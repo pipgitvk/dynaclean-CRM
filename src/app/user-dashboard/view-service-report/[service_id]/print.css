@@ -1,0 +1,248 @@
+@page {
+  size: A4;
+  margin: 0;
+}
+
+@media print {
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0;
+    padding: 0;
+    font-size: 10px;
+    line-height: 1.2;
+    font-family: Arial, sans-serif;
+  }
+
+  #print-content {
+    width: 210mm;
+    height: 297mm;
+    padding: 6mm;
+    box-sizing: border-box;
+    border: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transform: scale(0.95);
+    transform-origin: top left;
+  }
+
+  /* --- Header --- */
+  header {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 1rem !important;
+    flex-wrap: nowrap !important;
+  }
+
+  header > div:first-child {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+  }
+
+  header > div:last-child {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    text-align: right !important;
+    margin-top: -5rem !important;
+  }
+
+  header img {
+    width: 5rem !important;
+  }
+
+  h1, h2, h3 {
+    margin: 0 !important;
+    font-size: 14px !important;
+    font-weight: bold;
+  }
+
+  h2 {
+    text-align: center;
+    border-bottom: 1px solid #333;
+    padding-bottom: 2px;
+  }
+
+  address, .text-sm {
+    font-size: 9px !important;
+  }
+
+  /* --- Info Grid as Table --- */
+  .info-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9px !important;
+    margin: 2px 0 !important;
+  }
+
+  .info-table > div {
+    display: table-row !important;
+  }
+
+  .info-table > div > * {
+    display: table-cell !important;
+    border: 1px solid #333 !important;
+    padding: 2px 4px !important;
+    vertical-align: top;
+  }
+
+  .info-table label {
+    font-weight: bold !important;
+    white-space: nowrap;
+  }
+
+  /* --- Checklist --- */
+  .checklist-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9px !important;
+    border: 1px solid #333 !important;
+    margin: 2px 0 !important;
+  }
+
+  .checklist-table h3 {
+    display: table-caption !important;
+    caption-side: top !important;
+    text-align: center !important;
+    font-size: 10px !important;
+    border-bottom: 1px solid #333 !important;
+    padding: 2px;
+  }
+
+  .checklist-table .grid {
+    display: table-row-group !important;
+  }
+
+  .checklist-table .grid > div {
+    display: table-cell !important;
+    border: 1px solid #333 !important;
+    padding: 2px 4px !important;
+    vertical-align: middle;
+  }
+
+  .checklist-table input {
+    transform: scale(0.7);
+    margin-right: 2px;
+  }
+
+  /* --- Service Rendered --- */
+  .service-rendered {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9px !important;
+    margin: 2px 0 !important;
+  }
+
+  .service-rendered > div {
+    display: table-row !important;
+  }
+
+  .service-rendered > div > * {
+    display: table-cell !important;
+    border: 1px solid #333 !important;
+    padding: 2px 4px !important;
+    vertical-align: top !important;
+  }
+
+  /* --- Spare Parts --- */
+  table {
+    font-size: 9px !important;
+    border-collapse: collapse !important;
+    width: 100% !important;
+    margin: 2px 0;
+  }
+
+  table th,
+  table td {
+    padding: 2px 3px !important;
+    border: 1px solid #333 !important;
+  }
+
+  /* --- Feedback (inline row) --- */
+  .feedback-table {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 9px !important;
+    margin: 2px 0 !important;
+    border: 1px solid #333 !important;
+  }
+
+  .feedback-table > div {
+    display: table-row !important;
+  }
+
+  .feedback-table > div > * {
+    display: table-cell !important;
+    border: 1px solid #333 !important;
+    padding: 2px 4px !important;
+  }
+
+  /* --- Signature Section (Updated) --- */
+    /* --- Signature Section (Final Table Layout for Print) --- */
+  .signature-wrapper {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 6px !important;
+    font-size: 9px !important;
+    table-layout: fixed !important;
+  }
+
+  .signature-wrapper > div {
+    display: table-cell !important;
+    width: 50% !important;
+    vertical-align: top !important;
+    border: 1px solid #333 !important;
+    padding: 8px !important;
+  }
+
+  .signature-wrapper h3 {
+    font-size: 11px !important;
+    margin-bottom: 6px !important;
+    border-bottom: 1px solid #333 !important;
+    width: 100% !important;
+    text-align: center !important;
+  }
+
+  .signature-wrapper img {
+    max-height: 80px !important;
+    width: auto !important;
+    object-fit: contain !important;
+    margin-bottom: 8px !important;
+    border: 1px solid #333 !important;
+    display: block !important;
+  }
+
+  /* Label + Value inline rows inside each signature cell */
+  .signature-wrapper .read-row {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    margin: 2px 0 !important;
+    font-size: 9px !important;
+  }
+
+  .signature-wrapper .read-row label {
+    font-weight: bold !important;
+    white-space: nowrap !important;
+  }
+
+  .signature-wrapper .read-row span {
+    flex: 1 !important;
+    display: inline-block !important;
+    text-align: left !important;
+  }
+
+
+  /* --- Hide print button --- */
+  .no-print {
+    display: none !important;
+  }
+}

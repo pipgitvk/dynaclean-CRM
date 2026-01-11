@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #555353;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* --- Shinchan Theme Assets --- */
+/* Wallpaper 16:9, Sidebar 9:16, Navbar 21:9 */
+.sinchan-wallpaper {
+  /* Prefer illustrated park/room wallpaper */
+  background-image: url("/sinchan/Laptop Shinchan Wallpaper.jpeg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.sinchan-sidebar-texture {
+  background-image: linear-gradient(rgba(102, 97, 97, 0.64), rgba(26, 21, 21, 0.64)), url("/sinchan/side bar.jpeg"), linear-gradient(180deg, rgba(125,211,252,0.9), rgba(253,224,71,0.9));
+  background-size: cover, cover, 100% 100%;
+  background-position: center, center, center;
+  background-blend-mode: normal, multiply, multiply;
+}
+
+.sinchan-navbar-texture {
+  background-image: url("/sinchan/crayon-shin-chan-cartoon-humour-television-animation-crayon-3c019cf38a5cfe6e0ad63c830be36ae6.png"), linear-gradient(90deg, rgba(125,211,252,0.9), rgba(134,239,172,0.9), rgba(253,224,71,0.9));
+  background-size: cover, 100% 100%;
+  background-position: center, center;
+  background-blend-mode: multiply;
+}
+
+@media print {
+  /* Remove background color and margin from the page for printing */
+  body {
+    background-color: white !important;
+    margin: 0 !important;
+  }
+
+  /* Make the main container take up the full width and remove box styling */
+  .print-wrapper {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  /* Reset the flexbox properties to allow content to flow naturally */
+  .print-wrapper,
+  .flex,
+  .items-center,
+  .justify-center {
+    display: block !important;
+    min-height: auto !important;
+  }
+
+  /* Hide elements you don't want to print */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Ensure key sections don't get broken across pages */
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+}
