@@ -7,10 +7,6 @@ import { convertISTtoUTC } from "@/lib/timezone";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-export const config = {
-  api: { bodyParser: false },
-};
-
 export async function POST(req) {
   try {
     // ✅ Get token and verify
@@ -47,10 +43,10 @@ export async function POST(req) {
     // const visiting_card = cards.length ? cards.join(",") : null;
     const visiting_card = cards.length ? cards.join(",") : "";
 
-
     const now = new Date();
     // Convert IST datetime to UTC before storing
-    const next_followup_date = convertISTtoUTC(fields.next_followup_date) || null;
+    const next_followup_date =
+      convertISTtoUTC(fields.next_followup_date) || null;
 
     // ✅ Validate required fields
     const requiredFields = [
@@ -71,11 +67,7 @@ export async function POST(req) {
       }
     }
 
-
-
-
     console.log("✅ Creating new customer with fields:", fields);
-
 
     const conn = await getDbConnection();
 
@@ -88,7 +80,10 @@ export async function POST(req) {
     );
     if (dupRows[0].c > 0) {
       // await conn.end();
-      return NextResponse.json({ error: "Duplicate phone number" }, { status: 409 });
+      return NextResponse.json(
+        { error: "Duplicate phone number" },
+        { status: 409 }
+      );
     }
 
     // ✅ Insert into customers

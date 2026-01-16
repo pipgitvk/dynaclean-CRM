@@ -5,12 +5,6 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 /**
  * ABSOLUTE upload jail (outside app directory)
  * Must be mounted with noexec
@@ -21,18 +15,9 @@ const UPLOAD_ROOT = "/var/uploads/tmp";
 fs.mkdirSync(UPLOAD_ROOT, { recursive: true, mode: 0o755 });
 
 // Allowed types
-const ALLOWED_MIME = new Set([
-  "image/jpeg",
-  "image/png",
-  "application/pdf",
-]);
+const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "application/pdf"]);
 
-const ALLOWED_EXT = new Set([
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".pdf",
-]);
+const ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".pdf"]);
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -69,7 +54,9 @@ export async function parseFormData(request) {
        * SAFE filename generator
        */
       filename: (name, ext, part) => {
-        const cleanExt = path.extname(part.originalFilename || "").toLowerCase();
+        const cleanExt = path
+          .extname(part.originalFilename || "")
+          .toLowerCase();
 
         if (!ALLOWED_EXT.has(cleanExt)) {
           throw new Error("Invalid file extension");

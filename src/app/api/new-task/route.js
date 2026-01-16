@@ -4,13 +4,6 @@
 // import { jwtVerify } from "jose";
 // import { getDbConnection } from "@/lib/db";
 
-// // Set max upload size
-// export const config = {
-//   api: {
-//     bodyParser: false,
-//   },
-// };
-
 // const JWT_SECRET = process.env.JWT_SECRET;
 
 // export async function POST(req) {
@@ -89,19 +82,11 @@
 //   }
 // }
 
-
 import { writeFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { getDbConnection } from "@/lib/db";
-
-// Set max upload size
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -109,9 +94,13 @@ export async function POST(req) {
   try {
     // ✅ Get token from cookies
     const token = req.cookies.get("token")?.value;
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+    const { payload } = await jwtVerify(
+      token,
+      new TextEncoder().encode(JWT_SECRET)
+    );
     const createdby = payload.username;
 
     const formData = await req.formData();
@@ -129,7 +118,7 @@ export async function POST(req) {
     const conn = await getDbConnection();
 
     // Normalize params to avoid collation issues (compare pre-normalized params to normalized columns)
-    const norm = (s) => (s ?? '').toString().trim().toLowerCase();
+    const norm = (s) => (s ?? "").toString().trim().toLowerCase();
     const taskname_n = norm(taskname);
     const notes_n = norm(notes);
 
@@ -143,11 +132,14 @@ export async function POST(req) {
       [createdby, taskname_n, notes_n]
     );
     if (dup && dup.task_id) {
-      return NextResponse.json({ error: "A task with the same name and description already exists." }, { status: 409 });
+      return NextResponse.json(
+        { error: "A task with the same name and description already exists." },
+        { status: 409 }
+      );
     }
 
     // ✅ Handle file uploads
-  const handleUpload = async (file, fileType) => {
+    const handleUpload = async (file, fileType) => {
       if (!file || typeof file === "string") return "";
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
@@ -178,7 +170,7 @@ export async function POST(req) {
       }
 
       // Ensure the directory exists
-      await require('fs/promises').mkdir(uploadDir, { recursive: true });
+      await require("fs/promises").mkdir(uploadDir, { recursive: true });
 
       const filePath = path.join(uploadDir, fileName);
       await writeFile(filePath, buffer);
@@ -194,7 +186,8 @@ export async function POST(req) {
 
     // Backward compatibility: also support single legacy field 'card_front'
     const legacyCard = formData.get("card_front");
-    if (legacyCard && typeof legacyCard !== "string") attachFiles.push(legacyCard);
+    if (legacyCard && typeof legacyCard !== "string")
+      attachFiles.push(legacyCard);
 
     for (const f of attachFiles) {
       const pathSaved = await handleUpload(f, null);
@@ -205,7 +198,9 @@ export async function POST(req) {
     const task_video = await handleUpload(formData.get("task_video"), "video");
 
     // ✅ Insert into DB
-    const [[{ max_id }]] = await conn.execute("SELECT MAX(task_id) AS max_id FROM task");
+    const [[{ max_id }]] = await conn.execute(
+      "SELECT MAX(task_id) AS max_id FROM task"
+    );
     const task_id = (max_id || 999) + 1;
 
     await conn.execute(
@@ -236,6 +231,9 @@ export async function POST(req) {
     return NextResponse.json({ success: true, task_id }, { status: 200 });
   } catch (err) {
     console.error("❌ Task creation failed:", err);
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Something went wrong" },
+      { status: 500 }
+    );
   }
 }
