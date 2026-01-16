@@ -20,7 +20,9 @@ async function saveFileLocally(file) {
   ensureDir(uploadDir);
 
   const ext = path.extname(file.originalFilename || "") || ".bin";
-  const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
+  const uniqueName = `${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 8)}${ext}`;
   const destPath = path.join(uploadDir, uniqueName);
 
   await fs.promises.copyFile(file.filepath, destPath);
@@ -28,12 +30,6 @@ async function saveFileLocally(file) {
   // Return relative URL (for database usage)
   return `/Order/accounts/${uniqueName}`;
 }
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 // Normalize file input
 const getFile = (f) => (Array.isArray(f) ? f[0] : f);
@@ -50,25 +46,53 @@ export async function POST(req) {
     const taxAmt = parseFloat(fields.taxamt);
     const totalAmt = parseFloat(fields.totalamt);
 
-    const invoiceNumber = Array.isArray(fields.invoice_number) ? fields.invoice_number[0] : fields.invoice_number;
-    const dueDate = Array.isArray(fields.duedate) ? fields.duedate[0] : fields.duedate; // this is invoice date from UI
-    const remark = Array.isArray(fields.remark) ? fields.remark[0] : fields.remark || "";
+    const invoiceNumber = Array.isArray(fields.invoice_number)
+      ? fields.invoice_number[0]
+      : fields.invoice_number;
+    const dueDate = Array.isArray(fields.duedate)
+      ? fields.duedate[0]
+      : fields.duedate; // this is invoice date from UI
+    const remark = Array.isArray(fields.remark)
+      ? fields.remark[0]
+      : fields.remark || "";
 
     // Validate mandatory remark field
-    if (!remark || remark.trim() === '') {
-      return NextResponse.json({ error: "Remark is required" }, { status: 400 });
+    if (!remark || remark.trim() === "") {
+      return NextResponse.json(
+        { error: "Remark is required" },
+        { status: 400 }
+      );
     }
 
     // New payment fields
-    const paymentId = Array.isArray(fields.payment_id) ? fields.payment_id[0] : fields.payment_id || null;
-    const paymentDate = Array.isArray(fields.payment_date) ? fields.payment_date[0] : fields.payment_date || null;
-    const paymentAmount = fields.payment_amount !== undefined ? parseFloat(Array.isArray(fields.payment_amount) ? fields.payment_amount[0] : fields.payment_amount) : null;
+    const paymentId = Array.isArray(fields.payment_id)
+      ? fields.payment_id[0]
+      : fields.payment_id || null;
+    const paymentDate = Array.isArray(fields.payment_date)
+      ? fields.payment_date[0]
+      : fields.payment_date || null;
+    const paymentAmount =
+      fields.payment_amount !== undefined
+        ? parseFloat(
+            Array.isArray(fields.payment_amount)
+              ? fields.payment_amount[0]
+              : fields.payment_amount
+          )
+        : null;
 
     // Save files locally (if present)
-    const ewaybillPath = files.ewaybill_file ? await saveFileLocally(getFile(files.ewaybill_file)) : "";
-    const einvoicePath = files.einvoice_file ? await saveFileLocally(getFile(files.einvoice_file)) : "";
-    const reportPath = files.report_file ? await saveFileLocally(getFile(files.report_file)) : "";
-    const challanPath = files.deliverchallan ? await saveFileLocally(getFile(files.deliverchallan)) : "";
+    const ewaybillPath = files.ewaybill_file
+      ? await saveFileLocally(getFile(files.ewaybill_file))
+      : "";
+    const einvoicePath = files.einvoice_file
+      ? await saveFileLocally(getFile(files.einvoice_file))
+      : "";
+    const reportPath = files.report_file
+      ? await saveFileLocally(getFile(files.report_file))
+      : "";
+    const challanPath = files.deliverchallan
+      ? await saveFileLocally(getFile(files.deliverchallan))
+      : "";
 
     // DB connection
     const conn = await getDbConnection();
@@ -80,7 +104,8 @@ export async function POST(req) {
       `SELECT quote_number, duedate FROM neworder WHERE order_id = ?`,
       [orderId]
     );
-    const existingOrder = Array.isArray(orderRows) && orderRows.length ? orderRows[0] : {};
+    const existingOrder =
+      Array.isArray(orderRows) && orderRows.length ? orderRows[0] : {};
     const quoteNumber = existingOrder.quote_number;
 
     // Get payment_term_days from quotation (if available)
@@ -162,6 +187,9 @@ export async function POST(req) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("❌ Upload Error:", error);
-    return NextResponse.json({ error: error.message || "Upload failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Upload failed" },
+      { status: 500 }
+    );
   }
 }

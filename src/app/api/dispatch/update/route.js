@@ -14,18 +14,15 @@ async function savePhoto(file) {
   const targetPath = path.join(UPLOAD_DIR, fileName);
   const buf = await fs.readFile(file.filepath);
   await fs.writeFile(targetPath, buf);
-  await fs.unlink(file.filepath).catch(() => { });
+  await fs.unlink(file.filepath).catch(() => {});
   return `/attachments/${fileName}`;
 }
-
-export const config = {
-  api: { bodyParser: false },
-};
 
 export async function POST(req) {
   try {
     const tokenPayload = await getSessionPayload();
-    if (!tokenPayload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!tokenPayload)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = tokenPayload.role;
     const username = tokenPayload.username;
     if (role !== "warehouse incharge" && role !== "WAREHOUSE INCHARGE") {
@@ -35,12 +32,24 @@ export async function POST(req) {
     const { fields, files } = await parseFormData(req);
     // Accept either specific row update by id, or batch by ids
     const id = Array.isArray(fields.id) ? fields.id[0] : fields.id;
-    const serialNo = Array.isArray(fields.serial_no) ? fields.serial_no[0] : fields.serial_no;
-    const remarks = Array.isArray(fields.remarks) ? fields.remarks[0] : fields.remarks;
-    const godown = Array.isArray(fields.godown) ? fields.godown[0] : fields.godown; // required to know which location to deduct
-    const accessoriesChecklist = Array.isArray(fields.accessories_checklist) ? fields.accessories_checklist[0] : fields.accessories_checklist;
+    const serialNo = Array.isArray(fields.serial_no)
+      ? fields.serial_no[0]
+      : fields.serial_no;
+    const remarks = Array.isArray(fields.remarks)
+      ? fields.remarks[0]
+      : fields.remarks;
+    const godown = Array.isArray(fields.godown)
+      ? fields.godown[0]
+      : fields.godown; // required to know which location to deduct
+    const accessoriesChecklist = Array.isArray(fields.accessories_checklist)
+      ? fields.accessories_checklist[0]
+      : fields.accessories_checklist;
     // Files: photos[] can be multiple
-    const fileList = files.photos ? (Array.isArray(files.photos) ? files.photos : [files.photos]) : [];
+    const fileList = files.photos
+      ? Array.isArray(files.photos)
+        ? files.photos
+        : [files.photos]
+      : [];
 
     const photoUrls = [];
     for (const f of fileList) {
@@ -50,15 +59,23 @@ export async function POST(req) {
     }
 
     if (!godown) {
-      return NextResponse.json({ error: "Godown selection is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Godown selection is required" },
+        { status: 400 }
+      );
     }
 
     const conn = await getDbConnection();
 
     // Retrieve previous photos and check if stock already deducted
-    const [rows] = await conn.execute(`SELECT photos, stock_deducted FROM dispatch WHERE id = ?`, [id]);
-    const prevPhotos = rows && rows[0] && rows[0].photos ? rows[0].photos : null;
-    const stockAlreadyDeducted = rows && rows[0] && rows[0].stock_deducted === 1;
+    const [rows] = await conn.execute(
+      `SELECT photos, stock_deducted FROM dispatch WHERE id = ?`,
+      [id]
+    );
+    const prevPhotos =
+      rows && rows[0] && rows[0].photos ? rows[0].photos : null;
+    const stockAlreadyDeducted =
+      rows && rows[0] && rows[0].stock_deducted === 1;
 
     let newPhotos = null;
     if (photoUrls.length) {
@@ -77,7 +94,10 @@ export async function POST(req) {
       [id]
     );
     if (!dispatchRows || !dispatchRows[0]) {
-      return NextResponse.json({ error: "Dispatch row not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Dispatch row not found" },
+        { status: 404 }
+      );
     }
 
     const dispatchRow = dispatchRows[0];
@@ -92,22 +112,37 @@ export async function POST(req) {
     const orderRow = orderRows[0];
     const orderNumber = orderRow.order_id;
 
-
     // STEP 1: Validate and update dispatch details FIRST (this checks serial_no uniqueness)
     // This ensures we don't deduct stock if there's a duplicate serial number error
     if (stockAlreadyDeducted) {
       // If stock already deducted, only update dispatch details
       await conn.execute(
         `UPDATE dispatch SET serial_no = ?, remarks = ?, photos = ?, accessories_checklist = ?, updated_at = NOW() WHERE id = ?`,
-        [serialNo ?? null, remarks ?? null, newPhotos ?? null, accessoriesChecklist ?? null, id]
+        [
+          serialNo ?? null,
+          remarks ?? null,
+          newPhotos ?? null,
+          accessoriesChecklist ?? null,
+          id,
+        ]
       );
-      return NextResponse.json({ success: true, note: "Stock already deducted, only updated dispatch details" });
+      return NextResponse.json({
+        success: true,
+        note: "Stock already deducted, only updated dispatch details",
+      });
     }
 
     // Update dispatch record (including godown) WITHOUT marking stock_deducted yet (validates serial_no uniqueness)
     await conn.execute(
       `UPDATE dispatch SET serial_no = ?, remarks = ?, photos = ?, godown = ?, accessories_checklist = ?, updated_at = NOW() WHERE id = ?`,
-      [serialNo ?? null, remarks ?? null, newPhotos ?? null, godown ?? null, accessoriesChecklist ?? null, id]
+      [
+        serialNo ?? null,
+        remarks ?? null,
+        newPhotos ?? null,
+        godown ?? null,
+        accessoriesChecklist ?? null,
+        id,
+      ]
     );
 
     // STEP 2: If we reach here, serial_no is valid. Now proceed with stock deduction
@@ -124,14 +159,22 @@ export async function POST(req) {
     );
 
     if (!itemRows || !itemRows[0]) {
-      return NextResponse.json({ success: true, note: "No matching item to deduct" });
+      return NextResponse.json({
+        success: true,
+        note: "No matching item to deduct",
+      });
     }
 
     const { total_price, hsn_sac } = itemRows[0];
     const quantity = 1; // Each dispatch row is for ONE item
-    const companyName = quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].company_name : null;
-    const companyAddress = quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].company_address : null;
-    const gstin = quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].gstin : null;
+    const companyName =
+      quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].company_name : null;
+    const companyAddress =
+      quoteMetaRows && quoteMetaRows[0]
+        ? quoteMetaRows[0].company_address
+        : null;
+    const gstin =
+      quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].gstin : null;
 
     const locationColumn = godown === "Delhi - Mundka" ? "Delhi" : "South";
 
@@ -288,7 +331,7 @@ export async function POST(req) {
 
     // Send dispatch update email
     try {
-      const { sendTemplatedEmail } = await import('@/lib/template-utils');
+      const { sendTemplatedEmail } = await import("@/lib/template-utils");
 
       // Fetch order details
       const [orderDetails] = await conn.execute(
@@ -314,10 +357,18 @@ export async function POST(req) {
             </thead>
             <tbody>
               <tr>
-                <td style="padding: 12px; border: 1px solid #ddd;">${dispatchRow.item_name || 'N/A'}</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">${itemCode || 'N/A'}</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">${serialNo || 'N/A'}</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">${godown || 'N/A'}</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">${
+                  dispatchRow.item_name || "N/A"
+                }</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">${
+                  itemCode || "N/A"
+                }</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">${
+                  serialNo || "N/A"
+                }</td>
+                <td style="padding: 12px; border: 1px solid #ddd;">${
+                  godown || "N/A"
+                }</td>
               </tr>
             </tbody>
           </table>
@@ -330,29 +381,25 @@ export async function POST(req) {
           customer_name: order.client_name,
           company_name: order.company_name,
           delivery_location: order.delivery_location,
-          booking_id: order.booking_id || 'N/A',
-          booking_url: order.booking_url || '#',
+          booking_id: order.booking_id || "N/A",
+          booking_url: order.booking_url || "#",
           dispatch_person: order.dispatch_person || username,
-          dispatch_date: new Date().toISOString().split('T')[0],
+          dispatch_date: new Date().toISOString().split("T")[0],
           item_details: itemDetailsHtml,
           current_year: new Date().getFullYear(),
         };
 
         // Send email
-        const recipientEmail = order.email || '';
+        const recipientEmail = order.email || "";
         if (recipientEmail) {
-          await sendTemplatedEmail(
-            'DISPATCH',
-            templateData,
-            {
-              to: recipientEmail,
-              cc: 'service@dynacleanindustries.com',
-            }
-          );
+          await sendTemplatedEmail("DISPATCH", templateData, {
+            to: recipientEmail,
+            cc: "service@dynacleanindustries.com",
+          });
         }
       }
     } catch (emailError) {
-      console.error('Error sending dispatch update email:', emailError);
+      console.error("Error sending dispatch update email:", emailError);
       // Don't fail the request if email fails
     }
 
@@ -361,16 +408,23 @@ export async function POST(req) {
     console.error("Dispatch UPDATE error:", e);
 
     // Handle duplicate serial number error
-    if (e.code === 'ER_DUP_ENTRY' || (e.message && e.message.includes('Duplicate entry'))) {
-      return NextResponse.json({
-        success: false,
-        error: "Duplicate entry: This serial number is already in use. Please use a unique serial number."
-      }, { status: 400 });
+    if (
+      e.code === "ER_DUP_ENTRY" ||
+      (e.message && e.message.includes("Duplicate entry"))
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Duplicate entry: This serial number is already in use. Please use a unique serial number.",
+        },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ success: false, error: e.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: e.message },
+      { status: 500 }
+    );
   }
 }
-
-
-

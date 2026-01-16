@@ -4,13 +4,14 @@ import fs from "fs/promises";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
-export const config = { api: { bodyParser: false } };
-
 export async function POST(req) {
   try {
     const payload = await getSessionPayload();
     if (!payload) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 }
+      );
     }
     const username = payload.username || "unknown";
 
@@ -67,22 +68,40 @@ export async function POST(req) {
 
     const now = new Date();
     const values = [
-      f.product_name, f.specification, f.model, f.serial_number, f.gstin || "",
-      f.warranty_period, f.customer_name, f.email, f.contact, f.customer_address,
-      f.state || "", f.invoice_number, f.invoice_date, invoiceFilename,
-      reportNames.join(","), f.quantity, f.contact_person,
-      username, now, null, null
+      f.product_name,
+      f.specification,
+      f.model,
+      f.serial_number,
+      f.gstin || "",
+      f.warranty_period,
+      f.customer_name,
+      f.email,
+      f.contact,
+      f.customer_address,
+      f.state || "",
+      f.invoice_number,
+      f.invoice_date,
+      invoiceFilename,
+      reportNames.join(","),
+      f.quantity,
+      f.contact_person,
+      username,
+      now,
+      null,
+      null,
     ].map((v) => (v === undefined ? null : v));
 
     await conn.execute(sql, values);
     console.log("Form Data:", f);
-
 
     // await conn.end();
 
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Error in POST /api/warranty/register:", err);
-    return NextResponse.json({ success: false, error: err.message || "Unknown error" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: err.message || "Unknown error" },
+      { status: 500 }
+    );
   }
 }

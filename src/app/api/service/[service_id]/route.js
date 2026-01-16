@@ -1,6 +1,6 @@
 // /api/service/[service_id]/route.js
 import { NextResponse } from "next/server";
-import getDbConnection from "@/lib/db";
+import { getDbConnection } from "@/lib/db";
 
 export async function GET(req, { params }) {
   const { service_id } = params;
