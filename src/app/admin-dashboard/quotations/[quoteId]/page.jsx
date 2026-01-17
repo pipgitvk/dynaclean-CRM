@@ -10,11 +10,11 @@ async function getQuotationData(quoteId) {
 
   const [[headerRows]] = await conn.execute(
     "SELECT * FROM quotations_records WHERE quote_number = ?",
-    [quoteId]
+    [quoteId],
   );
   const [itemRows] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",
-    [quoteId]
+    [quoteId],
   );
 
   // await conn.end();
@@ -22,12 +22,14 @@ async function getQuotationData(quoteId) {
 }
 
 export default async function QuotationPage({ params }) {
-  const token = cookies().get("token")?.value;
+  const { quoteId } = params;
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
   if (!token) return <p className="p-6 text-red-600">Unauthorized</p>;
 
   await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
-  const { header, items } = await getQuotationData(params.quoteId);
+  const { header, items } = await getQuotationData(quoteId);
   if (!header) return <p className="p-6 text-red-600">Quote not found</p>;
 
   return (

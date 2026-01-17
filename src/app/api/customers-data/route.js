@@ -67,14 +67,31 @@ export async function GET(req) {
     // Role-based scoping and employee filter
     if (!isPrivileged && username) {
       // Non-privileged users only see their own customers, regardless of filter
-      whereClause +=
-        " AND (lead_source = ? OR sales_representative = ?)";
+      whereClause += " AND (lead_source = ? OR sales_representative = ?)";
       params.push(username, username);
     } else if (employeeName && employeeName !== "all") {
       // Admin-style filter: match on any of the responsible columns
-      whereClause +=
-        " AND (lead_source = ? OR sales_representative = ?)";
+      whereClause += " AND (lead_source = ? OR sales_representative = ?)";
       params.push(employeeName, employeeName);
+    }
+
+    // search functionality
+    const search = searchParams.get("search");
+
+    if (search && search.trim()) {
+      const like = `%${search.trim()}%`;
+
+      whereClause += `
+    AND (
+      first_name LIKE ?
+      OR company LIKE ?
+      OR CAST(phone AS CHAR) LIKE ?
+      OR CAST(customer_id AS CHAR) LIKE ?
+      OR lead_source LIKE ?
+    )
+  `;
+
+      params.push(like, like, like, like, like);
     }
 
     if (mode === "charts") {
@@ -103,11 +120,11 @@ export async function GET(req) {
       });
     }
 
-    const countSql =
-      "SELECT COUNT(*) as total FROM customers" + whereClause;
+    const countSql = "SELECT COUNT(*) as total FROM customers" + whereClause;
     const [countRows] = await conn.execute(countSql, params);
     const total = countRows[0]?.total || 0;
-    const totalPages = total === 0 ? 1 : Math.max(Math.ceil(total / pageSize), 1);
+    const totalPages =
+      total === 0 ? 1 : Math.max(Math.ceil(total / pageSize), 1);
     const currentPage = Math.min(page, totalPages);
     const offset = (currentPage - 1) * pageSize;
 
