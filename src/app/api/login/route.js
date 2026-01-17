@@ -7,11 +7,13 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 export async function POST(request) {
   console.log("--- API Route Execution Start ---");
+
   const conn = await getDbConnection();
   const userAgent = request.headers.get("user-agent") || "unknown";
 
   // Get client IP address
-  let ip = request.ip ||
+  let ip =
+    request.ip ||
     request.headers.get("x-forwarded-for") ||
     request.headers.get("x-real-ip") ||
     "unknown";
@@ -25,7 +27,7 @@ export async function POST(request) {
     try {
       await conn.execute(
         "INSERT INTO login_activity (username, ip_address, user_agent, status, role, message) VALUES (?, ?, ?, ?, ?, ?)",
-        [username, ip, userAgent, status, role, message]
+        [username, ip, userAgent, status, role, message],
       );
     } catch (err) {
       console.error("Failed to record login activity:", err);
@@ -37,7 +39,10 @@ export async function POST(request) {
     console.log("🟡 Login request received:", username);
 
     if (!username || !password) {
-      return NextResponse.json({ error: "Missing credentials" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing credentials" },
+        { status: 400 },
+      );
     }
 
     // --- 1. Time-based Restriction (9:00 AM - 7:00 PM IST) ---
@@ -46,15 +51,25 @@ export async function POST(request) {
     const startRange = 9 * 60; // 9:00 AM
     const endRange = 19 * 60; // 7:00 PM
 
-    if (currentTimeMinutes < startRange || currentTimeMinutes > endRange) {
-      await recordActivity(username, "UNKNOWN", "FAILED", `Login attempted outside allowed hours (09:00 - 19:00 IST). Current IST time: ${hour}:${minute}`);
-      return NextResponse.json({ error: "Login allowed only between 09:00 and 19:00 IST" }, { status: 403 });
+    if (username !== "admin" && username !== "VK") {
+      if (currentTimeMinutes < startRange || currentTimeMinutes > endRange) {
+        await recordActivity(
+          username,
+          "UNKNOWN",
+          "FAILED",
+          `Login attempted outside allowed hours (09:00 - 19:00 IST). Current IST time: ${hour}:${minute}`,
+        );
+        return NextResponse.json(
+          { error: "Login allowed only between 09:00 and 19:00 IST" },
+          { status: 403 },
+        );
+      }
     }
 
     // Step 1: Try emplist
     const [empRows] = await conn.execute(
       "SELECT * FROM emplist WHERE LOWER(username) = LOWER(?) and status = 1",
-      [username.trim()]
+      [username.trim()],
     );
 
     let user = null;
@@ -67,7 +82,7 @@ export async function POST(request) {
       // Step 2: Try rep_list
       const [repRows] = await conn.execute(
         "SELECT * FROM rep_list WHERE LOWER(username) = LOWER(?) and status = 1",
-        [username.trim()]
+        [username.trim()],
       );
       if (repRows.length > 0) {
         user = repRows[0];
@@ -86,7 +101,10 @@ export async function POST(request) {
 
     if (dbPassword !== inputPassword) {
       await recordActivity(username, userRole, "FAILED", "Incorrect password");
-      return NextResponse.json({ error: "Incorrect password" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Incorrect password" },
+        { status: 401 },
+      );
     }
 
     // --- 2. IP-based Restriction with Toggle ---
@@ -94,19 +112,31 @@ export async function POST(request) {
     const allowedIpsString = user.allowed_ips || "";
 
     if (isIpRestrictionEnabled && allowedIpsString.trim() !== "") {
-      const allowedIps = allowedIpsString.split(",").map(i => i.trim());
+      const allowedIps = allowedIpsString.split(",").map((i) => i.trim());
       // Check if current IP matches any allowed IP
       if (!allowedIps.includes(ip)) {
-        await recordActivity(username, userRole, "FAILED", `IP restriction enforced. Attempt from unauthorized IP: ${ip}`);
-        return NextResponse.json({ error: "Login from this IP is not allowed" }, { status: 403 });
+        await recordActivity(
+          username,
+          userRole,
+          "FAILED",
+          `IP restriction enforced. Attempt from unauthorized IP: ${ip}`,
+        );
+        return NextResponse.json(
+          { error: "Login from this IP is not allowed" },
+          { status: 403 },
+        );
       }
     }
 
     // ✅ Generate JWT
     const token = jwt.sign(
-      { id: user.id || user.client_index || user.empId, username: user.username, role: userRole },
+      {
+        id: user.id || user.client_index || user.empId,
+        username: user.username,
+        role: userRole,
+      },
       JWT_SECRET,
-      { expiresIn: "7d" } // longer session
+      { expiresIn: "7d" }, // longer session
     );
 
     // ✅ Return response with secure cookie
@@ -124,10 +154,18 @@ export async function POST(request) {
     });
 
     console.log(`🎉 Login successful for ${username} from ${sourceTable}`);
-    await recordActivity(username, userRole, "SUCCESS", `Login successful from IP: ${ip}`);
+    await recordActivity(
+      username,
+      userRole,
+      "SUCCESS",
+      `Login successful from IP: ${ip}`,
+    );
     return res;
   } catch (error) {
     console.error("🔥 Error during login:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }
