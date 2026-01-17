@@ -4,11 +4,17 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Save, X } from "lucide-react";
 
-export default function TLFollowupForm({ customerId, customerData, isAdmin = false, currentStage = "New" }) {
+export default function TLFollowupForm({
+  customerId,
+  customerData,
+  isAdmin = false,
+  currentStage = "New",
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [customerCurrentStage, setCustomerCurrentStage] = useState("New");
+  console.log("customer Data in Tl follow", customerData);
 
   const [formData, setFormData] = useState({
     estimated_order_date: "",
@@ -19,19 +25,26 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
     followed_date: (() => {
       const now = new Date();
       const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
       return `${year}-${month}-${day}T${hours}:${minutes}`;
     })(),
     next_followup_date: "",
     assigned_employee: customerData?.lead_source || "",
-    stage: "New"
+    stage: "New",
   });
 
   const statusOptions = ["Very Good", "Average", "Poor", "Denied"];
-  const tagOptions = ["Demo", "Prime", "Repeat order", "Mail", "Running Orders", "N/A"];
+  const tagOptions = [
+    "Demo",
+    "Prime",
+    "Repeat order",
+    "Mail",
+    "Running Orders",
+    "N/A",
+  ];
   const stageOptions = [
     "New",
     "Contacted",
@@ -45,7 +58,7 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
     "Decision Pending",
     "Won (Order Received)",
     "Lost",
-    "Disqualified / Invalid Lead"
+    "Disqualified / Invalid Lead",
   ];
 
   // Fetch customer's current stage from database
@@ -56,9 +69,9 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
         if (response.ok) {
           const data = await response.json();
           setCustomerCurrentStage(data.stage || "New");
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
-            stage: data.stage || "New"
+            stage: data.stage || "New",
           }));
         }
       } catch (error) {
@@ -80,7 +93,11 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
     const currentIndex = stageOrder.indexOf(currentStage);
 
     // For final stages, only allow staying in the same stage or going back
-    if (currentStage === "Won (Order Received)" || currentStage === "Lost" || currentStage === "Disqualified / Invalid Lead") {
+    if (
+      currentStage === "Won (Order Received)" ||
+      currentStage === "Lost" ||
+      currentStage === "Disqualified / Invalid Lead"
+    ) {
       return [currentStage];
     }
 
@@ -92,14 +109,14 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleTagChange = (tag) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       let newTags = [...prev.multi_tag];
 
       if (tag === "N/A") {
@@ -109,12 +126,12 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
         // If any other tag is selected
         if (newTags.includes("N/A")) {
           // Remove N/A if it exists
-          newTags = newTags.filter(t => t !== "N/A");
+          newTags = newTags.filter((t) => t !== "N/A");
         }
 
         if (newTags.includes(tag)) {
           // Remove tag if already selected
-          newTags = newTags.filter(t => t !== tag);
+          newTags = newTags.filter((t) => t !== tag);
         } else {
           // Add tag
           newTags.push(tag);
@@ -137,8 +154,8 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
         body: JSON.stringify({
           customer_id: customerId,
           ...formData,
-          multi_tag: formData.multi_tag.join(", ") // Convert array to comma-separated string
-        })
+          multi_tag: formData.multi_tag.join(", "), // Convert array to comma-separated string
+        }),
       });
 
       const data = await response.json();
@@ -168,7 +185,10 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
     <div className="bg-white rounded-lg p-6 shadow-md">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-2xl font-semibold text-gray-800">TL Follow-up</h3>
-        <button onClick={handleCancel} className="text-gray-500 hover:text-gray-700">
+        <button
+          onClick={handleCancel}
+          className="text-gray-500 hover:text-gray-700"
+        >
           <X size={24} />
         </button>
       </div>
@@ -310,7 +330,7 @@ export default function TLFollowupForm({ customerId, customerData, isAdmin = fal
               ))}
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              {formData.multi_tag.includes("N/A") 
+              {formData.multi_tag.includes("N/A")
                 ? "N/A is selected (no other tags can be selected)"
                 : "Select multiple tags. Selecting N/A will clear all others."}
             </p>

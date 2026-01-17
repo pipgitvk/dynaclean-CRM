@@ -6,13 +6,14 @@ import QuotationTableClient from "./QuotationClientTable";
 export const dynamic = "force-dynamic";
 
 export default async function QuotationPage() {
-  const token = cookies().get("token")?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
   let username = "";
 
   if (token) {
     const { payload } = await jwtVerify(
       token,
-      new TextEncoder().encode(process.env.JWT_SECRET)
+      new TextEncoder().encode(process.env.JWT_SECRET),
     );
     username = payload.username;
   }
