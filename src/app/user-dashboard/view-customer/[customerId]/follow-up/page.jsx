@@ -4,7 +4,8 @@ import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
 
 export default async function FollowUpPage({ params }) {
-  const customerId = params.customerId;
+  const { customerId } = await params;
+  console.log("customer id", params);
 
   const conn = await getDbConnection();
 
@@ -15,8 +16,8 @@ export default async function FollowUpPage({ params }) {
   //    ORDER BY followed_date DESC LIMIT 1`,
   //   [customerId]
   // );
-const [rows] = await conn.execute(
-  `SELECT 
+  const [rows] = await conn.execute(
+    `SELECT 
      cf.name AS followup_name, 
      cf.contact AS followup_contact, 
      cf.email AS followup_email, 
@@ -28,9 +29,8 @@ const [rows] = await conn.execute(
    WHERE cf.customer_id = ?
    ORDER BY cf.followed_date DESC 
    LIMIT 1`,
-  [customerId]
-);
-
+    [customerId],
+  );
 
   // await conn.end();
 
@@ -71,7 +71,6 @@ const [rows] = await conn.execute(
           <strong>Last Notes:</strong> {customer.notes}
         </p>
       </div>
-
 
       <FollowupForm customerId={customerId} />
     </div>
