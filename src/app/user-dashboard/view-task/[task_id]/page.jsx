@@ -12,7 +12,7 @@ async function getTaskDetails(taskId) {
   // Task
   const [taskRows] = await connection.execute(
     `SELECT * FROM task WHERE task_id = ?`,
-    [taskId]
+    [taskId],
   );
   if (taskRows.length === 0) {
     // await connection.end();
@@ -24,7 +24,7 @@ async function getTaskDetails(taskId) {
   // Follow-ups
   const [followupRows] = await connection.execute(
     `SELECT followed_date, notes FROM task_followup WHERE task_id = ?`,
-    [taskId]
+    [taskId],
   );
 
   // await connection.end();
@@ -34,6 +34,7 @@ async function getTaskDetails(taskId) {
 
 export default async function ViewTaskPage({ params }) {
   const { task_id } = await params;
+  console.log("task", params);
   const taskId = task_id;
   const data = await getTaskDetails(taskId);
 
@@ -102,76 +103,83 @@ export default async function ViewTaskPage({ params }) {
         {/* Media Files */}
         {(images.some((img) => img.trim()) ||
           videos.some((vid) => vid.trim())) && (
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-3 text-gray-700">
-                Media Files
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {images.map((img, i) => {
-                  const raw = (img || "").trim();
-                  if (!raw) return null;
-                  const src = normalizeImagePath(raw);
-                  const ext = (src.split(".").pop() || "").toLowerCase();
-                  const apiUrl = src.startsWith("/task/") ? `/api/files/task?path=${encodeURIComponent(src)}` : src;
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-3 text-gray-700">
+              Media Files
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {images.map((img, i) => {
+                const raw = (img || "").trim();
+                if (!raw) return null;
+                const src = normalizeImagePath(raw);
+                const ext = (src.split(".").pop() || "").toLowerCase();
+                const apiUrl = src.startsWith("/task/")
+                  ? `/api/files/task?path=${encodeURIComponent(src)}`
+                  : src;
 
-                  if (["jpg", "jpeg", "png", "gif"].includes(ext)) {
-                    // Use API to serve images inline reliably
-                    return (
-                      <a key={i} href={apiUrl} target="_blank" rel="noopener noreferrer">
-                        <img
-                          src={apiUrl}
-                          alt="Image"
-                          width={300}
-                          height={200}
-                          className="rounded-lg shadow-sm object-cover w-full h-48"
-                        />
-                      </a>
-                    );
-                  } else if (ext === "pdf") {
-                    // Open PDFs via API so they render inline reliably
-                    return (
-                      <a
-                        key={i}
-                        href={apiUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block bg-blue-600 text-white px-4 py-2 rounded-md text-center text-sm"
-                      >
-                        View PDF
-                      </a>
-                    );
-                  } else {
-                    // Other docs (doc/docx/xls/xlsx) – provide download link
-                    return (
-                      <a
-                        key={i}
-                        href={apiUrl}
-                        className="block bg-gray-600 text-white px-4 py-2 rounded-md text-center text-sm"
-                        download
-                      >
-                        Download File
-                      </a>
-                    );
-                  }
-                })}
-
-                {videos.map((vid, i) => {
-                  const raw = (vid || "").trim();
-                  if (!raw) return null;
-                  const vsrc = normalizeVideoPath(raw);
-
+                if (["jpg", "jpeg", "png", "gif"].includes(ext)) {
+                  // Use API to serve images inline reliably
                   return (
-                    <video
+                    <a
                       key={i}
-                      src={vsrc}
-                      controls
-                      className="rounded-lg shadow-sm w-full h-48 object-cover"
-                    />
+                      href={apiUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        src={apiUrl}
+                        alt="Image"
+                        width={300}
+                        height={200}
+                        className="rounded-lg shadow-sm object-cover w-full h-48"
+                      />
+                    </a>
                   );
-                })}
-              </div>
+                } else if (ext === "pdf") {
+                  // Open PDFs via API so they render inline reliably
+                  return (
+                    <a
+                      key={i}
+                      href={apiUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block bg-blue-600 text-white px-4 py-2 rounded-md text-center text-sm"
+                    >
+                      View PDF
+                    </a>
+                  );
+                } else {
+                  // Other docs (doc/docx/xls/xlsx) – provide download link
+                  return (
+                    <a
+                      key={i}
+                      href={apiUrl}
+                      className="block bg-gray-600 text-white px-4 py-2 rounded-md text-center text-sm"
+                      download
+                    >
+                      Download File
+                    </a>
+                  );
+                }
+              })}
+
+              {videos.map((vid, i) => {
+                const raw = (vid || "").trim();
+                if (!raw) return null;
+                const vsrc = normalizeVideoPath(raw);
+
+                return (
+                  <video
+                    key={i}
+                    src={vsrc}
+                    controls
+                    className="rounded-lg shadow-sm w-full h-48 object-cover"
+                  />
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
 
         {/* Follow-up Table */}
         <div className="mt-8">

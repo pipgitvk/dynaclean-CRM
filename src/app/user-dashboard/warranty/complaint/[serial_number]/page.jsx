@@ -8,6 +8,9 @@ import { toast, Toaster } from "react-hot-toast"; // For sleek notifications
 
 export default function AddComplaintPage({ params }) {
   const router = useRouter();
+  // const params = useParams<{ appointmentId: string }>();
+  // const appointmentId = params?.appointmentId;
+
   const serialNumberFromParams = params.serial_number; // Get serial_number directly from params
 
   const {

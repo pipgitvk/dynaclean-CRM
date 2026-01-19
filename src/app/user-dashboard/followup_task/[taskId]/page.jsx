@@ -4,18 +4,19 @@ import dayjs from "dayjs";
 import FollowupForm from "./FollowupForm";
 
 export default async function FollowupTaskPage({ params }) {
-  const taskId = params.taskId;
+  const { taskId } = await params;
+  // console.log("taskid", taskId);
 
   const conn = await getDbConnection();
 
   const [[taskRow]] = await conn.execute(
     `SELECT * FROM task WHERE task_id = ?`,
-    [taskId]
+    [taskId],
   );
 
   const [followups] = await conn.execute(
     `SELECT followed_date, notes, status FROM task_followup WHERE task_id = ? ORDER BY followed_date DESC`,
-    [taskId]
+    [taskId],
   );
 
   // await conn.end();
@@ -46,8 +47,8 @@ export default async function FollowupTaskPage({ params }) {
               taskRow.status === "Completed"
                 ? "bg-green-100 text-green-700"
                 : taskRow.status === "Working"
-                ? "bg-yellow-100 text-yellow-700"
-                : "bg-gray-100 text-gray-700"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-gray-100 text-gray-700"
             }`}
           >
             {taskRow.status}
