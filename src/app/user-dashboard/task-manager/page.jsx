@@ -14,7 +14,7 @@ async function getUsernameFromToken() {
   try {
     const { payload } = await jwtVerify(
       token,
-      new TextEncoder().encode(JWT_SECRET)
+      new TextEncoder().encode(JWT_SECRET),
     );
     return payload.username;
   } catch (e) {
@@ -83,7 +83,7 @@ export default async function TaskPage() {
   }
 
   const tasks = await getTasks(username);
-  console.log("Fetched Tasks:", tasks);
+  // console.log("Fetched Tasks:", tasks);
 
   return (
     <div className="p-6 mx-auto">
