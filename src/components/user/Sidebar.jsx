@@ -106,8 +106,7 @@ import {
   ShoppingBag,
   UserPlus,
   Mail,
-  Settings
-
+  Settings,
 } from "lucide-react";
 
 // Icon map
@@ -137,10 +136,18 @@ const iconMap = {
   ShoppingBag,
   UserPlus,
   Mail,
-  Settings
+  Settings,
 };
 
-export default function Sidebar({ isOpen, menuItems, onCloseSidebar, showBackButton, backButtonPath }) {
+//this is test
+
+export default function Sidebar({
+  isOpen,
+  menuItems,
+  onCloseSidebar,
+  showBackButton,
+  backButtonPath,
+}) {
   const [openMenus, setOpenMenus] = useState({});
   const { theme } = useTheme();
 
@@ -149,7 +156,11 @@ export default function Sidebar({ isOpen, menuItems, onCloseSidebar, showBackBut
   };
 
   const handleLinkClick = () => {
-    if (typeof window !== "undefined" && window.innerWidth < 768 && onCloseSidebar) {
+    if (
+      typeof window !== "undefined" &&
+      window.innerWidth < 768 &&
+      onCloseSidebar
+    ) {
       onCloseSidebar();
     }
   };
@@ -157,8 +168,8 @@ export default function Sidebar({ isOpen, menuItems, onCloseSidebar, showBackBut
   return (
     <div
       className={clsx(
-        `h-full bg-gradient-to-b ${theme.sidebar.gradient} ${theme.sidebar.text} ${theme.sidebar.textureClass || ''} overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out shadow-2xl border-r ${theme.sidebar.border}`,
-        isOpen ? "w-64" : "w-0"
+        `h-full bg-gradient-to-b ${theme.sidebar.gradient} ${theme.sidebar.text} ${theme.sidebar.textureClass || ""} overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out shadow-2xl border-r ${theme.sidebar.border}`,
+        isOpen ? "w-64" : "w-0",
       )}
       style={{
         minWidth: isOpen ? "16rem" : "0",
@@ -167,7 +178,11 @@ export default function Sidebar({ isOpen, menuItems, onCloseSidebar, showBackBut
     >
       {isOpen && (
         <>
-          <h2 className={`text-xl font-bold mb-4 ${theme.sidebar.text} border-b ${theme.sidebar.border} pb-3`}>User Dashboard</h2>
+          <h2
+            className={`text-xl font-bold mb-4 ${theme.sidebar.text} border-b ${theme.sidebar.border} pb-3`}
+          >
+            User Dashboard
+          </h2>
           {showBackButton && backButtonPath && (
             <Link
               href={backButtonPath}

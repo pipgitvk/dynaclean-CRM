@@ -7,6 +7,7 @@ import { Calendar, Save, X } from "lucide-react";
 export default function TLFollowupForm({
   customerId,
   customerData,
+  latestfollowup,
   isAdmin = false,
   currentStage = "New",
 }) {
@@ -84,6 +85,28 @@ export default function TLFollowupForm({
       fetchCustomerStage();
     }
   }, [customerId]);
+
+  // add alredy filled data of latest followup
+  useEffect(() => {
+    if (!latestfollowup) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      estimated_order_date: latestfollowup.estimated_order_date || "",
+      lead_quality_score: latestfollowup.lead_quality_score || "",
+      status: latestfollowup.status || "",
+      notes: latestfollowup.notes || "",
+      next_followup_date: latestfollowup.next_followup_date
+        ? latestfollowup.next_followup_date
+        : "",
+      stage: latestfollowup.stage || prev.stage,
+      multi_tag: latestfollowup.multi_tag
+        ? latestfollowup.multi_tag.split(",").map((t) => t.trim())
+        : [],
+      assigned_employee:
+        latestfollowup.assigned_employee || prev.assigned_employee,
+    }));
+  }, [latestfollowup]);
 
   // Filter stages based on customer's current stage from database
   const getAvailableStages = (currentStage) => {
