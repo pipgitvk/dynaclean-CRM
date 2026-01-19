@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"; // Import useRouter
 import { Search, Eye, Edit } from "lucide-react";
 import TargetCompletionModal from "./TargetCompletionModal";
 import EditTargetModal from "./EditTargetModal";
+import { useUser } from "@/context/UserContext";
 
 const TargetTable = () => {
   const [targets, setTargets] = useState([]);
@@ -17,6 +18,8 @@ const TargetTable = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const router = useRouter(); // Initialize the router
+  const { user } = useUser();
+  // console.log("Logged in user:", user?.userRole);
 
   // Add this helper at the top of your component file
   const formatDate = (dateString) => {
@@ -75,7 +78,7 @@ const TargetTable = () => {
   };
 
   const filteredTargets = targets.filter((target) =>
-    target.username.toLowerCase().includes(searchTerm.toLowerCase())
+    target.username.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   if (loading) {
@@ -148,14 +151,16 @@ const TargetTable = () => {
                         <Eye size={16} />
                         View
                       </button>
-                      <button
-                        onClick={() => openEditModal(target)}
-                        className="inline-flex items-center gap-1 bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200"
-                        title="Edit Target"
-                      >
-                        <Edit size={16} />
-                        Edit
-                      </button>
+                      {user?.userRole === "SUPERADMIN" && (
+                        <button
+                          onClick={() => openEditModal(target)}
+                          className="inline-flex items-center gap-1 bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200"
+                          title="Edit Target"
+                        >
+                          <Edit size={16} />
+                          Edit
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -205,13 +210,22 @@ const TargetTable = () => {
                   <Eye size={16} />
                   View
                 </button>
-                <button
+                {user?.userRole === "SUPERADMIN" && (
+                  <button
+                    onClick={() => openEditModal(target)}
+                    className="flex-1 inline-flex items-center justify-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200"
+                  >
+                    <Edit size={16} />
+                    Edit
+                  </button>
+                )}
+                {/* <button
                   onClick={() => openEditModal(target)}
                   className="flex-1 inline-flex items-center justify-center gap-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200"
                 >
                   <Edit size={16} />
                   Edit
-                </button>
+                </button> */}
               </div>
             </div>
           ))

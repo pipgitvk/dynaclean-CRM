@@ -1,163 +1,215 @@
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 // Helper to format currency
 const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-        style: 'currency',
-        currency: 'INR',
-        maximumFractionDigits: 2
-    }).format(amount);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(amount);
 };
 
 // Helper for date formatting
 const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const dateObj = new Date(dateString);
-    return dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  if (!dateString) return "";
+  const dateObj = new Date(dateString);
+  return dateObj.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 };
 
 const getMonthName = (monthStr) => {
-    if (!monthStr) return '';
-    const [year, month] = monthStr.split('-');
-    const date = new Date(year, month - 1);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+  if (!monthStr) return "";
+  const [year, month] = monthStr.split("-");
+  const date = new Date(year, month - 1);
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
 };
 
 const numberToWords = (num) => {
-    const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-    const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const a = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const b = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
 
-    // Helper to convert a two-digit number to words
-    const convertTwoDigit = (n) => {
-        if (n < 20) return a[n];
-        return b[Math.floor(n / 10)] + (n % 10 ? ' ' + a[n % 10] : '');
-    };
+  // Helper to convert a two-digit number to words
+  const convertTwoDigit = (n) => {
+    if (n < 20) return a[n];
+    return b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
+  };
 
-    if ((num = num.toString()).length > 9) return 'overflow';
-    const n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
-    if (!n) return 'Invalid number';
+  if ((num = num.toString()).length > 9) return "overflow";
+  const n = ("000000000" + num)
+    .substr(-9)
+    .match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+  if (!n) return "Invalid number";
 
-    let str = '';
-    str += (n[1] != 0) ? convertTwoDigit(Number(n[1])) + ' Crore ' : '';
-    str += (n[2] != 0) ? convertTwoDigit(Number(n[2])) + ' Lakh ' : '';
-    str += (n[3] != 0) ? convertTwoDigit(Number(n[3])) + ' Thousand ' : '';
-    str += (n[4] != 0) ? a[Number(n[4])] + ' Hundred ' : '';
-    str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + convertTwoDigit(Number(n[5])) + ' ' : '';
+  let str = "";
+  str += n[1] != 0 ? convertTwoDigit(Number(n[1])) + " Crore " : "";
+  str += n[2] != 0 ? convertTwoDigit(Number(n[2])) + " Lakh " : "";
+  str += n[3] != 0 ? convertTwoDigit(Number(n[3])) + " Thousand " : "";
+  str += n[4] != 0 ? a[Number(n[4])] + " Hundred " : "";
+  str +=
+    n[5] != 0
+      ? (str != "" ? "and " : "") + convertTwoDigit(Number(n[5])) + " "
+      : "";
 
-    // Trim and add "Only"
-    str = str.trim();
-    return str ? str + " Only" : "Zero Only";
+  // Trim and add "Only"
+  str = str.trim();
+  return str ? str + " Only" : "Zero Only";
 };
 
-
-
-
 const generatePayslipHTML = (salaryData, userData) => {
-    const {
-        salary_month,
-        working_days,
-        present_days,
-        basic_salary,
-        hra,
-        transport_allowance,
-        medical_allowance,
-        special_allowance,
-        bonus,
-        overtime_hours,
-        overtime_amount,
-        total_earnings,
-        pf_deduction,
-        esi_deduction,
-        income_tax,
-        professional_tax,
-        other_deductions,
-        total_deductions,
-        gross_salary,
-        net_salary,
-        deduction_details
-    } = salaryData;
+  const {
+    salary_month,
+    working_days,
+    present_days,
+    basic_salary,
+    hra,
+    transport_allowance,
+    medical_allowance,
+    special_allowance,
+    bonus,
+    overtime_hours,
+    overtime_amount,
+    total_earnings,
+    pf_deduction,
+    esi_deduction,
+    income_tax,
+    professional_tax,
+    other_deductions,
+    total_deductions,
+    gross_salary,
+    net_salary,
+    deduction_details,
+  } = salaryData;
 
-    const employeeName = userData?.username || salaryData.username || 'Employee';
-    const role = salaryData.userRole || userData?.userRole || 'N/A';
-    const department = salaryData.department || userData?.department || 'N/A';
-    const empId = salaryData.empId || userData?.empId || '-';
+  const employeeName = userData?.username || salaryData.username || "Employee";
+  const role = salaryData.userRole || userData?.userRole || "N/A";
+  const department = salaryData.department || userData?.department || "N/A";
+  const empId = salaryData.empId || userData?.empId || "-";
 
-    // Placeholders for data not available in checking
-    const bankName = userData?.bank_name || "-";
-    const accNo = userData?.bank_account_number || "-";
-    const uan = userData?.pf_uan || "-";
-    const esiNo = userData?.esic_number || "-";
-    const pan = userData?.pan_number || "-";
-    const gender = userData?.gender || "-";
-    const paidDays = present_days; // Assuming paid = present for simple case
-    const lopDays = working_days - present_days; // Loss of pay days
+  // Placeholders for data not available in checking
+  const bankName = userData?.bank_name || "-";
+  const accNo = userData?.bank_account_number || "-";
+  const uan = userData?.pf_uan || "-";
+  const esiNo = userData?.esic_number || "-";
+  const pan = userData?.pan_number || "-";
+  const gender = userData?.gender || "-";
+  const paidDays = present_days; // Assuming paid = present for simple case
+  const lopDays = working_days - present_days; // Loss of pay days
 
-    // Earnings
-    const standardEarnings = [
-        { label: 'Basic', amount: basic_salary },
-        { label: 'HRA', amount: hra },
-        { label: 'Special Allowance', amount: special_allowance },
-        { label: 'Transport Allowance', amount: transport_allowance },
-        { label: 'Medical Allowance', amount: medical_allowance },
-    ];
+  // Earnings
+  const standardEarnings = [
+    { label: "Basic", amount: basic_salary },
+    { label: "HRA", amount: hra },
+    { label: "Special Allowance", amount: special_allowance },
+    { label: "Transport Allowance", amount: transport_allowance },
+    { label: "Medical Allowance", amount: medical_allowance },
+  ];
 
-    const otherEarnings = [
-        { label: 'Incentives', amount: 0 }, // Placeholder
-        { label: 'Bonus', amount: bonus },
-        { label: 'Over Time Pay', amount: overtime_amount },
-    ];
+  const otherEarnings = [
+    { label: "Incentives", amount: 0 }, // Placeholder
+    { label: "Bonus", amount: bonus },
+    { label: "Over Time Pay", amount: overtime_amount },
+  ];
 
-    // Deductions
-    let deductionsList = [];
-    if (deduction_details && deduction_details.length > 0) {
-        deductionsList = deduction_details.map(d => ({
-            label: d.deduction_name,
-            amount: d.amount
-        }));
-    } else {
-        if (pf_deduction > 0) deductionsList.push({ label: 'Provident Fund', amount: pf_deduction });
-        if (esi_deduction > 0) deductionsList.push({ label: 'ESI', amount: esi_deduction });
-        if (professional_tax > 0) deductionsList.push({ label: 'Professional Tax', amount: professional_tax });
-        if (income_tax > 0) deductionsList.push({ label: 'TDS', amount: income_tax });
-        if (other_deductions > 0) deductionsList.push({ label: 'Other Deduction', amount: other_deductions });
-    }
+  // Deductions
+  let deductionsList = [];
+  if (deduction_details && deduction_details.length > 0) {
+    deductionsList = deduction_details.map((d) => ({
+      label: d.deduction_name,
+      amount: d.amount,
+    }));
+  } else {
+    if (pf_deduction > 0)
+      deductionsList.push({ label: "Provident Fund", amount: pf_deduction });
+    if (esi_deduction > 0)
+      deductionsList.push({ label: "ESI", amount: esi_deduction });
+    if (professional_tax > 0)
+      deductionsList.push({
+        label: "Professional Tax",
+        amount: professional_tax,
+      });
+    if (income_tax > 0)
+      deductionsList.push({ label: "TDS", amount: income_tax });
+    if (other_deductions > 0)
+      deductionsList.push({
+        label: "Other Deduction",
+        amount: other_deductions,
+      });
+  }
 
-    // Amount in words
-    const amountInWords = numberToWords(Math.round(net_salary)); // Using the helper
-    // const amountInWords = formatCurrency(net_salary) + " only"; // Fallback to avoid complexity bugs for now
+  // Amount in words
+  const amountInWords = numberToWords(Math.round(net_salary)); // Using the helper
+  // const amountInWords = formatCurrency(net_salary) + " only"; // Fallback to avoid complexity bugs for now
 
-    // To match the image rows, we iterate up to max length
-    const maxRows = Math.max(standardEarnings.length + otherEarnings.length + 3, deductionsList.length + 3);
+  // To match the image rows, we iterate up to max length
+  const maxRows = Math.max(
+    standardEarnings.length + otherEarnings.length + 3,
+    deductionsList.length + 3,
+  );
 
-    // We will build the table structure carefully in HTML instead of dynamic iterating rows to match the reference exactly
-    // Reference has "Earnings", "Amount", "Deductions", "Amount"
-    // Then "Gross Salary" row on left side
-    // Then "Other Earnings" section header?
+  // We will build the table structure carefully in HTML instead of dynamic iterating rows to match the reference exactly
+  // Reference has "Earnings", "Amount", "Deductions", "Amount"
+  // Then "Gross Salary" row on left side
+  // Then "Other Earnings" section header?
 
-    // Let's construct two separate HTML strings for columns
+  // Let's construct two separate HTML strings for columns
 
-    let earningsHTML = '';
-    standardEarnings.forEach(e => {
-        earningsHTML += `<tr><td>${e.label}</td><td class="text-right">${formatCurrency(e.amount)}</td></tr>`;
-    });
-    // Gross Salary Row (Visual only in the column?)
-    earningsHTML += `<tr class="font-bold"><td>Gross Salary</td><td class="text-right">${formatCurrency(total_earnings - bonus - overtime_amount)}</td></tr>`;
+  let earningsHTML = "";
+  standardEarnings.forEach((e) => {
+    earningsHTML += `<tr><td>${e.label}</td><td class="text-right">${formatCurrency(e.amount)}</td></tr>`;
+  });
+  // Gross Salary Row (Visual only in the column?)
+  earningsHTML += `<tr class="font-bold"><td>Gross Salary</td><td class="text-right">${formatCurrency(total_earnings - bonus - overtime_amount)}</td></tr>`;
 
-    earningsHTML += `<tr><td colspan="2" class="font-bold pt-2">Other Earnings</td></tr>`;
-    otherEarnings.forEach(e => {
-        earningsHTML += `<tr><td>${e.label}</td><td class="text-right">${e.amount ? formatCurrency(e.amount) : '-'}</td></tr>`;
-    });
+  earningsHTML += `<tr><td colspan="2" class="font-bold pt-2">Other Earnings</td></tr>`;
+  otherEarnings.forEach((e) => {
+    earningsHTML += `<tr><td>${e.label}</td><td class="text-right">${e.amount ? formatCurrency(e.amount) : "-"}</td></tr>`;
+  });
 
-    let deductionsHTML = '';
-    deductionsList.forEach(d => {
-        deductionsHTML += `<tr><td>${d.label}</td><td class="text-right">${formatCurrency(d.amount)}</td></tr>`;
-    });
+  let deductionsHTML = "";
+  deductionsList.forEach((d) => {
+    deductionsHTML += `<tr><td>${d.label}</td><td class="text-right">${formatCurrency(d.amount)}</td></tr>`;
+  });
 
-    // Fill remaining height? Not easily doable in HTML string without fixed height. 
-    // We will just let them flow naturally side-by-side.
+  // Fill remaining height? Not easily doable in HTML string without fixed height.
+  // We will just let them flow naturally side-by-side.
 
-    return `
+  return `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -305,45 +357,45 @@ const generatePayslipHTML = (salaryData, userData) => {
 };
 
 export const generatePayslipPDF = async (salaryData, userData) => {
-    try {
-        const htmlContent = generatePayslipHTML(salaryData, userData);
+  try {
+    const htmlContent = generatePayslipHTML(salaryData, userData);
 
-        // Create container
-        const tempContainer = document.createElement('div');
-        tempContainer.innerHTML = htmlContent;
-        tempContainer.style.position = 'absolute';
-        tempContainer.style.left = '-9999px';
-        tempContainer.style.top = '0';
-        tempContainer.style.width = '794px'; // A4 width
-        document.body.appendChild(tempContainer);
+    // Create container
+    const tempContainer = document.createElement("div");
+    tempContainer.innerHTML = htmlContent;
+    tempContainer.style.position = "absolute";
+    tempContainer.style.left = "-9999px";
+    tempContainer.style.top = "0";
+    tempContainer.style.width = "794px"; // A4 width
+    document.body.appendChild(tempContainer);
 
-        const canvas = await html2canvas(tempContainer, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff',
-            windowWidth: 794
-        });
+    const canvas = await html2canvas(tempContainer, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      windowWidth: 794,
+    });
 
-        document.body.removeChild(tempContainer);
+    document.body.removeChild(tempContainer);
 
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
-        const imgWidth = pageWidth;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
 
-        return pdf;
-    } catch (error) {
-        console.error('Error generating Payslip PDF:', error);
-        throw error;
-    }
+    return pdf;
+  } catch (error) {
+    console.error("Error generating Payslip PDF:", error);
+    throw error;
+  }
 };
 
 export const downloadPayslip = (pdf, filename) => {
-    pdf.save(filename || 'payslip.pdf');
+  pdf.save(filename || "payslip.pdf");
 };

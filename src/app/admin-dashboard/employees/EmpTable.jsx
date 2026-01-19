@@ -124,7 +124,7 @@ const EmpTable = ({ employees }) => {
   // ⭐ FILTER + SEARCH LOGIC
   const filteredEmployees = employees.filter((employee) => {
     const matchesSearch = Object.values(employee).some((value) =>
-      String(value).toLowerCase().includes(searchTerm.toLowerCase())
+      String(value).toLowerCase().includes(searchTerm.toLowerCase()),
     );
 
     const matchesStatus =
@@ -152,7 +152,6 @@ const EmpTable = ({ employees }) => {
 
   return (
     <div className="bg-white shadow-md rounded-lg p-6">
-
       {/* ⭐ KPI SECTION */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="p-4 bg-blue-100 rounded shadow text-center">
@@ -173,14 +172,14 @@ const EmpTable = ({ employees }) => {
 
       <div className="flex flex-wrap gap-4 mb-4">
         <Link
-          href="/user-dashboard/create-employee"
-          className="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-5 py-2.5 inline-block"
+          href="/admin-dashboard/create-employee"
+          className="text-white bg-blue-600 hover:bg-blue-700 whitespace-nowrap font-medium rounded-lg text-sm px-5 py-2.5 inline-block"
         >
           Add Employee
         </Link>
         <Link
           href="/admin-dashboard/ip-restrictions"
-          className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 inline-block flex items-center space-x-2 shadow-md"
+          className="text-white bg-red-600 hover:bg-red-700 font-medium whitespace-nowrap  rounded-lg text-sm px-5 py-2.5  flex items-center space-x-2 shadow-md"
         >
           <Shield size={18} />
           <span>Global IP Settings</span>
@@ -233,15 +232,27 @@ const EmpTable = ({ employees }) => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium">Number</th>
-                <th className="px-6 py-3 text-left text-xs font-medium">Emp ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium">
+                  Email
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium">
+                  Number
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium">
+                  Emp ID
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium">
                   User Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium">
+                  Actions
+                </th>
               </tr>
             </thead>
 

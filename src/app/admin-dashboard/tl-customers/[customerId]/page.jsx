@@ -33,11 +33,7 @@ export default async function AdminTLCustomerDetailPage({ params }) {
     return <div className="p-8 text-red-600">Unauthorized</div>;
   }
 
-  const { customerId } = params;
-  // const customerId = params?.customerId;
-  // if (!customerId || isNaN(customerId)) {
-  //   return <div className="p-8 text-red-600">Invalid Customer ID</div>;
-  // }
+  const { customerId } = await params;
 
   const conn = await getDbConnection();
 

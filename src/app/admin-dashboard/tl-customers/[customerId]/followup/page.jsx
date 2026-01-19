@@ -31,7 +31,7 @@ export default async function AdminTLFollowupPage({ params }) {
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     WHERE c.customer_id = ?`,
-    [customerId]
+    [customerId],
   );
 
   if (customers.length === 0) {
@@ -47,10 +47,11 @@ export default async function AdminTLFollowupPage({ params }) {
   // Fetch latest TL followup
   const [tlFollowups] = await conn.execute(
     `SELECT * FROM TL_followups WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1`,
-    [customerId]
+    [customerId],
   );
 
   const latestTLFollowup = tlFollowups[0] || null;
+  console.log("Latest TL Followup:", latestTLFollowup);
 
   return (
     <div className="max-w-4xl mx-auto mt-10 px-4">
@@ -89,7 +90,8 @@ export default async function AdminTLFollowupPage({ params }) {
               </span>
             </p>
             <p className="mb-2">
-              <strong>Assigned To:</strong> {customer.lead_source || "Unassigned"}
+              <strong>Assigned To:</strong>{" "}
+              {customer.lead_source || "Unassigned"}
             </p>
             <p className="mb-2">
               <strong>Products Interest:</strong> {customer.products_interest}
@@ -100,11 +102,15 @@ export default async function AdminTLFollowupPage({ params }) {
         {/* Latest Employee Follow-up Info */}
         {customer.latest_followed_date && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <h3 className="font-semibold text-gray-800 mb-2">Latest Employee Follow-up</h3>
+            <h3 className="font-semibold text-gray-800 mb-2">
+              Latest Employee Follow-up
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
               <p>
                 <strong>Last Called:</strong>{" "}
-                {dayjs(customer.latest_followed_date).format("DD MMM YYYY, hh:mm A")}
+                {dayjs(customer.latest_followed_date).format(
+                  "DD MMM YYYY, hh:mm A",
+                )}
               </p>
               <p>
                 <strong>By:</strong> {customer.latest_followed_by}
@@ -119,11 +125,15 @@ export default async function AdminTLFollowupPage({ params }) {
         {/* Latest TL Follow-up Info */}
         {latestTLFollowup && (
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <h3 className="font-semibold text-gray-800 mb-2">Latest TL Follow-up</h3>
+            <h3 className="font-semibold text-gray-800 mb-2">
+              Latest TL Follow-up
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
               <p>
                 <strong>Date:</strong>{" "}
-                {dayjs(latestTLFollowup.followed_date).format("DD MMM YYYY, hh:mm A")}
+                {dayjs(latestTLFollowup.followed_date).format(
+                  "DD MMM YYYY, hh:mm A",
+                )}
               </p>
               <p>
                 <strong>Quality Score:</strong>{" "}
@@ -138,7 +148,8 @@ export default async function AdminTLFollowupPage({ params }) {
                 <strong>Tags:</strong> {latestTLFollowup.multi_tag || "N/A"}
               </p>
               <p className="md:col-span-2">
-                <strong>TL Notes:</strong> {latestTLFollowup.notes || "No notes"}
+                <strong>TL Notes:</strong>{" "}
+                {latestTLFollowup.notes || "No notes"}
               </p>
             </div>
           </div>
@@ -146,10 +157,11 @@ export default async function AdminTLFollowupPage({ params }) {
       </div>
 
       {/* Follow-up Form */}
-      <TLFollowupForm 
-        customerId={customerId} 
+      <TLFollowupForm
+        customerId={customerId}
         customerData={customer}
         isAdmin={true}
+        latestfollowup={latestTLFollowup}
         currentStage={latestTLFollowup?.stage || "New"}
       />
     </div>
