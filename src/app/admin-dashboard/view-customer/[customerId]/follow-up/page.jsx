@@ -4,7 +4,8 @@ import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
 
 export default async function FollowUpPage({ params }) {
-  const customerId = params.customerId;
+  const { customerId } = await params;
+  // console.log("Customer ID:", params);
 
   const conn = await getDbConnection();
 
@@ -13,7 +14,7 @@ export default async function FollowUpPage({ params }) {
      FROM customers_followup
      WHERE customer_id = ?
      ORDER BY followed_date DESC LIMIT 1`,
-    [customerId]
+    [customerId],
   );
 
   // await conn.end();

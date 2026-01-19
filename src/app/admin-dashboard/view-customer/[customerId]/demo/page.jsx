@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 export const dynamic = "force-dynamic";
 
 export default async function DemoRegistrationPage({ params }) {
-  const { customerId } = params;
+  const { customerId } = await params;
 
   // ✅ Connect to DB
   const conn = await getDbConnection();
@@ -14,7 +14,7 @@ export default async function DemoRegistrationPage({ params }) {
   // ✅ Fetch customer details
   const [rows] = await conn.execute(
     `SELECT first_name, email, phone, company FROM customers WHERE customer_id = ?`,
-    [customerId]
+    [customerId],
   );
 
   // await conn.end();

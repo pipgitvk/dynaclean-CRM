@@ -173,13 +173,13 @@ const EmpTable = ({ employees }) => {
       <div className="flex flex-wrap gap-4 mb-4">
         <Link
           href="/admin-dashboard/create-employee"
-          className="text-white bg-blue-600 hover:bg-blue-700 font-medium rounded-lg text-sm px-5 py-2.5 inline-block"
+          className="text-white bg-blue-600 hover:bg-blue-700 whitespace-nowrap font-medium rounded-lg text-sm px-5 py-2.5 inline-block"
         >
           Add Employee
         </Link>
         <Link
           href="/admin-dashboard/ip-restrictions"
-          className="text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-5 py-2.5 inline-block flex items-center space-x-2 shadow-md"
+          className="text-white bg-red-600 hover:bg-red-700 font-medium whitespace-nowrap  rounded-lg text-sm px-5 py-2.5  flex items-center space-x-2 shadow-md"
         >
           <Shield size={18} />
           <span>Global IP Settings</span>
