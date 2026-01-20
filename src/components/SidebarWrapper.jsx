@@ -106,7 +106,7 @@ export default async function getSidebarMenuItems() {
     try {
       const { payload } = await jwtVerify(
         token,
-        new TextEncoderImpl().encode(JWT_SECRET)
+        new TextEncoderImpl().encode(JWT_SECRET),
       );
       role = payload?.role || "GUEST";
     } catch (error) {
@@ -115,6 +115,6 @@ export default async function getSidebarMenuItems() {
   }
 
   return allMenuItems.filter(
-    (item) => item.roles.includes("ALL") || item.roles.includes(role)
+    (item) => item.roles.includes("ALL") || item.roles.includes(role),
   );
 }

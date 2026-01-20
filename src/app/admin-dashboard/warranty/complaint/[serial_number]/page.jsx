@@ -1,14 +1,17 @@
 // app/user-dashboard/warranty/complaint/[serial_number]/page.jsx
 "use client"; // This is a Client Component
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, use } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast, Toaster } from "react-hot-toast"; // For sleek notifications
 
 export default function AddComplaintPage({ params }) {
   const router = useRouter();
-  const serialNumberFromParams = params.serial_number; // Get serial_number directly from params
+  const { serial_number } = useParams();
+  // const { serial_number } = params;
+  console.log("Params received:", serial_number);
+  const serialNumberFromParams = serial_number; // Get serial_number directly from params
 
   const {
     register,

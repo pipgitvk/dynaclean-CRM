@@ -2,7 +2,7 @@
 "use client"; // This is a Client Component
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast, Toaster } from "react-hot-toast"; // For sleek notifications
 
@@ -10,8 +10,9 @@ export default function AddComplaintPage({ params }) {
   const router = useRouter();
   // const params = useParams<{ appointmentId: string }>();
   // const appointmentId = params?.appointmentId;
+  const { serial_number } = useParams();
 
-  const serialNumberFromParams = params.serial_number; // Get serial_number directly from params
+  const serialNumberFromParams = serial_number; // Get serial_number directly from params
 
   const {
     register,

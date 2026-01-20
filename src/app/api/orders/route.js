@@ -51,7 +51,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { payload } = await jwtVerify(
       token,
-      new TextEncoder().encode(process.env.JWT_SECRET)
+      new TextEncoder().encode(process.env.JWT_SECRET),
     );
     const username = payload.username;
     const userRole = payload.role; // Assuming role is in JWT as per login/route.js
@@ -86,14 +86,14 @@ export async function POST(req) {
     if (!salesRemark || salesRemark.trim() === "") {
       return NextResponse.json(
         { error: "Remark is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!files.paymentProof || !files.paymentProof[0]) {
       return NextResponse.json(
         { error: "Payment Proof is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -107,7 +107,7 @@ export async function POST(req) {
     if (files.paymentProof && files.paymentProof[0]) {
       paymentProofUrl = await saveFileLocally(
         files.paymentProof[0],
-        "payment_files"
+        "payment_files",
       );
     }
 
@@ -120,9 +120,10 @@ export async function POST(req) {
     const conn = await getDbConnection();
 
     const [[{ count }]] = await conn.execute(
-      "SELECT COUNT(*) AS count FROM neworder WHERE DATE(created_at) = CURDATE()"
+      "SELECT COUNT(*) AS count FROM neworder WHERE DATE(created_at) = CURDATE()",
     );
     const orderId = generateOrderId(count);
+    // console.log("Generated Order ID:", orderId);
 
     // Compute duedate = (client may send) OR today + payment_term_days from quotation
     let duedateISO = fields.duedate;
@@ -134,7 +135,7 @@ export async function POST(req) {
         // attempt to fetch from quotations_records
         const [qRows] = await conn.execute(
           `SELECT payment_term_days FROM quotations_records WHERE quote_number = ? LIMIT 1`,
-          [quote_number]
+          [quote_number],
         );
         days =
           (Array.isArray(qRows) &&
@@ -147,6 +148,19 @@ export async function POST(req) {
       due.setDate(due.getDate() + days);
       duedateISO = due.toISOString().slice(0, 10);
     }
+
+    // console here
+    console.log("INSERT PARAMS", {
+      quote_number,
+      client_name,
+      phone,
+      email,
+      delivery_location: "",
+      company_name,
+      company_address,
+      state,
+      ship_to,
+    });
 
     const [result] = await conn.execute(
       `INSERT INTO neworder
@@ -173,7 +187,7 @@ export async function POST(req) {
         duedateISO,
         clientDeliveryDate || null,
         approvalStatus,
-      ]
+      ],
     );
 
     // 6. Send Email if pending approval
@@ -199,7 +213,7 @@ export async function POST(req) {
                 user: "neha.s",
                 pass: "tl~{9gBU^1ysVTXW", // User provided this pass in a way that suggests it's for this specific use case
               },
-            }
+            },
           );
         }
       } catch (emailErr) {
@@ -226,7 +240,7 @@ export async function POST(req) {
     // 2) Get quotation items for this quote
     const [quotationItems] = await conn.execute(
       `SELECT item_name, item_code, quantity FROM quotation_items WHERE quote_number = ?`,
-      [quote_number]
+      [quote_number],
     );
 
     // 3) Insert dispatch rows for each item based on quantity
@@ -244,7 +258,7 @@ export async function POST(req) {
         }
         await conn.execute(
           `INSERT INTO dispatch (quote_number, item_name, item_code, serial_no, remarks, photos, created_at, updated_at) VALUES ${placeholders}`,
-          params
+          params,
         );
       }
     }
@@ -256,7 +270,7 @@ export async function POST(req) {
     console.error("❌ Order save error:", err);
     return NextResponse.json(
       { success: false, error: err.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

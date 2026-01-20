@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
+import Link from "next/link";
 
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
@@ -14,7 +15,7 @@ export default async function CustomerPage({ params }) {
   // Fetch customer
   const [custs] = await conn.execute(
     `SELECT * FROM customers WHERE customer_id = ?`,
-    [customerId]
+    [customerId],
   );
   const customer = custs[0];
 
@@ -24,7 +25,7 @@ export default async function CustomerPage({ params }) {
      FROM customers_followup
      WHERE customer_id = ?
      ORDER BY time_stamp DESC`,
-    [customerId]
+    [customerId],
   );
 
   // await conn.end();
@@ -133,6 +134,12 @@ export default async function CustomerPage({ params }) {
               Demo Registration
             </a>
             <CustomerContactsModal customerId={customerId} />
+            <Link
+              href={`/user-dashboard/quotations/new?customerId=${customerId}`}
+              className="btn text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
+            >
+              add Quotation
+            </Link>
           </div>
 
           <section>

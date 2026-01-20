@@ -15,7 +15,7 @@ export default function QuotationForm() {
   const searchParams = useSearchParams();
   const customerIdFromUrl = searchParams.get("customerId");
 
-  console.log("customer id from url:", customerIdFromUrl);
+  // console.log("customer id from url:", customerIdFromUrl);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCustomerModal, setShowCustomerModal] =
