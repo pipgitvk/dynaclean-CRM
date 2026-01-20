@@ -6,11 +6,12 @@ import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
 
 async function fetchOrderData(orderId) {
+  console.log("order id", orderId);
   const conn = await getDbConnection();
 
   const [orderRows] = await conn.execute(
     "SELECT * FROM neworder WHERE order_id = ?",
-    [orderId]
+    [orderId],
   );
 
   if (orderRows.length === 0) return { orderDetails: null };
@@ -19,12 +20,12 @@ async function fetchOrderData(orderId) {
 
   const [items] = await conn.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",
-    [orderDetails.quote_number]
+    [orderDetails.quote_number],
   );
 
   const [statusRows] = await conn.execute(
     "SELECT sales_status, account_status, admin_status, dispatch_status, delivery_status, installation_status FROM neworder WHERE order_id = ?",
-    [orderId]
+    [orderId],
   );
 
   const statuses = statusRows[0];
@@ -34,7 +35,7 @@ async function fetchOrderData(orderId) {
   try {
     const [quoteRows] = await conn.execute(
       "SELECT gstin FROM quotations_records WHERE quote_number = ?",
-      [orderDetails.quote_number]
+      [orderDetails.quote_number],
     );
     gstin = quoteRows?.[0]?.gstin || null;
   } catch (_) {
@@ -52,10 +53,13 @@ async function fetchOrderData(orderId) {
 }
 
 export default async function Page({ params }) {
-  const orderId = parseInt(params.order_id);
+  const { order_id } = await params;
+  // console.log("par:", order_id);
+  const orderId = parseInt(order_id);
   if (isNaN(orderId)) notFound();
 
-  const { orderDetails, items, statuses, gstin } = await fetchOrderData(orderId);
+  const { orderDetails, items, statuses, gstin } =
+    await fetchOrderData(orderId);
 
   if (!orderDetails) {
     return (

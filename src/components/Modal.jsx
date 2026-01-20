@@ -14,7 +14,7 @@ export default function Modal({ isOpen, onClose, title, data }) {
       (col) =>
         !col.startsWith("Machine") &&
         !col.startsWith("Model") &&
-        col !== "Demo Date/Time"
+        col !== "Demo Date/Time",
     );
   };
 
@@ -39,7 +39,7 @@ export default function Modal({ isOpen, onClose, title, data }) {
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-opacity-75 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-4 border-b">
           <h3 className="text-xl font-bold text-gray-800">{title}</h3>
           <button
@@ -107,7 +107,7 @@ export default function Modal({ isOpen, onClose, title, data }) {
                           <Link
                             href={{
                               pathname: `${basePath}/${encodeURIComponent(
-                                row["Customer Name"]
+                                row["Customer Name"],
                               )}`,
                               query: {
                                 mobile: row.Mobile,

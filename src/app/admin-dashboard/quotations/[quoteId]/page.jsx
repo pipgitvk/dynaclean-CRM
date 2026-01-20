@@ -22,7 +22,7 @@ async function getQuotationData(quoteId) {
 }
 
 export default async function QuotationPage({ params }) {
-  const { quoteId } = params;
+  const { quoteId } = await params;
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
   if (!token) return <p className="p-6 text-red-600">Unauthorized</p>;

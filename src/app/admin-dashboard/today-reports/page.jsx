@@ -168,28 +168,31 @@ export default function DashboardPage() {
           <div className="flex gap-2">
             <button
               onClick={() => setDateRange("today")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateRange === "today"
-                ? "bg-blue-600 text-white shadow"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                dateRange === "today"
+                  ? "bg-blue-600 text-white shadow"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
             >
               Today
             </button>
             <button
               onClick={() => setDateRange("this_week")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateRange === "this_week"
-                ? "bg-blue-600 text-white shadow"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                dateRange === "this_week"
+                  ? "bg-blue-600 text-white shadow"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
             >
               This Week
             </button>
             <button
               onClick={() => setDateRange("this_month")}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateRange === "this_month"
-                ? "bg-blue-600 text-white shadow"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                dateRange === "this_month"
+                  ? "bg-blue-600 text-white shadow"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
             >
               This Month
             </button>
@@ -216,10 +219,11 @@ export default function DashboardPage() {
                 }
               }}
               disabled={isLoading}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${dateRange === "custom"
-                ? "bg-blue-600 text-white shadow"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                dateRange === "custom"
+                  ? "bg-blue-600 text-white shadow"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
               {isLoading ? "Fetching..." : "fetch"}
             </button>
