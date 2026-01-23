@@ -51,7 +51,7 @@ export default async function AdminTLFollowupPage({ params }) {
   );
 
   const latestTLFollowup = tlFollowups[0] || null;
-  console.log("Latest TL Followup:", latestTLFollowup);
+  // console.log("Latest TL Followup:", latestTLFollowup);
 
   return (
     <div className="max-w-4xl mx-auto mt-10 px-4">

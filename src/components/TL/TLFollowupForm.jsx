@@ -37,14 +37,18 @@ export default function TLFollowupForm({
     stage: "New",
   });
 
-  const statusOptions = ["Very Good", "Average", "Poor", "Denied"];
+  const statusOptions = ["Good", "Very Good", "Average", "Poor", "Denied"];
   const tagOptions = [
     "Demo",
     "Prime",
     "Repeat order",
     "Mail",
+    "Truck FollowUp",
+    "Payment Collection",
+    "Strong FollowUp",
+    "Service Issue",
     "Running Orders",
-    "N/A",
+    "Clear",
   ];
   const stageOptions = [
     "New",
@@ -52,6 +56,7 @@ export default function TLFollowupForm({
     "Interested",
     "Demo Scheduled",
     "Demo Completed",
+    "without GST order",
     "Qualified",
     "Quotation Sent",
     "Quotation Revised",

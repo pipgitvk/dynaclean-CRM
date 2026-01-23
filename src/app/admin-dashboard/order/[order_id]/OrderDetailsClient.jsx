@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import dayjs from "dayjs";
+import Image from "next/image";
 
 const stages = [
   "Sales",
@@ -137,7 +138,9 @@ export default function OrderDetailsClient({
                   <tr key={idx} className="bg-white hover:bg-gray-50">
                     <td>{idx + 1}</td>
                     <td>
-                      <img
+                      <Image
+                      width={200}
+                      height={200}
                         src={item.img_url}
                         alt="Item"
                         className="h-10 w-10 object-contain mx-auto rounded"
@@ -189,7 +192,9 @@ export default function OrderDetailsClient({
               className="border rounded-md p-4 shadow-sm bg-white space-y-1"
             >
               <div className="flex items-center gap-4">
-                <img
+                <Image
+                width={200}
+                height={200}
                   src={item.img_url}
                   alt="Item"
                   className="h-12 w-12 object-contain rounded"
