@@ -65,6 +65,12 @@ const allMenuItems = [
     icon: "DollarSign",
   },
   {
+    path: "/user-dashboard/monitor-targets",
+    name: "Monitor",
+    roles: ["ACCOUNTANT"],
+    icon: "DollarSign",
+  },
+  {
     path: "/view_service_reports",
     name: "Service History",
     roles: ["SERVICE ENGINEER"],

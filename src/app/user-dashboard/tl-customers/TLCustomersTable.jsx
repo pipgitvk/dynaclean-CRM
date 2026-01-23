@@ -22,26 +22,35 @@ export default function TLCustomersTable({
   const [isPending, startTransition] = useTransition();
   const [searchTerm, setSearchTerm] = useState(searchParams?.search || "");
   const [selectedEmployee, setSelectedEmployee] = useState(
-    searchParams?.employee || ""
+    searchParams?.employee || "",
   );
   const [selectedStatus, setSelectedStatus] = useState(
-    searchParams?.status || ""
+    searchParams?.status || "",
   );
-  const [selectedStage, setSelectedStage] = useState(
-    searchParams?.stage || ""
-  );
-  const [selectedTag, setSelectedTag] = useState(
-    searchParams?.tag || ""
-  );
+  const [selectedStage, setSelectedStage] = useState(searchParams?.stage || "");
+  const [selectedTag, setSelectedTag] = useState(searchParams?.tag || "");
   const [fromDate, setFromDate] = useState(searchParams?.fromDate || "");
   const [toDate, setToDate] = useState(searchParams?.toDate || "");
-  const [nextFromDate, setNextFromDate] = useState(searchParams?.nextFromDate || "");
+  const [nextFromDate, setNextFromDate] = useState(
+    searchParams?.nextFromDate || "",
+  );
   const [nextToDate, setNextToDate] = useState(searchParams?.nextToDate || "");
   const [assigningLead, setAssigningLead] = useState(null);
   const [selectedEmpForAssign, setSelectedEmpForAssign] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 
-  const TAGS = ["Demo", "Prime", "Repeat order", "Mail", "Running Orders", "N/A"];
+  const TAGS = [
+    "Demo",
+    "Payment Collection",
+    "Truck FollowUp",
+    "Strong FollowUp",
+    "Service Issue",
+    "Prime",
+    "Repeat order",
+    "Mail",
+    "Running Orders",
+    "Clear",
+  ];
 
   const basePath = isAdmin
     ? "/admin-dashboard/tl-customers"
@@ -66,7 +75,11 @@ export default function TLCustomersTable({
       case "due":
         return customers.filter((customer) => {
           // Exclude closed stages
-          const excludedStages = ["Won (Order Received)", "Lost", "Disqualified / Invalid Lead"];
+          const excludedStages = [
+            "Won (Order Received)",
+            "Lost",
+            "Disqualified / Invalid Lead",
+          ];
           if (excludedStages.includes(customer.stage)) return false;
 
           const nextFollowup =
@@ -79,7 +92,7 @@ export default function TLCustomersTable({
         return customers.filter(
           (customer) =>
             customer.multi_tag &&
-            customer.multi_tag.toLowerCase().includes("prime")
+            customer.multi_tag.toLowerCase().includes("prime"),
         );
       default:
         return customers;
@@ -100,7 +113,11 @@ export default function TLCustomersTable({
     }).length;
     const due = customersForKPI.filter((customer) => {
       // Exclude closed stages
-      const excludedStages = ["Won (Order Received)", "Lost", "Disqualified / Invalid Lead"];
+      const excludedStages = [
+        "Won (Order Received)",
+        "Lost",
+        "Disqualified / Invalid Lead",
+      ];
       if (excludedStages.includes(customer.stage)) return false;
 
       const nextFollowup =
@@ -111,7 +128,8 @@ export default function TLCustomersTable({
     }).length;
     const prime = customersForKPI.filter(
       (customer) =>
-        customer.multi_tag && customer.multi_tag.toLowerCase().includes("prime")
+        customer.multi_tag &&
+        customer.multi_tag.toLowerCase().includes("prime"),
     ).length;
 
     return { total, upcoming, due, prime };
@@ -120,10 +138,13 @@ export default function TLCustomersTable({
   // Get counts for tags
   const getTagCounts = () => {
     const tagCounts = {};
-    TAGS.forEach(tag => {
-      tagCounts[tag] = customersForKPI.filter(customer => {
-        if (!customer.multi_tag) return tag === "N/A";
-        return customer.multi_tag.split(", ").map(t => t.trim()).includes(tag);
+    TAGS.forEach((tag) => {
+      tagCounts[tag] = customersForKPI.filter((customer) => {
+        if (!customer.multi_tag) return tag === "Clear";
+        return customer.multi_tag
+          .split(", ")
+          .map((t) => t.trim())
+          .includes(tag);
       }).length;
     });
     return tagCounts;
@@ -131,10 +152,12 @@ export default function TLCustomersTable({
 
   // Get counts for statuses
   const getStatusCounts = () => {
-    const statuses = ["New", "Very Good", "Average", "Poor", "Denied"];
+    const statuses = ["New", "Good", "Very Good", "Average", "Poor", "Denied"];
     const statusCounts = {};
-    statuses.forEach(status => {
-      statusCounts[status] = customersForKPI.filter(customer => customer.status === status).length;
+    statuses.forEach((status) => {
+      statusCounts[status] = customersForKPI.filter(
+        (customer) => customer.status === status,
+      ).length;
     });
     return statusCounts;
   };
@@ -142,13 +165,26 @@ export default function TLCustomersTable({
   // Get counts for stages
   const getStageCounts = () => {
     const stages = [
-      "New", "Contacted", "Interested", "Demo Scheduled", "Demo Completed",
-      "Qualified", "Quotation Sent", "Quotation Revised", "Negotiation / Follow-up",
-      "Decision Pending", "Won (Order Received)", "Lost", "Disqualified / Invalid Lead"
+      "New",
+      "Contacted",
+      "Interested",
+      "Demo Scheduled",
+      "Demo Completed",
+      "without GST order",
+      "Qualified",
+      "Quotation Sent",
+      "Quotation Revised",
+      "Negotiation / Follow-up",
+      "Decision Pending",
+      "Won (Order Received)",
+      "Lost",
+      "Disqualified / Invalid Lead",
     ];
     const stageCounts = {};
-    stages.forEach(stage => {
-      stageCounts[stage] = customersForKPI.filter(customer => customer.stage === stage).length;
+    stages.forEach((stage) => {
+      stageCounts[stage] = customersForKPI.filter(
+        (customer) => customer.stage === stage,
+      ).length;
     });
     return stageCounts;
   };
@@ -392,7 +428,8 @@ export default function TLCustomersTable({
                         if (selectedTag) params.set("tag", selectedTag);
                         if (fromDate) params.set("fromDate", fromDate);
                         if (toDate) params.set("toDate", toDate);
-                        if (nextFromDate) params.set("nextFromDate", nextFromDate);
+                        if (nextFromDate)
+                          params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
                         router.push(`${basePath}?${params.toString()}`);
                       });
@@ -400,16 +437,21 @@ export default function TLCustomersTable({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Statuses</option>
-                    {["New", "Very Good", "Average", "Poor", "Denied"].map(
-                      (s) => {
-                        const statusCounts = getStatusCounts();
-                        return (
-                          <option key={s} value={s}>
-                            {s} ({statusCounts[s] || 0})
-                          </option>
-                        );
-                      }
-                    )}
+                    {[
+                      "New",
+                      "Good",
+                      "Very Good",
+                      "Average",
+                      "Poor",
+                      "Denied",
+                    ].map((s) => {
+                      const statusCounts = getStatusCounts();
+                      return (
+                        <option key={s} value={s}>
+                          {s} ({statusCounts[s] || 0})
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -434,7 +476,8 @@ export default function TLCustomersTable({
                         if (selectedTag) params.set("tag", selectedTag);
                         if (fromDate) params.set("fromDate", fromDate);
                         if (toDate) params.set("toDate", toDate);
-                        if (nextFromDate) params.set("nextFromDate", nextFromDate);
+                        if (nextFromDate)
+                          params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
                         router.push(`${basePath}?${params.toString()}`);
                       });
@@ -448,6 +491,7 @@ export default function TLCustomersTable({
                       "Interested",
                       "Demo Scheduled",
                       "Demo Completed",
+                      "without GST order",
                       "Qualified",
                       "Quotation Sent",
                       "Quotation Revised",
@@ -488,7 +532,8 @@ export default function TLCustomersTable({
                         if (tag) params.set("tag", tag);
                         if (fromDate) params.set("fromDate", fromDate);
                         if (toDate) params.set("toDate", toDate);
-                        if (nextFromDate) params.set("nextFromDate", nextFromDate);
+                        if (nextFromDate)
+                          params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
                         router.push(`${basePath}?${params.toString()}`);
                       });
@@ -602,29 +647,37 @@ export default function TLCustomersTable({
                       startTransition(() => {
                         const params = new URLSearchParams();
                         if (searchTerm) params.set("search", searchTerm);
-                        if (selectedEmployee) params.set("employee", selectedEmployee);
-                        if (selectedStatus) params.set("status", selectedStatus);
+                        if (selectedEmployee)
+                          params.set("employee", selectedEmployee);
+                        if (selectedStatus)
+                          params.set("status", selectedStatus);
                         if (selectedStage) params.set("stage", selectedStage);
                         if (selectedTag) params.set("tag", selectedTag);
                         if (fromDate) params.set("fromDate", fromDate);
                         if (toDate) params.set("toDate", toDate);
-                        if (nextFromDate) params.set("nextFromDate", nextFromDate);
+                        if (nextFromDate)
+                          params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
                         params.set("tlOnly", tlOnly ? "false" : "true");
                         router.push(`${basePath}?${params.toString()}`);
                       });
                     }}
                     disabled={isPending}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${tlOnly ? "bg-blue-600" : "bg-gray-300"
-                      }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      tlOnly ? "bg-blue-600" : "bg-gray-300"
+                    }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${tlOnly ? "translate-x-6" : "translate-x-1"
-                        }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        tlOnly ? "translate-x-6" : "translate-x-1"
+                      }`}
                     />
                   </button>
-                  <span className={`text-xs font-semibold ${tlOnly ? "text-blue-600" : "text-gray-500"
-                    }`}>
+                  <span
+                    className={`text-xs font-semibold ${
+                      tlOnly ? "text-blue-600" : "text-gray-500"
+                    }`}
+                  >
                     {tlOnly ? "ON" : "OFF"}
                   </span>
                 </div>
@@ -637,20 +690,23 @@ export default function TLCustomersTable({
             {/* Total/All Filter */}
             <div
               onClick={() => handleFilterClick("all")}
-              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${activeFilter === "all" ? "scale-110" : "hover:scale-105"
-                }`}
+              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${
+                activeFilter === "all" ? "scale-110" : "hover:scale-105"
+              }`}
             >
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${activeFilter === "all"
-                  ? "bg-blue-600 ring-2 ring-blue-200"
-                  : "bg-gray-400 hover:bg-gray-500"
-                  }`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                  activeFilter === "all"
+                    ? "bg-blue-600 ring-2 ring-blue-200"
+                    : "bg-gray-400 hover:bg-gray-500"
+                }`}
               >
                 {getFilterCounts().total}
               </div>
               <span
-                className={`mt-1 text-xs font-medium ${activeFilter === "all" ? "text-blue-600" : "text-gray-600"
-                  }`}
+                className={`mt-1 text-xs font-medium ${
+                  activeFilter === "all" ? "text-blue-600" : "text-gray-600"
+                }`}
               >
                 All
               </span>
@@ -659,22 +715,25 @@ export default function TLCustomersTable({
             {/* Upcoming Filter */}
             <div
               onClick={() => handleFilterClick("upcoming")}
-              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${activeFilter === "upcoming" ? "scale-110" : "hover:scale-105"
-                }`}
+              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${
+                activeFilter === "upcoming" ? "scale-110" : "hover:scale-105"
+              }`}
             >
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${activeFilter === "upcoming"
-                  ? "bg-green-600 ring-2 ring-green-200"
-                  : "bg-gray-400 hover:bg-gray-500"
-                  }`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                  activeFilter === "upcoming"
+                    ? "bg-green-600 ring-2 ring-green-200"
+                    : "bg-gray-400 hover:bg-gray-500"
+                }`}
               >
                 {getFilterCounts().upcoming}
               </div>
               <span
-                className={`mt-1 text-xs font-medium ${activeFilter === "upcoming"
-                  ? "text-green-600"
-                  : "text-gray-600"
-                  }`}
+                className={`mt-1 text-xs font-medium ${
+                  activeFilter === "upcoming"
+                    ? "text-green-600"
+                    : "text-gray-600"
+                }`}
               >
                 Up
               </span>
@@ -683,20 +742,23 @@ export default function TLCustomersTable({
             {/* Due/Overdue Filter */}
             <div
               onClick={() => handleFilterClick("due")}
-              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${activeFilter === "due" ? "scale-110" : "hover:scale-105"
-                }`}
+              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${
+                activeFilter === "due" ? "scale-110" : "hover:scale-105"
+              }`}
             >
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${activeFilter === "due"
-                  ? "bg-red-600 ring-2 ring-red-200"
-                  : "bg-gray-400 hover:bg-gray-500"
-                  }`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                  activeFilter === "due"
+                    ? "bg-red-600 ring-2 ring-red-200"
+                    : "bg-gray-400 hover:bg-gray-500"
+                }`}
               >
                 {getFilterCounts().due}
               </div>
               <span
-                className={`mt-1 text-xs font-medium ${activeFilter === "due" ? "text-red-600" : "text-gray-600"
-                  }`}
+                className={`mt-1 text-xs font-medium ${
+                  activeFilter === "due" ? "text-red-600" : "text-gray-600"
+                }`}
               >
                 Due
               </span>
@@ -705,20 +767,23 @@ export default function TLCustomersTable({
             {/* Prime Filter */}
             <div
               onClick={() => handleFilterClick("prime")}
-              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${activeFilter === "prime" ? "scale-110" : "hover:scale-105"
-                }`}
+              className={`flex flex-col items-center cursor-pointer transition-all duration-200 ${
+                activeFilter === "prime" ? "scale-110" : "hover:scale-105"
+              }`}
             >
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${activeFilter === "prime"
-                  ? "bg-purple-600 ring-2 ring-purple-200"
-                  : "bg-gray-400 hover:bg-gray-500"
-                  }`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                  activeFilter === "prime"
+                    ? "bg-purple-600 ring-2 ring-purple-200"
+                    : "bg-gray-400 hover:bg-gray-500"
+                }`}
               >
                 {getFilterCounts().prime}
               </div>
               <span
-                className={`mt-1 text-xs font-medium ${activeFilter === "prime" ? "text-purple-600" : "text-gray-600"
-                  }`}
+                className={`mt-1 text-xs font-medium ${
+                  activeFilter === "prime" ? "text-purple-600" : "text-gray-600"
+                }`}
               >
                 Prime
               </span>
@@ -828,7 +893,7 @@ export default function TLCustomersTable({
                     {customer.lead_quality_score ? (
                       <span
                         className={`px-2 py-1 text-xs font-semibold rounded ${getQualityScoreColor(
-                          customer.lead_quality_score
+                          customer.lead_quality_score,
                         )}`}
                       >
                         {customer.lead_quality_score}/10
@@ -856,17 +921,19 @@ export default function TLCustomersTable({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.tl_next_followup
                       ? dayjs(customer.tl_next_followup).format(
-                        "DD MMM, YYYY HH:mm"
-                      )
+                          "DD MMM, YYYY HH:mm",
+                        )
                       : customer.latest_next_followup
                         ? dayjs(customer.latest_next_followup).format(
-                          "DD MMM, YYYY HH:mm"
-                        )
+                            "DD MMM, YYYY HH:mm",
+                          )
                         : "N/A"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.date_created
-                      ? dayjs(customer.date_created).format("DD MMM, YYYY HH:mm")
+                      ? dayjs(customer.date_created).format(
+                          "DD MMM, YYYY HH:mm",
+                        )
                       : "N/A"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -1003,10 +1070,11 @@ export default function TLCustomersTable({
                     key={page}
                     onClick={() => handlePageChange(page)}
                     disabled={isPending}
-                    className={`px-3 py-1 border rounded-md text-sm font-medium ${page === currentPage
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
+                    className={`px-3 py-1 border rounded-md text-sm font-medium ${
+                      page === currentPage
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
                   >
                     {page}
                   </button>
