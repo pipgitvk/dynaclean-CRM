@@ -7,8 +7,9 @@ import fs from "fs/promises";
 
 // GET handler to fetch a single warranty product by serial number
 export async function GET(req, { params }) {
-  console.log("backend", params);
-  const serialNumber = params.serial_number;
+  // console.log("backend", params);
+  const { serial_number } = await params;
+  const serialNumber = serial_number;
   if (!serialNumber) {
     // This case should ideally not happen if the route is correctly accessed
     // via /[serial_number], but kept for robustness.

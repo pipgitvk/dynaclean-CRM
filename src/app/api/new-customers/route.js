@@ -7,6 +7,20 @@ import { convertISTtoUTC } from "@/lib/timezone";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+const normalizePhone = (phone) => {
+  if (!phone) return "";
+
+  // Remove spaces, hyphens, brackets
+  let cleaned = phone.replace(/[^\d]/g, "");
+
+  // Take last 10 digits (Indian mobile standard)
+  if (cleaned.length > 10) {
+    cleaned = cleaned.slice(-10);
+  }
+
+  return cleaned;
+};
+
 export async function POST(req) {
   try {
     // ✅ Get token and verify
@@ -16,7 +30,7 @@ export async function POST(req) {
 
     const { payload } = await jwtVerify(
       token,
-      new TextEncoder().encode(JWT_SECRET)
+      new TextEncoder().encode(JWT_SECRET),
     );
     const createdby = payload.username;
 
@@ -62,7 +76,7 @@ export async function POST(req) {
       if (!fields[field]) {
         return NextResponse.json(
           { error: `${field} is required` },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -72,17 +86,24 @@ export async function POST(req) {
     const conn = await getDbConnection();
 
     // ✅ Check for duplicate phone
-    if (fields.phone) fields.phone = fields.phone.trim();
+    fields.phone = normalizePhone(fields.phone);
+
+    if (fields.phone.length !== 10) {
+      return NextResponse.json(
+        { error: "Duplicate phone number" },
+        { status: 400 },
+      );
+    }
 
     const [dupRows] = await conn.execute(
       `SELECT COUNT(*) AS c FROM customers WHERE phone = ?`,
-      [fields.phone]
+      [fields.phone],
     );
     if (dupRows[0].c > 0) {
       // await conn.end();
       return NextResponse.json(
         { error: "Duplicate phone number" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -117,7 +138,7 @@ export async function POST(req) {
         next_followup_date || null,
         now,
         visiting_card,
-      ]
+      ],
     );
 
     const customerId = customerResult.insertId;
@@ -139,7 +160,7 @@ export async function POST(req) {
         fields.communication_mode,
         fields.notes,
         fields.email || "",
-      ]
+      ],
     );
 
     // await conn.end();

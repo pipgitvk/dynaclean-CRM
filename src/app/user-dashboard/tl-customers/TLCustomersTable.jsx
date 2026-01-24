@@ -2,7 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, UserPlus, Edit, Eye, RefreshCw, Loader2 } from "lucide-react";
+import {
+  Search,
+  UserPlus,
+  Edit,
+  Eye,
+  RefreshCw,
+  Loader2,
+  MoreHorizontal,
+  Shield,
+} from "lucide-react";
 import Link from "next/link";
 import dayjs from "dayjs";
 
@@ -36,8 +45,11 @@ export default function TLCustomersTable({
   );
   const [nextToDate, setNextToDate] = useState(searchParams?.nextToDate || "");
   const [assigningLead, setAssigningLead] = useState(null);
+  const [latestquote, setLatestquote] = useState([]);
   const [selectedEmpForAssign, setSelectedEmpForAssign] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [showQuotePopup, setShowQuotePopup] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const TAGS = [
     "Demo",
@@ -59,21 +71,68 @@ export default function TLCustomersTable({
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
   const customersForKPI =
     allCustomersForKPI.length > 0 ? allCustomersForKPI : customers;
+
+  // const getFilteredCustomers = () => {
+  //   const now = dayjs();
+
+  //   switch (activeFilter) {
+  //     case "upcoming":
+  //       // return customers.filter((customer) => {
+  //       //   const nextFollowup =
+  //       //     customer.tl_next_followup || customer.latest_next_followup;
+  //       //   if (!nextFollowup) return false;
+  //       //   const followupTime = dayjs(nextFollowup);
+  //       //   const hoursDiff = followupTime.diff(now, "hour");
+  //       //   return hoursDiff > 0 && hoursDiff <= 3; // Within next 3 hours
+  //       // });
+  //       return customers.filter(
+  //         (customer) =>
+  //           customer.multi_tag &&
+  //           customer.multi_tag.toLowerCase().includes("strong followup"),
+  //       );
+  //     case "due":
+  //       return customers.filter((customer) => {
+  //         // Exclude closed stages
+  //         const excludedStages = [
+  //           "Won (Order Received)",
+  //           "Lost",
+  //           "Disqualified / Invalid Lead",
+  //         ];
+  //         if (excludedStages.includes(customer.stage)) return false;
+
+  //         const nextFollowup =
+  //           customer.tl_next_followup || customer.latest_next_followup;
+  //         if (!nextFollowup) return false;
+  //         const followupTime = dayjs(nextFollowup);
+  //         return followupTime.isBefore(now); // Overdue
+  //       });
+  //     case "prime":
+  //       return customers.filter(
+  //         (customer) =>
+  //           customer.multi_tag &&
+  //           customer.multi_tag.toLowerCase().includes("prime"),
+  //       );
+  //     default:
+  //       return customers;
+  //   }
+  // };
+
   const getFilteredCustomers = () => {
     const now = dayjs();
 
     switch (activeFilter) {
       case "upcoming":
-        return customers.filter((customer) => {
-          const nextFollowup =
-            customer.tl_next_followup || customer.latest_next_followup;
-          if (!nextFollowup) return false;
-          const followupTime = dayjs(nextFollowup);
-          const hoursDiff = followupTime.diff(now, "hour");
-          return hoursDiff > 0 && hoursDiff <= 3; // Within next 3 hours
-        });
+        return customers.filter(
+          (customer) =>
+            allowCustomerByStatus(customer) &&
+            customer.multi_tag &&
+            customer.multi_tag.toLowerCase().includes("strong followup"),
+        );
+
       case "due":
         return customers.filter((customer) => {
+          if (!allowCustomerByStatus(customer)) return false;
+
           // Exclude closed stages
           const excludedStages = [
             "Won (Order Received)",
@@ -85,17 +144,21 @@ export default function TLCustomersTable({
           const nextFollowup =
             customer.tl_next_followup || customer.latest_next_followup;
           if (!nextFollowup) return false;
+
           const followupTime = dayjs(nextFollowup);
           return followupTime.isBefore(now); // Overdue
         });
+
       case "prime":
         return customers.filter(
           (customer) =>
+            allowCustomerByStatus(customer) &&
             customer.multi_tag &&
             customer.multi_tag.toLowerCase().includes("prime"),
         );
+
       default:
-        return customers;
+        return customers.filter((customer) => allowCustomerByStatus(customer));
     }
   };
 
@@ -103,14 +166,20 @@ export default function TLCustomersTable({
   const getFilterCounts = () => {
     const now = dayjs();
     const total = customersForKPI.length;
-    const upcoming = customersForKPI.filter((customer) => {
-      const nextFollowup =
-        customer.tl_next_followup || customer.latest_next_followup;
-      if (!nextFollowup) return false;
-      const followupTime = dayjs(nextFollowup);
-      const hoursDiff = followupTime.diff(now, "hour");
-      return hoursDiff > 0 && hoursDiff <= 3;
-    }).length;
+    // const upcoming = customersForKPI.filter((customer) => {
+    //   const nextFollowup =
+    //     customer.tl_next_followup || customer.latest_next_followup;
+    //   if (!nextFollowup) return false;
+    //   const followupTime = dayjs(nextFollowup);
+    //   const hoursDiff = followupTime.diff(now, "hour");
+    //   return hoursDiff > 0 && hoursDiff <= 3;
+    // }).length;
+    const upcoming = customersForKPI.filter(
+      (customer) =>
+        customer.multi_tag &&
+        customer.multi_tag.toLowerCase().includes("strong followup"),
+    ).length;
+
     const due = customersForKPI.filter((customer) => {
       // Exclude closed stages
       const excludedStages = [
@@ -135,6 +204,35 @@ export default function TLCustomersTable({
     return { total, upcoming, due, prime };
   };
 
+  // api call for latest quotation for cutomer
+  const fetchLatestQuotation = async ({ customer_name }) => {
+    console.log("Fetching quotations for user:", customer_name);
+    setLoading(true);
+    let url = `/api/quotations-show?customer_name=${encodeURIComponent(customer_name)}`;
+
+    // Append filters to the API request URL
+    if (fromDate) url += `&from_date=${fromDate}`;
+    if (toDate) url += `&to_date=${toDate}`;
+
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      const data = await res.json();
+      console.log("quotation data", data);
+      setLatestquote(Array.isArray(data) ? data[0] : data);
+      setShowQuotePopup(true);
+      // setFiltered(data); // set filtered too
+    } catch (error) {
+      console.error("Failed to fetch quotations:", error);
+      setLatestquote([]);
+      // setFiltered([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Get counts for tags
   const getTagCounts = () => {
     const tagCounts = {};
@@ -148,6 +246,17 @@ export default function TLCustomersTable({
       }).length;
     });
     return tagCounts;
+  };
+
+  // denied customer not show
+  const allowCustomerByStatus = (customer) => {
+    // Show Denied ONLY when explicitly selected
+    if (selectedStatus === "Denied") {
+      return customer.status === "Denied";
+    }
+
+    // Otherwise hide Denied
+    return customer.status !== "Denied";
   };
 
   // Get counts for statuses
@@ -242,6 +351,23 @@ export default function TLCustomersTable({
       router.push(`${basePath}?${params.toString()}`);
     });
   };
+
+  // store back functionality
+  const currentQuery = new URLSearchParams();
+
+  if (searchTerm) currentQuery.set("search", searchTerm);
+  if (selectedEmployee) currentQuery.set("employee", selectedEmployee);
+  if (selectedStatus) currentQuery.set("status", selectedStatus);
+  if (selectedStage) currentQuery.set("stage", selectedStage);
+  if (selectedTag) currentQuery.set("tag", selectedTag);
+  if (fromDate) currentQuery.set("fromDate", fromDate);
+  if (toDate) currentQuery.set("toDate", toDate);
+  if (nextFromDate) currentQuery.set("nextFromDate", nextFromDate);
+  if (nextToDate) currentQuery.set("nextToDate", nextToDate);
+  if (tlOnly !== undefined)
+    currentQuery.set("tlOnly", tlOnly ? "true" : "false");
+
+  const queryString = currentQuery.toString();
 
   const handleAssignLead = async (customerId) => {
     if (!selectedEmpForAssign) {
@@ -840,7 +966,7 @@ export default function TLCustomersTable({
                 Next Followup
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                Date Created
+                Estimated Date
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Actions
@@ -930,24 +1056,37 @@ export default function TLCustomersTable({
                         : "N/A"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {customer.date_created
-                      ? dayjs(customer.date_created).format(
+                    {customer.estimated_order_date
+                      ? dayjs(customer.estimated_order_date).format(
                           "DD MMM, YYYY HH:mm",
                         )
                       : "N/A"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <Link
-                        href={`${basePath}/${customer.customer_id}`}
+                        href={`${basePath}/${customer.customer_id}?${queryString}`}
                         className="text-blue-600 hover:text-blue-800"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         title="View Details"
                       >
                         <Eye size={18} />
                       </Link>
+                      {/* <button
+                        href={`${basePath}/${customer.customer_id}?${queryString}`}
+                        className="text-blue-600 hover:text-blue-800"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View Details"
+                      >
+                        <Eye size={18} />
+                      </button> */}
                       <Link
-                        href={`${basePath}/${customer.customer_id}/followup`}
+                        href={`${basePath}/${customer.customer_id}/followup?${queryString}`}
                         className="text-green-600 hover:text-green-800"
+                        target="_blank"
+                        rel="noopener noreferrer"
                         title="Add TL Followup"
                       >
                         <Edit size={18} />
@@ -958,6 +1097,20 @@ export default function TLCustomersTable({
                         title="Assign/Reassign Lead"
                       >
                         <UserPlus size={18} />
+                      </button>
+                      <button
+                        className="cursor-pointer"
+                        title="Latest Quotation"
+                        onClick={() =>
+                          fetchLatestQuotation({
+                            customer_name: `${customer.first_name} ${customer.last_name}`,
+                          })
+                        }
+                      >
+                        <Shield
+                          size={18}
+                          className="text-gray-600 hover:text-gray-800"
+                        />
                       </button>
                     </div>
 
@@ -1001,6 +1154,78 @@ export default function TLCustomersTable({
                               Cancel
                             </button>
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* // here another model  */}
+                    {showQuotePopup && latestquote && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                        <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-5 relative">
+                          {/* Header */}
+                          <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-semibold">
+                              Latest Quotation
+                            </h2>
+                            <button
+                              onClick={() => setShowQuotePopup(false)}
+                              className="text-gray-500 hover:text-gray-800"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          {/* Body */}
+                          {latestquote.length === 0 ? (
+                            <p className="text-sm text-gray-500">
+                              No quotation found
+                            </p>
+                          ) : (
+                            <div className="space-y-2 text-sm">
+                              <p>
+                                <b>Customer:</b> {latestquote.company_name}
+                              </p>
+                              <p>
+                                <b>Quote No:</b> {latestquote.quote_number}
+                              </p>
+                              <p>
+                                <b>Date:</b>{" "}
+                                {dayjs(latestquote.quote_date).format(
+                                  "DD MMM YYYY",
+                                )}
+                              </p>
+                              <p>
+                                <b>Total:</b> ₹{latestquote.grand_total}
+                              </p>
+                              <p>
+                                <b>Email:</b> {latestquote.email}
+                              </p>
+                              <p>
+                                <b>Phone:</b> {latestquote.phone}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Footer */}
+                          {latestquote?.quote_number && (
+                            <div className="flex justify-end gap-2 mt-5">
+                              <a
+                                href={`/admin-dashboard/quotations/${latestquote.quote_number}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                              >
+                                View Quotation
+                              </a>
+
+                              <button
+                                onClick={() => setShowQuotePopup(false)}
+                                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

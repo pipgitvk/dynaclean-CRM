@@ -64,7 +64,7 @@ export default function ServiceTable({ serviceRecords, role }) {
       const lowerSearch = searchTerm.toLowerCase();
       const searchMatch =
         Object.values(record).some((value) =>
-          value?.toString().toLowerCase().includes(lowerSearch)
+          value?.toString().toLowerCase().includes(lowerSearch),
         ) || record.customer_name?.toLowerCase().includes(lowerSearch);
 
       if (!searchMatch) return false;
@@ -113,7 +113,7 @@ export default function ServiceTable({ serviceRecords, role }) {
 
   // Deduplicate by service_id
   const uniqueRecords = Array.from(
-    new Map(filteredRecords.map((r) => [r.service_id, r])).values()
+    new Map(filteredRecords.map((r) => [r.service_id, r])).values(),
   );
 
   // Handlers
@@ -162,7 +162,7 @@ export default function ServiceTable({ serviceRecords, role }) {
 
   // Status options for the change-status modal (ensure Pending By Customer is available)
   const statusOptions = Array.from(
-    new Set([...uniqueStatuses.filter(Boolean), "PENDING BY CUSTOMER"])
+    new Set([...uniqueStatuses.filter(Boolean), "PENDING BY CUSTOMER"]),
   );
 
   // Calculate KPIs based on status
@@ -173,10 +173,10 @@ export default function ServiceTable({ serviceRecords, role }) {
     pending: records.filter((r) => r.status?.toUpperCase() === "PENDING")
       .length,
     pendingSpares: records.filter(
-      (r) => r.status?.toUpperCase() === "PENDING FOR SPARES"
+      (r) => r.status?.toUpperCase() === "PENDING FOR SPARES",
     ).length,
     pendingByCustomer: records.filter(
-      (r) => r.status?.toUpperCase() === "PENDING BY CUSTOMER"
+      (r) => r.status?.toUpperCase() === "PENDING BY CUSTOMER",
     ).length,
   };
 
@@ -232,7 +232,7 @@ export default function ServiceTable({ serviceRecords, role }) {
 
     if (requiresDescription && !description) {
       setStatusError(
-        "Description is required when status is PENDING BY CUSTOMER."
+        "Description is required when status is PENDING BY CUSTOMER.",
       );
       return;
     }
@@ -263,8 +263,8 @@ export default function ServiceTable({ serviceRecords, role }) {
         prev.map((r) =>
           r.service_id === statusForm.service_id
             ? { ...r, status: newStatus, status_description: description }
-            : r
-        )
+            : r,
+        ),
       );
 
       setIsStatusModalOpen(false);
@@ -632,7 +632,8 @@ export default function ServiceTable({ serviceRecords, role }) {
                         <div className="flex flex-col space-y-2">
                           {record.status?.toUpperCase() !== "COMPLETED" ? (
                             <>
-                              {(role === "ADMIN" || role === "SERVICE HEAD") && (
+                              {(role === "ADMIN" ||
+                                role === "SERVICE HEAD") && (
                                 <Link
                                   href={`/${dashboardPath}/assign-service/${record.service_id}`}
                                   className="inline-block px-3 py-1 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-center"
@@ -786,13 +787,14 @@ export default function ServiceTable({ serviceRecords, role }) {
                     </span>
                     <div className="flex flex-col items-end max-w-[50%]">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs font-semibold ${record.status?.toUpperCase() === "COMPLETED"
-                          ? "bg-green-200 text-green-800"
-                          : record.status?.toUpperCase() ===
-                            "PENDING FOR SPARES"
-                            ? "bg-orange-200 text-orange-800"
-                            : "bg-gray-200 text-gray-800"
-                          }`}
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          record.status?.toUpperCase() === "COMPLETED"
+                            ? "bg-green-200 text-green-800"
+                            : record.status?.toUpperCase() ===
+                                "PENDING FOR SPARES"
+                              ? "bg-orange-200 text-orange-800"
+                              : "bg-gray-200 text-gray-800"
+                        }`}
                       >
                         {record.status}
                       </span>
@@ -1022,8 +1024,8 @@ export default function ServiceTable({ serviceRecords, role }) {
                   Description{" "}
                   {statusForm.newStatus?.toUpperCase() ===
                     "PENDING BY CUSTOMER" && (
-                      <span className="text-red-500">*</span>
-                    )}
+                    <span className="text-red-500">*</span>
+                  )}
                 </label>
                 <textarea
                   rows={3}

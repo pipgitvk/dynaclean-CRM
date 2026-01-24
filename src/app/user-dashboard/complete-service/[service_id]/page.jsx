@@ -8,28 +8,29 @@ import UpdateReportButton from "@/components/UpdateReportButton";
 export const dynamic = "force-dynamic";
 
 export default async function CompleteServicePage({ params }) {
-  const serviceId = params.service_id;
+  const { service_id } = await params;
+  const serviceId = service_id;
   const conn = await getDbConnection();
 
   const [[service]] = await conn.execute(
     "SELECT * FROM service_records WHERE service_id = ?",
-    [serviceId]
+    [serviceId],
   );
 
   const [[product]] = await conn.execute(
     "SELECT * FROM warranty_products WHERE serial_number = ?",
-    [service?.serial_number]
+    [service?.serial_number],
   );
 
   const [[report]] = await conn.execute(
     "SELECT * FROM service_reports WHERE service_id = ?",
-    [serviceId]
+    [serviceId],
   );
 
   const warrantyExpiry = product?.installation_date
     ? dayjs(product.installation_date)
-      .add(product.warranty_period, "month")
-      .format("DD-MM-YYYY")
+        .add(product.warranty_period, "month")
+        .format("DD-MM-YYYY")
     : "N/A";
 
   const attachments = service?.attachments
@@ -151,8 +152,8 @@ export default async function CompleteServicePage({ params }) {
               <strong>Invoice Date:</strong>{" "}
               {combinedServiceData.product?.invoice_date
                 ? dayjs(combinedServiceData.product.invoice_date).format(
-                  "DD-MM-YYYY"
-                )
+                    "DD-MM-YYYY",
+                  )
                 : "N/A"}
             </p>
             <p>
