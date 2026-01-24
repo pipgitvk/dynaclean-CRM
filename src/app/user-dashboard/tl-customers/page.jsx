@@ -11,12 +11,25 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   const searchParamsResolved = await searchParams;
-  const { search, employee, status, stage, tag, fromDate, toDate, nextFromDate, nextToDate, lead_campaign, page = '1', tlOnly = 'true' } = searchParamsResolved;
+  const {
+    search,
+    employee,
+    status,
+    stage,
+    tag,
+    fromDate,
+    toDate,
+    nextFromDate,
+    nextToDate,
+    lead_campaign,
+    page = "1",
+    tlOnly = "true",
+  } = searchParamsResolved;
 
   const currentPage = parseInt(page);
   const pageSize = 50; // Number of records per page
   const offset = (currentPage - 1) * pageSize;
-  const showTLOnly = tlOnly === 'true';
+  const showTLOnly = tlOnly === "true";
 
   const conn = await getDbConnection();
 
@@ -136,7 +149,10 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   // Get total count for pagination (without LIMIT)
-  let countQuery = query.replace(/SELECT[\s\S]*?FROM customers c/, 'SELECT COUNT(*) as total FROM customers c');
+  let countQuery = query.replace(
+    /SELECT[\s\S]*?FROM customers c/,
+    "SELECT COUNT(*) as total FROM customers c",
+  );
   const [countResult] = await conn.execute(countQuery, params);
   const totalRecords = countResult[0].total;
   const totalPages = Math.ceil(totalRecords / pageSize);
@@ -254,7 +270,7 @@ export default async function TLCustomersPage({ searchParams }) {
 
   // Fetch employees for filter dropdown
   const [employees] = await conn.execute(
-    `SELECT DISTINCT username, username as name FROM rep_list WHERE userRole IN ('SALES', 'ADMIN', 'BACK OFFICE', 'SALES HEAD', 'GEM PORTAL') and status = 1 ORDER BY username`
+    `SELECT DISTINCT username, username as name FROM rep_list WHERE userRole IN ('SALES', 'ADMIN', 'BACK OFFICE', 'SALES HEAD', 'GEM PORTAL') and status = 1 ORDER BY username`,
   );
 
   return (

@@ -12,6 +12,7 @@ export default function QuotationTableClient({ username }) {
   const [toDate, setToDate] = useState("");
 
   const fetchData = async () => {
+    console.log("Fetching quotations for user:", username);
     setLoading(true);
     let url = `/api/quotations-show?username=${username}`;
 
@@ -137,7 +138,9 @@ export default function QuotationTableClient({ username }) {
                   <td className="px-4 py-2">{q.company_name}</td>
                   <td className="px-4 py-2">{q.email || "-"}</td>
                   <td className="px-4 py-2">{q.phone || "-"}</td>
-                  <td className="px-4 py-2">{new Date(q.quote_date).toLocaleDateString("en-IN")}</td>
+                  <td className="px-4 py-2">
+                    {new Date(q.quote_date).toLocaleDateString("en-IN")}
+                  </td>
                   <td className="px-4 py-2">₹{q.grand_total}</td>
                   <td className="px-4 py-2">{q.emp_name}</td>
                   <td className="px-4 py-2 text-center">
@@ -152,7 +155,10 @@ export default function QuotationTableClient({ username }) {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="text-center text-gray-500 py-6 italic">
+                <td
+                  colSpan="8"
+                  className="text-center text-gray-500 py-6 italic"
+                >
                   No quotations found.
                 </td>
               </tr>
@@ -180,7 +186,8 @@ export default function QuotationTableClient({ username }) {
                 </span>
               </div>
               <p className="text-gray-700">
-                <strong className="font-medium">Client Name:</strong> {q.company_name}
+                <strong className="font-medium">Client Name:</strong>{" "}
+                {q.company_name}
               </p>
               <p className="text-gray-700">
                 <strong className="font-medium">Email:</strong> {q.email || "-"}
@@ -192,7 +199,8 @@ export default function QuotationTableClient({ username }) {
                 <strong className="font-medium">Total:</strong> ₹{q.grand_total}
               </p>
               <p className="text-gray-700 mb-4">
-                <strong className="font-medium">Created By:</strong> {q.emp_name}
+                <strong className="font-medium">Created By:</strong>{" "}
+                {q.emp_name}
               </p>
               <div className="flex justify-end">
                 <Link
@@ -205,7 +213,9 @@ export default function QuotationTableClient({ username }) {
             </div>
           ))
         ) : (
-          <div className="p-4 text-center text-gray-500">No quotations found.</div>
+          <div className="p-4 text-center text-gray-500">
+            No quotations found.
+          </div>
         )}
       </div>
     </div>

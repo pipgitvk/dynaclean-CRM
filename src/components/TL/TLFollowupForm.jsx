@@ -97,7 +97,7 @@ export default function TLFollowupForm({
 
     setFormData((prev) => ({
       ...prev,
-      estimated_order_date: latestfollowup.estimated_order_date || "",
+      // estimated_order_date: latestfollowup.estimated_order_date || "",
       lead_quality_score: latestfollowup.lead_quality_score || "",
       status: latestfollowup.status || "",
       notes: latestfollowup.notes || "",
@@ -262,7 +262,7 @@ export default function TLFollowupForm({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               <Calendar size={14} className="inline mr-1" />
-              Estimated Order Date
+              Estimated Order Date (optional)
             </label>
             <input
               type="date"

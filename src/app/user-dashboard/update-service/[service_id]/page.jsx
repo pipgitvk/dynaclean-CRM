@@ -8,7 +8,7 @@ async function getServiceReportData(serviceId) {
     `${process.env.NEXT_PUBLIC_BASE_URL}/api/generate-report/service/${serviceId}`,
     {
       cache: "no-store",
-    }
+    },
   );
 
   if (!res.ok) {
@@ -19,7 +19,8 @@ async function getServiceReportData(serviceId) {
 }
 
 export default async function ServiceReportPage({ params }) {
-  const { service_id } = params;
+  const { service_id } = await params;
+  // console.log("Service ID received:", service_id);
 
   let reportData = null;
   let error = null;
