@@ -24,7 +24,6 @@ import {
   BarChart3,
   Zap,
 } from "lucide-react";
-import { useEffect } from "react";
 
 export const dynamic = "force-dynamic";
 
