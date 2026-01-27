@@ -65,6 +65,7 @@ export async function GET(req) {
   const fromDate = searchParams.get("from_date");
   const toDate = searchParams.get("to_date");
   const customerName = searchParams.get("customer_name");
+  const customerId = searchParams.get("customer_id");
 
   const conn = await getDbConnection();
 
@@ -75,6 +76,7 @@ export async function GET(req) {
     qr.company_name,
     qr.grand_total,
     qr.emp_name,
+    qr.customer_id,
     CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
     c.email,
     c.phone
@@ -93,6 +95,10 @@ export async function GET(req) {
   } else if (empName) {
     conditions.push(`qr.emp_name = ?`);
     values.push(empName);
+  }
+  if (customerId) {
+    conditions.push(`qr.customer_id = ?`);
+    values.push(customerId);
   }
   if (customerName) {
     query +=

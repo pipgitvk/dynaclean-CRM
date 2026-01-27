@@ -34,6 +34,21 @@ export default async function AdminTLCustomerDetailPage({ params }) {
   }
 
   const { customerId } = await params;
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_BASE_URL}/api/quotations-show?customer_id=${encodeURIComponent(customerId)}`,
+    { cache: "no-store" }, // important for server-side fresh data
+  );
+
+  console.log("quotation response status:", res.status);
+
+  let latestquote = null;
+
+  if (res.ok) {
+    latestquote = await res.json();
+    console.log("latestquote data:", latestquote);
+  } else {
+    console.error("Failed to fetch quotation");
+  }
 
   const conn = await getDbConnection();
 
@@ -327,6 +342,25 @@ export default async function AdminTLCustomerDetailPage({ params }) {
                                   )}
                                 </p>
                               </div>
+                            )}
+                            {latestquote?.length > 0 && (
+                              <Link
+                                href={`/admin-dashboard/quotations/${latestquote[0].quote_number}`}
+                                className="block"
+                              >
+                                <div className="bg-green-50 rounded p-1.5 border border-green-200 hover:bg-green-100 transition cursor-pointer">
+                                  <span className="text-gray-500">
+                                    Latest Quotation:
+                                  </span>
+
+                                  <p className="text-green-800 font-medium flex items-center gap-1">
+                                    <Target className="w-3 h-3" />
+                                    {dayjs(latestquote[0].quote_date).format(
+                                      "MMM DD",
+                                    )}
+                                  </p>
+                                </div>
+                              </Link>
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 mt-2 text-xs">
