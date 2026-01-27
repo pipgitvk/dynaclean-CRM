@@ -205,10 +205,10 @@ export default function TLCustomersTable({
   };
 
   // api call for latest quotation for cutomer
-  const fetchLatestQuotation = async ({ customer_name }) => {
-    console.log("Fetching quotations for user:", customer_name);
+  const fetchLatestQuotation = async ({ customerId }) => {
+    console.log("Fetching quotations for user:", customerId);
     setLoading(true);
-    let url = `/api/quotations-show?customer_name=${encodeURIComponent(customer_name)}`;
+    let url = `/api/quotations-show?customer_id=${encodeURIComponent(customerId)}`;
 
     // Append filters to the API request URL
     if (fromDate) url += `&from_date=${fromDate}`;
@@ -1103,7 +1103,7 @@ export default function TLCustomersTable({
                         title="Latest Quotation"
                         onClick={() =>
                           fetchLatestQuotation({
-                            customer_name: `${customer.first_name} ${customer.last_name}`,
+                            customerId: customer.customer_id,
                           })
                         }
                       >
