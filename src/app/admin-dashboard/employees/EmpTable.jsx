@@ -96,6 +96,7 @@ const EmpTable = ({ employees }) => {
   }, []);
 
   const handleImpersonateLogin = async (empId) => {
+    console.log("Impersonate login for empId:", empId);
     try {
       const response = await fetch("/api/impersonate", {
         method: "POST",
@@ -109,7 +110,8 @@ const EmpTable = ({ employees }) => {
         Cookies.set("impersonation_token", data.token, { expires: 1 / 24 });
         router.push("/user-dashboard");
       } else {
-        alert(data.error);
+        console.log("error data :", data.error);
+        // alert(data.error);
       }
     } catch (error) {
       alert("Error while impersonating.");

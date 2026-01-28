@@ -4,7 +4,7 @@ import RepUpdateForm from "@/components/rep-update-form";
 export const dynamic = "force-dynamic";
 
 export default async function RepPage({ params }) {
-  const { username } = params;
+  const { username } = await params;
 
   if (!username) {
     return (
@@ -20,7 +20,7 @@ export default async function RepPage({ params }) {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
       `SELECT password FROM rep_list WHERE username = ?`,
-      [username]
+      [username],
     );
     // await conn.end();
 

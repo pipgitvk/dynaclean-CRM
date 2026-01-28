@@ -64,6 +64,8 @@ export default function TLCustomersTable({
     "Clear",
   ];
 
+  console.log("customer data ", customers);
+
   const basePath = isAdmin
     ? "/admin-dashboard/tl-customers"
     : "/user-dashboard/tl-customers";
@@ -71,51 +73,6 @@ export default function TLCustomersTable({
   // Use allCustomersForKPI for counts, or fallback to customers if not provided
   const customersForKPI =
     allCustomersForKPI.length > 0 ? allCustomersForKPI : customers;
-
-  // const getFilteredCustomers = () => {
-  //   const now = dayjs();
-
-  //   switch (activeFilter) {
-  //     case "upcoming":
-  //       // return customers.filter((customer) => {
-  //       //   const nextFollowup =
-  //       //     customer.tl_next_followup || customer.latest_next_followup;
-  //       //   if (!nextFollowup) return false;
-  //       //   const followupTime = dayjs(nextFollowup);
-  //       //   const hoursDiff = followupTime.diff(now, "hour");
-  //       //   return hoursDiff > 0 && hoursDiff <= 3; // Within next 3 hours
-  //       // });
-  //       return customers.filter(
-  //         (customer) =>
-  //           customer.multi_tag &&
-  //           customer.multi_tag.toLowerCase().includes("strong followup"),
-  //       );
-  //     case "due":
-  //       return customers.filter((customer) => {
-  //         // Exclude closed stages
-  //         const excludedStages = [
-  //           "Won (Order Received)",
-  //           "Lost",
-  //           "Disqualified / Invalid Lead",
-  //         ];
-  //         if (excludedStages.includes(customer.stage)) return false;
-
-  //         const nextFollowup =
-  //           customer.tl_next_followup || customer.latest_next_followup;
-  //         if (!nextFollowup) return false;
-  //         const followupTime = dayjs(nextFollowup);
-  //         return followupTime.isBefore(now); // Overdue
-  //       });
-  //     case "prime":
-  //       return customers.filter(
-  //         (customer) =>
-  //           customer.multi_tag &&
-  //           customer.multi_tag.toLowerCase().includes("prime"),
-  //       );
-  //     default:
-  //       return customers;
-  //   }
-  // };
 
   const getFilteredCustomers = () => {
     const now = dayjs();
@@ -174,6 +131,7 @@ export default function TLCustomersTable({
     //   const hoursDiff = followupTime.diff(now, "hour");
     //   return hoursDiff > 0 && hoursDiff <= 3;
     // }).length;
+
     const upcoming = customersForKPI.filter(
       (customer) =>
         customer.multi_tag &&
@@ -206,7 +164,7 @@ export default function TLCustomersTable({
 
   // api call for latest quotation for cutomer
   const fetchLatestQuotation = async ({ customerId }) => {
-    console.log("Fetching quotations for user:", customerId);
+    // console.log("Fetching quotations for user:", customerId);
     setLoading(true);
     let url = `/api/quotations-show?customer_id=${encodeURIComponent(customerId)}`;
 
@@ -215,7 +173,7 @@ export default function TLCustomersTable({
     if (toDate) url += `&to_date=${toDate}`;
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { next: { revalidate: 3600 } });
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
@@ -298,8 +256,32 @@ export default function TLCustomersTable({
     return stageCounts;
   };
 
+  // const handleFilterClick = (filter) => {
+  //   setActiveFilter(filter);
+  //   // Reset other filters when clicking a filter
+  // };
+
   const handleFilterClick = (filter) => {
     setActiveFilter(filter);
+
+    // startTransition(() => {
+    //   const params = new URLSearchParams();
+
+    //   if (searchTerm) params.set("search", searchTerm);
+    //   if (selectedEmployee) params.set("employee", selectedEmployee);
+    //   if (selectedStatus) params.set("status", selectedStatus);
+    //   if (selectedStage) params.set("stage", selectedStage);
+    //   if (selectedTag) params.set("tag", selectedTag);
+    //   if (fromDate) params.set("fromDate", fromDate);
+    //   if (toDate) params.set("toDate", toDate);
+    //   if (nextFromDate) params.set("nextFromDate", nextFromDate);
+    //   if (nextToDate) params.set("nextToDate", nextToDate);
+
+    //   //  force page = 1
+    //   params.set("page", "1");
+
+    //   router.push(`${basePath}?${params.toString()}`);
+    // });
   };
 
   const handleSearch = (e) => {
@@ -383,6 +365,7 @@ export default function TLCustomersTable({
           customer_id: customerId,
           employee_username: selectedEmpForAssign,
         }),
+        next: { revalidate: 3600 },
       });
 
       const data = await response.json();
@@ -739,7 +722,7 @@ export default function TLCustomersTable({
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isPending ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -752,7 +735,7 @@ export default function TLCustomersTable({
                   type="button"
                   onClick={handleReset}
                   disabled={isPending}
-                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isPending ? (
                     <Loader2 size={18} className="animate-spin" />
@@ -941,35 +924,39 @@ export default function TLCustomersTable({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-blue-600 text-white">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Customer ID
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Name / Company / Phone
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Assigned To
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Stage
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 TL Score
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Multi Tag
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Next Followup
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Estimated Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Actions
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                Notes
               </th>
             </tr>
           </thead>
@@ -978,7 +965,7 @@ export default function TLCustomersTable({
               <tr>
                 <td
                   colSpan="10"
-                  className="px-6 py-4 text-center text-gray-500"
+                  className="px-4 py-4 text-center text-gray-500"
                 >
                   {activeFilter === "all"
                     ? "No customers found"
@@ -988,10 +975,10 @@ export default function TLCustomersTable({
             ) : (
               getFilteredCustomers().map((customer) => (
                 <tr key={customer.customer_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {customer.customer_id}
                   </td>
-                  <td className="px-6 py-4">
+                  <td className="px-4 py-4">
                     <div className="text-sm font-medium text-gray-900 break-words max-w-xs">
                       {customer.first_name} {customer.last_name}
                     </div>
@@ -1002,20 +989,20 @@ export default function TLCustomersTable({
                       {customer.phone}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.lead_source || "Unassigned"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                       {customer.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="w-24">
                       {renderStageProgress(customer.stage)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     {customer.lead_quality_score ? (
                       <span
                         className={`px-2 py-1 text-xs font-semibold rounded ${getQualityScoreColor(
@@ -1028,7 +1015,8 @@ export default function TLCustomersTable({
                       <span className="text-gray-400 text-xs">N/A</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     <div className="flex flex-wrap gap-1">
                       {customer.multi_tag &&
                         customer.multi_tag.split(", ").map((tag, index) => (
@@ -1044,7 +1032,7 @@ export default function TLCustomersTable({
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.tl_next_followup
                       ? dayjs(customer.tl_next_followup).format(
                           "DD MMM, YYYY HH:mm",
@@ -1055,38 +1043,30 @@ export default function TLCustomersTable({
                           )
                         : "N/A"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
                       ? dayjs(customer.estimated_order_date).format(
                           "DD MMM, YYYY HH:mm",
                         )
                       : "N/A"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex gap-3">
                       <Link
                         href={`${basePath}/${customer.customer_id}?${queryString}`}
                         className="text-blue-600 hover:text-blue-800"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        // target="_blank"
+                        // rel="noopener noreferrer"
                         title="View Details"
                       >
                         <Eye size={18} />
                       </Link>
-                      {/* <button
-                        href={`${basePath}/${customer.customer_id}?${queryString}`}
-                        className="text-blue-600 hover:text-blue-800"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="View Details"
-                      >
-                        <Eye size={18} />
-                      </button> */}
+
                       <Link
                         href={`${basePath}/${customer.customer_id}/followup?${queryString}`}
                         className="text-green-600 hover:text-green-800"
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        // target="_blank"
+                        // rel="noopener noreferrer"
                         title="Add TL Followup"
                       >
                         <Edit size={18} />
@@ -1228,6 +1208,26 @@ export default function TLCustomersTable({
                           )}
                         </div>
                       </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-sm text-gray-700">
+                    {customer.tl_notes ? (
+                      <div className="relative group max-w-[180px]">
+                        <span className="truncate block">
+                          {customer.tl_notes.split(" ").slice(0, 2).join(" ")}
+                          ...
+                        </span>
+
+                        <div
+                          className="absolute z-50 hidden group-hover:block
+                      bg-black text-white text-xs rounded px-2 py-1
+                      mt-1 max-w-xs whitespace-normal"
+                        >
+                          {customer.tl_notes}
+                        </div>
+                      </div>
+                    ) : (
+                      "—"
                     )}
                   </td>
                 </tr>

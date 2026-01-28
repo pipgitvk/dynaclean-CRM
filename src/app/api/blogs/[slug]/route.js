@@ -7,24 +7,18 @@ export async function GET(request, { params }) {
   try {
     const { slug } = params;
     const db = await getDbConnection();
-    const [rows] = await db.query(
-      `SELECT * FROM blogs WHERE slug = ?`,
-      [slug]
-    );
+    const [rows] = await db.query(`SELECT * FROM blogs WHERE slug = ?`, [slug]);
     // db.end();
 
     if (rows.length === 0) {
-      return NextResponse.json(
-        { message: "Blog not found." },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: "Blog not found." }, { status: 404 });
     }
     return NextResponse.json({ blog: rows[0] });
   } catch (error) {
     console.error("Error fetching blog data:", error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -46,28 +40,32 @@ export async function PUT(request, { params }) {
 
     const db = await getDbConnection();
 
-    // You will need to handle the image file upload here.
-    // For now, let's assume you've handled it and have the final image path.
-    // For a simple example, let's just use the existing image_path or log a message.
     let finalImagePath = image_path;
     if (imageFile) {
-        // Here you would add logic to save the new image and get its path.
-        // For example:
-        // const filePath = await saveImage(imageFile);
-        // finalImagePath = filePath;
-        console.log("New image file received but not processed yet.");
+      // const filePath = await saveImage(imageFile);
+      // finalImagePath = filePath;
+      console.log("New image file received but not processed yet.");
     }
 
     const [result] = await db.query(
       `UPDATE blogs SET title = ?, content = ?, image_path = ?, meta_tags = ?, og_tags = ?, category = ?, status = ?, updated_at = NOW() WHERE slug = ?`,
-      [title, content, finalImagePath, meta_tags, og_tags, category, status, slug]
+      [
+        title,
+        content,
+        finalImagePath,
+        meta_tags,
+        og_tags,
+        category,
+        status,
+        slug,
+      ],
     );
     // db.end();
 
     if (result.affectedRows === 0) {
       return NextResponse.json(
         { message: "Blog not found or no changes made." },
-        { status: 404 }
+        { status: 404 },
       );
     }
     return NextResponse.json({ message: "Blog updated successfully." });
@@ -75,7 +73,7 @@ export async function PUT(request, { params }) {
     console.error("Error updating blog:", error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -86,24 +84,18 @@ export async function DELETE(request, { params }) {
     const { slug } = params;
     const db = await getDbConnection();
 
-    const [result] = await db.query(
-      `DELETE FROM blogs WHERE slug = ?`,
-      [slug]
-    );
+    const [result] = await db.query(`DELETE FROM blogs WHERE slug = ?`, [slug]);
     // db.end();
 
     if (result.affectedRows === 0) {
-      return NextResponse.json(
-        { message: "Blog not found." },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: "Blog not found." }, { status: 404 });
     }
     return NextResponse.json({ message: "Blog deleted successfully." });
   } catch (error) {
     console.error("Error deleting blog:", error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

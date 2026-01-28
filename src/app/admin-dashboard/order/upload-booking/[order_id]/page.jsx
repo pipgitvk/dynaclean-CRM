@@ -3,13 +3,14 @@ import { getDbConnection } from "@/lib/db";
 import UploadBookingForm from "./form";
 
 export default async function UploadBookingPage({ params }) {
-  const orderId = parseInt(params.order_id);
+  const { order_id } = await params;
+  const orderId = order_id;
 
   const conn = await getDbConnection();
 
   const [rows] = await conn.execute(
     `SELECT order_id, client_name, contact, email, delivery_location, quote_number, client_delivery_date FROM neworder WHERE order_id = ?`,
-    [orderId]
+    [orderId],
   );
 
   // await conn.end();
