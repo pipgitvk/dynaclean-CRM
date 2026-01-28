@@ -10,28 +10,39 @@ const secret = new TextEncoder().encode(JWT_SECRET);
 export async function POST(request) {
   try {
     const { empId } = await request.json();
-    const adminToken = cookies().get("token")?.value;
+    console.log("employee id ", empId);
+    const cookieStore = await cookies();
+    const adminToken = cookieStore.get("token")?.value;
 
     if (!adminToken) {
-      return NextResponse.json({ error: "Admin not authenticated" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Admin not authenticated" },
+        { status: 401 },
+      );
     }
 
     // Verify the admin's token
     const { payload: adminPayload } = await jwtVerify(adminToken, secret);
 
     if (adminPayload.role !== "SUPERADMIN") {
-      return NextResponse.json({ error: "Unauthorized access" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Unauthorized access" },
+        { status: 403 },
+      );
     }
 
     const conn = await getDbConnection();
     const [empRows] = await conn.execute(
       "SELECT username, userRole FROM rep_list WHERE empId = ?",
-      [empId]
+      [empId],
     );
     // await conn.end();
 
     if (empRows.length === 0) {
-      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Employee not found" },
+        { status: 404 },
+      );
     }
 
     const employee = empRows[0];
@@ -51,6 +62,9 @@ export async function POST(request) {
     return NextResponse.json({ token: impersonationToken });
   } catch (error) {
     console.error("Error during impersonation:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }

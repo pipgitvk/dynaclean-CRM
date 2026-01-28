@@ -1,108 +1,28 @@
 "use client";
 
-import { useRef ,useMemo} from "react";
+import { useRef, useState, useMemo } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Image from "next/image";
+import { set } from "date-fns";
 
 export default function QuotationViewer({ header, items }) {
   const containerRef = useRef();
   const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
-    // Map payment_term_days to readable text
+  // Map payment_term_days to readable text
   const paymentTermDays = useMemo(() => {
     const map = {
-      "0": "Advance",
-      "9": "COD",
-      "15": "15 Days",
-      "30": "30 Days",
-      "45": "45 Days",
-      "60": "60 Days",
+      0: "Advance",
+      9: "COD",
+      15: "15 Days",
+      30: "30 Days",
+      45: "45 Days",
+      60: "60 Days",
     };
     return map[header.payment_term_days] || header.payment_term_days || "";
   }, [header.payment_term_days]);
 
-  // const downloadPDF = async () => {
-  //   const el = containerRef.current;
-  //   if (!el) return;
-  
-  //   // Force show large view and hide mobile view temporarily
-  //   const lgViewElements = el.querySelectorAll(".lg-view");
-  //   const mobileViewElements = el.querySelectorAll(".mobile-view");
-  //   const originalLgDisplay = Array.from(lgViewElements).map(e => e.style.display);
-  //   const originalMobileDisplay = Array.from(mobileViewElements).map(e => e.style.display);
-  
-  //   lgViewElements.forEach(e => (e.style.display = "block"));
-  //   mobileViewElements.forEach(e => (e.style.display = "none"));
-  
-  //   try {
-  //     const pdf = new jsPDF("p", "mm", "a4");
-  //     const pdfWidth = pdf.internal.pageSize.getWidth();
-  //     const pdfHeight = pdf.internal.pageSize.getHeight();
-  
-  //     const canvas = await html2canvas(el, {
-  //       scale: 2,
-  //       useCORS: true,
-  //       allowTaint: true,
-  //       scrollY: 0,
-  //       windowWidth: el.scrollWidth,
-  //       windowHeight: el.scrollHeight,
-  //     });
-  
-  //     const imgData = canvas.toDataURL("image/png", 1.0);
-  
-  //     const imgProps = pdf.getImageProperties(imgData);
-  //     const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-  
-  //     // If content fits in one page, simple addImage
-  //     if (imgHeight <= pdfHeight) {
-  //       pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, imgHeight);
-  //     } else {
-  //       // Split tall image into multiple page-sized chunks
-  //       let position = 0;
-  //       let heightLeft = imgHeight;
-  
-  //       const pageCanvas = document.createElement("canvas");
-  //       const pageCtx = pageCanvas.getContext("2d");
-  //       const pageHeightPx = (pdfHeight * canvas.height) / imgHeight; // height in px that fits one page
-  //       pageCanvas.width = canvas.width;
-  //       pageCanvas.height = pageHeightPx;
-  
-  //       let pageIndex = 0;
-  //       while (heightLeft > 0) {
-  //         // Clear previous
-  //         pageCtx.clearRect(0, 0, pageCanvas.width, pageCanvas.height);
-  //         // Copy portion from main canvas
-  //         pageCtx.drawImage(
-  //           canvas,
-  //           0,
-  //           pageIndex * pageHeightPx,
-  //           canvas.width,
-  //           pageHeightPx,
-  //           0,
-  //           0,
-  //           pageCanvas.width,
-  //           pageCanvas.height
-  //         );
-  
-  //         const pageData = pageCanvas.toDataURL("image/png", 1.0);
-  //         if (pageIndex > 0) pdf.addPage();
-  //         pdf.addImage(pageData, "PNG", 0, 0, pdfWidth, pdfHeight);
-  
-  //         heightLeft -= pdfHeight;
-  //         pageIndex++;
-  //       }
-  //     }
-  
-  //     pdf.save("quotation.pdf");
-  //   } catch (error) {
-  //     console.error("PDF generation failed:", error);
-  //   } finally {
-  //     // Revert to original
-  //     lgViewElements.forEach((e, i) => (e.style.display = originalLgDisplay[i]));
-  //     mobileViewElements.forEach((e, i) => (e.style.display = originalMobileDisplay[i]));
-  //   }
-  // };
-  
+  const [isInvoice, setIsInvoice] = useState(false);
 
   const downloadPDF = async () => {
     const el = containerRef.current;
@@ -114,10 +34,10 @@ export default function QuotationViewer({ header, items }) {
 
     // Store original display styles to revert later
     const originalLgDisplay = Array.from(lgViewElements).map(
-      (e) => e.style.display
+      (e) => e.style.display,
     );
     const originalMobileDisplay = Array.from(mobileViewElements).map(
-      (e) => e.style.display
+      (e) => e.style.display,
     );
 
     // Force show the large view and hide the mobile view
@@ -157,10 +77,10 @@ export default function QuotationViewer({ header, items }) {
           console.warn(
             "Failed to convert image to base64 for PDF:",
             img.src,
-            err
+            err,
           );
         }
-      })
+      }),
     );
 
     // Fix modern color function errors (oklch, lab, lch, etc.) for html2canvas compatibility
@@ -230,10 +150,153 @@ export default function QuotationViewer({ header, items }) {
     } finally {
       // Revert to original display styles and Tailwind classes
       lgViewElements.forEach(
-        (e, i) => (e.style.display = originalLgDisplay[i])
+        (e, i) => (e.style.display = originalLgDisplay[i]),
       );
       mobileViewElements.forEach(
-        (e, i) => (e.style.display = originalMobileDisplay[i])
+        (e, i) => (e.style.display = originalMobileDisplay[i]),
+      );
+
+      if (lgViewContainer && originalLgClasses !== undefined) {
+        lgViewContainer.className = originalLgClasses;
+      }
+
+      // Revert width so on-screen layout goes back to normal
+      el.style.width = originalWidth;
+      el.style.maxWidth = originalMaxWidth;
+    }
+  };
+
+  const downloadInvoice = async () => {
+    setIsInvoice(true);
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Temporarily force the large screen view for the PDF generation
+    const lgViewElements = el.querySelectorAll(".lg-view");
+    const mobileViewElements = el.querySelectorAll(".mobile-view");
+
+    // Store original display styles to revert later
+    const originalLgDisplay = Array.from(lgViewElements).map(
+      (e) => e.style.display,
+    );
+    const originalMobileDisplay = Array.from(mobileViewElements).map(
+      (e) => e.style.display,
+    );
+
+    // Force show the large view and hide the mobile view
+    lgViewElements.forEach((e) => (e.style.display = "block"));
+    mobileViewElements.forEach((e) => (e.style.display = "none"));
+
+    // Also make sure the lg-view container is not hidden by Tailwind classes
+    const lgViewContainer = el.querySelector(".lg-view");
+    const originalLgClasses = lgViewContainer?.className;
+    if (lgViewContainer) {
+      lgViewContainer.classList.remove("hidden");
+    }
+
+    // Fix the width so the PDF looks the same on mobile / tablet / desktop
+    // (approx. A4 width in pixels), and remember original inline width styles
+    const originalWidth = el.style.width;
+    const originalMaxWidth = el.style.maxWidth;
+    el.style.width = "1123px"; // ~ A4 width at 96dpi
+    el.style.maxWidth = "1123px";
+
+    // Convert all <img> tags to base64
+    const images = el.querySelectorAll("img");
+    await Promise.all(
+      Array.from(images).map(async (img) => {
+        if (img.src.startsWith("data:")) return;
+        try {
+          const res = await fetch(img.src, { mode: "cors" });
+          const blob = await res.blob();
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          img.src = base64;
+        } catch (err) {
+          console.warn(
+            "Failed to convert image to base64 for PDF:",
+            img.src,
+            err,
+          );
+        }
+      }),
+    );
+
+    // Fix modern color function errors (oklch, lab, lch, etc.) for html2canvas compatibility
+    el.querySelectorAll("*").forEach((e) => {
+      const style = window.getComputedStyle(e);
+      const color = style.color || "";
+      const bg = style.backgroundColor || "";
+
+      if (
+        color.includes("oklch") ||
+        color.includes("oklab") ||
+        color.includes("lab(") ||
+        color.includes("lch(")
+      ) {
+        e.style.color = "#000";
+      }
+
+      if (
+        bg.includes("oklch") ||
+        bg.includes("oklab") ||
+        bg.includes("lab(") ||
+        bg.includes("lch(")
+      ) {
+        e.style.backgroundColor = "#fff";
+      }
+    });
+
+    // Generate PDF
+    try {
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        scrollY: 0,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight,
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.7);
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Image dimensions in jsPDF units
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgWidth = pdfWidth;
+      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+      // Calculate total number of pages
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight; // shift canvas for next page
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pdfHeight;
+      }
+
+      pdf.save("quotation.pdf");
+    } catch (error) {
+      console.error("Error during PDF generation:", error);
+    } finally {
+      // Revert to original display styles and Tailwind classes
+      lgViewElements.forEach(
+        (e, i) => (e.style.display = originalLgDisplay[i]),
+      );
+      mobileViewElements.forEach(
+        (e, i) => (e.style.display = originalMobileDisplay[i]),
       );
 
       if (lgViewContainer && originalLgClasses !== undefined) {
@@ -274,13 +337,18 @@ export default function QuotationViewer({ header, items }) {
                 Gandhi Nagar, Ganapathy, Coimbatore, Coimbatore, Tamil Nadu,
                 641006
               </p>
-              <p>Email: sales@dynacleanindustries.com | Conatact: +91 7982456944, 011-45143666</p>
+              <p>
+                Email: sales@dynacleanindustries.com | Conatact: +91 7982456944,
+                011-45143666
+              </p>
               <p>GSTIN: 07AAKCD6495M1ZV </p>
             </div>
           </div>
         </div>
         <div className="text-center">
-          <span className="text-gray-800">Quotation / Proforma Invoice</span>
+          <span className="text-gray-800">
+            {isInvoice ? "Tax Invoice" : "Quotation / Proforma Invoice"}
+          </span>
         </div>
         {/* Customer Info */}
         <div className="p-4 border rounded bg-gray-50 text-sm space-y-2 sm:space-y-0 sm:flex sm:justify-between">
@@ -372,9 +440,7 @@ export default function QuotationViewer({ header, items }) {
                   </td>
                   <td className="p-1">{it.gst}</td>
                   <td className="p-1">{it.igsttamt}</td>
-                  <td className="p-1">
-                    ₹{Number(it.total_price).toFixed(2)}
-                  </td>
+                  <td className="p-1">₹{Number(it.total_price).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -477,6 +543,7 @@ export default function QuotationViewer({ header, items }) {
           {/* Bank */}
           <div className="border p-4 rounded bg-gray-50">
             <h4 className="font-semibold mb-1">Bank Details</h4>
+            <p>A/C Holder Name: Dynaclean Industries Private Limited</p>
             <p>ICICI Bank</p>
             <p>Account: 343405500379</p>
             <p>IFSC: ICIC0003434</p>
@@ -501,13 +568,23 @@ export default function QuotationViewer({ header, items }) {
       </div>
 
       {/* Download Button */}
-      <div className="text-right">
-        <button
-          onClick={downloadPDF}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-        >
-          Download PDF
-        </button>
+      <div className="flex gap-5 items-center justify-end w-full">
+        <div className="text-right">
+          <button
+            onClick={downloadPDF}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+          >
+            Download PDF
+          </button>
+        </div>
+        {/* <div className="text-right">
+          <button
+            onClick={downloadInvoice}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+          >
+            Download Invoice
+          </button>
+        </div> */}
       </div>
     </div>
   );

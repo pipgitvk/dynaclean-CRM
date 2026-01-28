@@ -33,6 +33,12 @@ export default async function TLCustomersPage({ searchParams }) {
 
   const conn = await getDbConnection();
 
+  // Fetch TL followups
+  // const [tlFollowups] = await conn.execute(
+  //   `SELECT * FROM TL_followups WHERE customer_id = ? ORDER BY created_at DESC`,
+  //   [customerId],
+  // );
+
   // Build query to fetch customers with their latest followup info
   let query = `
     SELECT

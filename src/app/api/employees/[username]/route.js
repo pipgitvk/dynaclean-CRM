@@ -6,18 +6,18 @@ import path from "path";
 
 export async function GET(request, { params }) {
   try {
-    const { username } = params;
+    const { username } = await params;
     const db = await getDbConnection();
     const [rows] = await db.query(
       "SELECT username, email, dob, number, address, state, userRole, profile_pic FROM rep_list WHERE username = ?",
-      [username]
+      [username],
     );
     // db.end();
 
     if (rows.length === 0) {
       return NextResponse.json(
         { message: "Employee not found." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -26,7 +26,7 @@ export async function GET(request, { params }) {
     console.error("Error fetching employee data:", error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -75,9 +75,18 @@ export async function PUT(request, { params }) {
         SET email = ?, dob = ?, number = ?, address = ?, state = ?, userRole = ?, profile_pic = ? 
         WHERE username = ?
       `;
-      queryParams = [email, dob, number, address, state, userRole, profilePicPath, username];
+      queryParams = [
+        email,
+        dob,
+        number,
+        address,
+        state,
+        userRole,
+        profilePicPath,
+        username,
+      ];
     }
-    
+
     const db = await getDbConnection();
     const [result] = await db.query(query, queryParams);
     // db.end();
@@ -85,7 +94,7 @@ export async function PUT(request, { params }) {
     if (result.affectedRows === 0) {
       return NextResponse.json(
         { message: "Employee not found or no changes made." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -94,7 +103,7 @@ export async function PUT(request, { params }) {
     console.error("Error updating employee data:", error);
     return NextResponse.json(
       { message: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

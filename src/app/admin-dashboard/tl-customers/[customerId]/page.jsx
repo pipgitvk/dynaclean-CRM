@@ -79,13 +79,13 @@ export default async function AdminTLCustomerDetailPage({ params }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Link
+        {/* <Link
           href="/admin-dashboard/tl-customers"
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6 transition-colors"
         >
           <ArrowLeft size={20} />
           Back to TL Customers
-        </Link>
+        </Link> */}
 
         {/* Customer Overview Card */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-4 mb-4">
