@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 
 export default function DispatchViewPage({ params }) {
-  const { order_id } = params;
+  const { order_id } = useParams();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +26,9 @@ export default function DispatchViewPage({ params }) {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Dispatch Details for Order #{order_id}</h2>
+        <h2 className="text-lg font-semibold">
+          Dispatch Details for Order #{order_id}
+        </h2>
         {/* <Link href={`/user-dashboard/order/dispatch/${order_id}`} className="text-blue-600 underline">Edit</Link> */}
       </div>
       {rows.length === 0 ? (
@@ -46,19 +49,26 @@ export default function DispatchViewPage({ params }) {
             </thead>
             <tbody>
               {rows.map((r) => {
-                const photos = (r.photos || "").split(",").map((s) => s.trim()).filter(Boolean);
+                const photos = (r.photos || "")
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
                 let accessories = [];
                 if (r.accessories_checklist) {
                   try {
                     accessories = JSON.parse(r.accessories_checklist);
                   } catch (e) {
-                    console.error('Failed to parse accessories_checklist:', e);
+                    console.error("Failed to parse accessories_checklist:", e);
                   }
                 }
                 return (
                   <tr key={r.id}>
-                    <td className="p-2 border whitespace-nowrap">{r.item_name}</td>
-                    <td className="p-2 border whitespace-nowrap">{r.item_code}</td>
+                    <td className="p-2 border whitespace-nowrap">
+                      {r.item_name}
+                    </td>
+                    <td className="p-2 border whitespace-nowrap">
+                      {r.item_code}
+                    </td>
                     <td className="p-2 border">{r.godown || "-"}</td>
                     <td className="p-2 border">{r.serial_no || "-"}</td>
                     <td className="p-2 border">{r.remarks || "-"}</td>
@@ -70,7 +80,9 @@ export default function DispatchViewPage({ params }) {
                               <span className="text-green-600">✓</span>
                               <span>{acc.accessory_name}</span>
                               {acc.is_mandatory === 1 && (
-                                <span className="text-red-600 text-[10px]">(required)</span>
+                                <span className="text-red-600 text-[10px]">
+                                  (required)
+                                </span>
                               )}
                             </li>
                           ))}
@@ -81,11 +93,24 @@ export default function DispatchViewPage({ params }) {
                     </td>
                     <td className="p-2 border">
                       <div className="flex gap-2 flex-wrap">
-                        {photos.length ? photos.map((p, idx) => (
-                          <a key={idx} href={p} target="_blank" className="block w-16 h-16 border rounded overflow-hidden">
-                            <img src={p} alt="photo" className="object-cover w-full h-full" />
-                          </a>
-                        )) : <span className="text-gray-500">No photos</span>}
+                        {photos.length ? (
+                          photos.map((p, idx) => (
+                            <a
+                              key={idx}
+                              href={p}
+                              target="_blank"
+                              className="block w-16 h-16 border rounded overflow-hidden"
+                            >
+                              <img
+                                src={p}
+                                alt="photo"
+                                className="object-cover w-full h-full"
+                              />
+                            </a>
+                          ))
+                        ) : (
+                          <span className="text-gray-500">No photos</span>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -10,7 +10,7 @@ async function getOrderDetails(orderId) {
 
   const [rows] = await conn.execute(
     "SELECT * FROM neworder WHERE order_id = ?",
-    [orderId]
+    [orderId],
   );
   // await conn.end();
 
@@ -18,7 +18,8 @@ async function getOrderDetails(orderId) {
 }
 
 export default async function Page({ params }) {
-  const orderId = params.order_id;
+  const { order_id } = await params;
+  const orderId = order_id;
   if (!orderId || isNaN(orderId)) notFound();
 
   const orderDetails = await getOrderDetails(orderId);

@@ -5,7 +5,7 @@ import { getDbConnection } from "@/lib/db";
 // GET single blog by slug
 export async function GET(request, { params }) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
     const db = await getDbConnection();
     const [rows] = await db.query(`SELECT * FROM blogs WHERE slug = ?`, [slug]);
     // db.end();
@@ -25,7 +25,7 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
 
     // Correctly handle FormData from the request
     const formData = await request.formData();
