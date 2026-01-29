@@ -10,7 +10,7 @@ async function getOrderData(order_id) {
 
   const [orderRows] = await connection.execute(
     "SELECT * FROM neworder WHERE order_id = ?",
-    [order_id]
+    [order_id],
   );
 
   if (orderRows.length === 0) return null;
@@ -18,7 +18,7 @@ async function getOrderData(order_id) {
   const orderDetails = orderRows[0];
   const [itemsRows] = await connection.execute(
     "SELECT * FROM quotation_items WHERE quote_number = ?",
-    [orderDetails.quote_number]
+    [orderDetails.quote_number],
   );
 
   const stages = [
@@ -67,7 +67,8 @@ async function getOrderData(order_id) {
 }
 
 export default async function Page({ params }) {
-  const data = await getOrderData(params.order_id);
+  const { order_id } = await params;
+  const data = await getOrderData(order_id);
   if (!data) return notFound();
   return <ViewOrderDetails data={data} />;
 }

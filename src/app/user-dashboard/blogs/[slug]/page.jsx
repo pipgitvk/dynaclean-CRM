@@ -11,7 +11,7 @@ const Editor = dynamic(
   () => import("@tinymce/tinymce-react").then((mod) => mod.Editor),
   {
     ssr: false,
-  }
+  },
 );
 
 const BlogEditorPage = () => {
@@ -33,16 +33,18 @@ const BlogEditorPage = () => {
 
   // Helper to generate a URL-friendly slug from the title
   const generateSlug = (text) => {
-    return text
-      .toString()
-      .toLowerCase()
-      .trim()
-      // Replace spaces and underscores with hyphens
-      .replace(/[\s_]+/g, "-")
-      // Remove all non-word chars except hyphens
-      .replace(/[^a-z0-9-]/g, "")
-      // Replace multiple hyphens with a single one
-      .replace(/-+/g, "-");
+    return (
+      text
+        .toString()
+        .toLowerCase()
+        .trim()
+        // Replace spaces and underscores with hyphens
+        .replace(/[\s_]+/g, "-")
+        // Remove all non-word chars except hyphens
+        .replace(/[^a-z0-9-]/g, "")
+        // Replace multiple hyphens with a single one
+        .replace(/-+/g, "-")
+    );
   };
 
   useEffect(() => {
@@ -77,7 +79,10 @@ const BlogEditorPage = () => {
         ...prev,
         title: value,
         // Only overwrite slug if user has not manually typed something different
-        slug: prev.slug && prev.slug !== generateSlug(prev.title) ? prev.slug : autoSlug,
+        slug:
+          prev.slug && prev.slug !== generateSlug(prev.title)
+            ? prev.slug
+            : autoSlug,
       }));
       return;
     }
@@ -237,8 +242,17 @@ const BlogEditorPage = () => {
                 "alignleft aligncenter alignright alignjustify | " +
                 "bullist numlist outdent indent | " +
                 "link unlink | image media | removeformat | help",
+              // link_context_toolbar: true,
+              // default_link_target: "_blank",
               link_context_toolbar: true,
               default_link_target: "_blank",
+              link_default_protocol: "https",
+
+              // ✅ URL validation (FORMAT check)
+              link_validate_callback: (href) => {
+                // allow only http / https links
+                return /^(https?:\/\/)/i.test(href);
+              },
             }}
             onEditorChange={handleEditorChange}
           />
