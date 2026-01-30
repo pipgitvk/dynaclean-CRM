@@ -2,12 +2,13 @@
 "use client"; // This makes it a Client Component
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast"; // For notifications
 
-export default function ServiceReportPage({ params }) {
-  const { service_id } = params;
+export default function ServiceReportPage() {
+  const { service_id } = useParams();
+  console.log("Service ID from params:", service_id);
   const router = useRouter();
   const [serviceData, setServiceData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -120,23 +121,23 @@ export default function ServiceReportPage({ params }) {
               <strong>Service ID:</strong> {currentServiceId}
             </p>
             <p>
-              <strong>Customer Name:</strong> {warranty_info.customer_name}
+              <strong>Customer Name:</strong> {warranty_info?.customer_name}
             </p>
             <p>
-              <strong>Email:</strong> {warranty_info.email}
+              <strong>Email:</strong> {warranty_info?.email}
             </p>
             <p>
-              <strong>Contact:</strong> {warranty_info.contact}
+              <strong>Contact:</strong> {warranty_info?.contact}
             </p>
             <p>
-              <strong>Address:</strong> {warranty_info.customer_address}
+              <strong>Address:</strong> {warranty_info?.customer_address}
             </p>
             <p>
               <strong>Installed Address:</strong>{" "}
-              {warranty_info.installed_address}
+              {warranty_info?.installed_address}
             </p>
             <p>
-              <strong>Invoice Number:</strong> {warranty_info.invoice_number}
+              <strong>Invoice Number:</strong> {warranty_info?.invoice_number}
             </p>
           </div>
           <div className="info-box p-4 rounded-md">
@@ -144,30 +145,30 @@ export default function ServiceReportPage({ params }) {
               Product & Warranty Info
             </h4>
             <p>
-              <strong>Invoice Date:</strong> {warranty_info.invoice_date}
+              <strong>Invoice Date:</strong> {warranty_info?.invoice_date}
             </p>
             <p>
-              <strong>Product Name:</strong> {warranty_info.product_name}
+              <strong>Product Name:</strong> {warranty_info?.product_name}
             </p>
             <p>
-              <strong>Specification:</strong> {warranty_info.specification}
+              <strong>Specification:</strong> {warranty_info?.specification}
             </p>
             <p>
-              <strong>Serial No.:</strong> {warranty_info.serial_number}
+              <strong>Serial No.:</strong> {warranty_info?.serial_number}
             </p>
             <p>
               <strong>Installation Date:</strong>{" "}
-              {warranty_info.installation_date}
+              {warranty_info?.installation_date}
             </p>
             <p>
-              <strong>Warranty Period:</strong> {warranty_info.warranty_period}{" "}
+              <strong>Warranty Period:</strong> {warranty_info?.warranty_period}{" "}
               months
             </p>
             <p>
               <strong>Warranty Expiry:</strong> {warranty_expiry}
             </p>
             <p>
-              <strong>Model:</strong> {warranty_info.model}
+              <strong>Model:</strong> {warranty_info?.model}
             </p>
           </div>
           <div className="col-span-full info-box bg-orange-50 p-4 rounded-md border border-orange-200">
@@ -175,7 +176,7 @@ export default function ServiceReportPage({ params }) {
               Complaint Details
             </h4>
             <p>
-              <strong>Complaint Date:</strong> {serviceData.complaint_date}
+              <strong>Complaint Date:</strong> {serviceData?.complaint_date}
             </p>
             <p>
               <strong>Complaint Summary:</strong> {complaint_summary}

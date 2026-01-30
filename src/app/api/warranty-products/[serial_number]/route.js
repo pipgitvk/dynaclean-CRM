@@ -48,7 +48,9 @@ export async function GET(req, { params }) {
 
 // PUT handler to update a warranty product
 export async function PUT(req, { params }) {
-  const serialNumber = params.serial_number; // This is the original serial_number from the URL
+  // const serialNumber = params.serial_number;
+  const { serial_number } = await params;
+  const serialNumber = serial_number;
   if (!serialNumber) {
     return NextResponse.json(
       { error: "Serial number for update is required." },

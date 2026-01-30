@@ -20,7 +20,9 @@ export default function MetaBackfillPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/meta-backfill?since=${since}&until=${until}`);
+      const res = await fetch(
+        `/api/meta-backfill?since=${since}&until=${until}`,
+      );
       if (!res.ok) {
         setMessage("Failed to fetch leads from Meta");
         return;
@@ -80,7 +82,9 @@ export default function MetaBackfillPage() {
         return;
       }
       const data = await res.json();
-      setMessage(`Imported / processed ${data.count} leads. Check DB/logs for details.`);
+      setMessage(
+        `Imported / processed ${data.count} leads. Check DB/logs for details.`,
+      );
     } catch (err) {
       console.error(err);
       setMessage("Error importing leads");
@@ -159,11 +163,19 @@ export default function MetaBackfillPage() {
               <tbody>
                 {leads.map((lead) => (
                   <tr key={lead.leadgen_id}>
-                    <td className="px-2 py-1 border break-all">{lead.leadgen_id}</td>
-                    <td className="px-2 py-1 border">{lead.created_time || "-"}</td>
-                    <td className="px-2 py-1 border">{lead.first_name || "-"}</td>
+                    <td className="px-2 py-1 border break-all">
+                      {lead.leadgen_id}
+                    </td>
+                    <td className="px-2 py-1 border">
+                      {lead.created_time || "-"}
+                    </td>
+                    <td className="px-2 py-1 border">
+                      {lead.first_name || "-"}
+                    </td>
                     <td className="px-2 py-1 border">{lead.phone || "-"}</td>
-                    <td className="px-2 py-1 border break-all">{lead.email || "-"}</td>
+                    <td className="px-2 py-1 border break-all">
+                      {lead.email || "-"}
+                    </td>
                     <td className="px-2 py-1 border">{lead.address || "-"}</td>
                     <td className="px-2 py-1 border">
                       {lead.products_interest || "-"}
