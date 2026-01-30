@@ -43,6 +43,8 @@ export default function EmployeeLeadsTable() {
     }
   };
 
+  console.log("Leads data:", leads);
+
   const getStageColor = (stage) => {
     const colors = {
       "Customer Created": "bg-blue-100 text-blue-800",
@@ -125,14 +127,14 @@ export default function EmployeeLeadsTable() {
   ];
   const totalLeads = uniqueCustomers.length;
   const quotationsCreated = filteredLeads.filter(
-    (lead) => lead.quote_number
+    (lead) => lead.quote_number,
   ).length;
   const ordersCreated = filteredLeads.filter(
-    (lead) => lead.order_id && lead.account_status === 1
+    (lead) => lead.order_id && lead.account_status === 1,
   ).length;
   const ordersProcessed = filteredLeads.filter(
     (lead) =>
-      lead.order_id && lead.account_status === 1 && lead.dispatch_status === 1
+      lead.order_id && lead.account_status === 1 && lead.dispatch_status === 1,
   ).length;
   const conversionRatio =
     totalLeads > 0 ? (ordersCreated / totalLeads) * 100 : 0;
@@ -284,7 +286,7 @@ export default function EmployeeLeadsTable() {
                   className="bg-white border rounded-lg p-4 shadow-sm cursor-pointer"
                   onClick={() =>
                     router.push(
-                      `/admin-dashboard/view-customer/${lead.customer_id}`
+                      `/admin-dashboard/view-customer/${lead.customer_id}`,
                     )
                   }
                 >
@@ -299,7 +301,7 @@ export default function EmployeeLeadsTable() {
                     </div>
                     <span
                       className={`px-2 py-1 rounded-full text-[10px] font-semibold ${getStageColor(
-                        lead.current_stage
+                        lead.current_stage,
                       )}`}
                     >
                       {lead.current_stage}
@@ -353,7 +355,7 @@ export default function EmployeeLeadsTable() {
                           ? `${lead.invoice_number || lead.order_id} (${
                               lead.invoice_date
                                 ? new Date(
-                                    lead.invoice_date
+                                    lead.invoice_date,
                                   ).toLocaleDateString()
                                 : "-"
                             })`
@@ -448,7 +450,7 @@ export default function EmployeeLeadsTable() {
                       className="hover:bg-gray-50 cursor-pointer"
                       onClick={() =>
                         router.push(
-                          `/admin-dashboard/view-customer/${lead.customer_id}`
+                          `/admin-dashboard/view-customer/${lead.customer_id}`,
                         )
                       }
                     >
@@ -472,7 +474,7 @@ export default function EmployeeLeadsTable() {
                       <td className="px-4 py-3 text-sm">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-semibold ${getStageColor(
-                            lead.current_stage
+                            lead.current_stage,
                           )}`}
                         >
                           {lead.current_stage}
@@ -506,7 +508,7 @@ export default function EmployeeLeadsTable() {
                             <div className="text-gray-500 text-xs">
                               {lead.invoice_date
                                 ? new Date(
-                                    lead.invoice_date
+                                    lead.invoice_date,
                                   ).toLocaleDateString()
                                 : "-"}
                             </div>

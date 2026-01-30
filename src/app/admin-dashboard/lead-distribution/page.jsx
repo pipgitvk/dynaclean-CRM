@@ -30,7 +30,9 @@ export default function LeadDistributionPage() {
       lead.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.products_interest.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.assigned_to.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.sales_representative.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.sales_representative
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
       new Date(lead.date_created)
         .toLocaleString()
         .toLowerCase()
@@ -57,6 +59,7 @@ export default function LeadDistributionPage() {
     setReps(repsData);
     setDistribution(distData);
     setLatestLeads(leadsData);
+    console.log("Lead distribution ", repsData, distData, leadsData);
     setPriorityTouched({});
     setMaxTouched({});
   };
@@ -77,11 +80,11 @@ export default function LeadDistributionPage() {
       {/* 🔹 Toggle Button (legacy form removed). Manual assign retained */}
       <div className="flex justify-end items-center mb-6">
         <button
-         onClick={() => router.push('/admin-dashboard/meta-backfill')}
+          onClick={() => router.push("/admin-dashboard/meta-backfill")}
           className="bg-blue-600 text-white px-4 py-2 rounded shadow"
         >
-           Meta BackFill
-           </button>
+          Meta BackFill
+        </button>
       </div>
 
       {/* 🔹 Rep Search & Add */}
@@ -102,8 +105,8 @@ export default function LeadDistributionPage() {
               .filter(
                 (u) =>
                   !distribution.some(
-                    (d) => (d.username || d).toLowerCase() === u.toLowerCase()
-                  )
+                    (d) => (d.username || d).toLowerCase() === u.toLowerCase(),
+                  ),
               )
               .slice(0, 20)
               .map((u) => (
@@ -116,15 +119,17 @@ export default function LeadDistributionPage() {
                       await fetch("/api/lead-distribution", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ username: u, priority: 0, max_leads: 0 }),
+                        body: JSON.stringify({
+                          username: u,
+                          priority: 0,
+                          max_leads: 0,
+                        }),
                       });
                       setDistribution((prev) =>
                         [
                           ...prev,
                           { username: u, priority: 0, max_leads: 0 },
-                        ].sort(
-                          (a, b) => (a.priority || 0) - (b.priority || 0)
-                        )
+                        ].sort((a, b) => (a.priority || 0) - (b.priority || 0)),
                       );
                       setPriorityTouched((s) => ({ ...s, [u]: false }));
                       setMaxTouched((s) => ({ ...s, [u]: false }));
@@ -139,7 +144,9 @@ export default function LeadDistributionPage() {
                 </button>
               ))}
             {reps.length === 0 && (
-              <div className="px-3 py-2 text-sm text-gray-500">No users available</div>
+              <div className="px-3 py-2 text-sm text-gray-500">
+                No users available
+              </div>
             )}
           </div>
         )}
@@ -168,11 +175,14 @@ export default function LeadDistributionPage() {
                       className="w-full border rounded p-1"
                       value={
                         priorityTouched[rep.username]
-                          ? (rep.priority || "")
+                          ? rep.priority || ""
                           : (rep.priority ?? 0)
                       }
                       onFocus={() =>
-                        setPriorityTouched((s) => ({ ...s, [rep.username]: true }))
+                        setPriorityTouched((s) => ({
+                          ...s,
+                          [rep.username]: true,
+                        }))
                       }
                       onChange={(e) => {
                         const raw = e.target.value;
@@ -181,8 +191,8 @@ export default function LeadDistributionPage() {
                           prev.map((r) =>
                             r.username === rep.username
                               ? { ...r, priority: Number.isNaN(v) ? 0 : v }
-                              : r
-                          )
+                              : r,
+                          ),
                         );
                       }}
                     />
@@ -193,7 +203,7 @@ export default function LeadDistributionPage() {
                       className="w-full border rounded p-1"
                       value={
                         maxTouched[rep.username]
-                          ? (rep.max_leads || "")
+                          ? rep.max_leads || ""
                           : (rep.max_leads ?? 0)
                       }
                       onFocus={() =>
@@ -206,8 +216,8 @@ export default function LeadDistributionPage() {
                           prev.map((r) =>
                             r.username === rep.username
                               ? { ...r, max_leads: Number.isNaN(v) ? 0 : v }
-                              : r
-                          )
+                              : r,
+                          ),
                         );
                       }}
                     />
@@ -220,8 +230,13 @@ export default function LeadDistributionPage() {
                       <button
                         className="bg-green-600 text-white px-3 py-1 rounded"
                         onClick={async () => {
-                          const payload = distribution.find((r) => r.username === rep.username);
-                          setSavingUsernames((s) => ({ ...s, [rep.username]: true }));
+                          const payload = distribution.find(
+                            (r) => r.username === rep.username,
+                          );
+                          setSavingUsernames((s) => ({
+                            ...s,
+                            [rep.username]: true,
+                          }));
                           try {
                             await fetch("/api/lead-distribution", {
                               method: "PUT",
@@ -234,12 +249,21 @@ export default function LeadDistributionPage() {
                             setDistribution(rows);
                             setPriorityTouched({});
                             setMaxTouched({});
-                            setJustSaved((s) => ({ ...s, [rep.username]: true }));
+                            setJustSaved((s) => ({
+                              ...s,
+                              [rep.username]: true,
+                            }));
                             setTimeout(() => {
-                              setJustSaved((s) => ({ ...s, [rep.username]: false }));
+                              setJustSaved((s) => ({
+                                ...s,
+                                [rep.username]: false,
+                              }));
                             }, 1500);
                           } finally {
-                            setSavingUsernames((s) => ({ ...s, [rep.username]: false }));
+                            setSavingUsernames((s) => ({
+                              ...s,
+                              [rep.username]: false,
+                            }));
                           }
                         }}
                         disabled={!!savingUsernames[rep.username]}
@@ -249,16 +273,19 @@ export default function LeadDistributionPage() {
                       <button
                         className="bg-red-600 text-white px-3 py-1 rounded"
                         onClick={async () => {
-                          setSavingUsernames((s) => ({ ...s, [rep.username]: true }));
+                          setSavingUsernames((s) => ({
+                            ...s,
+                            [rep.username]: true,
+                          }));
                           try {
                             await fetch(
                               `/api/lead-distribution?username=${encodeURIComponent(
-                                rep.username
+                                rep.username,
                               )}`,
-                              { method: "DELETE" }
+                              { method: "DELETE" },
                             );
                             setDistribution((prev) =>
-                              prev.filter((r) => r.username !== rep.username)
+                              prev.filter((r) => r.username !== rep.username),
                             );
                             setPriorityTouched((s) => {
                               const { [rep.username]: _omit, ...rest } = s;
@@ -269,7 +296,10 @@ export default function LeadDistributionPage() {
                               return rest;
                             });
                           } finally {
-                            setSavingUsernames((s) => ({ ...s, [rep.username]: false }));
+                            setSavingUsernames((s) => ({
+                              ...s,
+                              [rep.username]: false,
+                            }));
                           }
                         }}
                         disabled={!!savingUsernames[rep.username]}
@@ -283,7 +313,8 @@ export default function LeadDistributionPage() {
               {distribution.length === 0 && (
                 <tr>
                   <td className="p-3 text-center text-gray-500" colSpan={4}>
-                    No distribution configured. Use the search above to add users.
+                    No distribution configured. Use the search above to add
+                    users.
                   </td>
                 </tr>
               )}

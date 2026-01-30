@@ -317,6 +317,12 @@ const allMenuItems = [
         icon: "FileSignature",
       },
       {
+        path: "/admin-dashboard/invoices",
+        name: "Invoices",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
         name: "Service History",
         roles: ["SUPERADMIN"],
         icon: "BookOpen",

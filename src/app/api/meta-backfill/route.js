@@ -25,9 +25,32 @@ function normalizePhone(phone) {
   return p || null;
 }
 
+// get state from pincode
+async function getStateFromPincode(pincode) {
+  if (!pincode) return null;
+
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+    const data = await res.json();
+
+    if (
+      Array.isArray(data) &&
+      data[0]?.Status === "Success" &&
+      data[0]?.PostOffice?.length
+    ) {
+      return data[0].PostOffice[0].State;
+    }
+  } catch (err) {
+    console.warn("⚠️ Pincode lookup failed:", pincode, err);
+  }
+
+  return null;
+}
+
 // Helper: parse lead field_data from Meta into our shape
 function parseLeadFromFieldData(fieldData, extra = {}) {
-  const getValue = (name) => fieldData.find((f) => f.name === name)?.values?.[0] || null;
+  const getValue = (name) =>
+    fieldData.find((f) => f.name === name)?.values?.[0] || null;
 
   const first_name = getValue("full_name") || getValue("first_name");
   const email = getValue("email");
@@ -62,7 +85,9 @@ export async function GET(request) {
   const formId = process.env.FB_LEAD_FORM_ID; // set this in .env
 
   if (!token || !formId) {
-    return new Response("FB_PAGE_TOKEN or FB_LEAD_FORM_ID not configured", { status: 500 });
+    return new Response("FB_PAGE_TOKEN or FB_LEAD_FORM_ID not configured", {
+      status: 500,
+    });
   }
 
   try {
@@ -83,6 +108,7 @@ export async function GET(request) {
     while (url) {
       const res = await fetch(url.toString());
       const data = await res.json();
+      console.log("data from meta ", data);
 
       if (!res.ok) {
         console.error("❌ Meta backfill error:", data);
@@ -129,9 +155,7 @@ export async function GET(request) {
     }
 
     // Collect phones and check which already exist in DB
-    const phones = leadsInRange
-      .map((l) => l.phone)
-      .filter((p) => !!p);
+    const phones = leadsInRange.map((l) => l.phone).filter((p) => !!p);
 
     let existingPhones = new Set();
 
@@ -142,9 +166,7 @@ export async function GET(request) {
         `SELECT phone FROM customers WHERE phone IN (${placeholders})`,
         phones,
       );
-      existingPhones = new Set(
-        rows.map((r) => normalizePhone(r.phone)),
-      );
+      existingPhones = new Set(rows.map((r) => normalizePhone(r.phone)));
     }
 
     // Now only keep leads that are BOTH in the date range AND not in customers
