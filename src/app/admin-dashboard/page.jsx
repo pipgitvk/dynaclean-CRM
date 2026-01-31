@@ -41,7 +41,6 @@
 //       `
 //     );
 
-//     // await connection.end();
 //     const pendingOrdersCount = pendingOrders.length;
 
 //     if (!user) {
@@ -213,7 +212,7 @@ export default async function UserDashboardPage() {
   try {
     const { payload } = await jwtVerify(
       token,
-      new TextEncoderImpl().encode(JWT_SECRET)
+      new TextEncoderImpl().encode(JWT_SECRET),
     );
 
     const username = payload.username;
@@ -226,17 +225,16 @@ export default async function UserDashboardPage() {
       UNION
       SELECT username, email, empId, userRole FROM rep_list WHERE username = ?
       `,
-      [username, username]
+      [username, username],
     );
     const user = rows[0];
 
     const [pendingOrders] = await connection.execute(
       `
       SELECT * FROM neworder WHERE approval_status = 'pending'
-      `
+      `,
     );
 
-    // await connection.end();
     const pendingOrdersCount = pendingOrders.length;
 
     if (!user) {

@@ -17,11 +17,14 @@ export async function POST(req) {
 
     const [dupRows] = await conn.execute(
       `SELECT COUNT(*) AS c FROM customers WHERE phone = ?`,
-      [fields.phone]
+      [fields.phone],
     );
     if (dupRows[0].c > 0) {
       // await conn.end();
-      return NextResponse.json({ error: "Duplicate phone number" }, { status: 409 });
+      return NextResponse.json(
+        { error: "Duplicate phone number" },
+        { status: 409 },
+      );
     }
 
     // ✅ Insert into customers
@@ -54,10 +57,10 @@ export async function POST(req) {
         next_followup_date,
         now,
         fields.visiting_card || "",
-      ]
+      ],
     );
 
-    const customerId = customerResult.insertId;
+    const customerId = await customerResult.insertId;
 
     // ✅ Insert into follow-up table
     await conn.execute(
@@ -76,7 +79,7 @@ export async function POST(req) {
         fields.communication_mode,
         fields.notes,
         fields.email || "",
-      ]
+      ],
     );
 
     // await conn.end();

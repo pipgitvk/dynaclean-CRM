@@ -15,10 +15,8 @@ export default async function UpcomingTasks({ leadSource }) {
     FROM task
     WHERE taskassignto = ? AND status != 'Completed'
     `,
-    [leadSource]
+    [leadSource],
   );
-
-  // await connection.end();
 
   return (
     <div
@@ -61,7 +59,7 @@ export default async function UpcomingTasks({ leadSource }) {
                 dueDate={
                   task.next_followup_date
                     ? dayjs(task.next_followup_date).format(
-                        "DD MMM, YYYY hh:mm A"
+                        "DD MMM, YYYY hh:mm A",
                       )
                     : "Not set"
                 }
