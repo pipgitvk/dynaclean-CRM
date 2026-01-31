@@ -21,7 +21,6 @@ export async function GET(request) {
   return new Response("Forbidden", { status: 403 });
 }
 
-
 export async function POST(request) {
   const body = await request.json();
   console.log("🔔 Webhook received:", JSON.stringify(body, null, 2));
@@ -38,7 +37,7 @@ export async function POST(request) {
 
     // Step 1: Fetch lead details using leadgen_id
     const leadRes = await fetch(
-      `https://graph.facebook.com/v18.0/${leadgen_id}?access_token=${token}`
+      `https://graph.facebook.com/v18.0/${leadgen_id}?access_token=${token}`,
     );
     const leadData = await leadRes.json();
     console.log("📥 Lead data:", JSON.stringify(leadData, null, 2));
@@ -46,14 +45,11 @@ export async function POST(request) {
     const fieldData = leadData?.field_data || [];
     const ad_id = body?.entry?.[0]?.changes?.[0]?.value?.ad_id;
 
-
-
-
     // Step 2: Fetch campaign name from ad_id → campaign_id → name
     let campaignName = "";
     if (ad_id) {
       const adRes = await fetch(
-        `https://graph.facebook.com/v18.0/${ad_id}?fields=campaign_id&access_token=${token}`
+        `https://graph.facebook.com/v18.0/${ad_id}?fields=campaign_id&access_token=${token}`,
       );
       const adJson = await adRes.json();
       console.log("🧩 Ad Data:", adJson); // ← ADD THIS
@@ -61,7 +57,7 @@ export async function POST(request) {
 
       if (campaign_id) {
         const campRes = await fetch(
-          `https://graph.facebook.com/v18.0/${campaign_id}?fields=name&access_token=${token}`
+          `https://graph.facebook.com/v18.0/${campaign_id}?fields=name&access_token=${token}`,
         );
         const campJson = await campRes.json();
         console.log("🎯 Campaign Data:", campJson); // ← ADD THIS
@@ -70,7 +66,6 @@ export async function POST(request) {
         console.log("⚠️ No campaign_id found in adJson");
       }
     }
-
 
     // Step 3: Parse lead fields
     const getValue = (name) =>
@@ -88,12 +83,11 @@ export async function POST(request) {
       return new Response("Missing contact info", { status: 400 });
     }
     // Step 3.1: Check if the phone number starts with +91 and remove it
-    if (phone && typeof phone === 'string' && phone.startsWith("+91")) {
+    if (phone && typeof phone === "string" && phone.startsWith("+91")) {
       phone = phone.slice(3); // Removes the "+91" part
-    } else if (phone && typeof phone !== 'string') {
+    } else if (phone && typeof phone !== "string") {
       phone = String(phone); // Convert phone to a string if it's not already one
     }
-
 
     // Step 4: Connect to DB and fetch reps ordered by priority
     const conn = await getDbConnection();
@@ -147,10 +141,10 @@ export async function POST(request) {
         "New",
         now,
         products_interest,
-      ]
+      ],
     );
 
-    const customerId = customerResult.insertId;
+    const customerId = await customerResult.insertId;
 
     // Step 7: Insert into followup table
     await conn.execute(
@@ -168,7 +162,7 @@ export async function POST(request) {
         "Facebook",
         "Lead from Facebook ad",
         email || "",
-      ]
+      ],
     );
 
     // Step 8: Update selected rep’s lead count and timestamp
@@ -179,19 +173,17 @@ export async function POST(request) {
           last_assigned_at = ?
       WHERE username = ?
     `,
-      [now, assignedTo]
+      [now, assignedTo],
     );
 
     // await conn.end();
 
-
-    console.log(`✅ Lead assigned to ${assignedTo} for campaign: ${campaignName}`);
+    console.log(
+      `✅ Lead assigned to ${assignedTo} for campaign: ${campaignName}`,
+    );
     return new Response("EVENT_RECEIVED", { status: 200 });
   } catch (err) {
     console.error("❌ Error handling lead:", err);
     return new Response("Server Error", { status: 500 });
   }
 }
-
-
-

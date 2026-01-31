@@ -141,7 +141,7 @@ export async function POST(req) {
       ],
     );
 
-    const customerId = customerResult.insertId;
+    const customerId = await customerResult.insertId;
 
     // ✅ Insert into follow-up table
     await conn.execute(

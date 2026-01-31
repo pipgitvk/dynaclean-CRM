@@ -32,12 +32,14 @@ async function getStateFromPincode(pincode) {
   try {
     const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
     const data = await res.json();
+    console.log("📍 Pincode data:", data);
 
     if (
       Array.isArray(data) &&
       data[0]?.Status === "Success" &&
       data[0]?.PostOffice?.length
     ) {
+      console.log("📍 State from pincode:", data[0].PostOffice[0].State);
       return data[0].PostOffice[0].State;
     }
   } catch (err) {
@@ -375,7 +377,7 @@ async function insertLeadIntoDb(lead) {
     ],
   );
 
-  const customerId = customerResult.insertId;
+  const customerId = await customerResult.insertId;
 
   await conn.execute(
     `INSERT INTO customers_followup (
@@ -434,6 +436,10 @@ export async function POST(request) {
           `https://graph.facebook.com/v18.0/${leadgen_id}?fields=field_data,ad_id,created_time&access_token=${token}`,
         );
         const leadData = await leadRes.json();
+        console.log(
+          "🟦 RAW META field_data:",
+          JSON.stringify(leadData.field_data, null, 2),
+        );
 
         if (!leadRes.ok) {
           console.error("❌ Failed to fetch lead", leadgen_id, leadData);

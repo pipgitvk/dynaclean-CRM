@@ -17,7 +17,7 @@ export async function updateServiceAssignment(formData) {
     connection = await getDbConnection();
     const [result] = await connection.execute(
       "UPDATE service_records SET assigned_to = ? WHERE service_id = ?",
-      [assigned_to, serviceIdToUpdate]
+      [assigned_to, serviceIdToUpdate],
     );
 
     if (result.affectedRows === 0) {
@@ -38,7 +38,7 @@ export async function updateServiceAssignment(formData) {
 
 // Page Component
 export default async function AssignServicePage({ params, searchParams }) {
-  const service_id = params.service_id;
+  const { service_id } = await params;
   const message = searchParams?.message || "";
 
   let engineers = [];
@@ -46,7 +46,7 @@ export default async function AssignServicePage({ params, searchParams }) {
   try {
     connection = await getDbConnection();
     const [rows] = await connection.execute(
-      "SELECT username FROM rep_list WHERE userRole = 'SERVICE ENGINEER'"
+      "SELECT username FROM rep_list WHERE userRole = 'SERVICE ENGINEER'",
     );
     engineers = rows.map((row) => row.username);
   } catch (err) {
