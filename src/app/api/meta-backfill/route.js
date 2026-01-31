@@ -76,7 +76,7 @@ function parseLeadFromFieldData(fieldData, extra = {}) {
   const email = getValue("email");
   const rawPhone = getValue("phone_number");
   const address = getValue("city");
-  const pincode = getValue("postal_code") || getValue("zip_code");
+  const pincode = getValue("postcode") || getValue("zipcode");
 
   return {
     first_name: first_name || "",
