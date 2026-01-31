@@ -7,6 +7,31 @@ const dbConfig = {
   database: process.env.DB_NAME,
 };
 
+// pincode find
+// get state from pincode
+async function getStateFromPincode(pincode) {
+  if (!pincode) return null;
+
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+    const data = await res.json();
+    console.log("📍 Pincode data:", data);
+
+    if (
+      Array.isArray(data) &&
+      data[0]?.Status === "Success" &&
+      data[0]?.PostOffice?.length
+    ) {
+      console.log("📍 State from pincode:", data[0].PostOffice[0].State);
+      return data[0].PostOffice[0].State;
+    }
+  } catch (err) {
+    console.warn("⚠️ Pincode lookup failed:", pincode, err);
+  }
+
+  return null;
+}
+
 // ✅ Verify webhook subscription
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -33,6 +58,7 @@ export async function POST(request) {
   }
 
   try {
+    const conn = await getDbConnection(dbConfig);
     const token = process.env.FB_PAGE_TOKEN;
 
     // Step 1: Fetch lead details using leadgen_id
@@ -70,58 +96,56 @@ export async function POST(request) {
     // Step 3: Parse lead fields
     const getValue = (name) =>
       fieldData.find((f) => f.name === name)?.values?.[0] || null;
-
     const first_name = getValue("full_name") || getValue("first_name");
     const email = getValue("email");
     let phone = getValue("phone_number");
     const address = getValue("city");
+    const pincode = getValue("postcode") || getValue("zipcode");
     const lead_campaign = "social_media";
     const products_interest = campaignName;
     const now = new Date();
 
-    if (!phone && !email) {
+    if (!phone && !email)
       return new Response("Missing contact info", { status: 400 });
-    }
-    // Step 3.1: Check if the phone number starts with +91 and remove it
-    if (phone && typeof phone === "string" && phone.startsWith("+91")) {
-      phone = phone.slice(3); // Removes the "+91" part
-    } else if (phone && typeof phone !== "string") {
-      phone = String(phone); // Convert phone to a string if it's not already one
-    }
 
-    // Step 4: Connect to DB and fetch reps ordered by priority
-    const conn = await getDbConnection();
+    if (phone && typeof phone === "string" && phone.startsWith("+91"))
+      phone = phone.slice(3);
+    else if (phone && typeof phone !== "string") phone = String(phone);
+
+    // --- Fetch all active reps ---
     const [repRows] = await conn.execute(`
       SELECT * FROM lead_distribution
       WHERE is_active = 1
       ORDER BY priority ASC, last_assigned_at ASC
     `);
 
-    if (repRows.length === 0) {
-      // await conn.end();
+    if (!repRows.length)
       return new Response("No reps available", { status: 503 });
-    }
 
-    // Step 5: Round-robin logic to pick next available rep
-    let selectedRep = null;
-    for (const rep of repRows) {
-      if (rep.assigned_count < rep.max_leads) {
-        selectedRep = rep;
-        break;
+    // --- Assign rep based on pincode (runtime only) ---
+    let assignedRep = null;
+    if (pincode) {
+      const state = await getStateFromPincode(pincode);
+      const normalizedState = state?.toUpperCase();
+
+      if (normalizedState === "TAMIL NADU" || normalizedState === "KERALA") {
+        assignedRep = repRows.find((r) => r.username === "KAVYA") || null;
       }
     }
 
-    // If no rep is available (all hit max), reset counts and pick first
-    if (!selectedRep) {
-      await conn.execute(`
-        UPDATE lead_distribution
-        SET assigned_count = 0
-        WHERE is_active = 1
-      `);
-      selectedRep = repRows[0];
+    // --- Round-robin fallback ---
+    if (!assignedRep) {
+      assignedRep =
+        repRows.find((r) => r.assigned_count < r.max_leads) || repRows[0];
+      // reset counts if all reached max
+      if (assignedRep.assigned_count >= assignedRep.max_leads) {
+        await conn.execute(
+          `UPDATE lead_distribution SET assigned_count = 0 WHERE is_active = 1`,
+        );
+      }
     }
 
-    const assignedTo = selectedRep.username;
+    const assignedTo = assignedRep.username;
 
     // Step 6: Insert into customers table
     const [customerResult] = await conn.execute(
