@@ -48,6 +48,24 @@ async function getStateFromPincode(pincode) {
 }
 
 // Helper: parse lead field_data from Meta into our shape
+// function parseLeadFromFieldData(fieldData, extra = {}) {
+//   const getValue = (name) =>
+//     fieldData.find((f) => f.name === name)?.values?.[0] || null;
+
+//   const first_name = getValue("full_name") || getValue("first_name");
+//   const email = getValue("email");
+//   const rawPhone = getValue("phone_number");
+//   const address = getValue("city");
+
+//   return {
+//     first_name: first_name || "",
+//     email: email || "",
+//     phone: normalizePhone(rawPhone),
+//     address: address || "",
+//     ...extra,
+//   };
+// }
+
 function parseLeadFromFieldData(fieldData, extra = {}) {
   const getValue = (name) =>
     fieldData.find((f) => f.name === name)?.values?.[0] || null;
@@ -56,12 +74,14 @@ function parseLeadFromFieldData(fieldData, extra = {}) {
   const email = getValue("email");
   const rawPhone = getValue("phone_number");
   const address = getValue("city");
+  const pincode = getValue("postal_code") || getValue("zip_code");
 
   return {
     first_name: first_name || "",
     email: email || "",
     phone: normalizePhone(rawPhone),
     address: address || "",
+    pincode: pincode || null,
     ...extra,
   };
 }
@@ -154,6 +174,9 @@ export async function GET(request) {
       });
     }
 
+    // first latest lead data
+    console.log("Latest lead first:", allLeads[0]);
+
     // Collect phones and check which already exist in DB
     const phones = leadsInRange.map((l) => l.phone).filter((p) => !!p);
 
@@ -214,32 +237,98 @@ async function insertLeadIntoDb(lead) {
   const conn = await getDbConnection();
 
   // Step 4: fetch reps ordered by priority
-  const [repRows] = await conn.execute(
-    `SELECT * FROM lead_distribution
+  // const [repRows] = await conn.execute(
+  //   `SELECT * FROM lead_distribution
+  //    WHERE is_active = 1
+  //    ORDER BY priority ASC, last_assigned_at ASC`,
+  // );
+
+  // STEP 1: check state from pincode (runtime)
+  let tamilOverride = false;
+
+  if (lead.pincode) {
+    const state = await Promise.race([
+      getStateFromPincode(lead.pincode),
+      new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]);
+
+    const normalizedState = state?.toUpperCase();
+
+    if (normalizedState === "TAMIL NADU" || normalizedState === "KERALA") {
+      tamilOverride = true;
+    }
+  }
+
+  let repRows = [];
+
+  //  STEP 2: if Tamil Nadu, kerala → assign Kavya directly
+  if (tamilOverride) {
+    const [rows] = await conn.execute(
+      `SELECT *
+     FROM lead_distribution
+     WHERE is_active = 1
+       AND username = 'KAVYA'
+     LIMIT 1`,
+    );
+
+    if (rows.length) {
+      repRows = rows;
+    }
+  }
+
+  // STEP 3: fallback ONLY if NOT Tamil/Kerala
+  if (!repRows.length && !tamilOverride) {
+    const [rows] = await conn.execute(
+      `SELECT *
+     FROM lead_distribution
      WHERE is_active = 1
      ORDER BY priority ASC, last_assigned_at ASC`,
-  );
+    );
+    repRows = rows;
+  }
 
   if (repRows.length === 0) {
     throw new Error("No reps available");
   }
 
   // Round-robin
-  let selectedRep = null;
-  for (const rep of repRows) {
-    if (rep.assigned_count < rep.max_leads) {
-      selectedRep = rep;
-      break;
-    }
-  }
+  // let selectedRep = null;
+  // for (const rep of repRows) {
+  //   if (rep.assigned_count < rep.max_leads) {
+  //     selectedRep = rep;
+  //     break;
+  //   }
+  // }
 
-  if (!selectedRep) {
-    await conn.execute(
-      `UPDATE lead_distribution
+  // if (!selectedRep) {
+  //   await conn.execute(
+  //     `UPDATE lead_distribution
+  //      SET assigned_count = 0
+  //      WHERE is_active = 1`,
+  //   );
+  //   selectedRep = repRows[0];
+  // }
+
+  let selectedRep = null;
+
+  if (tamilOverride) {
+    selectedRep = repRows[0];
+  } else {
+    for (const rep of repRows) {
+      if (rep.assigned_count < rep.max_leads) {
+        selectedRep = rep;
+        break;
+      }
+    }
+
+    if (!selectedRep) {
+      await conn.execute(
+        `UPDATE lead_distribution
        SET assigned_count = 0
        WHERE is_active = 1`,
-    );
-    selectedRep = repRows[0];
+      );
+      selectedRep = repRows[0];
+    }
   }
 
   const assignedTo = selectedRep.username;

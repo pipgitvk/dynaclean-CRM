@@ -176,7 +176,7 @@ export default function InvoiceTable() {
         </div>
         <input
           type="text"
-          placeholder="Search by invoice number..."
+          placeholder="By invoice,quotation num..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="border border-gray-300 rounded px-3 py-1 w-full md:w-64"
@@ -219,6 +219,7 @@ export default function InvoiceTable() {
                 Invoice Number <SortIcon column="invoice_number" />
               </th>
               <th className="px-4 py-2">Quotation ID</th>
+              <th className="px-4 py-2">Quotation No.</th>
               <th
                 className="px-4 py-2 cursor-pointer hover:bg-gray-200"
                 onClick={() => handleSort("invoice_date")}
@@ -253,6 +254,7 @@ export default function InvoiceTable() {
                     {invoice.invoice_number}
                   </td>
                   <td className="px-4 py-2">{invoice.quotation_id}</td>
+                  <td className="px-4 py-2">{invoice.quote_number}</td>
                   <td className="px-4 py-2">
                     {new Date(invoice.invoice_date).toLocaleDateString("en-IN")}
                   </td>
@@ -291,7 +293,7 @@ export default function InvoiceTable() {
                   </td>
                   <td className="px-4 py-2 text-center">
                     <Link
-                      href={`/admin-dashboard/invoices/${invoice.id}`}
+                      href={`/admin-dashboard/invoices/${invoice.invoice_number}`}
                       className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 inline-block"
                     >
                       View

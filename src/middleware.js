@@ -1,9 +1,3 @@
-
-
-
-
-
-
 // import { NextResponse } from "next/server";
 // import { jwtVerify } from "jose";
 
@@ -66,7 +60,6 @@
 //   matcher: ["/", "/login", "/admin-dashboard/:path*", "/user-dashboard/:path*"],
 // };
 
-
 // middleware.js (Updated)
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
@@ -75,9 +68,11 @@ const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
-  
+
   // Use the impersonation token if it exists, otherwise use the regular token
-  const token = request.cookies.get("impersonation_token")?.value || request.cookies.get("token")?.value;
+  const token =
+    request.cookies.get("impersonation_token")?.value ||
+    request.cookies.get("token")?.value;
 
   // 🚫 Redirect '/' to '/login'
   if (pathname === "/") {
@@ -102,7 +97,11 @@ export async function middleware(request) {
   }
 
   // ✅ Protect dashboard routes
-  if (pathname.startsWith("/admin-dashboard") || pathname.startsWith("/user-dashboard") || pathname.startsWith("/empcrm")) {
+  if (
+    pathname.startsWith("/admin-dashboard") ||
+    pathname.startsWith("/user-dashboard") ||
+    pathname.startsWith("/empcrm")
+  ) {
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -120,14 +119,18 @@ export async function middleware(request) {
       // Company Documents access control - only SUPERADMIN, ADMIN, ACCOUNTANT
       if (pathname.startsWith("/admin-dashboard/company-documents")) {
         if (!["SUPERADMIN", "ADMIN", "ACCOUNTANT"].includes(role)) {
-          return NextResponse.redirect(new URL("/admin-dashboard", request.url));
+          return NextResponse.redirect(
+            new URL("/admin-dashboard", request.url),
+          );
         }
       }
 
       // EMPCRM Admin Dashboard access control - SUPERADMIN, HR HEAD, HR, HR Executive
       if (pathname.startsWith("/empcrm/admin-dashboard")) {
         if (!["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].includes(role)) {
-          return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
+          return NextResponse.redirect(
+            new URL("/empcrm/user-dashboard", request.url),
+          );
         }
       }
 
@@ -138,7 +141,11 @@ export async function middleware(request) {
       }
 
       // User dashboard protection (check for role and if not impersonated)
-      if (pathname.startsWith("/user-dashboard") && role === "SUPERADMIN" && !isImpersonated) {
+      if (
+        pathname.startsWith("/user-dashboard") &&
+        role === "SUPERADMIN" &&
+        !isImpersonated
+      ) {
         return NextResponse.redirect(new URL("/admin-dashboard", request.url));
       }
 
@@ -153,5 +160,11 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/admin-dashboard/:path*", "/user-dashboard/:path*", "/empcrm/:path*"],
+  matcher: [
+    "/",
+    "/login",
+    "/admin-dashboard/:path*",
+    "/user-dashboard/:path*",
+    "/empcrm/:path*",
+  ],
 };
