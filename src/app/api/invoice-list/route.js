@@ -30,11 +30,12 @@ export async function GET(req) {
 
     if (search) {
       whereClause += `
-        AND (
-          invoice_number LIKE ?
-        )
-      `;
-      values.push(`%${search}%`);
+    AND (
+      invoice_number LIKE ? OR
+      quote_number LIKE ?
+    )
+  `;
+      values.push(`%${search}%`, `%${search}%`);
     }
 
     if (fromDate) {
@@ -72,6 +73,7 @@ export async function GET(req) {
         tax_amount,
         grand_total,
         status,
+        quote_number,
         created_at
       FROM invoices
       ${whereClause}

@@ -21,6 +21,7 @@ export async function GET() {
         grand_total DECIMAL(10,2) NOT NULL,
 
         status ENUM('draft','sent','paid','cancelled') DEFAULT 'draft',
+        quote_number VARCHAR(50) NOT NULL,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -99,15 +100,15 @@ export async function POST(req) {
     const [result] = await conn.execute(
       `INSERT INTO invoices (
         quotation_id,
-        quote_number,
         invoice_number,
         invoice_date,
         due_date,
         total_amount,
         tax_amount,
         grand_total,
-        status
-      ) VALUES (?,?,?,?,?,?,?,?)`,
+        status,
+        quote_number
+      ) VALUES (?,?,?,?,?,?,?,?,?)`,
       [
         header.quotation_id,
         invoiceNumber,
@@ -117,6 +118,7 @@ export async function POST(req) {
         header.gst,
         header.grand_total,
         "draft",
+        quoteNumber,
       ],
     );
 

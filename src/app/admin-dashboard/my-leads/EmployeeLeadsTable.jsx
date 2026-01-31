@@ -29,6 +29,7 @@ export default function EmployeeLeadsTable() {
         : "/api/employee-leads";
       const response = await fetch(url);
       const result = await response.json();
+      // console.log("fetch result from meta :", result);
 
       if (result.success) {
         setLeads(result.data);

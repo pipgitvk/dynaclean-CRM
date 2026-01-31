@@ -325,7 +325,7 @@ const allMenuItems = [
   },
   {
     path: "/user-dashboard/product-stock",
-    name: "Products",
+    name: "Price List",
     roles: [
       "ADMIN",
       "ACCOUNTANT",
@@ -374,20 +374,20 @@ const allMenuItems = [
       },
     ],
   },
-  {
-    path: "/user-dashboard/spare",
-    name: "Spare Parts",
-    roles: [
-      "ADMIN",
-      "ACCOUNTANT",
-      "WAREHOUSE INCHARGE",
-      "DIGITAL MARKETER",
-      "TEAM LEADER",
-      "SALES",
-      "SALES HEAD",
-    ],
-    icon: "FileText",
-  },
+  // {
+  //   path: "/user-dashboard/spare",
+  //   name: "Spare Parts",
+  //   roles: [
+  //     "ADMIN",
+  //     "ACCOUNTANT",
+  //     "WAREHOUSE INCHARGE",
+  //     "DIGITAL MARKETER",
+  //     "TEAM LEADER",
+  //     "SALES",
+  //     "SALES HEAD",
+  //   ],
+  //   icon: "FileText",
+  // },
   {
     name: "Purchase Spares",
     roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],

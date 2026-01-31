@@ -166,148 +166,148 @@ export default function QuotationViewer({ header, items }) {
     }
   };
 
-  const downloadInvoice = async () => {
-    setIsInvoice(true);
-    const el = containerRef.current;
-    if (!el) return;
+  // const downloadInvoice = async () => {
+  //   setIsInvoice(true);
+  //   const el = containerRef.current;
+  //   if (!el) return;
 
-    // Temporarily force the large screen view for the PDF generation
-    const lgViewElements = el.querySelectorAll(".lg-view");
-    const mobileViewElements = el.querySelectorAll(".mobile-view");
+  //   // Temporarily force the large screen view for the PDF generation
+  //   const lgViewElements = el.querySelectorAll(".lg-view");
+  //   const mobileViewElements = el.querySelectorAll(".mobile-view");
 
-    // Store original display styles to revert later
-    const originalLgDisplay = Array.from(lgViewElements).map(
-      (e) => e.style.display,
-    );
-    const originalMobileDisplay = Array.from(mobileViewElements).map(
-      (e) => e.style.display,
-    );
+  //   // Store original display styles to revert later
+  //   const originalLgDisplay = Array.from(lgViewElements).map(
+  //     (e) => e.style.display,
+  //   );
+  //   const originalMobileDisplay = Array.from(mobileViewElements).map(
+  //     (e) => e.style.display,
+  //   );
 
-    // Force show the large view and hide the mobile view
-    lgViewElements.forEach((e) => (e.style.display = "block"));
-    mobileViewElements.forEach((e) => (e.style.display = "none"));
+  //   // Force show the large view and hide the mobile view
+  //   lgViewElements.forEach((e) => (e.style.display = "block"));
+  //   mobileViewElements.forEach((e) => (e.style.display = "none"));
 
-    // Also make sure the lg-view container is not hidden by Tailwind classes
-    const lgViewContainer = el.querySelector(".lg-view");
-    const originalLgClasses = lgViewContainer?.className;
-    if (lgViewContainer) {
-      lgViewContainer.classList.remove("hidden");
-    }
+  //   // Also make sure the lg-view container is not hidden by Tailwind classes
+  //   const lgViewContainer = el.querySelector(".lg-view");
+  //   const originalLgClasses = lgViewContainer?.className;
+  //   if (lgViewContainer) {
+  //     lgViewContainer.classList.remove("hidden");
+  //   }
 
-    // Fix the width so the PDF looks the same on mobile / tablet / desktop
-    // (approx. A4 width in pixels), and remember original inline width styles
-    const originalWidth = el.style.width;
-    const originalMaxWidth = el.style.maxWidth;
-    el.style.width = "1123px"; // ~ A4 width at 96dpi
-    el.style.maxWidth = "1123px";
+  //   // Fix the width so the PDF looks the same on mobile / tablet / desktop
+  //   // (approx. A4 width in pixels), and remember original inline width styles
+  //   const originalWidth = el.style.width;
+  //   const originalMaxWidth = el.style.maxWidth;
+  //   el.style.width = "1123px"; // ~ A4 width at 96dpi
+  //   el.style.maxWidth = "1123px";
 
-    // Convert all <img> tags to base64
-    const images = el.querySelectorAll("img");
-    await Promise.all(
-      Array.from(images).map(async (img) => {
-        if (img.src.startsWith("data:")) return;
-        try {
-          const res = await fetch(img.src, { mode: "cors" });
-          const blob = await res.blob();
-          const base64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-          img.src = base64;
-        } catch (err) {
-          console.warn(
-            "Failed to convert image to base64 for PDF:",
-            img.src,
-            err,
-          );
-        }
-      }),
-    );
+  //   // Convert all <img> tags to base64
+  //   const images = el.querySelectorAll("img");
+  //   await Promise.all(
+  //     Array.from(images).map(async (img) => {
+  //       if (img.src.startsWith("data:")) return;
+  //       try {
+  //         const res = await fetch(img.src, { mode: "cors" });
+  //         const blob = await res.blob();
+  //         const base64 = await new Promise((resolve, reject) => {
+  //           const reader = new FileReader();
+  //           reader.onloadend = () => resolve(reader.result);
+  //           reader.onerror = reject;
+  //           reader.readAsDataURL(blob);
+  //         });
+  //         img.src = base64;
+  //       } catch (err) {
+  //         console.warn(
+  //           "Failed to convert image to base64 for PDF:",
+  //           img.src,
+  //           err,
+  //         );
+  //       }
+  //     }),
+  //   );
 
-    // Fix modern color function errors (oklch, lab, lch, etc.) for html2canvas compatibility
-    el.querySelectorAll("*").forEach((e) => {
-      const style = window.getComputedStyle(e);
-      const color = style.color || "";
-      const bg = style.backgroundColor || "";
+  //   // Fix modern color function errors (oklch, lab, lch, etc.) for html2canvas compatibility
+  //   el.querySelectorAll("*").forEach((e) => {
+  //     const style = window.getComputedStyle(e);
+  //     const color = style.color || "";
+  //     const bg = style.backgroundColor || "";
 
-      if (
-        color.includes("oklch") ||
-        color.includes("oklab") ||
-        color.includes("lab(") ||
-        color.includes("lch(")
-      ) {
-        e.style.color = "#000";
-      }
+  //     if (
+  //       color.includes("oklch") ||
+  //       color.includes("oklab") ||
+  //       color.includes("lab(") ||
+  //       color.includes("lch(")
+  //     ) {
+  //       e.style.color = "#000";
+  //     }
 
-      if (
-        bg.includes("oklch") ||
-        bg.includes("oklab") ||
-        bg.includes("lab(") ||
-        bg.includes("lch(")
-      ) {
-        e.style.backgroundColor = "#fff";
-      }
-    });
+  //     if (
+  //       bg.includes("oklch") ||
+  //       bg.includes("oklab") ||
+  //       bg.includes("lab(") ||
+  //       bg.includes("lch(")
+  //     ) {
+  //       e.style.backgroundColor = "#fff";
+  //     }
+  //   });
 
-    // Generate PDF
-    try {
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        scrollY: 0,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
-      });
+  //   // Generate PDF
+  //   try {
+  //     const canvas = await html2canvas(el, {
+  //       scale: 2,
+  //       useCORS: true,
+  //       allowTaint: true,
+  //       scrollY: 0,
+  //       windowWidth: el.scrollWidth,
+  //       windowHeight: el.scrollHeight,
+  //     });
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.7);
+  //     const imgData = canvas.toDataURL("image/jpeg", 0.7);
 
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+  //     const pdf = new jsPDF("p", "mm", "a4");
+  //     const pdfWidth = pdf.internal.pageSize.getWidth();
+  //     const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      // Image dimensions in jsPDF units
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgWidth = pdfWidth;
-      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+  //     // Image dimensions in jsPDF units
+  //     const imgProps = pdf.getImageProperties(imgData);
+  //     const imgWidth = pdfWidth;
+  //     const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
-      // Calculate total number of pages
-      let heightLeft = imgHeight;
-      let position = 0;
+  //     // Calculate total number of pages
+  //     let heightLeft = imgHeight;
+  //     let position = 0;
 
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
+  //     pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+  //     heightLeft -= pdfHeight;
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight; // shift canvas for next page
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-      }
+  //     while (heightLeft > 0) {
+  //       position = heightLeft - imgHeight; // shift canvas for next page
+  //       pdf.addPage();
+  //       pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+  //       heightLeft -= pdfHeight;
+  //     }
 
-      pdf.save("quotation.pdf");
-    } catch (error) {
-      console.error("Error during PDF generation:", error);
-    } finally {
-      // Revert to original display styles and Tailwind classes
-      lgViewElements.forEach(
-        (e, i) => (e.style.display = originalLgDisplay[i]),
-      );
-      mobileViewElements.forEach(
-        (e, i) => (e.style.display = originalMobileDisplay[i]),
-      );
+  //     pdf.save("quotation.pdf");
+  //   } catch (error) {
+  //     console.error("Error during PDF generation:", error);
+  //   } finally {
+  //     // Revert to original display styles and Tailwind classes
+  //     lgViewElements.forEach(
+  //       (e, i) => (e.style.display = originalLgDisplay[i]),
+  //     );
+  //     mobileViewElements.forEach(
+  //       (e, i) => (e.style.display = originalMobileDisplay[i]),
+  //     );
 
-      if (lgViewContainer && originalLgClasses !== undefined) {
-        lgViewContainer.className = originalLgClasses;
-      }
+  //     if (lgViewContainer && originalLgClasses !== undefined) {
+  //       lgViewContainer.className = originalLgClasses;
+  //     }
 
-      // Revert width so on-screen layout goes back to normal
-      el.style.width = originalWidth;
-      el.style.maxWidth = originalMaxWidth;
-    }
-  };
+  //     // Revert width so on-screen layout goes back to normal
+  //     el.style.width = originalWidth;
+  //     el.style.maxWidth = originalMaxWidth;
+  //   }
+  // };
 
   return (
     <div className="space-y-6">

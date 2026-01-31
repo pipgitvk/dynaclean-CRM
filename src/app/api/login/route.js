@@ -108,25 +108,25 @@ export async function POST(request) {
     }
 
     // --- 2. IP-based Restriction with Toggle ---
-    const isIpRestrictionEnabled = user.ip_restriction_enabled === 1;
-    const allowedIpsString = user.allowed_ips || "";
+    // const isIpRestrictionEnabled = user.ip_restriction_enabled === 1;
+    // const allowedIpsString = user.allowed_ips || "";
 
-    if (isIpRestrictionEnabled && allowedIpsString.trim() !== "") {
-      const allowedIps = allowedIpsString.split(",").map((i) => i.trim());
-      // Check if current IP matches any allowed IP
-      if (!allowedIps.includes(ip)) {
-        await recordActivity(
-          username,
-          userRole,
-          "FAILED",
-          `IP restriction enforced. Attempt from unauthorized IP: ${ip}`,
-        );
-        return NextResponse.json(
-          { error: "Login from this IP is not allowed" },
-          { status: 403 },
-        );
-      }
-    }
+    // if (isIpRestrictionEnabled && allowedIpsString.trim() !== "") {
+    //   const allowedIps = allowedIpsString.split(",").map((i) => i.trim());
+    //   // Check if current IP matches any allowed IP
+    //   if (!allowedIps.includes(ip)) {
+    //     await recordActivity(
+    //       username,
+    //       userRole,
+    //       "FAILED",
+    //       `IP restriction enforced. Attempt from unauthorized IP: ${ip}`,
+    //     );
+    //     return NextResponse.json(
+    //       { error: "Login from this IP is not allowed" },
+    //       { status: 403 },
+    //     );
+    //   }
+    // }
 
     // ✅ Generate JWT
     const token = jwt.sign(
