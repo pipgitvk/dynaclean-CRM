@@ -20,7 +20,7 @@ async function getExpenseById(expenseId) {
 }
 
 export default async function ExpenseDetailPage({ params }) {
-  const expenseId = params.expenseId;
+  const { expenseId } = await params;
   const expense = await getExpenseById(expenseId);
   if (!expense)
     return (
@@ -189,7 +189,7 @@ export default async function ExpenseDetailPage({ params }) {
         </Link>
 
         <Link
-          href={`/user-dashboard/expenses/edit/${expenseId}`}
+          href={`/admin-dashboard/expenses/edit/${expenseId}`}
           className="inline-block px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-center"
         >
           Edit

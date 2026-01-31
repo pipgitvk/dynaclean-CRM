@@ -9,7 +9,10 @@ export async function GET(req) {
     const token = cookieStore.get("token")?.value;
 
     if (!token) {
-      return NextResponse.json({ error: "Authentication token missing." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Authentication token missing." },
+        { status: 401 },
+      );
     }
 
     let username;
@@ -17,7 +20,10 @@ export async function GET(req) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       username = decoded.username;
     } catch (error) {
-      return NextResponse.json({ error: "Invalid or expired token." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Invalid or expired token." },
+        { status: 401 },
+      );
     }
 
     const db = await getDbConnection();
@@ -89,20 +95,20 @@ export async function GET(req) {
     }, {});
 
     // Create flat rows: one row per quotation
-    const result = quotations.map(quotation => {
+    const result = quotations.map((quotation) => {
       const customer = customerMap[quotation.customer_id] || {};
       const order = ordersByQuote[quotation.quote_number] || null;
 
       // Determine current stage
-      let current_stage = 'Quotation Created';
+      let current_stage = "Quotation Created";
       let order_processed = 0;
-      
+
       if (order) {
         if (order.account_status === 1 && order.dispatch_status === 1) {
-          current_stage = 'Order Processed';
+          current_stage = "Order Processed";
           order_processed = 1;
         } else if (order.account_status === 1) {
-          current_stage = 'Order Created';
+          current_stage = "Order Created";
         }
       }
 
@@ -122,13 +128,13 @@ export async function GET(req) {
         stage: customer.stage,
         date_created: customer.date_created,
         next_follow_date: customer.next_follow_date,
-        
+
         // Quotation fields
         quote_number: quotation.quote_number,
         quote_date: quotation.quote_date,
         quotation_amount: quotation.grand_total,
         created_by: quotation.emp_name,
-        
+
         // Order fields
         order_id: order?.order_id,
         invoice_number: order?.invoice_number,
@@ -137,16 +143,18 @@ export async function GET(req) {
         installation_status: order?.installation_status,
         account_status: order?.account_status,
         dispatch_status: order?.dispatch_status,
-        
+
         // Derived fields
         current_stage,
-        order_processed
+        order_processed,
       };
     });
 
     // Add customers with no quotations
-    customers.forEach(customer => {
-      const hasQuotation = quotations.some(q => q.customer_id === customer.customer_id);
+    customers.forEach((customer) => {
+      const hasQuotation = quotations.some(
+        (q) => q.customer_id === customer.customer_id,
+      );
       if (!hasQuotation) {
         result.push({
           // Customer fields
@@ -164,7 +172,7 @@ export async function GET(req) {
           stage: customer.stage,
           date_created: customer.date_created,
           next_follow_date: customer.next_follow_date,
-          
+
           // No quotation/order data
           quote_number: null,
           quote_date: null,
@@ -177,10 +185,10 @@ export async function GET(req) {
           installation_status: null,
           account_status: null,
           dispatch_status: null,
-          
+
           // Derived fields
-          current_stage: 'Customer Created',
-          order_processed: 0
+          current_stage: "Customer Created",
+          order_processed: 0,
         });
       }
     });
@@ -188,13 +196,16 @@ export async function GET(req) {
     return NextResponse.json({
       success: true,
       data: result,
-      count: result.length
+      count: result.length,
     });
   } catch (error) {
     console.error("/api/employee-leads error:", error);
-    return NextResponse.json({
-      success: false,
-      error: "Failed to fetch employee leads."
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to fetch employee leads.",
+      },
+      { status: 500 },
+    );
   }
 }

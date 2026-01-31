@@ -6,19 +6,57 @@ import { getSessionPayload } from "./auth";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 const allMenuItems = [
-  { path: "/user-dashboard", name: "Dashboard", roles: ["ALL"], icon: "Home" },
   {
-    path: "/user-dashboard/today-reports",
-    name: "Today Report",
-    roles: ["TEAM LEADER", "ADMIN", "HR", "SALES", "SALES HEAD"],
-    icon: "FileText",
+    path: "/user-dashboard",
+    name: "Dashboard",
+    roles: ["ALL"],
+    icon: "Home",
+    children: [
+      {
+        path: "/user-dashboard",
+        name: "Dashboard",
+        roles: ["ALL"],
+        icon: "Home",
+      },
+      {
+        path: "/user-dashboard/lead-reports",
+        name: "Lead Reports",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/today-reports",
+        name: "Today Report",
+        roles: ["TEAM LEADER", "ADMIN", "HR", "SALES", "SALES HEAD"],
+        icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/attendance/",
+        name: "Attendance",
+        roles: ["ALL"],
+        icon: "ListOrdered",
+      },
+      {
+        path: "/user-dashboard/task-manager",
+        name: "Task Manager",
+        roles: ["ALL"],
+        icon: "ClipboardList",
+      },
+      {
+        path: "/user-dashboard/expenses",
+        name: "Expense",
+        roles: ["ALL"],
+        icon: "DollarSign",
+      },
+      {
+        path: "/user-dashboard/report-data",
+        name: "Fast Card",
+        roles: ["ALL"],
+        icon: "ShieldCheck",
+      },
+    ],
   },
-  {
-    path: "/user-dashboard/lead-reports",
-    name: "Lead Reports",
-    roles: ["SALES", "SALES HEAD"],
-    icon: "FileText",
-  },
+
   {
     path: "/user-dashboard/reports/customer-payment-behavior",
     name: "Customer Payment Behavior",
@@ -74,6 +112,7 @@ const allMenuItems = [
       },
     ],
   },
+
   {
     path: "/user-dashboard/reports/payment-pending",
     name: "Payment Pending",
@@ -112,12 +151,7 @@ const allMenuItems = [
       },
     ],
   },
-  {
-    path: "/user-dashboard/attendance/",
-    name: "Attendance",
-    roles: ["ALL"],
-    icon: "ListOrdered",
-  },
+
   {
     path: "/user-dashboard/monitor-targets",
     name: "Target Monitor",
@@ -148,17 +182,26 @@ const allMenuItems = [
     roles: ["DIGITAL MARKETER", "TEAM LEADER"],
     icon: "Upload",
   },
+
   {
-    path: "/user-dashboard/add-customer",
-    name: "Add Customer",
-    roles: ["ALL"],
-    icon: "FilePlus2",
-  },
-  {
-    path: "/user-dashboard/customers",
+    // path: "/user-dashboard/customers",
     name: "View Customers",
     roles: ["ALL"],
     icon: "ScrollText",
+    children: [
+      {
+        path: "/user-dashboard/customers",
+        name: "View Customers",
+        roles: ["ALL"],
+        icon: "ScrollText",
+      },
+      {
+        path: "/user-dashboard/add-customer",
+        name: "Add Customer",
+        roles: ["ALL"],
+        icon: "FilePlus2",
+      },
+    ],
   },
   {
     path: "/user-dashboard/tl-customers",
@@ -166,12 +209,7 @@ const allMenuItems = [
     roles: ["TEAM LEADER"],
     icon: "Users",
   },
-  {
-    path: "/user-dashboard/task-manager",
-    name: "Task Manager",
-    roles: ["ALL"],
-    icon: "ClipboardList",
-  },
+
   {
     path: "/user-dashboard/demo_details",
     name: "Demo Details",
@@ -194,12 +232,7 @@ const allMenuItems = [
     ],
     icon: "FileSignature",
   },
-  {
-    path: "/user-dashboard/expenses",
-    name: "Expense",
-    roles: ["ALL"],
-    icon: "DollarSign",
-  },
+
   {
     path: "/user-dashboard/all-expenses",
     name: "View Expenses",
@@ -261,12 +294,7 @@ const allMenuItems = [
     roles: ["ADMIN", "GRAPHIC DESIGNER", "SERVICE HEAD", "DIGITAL MARKETER"],
     icon: "Mail",
   },
-  {
-    path: "/user-dashboard/report-data",
-    name: "Fast Card",
-    roles: ["ALL"],
-    icon: "ShieldCheck",
-  },
+
   {
     name: "Warranty",
     roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER"],

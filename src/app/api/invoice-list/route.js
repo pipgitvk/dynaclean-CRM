@@ -9,73 +9,72 @@ export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
 
+    // Pagination
     const page = Math.max(parseInt(searchParams.get("page")) || 1, 1);
     const limit = Math.min(parseInt(searchParams.get("limit")) || 20, 100);
     const offset = (page - 1) * limit;
 
+    // Filters
     const search = searchParams.get("search");
     const fromDate = searchParams.get("fromDate");
     const toDate = searchParams.get("toDate");
 
-    const allowedSort = ["created_at", "invoice_date", "invoice_number"];
+    // Sorting (whitelisted)
+    const allowedSort = ["created_at", "order_date", "invoice_number"];
     const sort = allowedSort.includes(searchParams.get("sort"))
       ? searchParams.get("sort")
       : "created_at";
 
     const order = searchParams.get("order") === "asc" ? "ASC" : "DESC";
 
-    // 3️⃣ Filters
+    // WHERE clause builder
     let whereClause = "WHERE 1=1";
     const values = [];
 
     if (search) {
       whereClause += `
-    AND (
-      invoice_number LIKE ? OR
-      quote_number LIKE ?
-    )
-  `;
+        AND (
+          invoice_number LIKE ? OR
+          buyer_name LIKE ?
+        )
+      `;
       values.push(`%${search}%`, `%${search}%`);
     }
 
     if (fromDate) {
-      whereClause += " AND invoice_date >= ?";
+      whereClause += " AND order_date >= ?";
       values.push(fromDate);
     }
 
     if (toDate) {
-      whereClause += " AND invoice_date <= ?";
+      whereClause += " AND order_date <= ?";
       values.push(toDate);
     }
 
     conn = await getDbConnection();
 
-    // 4️⃣ Total count
+    // Total count
     const [[{ total }]] = await conn.execute(
       `
       SELECT COUNT(*) AS total
-      FROM invoices
+      FROM invoice_details
       ${whereClause}
       `,
       values,
     );
 
-    // 5️⃣ Paginated data
+    // Paginated list data
     const [rows] = await conn.execute(
       `
       SELECT
         id,
-        quotation_id,
         invoice_number,
-        invoice_date,
-        due_date,
-        total_amount,
+        order_date,
+        buyer_name,
         tax_amount,
         grand_total,
-        status,
-        quote_number,
         created_at
-      FROM invoices
+      FROM invoice_details
       ${whereClause}
       ORDER BY ${sort} ${order}
       LIMIT ? OFFSET ?
@@ -100,12 +99,7 @@ export async function GET(req) {
       { error: "Failed to fetch invoices" },
       { status: 500 },
     );
+  } finally {
+    if (conn) conn.release?.();
   }
 }
-
-// for future ref for lg data
-
-// CREATE INDEX idx_invoice_number ON invoice (invoice_number);
-// CREATE INDEX idx_quotation_no ON invoice (quotation_no);
-// CREATE INDEX idx_invoice_date ON invoice (invoice_date);
-// CREATE INDEX idx_created_at ON invoice (created_at);
