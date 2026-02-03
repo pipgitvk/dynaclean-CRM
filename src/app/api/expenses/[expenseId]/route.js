@@ -4,7 +4,7 @@ import { join } from "path";
 
 export async function PUT(req, { params }) {
   try {
-    const { expenseId } = params;
+    const { expenseId } = await params;
     const formData = await req.formData();
 
     // Extract form fields

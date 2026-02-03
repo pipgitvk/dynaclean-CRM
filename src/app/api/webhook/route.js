@@ -100,7 +100,8 @@ export async function POST(request) {
     const email = getValue("email");
     let phone = getValue("phone_number");
     const address = getValue("city");
-    const pincode = getValue("postcode") || getValue("zipcode");
+    const pincode = getValue("postcode") || getValue("post_code");
+    const language = getValue("preferred_language_to_communicate");
     const lead_campaign = "social_media";
     const products_interest = campaignName;
     const now = new Date();
@@ -124,7 +125,13 @@ export async function POST(request) {
 
     // --- Assign rep based on pincode (runtime only) ---
     let assignedRep = null;
-    if (pincode) {
+
+    // normalize once
+    const normalizedLanguage = language?.toUpperCase();
+
+    if (normalizedLanguage === "TAMIL") {
+      assignedRep = repRows.find((r) => r.username === "KAVYA") || null;
+    } else if (pincode) {
       const state = await getStateFromPincode(pincode);
       const normalizedState = state?.toUpperCase();
 

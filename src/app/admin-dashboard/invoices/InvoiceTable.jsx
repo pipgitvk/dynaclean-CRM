@@ -38,8 +38,9 @@ export default function InvoiceTable() {
     if (search) params.append("search", search);
 
     try {
-      const res = await fetch(`/api/invoice-list?${params.toString()}`);
+      const res = await fetch(`/api/invoice-table?${params.toString()}`);
       const response = await res.json();
+      console.log("response data :", response);
 
       if (response.success) {
         setInvoices(response.data || []);

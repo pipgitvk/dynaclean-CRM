@@ -14,7 +14,7 @@ export default function ServiceRecordsPage() {
 
     setLoading(true);
     fetch(
-      `/api/service-records?serial_number=${encodeURIComponent(serial_number)}`
+      `/api/service-records?serial_number=${encodeURIComponent(serial_number)}`,
     )
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch records");
@@ -23,7 +23,7 @@ export default function ServiceRecordsPage() {
       .then((data) => {
         if (!data.records || data.records.length === 0) {
           setError(
-            `No service records found for serial number ${serial_number}.`
+            `No service records found for serial number ${serial_number}.`,
           );
         } else {
           setRecords(data.records);
@@ -74,8 +74,8 @@ export default function ServiceRecordsPage() {
                   row.status === "PENDING FOR SPARES"
                     ? "bg-orange-300"
                     : i % 2 === 1
-                    ? "bg-gray-100"
-                    : "bg-white";
+                      ? "bg-gray-100"
+                      : "bg-white";
 
                 const attachments = row.attachments?.split(",") || [];
 
