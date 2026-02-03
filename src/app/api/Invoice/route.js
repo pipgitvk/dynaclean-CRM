@@ -1,49 +1,49 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 
-export async function GET() {
-  try {
-    const conn = await getDbConnection();
-    console.log("check this connection:", conn);
+// export async function GET() {
+//   try {
+//     const conn = await getDbConnection();
+//     console.log("check this connection:", conn);
 
-    const createTableQuery = `
-      CREATE TABLE IF NOT EXISTS invoices (
-        id INT AUTO_INCREMENT PRIMARY KEY,
+//     const createTableQuery = `
+//       CREATE TABLE IF NOT EXISTS invoices (
+//         id INT AUTO_INCREMENT PRIMARY KEY,
 
-        quotation_id INT NOT NULL,
-        invoice_number VARCHAR(50) NOT NULL UNIQUE,
+//         quotation_id INT NOT NULL,
+//         invoice_number VARCHAR(50) NOT NULL UNIQUE,
 
-        invoice_date DATE NOT NULL,
-        due_date DATE NULL,
+//         invoice_date DATE NOT NULL,
+//         due_date DATE NULL,
 
-        total_amount DECIMAL(10,2) NOT NULL,
-        tax_amount DECIMAL(10,2) NOT NULL,
-        grand_total DECIMAL(10,2) NOT NULL,
+//         total_amount DECIMAL(10,2) NOT NULL,
+//         tax_amount DECIMAL(10,2) NOT NULL,
+//         grand_total DECIMAL(10,2) NOT NULL,
 
-        status ENUM('draft','sent','paid','cancelled') DEFAULT 'draft',
-        quote_number VARCHAR(50) NOT NULL,
+//         status ENUM('draft','sent','paid','cancelled') DEFAULT 'draft',
+//         quote_number VARCHAR(50) NOT NULL,
 
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+//         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+//         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-        INDEX (quotation_id)
-      );
-    `;
+//         INDEX (quotation_id)
+//       );
+//     `;
 
-    await conn.execute(createTableQuery);
+//     await conn.execute(createTableQuery);
 
-    return NextResponse.json({
-      success: true,
-      message: "Invoice table created successfully",
-    });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 },
-    );
-  }
-}
+//     return NextResponse.json({
+//       success: true,
+//       message: "Invoice table created successfully",
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     return NextResponse.json(
+//       { success: false, error: error.message },
+//       { status: 500 },
+//     );
+//   }
+// }
 
 // generate and store invoices
 

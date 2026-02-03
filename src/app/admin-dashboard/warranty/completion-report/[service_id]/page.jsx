@@ -37,8 +37,8 @@ export default function CompletionReportPage() {
     ? new Date(
         new Date(product.installation_date).setMonth(
           new Date(product.installation_date).getMonth() +
-            product.warranty_period
-        )
+            product.warranty_period,
+        ),
       )
     : null;
 
@@ -110,7 +110,7 @@ export default function CompletionReportPage() {
             {attachments.map((img, i) => (
               <img
                 key={i}
-                src={`/attachments/${img}`}
+                src={`${NEXT_PUBLIC_BASE_URL}src/app/attachments/${img}`}
                 alt={`Att ${i + 1}`}
                 className="w-full rounded border"
               />

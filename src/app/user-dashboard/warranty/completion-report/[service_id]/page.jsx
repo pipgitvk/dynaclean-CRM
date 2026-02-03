@@ -37,8 +37,8 @@ export default function CompletionReportPage() {
     ? new Date(
         new Date(product.installation_date).setMonth(
           new Date(product.installation_date).getMonth() +
-            product.warranty_period
-        )
+            product.warranty_period,
+        ),
       )
     : null;
 

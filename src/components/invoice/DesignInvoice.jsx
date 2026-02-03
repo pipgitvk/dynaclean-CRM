@@ -6,240 +6,252 @@ import autoTable from "jspdf-autotable";
 import Image from "next/image";
 import html2canvas from "html2canvas";
 
-// Dummy data - Replace with your SQL database data
-const dummyInvoiceData = {
-  company: {
-    name: "Dynaclean Industries Pvt. Ltd.",
-    address:
-      "4th Floor, PLOT No-9, Block-B, Pocket-3, Sector-17, Dwarka,, Pincode:110078",
-    contact:
-      "Tel.7982456944, Mob:9220454360, E-Mail:sales@dynacleanindustries.com",
-    gstin: "GSTIN/UIN:07AAKCD6495M1ZV, State Name:Delhi, Code:07",
-    CIN: "U74999DL2010PTC210201",
-  },
-  buyer: {
-    name: "M/S Ashlesh Enterprises",
-    address: "Opp.: M.I.T., Manipal-Karkala Road, Manipal",
-    gstin: "29AAIFA3943L1Z3",
-    state: "Karnataka, Code : 29",
-    placeOfSupply: "Karnataka",
-    contactPerson: "Ganesh Shanay",
-    phone: "9620144079",
-    email: "ashleshhotelmanipal@yahoo.com",
-  },
-  invoice: {
-    number: "DYN/2025-26/0347",
-    eWayBill: "7115 9881 3229",
-    referenceNo: "QUOTE20260120009 dt. 20-Jan-26",
-    orderDate: "20-Jan-26",
-  },
-  items: [
-    {
-      slNo: 1,
-      description: "Auto Scrubber Drier DYNA-40",
-      specs:
-        "Clear/Waste Water Tank: 40/45 L, Scrubbing Width: 460 mm, Squeegee Width: 780 mm, Cleaning Efficiency: 1800 m3/h, Battery Capacity/Wire Size: 15 m, Voltage: 220 V, Brush/Suction Motor Power 550/550 W, Brush Pressure: 25 Kg, Size: 970 x 540 x 970 mm, Weight: 65 kg, Working Time: N/A",
-      hsn: "84798999",
-      qty: "1 Nos",
-      rate: "88,500.00 Nos",
-      amount: "88,500.00",
-    },
-    {
-      slNo: 2,
-      description: "Auto Scrubber Drier DYNA-30",
-      specs:
-        "Clear/Waste Water Tank: 40/45 L, Scrubbing Width: 460 mm, Squeegee Width: 780 mm, Cleaning Efficiency: 1800 m3/h, Battery Capacity/Wire Size: 15 m, Voltage: 220 V, Brush/Suction Motor Power 550/550 W, Brush Pressure: 25 Kg, Size: 970 x 540 x 970 mm, Weight: 65 kg, Working Time: N/A",
-      hsn: "84798999",
-      qty: "1 Nos",
-      rate: "88,500.00 Nos",
-      amount: "88,500.00",
-    },
-  ],
-  taxRate: 18,
-  taxAmount: "15,930.00",
-  total: "1,04,430.00",
-  terms: [
-    "100% Payment Advance With PO",
-    "Late payment charges: Interest charges at the rate of 1.5% per month or as per MSME act 2006 whichever is higher will be charged on overdue amounts from the invoice due date",
-    "Packing & forwarding and freight inclusive",
-    "one year Warranty (Consumable items are not included).",
-    "Above Rates Are Valid For One Month Only",
-  ],
-  bank: {
-    accountHolderName: "Dynaclean Industries Private Limited",
-    name: "ICICI Bank",
-    accountNo: "343405500379",
-    branch: "Dwarka Sec-17 & ICIC0003434",
-  },
-};
+const NewInvoice = ({ invoice }) => {
+  // Calculate tax rate from the invoice data
+  const calculateTaxRate = () => {
+    if (invoice.subtotal && invoice.subtotal > 0) {
+      if (invoice.igst && invoice.igst > 0) {
+        return ((invoice.igst / invoice.subtotal) * 100).toFixed(2);
+      } else if (invoice.cgst && invoice.cgst > 0) {
+        return ((invoice.cgst / invoice.subtotal) * 100).toFixed(2);
+      }
+    }
+    return "0.00";
+  };
 
-const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
+  // Create items array from invoice items data
+  const createItemsArray = () => {
+    // If invoice has items array (from database), use it
+    if (invoice.items && Array.isArray(invoice.items)) {
+      return invoice.items.map((item, index) => ({
+        sr_no: index + 1,
+        description: item.item_name,
+        fullDescription: item.description || "",
+        hsn: item.hsn_code || "",
+        quantity: parseFloat(item.quantity) || 1,
+        rate: parseFloat(item.rate) || 0,
+        discount_percent: parseFloat(item.discount_percent) || 0,
+        discount_amount: parseFloat(item.discount_amount) || 0,
+        taxable_value: parseFloat(item.taxable_value) || 0,
+        cgst_percent: parseFloat(item.cgst_percent) || 0,
+        sgst_percent: parseFloat(item.sgst_percent) || 0,
+        igst_percent: parseFloat(item.igst_percent) || 0,
+        cgst_amount: parseFloat(item.cgst_amount) || 0,
+        sgst_amount: parseFloat(item.sgst_amount) || 0,
+        igst_amount: parseFloat(item.igst_amount) || 0,
+        total_amount: parseFloat(item.total_amount) || 0,
+        amount: parseFloat(item.taxable_value) || 0,
+      }));
+    } else {
+      // Fallback to old method if no items array
+      return [
+        {
+          sr_no: 1,
+          description: "Invoice Amount",
+          fullDescription: "",
+          hsn: "",
+          quantity: 1,
+          rate: invoice.subtotal || 0,
+          amount: invoice.subtotal || 0,
+        },
+      ];
+    }
+  };
+
+  // Convert terms_conditions string to array
+  const parseTerms = () => {
+    if (invoice.terms_conditions) {
+      return invoice.terms_conditions
+        .split("\n")
+        .filter((term) => term.trim() !== "");
+    }
+    return [];
+  };
+
+  // Calculate item-level totals for display
+  const calculateItemTotals = () => {
+    if (!invoice.items || !Array.isArray(invoice.items)) {
+      return {
+        subtotal: invoice.subtotal || 0,
+        totalTax: invoice.total_tax || 0,
+        grandTotal: invoice.grand_total || 0,
+        totalCGST: invoice.cgst || 0,
+        totalSGST: invoice.sgst || 0,
+        totalIGST: invoice.igst || 0,
+        totalQuantity: 1,
+      };
+    }
+
+    const totals = {
+      subtotal: 0,
+      totalTax: 0,
+      grandTotal: 0,
+      totalCGST: 0,
+      totalSGST: 0,
+      totalIGST: 0,
+      totalQuantity: 0,
+    };
+
+    invoice.items.forEach((item) => {
+      totals.subtotal += parseFloat(item.taxable_value) || 0;
+      totals.totalCGST += parseFloat(item.cgst_amount) || 0;
+      totals.totalSGST += parseFloat(item.sgst_amount) || 0;
+      totals.totalIGST += parseFloat(item.igst_amount) || 0;
+      totals.totalTax +=
+        (parseFloat(item.cgst_amount) || 0) +
+        (parseFloat(item.sgst_amount) || 0) +
+        (parseFloat(item.igst_amount) || 0);
+      totals.grandTotal += parseFloat(item.total_amount) || 0;
+      totals.totalQuantity += parseFloat(item.quantity) || 0;
+    });
+
+    return totals;
+  };
+
+  const itemTotals = calculateItemTotals();
+  const itemsArray = createItemsArray();
+
+  const data = {
+    company: {
+      name: "Dynaclean Industries Pvt Ltd",
+      address:
+        "1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road, Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu - 641006",
+      phone: "011-45143666, +91-7982456944",
+      email: "sales@dynacleanindustries.com",
+      gstin: "07AAKCD6495M1ZV",
+    },
+    buyer: {
+      name: invoice.customer_name || "",
+      address: invoice.billing_address || "",
+      gstin: invoice.gst_number || "",
+      state: invoice.state || "",
+      placeOfSupply: invoice.state || "",
+      contactPerson: invoice.customer_name || "",
+      phone: invoice.customer_phone || "",
+      email: invoice.customer_email || "",
+    },
+    consignee: {
+      name: invoice.Consignee || invoice.customer_name || "",
+      address: invoice.shipping_address || invoice.billing_address || "",
+      gstin: invoice.gst_number || "",
+      state: invoice.state || "",
+      contactPerson: invoice.customer_name || "",
+      phone: invoice.Consignee_Contact || "",
+    },
+    invoice: {
+      number: invoice.invoice_number || "",
+      eWayBill: "", // Not in your table
+      referenceNo: "", // Not in your table
+      orderDate: invoice.invoice_date
+        ? new Date(invoice.invoice_date)
+            .toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "2-digit",
+            })
+            .replace(/ /g, "-")
+        : "",
+      dueDate: invoice.due_date
+        ? new Date(invoice.due_date)
+            .toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "2-digit",
+            })
+            .replace(/ /g, "-")
+        : "",
+    },
+    items: itemsArray,
+    taxRate: calculateTaxRate(),
+    taxAmount: itemTotals.totalTax
+      ? parseFloat(itemTotals.totalTax).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "0.00",
+    total: itemTotals.grandTotal
+      ? parseFloat(itemTotals.grandTotal).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "0.00",
+    subtotal: itemTotals.subtotal
+      ? parseFloat(itemTotals.subtotal).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "0.00",
+    cgst: itemTotals.totalCGST
+      ? parseFloat(itemTotals.totalCGST).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "0.00",
+    sgst: itemTotals.totalSGST
+      ? parseFloat(itemTotals.totalSGST).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "0.00",
+    igst: itemTotals.totalIGST
+      ? parseFloat(itemTotals.totalIGST).toLocaleString("en-IN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : "0.00",
+    amountInWords: "Not Available", // You'll need to implement number to words conversion
+    taxAmountInWords: "Not Available", // You'll need to implement number to words conversion
+    terms: parseTerms(),
+    notes: invoice.notes || "",
+    bank: {
+      accountHolderName: "Dynaclean Industries Private Limited",
+      name: "ICICI Bank",
+      accountNo: "343405500379",
+      IFSC: "ICIC0003434",
+    },
+    paymentInfo: {
+      status: invoice.payment_status || "UNPAID",
+      amountPaid: invoice.amount_paid
+        ? parseFloat(invoice.amount_paid).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        : "0.00",
+      balanceAmount: invoice.balance_amount
+        ? parseFloat(invoice.balance_amount).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        : "0.00",
+    },
+  };
+
   const containerRef = React.useRef(null);
-  console.log("Invoice header:", header);
-  console.log("Invoice invoice:", invoice);
-  console.log("Invoice items:", items);
-
-  // const generatePDF = async () => {
-  //   const el = containerRef.current;
-  //   if (!el) return;
-
-  //   // -------------------------------
-  //   // Store original styles
-  //   // -------------------------------
-  //   const originalWidth = el.style.width;
-  //   const originalMaxWidth = el.style.maxWidth;
-  //   const originalPadding = el.style.padding;
-
-  //   // -------------------------------
-  //   // Force A4 width (794px @ 96dpi)
-  //   // -------------------------------
-  //   el.style.width = "794px";
-  //   el.style.maxWidth = "794px";
-  //   el.style.padding = "20px";
-
-  //   // -------------------------------
-  //   // Convert images to base64
-  //   // -------------------------------
-  //   const images = el.querySelectorAll("img");
-  //   await Promise.all(
-  //     Array.from(images).map(async (img) => {
-  //       if (!img.src || img.src.startsWith("data:")) return;
-  //       try {
-  //         const res = await fetch(img.src, { mode: "cors" });
-  //         const blob = await res.blob();
-  //         const base64 = await new Promise((resolve, reject) => {
-  //           const reader = new FileReader();
-  //           reader.onloadend = () => resolve(reader.result);
-  //           reader.onerror = reject;
-  //           reader.readAsDataURL(blob);
-  //         });
-  //         img.src = base64;
-  //       } catch (err) {
-  //         console.warn("Image base64 conversion failed:", img.src, err);
-  //       }
-  //     }),
-  //   );
-
-  //   // -------------------------------
-  //   // 🔥 TEMPORARY CSS OVERRIDE
-  //   // Fix lab(), oklch(), oklab(), lch()
-  //   // -------------------------------
-  //   const styleTag = document.createElement("style");
-  //   styleTag.setAttribute("data-pdf-fix", "true");
-  //   styleTag.innerHTML = `
-  //   * {
-  //     color: rgb(0, 0, 0) !important;
-  //     background-color: rgb(255, 255, 255) !important;
-  //     border-color: rgb(0, 0, 0) !important;
-  //     outline-color: rgb(0, 0, 0) !important;
-  //     box-shadow: none !important;
-  //     text-shadow: none !important;
-  //   }
-
-  //   *::before,
-  //   *::after {
-  //     color: rgb(0, 0, 0) !important;
-  //     background-color: rgb(255, 255, 255) !important;
-  //     border-color: rgb(0, 0, 0) !important;
-  //   }
-  // `;
-  //   document.head.appendChild(styleTag);
-
-  //   try {
-  //     // -------------------------------
-  //     // Generate canvas
-  //     // -------------------------------
-  //     const canvas = await html2canvas(el, {
-  //       scale: 2,
-  //       useCORS: true,
-  //       allowTaint: true,
-  //       foreignObjectRendering: false,
-  //       scrollY: 0,
-  //       windowWidth: el.scrollWidth,
-  //       windowHeight: el.scrollHeight,
-  //       backgroundColor: "#ffffff",
-  //       logging: false,
-  //     });
-
-  //     const imgData = canvas.toDataURL("image/jpeg", 0.95);
-
-  //     // -------------------------------
-  //     // Create PDF
-  //     // -------------------------------
-  //     const pdf = new jsPDF("p", "mm", "a4");
-  //     const pdfWidth = pdf.internal.pageSize.getWidth();
-  //     const pdfHeight = pdf.internal.pageSize.getHeight();
-
-  //     const imgProps = pdf.getImageProperties(imgData);
-  //     const imgWidth = pdfWidth;
-  //     const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-  //     let heightLeft = imgHeight;
-  //     let position = 0;
-
-  //     pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-  //     heightLeft -= pdfHeight;
-
-  //     while (heightLeft > 0) {
-  //       position -= pdfHeight;
-  //       pdf.addPage();
-  //       pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-  //       heightLeft -= pdfHeight;
-  //     }
-
-  //     pdf.save(`Invoice-${data.invoice.number}.pdf`);
-  //   } catch (error) {
-  //     console.error("PDF generation failed:", error);
-  //     alert("Failed to generate PDF. Please try again.");
-  //   } finally {
-  //     // -------------------------------
-  //     // Cleanup
-  //     // -------------------------------
-  //     if (styleTag && styleTag.parentNode) {
-  //       document.head.removeChild(styleTag);
-  //     }
-
-  //     el.style.width = originalWidth;
-  //     el.style.maxWidth = originalMaxWidth;
-  //     el.style.padding = originalPadding;
-  //   }
-  // };
 
   const generatePDF = async () => {
     const el = containerRef.current;
     if (!el) return;
 
-    // -------------------------------
-    // Loading indicator
-    // -------------------------------
     const loadingDiv = document.createElement("div");
     loadingDiv.innerHTML = "Generating PDF...";
     loadingDiv.style.cssText =
-      "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);color:white;padding:20px;border-radius:8px;z-index:9999;";
+      "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);color:white;padding:20px;border-radius:8px;z-index:9999;font-family:Arial,sans-serif;";
     document.body.appendChild(loadingDiv);
 
     let styleTag;
 
     try {
-      // -------------------------------
-      // Store original styles
-      // -------------------------------
       const originalWidth = el.style.width;
       const originalMaxWidth = el.style.maxWidth;
       const originalPadding = el.style.padding;
       const originalBorder = el.style.border;
 
-      // -------------------------------
-      // Force A4 width
-      // -------------------------------
       el.style.width = "794px";
       el.style.maxWidth = "794px";
       el.style.padding = "20px";
       el.style.border = "none";
 
-      // -------------------------------
       // Convert images to base64
-      // -------------------------------
       const images = el.querySelectorAll("img");
       await Promise.all(
         Array.from(images).map(async (img) => {
@@ -265,71 +277,71 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
         }),
       );
 
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 200));
 
-      // -------------------------------
-      // 🔥 CRITICAL FIX: disable lab/oklch
-      // -------------------------------
+      // CRITICAL FIX: Override ALL color functions
       styleTag = document.createElement("style");
+      styleTag.setAttribute("data-pdf-override", "true");
       styleTag.innerHTML = `
-      [data-pdf-container] * {
-        color: rgb(0,0,0) !important;
-        background-color: rgb(255,255,255) !important;
-        border-color: rgb(0,0,0) !important;
-        outline-color: rgb(0,0,0) !important;
+      * {
+        color: rgb(0, 0, 0) !important;
+        background-color: rgb(255, 255, 255) !important;
+        border-color: rgb(0, 0, 0) !important;
+        outline-color: rgb(0, 0, 0) !important;
         box-shadow: none !important;
         text-shadow: none !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
       }
 
-      [data-pdf-container] *::before,
-      [data-pdf-container] *::after {
-        color: rgb(0,0,0) !important;
-        background-color: rgb(255,255,255) !important;
-        border-color: rgb(0,0,0) !important;
+      *::before,
+      *::after {
+        color: rgb(0, 0, 0) !important;
+        background-color: rgb(255, 255, 255) !important;
+        border-color: rgb(0, 0, 0) !important;
       }
 
-      [data-pdf-container] table {
+      table {
         border-collapse: collapse !important;
       }
 
-      [data-pdf-container] td,
-      [data-pdf-container] th {
+      td, th {
         page-break-inside: avoid !important;
       }
     `;
       document.head.appendChild(styleTag);
 
-      el.setAttribute("data-pdf-container", "true");
+      await new Promise((r) => setTimeout(r, 100));
 
-      // -------------------------------
-      // Generate canvas
-      // -------------------------------
       const canvas = await html2canvas(el, {
-        scale: 3,
+        scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         foreignObjectRendering: false,
         backgroundColor: "#ffffff",
         windowWidth: el.scrollWidth,
         windowHeight: el.scrollHeight,
         logging: false,
         imageTimeout: 15000,
-        onclone: (doc) => {
-          const cloned = doc.querySelector("[data-pdf-container]");
-          if (cloned) {
-            cloned.style.width = "794px";
-            cloned.style.maxWidth = "794px";
+        onclone: (clonedDoc) => {
+          const clonedEl =
+            clonedDoc.body.querySelector("[ref]") ||
+            clonedDoc.body.firstElementChild;
+          if (clonedEl) {
+            clonedEl.style.width = "794px";
+            clonedEl.style.maxWidth = "794px";
+
+            // Force RGB colors in cloned document
+            const allElements = clonedEl.querySelectorAll("*");
+            allElements.forEach((elem) => {
+              elem.style.color = "rgb(0, 0, 0)";
+              elem.style.backgroundColor = "rgb(255, 255, 255)";
+              elem.style.borderColor = "rgb(0, 0, 0)";
+            });
           }
         },
       });
 
       const imgData = canvas.toDataURL("image/png", 1.0);
 
-      // -------------------------------
-      // Create PDF
-      // -------------------------------
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -339,7 +351,6 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-
       const imgProps = pdf.getImageProperties(imgData);
       const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
@@ -376,21 +387,156 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
 
       pdf.save(`Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`);
 
-      // -------------------------------
-      // Restore styles
-      // -------------------------------
       el.style.width = originalWidth;
       el.style.maxWidth = originalMaxWidth;
       el.style.padding = originalPadding;
       el.style.border = originalBorder;
-      el.removeAttribute("data-pdf-container");
     } catch (err) {
       console.error("PDF generation failed:", err);
       alert("Failed to generate PDF. Check console for details.");
     } finally {
-      if (styleTag) document.head.removeChild(styleTag);
-      if (loadingDiv) document.body.removeChild(loadingDiv);
+      if (styleTag && styleTag.parentNode) {
+        document.head.removeChild(styleTag);
+      }
+      if (loadingDiv && loadingDiv.parentNode) {
+        document.body.removeChild(loadingDiv);
+      }
     }
+  };
+
+  // Calculate totals for display
+  const calculateSubtotal = () => {
+    return data.items.reduce(
+      (sum, item) => sum + parseFloat(item.amount || 0),
+      0,
+    );
+  };
+
+  const formatCurrency = (value) => {
+    if (!value) return "0.00";
+    return parseFloat(value).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  // to add in single hsn calc
+  const buildHSNSummary = () => {
+    const map = {};
+
+    data.items.forEach((item) => {
+      const hsn = item.hsn || "NA";
+
+      if (!map[hsn]) {
+        map[hsn] = {
+          hsn,
+          taxableValue: 0,
+          cgst: 0,
+          sgst: 0,
+          igst: 0,
+          cgstPercent: item.cgst_percent,
+          sgstPercent: item.sgst_percent,
+          igstPercent: item.igst_percent,
+        };
+      }
+
+      map[hsn].taxableValue += parseFloat(item.amount || 0);
+      map[hsn].cgst += parseFloat(item.cgst_amount || 0);
+      map[hsn].sgst += parseFloat(item.sgst_amount || 0);
+      map[hsn].igst += parseFloat(item.igst_amount || 0);
+    });
+
+    return Object.values(map);
+  };
+
+  const hsnSummary = buildHSNSummary();
+
+  // Function to render tax rows based on available tax data
+  const renderTaxRows = () => {
+    const rows = [];
+
+    if (parseFloat(itemTotals.totalIGST) > 0) {
+      rows.push(
+        <tr key="igst">
+          <td
+            colSpan="5"
+            style={{
+              border: "1px solid #000",
+              padding: "4px",
+              textAlign: "right",
+              fontWeight: "bold",
+            }}
+          >
+            Output IGST {data.taxRate}%
+          </td>
+          <td
+            style={{
+              border: "1px solid #000",
+              padding: "4px",
+              textAlign: "right",
+            }}
+          >
+            {data.igst}
+          </td>
+        </tr>,
+      );
+    } else {
+      if (parseFloat(itemTotals.totalCGST) > 0) {
+        rows.push(
+          <tr key="cgst">
+            <td
+              colSpan="5"
+              style={{
+                border: "1px solid #000",
+                padding: "4px",
+                textAlign: "right",
+                fontWeight: "bold",
+              }}
+            >
+              Output CGST {data.taxRate}%
+            </td>
+            <td
+              style={{
+                border: "1px solid #000",
+                padding: "4px",
+                textAlign: "right",
+              }}
+            >
+              {data.cgst}
+            </td>
+          </tr>,
+        );
+      }
+
+      if (parseFloat(itemTotals.totalSGST) > 0) {
+        rows.push(
+          <tr key="sgst">
+            <td
+              colSpan="5"
+              style={{
+                border: "1px solid #000",
+                padding: "4px",
+                textAlign: "right",
+                fontWeight: "bold",
+              }}
+            >
+              Output SGST {data.taxRate}%
+            </td>
+            <td
+              style={{
+                border: "1px solid #000",
+                padding: "4px",
+                textAlign: "right",
+              }}
+            >
+              {data.sgst}
+            </td>
+          </tr>,
+        );
+      }
+    }
+
+    return rows;
   };
 
   return (
@@ -416,19 +562,6 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
         >
           Download PDF
         </button>
-        <button
-          onClick={() => alert("Edit functionality not implemented")}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: "#4CAF50",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-          Edit Invoice
-        </button>
       </div>
       <div
         ref={containerRef}
@@ -438,6 +571,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
           maxWidth: "210mm",
           margin: "0 auto",
           padding: "10mm",
+          background: "#fff",
           backgroundColor: "#fff",
           border: "1px solid #000",
         }}
@@ -484,9 +618,9 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
               {data.company.name}
             </div>
             <div>{data.company.address}</div>
-            <div>{data.company.contact}</div>
-            <div>{data.company.gstin}</div>
-            <div>CIN:{data.company.CIN}</div>
+            <div>{data.company.phone}</div>
+            <div>GST:{data.company.gstin}</div>
+            {/* <div>{data.company.CIN}</div> */}
           </div>
           <div></div>
         </div>
@@ -520,7 +654,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   fontWeight: "bold",
                 }}
               >
-                e-Way Bill No.
+                Invoice Date
               </td>
               <td
                 style={{
@@ -530,7 +664,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   fontWeight: "bold",
                 }}
               >
-                Delivery Note
+                Due Date
               </td>
             </tr>
             <tr>
@@ -538,9 +672,11 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                 {data.invoice.number}
               </td>
               <td style={{ border: "1px solid #000", padding: "4px" }}>
-                {data.invoice.eWayBill}
+                {data.invoice.orderDate}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
+              <td style={{ border: "1px solid #000", padding: "4px" }}>
+                {data.invoice.dueDate}
+              </td>
             </tr>
             <tr>
               <td
@@ -575,7 +711,9 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
               <td style={{ border: "1px solid #000", padding: "4px" }}>
                 {data.invoice.referenceNo}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
+              <td style={{ border: "1px solid #000", padding: "4px" }}>
+                {invoice.quotation_id ? `QT-${invoice.quotation_id}` : ""}
+              </td>
               <td style={{ border: "1px solid #000", padding: "4px" }}>
                 {data.invoice.orderDate}
               </td>
@@ -588,7 +726,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   fontWeight: "bold",
                 }}
               >
-                Delivery Note Date
+                e-Way Bill No.
               </td>
               <td
                 style={{
@@ -597,7 +735,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   fontWeight: "bold",
                 }}
               >
-                Other References
+                Payment Status
               </td>
               <td
                 style={{
@@ -606,13 +744,19 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   fontWeight: "bold",
                 }}
               >
-                Dated
+                Balance Amount
               </td>
             </tr>
             <tr>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
+              <td style={{ border: "1px solid #000", padding: "4px" }}>
+                {data.invoice.eWayBill}
+              </td>
+              <td style={{ border: "1px solid #000", padding: "4px" }}>
+                {data.paymentInfo.status}
+              </td>
+              <td style={{ border: "1px solid #000", padding: "4px" }}>
+                ₹{data.paymentInfo.balanceAmount}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -659,13 +803,12 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                 <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
                   Consignee (Ship to)
                 </div>
-                <div style={{ fontWeight: "bold" }}>{data.buyer.name}</div>
-                <div>{data.buyer.address}</div>
-                <div>GSTIN/UIN : {data.buyer.gstin}</div>
-                <div>State Name : {data.buyer.state}</div>
-                <div>Contact person : {data.buyer.contactPerson}</div>
-                <div>Contact : {data.buyer.phone}</div>
-                <div>E-Mail : {data.buyer.email}</div>
+                <div style={{ fontWeight: "bold" }}>{data.consignee.name}</div>
+                <div>{data.consignee.address}</div>
+                <div>GSTIN/UIN : {data.consignee.gstin}</div>
+                <div>State Name : {data.consignee.state}</div>
+                <div>Contact person : {data.consignee.contactPerson}</div>
+                <div>Contact : {data.consignee.phone}</div>
               </td>
             </tr>
           </tbody>
@@ -689,7 +832,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   fontWeight: "bold",
                 }}
               >
-                Destination
+                State Code
               </td>
               <td
                 style={{
@@ -698,48 +841,36 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   fontWeight: "bold",
                 }}
               >
-                Dispatch Doc No.
+                Amount Paid
               </td>
             </tr>
             <tr>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
+              <td style={{ border: "1px solid #000", padding: "4px" }}>
+                {invoice.state_code || ""}
+              </td>
+              <td style={{ border: "1px solid #000", padding: "4px" }}>
+                ₹{data.paymentInfo.amountPaid}
+              </td>
             </tr>
             <tr>
               <td
+                colSpan="2"
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
                   fontWeight: "bold",
                 }}
               >
-                Dispatched through
-              </td>
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  fontWeight: "bold",
-                }}
-              >
-                Mode/Terms of Payment
+                Notes
               </td>
             </tr>
             <tr>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
-            </tr>
-            <tr>
               <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  fontWeight: "bold",
-                }}
+                colSpan="2"
+                style={{ border: "1px solid #000", padding: "4px" }}
               >
-                Terms of Delivery
+                {data.notes}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}></td>
             </tr>
           </tbody>
         </table>
@@ -782,49 +913,15 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
               >
                 HSN/SAC
               </th>
-              {/* <th
-              style={{
-                border: "1px solid #000",
-                padding: "4px",
-                textAlign: "center",
-              }}
-            >
-              Quantity
-              <br />
-              Shipped Billed
-            </th> */}
-              <tr>
-                <th
-                  colSpan={2}
-                  style={{
-                    borderTop: "1px solid #000",
-                    borderBottom: "1px solid #000",
-                    padding: "4px",
-                    textAlign: "center",
-                  }}
-                >
-                  Quantity
-                </th>
-              </tr>
-              <tr>
-                <th
-                  style={{
-                    borderRight: "1px solid #000",
-                    padding: "4px",
-                    textAlign: "center",
-                  }}
-                >
-                  Shipped
-                </th>
-                <th
-                  style={{
-                    padding: "4px",
-                    textAlign: "center",
-                  }}
-                >
-                  Billed
-                </th>
-              </tr>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  textAlign: "center",
+                }}
+              >
+                Quantity
+              </th>
               <th
                 style={{
                   border: "1px solid #000",
@@ -832,7 +929,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   textAlign: "right",
                 }}
               >
-                Rate per
+                Rate
               </th>
               <th
                 style={{
@@ -847,57 +944,35 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
           </thead>
           <tbody>
             {data.items.map((item) => (
-              <tr key={item.slNo}>
+              <tr key={item.sr_no}>
                 <td style={{ border: "1px solid #000", padding: "4px" }}>
-                  {item.slNo}
+                  {item.sr_no}
                 </td>
                 <td style={{ border: "1px solid #000", padding: "4px" }}>
                   <div style={{ fontWeight: "bold" }}>{item.description}</div>
-                  <div style={{ fontSize: "8px", marginTop: "2px" }}>
-                    {item.specs}
-                  </div>
+                  {item.fullDescription && (
+                    <div
+                      style={{
+                        fontSize: "8px",
+                        marginTop: "2px",
+                        lineHeight: "1.2",
+                      }}
+                    >
+                      {item.fullDescription}
+                    </div>
+                  )}
                 </td>
                 <td style={{ border: "1px solid #000", padding: "4px" }}>
                   {item.hsn}
                 </td>
-                {/* <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                }}
-              >
-                {item.qty}
-                <br />
-                {item.qty}
-              </td> */}
                 <td
                   style={{
                     border: "1px solid #000",
-                    height: "100%",
                     padding: "4px",
                     textAlign: "center",
                   }}
                 >
-                  <span
-                    style={{
-                      // borderRight: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {item.qty}
-                  </span>
-
-                  <span
-                    style={{
-                      // border: "1px solid #000",
-                      padding: "4px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {item.qty}
-                  </span>
+                  {item.quantity}
                 </td>
                 <td
                   style={{
@@ -906,7 +981,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                     textAlign: "right",
                   }}
                 >
-                  {item.rate}
+                  {formatCurrency(item.rate)}
                 </td>
                 <td
                   style={{
@@ -915,32 +990,14 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                     textAlign: "right",
                   }}
                 >
-                  {item.amount}
+                  {formatCurrency(item.amount)}
                 </td>
               </tr>
             ))}
-            <tr>
-              <td
-                colSpan="5"
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "right",
-                  fontWeight: "bold",
-                }}
-              >
-                Output IGST {data.taxRate}%
-              </td>
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "right",
-                }}
-              >
-                {data.taxAmount}
-              </td>
-            </tr>
+
+            {/* Tax Rows */}
+            {renderTaxRows()}
+
             <tr>
               <td
                 colSpan="3"
@@ -957,12 +1014,10 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "center",
-                  // display: "flex",
-                  gap: "10px",
+                  fontWeight: "bold",
                 }}
               >
-                <span style={{ paddingRight: "5px" }}>{data.items[0].qty}</span>
-                <span>{data.items[0].qty}</span>
+                {itemTotals.totalQuantity}
               </td>
               <td
                 style={{
@@ -992,7 +1047,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
         <div style={{ marginBottom: "10px", fontSize: "9px" }}>
           <strong>Amount Chargeable (in words)</strong> E. & O.E
           <br />
-          <strong>INR One Lakh Four Thousand Four Hundred Thirty Only</strong>
+          <strong>INR {data.amountInWords}</strong>
         </div>
 
         {/* Tax Summary Table */}
@@ -1024,17 +1079,94 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
               >
                 Taxable Value
               </th>
-              <th
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                }}
-              >
-                IGST
-                <br />
-                Rate Amount
-              </th>
+              {parseFloat(itemTotals.totalIGST) > 0 ? (
+                <>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  >
+                    IGST
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  >
+                    Rate
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "right",
+                    }}
+                  >
+                    Amount
+                  </th>
+                </>
+              ) : (
+                <>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  >
+                    CGST
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  >
+                    Rate
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "right",
+                    }}
+                  >
+                    Amount
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  >
+                    SGST/UTGST
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  >
+                    Rate
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "right",
+                    }}
+                  >
+                    Amount
+                  </th>
+                </>
+              )}
               <th
                 style={{
                   border: "1px solid #000",
@@ -1047,38 +1179,126 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
-                {data.items[0].hsn}
-              </td>
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "right",
-                }}
-              >
-                {data.items[0].amount}
-              </td>
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                }}
-              >
-                {data.taxRate}% {data.taxAmount}
-              </td>
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "right",
-                }}
-              >
-                {data.taxAmount}
-              </td>
-            </tr>
+            {hsnSummary.map((row, idx) => (
+              <tr key={idx}>
+                <td style={{ border: "1px solid #000", padding: "4px" }}>
+                  {row.hsn}
+                </td>
+
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    textAlign: "right",
+                  }}
+                >
+                  {formatCurrency(row.taxableValue)}
+                </td>
+
+                {parseFloat(itemTotals.totalIGST) > 0 ? (
+                  <>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
+                      IGST
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {row.igstPercent}%
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "right",
+                      }}
+                    >
+                      {formatCurrency(row.igst)}
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
+                      CGST
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {row.cgstPercent}%
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "right",
+                      }}
+                    >
+                      {formatCurrency(row.cgst)}
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
+                      SGST/UTGST
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {row.sgstPercent}%
+                    </td>
+                    <td
+                      style={{
+                        border: "1px solid #000",
+                        padding: "4px",
+                        textAlign: "right",
+                      }}
+                    >
+                      {formatCurrency(row.sgst)}
+                    </td>
+                  </>
+                )}
+
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    textAlign: "right",
+                  }}
+                >
+                  {parseFloat(itemTotals.totalIGST) > 0
+                    ? formatCurrency(row.igst)
+                    : formatCurrency(row.cgst + row.sgst)}
+                </td>
+              </tr>
+            ))}
+
+            {/* TOTAL ROW */}
             <tr style={{ fontWeight: "bold" }}>
               <td style={{ border: "1px solid #000", padding: "4px" }}>
                 Total
@@ -1090,17 +1310,66 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
                   textAlign: "right",
                 }}
               >
-                {data.items[0].amount}
+                {data.subtotal}
               </td>
-              <td
-                style={{
-                  border: "1px solid #000",
-                  padding: "4px",
-                  textAlign: "center",
-                }}
-              >
-                {data.taxAmount}
-              </td>
+              {parseFloat(itemTotals.totalIGST) > 0 ? (
+                <>
+                  <td
+                    colSpan="2"
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  ></td>
+                  <td
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {data.igst}
+                  </td>
+                </>
+              ) : (
+                <>
+                  <td
+                    colSpan="2"
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  ></td>
+                  <td
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {data.cgst}
+                  </td>
+                  <td
+                    colSpan="2"
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "center",
+                    }}
+                  ></td>
+                  <td
+                    style={{
+                      border: "1px solid #000",
+                      padding: "4px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {data.sgst}
+                  </td>
+                </>
+              )}
               <td
                 style={{
                   border: "1px solid #000",
@@ -1116,10 +1385,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
 
         {/* Tax Amount in Words */}
         <div style={{ marginBottom: "15px", fontSize: "9px" }}>
-          <strong>
-            Tax Amount (in words) : INR Fifteen Thousand Nine Hundred Thirty
-            Only
-          </strong>
+          <strong>Tax Amount (in words) : INR {data.taxAmountInWords}</strong>
         </div>
 
         {/* Terms & Bank Details */}
@@ -1128,11 +1394,15 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
             <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
               Terms & Condition
             </div>
-            {data.terms.map((term, index) => (
-              <div key={index} style={{ marginBottom: "3px" }}>
-                {index + 1} {term}
-              </div>
-            ))}
+            {data.terms.length > 0 ? (
+              data.terms.map((term, index) => (
+                <div key={index} style={{ marginBottom: "3px" }}>
+                  {term}
+                </div>
+              ))
+            ) : (
+              <div>No terms and conditions specified.</div>
+            )}
           </div>
           <div style={{ width: "250px", fontSize: "9px" }}>
             <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
@@ -1141,7 +1411,7 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
             <div>A/C Holder Name : {data.bank.accountHolderName}</div>
             <div>Bank Name : {data.bank.name}</div>
             <div>A/c No. : {data.bank.accountNo}</div>
-            <div>Branch & IFS Code: {data.bank.branch}</div>
+            <div>Branch & IFS Code: {data.bank.IFSC}</div>
           </div>
         </div>
 
@@ -1164,16 +1434,6 @@ const NewInvoice = ({ data = dummyInvoiceData, header, invoice, items }) => {
         >
           This is a Computer Generated Invoice
         </div>
-
-        {/* Action Buttons */}
-        <div
-          style={{
-            marginTop: "20px",
-            display: "flex",
-            gap: "10px",
-            justifyContent: "center",
-          }}
-        ></div>
       </div>
     </>
   );
