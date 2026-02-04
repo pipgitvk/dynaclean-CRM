@@ -131,14 +131,15 @@ export async function POST(request) {
 
     if (normalizedLanguage === "TAMIL") {
       assignedRep = repRows.find((r) => r.username === "KAVYA") || null;
-    } else if (pincode) {
-      const state = await getStateFromPincode(pincode);
-      const normalizedState = state?.toUpperCase();
-
-      if (normalizedState === "TAMIL NADU" || normalizedState === "KERALA") {
-        assignedRep = repRows.find((r) => r.username === "KAVYA") || null;
-      }
     }
+    // else if (pincode) {
+    //   const state = await getStateFromPincode(pincode);
+    //   const normalizedState = state?.toUpperCase();
+
+    //   if (normalizedState === "TAMIL NADU" || normalizedState === "KERALA") {
+    //     assignedRep = repRows.find((r) => r.username === "KAVYA") || null;
+    //   }
+    // }
 
     // --- Round-robin fallback ---
     if (!assignedRep) {
