@@ -26,28 +26,28 @@ function normalizePhone(phone) {
 }
 
 // get state from pincode
-async function getStateFromPincode(pincode) {
-  if (!pincode) return null;
+// async function getStateFromPincode(pincode) {
+//   if (!pincode) return null;
 
-  try {
-    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-    const data = await res.json();
-    console.log("📍 Pincode data:", data);
+//   try {
+//     const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+//     const data = await res.json();
+//     console.log("📍 Pincode data:", data);
 
-    if (
-      Array.isArray(data) &&
-      data[0]?.Status === "Success" &&
-      data[0]?.PostOffice?.length
-    ) {
-      console.log("📍 State from pincode:", data[0].PostOffice[0].State);
-      return data[0].PostOffice[0].State;
-    }
-  } catch (err) {
-    console.warn("⚠️ Pincode lookup failed:", pincode, err);
-  }
+//     if (
+//       Array.isArray(data) &&
+//       data[0]?.Status === "Success" &&
+//       data[0]?.PostOffice?.length
+//     ) {
+//       console.log("📍 State from pincode:", data[0].PostOffice[0].State);
+//       return data[0].PostOffice[0].State;
+//     }
+//   } catch (err) {
+//     console.warn("⚠️ Pincode lookup failed:", pincode, err);
+//   }
 
-  return null;
-}
+//   return null;
+// }
 
 // Helper: parse lead field_data from Meta into our shape
 // function parseLeadFromFieldData(fieldData, extra = {}) {
@@ -76,14 +76,15 @@ function parseLeadFromFieldData(fieldData, extra = {}) {
   const email = getValue("email");
   const rawPhone = getValue("phone_number");
   const address = getValue("city");
-  const pincode = getValue("postcode") || getValue("zipcode");
+  const language = getValue("preferred_language_to_communicate");
+  // const pincode = getValue("postcode") || getValue("zipcode");
 
   return {
     first_name: first_name || "",
     email: email || "",
     phone: normalizePhone(rawPhone),
     address: address || "",
-    pincode: pincode || null,
+    language:language || "",
     ...extra,
   };
 }
@@ -238,60 +239,43 @@ export async function GET(request) {
 async function insertLeadIntoDb(lead) {
   const conn = await getDbConnection();
 
-  // Step 4: fetch reps ordered by priority
-  // const [repRows] = await conn.execute(
-  //   `SELECT * FROM lead_distribution
-  //    WHERE is_active = 1
-  //    ORDER BY priority ASC, last_assigned_at ASC`,
-  // );
 
   // STEP 1: check state from pincode (runtime)
-  let tamilOverride = false;
 
-  if (lead.pincode) {
-    const state = await Promise.race([
-      getStateFromPincode(lead.pincode),
-      new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
-    ]);
+ let repRows = [];
+const normalizedLanguage = lead.language?.toUpperCase();
 
-    const normalizedState = state?.toUpperCase();
-
-    if (normalizedState === "TAMIL NADU" || normalizedState === "KERALA") {
-      tamilOverride = true;
-    }
-  }
-
-  let repRows = [];
-
-  //  STEP 2: if Tamil Nadu, kerala → assign Kavya directly
-  if (tamilOverride) {
-    const [rows] = await conn.execute(
-      `SELECT *
+// 🟢 STEP 1: Tamil → Kavya
+if (normalizedLanguage === "TAMIL") {
+  const [rows] = await conn.execute(
+    `SELECT *
      FROM lead_distribution
      WHERE is_active = 1
        AND username = 'KAVYA'
+       AND assigned_count < max_leads
      LIMIT 1`,
-    );
+  );
 
-    if (rows.length) {
-      repRows = rows;
-    }
+  if (rows.length) {
+    repRows = rows;
   }
+}
 
-  // STEP 3: fallback ONLY if NOT Tamil/Kerala
-  if (!repRows.length && !tamilOverride) {
-    const [rows] = await conn.execute(
-      `SELECT *
+// 🟡 STEP 2: fallback round-robin
+if (!repRows.length) {
+  const [rows] = await conn.execute(
+    `SELECT *
      FROM lead_distribution
      WHERE is_active = 1
      ORDER BY priority ASC, last_assigned_at ASC`,
-    );
-    repRows = rows;
-  }
+  );
+  repRows = rows;
+}
 
-  if (repRows.length === 0) {
-    throw new Error("No reps available");
-  }
+if (repRows.length === 0) {
+  throw new Error("No reps available");
+}
+
 
   // Round-robin
   // let selectedRep = null;
@@ -311,27 +295,24 @@ async function insertLeadIntoDb(lead) {
   //   selectedRep = repRows[0];
   // }
 
-  let selectedRep = null;
+let selectedRep = null;
 
-  if (tamilOverride) {
-    selectedRep = repRows[0];
-  } else {
-    for (const rep of repRows) {
-      if (rep.assigned_count < rep.max_leads) {
-        selectedRep = rep;
-        break;
-      }
-    }
-
-    if (!selectedRep) {
-      await conn.execute(
-        `UPDATE lead_distribution
-       SET assigned_count = 0
-       WHERE is_active = 1`,
-      );
-      selectedRep = repRows[0];
-    }
+for (const rep of repRows) {
+  if (rep.assigned_count < rep.max_leads) {
+    selectedRep = rep;
+    break;
   }
+}
+
+if (!selectedRep) {
+  await conn.execute(
+    `UPDATE lead_distribution
+     SET assigned_count = 0
+     WHERE is_active = 1`,
+  );
+  selectedRep = repRows[0];
+}
+
 
   const assignedTo = selectedRep.username;
   const now = new Date();
