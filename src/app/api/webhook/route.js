@@ -9,28 +9,28 @@ const dbConfig = {
 
 // pincode find
 // get state from pincode
-async function getStateFromPincode(pincode) {
-  if (!pincode) return null;
+// async function getStateFromPincode(pincode) {
+//   if (!pincode) return null;
 
-  try {
-    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-    const data = await res.json();
-    console.log("📍 Pincode data:", data);
+//   try {
+//     const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+//     const data = await res.json();
+//     console.log("📍 Pincode data:", data);
 
-    if (
-      Array.isArray(data) &&
-      data[0]?.Status === "Success" &&
-      data[0]?.PostOffice?.length
-    ) {
-      console.log("📍 State from pincode:", data[0].PostOffice[0].State);
-      return data[0].PostOffice[0].State;
-    }
-  } catch (err) {
-    console.warn("⚠️ Pincode lookup failed:", pincode, err);
-  }
+//     if (
+//       Array.isArray(data) &&
+//       data[0]?.Status === "Success" &&
+//       data[0]?.PostOffice?.length
+//     ) {
+//       console.log("📍 State from pincode:", data[0].PostOffice[0].State);
+//       return data[0].PostOffice[0].State;
+//     }
+//   } catch (err) {
+//     console.warn("⚠️ Pincode lookup failed:", pincode, err);
+//   }
 
-  return null;
-}
+//   return null;
+// }
 
 // ✅ Verify webhook subscription
 export async function GET(request) {
@@ -100,7 +100,7 @@ export async function POST(request) {
     const email = getValue("email");
     let phone = getValue("phone_number");
     const address = getValue("city");
-    const pincode = getValue("postcode") || getValue("post_code");
+    // const pincode = getValue("postcode") || getValue("post_code");
     const language = getValue("preferred_language_to_communicate");
     const lead_campaign = "social_media";
     const products_interest = campaignName;
