@@ -123,23 +123,20 @@ export async function POST(request) {
     if (!repRows.length)
       return new Response("No reps available", { status: 503 });
 
-    // --- Assign rep based on pincode (runtime only) ---
+    // --- Assign rep based on language ---
     let assignedRep = null;
 
     // normalize once
-    const normalizedLanguage = language?.toUpperCase();
+    const normalizedLanguage = language?.toUpperCase()?.trim();
 
     if (normalizedLanguage === "TAMIL") {
       assignedRep = repRows.find((r) => r.username === "KAVYA") || null;
-    }
-    // else if (pincode) {
-    //   const state = await getStateFromPincode(pincode);
-    //   const normalizedState = state?.toUpperCase();
 
-    //   if (normalizedState === "TAMIL NADU" || normalizedState === "KERALA") {
-    //     assignedRep = repRows.find((r) => r.username === "KAVYA") || null;
-    //   }
-    // }
+      if (!assignedRep) {
+        console.error("❌ KAVYA not found in lead_distribution table");
+        return new Response("KAVYA not configured", { status: 500 });
+      }
+    }
 
     // --- Round-robin fallback ---
     if (!assignedRep) {
