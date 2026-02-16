@@ -265,6 +265,181 @@
 
 
 
+// "use client";
+// import dayjs from "dayjs";
+
+// export default function FollowUpHistory({
+//   entries = [],
+//   cust_analysis_external,
+// }) {
+//   const uploads = cust_analysis_external?.uploads || [];
+
+//   // Normalize date (remove time for matching)
+//   const normalizeDate = (date) => dayjs(date).format("YYYY-MM-DD");
+
+//   // Create grouped map
+//   const mergedMap = {};
+
+//   // Add followups
+//   entries.forEach((entry) => {
+//     const dateKey = entry.followed_date
+//       ? normalizeDate(entry.followed_date)
+//       : "no-date";
+
+//     if (!mergedMap[dateKey]) {
+//       mergedMap[dateKey] = {
+//         followup: null,
+//         uploads: [],
+//       };
+//     }
+
+//     mergedMap[dateKey].followup = entry;
+//   });
+
+//   // Add uploads (IMPORTANT FIX: store as array)
+//   uploads.forEach((upload) => {
+//     const dateKey = upload.datetime
+//       ? normalizeDate(upload.datetime)
+//       : "no-date";
+
+//     if (!mergedMap[dateKey]) {
+//       mergedMap[dateKey] = {
+//         followup: null,
+//         uploads: [],
+//       };
+//     }
+
+//     mergedMap[dateKey].uploads.push(upload);
+//   });
+
+//   // Convert map to array
+//   const mergedData = Object.values(mergedMap);
+
+//   return (
+//     <div className="overflow-x-auto bg-white shadow rounded w-full">
+//       <table className="min-w-full divide-y divide-gray-200 text-sm">
+//         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
+//           <tr>
+//             <th className="px-4 py-3">Next Follow-up</th>
+//             <th className="px-4 py-3">Followed By</th>
+//             <th className="px-4 py-3">Followed Date</th>
+//             <th className="px-4 py-3">Mode</th>
+//             <th className="px-4 py-3">Remarks</th>
+
+//             <th className="px-4 py-3">Date & Time</th>
+//             <th className="px-4 py-3">User</th>
+//             <th className="px-4 py-3">Summary</th>
+//             <th className="px-4 py-3">Key Points</th>
+//           </tr>
+//         </thead>
+
+//         <tbody className="bg-white divide-y divide-gray-200">
+//           {mergedData.length === 0 ? (
+//             <tr>
+//               <td colSpan={9} className="text-center py-4 text-gray-500">
+//                 No Data Available
+//               </td>
+//             </tr>
+//           ) : (
+//             mergedData.map((row, index) => (
+//               <tr key={index}>
+//                 {/* FOLLOWUP COLUMNS */}
+//                 <td className="px-4 py-2">
+//                   {row.followup?.next_followup_date
+//                     ? dayjs(row.followup.next_followup_date).format(
+//                         "DD MMM, YYYY hh:mm A"
+//                       )
+//                     : "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.followup?.followed_by || "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.followup?.followed_date
+//                     ? dayjs(row.followup.followed_date).format(
+//                         "DD MMM, YYYY hh:mm A"
+//                       )
+//                     : "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.followup?.comm_mode || "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.followup?.notes || "-"}
+//                 </td>
+
+//                 {/* UPLOAD COLUMNS (MULTIPLE SUPPORT) */}
+//                 <td className="px-4 py-2">
+//                   {row.uploads.length > 0
+//                     ? row.uploads.map((upload, i) => (
+//                         <div key={i} className="mb-3">
+//                           {upload.datetime
+//                             ? dayjs(upload.datetime).format(
+//                                 "DD MMM, YYYY hh:mm A"
+//                               )
+//                             : "-"}
+//                         </div>
+//                       ))
+//                     : "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.uploads.length > 0
+//                     ? row.uploads.map((upload, i) => (
+//                         <div key={i} className="mb-3">
+//                           {upload.user_name || "-"}
+//                         </div>
+//                       ))
+//                     : "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2 max-w-xs">
+//                   {row.uploads.length > 0
+//                     ? row.uploads.map((upload, i) => (
+//                         <div
+//                           key={i}
+//                           className="mb-3 whitespace-pre-wrap break-words"
+//                         >
+//                           {upload.summary || "-"}
+//                         </div>
+//                       ))
+//                     : "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.uploads.length > 0 ? (
+//                     row.uploads.map((upload, i) => (
+//                       <div key={i} className="mb-3">
+//                         {upload.keypoints?.length > 0 ? (
+//                           <ul className="list-disc list-inside space-y-1">
+//                             {upload.keypoints.map((point, kIndex) => (
+//                               <li key={kIndex}>{point}</li>
+//                             ))}
+//                           </ul>
+//                         ) : (
+//                           "-"
+//                         )}
+//                       </div>
+//                     ))
+//                   ) : (
+//                     "-"
+//                   )}
+//                 </td>
+//               </tr>
+//             ))
+//           )}
+//         </tbody>
+//       </table>
+//     </div>
+//   );
+// }
+
+
+
 "use client";
 import dayjs from "dayjs";
 
@@ -274,159 +449,88 @@ export default function FollowUpHistory({
 }) {
   const uploads = cust_analysis_external?.uploads || [];
 
-  // Normalize date (remove time for matching)
-  const normalizeDate = (date) => dayjs(date).format("YYYY-MM-DD");
+  // Convert followups into timeline format
+  const followupData = entries.map((item) => ({
+    type: "followup",
+    datetime: item.followed_date,
+    data: item,
+  }));
 
-  // Create grouped map
-  const mergedMap = {};
+  // Convert uploads into timeline format
+  const uploadData = uploads.map((item) => ({
+    type: "upload",
+    datetime: item.datetime,
+    data: item,
+  }));
 
-  // Add followups
-  entries.forEach((entry) => {
-    const dateKey = entry.followed_date
-      ? normalizeDate(entry.followed_date)
-      : "no-date";
-
-    if (!mergedMap[dateKey]) {
-      mergedMap[dateKey] = {
-        followup: null,
-        uploads: [],
-      };
-    }
-
-    mergedMap[dateKey].followup = entry;
-  });
-
-  // Add uploads (IMPORTANT FIX: store as array)
-  uploads.forEach((upload) => {
-    const dateKey = upload.datetime
-      ? normalizeDate(upload.datetime)
-      : "no-date";
-
-    if (!mergedMap[dateKey]) {
-      mergedMap[dateKey] = {
-        followup: null,
-        uploads: [],
-      };
-    }
-
-    mergedMap[dateKey].uploads.push(upload);
-  });
-
-  // Convert map to array
-  const mergedData = Object.values(mergedMap);
+  // Merge both arrays
+  const timeline = [...followupData, ...uploadData]
+    .filter((item) => item.datetime)
+    .sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
 
   return (
     <div className="overflow-x-auto bg-white shadow rounded w-full">
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
           <tr>
-            <th className="px-4 py-3">Next Follow-up</th>
-            <th className="px-4 py-3">Followed By</th>
-            <th className="px-4 py-3">Followed Date</th>
-            <th className="px-4 py-3">Mode</th>
-            <th className="px-4 py-3">Remarks</th>
-
+            <th className="px-4 py-3">Type</th>
             <th className="px-4 py-3">Date & Time</th>
             <th className="px-4 py-3">User</th>
-            <th className="px-4 py-3">Summary</th>
-            <th className="px-4 py-3">Key Points</th>
+            <th className="px-4 py-3">Details</th>
           </tr>
         </thead>
 
         <tbody className="bg-white divide-y divide-gray-200">
-          {mergedData.length === 0 ? (
+          {timeline.length === 0 ? (
             <tr>
-              <td colSpan={9} className="text-center py-4 text-gray-500">
+              <td colSpan={4} className="text-center py-4 text-gray-500">
                 No Data Available
               </td>
             </tr>
           ) : (
-            mergedData.map((row, index) => (
+            timeline.map((item, index) => (
               <tr key={index}>
-                {/* FOLLOWUP COLUMNS */}
-                <td className="px-4 py-2">
-                  {row.followup?.next_followup_date
-                    ? dayjs(row.followup.next_followup_date).format(
-                        "DD MMM, YYYY hh:mm A"
-                      )
-                    : "-"}
+                {/* TYPE */}
+                <td className="px-4 py-2 font-semibold">
+                  {item.type === "followup" ? "Follow-up" : "Call Analysis"}
                 </td>
 
+                {/* DATETIME */}
                 <td className="px-4 py-2">
-                  {row.followup?.followed_by || "-"}
+                  {dayjs(item.datetime).format("DD MMM, YYYY hh:mm A")}
                 </td>
 
+                {/* USER */}
                 <td className="px-4 py-2">
-                  {row.followup?.followed_date
-                    ? dayjs(row.followup.followed_date).format(
-                        "DD MMM, YYYY hh:mm A"
-                      )
-                    : "-"}
+                  {item.type === "followup"
+                    ? item.data.followed_by
+                    : item.data.user_name}
                 </td>
 
+                {/* DETAILS */}
                 <td className="px-4 py-2">
-                  {row.followup?.comm_mode || "-"}
-                </td>
-
-                <td className="px-4 py-2">
-                  {row.followup?.notes || "-"}
-                </td>
-
-                {/* UPLOAD COLUMNS (MULTIPLE SUPPORT) */}
-                <td className="px-4 py-2">
-                  {row.uploads.length > 0
-                    ? row.uploads.map((upload, i) => (
-                        <div key={i} className="mb-3">
-                          {upload.datetime
-                            ? dayjs(upload.datetime).format(
-                                "DD MMM, YYYY hh:mm A"
-                              )
-                            : "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2">
-                  {row.uploads.length > 0
-                    ? row.uploads.map((upload, i) => (
-                        <div key={i} className="mb-3">
-                          {upload.user_name || "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2 max-w-xs">
-                  {row.uploads.length > 0
-                    ? row.uploads.map((upload, i) => (
-                        <div
-                          key={i}
-                          className="mb-3 whitespace-pre-wrap break-words"
-                        >
-                          {upload.summary || "-"}
-                        </div>
-                      ))
-                    : "-"}
-                </td>
-
-                <td className="px-4 py-2">
-                  {row.uploads.length > 0 ? (
-                    row.uploads.map((upload, i) => (
-                      <div key={i} className="mb-3">
-                        {upload.keypoints?.length > 0 ? (
-                          <ul className="list-disc list-inside space-y-1">
-                            {upload.keypoints.map((point, kIndex) => (
-                              <li key={kIndex}>{point}</li>
-                            ))}
-                          </ul>
-                        ) : (
-                          "-"
-                        )}
-                      </div>
-                    ))
+                  {item.type === "followup" ? (
+                    <div>
+                      <div><b>Next Follow-up:</b> {item.data.next_followup_date
+                        ? dayjs(item.data.next_followup_date).format("DD MMM, YYYY hh:mm A")
+                        : "-"}</div>
+                      <div><b>Mode:</b> {item.data.comm_mode}</div>
+                      <div><b>Remarks:</b> {item.data.notes}</div>
+                    </div>
                   ) : (
-                    "-"
+                    <div>
+                      <div className="whitespace-pre-wrap break-words">
+                        {item.data.summary}
+                      </div>
+
+                      {item.data.keypoints?.length > 0 && (
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          {item.data.keypoints.map((point, i) => (
+                            <li key={i}>{point}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   )}
                 </td>
               </tr>
