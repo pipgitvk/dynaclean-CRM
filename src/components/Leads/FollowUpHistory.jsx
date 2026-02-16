@@ -271,43 +271,61 @@ export default function FollowUpHistory({
 }) {
   const uploads = cust_analysis_external?.uploads || [];
 
-  const normalizeDate = (date) => dayjs(date).format("YYYY-MM-DD");
+ // Normalize date (remove time for matching)
+const normalizeDate = (date) => dayjs(date).format("YYYY-MM-DD");
 
-  const mergedMap = {};
+// Create grouped map
+const mergedMap = {};
 
-  // 🔥 FIX 1: followups must be array
-  entries.forEach((entry) => {
-    const dateKey = entry.followed_date
-      ? normalizeDate(entry.followed_date)
-      : "no-date";
+// 1️⃣ Add followups (support multiple per date safely)
+entries.forEach((entry) => {
+  const dateKey = entry.followed_date
+    ? normalizeDate(entry.followed_date)
+    : "no-date";
 
-    if (!mergedMap[dateKey]) {
-      mergedMap[dateKey] = {
-        followups: [],
-        uploads: [],
-      };
-    }
+  if (!mergedMap[dateKey]) {
+    mergedMap[dateKey] = {
+      followups: [],
+      uploads: [],
+      sortDate: entry.followed_date || null,
+    };
+  }
 
-    mergedMap[dateKey].followups.push(entry);
-  });
+  mergedMap[dateKey].followups.push(entry);
 
-  // 🔥 FIX 2: uploads already array (correct)
-  uploads.forEach((upload) => {
-    const dateKey = upload.datetime
-      ? normalizeDate(upload.datetime)
-      : "no-date";
+  // Keep latest date for sorting
+  if (!mergedMap[dateKey].sortDate && entry.followed_date) {
+    mergedMap[dateKey].sortDate = entry.followed_date;
+  }
+});
 
-    if (!mergedMap[dateKey]) {
-      mergedMap[dateKey] = {
-        followups: [],
-        uploads: [],
-      };
-    }
+// 2️⃣ Add uploads
+uploads.forEach((upload) => {
+  const dateKey = upload.datetime
+    ? normalizeDate(upload.datetime)
+    : "no-date";
 
-    mergedMap[dateKey].uploads.push(upload);
-  });
+  if (!mergedMap[dateKey]) {
+    mergedMap[dateKey] = {
+      followups: [],
+      uploads: [],
+      sortDate: upload.datetime || null,
+    };
+  }
 
-  const mergedData = Object.values(mergedMap);
+  mergedMap[dateKey].uploads.push(upload);
+
+  if (!mergedMap[dateKey].sortDate && upload.datetime) {
+    mergedMap[dateKey].sortDate = upload.datetime;
+  }
+});
+
+// 3️⃣ Convert to array & sort by latest date first
+const mergedData = Object.values(mergedMap).sort((a, b) => {
+  return dayjs(b.sortDate).valueOf() - dayjs(a.sortDate).valueOf();
+});
+
+  
 
   return (
     <div className="overflow-x-auto bg-white shadow rounded w-full">
