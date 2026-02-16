@@ -99,12 +99,54 @@
 //   );
 // }
 
+
 "use client";
 import dayjs from "dayjs";
 
 export default function FollowUpHistory({ entries, cust_analysis_external }) {
   const uploads = cust_analysis_external?.uploads || [];
- 
+
+  // Create one combined array
+  const combinedData = [];
+
+  // Add DB followups first
+  entries.forEach((e) => {
+    combinedData.push({
+      next_followup_date: e.next_followup_date || "-",
+      followed_by: e.followed_by || "-",
+      followed_date: e.followed_date || "-",
+      mode: e.comm_mode || "-",
+      remarks: e.notes || "-",
+      datetime: "-",
+      user_name: "-",
+      summary: "-",
+      keypoints: "-",
+      sortDate: e.followed_date,
+    });
+  });
+
+  // Add external uploads
+  uploads.forEach((u) => {
+    combinedData.push({
+      next_followup_date: "-",
+      followed_by: "-",
+      followed_date: "-",
+      mode: "-",
+      remarks: "-",
+      datetime: u.datetime || "-",
+      user_name: u.user_name || "-",
+      summary: u.summary || "-",
+      keypoints: u.keypoints || "-",
+      sortDate: u.datetime,
+    });
+  });
+
+  // Sort by latest date
+  combinedData.sort(
+    (a, b) =>
+      dayjs(b.sortDate || 0).valueOf() -
+      dayjs(a.sortDate || 0).valueOf()
+  );
 
   return (
     <div className="overflow-x-auto bg-white shadow rounded w-full">
@@ -124,65 +166,59 @@ export default function FollowUpHistory({ entries, cust_analysis_external }) {
         </thead>
 
         <tbody className="bg-white divide-y divide-gray-200">
-          {entries.map((e, i) => {
-            const matchedUpload = uploads.find((upload) => {
-              if (!e.followed_date || !upload.datetime) return false;
+          {combinedData.map((row, i) => (
+            <tr key={i} className="hover:bg-gray-50">
+              <td className="px-4 py-2">
+                {row.next_followup_date !== "-"
+                  ? dayjs(row.next_followup_date).format(
+                      "DD MMM, YYYY hh:mm A"
+                    )
+                  : "-"}
+              </td>
 
-              return (
-                dayjs(upload.datetime).format("YYYY-MM-DD HH:mm") ===
-                dayjs(e.followed_date).format("YYYY-MM-DD HH:mm")
-              );
-            });
+              <td className="px-4 py-2">{row.followed_by}</td>
 
-            return (
-              <tr key={i}>
-                <td className="px-4 py-2">
-                  {e.next_followup_date
-                    ? dayjs(e.next_followup_date).format("DD MMM, YYYY hh:mm A")
-                    : "-"}
-                </td>
+              <td className="px-4 py-2">
+                {row.followed_date !== "-"
+                  ? dayjs(row.followed_date).format(
+                      "DD MMM, YYYY hh:mm A"
+                    )
+                  : "-"}
+              </td>
 
-                <td className="px-4 py-2">{e.followed_by || "-"}</td>
+              <td className="px-4 py-2">{row.mode}</td>
 
-                <td className="px-4 py-2">
-                  {e.followed_date
-                    ? dayjs(e.followed_date).format("DD MMM, YYYY hh:mm A")
-                    : "-"}
-                </td>
+              <td className="px-4 py-2">{row.remarks}</td>
 
-                <td className="px-4 py-2">{e.comm_mode || "-"}</td>
+              <td className="px-4 py-2">
+                {row.datetime !== "-"
+                  ? dayjs(row.datetime).format(
+                      "DD MMM, YYYY hh:mm A"
+                    )
+                  : "-"}
+              </td>
 
-                <td className="px-4 py-2">{e.notes || "-"}</td>
+              <td className="px-4 py-2">{row.user_name}</td>
 
-                {/* Upload Data (Only if matched) */}
-                <td className="px-4 py-2">
-                  {matchedUpload?.datetime
-                    ? dayjs(matchedUpload.datetime).format(
-                        "DD MMM, YYYY hh:mm A",
-                      )
-                    : ""}
-                </td>
+              <td className="px-4 py-2 max-w-xs">
+                <div className="whitespace-pre-wrap break-words">
+                  {row.summary}
+                </div>
+              </td>
 
-                <td className="px-4 py-2">{matchedUpload?.user_name || ""}</td>
-
-                <td className="px-4 py-2 max-w-xs">
-                  {matchedUpload?.summary || ""}
-                </td>
-
-                <td className="px-4 py-2">
-                  {matchedUpload?.keypoints?.length > 0 ? (
-                    <ul className="list-disc list-inside">
-                      {matchedUpload.keypoints.map((point, idx) => (
-                        <li key={idx}>{point}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    ""
-                  )}
-                </td>
-              </tr>
-            );
-          })}
+              <td className="px-4 py-2">
+                {Array.isArray(row.keypoints) ? (
+                  <ul className="list-disc list-inside space-y-1">
+                    {row.keypoints.map((point, index) => (
+                      <li key={index}>{point}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  row.keypoints
+                )}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
