@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
 import Link from "next/link";
+import axios from "axios";
 
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
@@ -28,6 +29,24 @@ export default async function CustomerPage({ params }) {
     [customerId],
   );
 
+   const phone=custs[0]?.phone;
+  // const phone = 9949297589;
+
+  const token = "MsvlRZ16sFnrtGcfuZ2Fjk3CIA4Zsm90jPUZFkVqDsI";
+
+  const result = await axios.get(
+    `https://srvr2.dynacleanindustries.com/api/customer-analysis/external/${phone}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  const cust_analysis_external = result.data;
+
+
   // await conn.end();
 
   return (
@@ -42,73 +61,136 @@ export default async function CustomerPage({ params }) {
           <h2 className="text-xl font-semibold mb-6 text-gray-800 border-b pb-3">
             Customer Details
           </h2>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5">
-            {/* Row 1 */}
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Email</dt>
-              <dd className="mt-1 text-gray-800">{customer.email}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Phone</dt>
-              <dd className="mt-1 text-blue-600 font-medium">
-                {customer.phone}
-              </dd>
-            </div>
+    <div className="w-full flex flex-col lg:flex-row gap-10">
 
-            {/* Row 2 */}
-            <div>
-              <dt className="text-sm font-medium text-gray-500">
-                Product Interested
-              </dt>
-              <dd className="mt-1 text-gray-800 font-semibold">
-                {customer.products_interest}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Company</dt>
-              <dd className="mt-1 text-gray-800">{customer.company}</dd>
-            </div>
+  {/* LEFT SIDE – Customer Details */}
+  <div className="w-full lg:w-[60%]">
+    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
 
-            {/* Row 3 */}
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Tags</dt>
-              <dd className="mt-1 text-gray-800">{customer.tags}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Status</dt>
-              <dd className="mt-1 text-gray-800">{customer.status}</dd>
-            </div>
+      {/* Row 1 */}
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Email</dt>
+        <dd className="mt-1 text-gray-800 break-words">
+          {customer.email || "-"}
+        </dd>
+      </div>
 
-            {/* Row 4 */}
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Lead Source</dt>
-              <dd className="mt-1 text-gray-800">{customer.lead_source}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">
-                Lead Campaign
-              </dt>
-              <dd className="mt-1 text-gray-800">{customer.lead_campaign}</dd>
-            </div>
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Phone</dt>
+        <dd className="mt-1 text-blue-600 font-medium">
+          {customer.phone || "-"}
+        </dd>
+      </div>
 
-            {/* Row 5 */}
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Address</dt>
-              <dd className="mt-1 text-gray-800">{customer.address}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Created</dt>
-              <dd className="mt-1 text-gray-800">
-                {dayjs(customer.date_created).format("DD MMM, YYYY")}
-              </dd>
-            </div>
+      {/* Row 2 */}
+      <div>
+        <dt className="text-sm font-medium text-gray-500">
+          Product Interested
+        </dt>
+        <dd className="mt-1 text-gray-800 font-semibold">
+          {customer.products_interest || "-"}
+        </dd>
+      </div>
 
-            {/* Full-width Notes */}
-            <div className="sm:col-span-2">
-              <dt className="text-sm font-medium text-gray-500">Notes</dt>
-              <dd className="mt-1 text-gray-800">{customer.notes}</dd>
-            </div>
-          </dl>
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Company</dt>
+        <dd className="mt-1 text-gray-800">
+          {customer.company || "-"}
+        </dd>
+      </div>
+
+      {/* Row 3 */}
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Tags</dt>
+        <dd className="mt-1 text-gray-800">
+          {customer.tags || "-"}
+        </dd>
+      </div>
+
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Status</dt>
+        <dd className="mt-1 text-gray-800">
+          {customer.status || "-"}
+        </dd>
+      </div>
+
+      {/* Row 4 */}
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Lead Source</dt>
+        <dd className="mt-1 text-gray-800">
+          {customer.lead_source || "-"}
+        </dd>
+      </div>
+
+      <div>
+        <dt className="text-sm font-medium text-gray-500">
+          Lead Campaign
+        </dt>
+        <dd className="mt-1 text-gray-800">
+          {customer.lead_campaign || "-"}
+        </dd>
+      </div>
+
+      {/* Row 5 */}
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Address</dt>
+        <dd className="mt-1 text-gray-800 break-words">
+          {customer.address || "-"}
+        </dd>
+      </div>
+
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Created</dt>
+        <dd className="mt-1 text-gray-800">
+          {customer.date_created
+            ? dayjs(customer.date_created).format("DD MMM, YYYY")
+            : "-"}
+        </dd>
+      </div>
+
+      {/* Full-width Notes */}
+      <div className="sm:col-span-2">
+        <dt className="text-sm font-medium text-gray-500">Notes</dt>
+        <dd className="mt-1 text-gray-800 break-words">
+          {customer.notes || "-"}
+        </dd>
+      </div>
+
+    </dl>
+  </div>
+
+  {/* RIGHT SIDE – Suggestion Summary */}
+  <div className="w-full lg:w-[40%]">
+    <div className=" p-2 rounded-xl  h-fit">
+      
+      <h3 className="text-lg font-semibold text-gray-800 mb-3">
+       Suggestion Summary
+      </h3>
+
+      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+        {cust_analysis_external?.next_suggestion_summary || "No summary available."}
+      </p>
+
+    </div>
+
+     <div className=" p-2 rounded-xl  h-fit">
+      
+      <h3 className="text-lg font-semibold text-gray-800 mb-3">
+       Suggestion Transcription
+      </h3>
+
+      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+        {cust_analysis_external?.next_suggestion_transcription || "No transcription available."}
+      </p>
+
+    </div>
+  </div>
+  
+
+</div>
+
+
+         
         </div>
 
         {/* Actions and Follow-up History Block */}
@@ -144,7 +226,10 @@ export default async function CustomerPage({ params }) {
 
           <section>
             <h2 className="text-2xl font-bold mb-4">Follow-up History</h2>
-            <FollowUpHistory entries={fups} />
+            <FollowUpHistory
+              entries={fups}
+              cust_analysis_external={cust_analysis_external}
+            />
           </section>
         </div>
       </div>
