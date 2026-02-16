@@ -125,17 +125,159 @@
 // }
 
 
+// "use client";
+// import dayjs from "dayjs";
+
+// export default function FollowUpHistory({ entries = [], cust_analysis_external }) {
+//   const uploads = cust_analysis_external?.uploads || [];
+
+//   // Normalize date (remove time for matching)
+//   const normalizeDate = (date) =>
+//     dayjs(date).format("YYYY-MM-DD");
+
+//   // Create map grouped by date
+//   const mergedMap = {};
+
+//   // Add followups
+//   entries.forEach((entry) => {
+//     const dateKey = entry.followed_date
+//       ? normalizeDate(entry.followed_date)
+//       : "no-date";
+
+//     if (!mergedMap[dateKey]) {
+//       mergedMap[dateKey] = {
+//         followup: null,
+//         upload: null,
+//       };
+//     }
+
+//     mergedMap[dateKey].followup = entry;
+//   });
+
+//   // Add uploads
+//   uploads.forEach((upload) => {
+//     const dateKey = upload.datetime
+//       ? normalizeDate(upload.datetime)
+//       : "no-date";
+
+//     if (!mergedMap[dateKey]) {
+//       mergedMap[dateKey] = {
+//         followup: null,
+//         upload: null,
+//       };
+//     }
+
+//     mergedMap[dateKey].upload = upload;
+//   });
+
+//   const mergedData = Object.values(mergedMap);
+
+//   return (
+//     <div className="overflow-x-auto bg-white shadow rounded w-full">
+//       <table className="min-w-full divide-y divide-gray-200 text-sm">
+//         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
+//           <tr>
+//             <th className="px-4 py-3">Next Follow-up</th>
+//             <th className="px-4 py-3">Followed By</th>
+//             <th className="px-4 py-3">Followed Date</th>
+//             <th className="px-4 py-3">Mode</th>
+//             <th className="px-4 py-3">Remarks</th>
+
+//             <th className="px-4 py-3">Date & Time</th>
+//             <th className="px-4 py-3">User</th>
+//             <th className="px-4 py-3">Summary</th>
+//             <th className="px-4 py-3">Key Points</th>
+//           </tr>
+//         </thead>
+
+//         <tbody className="bg-white divide-y divide-gray-200">
+//           {mergedData.length === 0 ? (
+//             <tr>
+//               <td colSpan={9} className="text-center py-4 text-gray-500">
+//                 No Data Available
+//               </td>
+//             </tr>
+//           ) : (
+//             mergedData.map((row, index) => (
+//               <tr key={index}>
+//                 {/* Followup Columns */}
+//                 <td className="px-4 py-2">
+//                   {row.followup?.next_followup_date
+//                     ? dayjs(row.followup.next_followup_date).format("DD MMM, YYYY hh:mm A")
+//                     : "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.followup?.followed_by || "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.followup?.followed_date
+//                     ? dayjs(row.followup.followed_date).format("DD MMM, YYYY hh:mm A")
+//                     : "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.followup?.comm_mode || "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.followup?.notes || "-"}
+//                 </td>
+
+//                 {/* Upload Columns */}
+//                 <td className="px-4 py-2">
+//                   {row.upload?.datetime
+//                     ? dayjs(row.upload.datetime).format("DD MMM, YYYY hh:mm A")
+//                     : "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.upload?.user_name || "-"}
+//                 </td>
+
+//                 <td className="px-4 py-2 max-w-xs">
+//                   <div className="whitespace-pre-wrap break-words">
+//                     {row.upload?.summary || "-"}
+//                   </div>
+//                 </td>
+
+//                 <td className="px-4 py-2">
+//                   {row.upload?.keypoints?.length > 0 ? (
+//                     <ul className="list-disc list-inside space-y-1">
+//                       {row.upload.keypoints.map((point, i) => (
+//                         <li key={i}>{point}</li>
+//                       ))}
+//                     </ul>
+//                   ) : (
+//                     "-"
+//                   )}
+//                 </td>
+//               </tr>
+//             ))
+//           )}
+//         </tbody>
+//       </table>
+//     </div>
+//   );
+// }
+
+
+
+
 "use client";
 import dayjs from "dayjs";
 
-export default function FollowUpHistory({ entries = [], cust_analysis_external }) {
+export default function FollowUpHistory({
+  entries = [],
+  cust_analysis_external,
+}) {
   const uploads = cust_analysis_external?.uploads || [];
 
   // Normalize date (remove time for matching)
-  const normalizeDate = (date) =>
-    dayjs(date).format("YYYY-MM-DD");
+  const normalizeDate = (date) => dayjs(date).format("YYYY-MM-DD");
 
-  // Create map grouped by date
+  // Create grouped map
   const mergedMap = {};
 
   // Add followups
@@ -147,14 +289,14 @@ export default function FollowUpHistory({ entries = [], cust_analysis_external }
     if (!mergedMap[dateKey]) {
       mergedMap[dateKey] = {
         followup: null,
-        upload: null,
+        uploads: [],
       };
     }
 
     mergedMap[dateKey].followup = entry;
   });
 
-  // Add uploads
+  // Add uploads (IMPORTANT FIX: store as array)
   uploads.forEach((upload) => {
     const dateKey = upload.datetime
       ? normalizeDate(upload.datetime)
@@ -163,13 +305,14 @@ export default function FollowUpHistory({ entries = [], cust_analysis_external }
     if (!mergedMap[dateKey]) {
       mergedMap[dateKey] = {
         followup: null,
-        upload: null,
+        uploads: [],
       };
     }
 
-    mergedMap[dateKey].upload = upload;
+    mergedMap[dateKey].uploads.push(upload);
   });
 
+  // Convert map to array
   const mergedData = Object.values(mergedMap);
 
   return (
@@ -200,10 +343,12 @@ export default function FollowUpHistory({ entries = [], cust_analysis_external }
           ) : (
             mergedData.map((row, index) => (
               <tr key={index}>
-                {/* Followup Columns */}
+                {/* FOLLOWUP COLUMNS */}
                 <td className="px-4 py-2">
                   {row.followup?.next_followup_date
-                    ? dayjs(row.followup.next_followup_date).format("DD MMM, YYYY hh:mm A")
+                    ? dayjs(row.followup.next_followup_date).format(
+                        "DD MMM, YYYY hh:mm A"
+                      )
                     : "-"}
                 </td>
 
@@ -213,7 +358,9 @@ export default function FollowUpHistory({ entries = [], cust_analysis_external }
 
                 <td className="px-4 py-2">
                   {row.followup?.followed_date
-                    ? dayjs(row.followup.followed_date).format("DD MMM, YYYY hh:mm A")
+                    ? dayjs(row.followup.followed_date).format(
+                        "DD MMM, YYYY hh:mm A"
+                      )
                     : "-"}
                 </td>
 
@@ -225,30 +372,59 @@ export default function FollowUpHistory({ entries = [], cust_analysis_external }
                   {row.followup?.notes || "-"}
                 </td>
 
-                {/* Upload Columns */}
+                {/* UPLOAD COLUMNS (MULTIPLE SUPPORT) */}
                 <td className="px-4 py-2">
-                  {row.upload?.datetime
-                    ? dayjs(row.upload.datetime).format("DD MMM, YYYY hh:mm A")
+                  {row.uploads.length > 0
+                    ? row.uploads.map((upload, i) => (
+                        <div key={i} className="mb-3">
+                          {upload.datetime
+                            ? dayjs(upload.datetime).format(
+                                "DD MMM, YYYY hh:mm A"
+                              )
+                            : "-"}
+                        </div>
+                      ))
                     : "-"}
                 </td>
 
                 <td className="px-4 py-2">
-                  {row.upload?.user_name || "-"}
+                  {row.uploads.length > 0
+                    ? row.uploads.map((upload, i) => (
+                        <div key={i} className="mb-3">
+                          {upload.user_name || "-"}
+                        </div>
+                      ))
+                    : "-"}
                 </td>
 
                 <td className="px-4 py-2 max-w-xs">
-                  <div className="whitespace-pre-wrap break-words">
-                    {row.upload?.summary || "-"}
-                  </div>
+                  {row.uploads.length > 0
+                    ? row.uploads.map((upload, i) => (
+                        <div
+                          key={i}
+                          className="mb-3 whitespace-pre-wrap break-words"
+                        >
+                          {upload.summary || "-"}
+                        </div>
+                      ))
+                    : "-"}
                 </td>
 
                 <td className="px-4 py-2">
-                  {row.upload?.keypoints?.length > 0 ? (
-                    <ul className="list-disc list-inside space-y-1">
-                      {row.upload.keypoints.map((point, i) => (
-                        <li key={i}>{point}</li>
-                      ))}
-                    </ul>
+                  {row.uploads.length > 0 ? (
+                    row.uploads.map((upload, i) => (
+                      <div key={i} className="mb-3">
+                        {upload.keypoints?.length > 0 ? (
+                          <ul className="list-disc list-inside space-y-1">
+                            {upload.keypoints.map((point, kIndex) => (
+                              <li key={kIndex}>{point}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          "-"
+                        )}
+                      </div>
+                    ))
                   ) : (
                     "-"
                   )}
