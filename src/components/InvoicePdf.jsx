@@ -1,26 +1,36 @@
-"use client"
+// "use client"
 import React from "react";
 import {
   Document,
   Page,
   View,
   Text,
-  Image,
   StyleSheet,
   Font,
+  Image,
 } from "@react-pdf/renderer";
+// import logo from "./logo1.jpg";
+import {numberToWords} from "@/utils/NumbertoWord"
 
-// Register fonts (optional - for better typography)
+// Register fonts - using Roboto from cdnjs (more reliable)
 Font.register({
-  family: "Arial",
+  family: "Roboto",
   fonts: [
     {
-      src: "https://fonts.gstatic.com/s/arial/v12/9kDpJVQ0S4zCJSZEH7HnVQ.ttf",
-      fontWeight: "normal",
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-light-webfont.ttf",
+      fontWeight: 300,
     },
     {
-      src: "https://fonts.gstatic.com/s/arial/v12/4UaCrEVJchcbVhT6qLCJng.ttf",
-      fontWeight: "bold",
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-regular-webfont.ttf",
+      fontWeight: 400,
+    },
+    {
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-medium-webfont.ttf",
+      fontWeight: 500,
+    },
+    {
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf",
+      fontWeight: 700,
     },
   ],
 });
@@ -28,15 +38,17 @@ Font.register({
 // Create styles
 const styles = StyleSheet.create({
   page: {
-    padding: 28,
+    padding: 10,
+    paddingTop: 20,
+    paddingBottom: 20,
     fontSize: 9,
-    fontFamily: "Arial",
+    fontFamily: "Roboto",
     backgroundColor: "#fff",
     width: "100%",
   },
   container: {
     border: "1px solid #000",
-    padding: 28,
+    padding: 10,
     width: "100%",
     minHeight: "100%",
   },
@@ -49,7 +61,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 15,
-    fontWeight: "bold",
+    fontWeight: 700,
     margin: 0,
   },
   // Company Details
@@ -73,7 +85,7 @@ const styles = StyleSheet.create({
   },
   companyName: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: 700,
     marginBottom: 2,
   },
   companyText: {
@@ -99,20 +111,20 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     backgroundColor: "#f0f0f0",
-    fontWeight: "bold",
+    fontWeight: 700,
   },
   // Sections
   section: {
     marginBottom: 10,
   },
   sectionTitle: {
-    fontWeight: "bold",
+    fontWeight: 700,
     marginBottom: 4,
     fontSize: 9,
   },
   // Text styles
   bold: {
-    fontWeight: "bold",
+    fontWeight: 700,
   },
   rightAlign: {
     textAlign: "right",
@@ -129,7 +141,7 @@ const styles = StyleSheet.create({
     border: "1px solid #000",
   },
   descriptionText: {
-    fontWeight: "bold",
+    fontWeight: 700,
     marginBottom: 2,
   },
   descriptionSubtext: {
@@ -151,6 +163,7 @@ const styles = StyleSheet.create({
   },
   termsContainer: {
     flex: 1,
+    marginRight: 10,
   },
   bankContainer: {
     width: 250,
@@ -163,7 +176,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     fontSize: 8,
-    fontStyle: "italic",
   },
 });
 
@@ -180,46 +192,67 @@ const formatCurrency = (value) => {
 // Helper function to calculate tax rows
 const renderTaxRows = (data, itemTotals) => {
   const rows = [];
-  
+
   if (parseFloat(itemTotals.totalIGST) > 0) {
     rows.push(
       <View key="igst" style={styles.tableRow}>
-        <Text style={[styles.tableCell, { width: "83.33%", textAlign: "right", fontWeight: "bold" }]}>
+        <Text
+          style={[
+            styles.tableCell,
+            { width: "83.33%", textAlign: "right", fontWeight: 700 },
+          ]}
+        >
           Output IGST {data.taxRate}%
         </Text>
-        <Text style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}>
+        <Text
+          style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}
+        >
           {data.igst}
         </Text>
-      </View>
+      </View>,
     );
   } else {
     if (parseFloat(itemTotals.totalCGST) > 0) {
       rows.push(
         <View key="cgst" style={styles.tableRow}>
-          <Text style={[styles.tableCell, { width: "83.33%", textAlign: "right", fontWeight: "bold" }]}>
+          <Text
+            style={[
+              styles.tableCell,
+              { width: "83.33%", textAlign: "right", fontWeight: 700 },
+            ]}
+          >
             Output CGST {data.taxRate}%
           </Text>
-          <Text style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}>
+          <Text
+            style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}
+          >
             {data.cgst}
           </Text>
-        </View>
+        </View>,
       );
     }
 
     if (parseFloat(itemTotals.totalSGST) > 0) {
       rows.push(
         <View key="sgst" style={styles.tableRow}>
-          <Text style={[styles.tableCell, { width: "83.33%", textAlign: "right", fontWeight: "bold" }]}>
+          <Text
+            style={[
+              styles.tableCell,
+              { width: "83.33%", textAlign: "right", fontWeight: 700 },
+            ]}
+          >
             Output SGST {data.taxRate}%
           </Text>
-          <Text style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}>
+          <Text
+            style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}
+          >
             {data.sgst}
           </Text>
-        </View>
+        </View>,
       );
     }
   }
-  
+
   return rows;
 };
 
@@ -296,8 +329,15 @@ const InvoicePDFDocument = ({ data }) => {
           {/* Company Details */}
           <View style={styles.companyContainer}>
             <View style={styles.logoContainer}>
-              {/* Note: React PDF Image requires a static source or base64 */}
-              <Text>[Company Logo]</Text>
+              {/* <Image
+                src="https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=120&h=60&fit=crop"
+                style={{
+                  width: 120,
+                  height: 60,
+                  objectFit: "contain",
+                }}
+              /> */}
+               <Image src="/logo1.jpg" style={{width: 80,height: 60,objectFit: "contain",}}/>
             </View>
             <View style={styles.companyDetails}>
               <Text style={styles.companyName}>{data.company.name}</Text>
@@ -437,7 +477,9 @@ const InvoicePDFDocument = ({ data }) => {
                 </Text>
               </View>
               <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.bold, { width: "100%" }]}>
+                <Text
+                  style={[styles.tableCell, styles.bold, { width: "100%" }]}
+                >
                   Notes
                 </Text>
               </View>
@@ -461,13 +503,28 @@ const InvoicePDFDocument = ({ data }) => {
                 <Text style={[styles.tableCell, { width: "12%" }]}>
                   HSN/SAC
                 </Text>
-                <Text style={[styles.tableCell, { width: "12%", textAlign: "center" }]}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: "12%", textAlign: "center" },
+                  ]}
+                >
                   Quantity
                 </Text>
-                <Text style={[styles.tableCell, { width: "16%", textAlign: "right" }]}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: "16%", textAlign: "right" },
+                  ]}
+                >
                   Rate
                 </Text>
-                <Text style={[styles.tableCell, { width: "17%", textAlign: "right" }]}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: "17%", textAlign: "right" },
+                  ]}
+                >
                   Amount
                 </Text>
               </View>
@@ -491,13 +548,28 @@ const InvoicePDFDocument = ({ data }) => {
                   <Text style={[styles.tableCell, { width: "12%" }]}>
                     {item.hsn}
                   </Text>
-                  <Text style={[styles.tableCell, { width: "12%", textAlign: "center" }]}>
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      { width: "12%", textAlign: "center" },
+                    ]}
+                  >
                     {item.quantity}
                   </Text>
-                  <Text style={[styles.tableCell, { width: "16%", textAlign: "right" }]}>
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      { width: "16%", textAlign: "right" },
+                    ]}
+                  >
                     {formatCurrency(item.rate)}
                   </Text>
-                  <Text style={[styles.tableCell, { width: "17%", textAlign: "right" }]}>
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      { width: "17%", textAlign: "right" },
+                    ]}
+                  >
                     {formatCurrency(item.amount)}
                   </Text>
                 </View>
@@ -507,17 +579,30 @@ const InvoicePDFDocument = ({ data }) => {
               {renderTaxRows(data, itemTotals)}
 
               {/* Total Row */}
-              <View style={[styles.tableRow, { fontWeight: "bold" }]}>
-                <Text style={[styles.tableCell, { width: "55%" }]}>
-                  Total
-                </Text>
-                <Text style={[styles.tableCell, { width: "12%", textAlign: "center" }]}>
+              <View style={[styles.tableRow, { fontWeight: 700 }]}>
+                <Text style={[styles.tableCell, { width: "55%" }]}>Total</Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: "12%", textAlign: "center" },
+                  ]}
+                >
                   {itemTotals.totalQuantity}
                 </Text>
-                <Text style={[styles.tableCell, { width: "16%", textAlign: "right" }]}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: "16%", textAlign: "right" },
+                  ]}
+                >
                   ₹
                 </Text>
-                <Text style={[styles.tableCell, { width: "17%", textAlign: "right" }]}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: "17%", textAlign: "right" },
+                  ]}
+                >
                   {data.total}
                 </Text>
               </View>
@@ -527,9 +612,10 @@ const InvoicePDFDocument = ({ data }) => {
           {/* Amount in Words */}
           <View style={[styles.section, { marginBottom: 10 }]}>
             <Text>
-              <Text style={styles.bold}>Amount Chargeable (in words)</Text> E. & O.E
+              <Text style={styles.bold}>Amount Chargeable (in words)</Text> E. &
+              O.E
             </Text>
-            <Text style={styles.bold}>INR {data.amountInWords}</Text>
+            <Text style={styles.bold}>INR: {numberToWords(data.total)}</Text>
           </View>
 
           {/* Tax Summary Table */}
@@ -540,45 +626,105 @@ const InvoicePDFDocument = ({ data }) => {
                 <Text style={[styles.tableCell, { width: "15%" }]}>
                   HSN/SAC
                 </Text>
-                <Text style={[styles.tableCell, { width: "20%", textAlign: "right" }]}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: "20%", textAlign: "right" },
+                  ]}
+                >
                   Taxable Value
                 </Text>
                 {parseFloat(itemTotals.totalIGST) > 0 ? (
                   <>
-                    <Text style={[styles.tableCell, { width: "10%", textAlign: "center" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "10%", textAlign: "center" },
+                      ]}
+                    >
                       IGST
                     </Text>
-                    <Text style={[styles.tableCell, { width: "10%", textAlign: "center" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "10%", textAlign: "center" },
+                      ]}
+                    >
                       Rate
                     </Text>
-                    <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "15%", textAlign: "right" },
+                      ]}
+                    >
                       Amount
                     </Text>
-                    <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "15%", textAlign: "right" },
+                      ]}
+                    >
                       Total Tax Amount
                     </Text>
                   </>
                 ) : (
                   <>
-                    <Text style={[styles.tableCell, { width: "8%", textAlign: "center" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "8%", textAlign: "center" },
+                      ]}
+                    >
                       CGST
                     </Text>
-                    <Text style={[styles.tableCell, { width: "7%", textAlign: "center" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "7%", textAlign: "center" },
+                      ]}
+                    >
                       Rate
                     </Text>
-                    <Text style={[styles.tableCell, { width: "10%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "10%", textAlign: "right" },
+                      ]}
+                    >
                       Amount
                     </Text>
-                    <Text style={[styles.tableCell, { width: "8%", textAlign: "center" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "8%", textAlign: "center" },
+                      ]}
+                    >
                       SGST/UTGST
                     </Text>
-                    <Text style={[styles.tableCell, { width: "7%", textAlign: "center" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "7%", textAlign: "center" },
+                      ]}
+                    >
                       Rate
                     </Text>
-                    <Text style={[styles.tableCell, { width: "10%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "10%", textAlign: "right" },
+                      ]}
+                    >
                       Amount
                     </Text>
-                    <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "15%", textAlign: "right" },
+                      ]}
+                    >
                       Total Tax Amount
                     </Text>
                   </>
@@ -591,46 +737,106 @@ const InvoicePDFDocument = ({ data }) => {
                   <Text style={[styles.tableCell, { width: "15%" }]}>
                     {row.hsn}
                   </Text>
-                  <Text style={[styles.tableCell, { width: "20%", textAlign: "right" }]}>
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      { width: "20%", textAlign: "right" },
+                    ]}
+                  >
                     {formatCurrency(row.taxableValue)}
                   </Text>
 
                   {parseFloat(itemTotals.totalIGST) > 0 ? (
                     <>
-                      <Text style={[styles.tableCell, { width: "10%", textAlign: "center" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "10%", textAlign: "center" },
+                        ]}
+                      >
                         IGST
                       </Text>
-                      <Text style={[styles.tableCell, { width: "10%", textAlign: "center" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "10%", textAlign: "center" },
+                        ]}
+                      >
                         {row.igstPercent}%
                       </Text>
-                      <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "15%", textAlign: "right" },
+                        ]}
+                      >
                         {formatCurrency(row.igst)}
                       </Text>
-                      <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "15%", textAlign: "right" },
+                        ]}
+                      >
                         {formatCurrency(row.igst)}
                       </Text>
                     </>
                   ) : (
                     <>
-                      <Text style={[styles.tableCell, { width: "8%", textAlign: "center" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "8%", textAlign: "center" },
+                        ]}
+                      >
                         CGST
                       </Text>
-                      <Text style={[styles.tableCell, { width: "7%", textAlign: "center" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "7%", textAlign: "center" },
+                        ]}
+                      >
                         {row.cgstPercent}%
                       </Text>
-                      <Text style={[styles.tableCell, { width: "10%", textAlign: "right" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "10%", textAlign: "right" },
+                        ]}
+                      >
                         {formatCurrency(row.cgst)}
                       </Text>
-                      <Text style={[styles.tableCell, { width: "8%", textAlign: "center" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "8%", textAlign: "center" },
+                        ]}
+                      >
                         SGST/UTGST
                       </Text>
-                      <Text style={[styles.tableCell, { width: "7%", textAlign: "center" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "7%", textAlign: "center" },
+                        ]}
+                      >
                         {row.sgstPercent}%
                       </Text>
-                      <Text style={[styles.tableCell, { width: "10%", textAlign: "right" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "10%", textAlign: "right" },
+                        ]}
+                      >
                         {formatCurrency(row.sgst)}
                       </Text>
-                      <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          { width: "15%", textAlign: "right" },
+                        ]}
+                      >
                         {formatCurrency(row.cgst + row.sgst)}
                       </Text>
                     </>
@@ -639,40 +845,77 @@ const InvoicePDFDocument = ({ data }) => {
               ))}
 
               {/* Total Row */}
-              <View style={[styles.tableRow, { fontWeight: "bold" }]}>
-                <Text style={[styles.tableCell, { width: "15%" }]}>
-                  Total
-                </Text>
-                <Text style={[styles.tableCell, { width: "20%", textAlign: "right" }]}>
+              <View style={[styles.tableRow, { fontWeight: 700 }]}>
+                <Text style={[styles.tableCell, { width: "15%" }]}>Total</Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { width: "20%", textAlign: "right" },
+                  ]}
+                >
                   {data.subtotal}
                 </Text>
                 {parseFloat(itemTotals.totalIGST) > 0 ? (
                   <>
-                    <Text style={[styles.tableCell, { width: "20%", textAlign: "center" }]} colSpan="2">
-                      
-                    </Text>
-                    <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "20%", textAlign: "center" },
+                      ]}
+                    ></Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "15%", textAlign: "right" },
+                      ]}
+                    >
                       {data.igst}
                     </Text>
-                    <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "15%", textAlign: "right" },
+                      ]}
+                    >
                       {data.taxAmount}
                     </Text>
                   </>
                 ) : (
                   <>
-                    <Text style={[styles.tableCell, { width: "15%", textAlign: "center" }]} colSpan="2">
-                      
-                    </Text>
-                    <Text style={[styles.tableCell, { width: "10%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "15%", textAlign: "center" },
+                      ]}
+                    ></Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "10%", textAlign: "right" },
+                      ]}
+                    >
                       {data.cgst}
                     </Text>
-                    <Text style={[styles.tableCell, { width: "15%", textAlign: "center" }]} colSpan="2">
-                      
-                    </Text>
-                    <Text style={[styles.tableCell, { width: "10%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "15%", textAlign: "center" },
+                      ]}
+                    ></Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "10%", textAlign: "right" },
+                      ]}
+                    >
                       {data.sgst}
                     </Text>
-                    <Text style={[styles.tableCell, { width: "15%", textAlign: "right" }]}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { width: "15%", textAlign: "right" },
+                      ]}
+                    >
                       {data.taxAmount}
                     </Text>
                   </>
@@ -684,7 +927,7 @@ const InvoicePDFDocument = ({ data }) => {
           {/* Tax Amount in Words */}
           <View style={[styles.section, { marginBottom: 15 }]}>
             <Text style={styles.bold}>
-              Tax Amount (in words) : INR {data.taxAmountInWords}
+              Tax Amount (in words) : INR: {numberToWords(data.taxAmount)}
             </Text>
           </View>
 

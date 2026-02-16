@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import { getDbConnection } from "@/lib/db";
 import { getCurrentISTTime } from "@/lib/timezone";
 
+
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 export async function POST(request) {
@@ -74,6 +75,7 @@ export async function POST(request) {
 
     let user = null;
     let sourceTable = "";
+    console.log(`🔍 Checking emplist for user: ${username}`);
 
     if (empRows.length > 0) {
       user = empRows[0];
@@ -81,14 +83,17 @@ export async function POST(request) {
     } else {
       // Step 2: Try rep_list
       const [repRows] = await conn.execute(
-        "SELECT * FROM rep_list WHERE LOWER(username) = LOWER(?) and status = 1",
+        "SELECT * FROM emplist WHERE LOWER(username) = LOWER(?) ",
         [username.trim()],
       );
+      
       if (repRows.length > 0) {
-        user = repRows[0];
+        user = [repRows][0][0];
         sourceTable = "rep_list";
       }
+    
     }
+    
 
     if (!user) {
       await recordActivity(username, "UNKNOWN", "FAILED", "User not found");
@@ -96,8 +101,9 @@ export async function POST(request) {
     }
 
     const userRole = user.userRole || user.role || "UNKNOWN";
-    const dbPassword = user.password?.trim() || "";
+    const dbPassword = user.password || "";
     const inputPassword = password.trim();
+   
 
     if (dbPassword !== inputPassword) {
       await recordActivity(username, userRole, "FAILED", "Incorrect password");
@@ -127,7 +133,7 @@ export async function POST(request) {
         );
       }
     }
-
+console.log('✅ User ',user);
     // ✅ Generate JWT
     const token = jwt.sign(
       {
@@ -169,3 +175,4 @@ export async function POST(request) {
     );
   }
 }
+

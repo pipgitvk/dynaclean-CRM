@@ -11,6 +11,8 @@ export async function GET() {
   // const cookieStore = await cookies();
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
+  console.log("User Token".token);
+  
 
   if (!token) {
     return NextResponse.json({ error: "No token" }, { status: 401 });
