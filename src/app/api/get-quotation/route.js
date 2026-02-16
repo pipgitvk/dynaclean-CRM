@@ -16,8 +16,24 @@ export async function GET(req) {
     const conn = await getDbConnection();
 
     // 1️⃣ Fetch quotation record
+    // const [quotationRows] = await conn.execute(
+    //   `SELECT * FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+    //   [quotationNumber],
+    // );
+
     const [quotationRows] = await conn.execute(
-      `SELECT * FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+      `
+  SELECT 
+    q.*,
+    c.first_name,
+    c.email,
+    c.phone
+  FROM quotations_records q
+  LEFT JOIN customers c 
+    ON q.customer_id = c.customer_id
+  WHERE q.quote_number = ?
+  LIMIT 1
+  `,
       [quotationNumber],
     );
 
@@ -27,6 +43,63 @@ export async function GET(req) {
         { status: 404 },
       );
     }
+
+    // amount paid
+    // 3️⃣ Fetch total amount paid from neworder table
+    //   const [paymentRows] = await conn.execute(
+    //     `
+    // SELECT
+    //   COALESCE(
+    //     SUM(
+    //       CAST(
+    //         SUBSTRING_INDEX(
+    //           SUBSTRING_INDEX(payment_amount, ',', numbers.n),
+    //           ',', -1
+    //         ) AS DECIMAL(10,2)
+    //       )
+    //     ), 0
+    //   ) AS amount_paid
+    // FROM neworder
+    // JOIN (
+    //   SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5
+    // ) numbers
+    // ON CHAR_LENGTH(payment_amount) - CHAR_LENGTH(REPLACE(payment_amount, ',', '')) >= numbers.n - 1
+    // WHERE quote_number = ?
+    // `,
+    //     [quotationNumber],
+    //   );
+
+    //   const amountPaid = Number(paymentRows[0]?.amount_paid || 0);
+
+    const [paymentRows] = await conn.execute(
+      `
+  SELECT 
+    COALESCE(
+      SUM(
+        CAST(
+          SUBSTRING_INDEX(
+            SUBSTRING_INDEX(payment_amount, ',', numbers.n),
+            ',', -1
+          ) AS DECIMAL(10,2)
+        )
+      ), 0
+    ) AS amount_paid,
+    MAX(duedate) AS duedate
+  FROM neworder
+  JOIN (
+    SELECT 1 n UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5
+  ) numbers
+    ON CHAR_LENGTH(payment_amount) - CHAR_LENGTH(REPLACE(payment_amount, ',', '')) >= numbers.n - 1
+  WHERE quote_number = ?
+  `,
+      [quotationNumber],
+    );
+
+    const amountPaid = Number(paymentRows[0]?.amount_paid || 0);
+    const dueDate = paymentRows[0]?.duedate || null;
+    // console.log("due date :", dueDate);
+
+    // console.log("amount paid by client:", amountPaid);
 
     const quotation = quotationRows[0];
 
@@ -39,17 +112,23 @@ export async function GET(req) {
     return NextResponse.json({
       success: true,
       quotation: {
-        quotation_id: quotation["S.No."], 
+        quotation_id: quotation["S.No."],
         quotation_number: quotation.quote_number,
         quotation_date: quotation.quote_date,
 
         customer_id: quotation.customer_id || "",
-        customer_name: quotation.company_name || "",
+        customer_name: quotation.first_name || quotation.company_name || "",
+        customer_email: quotation.email || "",
+        customer_contact: quotation.phone || "",
+
         billing_address: quotation.company_address || "",
         shipping_address: quotation.ship_to || "",
 
         gst_number: quotation.gstin || "",
         state: quotation.state || "",
+
+        amount_paid: Number(amountPaid),
+        due_date: dueDate,
 
         terms_conditions: quotation.term_con || "",
 

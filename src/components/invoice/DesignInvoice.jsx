@@ -5,6 +5,9 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Image from "next/image";
 import html2canvas from "html2canvas";
+import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
+import InvoicePDFPreview from "../Preview";
+import { numberToWords } from "@/utils/NumbertoWord";
 
 const NewInvoice = ({ invoice }) => {
   // Calculate tax rate from the invoice data
@@ -248,7 +251,7 @@ const NewInvoice = ({ invoice }) => {
 
       el.style.width = "794px";
       el.style.maxWidth = "794px";
-      el.style.padding = "20px";
+      el.style.padding = "30px";
       el.style.border = "none";
 
       // Convert images to base64
@@ -562,6 +565,7 @@ const NewInvoice = ({ invoice }) => {
         >
           Download PDF
         </button>
+        <DownloadPDFButton invoiceData={data} />
       </div>
       <div
         ref={containerRef}
@@ -581,7 +585,6 @@ const NewInvoice = ({ invoice }) => {
           style={{
             textAlign: "center",
             marginBottom: "5px",
-            borderBottom: "2px solid #000",
             paddingBottom: "5px",
           }}
         >
@@ -589,48 +592,75 @@ const NewInvoice = ({ invoice }) => {
             Tax Invoice
           </h1>
         </div>
-
         {/* Company Details */}
-        <div
+        <table
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            fontSize: "10px",
+            width: "100%",
+            borderCollapse: "collapse",
+            tableLayout: "fixed",
+            border: "1px solid #000",
+            borderBottom: "0px",
           }}
         >
-          <Image
-            src={"/logo1.jpg"}
-            width={150}
-            height={150}
-            style={{ width: "120px", height: "110px" }}
-            alt="logo"
-          />
+          <tbody>
+            <tr style={{ height: "110px" }}>
+              {/* Left - Logo */}
+              <td style={{ width: "25%" }}>
+                <img
+                  src="/logo.png"
+                  style={{ width: 110, height: "auto", display: "block" }}
+                  alt="logo"
+                />
+              </td>
 
-          <div
-            style={{
-              marginBottom: "10px",
-              fontSize: "10px",
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontWeight: "bold", fontSize: "18px" }}>
-              {data.company.name}
-            </div>
-            <div>{data.company.address}</div>
-            <div>{data.company.phone}</div>
-            <div>GST:{data.company.gstin}</div>
-            {/* <div>{data.company.CIN}</div> */}
-          </div>
-          <div></div>
-        </div>
+              {/* Center - Company Details */}
+              <td style={{ width: "75%" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "110px",
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      fontSize: "20px",
+                      marginBottom: "4px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {data.company.name}
+                  </div>
+
+                  <div style={{ fontSize: "10px", marginBottom: "4px" }}>
+                    {data.company.address}
+                  </div>
+
+                  <div style={{ fontSize: "10px", marginBottom: "3px" }}>
+                    Ph: {data.company.phone}
+                  </div>
+
+                  <div style={{ fontSize: "10px", marginBottom: "6px" }}>
+                    GST: {data.company.gstin}
+                  </div>
+                </div>
+              </td>
+
+              {/* Right Empty */}
+              <td style={{ width: "25%" }}></td>
+            </tr>
+          </tbody>
+        </table>
 
         {/* Invoice Info Table */}
         <table
           style={{
             width: "100%",
             borderCollapse: "collapse",
-            marginBottom: "10px",
             fontSize: "9px",
           }}
         >
@@ -638,10 +668,13 @@ const NewInvoice = ({ invoice }) => {
             <tr>
               <td
                 style={{
-                  border: "1px solid #000",
+                  border: "0.2px solid #000",
                   padding: "4px",
+                  paddingBottom: "10px",
                   width: "33%",
                   fontWeight: "bold",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 Invoice No.
@@ -650,8 +683,12 @@ const NewInvoice = ({ invoice }) => {
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
+                  paddingBottom: "10px",
                   width: "33%",
                   fontWeight: "bold",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                  marginBottom: "20px",
                 }}
               >
                 Invoice Date
@@ -660,21 +697,46 @@ const NewInvoice = ({ invoice }) => {
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
+                  paddingBottom: "10px",
                   width: "34%",
                   fontWeight: "bold",
+                  borderBottom: "0px",
                 }}
               >
                 Due Date
               </td>
             </tr>
             <tr>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
                 {data.invoice.number}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
                 {data.invoice.orderDate}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                }}
+              >
                 {data.invoice.dueDate}
               </td>
             </tr>
@@ -683,38 +745,66 @@ const NewInvoice = ({ invoice }) => {
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
-                  fontWeight: "bold",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
-                Reference No. & Date.
+                <b>Reference No. & Date.</b>
               </td>
               <td
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
-                  fontWeight: "bold",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
-                Buyer's Order No.
+                <b>Buyer's Order No.</b>
               </td>
               <td
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
-                  fontWeight: "bold",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
                 }}
               >
-                Dated
+                <b>Dated</b>
               </td>
             </tr>
             <tr>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
                 {data.invoice.referenceNo}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
                 {invoice.quotation_id ? `QT-${invoice.quotation_id}` : ""}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                }}
+              >
                 {data.invoice.orderDate}
               </td>
             </tr>
@@ -723,38 +813,65 @@ const NewInvoice = ({ invoice }) => {
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
-                  fontWeight: "bold",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
-                e-Way Bill No.
+                <b>e-Way Bill No.</b>
               </td>
               <td
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
-                  fontWeight: "bold",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
-                Payment Status
+                <b>Payment Status</b>
               </td>
               <td
                 style={{
                   border: "1px solid #000",
                   padding: "4px",
-                  fontWeight: "bold",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
                 }}
               >
-                Balance Amount
+                <b>Balance Amount</b>
               </td>
             </tr>
             <tr>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
                 {data.invoice.eWayBill}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
                 {data.paymentInfo.status}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  paddingBottom: "10px",
+                  borderBottom: "0px",
+                }}
+              >
                 ₹{data.paymentInfo.balanceAmount}
               </td>
             </tr>
@@ -778,19 +895,36 @@ const NewInvoice = ({ invoice }) => {
                   padding: "6px",
                   width: "50%",
                   verticalAlign: "top",
+                  borderRight: "0px",
                 }}
               >
                 <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
                   Buyer (Bill to)
                 </div>
-                <div style={{ fontWeight: "bold" }}>{data.buyer.name}</div>
-                <div>{data.buyer.address}</div>
-                <div>GSTIN/UIN : {data.buyer.gstin}</div>
-                <div>State Name : {data.buyer.state}</div>
-                <div>Place of Supply : {data.buyer.placeOfSupply}</div>
-                <div>Contact person : {data.buyer.contactPerson}</div>
-                <div>Contact : {data.buyer.phone}</div>
-                <div>E-Mail : {data.buyer.email}</div>
+                <div style={{ fontWeight: "bold", marginBottom: "2px" }}>
+                  {data.buyer.name}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  {data.buyer.address}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  GSTIN/UIN : {data.buyer.gstin}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  State Name : {data.buyer.state}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  Place of Supply : {data.buyer.placeOfSupply}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  Contact person : {data.buyer.contactPerson}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  Contact : {data.buyer.phone}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  E-Mail : {data.buyer.email}
+                </div>
               </td>
               <td
                 style={{
@@ -803,12 +937,24 @@ const NewInvoice = ({ invoice }) => {
                 <div style={{ fontWeight: "bold", marginBottom: "4px" }}>
                   Consignee (Ship to)
                 </div>
-                <div style={{ fontWeight: "bold" }}>{data.consignee.name}</div>
-                <div>{data.consignee.address}</div>
-                <div>GSTIN/UIN : {data.consignee.gstin}</div>
-                <div>State Name : {data.consignee.state}</div>
-                <div>Contact person : {data.consignee.contactPerson}</div>
-                <div>Contact : {data.consignee.phone}</div>
+                <div style={{ fontWeight: "bold", marginBottom: "2px" }}>
+                  {data.consignee.name}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  {data.consignee.address}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  GSTIN/UIN : {data.consignee.gstin}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  State Name : {data.consignee.state}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  Contact person : {data.consignee.contactPerson}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                  Contact : {data.consignee.phone}
+                </div>
               </td>
             </tr>
           </tbody>
@@ -819,7 +965,6 @@ const NewInvoice = ({ invoice }) => {
           style={{
             width: "100%",
             borderCollapse: "collapse",
-            marginBottom: "10px",
             fontSize: "9px",
           }}
         >
@@ -830,6 +975,8 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   fontWeight: "bold",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 State Code
@@ -839,16 +986,30 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   fontWeight: "bold",
+                  borderBottom: "0px",
                 }}
               >
                 Amount Paid
               </td>
             </tr>
             <tr>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  borderBottom: "0px",
+                  borderRight: "0px",
+                }}
+              >
                 {invoice.state_code || ""}
               </td>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  borderBottom: "0px",
+                }}
+              >
                 ₹{data.paymentInfo.amountPaid}
               </td>
             </tr>
@@ -859,6 +1020,7 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   fontWeight: "bold",
+                  borderBottom: "0px",
                 }}
               >
                 Notes
@@ -867,7 +1029,11 @@ const NewInvoice = ({ invoice }) => {
             <tr>
               <td
                 colSpan="2"
-                style={{ border: "1px solid #000", padding: "4px" }}
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  borderBottom: "0px",
+                }}
               >
                 {data.notes}
               </td>
@@ -891,6 +1057,8 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "left",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 Sl No.
@@ -900,6 +1068,8 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "left",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 Description of Goods
@@ -909,6 +1079,8 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "left",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 HSN/SAC
@@ -918,6 +1090,8 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "center",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 Quantity
@@ -927,6 +1101,8 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "right",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 Rate
@@ -936,6 +1112,7 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "right",
+                  borderBottom: "0px",
                 }}
               >
                 Amount
@@ -945,10 +1122,24 @@ const NewInvoice = ({ invoice }) => {
           <tbody>
             {data.items.map((item) => (
               <tr key={item.sr_no}>
-                <td style={{ border: "1px solid #000", padding: "4px" }}>
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    borderBottom: "0px",
+                    borderRight: "0px",
+                  }}
+                >
                   {item.sr_no}
                 </td>
-                <td style={{ border: "1px solid #000", padding: "4px" }}>
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    borderBottom: "0px",
+                    borderRight: "0px",
+                  }}
+                >
                   <div style={{ fontWeight: "bold" }}>{item.description}</div>
                   {item.fullDescription && (
                     <div
@@ -962,7 +1153,14 @@ const NewInvoice = ({ invoice }) => {
                     </div>
                   )}
                 </td>
-                <td style={{ border: "1px solid #000", padding: "4px" }}>
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    borderBottom: "0px",
+                    borderRight: "0px",
+                  }}
+                >
                   {item.hsn}
                 </td>
                 <td
@@ -970,6 +1168,8 @@ const NewInvoice = ({ invoice }) => {
                     border: "1px solid #000",
                     padding: "4px",
                     textAlign: "center",
+                    borderBottom: "0px",
+                    borderRight: "0px",
                   }}
                 >
                   {item.quantity}
@@ -979,6 +1179,8 @@ const NewInvoice = ({ invoice }) => {
                     border: "1px solid #000",
                     padding: "4px",
                     textAlign: "right",
+                    borderBottom: "0px",
+                    borderRight: "0px",
                   }}
                 >
                   {formatCurrency(item.rate)}
@@ -988,6 +1190,7 @@ const NewInvoice = ({ invoice }) => {
                     border: "1px solid #000",
                     padding: "4px",
                     textAlign: "right",
+                    borderBottom: "0px",
                   }}
                 >
                   {formatCurrency(item.amount)}
@@ -1005,6 +1208,7 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   fontWeight: "bold",
+                  borderRight: "0px",
                 }}
               >
                 Total
@@ -1015,6 +1219,7 @@ const NewInvoice = ({ invoice }) => {
                   padding: "4px",
                   textAlign: "center",
                   fontWeight: "bold",
+                  borderRight: "0px",
                 }}
               >
                 {itemTotals.totalQuantity}
@@ -1025,6 +1230,7 @@ const NewInvoice = ({ invoice }) => {
                   padding: "4px",
                   textAlign: "right",
                   fontWeight: "bold",
+                  borderRight: "0px",
                 }}
               >
                 ₹
@@ -1044,10 +1250,12 @@ const NewInvoice = ({ invoice }) => {
         </table>
 
         {/* Amount in Words */}
-        <div style={{ marginBottom: "10px", fontSize: "9px" }}>
-          <strong>Amount Chargeable (in words)</strong> E. & O.E
+        <div style={{ marginBottom: "8px", fontSize: "9px" }}>
+          <div style={{ fontWeight: "bold", marginBottom: "2px" }}>
+            Amount Chargeable (in words) E. & O.E
+          </div>
           <br />
-          <strong>INR {data.amountInWords}</strong>
+          <strong>INR- {numberToWords(data.total)}</strong>
         </div>
 
         {/* Tax Summary Table */}
@@ -1066,6 +1274,8 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "left",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 HSN/SAC
@@ -1075,6 +1285,8 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "right",
+                  borderBottom: "0px",
+                  borderRight: "0px",
                 }}
               >
                 Taxable Value
@@ -1086,6 +1298,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     IGST
@@ -1095,6 +1309,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     Rate
@@ -1104,6 +1320,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "right",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     Amount
@@ -1116,6 +1334,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     CGST
@@ -1125,6 +1345,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     Rate
@@ -1134,6 +1356,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "right",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     Amount
@@ -1143,6 +1367,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     SGST/UTGST
@@ -1152,6 +1378,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     Rate
@@ -1161,6 +1389,8 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "right",
+                      borderBottom: "0px",
+                      borderRight: "0px",
                     }}
                   >
                     Amount
@@ -1172,6 +1402,7 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "right",
+                  borderBottom: "0px",
                 }}
               >
                 Total Tax Amount
@@ -1181,7 +1412,14 @@ const NewInvoice = ({ invoice }) => {
           <tbody>
             {hsnSummary.map((row, idx) => (
               <tr key={idx}>
-                <td style={{ border: "1px solid #000", padding: "4px" }}>
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "4px",
+                    borderBottom: "0px",
+                    borderRight: "0px",
+                  }}
+                >
                   {row.hsn}
                 </td>
 
@@ -1190,6 +1428,8 @@ const NewInvoice = ({ invoice }) => {
                     border: "1px solid #000",
                     padding: "4px",
                     textAlign: "right",
+                    borderBottom: "0px",
+                    borderRight: "0px",
                   }}
                 >
                   {formatCurrency(row.taxableValue)}
@@ -1232,6 +1472,8 @@ const NewInvoice = ({ invoice }) => {
                         border: "1px solid #000",
                         padding: "4px",
                         textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
                       }}
                     >
                       CGST
@@ -1241,6 +1483,8 @@ const NewInvoice = ({ invoice }) => {
                         border: "1px solid #000",
                         padding: "4px",
                         textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
                       }}
                     >
                       {row.cgstPercent}%
@@ -1250,6 +1494,8 @@ const NewInvoice = ({ invoice }) => {
                         border: "1px solid #000",
                         padding: "4px",
                         textAlign: "right",
+                        borderBottom: "0px",
+                        borderRight: "0px",
                       }}
                     >
                       {formatCurrency(row.cgst)}
@@ -1259,6 +1505,8 @@ const NewInvoice = ({ invoice }) => {
                         border: "1px solid #000",
                         padding: "4px",
                         textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
                       }}
                     >
                       SGST/UTGST
@@ -1268,6 +1516,8 @@ const NewInvoice = ({ invoice }) => {
                         border: "1px solid #000",
                         padding: "4px",
                         textAlign: "center",
+                        borderBottom: "0px",
+                        borderRight: "0px",
                       }}
                     >
                       {row.sgstPercent}%
@@ -1277,6 +1527,8 @@ const NewInvoice = ({ invoice }) => {
                         border: "1px solid #000",
                         padding: "4px",
                         textAlign: "right",
+                        borderBottom: "0px",
+                        borderRight: "0px",
                       }}
                     >
                       {formatCurrency(row.sgst)}
@@ -1289,6 +1541,7 @@ const NewInvoice = ({ invoice }) => {
                     border: "1px solid #000",
                     padding: "4px",
                     textAlign: "right",
+                    borderBottom: "0px",
                   }}
                 >
                   {parseFloat(itemTotals.totalIGST) > 0
@@ -1300,7 +1553,13 @@ const NewInvoice = ({ invoice }) => {
 
             {/* TOTAL ROW */}
             <tr style={{ fontWeight: "bold" }}>
-              <td style={{ border: "1px solid #000", padding: "4px" }}>
+              <td
+                style={{
+                  border: "1px solid #000",
+                  padding: "4px",
+                  borderRight: "0px",
+                }}
+              >
                 Total
               </td>
               <td
@@ -1308,6 +1567,7 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "4px",
                   textAlign: "right",
+                  borderRight: "0px",
                 }}
               >
                 {data.subtotal}
@@ -1320,6 +1580,7 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderRight: "0px",
                     }}
                   ></td>
                   <td
@@ -1327,6 +1588,7 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "right",
+                      borderRight: "0px",
                     }}
                   >
                     {data.igst}
@@ -1340,6 +1602,7 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderRight: "0px",
                     }}
                   ></td>
                   <td
@@ -1347,6 +1610,7 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "right",
+                      borderRight: "0px",
                     }}
                   >
                     {data.cgst}
@@ -1357,6 +1621,7 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "center",
+                      borderRight: "0px",
                     }}
                   ></td>
                   <td
@@ -1364,6 +1629,7 @@ const NewInvoice = ({ invoice }) => {
                       border: "1px solid #000",
                       padding: "4px",
                       textAlign: "right",
+                      borderRight: "0px",
                     }}
                   >
                     {data.sgst}
@@ -1385,7 +1651,9 @@ const NewInvoice = ({ invoice }) => {
 
         {/* Tax Amount in Words */}
         <div style={{ marginBottom: "15px", fontSize: "9px" }}>
-          <strong>Tax Amount (in words) : INR {data.taxAmountInWords}</strong>
+          <strong>
+            Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
+          </strong>
         </div>
 
         {/* Terms & Bank Details */}
@@ -1408,10 +1676,18 @@ const NewInvoice = ({ invoice }) => {
             <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
               Company's Bank Details
             </div>
-            <div>A/C Holder Name : {data.bank.accountHolderName}</div>
-            <div>Bank Name : {data.bank.name}</div>
-            <div>A/c No. : {data.bank.accountNo}</div>
-            <div>Branch & IFS Code: {data.bank.IFSC}</div>
+            <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+              A/C Holder Name : {data.bank.accountHolderName}
+            </div>
+            <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+              Bank Name : {data.bank.name}
+            </div>
+            <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+              A/c No. : {data.bank.accountNo}
+            </div>
+            <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+              Branch & IFS Code: {data.bank.IFSC}
+            </div>
           </div>
         </div>
 
@@ -1434,6 +1710,9 @@ const NewInvoice = ({ invoice }) => {
         >
           This is a Computer Generated Invoice
         </div>
+      </div>
+      <div style={{ width: "80%", marginTop: "20px" }}>
+        <InvoicePDFPreview invoiceData={data} />
       </div>
     </>
   );

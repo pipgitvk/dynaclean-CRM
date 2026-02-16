@@ -13,6 +13,8 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ showQuotationModal, setShowQuotationModal]= useState(false)
   const [quotationNumber, setQuotationNumber] = useState("")
+  const [isFromQuotation, setIsFromQuotation] = useState(false);
+
 
   const [items, setItems] = useState([
     {
@@ -44,6 +46,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
     customer_id: "",
     payment_status: "UNPAID",
     due_date: "",
+    amount_paid: 0,
   });
 
   const [cgstRate, setCgstRate] = useState(9);
@@ -222,6 +225,8 @@ Thanks for doing business with us!`,
           total_amount: totalAmount,
         };
       });
+      const amountPaid = Number(form.amount_paid || 0);
+const balanceAmount = taxSummary.grandTotal - amountPaid;
 
       const dataToSend = {
         ...form,
@@ -234,8 +239,9 @@ Thanks for doing business with us!`,
         igst: taxSummary.igst,
         total_tax: taxSummary.totalTax,
         grand_total: taxSummary.grandTotal,
-        amount_paid: 0,
-        balance_amount: taxSummary.grandTotal,
+        amount_paid: amountPaid,
+        // balance_amount: taxSummary.grandTotal,
+        balance_amount: balanceAmount < 0 ? 0 : balanceAmount,
         notes: notes,
         terms_conditions: editableTerms,
       };
@@ -250,7 +256,7 @@ Thanks for doing business with us!`,
 
       const data = await res.json();
       if (data.success) {
-        toast.success("✅ Invoice created successfully");
+        toast.success("Invoice created successfully");
         router.push("/admin-dashboard/invoices");
       } else {
         alert("Error: " + data.error);
@@ -262,6 +268,14 @@ Thanks for doing business with us!`,
       setIsSubmitting(false);
     }
   };
+
+  // handle with this 
+  useEffect(() => {
+  if (!quotationNumber && !showQuotationModal) {
+    setIsFromQuotation(false);
+  }
+}, [quotationNumber, showQuotationModal]);
+
 
   // fetch data with quotation number 
 const fetchQuotationAndFill = async () => {
@@ -289,15 +303,21 @@ const fetchQuotationAndFill = async () => {
       ...prev,
       customer_name: quotation.customer_name,
       customer_email: quotation.customer_email,
-      customer_phone: quotation.customer_phone,
+      customer_phone: quotation.customer_contact,
       billing_address: quotation.billing_address,
       shipping_address: quotation.shipping_address,
       gst_number: quotation.gst_number,
+      amount_paid: Number(quotation.amount_paid || 0),
       state: quotation.state,
       state_code: quotation.state_code,
       customer_id: quotation.customer_id,
       quotation_id: quotation.quotation_number, 
+      due_date: quotation.due_date
+  ? quotation.due_date.split("T")[0]
+  : "",
     }));
+
+    setIsFromQuotation(true);
 
     // Fill items from quotation
    setItems(
@@ -400,12 +420,18 @@ const fetchQuotationAndFill = async () => {
         <div>
           <label className="text-sm text-gray-600">Due Date</label>
           <input
-            type="date"
-            value={form.due_date}
-            onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-            className="input w-full"
-            required
-          />
+  type="date"
+  value={form.due_date}
+  readOnly={isFromQuotation}
+  className={`input w-full ${
+    isFromQuotation ? "bg-gray-100 cursor-not-allowed" : ""
+  }`}
+  onChange={(e) =>
+    setForm({ ...form, due_date: e.target.value })
+  }
+  required
+/>
+
         </div>
       </div>
 
@@ -578,6 +604,23 @@ const fetchQuotationAndFill = async () => {
           </div>
         )}
 
+
+<div>
+  <label className="text-sm text-gray-600">Amount Paid</label>
+  <input
+    type="number"
+    min="0"
+    className={`input w-full ${
+      isFromQuotation ? "bg-gray-100 cursor-not-allowed" : ""
+    }`}
+    value={form.amount_paid}
+    readOnly={isFromQuotation} 
+    onChange={(e) =>
+      setForm({ ...form, amount_paid: Number(e.target.value) })
+    }
+  />
+</div>
+
         <div>
           <label className="text-sm text-gray-600">Payment Status</label>
           <select
@@ -593,6 +636,7 @@ const fetchQuotationAndFill = async () => {
             <option value="PAID">Paid</option>
           </select>
         </div>
+
       </div>
 
       {/* Invoice Items Table */}
