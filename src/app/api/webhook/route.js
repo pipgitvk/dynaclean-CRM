@@ -165,6 +165,13 @@ if (phone) {
   if (rows.length > 0) {
     customerId = rows[0].id;
 
+    // ✅ 1️⃣ Update customer status to 'Average'
+    await conn.execute(
+      `UPDATE customers SET status = ? WHERE id = ?`,
+      ["Average", customerId]
+    );
+
+    // ✅ 2️⃣ Insert urgent followup
     await conn.execute(
       `INSERT INTO customers_followup (
         customer_id, name, contact, next_followup_date,
@@ -175,7 +182,7 @@ if (phone) {
         customerId,
         first_name,
         phone,
-        new Date(),
+        new Date(), // immediate followup
         assignedTo,
         now,
         "Facebook",
@@ -184,11 +191,12 @@ if (phone) {
       ]
     );
 
-    console.log("⚡ Existing customer → urgent followup added");
+    console.log("⚡ Existing customer → status updated + urgent followup added");
 
-    return new Response("EXISTING_CUSTOMER_FOLLOWUP_ADDED", { status: 200 });
+    return new Response("EXISTING_CUSTOMER_UPDATED_AND_FOLLOWUP_ADDED", { status: 200 });
   }
 }
+
 
 // Step 6: Insert into customers table
 const [customerResult] = await conn.execute(
