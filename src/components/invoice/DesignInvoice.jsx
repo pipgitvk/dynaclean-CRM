@@ -1725,7 +1725,7 @@ import React from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Image from "next/image";
-import signImg from "../../../public/attachments/s.png"
+import signImg from "../../../public/s.png"
 import html2canvas from "html2canvas";
 import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
 import InvoicePDFPreview from "../Preview";

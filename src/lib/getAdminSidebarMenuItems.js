@@ -319,7 +319,7 @@ const allMenuItems = [
       {
         path: "/admin-dashboard/invoices",
         name: "Invoices",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN","ACCOUNTANT"],
         icon: "FileText",
       },
       {
