@@ -4,7 +4,10 @@ import RepUpdateForm from "@/components/rep-update-form";
 export const dynamic = "force-dynamic";
 
 export default async function RepPage({ params }) {
-  const { username } = await params;
+  let { username } = await params;
+   username = decodeURIComponent(username);
+  console.log("Hello",username);
+  
 
   if (!username) {
     return (
@@ -34,7 +37,9 @@ export default async function RepPage({ params }) {
       );
     }
 
-    const { rep_password } = rows[0];
+    const { password } = rows[0];
+    console.log(password);
+    
 
     return (
       <div className="flex flex-col items-center justify-center  bg-gray-100 p-4">
@@ -42,7 +47,7 @@ export default async function RepPage({ params }) {
           <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">
             Edit Password for **{username}**
           </h1>
-          <RepUpdateForm initialPassword={rep_password} username={username} />
+          <RepUpdateForm initialPassword={password} username={username} />
         </div>
       </div>
     );
