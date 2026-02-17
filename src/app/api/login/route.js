@@ -75,7 +75,7 @@ export async function POST(request) {
 
     let user = null;
     let sourceTable = "";
-    console.log(`🔍 Checking emplist for user: ${username}`);
+    console.log(`🔍 Checking emplist for user: ${empRows[0]}`);
 
     if (empRows.length > 0) {
       user = empRows[0];
@@ -83,7 +83,7 @@ export async function POST(request) {
     } else {
       // Step 2: Try rep_list
       const [repRows] = await conn.execute(
-        "SELECT * FROM emplist WHERE LOWER(username) = LOWER(?) ",
+        "SELECT * FROM rep_list WHERE LOWER(username) = LOWER(?) and status = 1",
         [username.trim()],
       );
       
@@ -95,14 +95,21 @@ export async function POST(request) {
     }
     
 
+
     if (!user) {
       await recordActivity(username, "UNKNOWN", "FAILED", "User not found");
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
+   
+    
 
     const userRole = user.userRole || user.role || "UNKNOWN";
     const dbPassword = user.password || "";
     const inputPassword = password.trim();
+
+    console.log("inputPassword",inputPassword);
+    console.log("dbPassword",dbPassword);
+    
    
 
     if (dbPassword !== inputPassword) {
