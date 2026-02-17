@@ -152,28 +152,68 @@ export async function POST(request) {
 
     const assignedTo = assignedRep.username;
 
-    // Step 6: Insert into customers table
-    const [customerResult] = await conn.execute(
-      `INSERT INTO customers (
-        first_name, email, phone, address, lead_campaign,
-        lead_source,sales_representative, assigned_to, status, date_created, products_interest
-      ) VALUES (?, ?, ?, ?, ?, ?,?, ?, ?, ?, ?)`,
+
+    // --- Check if customer already exists (PHONE ONLY) ---
+let customerId = null;
+
+if (phone) {
+  const [rows] = await conn.execute(
+    `SELECT id FROM customers WHERE phone = ? LIMIT 1`,
+    [phone]
+  );
+
+  if (rows.length > 0) {
+    customerId = rows[0].id;
+
+    await conn.execute(
+      `INSERT INTO customers_followup (
+        customer_id, name, contact, next_followup_date,
+        followed_by, followed_date, communication_mode,
+        notes, email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        customerId,
         first_name,
-        email,
         phone,
-        address || "",
-        lead_campaign,
+        new Date(),
         assignedTo,
-        assignedTo,
-        "Automatic",
-        "New",
         now,
-        products_interest,
-      ],
+        "Facebook",
+        "urgent customer follow",
+        email || ""
+      ]
     );
 
-    const customerId = await customerResult.insertId;
+    console.log("⚡ Existing customer → urgent followup added");
+
+    return new Response("EXISTING_CUSTOMER_FOLLOWUP_ADDED", { status: 200 });
+  }
+}
+
+// Step 6: Insert into customers table
+const [customerResult] = await conn.execute(
+  `INSERT INTO customers (
+    first_name, email, phone, address, lead_campaign,
+    lead_source, sales_representative, assigned_to,
+    status, date_created, products_interest
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  [
+    first_name,
+    email,
+    phone,
+    address || "",
+    lead_campaign,
+    assignedTo,
+    assignedTo,
+    "Automatic",
+    "New",
+    now,
+    products_interest,
+  ],
+);
+
+customerId = customerResult.insertId; // ✅ FIXED
+
 
     // Step 7: Insert into followup table
     await conn.execute(
