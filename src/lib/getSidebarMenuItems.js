@@ -232,6 +232,14 @@ const allMenuItems = [
     ],
     icon: "FileSignature",
   },
+  {
+    path: "/user-dashboard/invoices",
+    name: "Invoices",
+    roles: [
+      "ACCOUNTANT"
+    ],
+    icon: "FileText",
+  },
 
   {
     path: "/user-dashboard/all-expenses",
