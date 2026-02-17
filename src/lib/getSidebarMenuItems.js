@@ -510,6 +510,8 @@ export default async function getSidebarMenuItems() {
   const payload = await getSessionPayload(); // Get the full session payload
 
   let role = payload?.role || "GUEST";
+ 
+  
 
   return allMenuItems.filter(
     (item) => item.roles.includes("ALL") || item.roles.includes(role),
