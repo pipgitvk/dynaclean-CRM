@@ -3,9 +3,11 @@
 import { useState } from "react";
 import Image from "next/image";
 
-export default function QuotationItemsTable({ items, setItems }) {
+
+export default function QuotationItemsTable({ items, setItems ,customerId}) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
+
 
   const handleChange = (index, field, value) => {
     const updated = [...items];
@@ -35,45 +37,128 @@ export default function QuotationItemsTable({ items, setItems }) {
     }
   };
 
+  // const fetchProductDetails = async (code, index, isSuggestion = false) => {
+  //   try {
+  //     const res = await fetch(
+  //       `/api/get-product-details?code=${code}&mode=${isSuggestion ? "suggestion" : "full"
+  //       }`
+  //     );
+  //     const data = await res.json();
+
+  //     if (!data || data.length === 0) return;
+
+  //     if (isSuggestion) {
+  //       setProductSuggestions(data);
+  //       setActiveRowIndex(index);
+  //       return;
+  //     }
+      
+      
+      
+  //     const item = data[0];
+
+     
+      
+     
+
+  //     const imageUrl = item.image_path || item.product_image || "";
+
+  //     let updated = [...items];
+  //     updated[index] = {
+  //       ...updated[index],
+  //       productCode: item.item_code || code,
+  //       name: item.item_name || "",
+  //       hsn: item.hsn_sac || "",
+  //       specification: item.specification || "",
+  //       unit: item.unit || "",
+  //       quantity: updated[index].quantity,
+  //       price: parseFloat(item.price_per_unit) || 0,
+  //       last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
+  //       gst: parseFloat(item.gst_rate) || 18,
+  //       imageUrl,
+  //     };
+  //     setItems(updated);
+  //     setProductSuggestions([]);
+  //   } catch (err) {
+  //     console.error("❌ Product fetch error", err);
+  //   }
+  // };
+
+
   const fetchProductDetails = async (code, index, isSuggestion = false) => {
-    try {
-      const res = await fetch(
-        `/api/get-product-details?code=${code}&mode=${isSuggestion ? "suggestion" : "full"
-        }`
-      );
-      const data = await res.json();
+  try {
+    const res = await fetch(
+      `/api/get-product-details?code=${code}&mode=${
+        isSuggestion ? "suggestion" : "full"
+      }`
+    );
 
-      if (!data || data.length === 0) return;
+    const data = await res.json();
+    if (!data || data.length === 0) return;
 
-      if (isSuggestion) {
-        setProductSuggestions(data);
-        setActiveRowIndex(index);
-        return;
-      }
-
-      const item = data[0];
-      const imageUrl = item.image_path || "";
-
-      const updated = [...items];
-      updated[index] = {
-        ...updated[index],
-        productCode: item.item_code || code,
-        name: item.item_name || "",
-        hsn: item.hsn_sac || "",
-        specification: item.specification || "",
-        unit: item.unit || "",
-        quantity: updated[index].quantity,
-        price: parseFloat(item.price_per_unit) || 0,
-        last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
-        gst: parseFloat(item.gst_rate) || 18,
-        imageUrl,
-      };
-      setItems(updated);
-      setProductSuggestions([]);
-    } catch (err) {
-      console.error("❌ Product fetch error", err);
+    if (isSuggestion) {
+      setProductSuggestions(data);
+      setActiveRowIndex(index);
+      return;
     }
-  };
+
+    const item = data[0];
+
+
+    let finalPrice = parseFloat(item.price_per_unit) || 0;
+    let specialPrice = null;
+
+    try {
+      const specialRes = await fetch("/api/special-price/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_id: customerId, 
+          product_code: item.item_code || code,
+        }),
+      });
+
+      const specialData = await specialRes.json();
+      console.log("Special Data",specialData);
+      
+
+      if (specialData?.special_price) {
+        specialPrice = parseFloat(specialData.special_price);
+        finalPrice = specialPrice;
+      }
+    } catch (err) {
+      console.error("❌ Special price fetch error", err);
+    }
+
+    /* =============================== */
+
+    const imageUrl = item.image_path || item.product_image || "";
+
+    let updated = [...items];
+
+    updated[index] = {
+      ...updated[index],
+      productCode: item.item_code || code,
+      name: item.item_name || "",
+      hsn: item.hsn_sac || "",
+      specification: item.specification || "",
+      unit: item.unit || "",
+      quantity: updated[index].quantity,
+      price: finalPrice, // 🔥 overridden price
+      original_price: parseFloat(item.price_per_unit) || 0,
+      special_price: specialPrice,
+      last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
+      gst: parseFloat(item.gst_rate) || 18,
+      imageUrl,
+    };
+
+    setItems(updated);
+    setProductSuggestions([]);
+
+  } catch (err) {
+    console.error("❌ Product fetch error", err);
+  }
+};
 
   const addRow = () => {
     setItems([
@@ -91,6 +176,9 @@ export default function QuotationItemsTable({ items, setItems }) {
       },
     ]);
   };
+
+  
+  
 
   const removeRow = (index) => {
     const updated = items.filter((_, i) => i !== index);
@@ -126,9 +214,9 @@ export default function QuotationItemsTable({ items, setItems }) {
               <tr key={idx} className="border-t">
                 <td className="border px-2 py-2">{idx + 1}</td>
                 <td className="border px-2 py-2">
-                  {item.imageUrl ? (
+                  {item?.imageUrl ? (
                     <Image
-                      src={item.imageUrl}
+                      src={item?.imageUrl}
                       alt="Product"
                       width={40}
                       height={40}

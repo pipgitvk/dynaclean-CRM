@@ -790,7 +790,7 @@ Thanks for doing business with us!`,
             </select>
           </div>
         </div>
-        <QuotationItemsTable items={items} setItems={setItems} />
+        <QuotationItemsTable items={items} setItems={setItems} customerId={form.customer_id} />
         <TaxAndSummary
           subtotal={taxSummary.subtotal}
           cgst={taxSummary.cgst}
