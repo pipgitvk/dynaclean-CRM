@@ -46,6 +46,10 @@ export async function GET(request) {
   return new Response("Forbidden", { status: 403 });
 }
 
+
+
+
+
 export async function POST(request) {
   const body = await request.json();
   console.log("🔔 Webhook received:", JSON.stringify(body, null, 2));
@@ -58,7 +62,7 @@ export async function POST(request) {
   }
 
   try {
-    const conn = await getDbConnection(dbConfig);
+    const conn = await getDbConnection();
     const token = process.env.FB_PAGE_TOKEN;
 
     // Step 1: Fetch lead details using leadgen_id
@@ -220,7 +224,7 @@ const [customerResult] = await conn.execute(
   ],
 );
 
-customerId = customerResult.insertId; // ✅ FIXED
+customerId =await customerResult.insertId; // ✅ FIXED
 
 
     // Step 7: Insert into followup table
@@ -264,3 +268,6 @@ customerId = customerResult.insertId; // ✅ FIXED
     return new Response("Server Error", { status: 500 });
   }
 }
+
+
+
