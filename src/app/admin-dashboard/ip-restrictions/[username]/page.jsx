@@ -6,7 +6,9 @@ import { Shield, ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 
 export default function UserIpRestrictionPage() {
-    const { username } = useParams();
+   
+    let { username } = useParams();
+   username = decodeURIComponent(username);
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);

@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default async function RepPage({ params }) {
   let { username } = await params;
    username = decodeURIComponent(username);
-  console.log("Hello",username);
+
   
 
   if (!username) {
@@ -38,7 +38,7 @@ export default async function RepPage({ params }) {
     }
 
     const { password } = rows[0];
-    console.log(password);
+  
     
 
     return (
