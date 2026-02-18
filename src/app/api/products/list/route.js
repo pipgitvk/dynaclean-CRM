@@ -6,6 +6,7 @@ export async function GET() {
         const db = await getDbConnection();
         const [rows] = await db.execute(
             `SELECT 
+            p.id,
          p.item_code,
          p.item_name,
          p.product_image,

@@ -183,6 +183,27 @@ const allMenuItems = [
     icon: "Upload",
   },
 
+  
+{
+  name: "Special Pricing",
+  roles: ["ALL"],
+  icon: "ScrollText",
+  children: [
+    {
+      path: "/user-dashboard/special-pricing",
+      name: "All Special Prices",
+      roles: ["ADMIN", "MANAGER"],
+      icon: "List",
+    },
+    {
+      path: "/user-dashboard/special-pricing/new",
+      name: "Create Special Price",
+      roles: ["ADMIN", "EMPLOYEE"],
+      icon: "FilePlus2",
+    }
+  ],
+},
+
   {
     // path: "/user-dashboard/customers",
     name: "View Customers",
