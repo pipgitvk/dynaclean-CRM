@@ -324,6 +324,25 @@ export default async function UserDashboardPage() {
               </div>
             </div>
           </div>
+
+          <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
+            <div className="flex flex-col h-full justify-between min-h-[100px]">
+              <div className="text-white">
+                <h2 className="text-xl font-bold mb-2">
+                  📤 Bulk Upload Customers
+                </h2>
+                <p className="text-xs opacity-80">Upload CSV & auto-distribute leads to sales reps</p>
+              </div>
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
+                <a
+                  href="/admin-dashboard/bulk-upload"
+                  className="px-4 py-2 bg-white text-teal-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
+                >
+                  Upload CSV →
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* System Performance Dashboard - Featured Card */}
