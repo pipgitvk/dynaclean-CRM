@@ -196,32 +196,43 @@ export default async function CustomerPage({ params }) {
         {/* Actions and Follow-up History Block */}
         <div className="bg-white shadow-lg rounded-lg p-6 flex flex-col">
           <h2 className="text-2xl font-bold text-gray-800 mb-5">Actions</h2>
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-10 gap-4">
-            <a
-              href={`/admin-dashboard/view-customer/${customerId}/follow-up`}
-              className="btn text-white bg-green-600 hover:bg-green-700 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
-            >
-              Follow-up
-            </a>
-            <a
-              href={`/admin-dashboard/view-customer/${customerId}/edit`}
-              className="btn text-white bg-yellow-600 hover:bg-yellow-700 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
-            >
-              Edit
-            </a>
-            <a
-              href={`/admin-dashboard/view-customer/${customerId}/demo`}
-              className="btn text-white bg-blue-600 hover:bg-blue-700 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
-            >
-              Demo Registration
-            </a>
-            <CustomerContactsModal customerId={customerId} />
-            <Link
-              href={`/admin-dashboard/quotations/new?customerId=${customerId}`}
-              className="btn text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
-            >
-              add Quotation
-            </Link>
+          <div className="w-full mb-10">
+            <div className="flex items-center gap-3 overflow-x-auto flex-nowrap pb-2">
+              <a
+                href={`/admin-dashboard/view-customer/${customerId}/follow-up`}
+                className="btn flex-shrink-0 whitespace-nowrap text-white bg-green-600 hover:bg-green-700 py-2 px-4 rounded-md text-center transition duration-300"
+              >
+                Follow-up
+              </a>
+              <a
+                href={`/admin-dashboard/view-customer/${customerId}/edit`}
+                className="btn flex-shrink-0 whitespace-nowrap text-white bg-yellow-600 hover:bg-yellow-700 py-2 px-4 rounded-md text-center transition duration-300"
+              >
+                Edit
+              </a>
+              <a
+                href={`/admin-dashboard/view-customer/${customerId}/demo`}
+                className="btn flex-shrink-0 whitespace-nowrap text-white bg-blue-600 hover:bg-blue-700 py-2 px-4 rounded-md text-center transition duration-300"
+              >
+                Demo Registration
+              </a>
+              <div className="flex-shrink-0 whitespace-nowrap">
+                <CustomerContactsModal customerId={customerId} />
+              </div>
+              {/*  */}
+              <Link
+                href={`/admin-dashboard/quotations/new?customerId=${customerId}`}
+                className="btn flex-shrink-0 whitespace-nowrap text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md text-center transition duration-300"
+              >
+                add Quotation
+              </Link>
+              <Link
+                href={`/admin-dashboard/special-pricing/${customerId}`}
+                className="btn flex-shrink-0 whitespace-nowrap text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md text-center transition duration-300"
+              >
+                Special Price
+              </Link>
+            </div>
           </div>
 
           <section>

@@ -23,8 +23,8 @@ export default async function ProductSpecialPrice({ params }) {
       sp.special_price,
       sp.status,
       sp.set_date,
+      sp.approved_by,
       sp.approved_date,
-      u.username AS approved_user,
       c.first_name,
       c.last_name,
       p.item_name,
@@ -33,7 +33,6 @@ export default async function ProductSpecialPrice({ params }) {
     FROM special_price sp
     JOIN customers c ON sp.customer_id = c.customer_id
     JOIN products_list p ON sp.product_id = p.id
-    LEFT JOIN emplist u ON sp.approved_by = u.id
     WHERE sp.customer_id = ? AND sp.product_id = ?
     LIMIT 1
     `,
@@ -58,27 +57,28 @@ export default async function ProductSpecialPrice({ params }) {
         <p><strong>Product:</strong> {data.item_name}</p>
         <p><strong>Original Price:</strong> ₹ {data.price_per_unit}</p>
         <p><strong>Special Price:</strong> ₹ {data.special_price}</p>
-        <p>
-          <strong>Status:</strong>{" "}
-          <span
-            className={`ml-2 px-2 py-1 rounded text-sm ${
-              data.status === "approved"
-                ? "bg-green-100 text-green-700"
-                : data.status === "rejected"
-                ? "bg-red-100 text-red-700"
-                : "bg-yellow-100 text-yellow-700"
-            }`}
-          >
-            {data.status}
+        <p className="flex flex-col gap-1">
+          <span>
+            <strong>Status:</strong>{" "}
+            <span
+              className={`ml-2 px-2 py-1 rounded text-sm ${
+                data.status === "approved"
+                  ? "bg-green-100 text-green-700"
+                  : data.status === "rejected"
+                  ? "bg-red-100 text-red-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}
+            >
+              {data.status}
+            </span>
           </span>
+          {data.status === "approved" && data.approved_by && data.approved_date && (
+            <span className="text-xs text-gray-600 ml-6">
+              Approved by {data.approved_by} on{" "}
+              {new Date(data.approved_date).toLocaleString()}
+            </span>
+          )}
         </p>
-
-        {data.approved_user && (
-          <p className="text-sm text-gray-600">
-            Approved by {data.approved_user} on{" "}
-            {new Date(data.approved_date).toLocaleString()}
-          </p>
-        )}
       </div>
 
       {/* UPDATE FORM */}

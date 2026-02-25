@@ -25,6 +25,7 @@ export default async function ProductSpecialPrice({ params }) {
     `
     SELECT 
       sp.special_price,
+      sp.status,
       c.first_name,
       c.last_name,
       p.item_name,
@@ -53,7 +54,7 @@ export default async function ProductSpecialPrice({ params }) {
         Edit Special Price
       </h1>
         <Link
-          href="/user-dashboard/special-pricing"
+          href={`/user-dashboard/special-pricing/${customerId}`}
           className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded transition"
         >
           ← Back
@@ -68,47 +69,69 @@ export default async function ProductSpecialPrice({ params }) {
         <p><strong>Product:</strong> {data.item_name}</p>
         <p><strong>Original Price:</strong> ₹ {data.price_per_unit}</p>
         <p><strong>GST:</strong> {data.gst_rate}%</p>
+        <p>
+          <strong>Status:</strong>{" "}
+          <span
+            className={`ml-2 px-2 py-1 rounded text-sm ${
+              data.status === "approved"
+                ? "bg-green-100 text-green-700"
+                : data.status === "rejected"
+                ? "bg-red-100 text-red-700"
+                : "bg-yellow-100 text-yellow-700"
+            }`}
+          >
+            {data.status}
+          </span>
+        </p>
       </div>
 
-      {/* UPDATE FORM */}
-      <form action={updateSpecialPrice} className="space-y-4">
-        <input type="hidden" name="customer_id" value={customerId} />
-        <input type="hidden" name="product_id" value={productId} />
-
-        <div>
-          <label className="block font-medium mb-1">
-            Special Price
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            name="special_price"
-            defaultValue={data.special_price}
-            required
-            className="w-full border rounded px-3 py-2"
-          />
+      {data.status === "approved" ? (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded">
+          This special price is approved and cannot be edited. Please contact admin to change it.
         </div>
+      ) : (
+        <>
+          {/* UPDATE FORM */}
+          <form action={updateSpecialPrice} className="space-y-4">
+            <input type="hidden" name="customer_id" value={customerId} />
+            <input type="hidden" name="product_id" value={productId} />
 
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Update Special Price
-        </button>
-      </form>
+            <div>
+              <label className="block font-medium mb-1">
+                Special Price
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                name="special_price"
+                defaultValue={data.special_price}
+                required
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
 
-      {/* DELETE */}
-      <form action={deleteSpecialPrice} className="mt-6">
-        <input type="hidden" name="customer_id" value={customerId} />
-        <input type="hidden" name="product_id" value={productId} />
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Update Special Price
+            </button>
+          </form>
 
-        <button
-          type="submit"
-          className="bg-red-600 text-white px-4 py-2 rounded"
-        >
-          Delete Special Price
-        </button>
-      </form>
+          {/* DELETE */}
+          <form action={deleteSpecialPrice} className="mt-6">
+            <input type="hidden" name="customer_id" value={customerId} />
+            <input type="hidden" name="product_id" value={productId} />
+
+            <button
+              type="submit"
+              className="bg-red-600 text-white px-4 py-2 rounded"
+            >
+              Delete Special Price
+            </button>
+          </form>
+        </>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import TaxAndSummary from "./Tax-invoice";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 
 export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
   const router = useRouter();
@@ -637,6 +638,14 @@ const fetchQuotationAndFill = async () => {
           </select>
         </div>
 
+      </div>
+
+      {/* Set Special Price for this customer */}
+      <div className="flex justify-end">
+        <AddSpecialPriceModal
+          customerId={form.customer_id}
+          buttonLabel="Set Special Price"
+        />
       </div>
 
       {/* Invoice Items Table */}

@@ -237,6 +237,16 @@ export default async function UserDashboardPage() {
 
     const pendingOrdersCount = pendingOrders.length;
 
+    const [pendingSpecialRows] = await connection.execute(
+      `
+      SELECT COUNT(*) AS total_pending
+      FROM special_price
+      WHERE status = 'pending'
+      `,
+    );
+    const pendingSpecialCount =
+      Number(pendingSpecialRows[0]?.total_pending ?? 0);
+
     if (!user) {
       return <p className="text-red-600">User not found</p>;
     }
@@ -343,6 +353,30 @@ export default async function UserDashboardPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Special Price Approvals Card */}
+        <div className="mt-6 w-full max-w-xs sm:max-w-sm bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl p-6 flex flex-col items-start justify-between gap-4 text-white aspect-square">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold mb-1">
+              Special Price Approvals
+            </h2>
+            <p className="text-sm sm:text-base text-white/90">
+              Approve or reject customer-wise special prices set by your team.
+            </p>
+            <p className="mt-2 text-sm">
+              Pending approvals:{" "}
+              <span className="font-semibold">
+                {pendingSpecialCount}
+              </span>
+            </p>
+          </div>
+          <a
+            href="/admin-dashboard/special-pricing"
+            className="px-6 py-3 bg-white text-purple-700 rounded-lg font-semibold text-sm sm:text-base hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200 whitespace-nowrap"
+          >
+            Review Special Prices →
+          </a>
         </div>
 
         {/* System Performance Dashboard - Featured Card */}

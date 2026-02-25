@@ -428,7 +428,7 @@ const InvoicePDFDocument = ({ data }) => {
           </View>
 
           {/* Buyer and Consignee Details */}
-          <View style={styles.section}>
+          {/* <View style={styles.section}>
             <View style={styles.tableRow}>
               <View style={[styles.tableCell, { width: "50%" }]}>
                 <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>
@@ -455,7 +455,48 @@ const InvoicePDFDocument = ({ data }) => {
                 <Text>Contact : {data.consignee.phone}</Text>
               </View>
             </View>
-          </View>
+          </View> */}
+
+          <View style={styles.section}>
+  <View style={styles.tableRow}>
+    {/* Left Column: Buyer + Consignee */}
+    <View style={[styles.tableCell, { width: "40%" }]}>
+      {/* Buyer */}
+      <View style={{ marginBottom: 10 }}>
+        <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>
+          Buyer (Bill to)
+        </Text>
+        <Text style={styles.bold}>{data.buyer.name}</Text>
+        <Text>{data.buyer.address}</Text>
+        <Text>GSTIN/UIN : {data.buyer.gstin}</Text>
+        <Text>State Name : {data.buyer.state}</Text>
+        <Text>Place of Supply : {data.buyer.placeOfSupply}</Text>
+        <Text>Contact person : {data.buyer.contactPerson}</Text>
+        <Text>Contact : {data.buyer.phone}</Text>
+        <Text>E-Mail : {data.buyer.email}</Text>
+      </View>
+
+      {/* Consignee */}
+      <View>
+        <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>
+          Consignee (Ship to)
+        </Text>
+        <Text style={styles.bold}>{data.consignee.name}</Text>
+        <Text>{data.consignee.address}</Text>
+        <Text>GSTIN/UIN : {data.consignee.gstin}</Text>
+        <Text>State Name : {data.consignee.state}</Text>
+        <Text>Contact person : {data.consignee.contactPerson}</Text>
+        <Text>Contact : {data.consignee.phone}</Text>
+      </View>
+    </View>
+
+    {/* Right Column: Empty for future use */}
+    <View style={[styles.tableCell, { width: "60%" }]}>
+      {/* Empty space for future content */}
+    </View>
+  </View>
+</View>
+
 
           {/* Additional Info */}
           <View style={styles.section}>
