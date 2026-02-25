@@ -31,7 +31,8 @@ export async function proxy(request) {
 
   if (
     pathname.startsWith("/admin-dashboard") ||
-    pathname.startsWith("/user-dashboard")
+    pathname.startsWith("/user-dashboard") ||
+    pathname.startsWith("/empcrm")
   ) {
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -44,6 +45,26 @@ export async function proxy(request) {
 
       if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN") {
         return NextResponse.redirect(new URL("/user-dashboard", request.url));
+      }
+
+      if (pathname.startsWith("/admin-dashboard/company-documents")) {
+        if (!["SUPERADMIN", "ADMIN", "ACCOUNTANT"].includes(role)) {
+          return NextResponse.redirect(
+            new URL("/admin-dashboard", request.url),
+          );
+        }
+      }
+
+      if (pathname.startsWith("/empcrm/admin-dashboard")) {
+        if (!["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].includes(role)) {
+          return NextResponse.redirect(
+            new URL("/empcrm/user-dashboard", request.url),
+          );
+        }
+      }
+
+      if (pathname.startsWith("/empcrm/user-dashboard")) {
+        return NextResponse.next();
       }
 
       if (
@@ -64,6 +85,12 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/admin-dashboard/:path*", "/user-dashboard/:path*"],
+  matcher: [
+    "/",
+    "/login",
+    "/admin-dashboard/:path*",
+    "/user-dashboard/:path*",
+    "/empcrm/:path*",
+  ],
 };
 
