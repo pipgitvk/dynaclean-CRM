@@ -28,7 +28,7 @@ export async function GET() {
         wp.longt,
         wp.warranty_period
       FROM service_records sr
-      LEFT JOIN warranty_products wp ON sr.serial_number COLLATE utf8mb4_unicode_ci = wp.serial_number
+      LEFT JOIN warranty_products wp ON sr.serial_number COLLATE utf8mb3_unicode_ci = wp.serial_number
       WHERE wp.lat IS NOT NULL 
         AND wp.longt IS NOT NULL 
         AND wp.lat != '' 

@@ -57,7 +57,7 @@ export async function GET(req) {
     // STEP 5: Check if dispatch exists
     const [dispatchCheck] = await conn.execute(
       `SELECT * FROM dispatch 
-       WHERE CONVERT(quote_number USING utf8mb4) COLLATE utf8mb4_unicode_ci = ?
+       WHERE CONVERT(quote_number USING utf8mb3) COLLATE utf8mb3_unicode_ci = ?
        ORDER BY id DESC`,
       [order.quote_number]
     );
@@ -100,14 +100,14 @@ export async function GET(req) {
          no.invoice_date AS invoice_date
        FROM neworder no
        JOIN dispatch d
-         ON CONVERT(d.quote_number USING utf8mb4) COLLATE utf8mb4_unicode_ci = no.quote_number
+         ON CONVERT(d.quote_number USING utf8mb3) COLLATE utf8mb3_unicode_ci = no.quote_number
        JOIN quotation_items qi
          ON qi.quote_number = no.quote_number
-        AND qi.item_code = CONVERT(d.item_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        AND qi.item_code = CONVERT(d.item_code USING utf8mb3) COLLATE utf8mb3_unicode_ci
        LEFT JOIN quotations_records qr
          ON qr.quote_number = no.quote_number
        LEFT JOIN warranty_products wp
-         ON wp.serial_number = CONVERT(d.serial_no USING utf8mb4) COLLATE utf8mb4_unicode_ci
+         ON wp.serial_number = CONVERT(d.serial_no USING utf8mb3) COLLATE utf8mb3_unicode_ci
        WHERE BINARY no.order_id = BINARY ?
          AND wp.serial_number IS NULL
        ORDER BY d.id DESC`,

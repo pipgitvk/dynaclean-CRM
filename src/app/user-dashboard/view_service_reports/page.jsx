@@ -36,7 +36,7 @@ export default async function ViewServiceReportsPage() {
         ELSE 0
     END AS view_status
 FROM service_records sr
-LEFT JOIN warranty_products wp ON sr.serial_number COLLATE utf8mb4_unicode_ci = wp.serial_number
+LEFT JOIN warranty_products wp ON sr.serial_number COLLATE utf8mb3_unicode_ci = wp.serial_number
 LEFT JOIN service_reports sr_report ON sr.service_id = sr_report.service_id
 ORDER BY sr.service_id DESC;
     `;

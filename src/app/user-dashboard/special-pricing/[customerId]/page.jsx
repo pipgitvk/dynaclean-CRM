@@ -50,7 +50,7 @@ export default async function CustomerSpecialPrice({ params }) {
       SELECT item_code, MIN(image_path) AS image_path
       FROM product_images
       GROUP BY item_code
-    ) pi ON pi.item_code = p.item_code
+    ) pi ON BINARY pi.item_code = BINARY p.item_code
     LEFT JOIN customers c ON sp.customer_id = c.customer_id
     LEFT JOIN rep_list u ON sp.set_by = u.username
     WHERE sp.customer_id = ?

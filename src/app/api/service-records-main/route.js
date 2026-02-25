@@ -17,7 +17,7 @@ export async function GET(req) {
         wp.customer_name AS customer_name_from_wp,
         wp.installed_address AS installed_address_from_wp
       FROM service_records sr
-      LEFT JOIN warranty_products wp ON sr.serial_number COLLATE utf8mb4_unicode_ci = wp.serial_number
+      LEFT JOIN warranty_products wp ON sr.serial_number COLLATE utf8mb3_unicode_ci = wp.serial_number
 
     `;
     const params = [];

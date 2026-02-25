@@ -254,7 +254,7 @@ export async function POST(request, context) {
           `UPDATE warranty_products 
            SET installation_date = ? 
            WHERE serial_number = (
-               SELECT serial_number COLLATE utf8mb4_unicode_ci 
+               SELECT serial_number COLLATE utf8mb3_unicode_ci 
                FROM service_records 
                WHERE service_id = ?
            )`,
@@ -475,7 +475,7 @@ export async function POST(request, context) {
         `SELECT T1.serial_number, T2.email, T2.installed_address,T2.site_email,T2.site_contact,T2.site_person
          FROM service_records T1
          LEFT JOIN warranty_products T2 
-           ON T1.serial_number COLLATE utf8mb4_unicode_ci = T2.serial_number COLLATE utf8mb4_unicode_ci
+           ON T1.serial_number COLLATE utf8mb3_unicode_ci = T2.serial_number COLLATE utf8mb3_unicode_ci
          WHERE T1.service_id = ?`,
         [serviceId]
       );

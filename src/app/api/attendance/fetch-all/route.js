@@ -28,7 +28,7 @@ export async function GET(request) {
       a.checkout_address
    FROM attendance_logs a
    INNER JOIN rep_list r
-      ON a.username = r.username COLLATE utf8mb4_unicode_ci
+      ON a.username = r.username COLLATE utf8mb3_unicode_ci
    WHERE r.status = 1
    ORDER BY a.date DESC`
     );
