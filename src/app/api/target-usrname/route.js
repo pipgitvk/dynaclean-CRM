@@ -18,7 +18,7 @@ export async function GET(request) {
       sql = `
         SELECT DISTINCT rl.username 
         FROM rep_list rl
-        LEFT JOIN target t ON rl.username COLLATE utf8mb4_unicode_ci = t.username COLLATE utf8mb4_unicode_ci
+        LEFT JOIN target t ON rl.username COLLATE utf8mb3_unicode_ci = t.username COLLATE utf8mb3_unicode_ci
           AND (
             (t.target_start_date <= ? AND t.target_end_date >= ?)
             OR (t.target_start_date <= ? AND t.target_end_date >= ?)

@@ -34,7 +34,7 @@ export async function GET(req) {
         q.subtotal
       FROM neworder AS o
       LEFT JOIN customers AS c 
-        ON o.contact = c.phone COLLATE utf8mb4_general_ci
+        ON o.contact = c.phone COLLATE utf8mb3_general_ci
       LEFT JOIN quotations_records AS q
         ON o.quote_number = q.quote_number
     `;
