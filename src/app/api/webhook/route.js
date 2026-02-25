@@ -69,11 +69,18 @@ export async function POST(request) {
     const token = process.env.FB_PAGE_TOKEN;
 
     // Step 1: Fetch lead details using leadgen_id
+    // Explicitly request field_data + ad_id, otherwise Meta may not include them
     const leadRes = await fetch(
-      `https://graph.facebook.com/v18.0/${leadgen_id}?access_token=${token}`,
+      `https://graph.facebook.com/v18.0/${leadgen_id}?fields=field_data,ad_id,created_time&access_token=${token}`,
     );
     const leadData = await leadRes.json();
     console.log("📥 Lead data:", JSON.stringify(leadData, null, 2));
+
+    // If Meta returned an error or not OK status, don't continue silently
+    if (!leadRes.ok || leadData?.error) {
+      console.error("❌ Meta lead fetch failed:", leadData);
+      return new Response("Failed to fetch lead from Meta", { status: 502 });
+    }
 
     const fieldData = leadData?.field_data || [];
     const ad_id = body?.entry?.[0]?.changes?.[0]?.value?.ad_id;
