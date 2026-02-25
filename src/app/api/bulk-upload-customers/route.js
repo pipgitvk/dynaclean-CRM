@@ -195,7 +195,7 @@ export async function POST(request) {
             now,
             assignedTo,
             now,
-            "Call",
+            "Unknown",
             notes || "Bulk uploaded lead",
             email,
           ]

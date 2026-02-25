@@ -299,7 +299,11 @@ function DocList({ profile }) {
     doc_police_verification: "Police Verification"
   };
 
-  const urls = Array.isArray(profile.joining_form_documents) ? profile.joining_form_documents : [];
+  // const urls = Array.isArray(profile.joining_form_documents) ? profile.joining_form_documents : [];
+  const urls = Array.isArray(profile.joining_form_documents)
+  ? profile.joining_form_documents.map(u => decodeURIComponent(u))
+  : [];
+
 
   const docItems = urls.map(url => {
     const filename = url.split('/').pop();
