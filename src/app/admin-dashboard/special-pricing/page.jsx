@@ -1,10 +1,14 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import Link from "next/link";
+import SpecialPriceDetailsModal from "@/components/specialPrice/SpecialPriceDetailsModal";
 import {
   approveSpecialPrice,
   rejectSpecialPrice,
+  updateSpecialPrice,
+  deleteSpecialPrice,
 } from "./_actions";
+import SpecialPricingSearch from "./SpecialPricingSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +28,27 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   const searchParamsResolved = await searchParams;
   const pageParam = Number(searchParamsResolved?.page || 1) || 1;
   const currentPage = pageParam < 1 ? 1 : pageParam;
+  const searchQuery = String(searchParamsResolved?.search || "").trim();
 
   const conn = await getDbConnection();
 
   const offset = (currentPage - 1) * PAGE_SIZE;
+
+  let whereClause = "";
+  const whereParams = [];
+
+  if (searchQuery) {
+    const like = `%${searchQuery}%`;
+    whereClause = `
+      WHERE
+        c.first_name LIKE ? OR
+        c.last_name LIKE ? OR
+        p.item_name LIKE ? OR
+        sp.product_code LIKE ? OR
+        sp.status LIKE ?
+    `;
+    whereParams.push(like, like, like, like, like);
+  }
 
   const [rows] = await conn.execute(
     `
@@ -49,14 +70,22 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
     FROM special_price sp
     JOIN customers c ON sp.customer_id = c.customer_id
     JOIN products_list p ON sp.product_id = p.id
+    ${whereClause}
     ORDER BY sp.set_date DESC
     LIMIT ? OFFSET ?
   `,
-    [PAGE_SIZE, offset],
+    [...whereParams, PAGE_SIZE, offset],
   );
 
   const [countRows] = await conn.execute(
-    `SELECT COUNT(*) AS total FROM special_price`,
+    `
+      SELECT COUNT(*) AS total
+      FROM special_price sp
+      JOIN customers c ON sp.customer_id = c.customer_id
+      JOIN products_list p ON sp.product_id = p.id
+      ${whereClause}
+    `,
+    whereParams,
   );
   const totalCount = Number(countRows[0]?.total || 0);
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
@@ -107,6 +136,16 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
         </div>
       </div>
 
+      <SpecialPricingSearch
+        initialSearch={searchQuery}
+        suggestions={rows.map((row) => ({
+          id: row.id,
+          customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+          productName: row.item_name,
+          productCode: row.product_code,
+        }))}
+      />
+
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <table className="min-w-full border-collapse text-sm">
           <thead className="bg-gray-100">
@@ -128,7 +167,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                   colSpan={8}
                   className="p-4 text-center text-gray-500 text-sm"
                 >
-                  No special prices found.
+                  {searchQuery ? "No data found" : "No special prices found."}
                 </td>
               </tr>
             ) : (
@@ -204,12 +243,24 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                   </td>
                   <td className="p-3 space-y-1">
                     <div className="flex flex-wrap gap-2">
-                      <Link
-                        href={`/admin-dashboard/special-pricing/${row.customer_id}/${row.product_id}`}
-                        className="text-xs text-indigo-600 hover:underline"
-                      >
-                        Details
-                      </Link>
+                      <SpecialPriceDetailsModal
+                        details={{
+                          id: row.id,
+                          customerId: row.customer_id,
+                          customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+                          productName: row.item_name,
+                          productCode: row.product_code,
+                          originalPrice: row.price_per_unit,
+                          specialPrice: row.special_price,
+                          status: row.status,
+                          setBy: row.set_by,
+                          setDate: row.set_date,
+                          approvedBy: row.approved_by,
+                          approvedDate: row.approved_date,
+                        }}
+                        onUpdate={updateSpecialPrice}
+                        onDelete={deleteSpecialPrice}
+                      />
                     </div>
                     {row.status === "pending" && (
                       <div className="flex flex-wrap gap-2 mt-2">
