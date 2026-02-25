@@ -62,7 +62,7 @@ export async function POST(req) {
 
     // Execute the single query
     await conn.execute(sql, params);
-    conn.end();
+    //conn.end();
 
     return NextResponse.json({ message: "Report updated successfully", publicPath }, { status: 200 });
   } catch (error) {
