@@ -66,7 +66,8 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
       c.first_name,
       c.last_name,
       p.item_name,
-      p.price_per_unit
+      p.price_per_unit,
+      p.product_image
     FROM special_price sp
     JOIN customers c ON sp.customer_id = c.customer_id
     JOIN products_list p ON sp.product_id = p.id
@@ -151,6 +152,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
           <thead className="bg-gray-100">
             <tr>
               <th className="p-3 text-left">Customer</th>
+              <th className="p-3 text-left">Image</th>
               <th className="p-3 text-left">Product</th>
               <th className="p-3 text-right">Original Price</th>
               <th className="p-3 text-right">Special Price</th>
@@ -178,6 +180,18 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                     <div className="text-xs text-gray-500">
                       ID: {row.customer_id}
                     </div>
+                  </td>
+                  <td className="p-3">
+                    {row.product_image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={row.product_image}
+                        alt={row.item_name || "Product"}
+                        className="w-10 h-10 object-cover rounded"
+                      />
+                    ) : (
+                      <span className="text-gray-400 text-xs">No image</span>
+                    )}
                   </td>
                   <td className="p-3">
                     <div>{row.item_name}</div>
