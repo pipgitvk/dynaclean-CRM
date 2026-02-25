@@ -65,9 +65,9 @@ export default async function CustomerSpecialPrice({ params }) {
       SELECT item_code, MIN(image_path) AS image_path
       FROM product_images
       GROUP BY item_code
-    ) pi ON BINARY pi.item_code = BINARY p.item_code
+    ) pi ON pi.item_code COLLATE utf8mb4_unicode_ci = p.item_code COLLATE utf8mb4_unicode_ci
     LEFT JOIN customers c ON sp.customer_id = c.customer_id
-    LEFT JOIN rep_list u ON sp.set_by = u.username
+    LEFT JOIN rep_list u ON sp.set_by COLLATE utf8mb4_unicode_ci = u.username COLLATE utf8mb4_unicode_ci
     WHERE sp.customer_id = ?
     ORDER BY sp.set_date DESC
     `,
