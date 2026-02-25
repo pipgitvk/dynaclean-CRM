@@ -49,6 +49,10 @@ import { getDbConnection } from "@/lib/db";
 
 
 
+
+
+
+
 export async function POST(request) {
   const body = await request.json();
   console.log("🔔 Webhook received:", JSON.stringify(body, null, 2));
@@ -223,7 +227,7 @@ const [customerResult] = await conn.execute(
   ],
 );
 
-customerId = customerResult.insertId; // ✅ FIXED
+customerId =await customerResult.insertId; // ✅ FIXED
 
 
     // Step 7: Insert into followup table
@@ -269,18 +273,18 @@ customerId = customerResult.insertId; // ✅ FIXED
 }
 
 
-// src/app/api/webhook/route.js
+  // src/app/api/webhook/route.js
 
-// export async function POST(request) {
-//   try {
-//     const body = await request.json();
-//     console.log("📥 Received body:", body);
+  // export async function POST(request) {
+  //   try {
+  //     const body = await request.json();
+  //     console.log("📥 Received body:", body);
 
-//     // Simple response
-//     return new Response(
-//       JSON.stringify({
-//         message: "POST received successfully",
-//         received: body,
+  //     // Simple response
+  //     return new Response(
+  //       JSON.stringify({
+  //         message: "POST received successfully",
+  //         received: body,
 //       }),
 //       {
 //         status: 200,
