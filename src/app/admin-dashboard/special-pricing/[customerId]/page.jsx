@@ -12,24 +12,38 @@ export default async function CustomerSpecialPrice({ params }) {
   const payload = await getSessionPayload();
   if (!payload) return null;
 
-  const conn = await getDbConnection();
+  let conn;
+  try {
+    conn = await getDbConnection();
+  } catch (dbErr) {
+    console.error("[special-pricing] DB connection error:", dbErr);
+    return (
+      <div className="p-6 text-red-600">
+        Database connection failed. Please try again later.
+      </div>
+    );
+  }
 
-  // Fetch customer info for header strip
-  const [customerRows] = await conn.execute(
-    `SELECT customer_id, first_name, last_name, phone FROM customers WHERE customer_id = ? LIMIT 1`,
-    [customerId],
-  );
+  let customerInfo = null;
+  let rows = [];
 
-  const customerInfo = customerRows.length
-    ? {
-        id: customerRows[0].customer_id,
-        name: `${customerRows[0].first_name || ""} ${customerRows[0].last_name || ""}`.trim(),
-        phone: customerRows[0].phone || "",
-      }
-    : null;
+  try {
+    // Fetch customer info for header strip
+    const [customerRows] = await conn.execute(
+      `SELECT customer_id, first_name, last_name, phone FROM customers WHERE customer_id = ? LIMIT 1`,
+      [customerId],
+    );
 
-  const [rows] = await conn.execute(
-    `
+    customerInfo = customerRows.length
+      ? {
+          id: customerRows[0].customer_id,
+          name: `${customerRows[0].first_name || ""} ${customerRows[0].last_name || ""}`.trim(),
+          phone: customerRows[0].phone || "",
+        }
+      : null;
+
+    const [rowsResult] = await conn.execute(
+      `
     SELECT 
       sp.product_id,
       sp.special_price,
@@ -57,8 +71,28 @@ export default async function CustomerSpecialPrice({ params }) {
     WHERE sp.customer_id = ?
     ORDER BY sp.set_date DESC
     `,
-    [customerId]
-  );
+      [customerId]
+    );
+    rows = rowsResult;
+  } catch (err) {
+    console.error("[special-pricing] Query error:", err);
+    return (
+      <div className="p-6">
+        <div className="text-red-600 font-medium mb-2">
+          Failed to load special prices
+        </div>
+        <pre className="text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
+          {err?.message || String(err)}
+        </pre>
+        <Link
+          href={`/admin-dashboard/view-customer/${customerId}`}
+          className="inline-block mt-4 text-blue-600 hover:underline"
+        >
+          ← Back to customer
+        </Link>
+      </div>
+    );
+  }
 
   const maskedPhone =
     customerInfo && customerInfo.phone
