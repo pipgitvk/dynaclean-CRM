@@ -8,7 +8,15 @@ const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
   const [currentTheme, setCurrentTheme] = useState("slate");
-  const { user } = useUser ? useUser() : { user: null };
+
+  // Safely read user from UserContext (if available)
+  let user = null;
+  try {
+    const userResult = typeof useUser === "function" ? useUser() : null;
+    user = userResult?.user ?? null;
+  } catch {
+    user = null;
+  }
 
   // Load theme from localStorage on mount
   useEffect(() => {

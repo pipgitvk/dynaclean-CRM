@@ -60,6 +60,7 @@ export async function approveSpecialPrice(formData) {
 
   const conn = await getDbConnection();
 
+  // Approve the special price entry
   await conn.execute(
     `
     UPDATE special_price
@@ -69,8 +70,34 @@ export async function approveSpecialPrice(formData) {
       approved_date = NOW()
     WHERE id = ?
     `,
-    [payload.id, Number(id)]
+    ["admin", Number(id)]
   );
+
+  // After approval, reflect this in products_list.last_negotiation_price
+  try {
+    const [rows] = await conn.execute(
+      `SELECT product_id, special_price FROM special_price WHERE id = ? LIMIT 1`,
+      [Number(id)],
+    );
+
+    if (rows.length > 0) {
+      const { product_id, special_price } = rows[0];
+
+      await conn.execute(
+        `
+        UPDATE products_list
+        SET last_negotiation_price = ?
+        WHERE id = ?
+      `,
+        [Number(special_price), Number(product_id)],
+      );
+    }
+  } catch (e) {
+    console.error(
+      "⚠️ Failed to update products_list.last_negotiation_price on approval:",
+      e,
+    );
+  }
 
   redirect("/admin-dashboard/special-pricing");
 }
@@ -97,8 +124,8 @@ export async function rejectSpecialPrice(formData) {
       approved_date = NOW()
     WHERE id = ?
     `,
-    [payload.id, Number(id)]
+    ["admin", Number(id)]
   );
 
-  redirect("/admin-dashboard/special-pricing");
+  redirect("/admin-dashboard/view-customer");
 }

@@ -34,3 +34,100 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+aditya
+
+
+
+
+
+
+        <table
+  style={{
+    width: "100%",
+    borderCollapse: "collapse",
+    marginBottom: "10px",
+    fontSize: "11px",
+  }}
+>
+  <tbody>
+    <tr>
+      {/* Left Column: Buyer + Consignee */}
+      <td
+        style={{
+          border: "1px solid #000",
+          padding: "4px",
+          width: "50%",
+          verticalAlign: "top",
+          borderRight: "0px",
+        }}
+      >
+        {/* Buyer */}
+        <div style={{ fontWeight: "bold", marginBottom: "3px" }}>
+          Buyer (Bill to)
+        </div>
+        <div style={{ fontWeight: "bold", marginBottom: "1px" }}>
+          {data.buyer.name}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          {data.buyer.address}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          GSTIN/UIN : {data.buyer.gstin}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          State Name : {data.buyer.state}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          Place of Supply : {data.buyer.placeOfSupply}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          Contact person : {data.buyer.contactPerson}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          Contact : {data.buyer.phone}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px"}}>
+          E-Mail : {data.buyer.email}
+        </div>
+        <hr style={{width:"100%"}} />
+
+        {/* Consignee */}
+        <div style={{ fontWeight: "bold", marginBottom: "3px", marginTop: "3px" }}>
+          Consignee (Ship to)
+        </div>
+        <div style={{ fontWeight: "bold", marginBottom: "1px" }}>
+          {data.consignee.name}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          {data.consignee.address}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          GSTIN/UIN : {data.consignee.gstin}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          State Name : {data.consignee.state}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          Contact person : {data.consignee.contactPerson}
+        </div>
+        <div style={{ fontSize: "10px", marginBottom: "1px" }}>
+          Contact : {data.consignee.phone}
+        </div>
+      </td>
+
+      {/* Right Column: Empty for future use */}
+      <td
+        style={{
+          border: "1px solid #000",
+          padding: "6px",
+          width: "50%",
+          verticalAlign: "top",
+        }}
+      >
+        {/* Empty space for future content */}
+      </td>
+    </tr>
+  </tbody>
+</table>

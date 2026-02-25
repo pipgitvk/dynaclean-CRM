@@ -1,5 +1,5 @@
 import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "react-hot-toast"; // ✅ Import toast provider
+import { Toaster } from "react-hot-toast";
 import NextTopLoader from "nextjs-toploader";
 import { UserProvider } from "@/context/UserContext";
 import "./globals.css";

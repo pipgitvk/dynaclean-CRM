@@ -5,6 +5,8 @@ dist/
 build/
 *.log
 public/
+.env
 
 uploads/
 uploads
+Guru.txt

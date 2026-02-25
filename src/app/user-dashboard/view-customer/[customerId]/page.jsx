@@ -221,6 +221,12 @@ export default async function CustomerPage({ params }) {
             >
               add Quotation
             </Link>
+            <Link
+              href={`/user-dashboard/special-pricing/${customerId}`}
+              className="btn text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
+            >
+              Special Price
+            </Link>
           </div>
 
           <section>

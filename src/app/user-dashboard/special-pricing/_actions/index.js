@@ -14,12 +14,38 @@ export async function updateSpecialPrice(formData) {
 
   if (!customerId || !productId) return;
 
+  const payload = await getSessionPayload();
+  if (!payload) return;
+
   const conn = await getDbConnection();
+
+  // Check current status to prevent editing approved records
+  const [rows] = await conn.execute(
+    `
+    SELECT status
+    FROM special_price
+    WHERE customer_id = ? AND product_id = ?
+    LIMIT 1
+    `,
+    [Number(customerId), Number(productId)]
+  );
+
+  const current = rows[0];
+  if (!current) {
+    redirect(`/user-dashboard/special-pricing/${customerId}`);
+    return;
+  }
+
+  if (current.status === "approved") {
+    // Do not allow editing approved prices
+    redirect(`/user-dashboard/special-pricing/${customerId}`);
+    return;
+  }
 
   await conn.execute(
     `
     UPDATE special_price
-    SET special_price = ?
+    SET special_price = ?, status = 'pending', approved_by = NULL, approved_date = NULL
     WHERE customer_id = ? AND product_id = ?
     `,
     [Number(specialPrice), Number(customerId), Number(productId)]
@@ -38,6 +64,9 @@ export async function deleteSpecialPrice(formData) {
   const productId = formData.get("product_id");
 
   if (!customerId || !productId) return;
+
+  const payload = await getSessionPayload();
+  if (!payload) return;
 
   const conn = await getDbConnection();
 

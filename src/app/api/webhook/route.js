@@ -1,50 +1,53 @@
 import { getDbConnection } from "@/lib/db";
 
-const dbConfig = {
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-};
+// const dbConfig = {
+//   host: process.env.DB_HOST,
+//   user: process.env.DB_USER,
+//   password: process.env.DB_PASSWORD,
+//   database: process.env.DB_NAME,
+// };
 
-// pincode find
-// get state from pincode
-// async function getStateFromPincode(pincode) {
-//   if (!pincode) return null;
+// // pincode find
+// // get state from pincode
+// // async function getStateFromPincode(pincode) {
+// //   if (!pincode) return null;
 
-//   try {
-//     const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-//     const data = await res.json();
-//     console.log("📍 Pincode data:", data);
+// //   try {
+// //     const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+// //     const data = await res.json();
+// //     console.log("📍 Pincode data:", data);
 
-//     if (
-//       Array.isArray(data) &&
-//       data[0]?.Status === "Success" &&
-//       data[0]?.PostOffice?.length
-//     ) {
-//       console.log("📍 State from pincode:", data[0].PostOffice[0].State);
-//       return data[0].PostOffice[0].State;
-//     }
-//   } catch (err) {
-//     console.warn("⚠️ Pincode lookup failed:", pincode, err);
+// //     if (
+// //       Array.isArray(data) &&
+// //       data[0]?.Status === "Success" &&
+// //       data[0]?.PostOffice?.length
+// //     ) {
+// //       console.log("📍 State from pincode:", data[0].PostOffice[0].State);
+// //       return data[0].PostOffice[0].State;
+// //     }
+// //   } catch (err) {
+// //     console.warn("⚠️ Pincode lookup failed:", pincode, err);
+// //   }
+
+// //   return null;
+// // }
+
+// // ✅ Verify webhook subscription
+// export async function GET(request) {
+//   const { searchParams } = new URL(request.url);
+//   const mode = searchParams.get("hub.mode");
+//   const token = searchParams.get("hub.verify_token");
+//   const challenge = searchParams.get("hub.challenge");
+
+//   if (mode === "subscribe" && token === process.env.FB_VERIFY_TOKEN) {
+//     return new Response(challenge);
 //   }
 
-//   return null;
+//   return new Response("Forbidden", { status: 403 });
 // }
 
-// ✅ Verify webhook subscription
-export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const mode = searchParams.get("hub.mode");
-  const token = searchParams.get("hub.verify_token");
-  const challenge = searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === process.env.FB_VERIFY_TOKEN) {
-    return new Response(challenge);
-  }
 
-  return new Response("Forbidden", { status: 403 });
-}
 
 
 
@@ -270,4 +273,31 @@ customerId =await customerResult.insertId; // ✅ FIXED
 }
 
 
+  // src/app/api/webhook/route.js
 
+  // export async function POST(request) {
+  //   try {
+  //     const body = await request.json();
+  //     console.log("📥 Received body:", body);
+
+  //     // Simple response
+  //     return new Response(
+  //       JSON.stringify({
+  //         message: "POST received successfully",
+  //         received: body,
+//       }),
+//       {
+//         status: 200,
+//         headers: { "Content-Type": "application/json" },
+//       }
+//     );
+//   } catch (err) {
+//     console.error("❌ Error parsing request:", err);
+//     return new Response(
+//       JSON.stringify({ message: "Invalid JSON" }),
+//       { status: 400, headers: { "Content-Type": "application/json" } }
+//     );
+//   }
+// }
+
+// Optional GET
