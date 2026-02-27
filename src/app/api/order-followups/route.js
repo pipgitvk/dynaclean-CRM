@@ -13,6 +13,7 @@ export async function GET(req) {
     connection = await getDbConnection();
 
     // Build query with all data including amounts from quotations_records
+    // Use COLLATE for joins to avoid "Illegal mix of collations" errors
     let query = `
       SELECT 
         o.order_id, 
@@ -34,9 +35,9 @@ export async function GET(req) {
         q.subtotal
       FROM neworder AS o
       LEFT JOIN customers AS c 
-        ON o.contact = c.phone COLLATE utf8mb3_general_ci
+        ON o.contact = c.phone COLLATE utf8mb4_unicode_ci
       LEFT JOIN quotations_records AS q
-        ON o.quote_number = q.quote_number
+        ON o.quote_number COLLATE utf8mb4_unicode_ci = q.quote_number COLLATE utf8mb4_unicode_ci
     `;
 
     const whereClause = [];
@@ -73,9 +74,15 @@ export async function GET(req) {
       created_byList: created_byList.map(item => item.created_by)
     }, { status: 200 });
   } catch (error) {
-    console.error("Database query error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-  } finally {
-    console.log("Closing database connection");
+    console.error("Order-followups API error:", error?.message || error);
+    return NextResponse.json(
+      {
+        error: "Internal Server Error",
+        ...(process.env.NODE_ENV === "development" && {
+          detail: error?.message || String(error),
+        }),
+      },
+      { status: 500 }
+    );
   }
 }
