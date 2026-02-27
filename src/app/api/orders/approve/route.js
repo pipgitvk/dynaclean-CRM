@@ -15,27 +15,45 @@ export async function POST(req) {
             return NextResponse.json({ error: "Forbidden: Super Admin only" }, { status: 403 });
         }
 
-        const { orderId, action } = await req.json(); // action: 'approve' or 'reject'
+        const { orderId, action, remark } = await req.json(); // action: 'approve', 'reject', or 'pending'
 
-        if (!orderId || !['approve', 'reject'].includes(action)) {
+        if (!orderId || !['approve', 'reject', 'pending'].includes(action)) {
             return NextResponse.json({ error: "Invalid request data" }, { status: 400 });
         }
 
         const conn = await getDbConnection();
 
+        // Ensure approval_remark column exists (ignore if already exists)
+        try {
+            await conn.execute(
+                "ALTER TABLE neworder ADD COLUMN approval_remark TEXT NULL DEFAULT NULL"
+            );
+        } catch (_) {
+            // Column may already exist
+        }
+
+        const remarkVal = typeof remark === "string" ? remark.trim() || null : null;
+
         if (action === 'approve') {
             await conn.execute(
-                "UPDATE neworder SET approval_status = 'approved', sales_status = 1 WHERE order_id = ?",
-                [orderId]
+                "UPDATE neworder SET approval_status = 'approved', sales_status = 1, approval_remark = ? WHERE order_id = ?",
+                [remarkVal, orderId]
+            );
+        } else if (action === 'reject') {
+            await conn.execute(
+                "UPDATE neworder SET approval_status = 'rejected', is_cancelled = 1, approval_remark = ? WHERE order_id = ?",
+                [remarkVal, orderId]
             );
         } else {
+            // Reset to pending (undo approve/reject)
             await conn.execute(
-                "UPDATE neworder SET approval_status = 'rejected', is_cancelled = 1 WHERE order_id = ?",
+                "UPDATE neworder SET approval_status = 'pending', is_cancelled = 0, sales_status = 0, approval_remark = NULL WHERE order_id = ?",
                 [orderId]
             );
         }
 
-        return NextResponse.json({ success: true, message: `Order ${action}d successfully` });
+        const msg = action === 'pending' ? 'Order reset to pending' : `Order ${action}d successfully`;
+        return NextResponse.json({ success: true, message: msg });
     } catch (err) {
         console.error("❌ Approval API error:", err);
         return NextResponse.json({ success: false, error: err.message }, { status: 500 });
