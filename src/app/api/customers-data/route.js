@@ -14,7 +14,7 @@ export async function GET(req) {
 
     const role = (payload.role || "").toUpperCase().trim();
     const username = payload.username || null;
-    const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "HR"];
+    const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "HR", "SERVICE HEAD"];
     const isPrivileged = privilegedRoles.includes(role);
 
     const { searchParams } = new URL(req.url);
@@ -66,13 +66,13 @@ export async function GET(req) {
 
     // Role-based scoping and employee filter
     if (!isPrivileged && username) {
-      // Non-privileged users only see their own customers, regardless of filter
-      whereClause += " AND (lead_source = ? OR sales_representative = ?)";
-      params.push(username, username);
+      // Non-privileged users only see their own assigned customers (lead_source, sales_representative, assigned_to)
+      whereClause += " AND (lead_source = ? OR sales_representative = ? OR assigned_to = ?)";
+      params.push(username, username, username);
     } else if (employeeName && employeeName !== "all") {
       // Admin-style filter: match on any of the responsible columns
-      whereClause += " AND (lead_source = ? OR sales_representative = ?)";
-      params.push(employeeName, employeeName);
+      whereClause += " AND (lead_source = ? OR sales_representative = ? OR assigned_to = ?)";
+      params.push(employeeName, employeeName, employeeName);
     }
 
     // search functionality
@@ -88,10 +88,12 @@ export async function GET(req) {
       OR CAST(phone AS CHAR) LIKE ?
       OR CAST(customer_id AS CHAR) LIKE ?
       OR lead_source LIKE ?
+      OR sales_representative LIKE ?
+      OR assigned_to LIKE ?
     )
   `;
 
-      params.push(like, like, like, like, like);
+      params.push(like, like, like, like, like, like, like);
     }
 
     if (mode === "charts") {
