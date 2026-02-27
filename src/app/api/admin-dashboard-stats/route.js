@@ -57,9 +57,21 @@ export async function GET(req) {
       SELECT 
         COUNT(*) as total_orders,
         SUM(COALESCE(totalamt, 0)) as total_revenue,
+        SUM(COALESCE(taxamt, 0)) as total_tax_gst,
+        SUM(COALESCE(baseAmount, 0)) as total_base_amount,
         COUNT(DISTINCT created_by) as active_salespeople
       FROM neworder
       WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
+    `, [startDateStr, endDateStr]);
+
+    // GST (CGST+SGST) and Tax (IGST) from quotation_items - column is sgstxamt (not sgsttxamt)
+    const [gstTaxBreakdown] = await conn.execute(`
+      SELECT 
+        SUM(COALESCE(qi.cgsttxamt, 0) + COALESCE(qi.sgstxamt, 0)) as total_gst,
+        SUM(COALESCE(qi.igsttamt, 0)) as total_tax
+      FROM neworder no
+      JOIN quotation_items qi ON no.quote_number = qi.quote_number
+      WHERE DATE(no.created_at) >= ? AND DATE(no.created_at) <= ?
     `, [startDateStr, endDateStr]);
 
     // Get quotation to order conversion
@@ -220,6 +232,10 @@ export async function GET(req) {
         sales: {
           totalOrders: salesStats[0].total_orders || 0,
           totalRevenue: salesStats[0].total_revenue || 0,
+          totalTaxGst: salesStats[0].total_tax_gst || 0,
+          totalBaseAmount: salesStats[0].total_base_amount || 0,
+          totalGst: gstTaxBreakdown[0]?.total_gst || 0,
+          totalTax: gstTaxBreakdown[0]?.total_tax || 0,
           activeSalespeople: salesStats[0].active_salespeople || 0,
           conversionRate: parseFloat(conversionRate),
           topPerformers: topSalespeople

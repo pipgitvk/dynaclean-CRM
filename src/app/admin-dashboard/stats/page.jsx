@@ -304,7 +304,11 @@ export default function AdminStatsDashboard() {
                         value={formatCurrency(stats?.sales?.totalRevenue)}
                         icon={DollarSign}
                         color="bg-gradient-to-br from-green-500 to-green-600"
-                        subtitle="Total sales amount"
+                        subtitle={
+                            (stats?.sales?.totalGst != null || stats?.sales?.totalTax != null)
+                                ? `GST = ${formatCurrency(stats?.sales?.totalGst)} + Tax = ${formatCurrency(stats?.sales?.totalTax)}`
+                                : "Total sales amount"
+                        }
                     />
                     <KPICard
                         title="Conversion Rate"
