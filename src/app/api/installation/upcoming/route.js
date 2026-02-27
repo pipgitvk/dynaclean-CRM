@@ -30,7 +30,7 @@ export async function GET(req) {
         END AS installation_status,
         DATEDIFF(no.delivery_date, CURDATE()) AS days_until_installation
       FROM neworder no
-       JOIN dispatch d ON d.quote_number COLLATE utf8mb3_unicode_ci = no.quote_number COLLATE utf8mb3_unicode_ci
+       JOIN dispatch d ON d.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
        WHERE d.serial_no IS NOT NULL AND d.serial_no <> ''
        AND no.installation_status = 0
        AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)
