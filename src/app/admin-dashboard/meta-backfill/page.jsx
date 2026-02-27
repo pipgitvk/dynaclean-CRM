@@ -9,6 +9,8 @@ export default function MetaBackfillPage() {
   const [loading, setLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [diagnoseLoading, setDiagnoseLoading] = useState(false);
+  const [diagnoseResult, setDiagnoseResult] = useState(null);
 
   const handleFetch = async (e) => {
     e.preventDefault();
@@ -23,11 +25,12 @@ export default function MetaBackfillPage() {
       const res = await fetch(
         `/api/meta-backfill?since=${since}&until=${until}`,
       );
+      const data = await res.json();
       if (!res.ok) {
-        setMessage("Failed to fetch leads from Meta");
+        const metaMsg = data?.metaError?.message || data?.metaError?.error?.message || data?.message;
+        setMessage(metaMsg ? `Meta error: ${metaMsg}` : "Failed to fetch leads from Meta");
         return;
       }
-      const data = await res.json();
       setLeads(data.leads || []);
       setMessage(
         `Total from Meta: ${data.total_from_meta}, In range: ${data.total_in_range}, Existing in DB: ${data.existing_in_db}, New: ${data.new_count}`,
@@ -46,11 +49,12 @@ export default function MetaBackfillPage() {
     setLoading(true);
     try {
       const res = await fetch(`/api/meta-backfill?mode=all`);
+      const data = await res.json();
       if (!res.ok) {
-        setMessage("Failed to fetch all leads from Meta");
+        const metaMsg = data?.metaError?.message || data?.metaError?.error?.message || data?.message;
+        setMessage(metaMsg ? `Meta error: ${metaMsg}` : "Failed to fetch all leads from Meta");
         return;
       }
-      const data = await res.json();
       setLeads(data.leads || []);
       setMessage(
         `Total from Meta: ${data.total_from_meta}, New (not in DB): ${data.new_count}`,
@@ -60,6 +64,21 @@ export default function MetaBackfillPage() {
       setMessage("Error fetching all leads");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDiagnose = async () => {
+    setDiagnoseResult(null);
+    setDiagnoseLoading(true);
+    try {
+      const res = await fetch("/api/meta-backfill/diagnose");
+      const data = await res.json();
+      setDiagnoseResult(data);
+    } catch (err) {
+      console.error(err);
+      setDiagnoseResult({ error: err.message });
+    } finally {
+      setDiagnoseLoading(false);
     }
   };
 
@@ -96,6 +115,65 @@ export default function MetaBackfillPage() {
   return (
     <div className="p-4 space-y-4 max-w-full">
       <h1 className="text-xl font-semibold">Meta Leads Backfill</h1>
+
+      {/* Check connection - commented out
+      <div className="border rounded p-4 bg-gray-50">
+        <h2 className="font-medium mb-2">Check connection</h2>
+        <p className="text-sm text-gray-600 mb-2">
+          Run this to verify token, form ID, and permissions before fetching leads.
+        </p>
+        <button
+          type="button"
+          onClick={handleDiagnose}
+          disabled={diagnoseLoading}
+          className="px-3 py-1.5 rounded bg-amber-600 text-white text-sm disabled:opacity-50"
+        >
+          {diagnoseLoading ? "Checking..." : "Check connection"}
+        </button>
+        {diagnoseResult && (
+          <div className="mt-4 space-y-2 text-sm">
+            {diagnoseResult.error && (
+              <p className="text-red-600">{diagnoseResult.error}</p>
+            )}
+            {diagnoseResult.checks?.map((c, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <span
+                  className={
+                    c.status === "ok"
+                      ? "text-green-600"
+                      : c.status === "error"
+                        ? "text-red-600"
+                        : c.status === "warning"
+                          ? "text-amber-600"
+                          : "text-gray-500"
+                  }
+                >
+                  {c.status === "ok" ? "✓" : c.status === "error" ? "✗" : "○"}
+                </span>
+                <span>
+                  <strong>{c.name}:</strong> {c.message}
+                  {c.forms?.length > 0 && (
+                    <span className="block mt-1 text-gray-600">
+                      Forms: {c.forms.map((f) => `${f.name} (${f.id})`).join(", ")}
+                    </span>
+                  )}
+                </span>
+              </div>
+            ))}
+            {diagnoseResult.suggestions?.length > 0 && (
+              <div className="mt-2 pt-2 border-t">
+                <strong className="text-amber-700">Suggestions:</strong>
+                <ul className="list-disc list-inside text-amber-800 mt-1">
+                  {diagnoseResult.suggestions.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      */}
 
       <form onSubmit={handleFetch} className="space-y-2">
         <div className="flex flex-wrap gap-3 items-end">
