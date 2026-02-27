@@ -310,26 +310,26 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "ScrollText",
       },
-//       {
-//   name: "Special Pricing",
-//   path: "/admin-dashboard/special-pricing",
-//   roles: ["SUPERADMIN"],
-//   icon: "ScrollText",
-//   children: [
-//     {
-//       path: "/admin-dashboard/special-pricing",
-//       name: "All Special Prices",
-//       roles: ["ADMIN"],
-//       icon: "List",
-//     },
-//     {
-//       path: "/admin-dashboard/special-pricing/new",
-//       name: "Create Special Price",
-//       roles: ["ADMIN"],
-//       icon: "FilePlus2",
-//     }
-//   ],
-// },
+  //       {
+  //   name: "Special Pricing",
+  //   path: "/admin-dashboard/special-pricing",
+  //   roles: ["SUPERADMIN"],
+  //   icon: "ScrollText",
+  //   children: [
+  //     {
+  //       path: "/admin-dashboard/special-pricing",
+  //       name: "All Special Prices",
+  //       roles: ["ADMIN"],
+  //       icon: "List",
+  //     },
+  //     {
+  //       path: "/admin-dashboard/special-pricing/new",
+  //       name: "Create Special Price",
+  //       roles: ["ADMIN"],
+  //       icon: "FilePlus2",
+  //     }
+  //   ],
+  // },
      
       {
         path: "/admin-dashboard/quotations",
