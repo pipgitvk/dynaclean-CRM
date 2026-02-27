@@ -45,16 +45,16 @@ export default async function CustomersPage({ searchParams }) {
   const customerConditions = [];
   const customerParams = [];
 
-  // Only filter by lead_source if user is not ADMIN, SUPERADMIN, or SERVICE HEAD or TEAM LEADER
+  // Only filter by assigned fields if user is not ADMIN, SUPERADMIN, or SERVICE HEAD or TEAM LEADER
   if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER") {
-    customerConditions.push("c.lead_source = ?");
-    customerParams.push(username);
+    customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
+    customerParams.push(username, username, username);
   }
 
   // Employee filter (only for ADMIN, SUPERADMIN, TEAM LEADER)
   if (employee && (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER")) {
-    customerConditions.push("c.lead_source = ?");
-    customerParams.push(employee);
+    customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
+    customerParams.push(employee, employee, employee);
   }
 
   let joinClause = "";

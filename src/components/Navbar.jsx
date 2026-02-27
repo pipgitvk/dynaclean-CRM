@@ -64,9 +64,15 @@ export default function Navbar({ onToggleSidebar }) {
     try {
       setLoading(true);
       const res = await fetch(
-        `/api/customers-data?search=${encodeURIComponent(q)}&pageSize=5`
+        `/api/customers-data?search=${encodeURIComponent(q)}&pageSize=5`,
+        { credentials: "include" }
       );
       const data = await res.json();
+      if (!res.ok) {
+        setResults([]);
+        setShowDropdown(true);
+        return;
+      }
       setResults(data.customers || []);
       setShowDropdown(true);
     } finally {
@@ -159,9 +165,8 @@ export default function Navbar({ onToggleSidebar }) {
                       setShowDropdown(false);
                       setResults([]);
                       setQuery("");
-                      router.push(
-                        `/admin-dashboard/view-customer/${c.customer_id}`
-                      );
+                      const base = pathname?.startsWith("/admin-dashboard") ? "admin-dashboard" : "user-dashboard";
+                      router.push(`/${base}/view-customer/${c.customer_id}`);
                     }}
                     className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
                   >

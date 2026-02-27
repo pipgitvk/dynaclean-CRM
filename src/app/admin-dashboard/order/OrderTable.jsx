@@ -444,7 +444,17 @@ export default function OrderTable({ orders, userRole }) {
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <ApprovalActions r={r} userRole={userRole} />
+                      <div className="flex flex-col items-center gap-1">
+                        <ApprovalActions r={r} userRole={userRole} />
+                        {r.approval_remark && (
+                          <span
+                            className="text-xs text-gray-600 max-w-[180px] line-clamp-2 block text-left"
+                            title={r.approval_remark}
+                          >
+                            {r.approval_remark}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-center">
                       {dayjs(r.duedate).format("DD/MM/YYYY")}
@@ -518,6 +528,25 @@ export default function OrderTable({ orders, userRole }) {
                 <div>
                   <strong>Location:</strong> {r.state}
                 </div>
+                {(r.approval_status === "approved" || r.approval_status === "rejected") && (
+                  <div>
+                    <strong>Approval:</strong>{" "}
+                    <span
+                      className={
+                        r.approval_status === "approved"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }
+                    >
+                      {r.approval_status}
+                    </span>
+                    {r.approval_remark && (
+                      <span className="text-gray-600 text-xs block mt-1">
+                        {r.approval_remark}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })
@@ -1196,21 +1225,28 @@ function UpdateDeliveryMenuItem({ order }) {
 function ApprovalActions({ r, userRole }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [modalAction, setModalAction] = useState(null); // 'approve' | 'reject'
+  const [remark, setRemark] = useState("");
   const isSuperAdmin =
     (userRole || "").toString().trim().toUpperCase() === "SUPERADMIN";
 
-  const handleAction = async (action) => {
-    if (!confirm(`Are you sure you want to ${action} this order?`)) return;
+  const submitAction = async (action, remarkVal) => {
     setLoading(true);
     try {
       const res = await fetch("/api/orders/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: r.order_id, action }),
+        body: JSON.stringify({
+          orderId: r.order_id,
+          action,
+          remark: remarkVal || undefined,
+        }),
       });
       const json = await res.json();
       if (json.success) {
         alert(json.message);
+        setModalAction(null);
+        setRemark("");
         router.refresh();
       } else {
         alert(json.error);
@@ -1223,41 +1259,131 @@ function ApprovalActions({ r, userRole }) {
     }
   };
 
+  const handleAction = async (action) => {
+    if (action === "pending") {
+      if (!confirm("Reset this order to Pending approval?")) return;
+      await submitAction("pending");
+      return;
+    }
+    // For approve/reject, open modal with remark
+    setModalAction(action);
+  };
+
+  const handleModalSubmit = () => {
+    submitAction(modalAction, remark);
+  };
+
   if (r.approval_status === "approved") {
     return (
-      <div className="flex items-center justify-center gap-1 text-green-600 font-semibold px-2 py-1 bg-green-50 rounded-lg border border-green-100">
-        <CheckCircle size={14} />
-        <span>Approved</span>
+      <div className="flex flex-col items-center gap-1">
+        <div className="flex items-center gap-1 text-green-600 font-semibold px-2 py-1 bg-green-50 rounded-lg border border-green-100">
+          <CheckCircle size={14} />
+          <span>Approved</span>
+        </div>
+        {isSuperAdmin && (
+          <button
+            onClick={() => handleAction("pending")}
+            disabled={loading}
+            className="text-xs text-gray-500 hover:text-orange-600 underline"
+            title="Reset to Pending"
+          >
+            Edit
+          </button>
+        )}
       </div>
     );
   }
   if (r.approval_status === "rejected") {
     return (
-      <div className="flex items-center justify-center gap-1 text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-lg border border-red-100">
-        <XCircle size={14} />
-        <span>Rejected</span>
+      <div className="flex flex-col items-center gap-1">
+        <div className="flex items-center gap-1 text-red-600 font-semibold px-2 py-1 bg-red-50 rounded-lg border border-red-100">
+          <XCircle size={14} />
+          <span>Rejected</span>
+        </div>
+        {isSuperAdmin && (
+          <button
+            onClick={() => handleAction("pending")}
+            disabled={loading}
+            className="text-xs text-gray-500 hover:text-orange-600 underline"
+            title="Reset to Pending"
+          >
+            Edit
+          </button>
+        )}
       </div>
     );
   }
 
   if (isSuperAdmin) {
     return (
-      <div className="flex gap-2 justify-center">
-        <button
-          onClick={() => handleAction("approve")}
-          disabled={loading}
-          className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-xs font-medium border border-green-200"
-        >
-          Approve
-        </button>
-        <button
-          onClick={() => handleAction("reject")}
-          disabled={loading}
-          className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium border border-red-200"
-        >
-          Reject
-        </button>
-      </div>
+      <>
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={() => handleAction("approve")}
+            disabled={loading}
+            className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-xs font-medium border border-green-200"
+          >
+            Approve
+          </button>
+          <button
+            onClick={() => handleAction("reject")}
+            disabled={loading}
+            className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium border border-red-200"
+          >
+            Reject
+          </button>
+        </div>
+        {modalAction && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+            onClick={(e) => e.target === e.currentTarget && setModalAction(null)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-lg p-4 w-full max-w-md mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="font-semibold mb-3 text-gray-800">
+                {modalAction === "approve" ? "Approve Order" : "Reject Order"}
+              </h3>
+              <p className="text-sm text-gray-600 mb-2">
+                Order: <strong>{r.order_id}</strong>
+              </p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Remark (optional)
+              </label>
+              <textarea
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="Add remark..."
+                rows={3}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setModalAction(null);
+                    setRemark("");
+                  }}
+                  className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleModalSubmit}
+                  disabled={loading}
+                  className={`px-3 py-1.5 rounded text-sm font-medium text-white disabled:opacity-50 ${
+                    modalAction === "approve"
+                      ? "bg-green-600 hover:bg-green-700"
+                      : "bg-red-600 hover:bg-red-700"
+                  }`}
+                >
+                  {loading ? "Processing..." : modalAction === "approve" ? "Approve" : "Reject"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
