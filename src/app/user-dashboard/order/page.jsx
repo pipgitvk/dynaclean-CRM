@@ -54,9 +54,9 @@ export default async function OrdersPage() {
   if (userRole === "SERVICE HEAD") {
     sql += `
     WHERE 
-      no.created_by COLLATE utf8mb3_unicode_ci = ?
-      OR no.created_by COLLATE utf8mb3_unicode_ci NOT IN (
-        SELECT username COLLATE utf8mb3_unicode_ci 
+      no.created_by COLLATE utf8mb4_unicode_ci = ?
+      OR no.created_by COLLATE utf8mb4_unicode_ci NOT IN (
+        SELECT username COLLATE utf8mb4_unicode_ci 
         FROM rep_list 
         WHERE userRole LIKE '%SALES%'
       )`;
