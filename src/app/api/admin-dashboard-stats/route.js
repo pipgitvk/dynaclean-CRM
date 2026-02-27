@@ -73,7 +73,7 @@ export async function GET(req) {
       ? ((salesStats[0].total_orders / quotationStats[0].total_quotations) * 100).toFixed(2)
       : 0;
 
-    // Top performing salespeople
+    // Top 20 performing salespeople (sorted by revenue, highest first)
     const [topSalespeople] = await conn.execute(`
       SELECT 
         created_by as salesperson,
@@ -84,7 +84,7 @@ export async function GET(req) {
         AND created_by IS NOT NULL
       GROUP BY created_by
       ORDER BY revenue DESC
-      LIMIT 5
+      LIMIT 20
     `, [startDateStr, endDateStr]);
 
     // ===== 2. DELIVERY STATISTICS =====
