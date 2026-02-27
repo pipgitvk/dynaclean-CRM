@@ -135,7 +135,14 @@ export async function GET(request) {
 
       if (!res.ok) {
         console.error("❌ Meta backfill error:", data);
-        return new Response("Failed to fetch leads from Meta", { status: 502 });
+        return Response.json(
+          {
+            error: "meta_fetch_failed",
+            message: "Failed to fetch leads from Meta",
+            metaError: data?.error || data,
+          },
+          { status: 502 }
+        );
       }
 
       rawLeads = rawLeads.concat(data?.data || []);
