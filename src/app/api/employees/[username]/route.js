@@ -33,7 +33,7 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
-    const { username } = params;
+    const { username } = await params;
     const formData = await request.formData();
 
     const email = formData.get("email");
@@ -88,17 +88,28 @@ export async function PUT(request, { params }) {
     }
 
     const db = await getDbConnection();
-    const [result] = await db.query(query, queryParams);
-    // db.end();
 
-    if (result.affectedRows === 0) {
+    // Verify employee exists first (handles wrong username)
+    const [checkRows] = await db.query(
+      "SELECT username FROM rep_list WHERE username = ?",
+      [username],
+    );
+    if (checkRows.length === 0) {
       return NextResponse.json(
-        { message: "Employee not found or no changes made." },
+        { message: "Employee not found." },
         { status: 404 },
       );
     }
 
-    return NextResponse.json({ message: "Employee updated successfully." });
+    const [result] = await db.query(query, queryParams);
+
+    // affectedRows can be 0 when data is unchanged - still success
+    return NextResponse.json({
+      message:
+        result.affectedRows > 0
+          ? "Employee updated successfully."
+          : "No changes made (data already up to date).",
+    });
   } catch (error) {
     console.error("Error updating employee data:", error);
     return NextResponse.json(
