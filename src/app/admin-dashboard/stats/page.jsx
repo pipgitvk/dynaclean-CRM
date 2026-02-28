@@ -302,17 +302,13 @@ export default function AdminStatsDashboard() {
                     />
                     <KPICard
                         title="Total Revenue"
-                        value={formatCurrency(
-                            (parseFloat(stats?.sales?.totalBaseAmount) || 0) +
-                            (parseFloat(stats?.sales?.totalGst) || 0) +
-                            (parseFloat(stats?.sales?.totalTax) || 0)
-                        )}
+                        value={formatCurrency(stats?.sales?.totalRevenue)}
                         icon={DollarSign}
                         color="bg-gradient-to-br from-green-500 to-green-600"
                         subtitle={
                             (stats?.sales?.totalBaseAmount != null || stats?.sales?.totalGst != null || stats?.sales?.totalTax != null)
-                                ? `Base ${formatCurrency(parseFloat(stats?.sales?.totalBaseAmount) || 0)} + Tax ${formatCurrency((parseFloat(stats?.sales?.totalGst) || 0) + (parseFloat(stats?.sales?.totalTax) || 0))}`
-                                : "Total = Base + Tax"
+                                ? `GST ${formatCurrency(parseFloat(stats?.sales?.totalGst) || 0)} + Tax ${formatCurrency(parseFloat(stats?.sales?.totalTax) || 0)}`
+                                : "Order total (totalamt)"
                         }
                     />
                     <KPICard
