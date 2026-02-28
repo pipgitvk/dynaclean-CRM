@@ -224,11 +224,8 @@ export async function GET(req) {
       ORDER BY date ASC
     `);
 
-    // Total Revenue = Base + GST + Tax
-    const totalBaseAmount = parseFloat(salesStats[0].total_base_amount) || 0;
-    const totalGst = parseFloat(gstTaxBreakdown[0]?.total_gst) || 0;
-    const totalTax = parseFloat(gstTaxBreakdown[0]?.total_tax) || 0;
-    const totalRevenue = totalBaseAmount + totalGst + totalTax;
+    // Total Revenue = totalamt (order total from neworder)
+    const totalRevenue = parseFloat(salesStats[0].total_revenue) || 0;
 
     // Return aggregated data
     return NextResponse.json({
