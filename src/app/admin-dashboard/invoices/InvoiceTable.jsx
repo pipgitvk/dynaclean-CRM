@@ -23,6 +23,7 @@ export default function InvoiceTable() {
   // Sorting
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
+  const [fetchError, setFetchError] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -38,6 +39,7 @@ export default function InvoiceTable() {
     if (search) params.append("search", search);
 
     try {
+      setFetchError(null);
       const res = await fetch(`/api/invoice-table?${params.toString()}`);
       const response = await res.json();
       console.log("response data :", response);
@@ -47,10 +49,12 @@ export default function InvoiceTable() {
         setMeta(response.meta);
       } else {
         setInvoices([]);
+        setFetchError(response.detail || response.error || "Failed to load invoices");
       }
     } catch (err) {
       console.error("Fetch invoices failed:", err);
       setInvoices([]);
+      setFetchError(err?.message || "Failed to load invoices");
     } finally {
       setLoading(false);
     }
@@ -75,6 +79,7 @@ export default function InvoiceTable() {
     setSortBy("created_at");
     setSortOrder("desc");
     setCurrentPage(1);
+    setFetchError(null);
   };
 
   const handleSort = (column) => {
@@ -172,6 +177,12 @@ export default function InvoiceTable() {
               <tr>
                 <td colSpan="7" className="text-center py-4">
                   Loading...
+                </td>
+              </tr>
+            ) : fetchError ? (
+              <tr>
+                <td colSpan="7" className="text-center py-6 text-red-600">
+                  {fetchError}
                 </td>
               </tr>
             ) : invoices.length ? (

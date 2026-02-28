@@ -90,8 +90,14 @@ export async function GET(req) {
     });
   } catch (err) {
     console.error("Invoice list error:", err);
+    const showDetail =
+      process.env.NODE_ENV !== "production" ||
+      process.env.DEBUG_INVOICE_ERROR === "1";
     return NextResponse.json(
-      { error: "Failed to fetch invoices" },
+      {
+        error: "Failed to fetch invoices",
+        ...(showDetail && { detail: err?.message || String(err) }),
+      },
       { status: 500 },
     );
   }
