@@ -11,6 +11,7 @@ import {
   XCircle,
   MoreVertical,
   Truck,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
@@ -726,10 +727,92 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               </div>
             )}
             <UpdateDeliveryMenuItem order={r} />
+            {isSuperAdmin && (
+              <div className="border-t border-gray-100 mt-1 pt-1">
+                <DeletePermanentlyButton orderId={r.order_id} onDeleted={toggleMenu} />
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function DeletePermanentlyButton({ orderId, onDeleted }) {
+  const router = useRouter();
+  const [showModal, setShowModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    try {
+      setDeleting(true);
+      const res = await fetch("/api/delete-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setShowModal(false);
+        onDeleted?.();
+        router.refresh();
+      } else {
+        alert(json.error || "Delete failed");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete order");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowModal(true);
+        }}
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-red-50 text-red-600 text-left"
+        title="Delete permanently from database"
+      >
+        <Trash2 size={16} />
+        <span>Delete Permanently</span>
+      </button>
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-semibold text-red-600 mb-2">Delete Permanently</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Order <strong>{orderId}</strong> will be permanently deleted from the database. This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 text-sm"
+              >
+                {deleting ? "Deleting..." : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
