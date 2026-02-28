@@ -75,13 +75,14 @@ export default function AdminStatsDashboard() {
         }
     };
 
-    // Format currency
+    // Format currency (NaN/undefined → 0)
     const formatCurrency = (amount) => {
+        const val = parseFloat(amount);
         return new Intl.NumberFormat("en-IN", {
             style: "currency",
             currency: "INR",
             maximumFractionDigits: 0,
-        }).format(amount || 0);
+        }).format(isNaN(val) ? 0 : val);
     };
 
     // KPI Card Component
@@ -301,13 +302,17 @@ export default function AdminStatsDashboard() {
                     />
                     <KPICard
                         title="Total Revenue"
-                        value={formatCurrency(stats?.sales?.totalRevenue)}
+                        value={formatCurrency(
+                            (parseFloat(stats?.sales?.totalBaseAmount) || 0) +
+                            (parseFloat(stats?.sales?.totalGst) || 0) +
+                            (parseFloat(stats?.sales?.totalTax) || 0)
+                        )}
                         icon={DollarSign}
                         color="bg-gradient-to-br from-green-500 to-green-600"
                         subtitle={
-                            (stats?.sales?.totalGst != null || stats?.sales?.totalTax != null)
-                                ? `GST = ${formatCurrency(stats?.sales?.totalGst)} + Tax = ${formatCurrency(stats?.sales?.totalTax)}`
-                                : "Total sales amount"
+                            (stats?.sales?.totalBaseAmount != null || stats?.sales?.totalGst != null || stats?.sales?.totalTax != null)
+                                ? `Base ${formatCurrency(parseFloat(stats?.sales?.totalBaseAmount) || 0)} + Tax ${formatCurrency((parseFloat(stats?.sales?.totalGst) || 0) + (parseFloat(stats?.sales?.totalTax) || 0))}`
+                                : "Total = Base + Tax"
                         }
                     />
                     <KPICard

@@ -36,23 +36,23 @@ export async function POST(req) {
           (
             SELECT psr.amount_per_unit
             FROM product_stock_request psr
-            WHERE psr.product_code COLLATE utf8mb3_unicode_ci = qi.item_code COLLATE utf8mb3_unicode_ci
+            WHERE psr.product_code COLLATE utf8mb4_unicode_ci = qi.item_code COLLATE utf8mb4_unicode_ci
             ORDER BY psr.id DESC
             LIMIT 1
           ),
           (
             SELECT ssr.amount_per_unit
             FROM spare_stock_request ssr
-            WHERE ssr.spare_name COLLATE utf8mb3_unicode_ci = qi.item_name COLLATE utf8mb3_unicode_ci
+            WHERE ssr.spare_name COLLATE utf8mb4_unicode_ci = qi.item_name COLLATE utf8mb4_unicode_ci
             ORDER BY ssr.id DESC
             LIMIT 1
           ),
           0
         ) as purchase_price_unit
       FROM neworder n
-      LEFT JOIN quotations_records qr ON n.quote_number COLLATE utf8mb3_unicode_ci = qr.quote_number COLLATE utf8mb3_unicode_ci
+      LEFT JOIN quotations_records qr ON n.quote_number COLLATE utf8mb4_unicode_ci = qr.quote_number COLLATE utf8mb4_unicode_ci
       LEFT JOIN customers c ON qr.customer_id = c.customer_id
-      LEFT JOIN quotation_items qi ON n.quote_number COLLATE utf8mb3_unicode_ci = qi.quote_number COLLATE utf8mb3_unicode_ci
+      LEFT JOIN quotation_items qi ON n.quote_number COLLATE utf8mb4_unicode_ci = qi.quote_number COLLATE utf8mb4_unicode_ci
       WHERE n.invoice_number IS NOT NULL AND n.invoice_number != ''
       ${dateFilter}
       ORDER BY n.invoice_date DESC
