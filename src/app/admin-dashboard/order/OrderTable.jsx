@@ -539,7 +539,7 @@ export default function OrderTable({ orders, userRole }) {
                   <strong>Due Date:</strong> {dayjs(r.duedate).format("DD/MM/YYYY")}
                 </div>
 
-                {/* Approval Actions - Approve/Reject/Edit - visible on mobile */}
+                {/* Approval Actions - Approve/Reject/Revert - visible on mobile */}
                 <div className="pt-2 border-t border-gray-100">
                   <div className="flex flex-col gap-2">
                     <ApprovalActions r={r} userRole={userRole} />
@@ -1376,7 +1376,7 @@ function ApprovalActions({ r, userRole }) {
             className="text-xs text-gray-500 hover:text-orange-600 underline"
             title="Reset to Pending"
           >
-            Edit
+            Revert
           </button>
         )}
       </div>
@@ -1396,7 +1396,7 @@ function ApprovalActions({ r, userRole }) {
             className="text-xs text-gray-500 hover:text-orange-600 underline"
             title="Reset to Pending"
           >
-            Edit
+            Revert
           </button>
         )}
       </div>
