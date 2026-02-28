@@ -770,7 +770,7 @@ function DeletePermanentlyButton({ orderId, onDeleted }) {
 
   return (
     <>
-      <button
+      {/* <button
         onClick={(e) => {
           e.stopPropagation();
           setShowModal(true);
@@ -780,7 +780,7 @@ function DeletePermanentlyButton({ orderId, onDeleted }) {
       >
         <Trash2 size={16} />
         <span>Delete Permanently</span>
-      </button>
+      </button> */}
       {showModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
