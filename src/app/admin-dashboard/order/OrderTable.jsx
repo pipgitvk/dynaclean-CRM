@@ -486,23 +486,29 @@ export default function OrderTable({ orders, userRole }) {
         {filteredOrders.length > 0 ? (
           filteredOrders.map((r, i) => {
             const status = getStatusText(r);
+            const pay = getPaymentBadge(r.payment_status);
             return (
               <div
                 key={r.order_id}
                 className="bg-white border border-gray-200 rounded-xl shadow-md p-4 space-y-2 text-sm"
               >
-                <div className="flex justify-between items-center text-gray-500">
-                  <span className="text-xs">#{i + 1}</span>
-                  <div className="flex items-center">
-                    <span className="font-medium text-gray-800 mr-2">
+                <div className="flex justify-between items-start gap-2 flex-wrap">
+                  <span className="text-xs text-gray-500">#{i + 1}</span>
+                  <div className="flex items-center gap-2 flex-wrap justify-end min-w-0">
+                    <span className="font-medium text-gray-800 text-xs shrink-0">
                       {dayjs(r.created_at).format("DD/MM/YYYY")}
                     </span>
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.textCol}`}
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${status.bg} ${status.textCol}`}
                     >
                       {status.text}
                     </span>
-                    <span>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${pay.cls}`}
+                    >
+                      {pay.text}
+                    </span>
+                    <span className="shrink-0">
                       <ActionButtons
                         r={r}
                         userRole={userRole}
@@ -528,25 +534,25 @@ export default function OrderTable({ orders, userRole }) {
                 <div>
                   <strong>Location:</strong> {r.state}
                 </div>
-                {(r.approval_status === "approved" || r.approval_status === "rejected") && (
-                  <div>
-                    <strong>Approval:</strong>{" "}
-                    <span
-                      className={
-                        r.approval_status === "approved"
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }
-                    >
-                      {r.approval_status}
-                    </span>
+                <div>
+                  <strong>Due Date:</strong> {dayjs(r.duedate).format("DD/MM/YYYY")}
+                </div>
+
+                {/* Approval Actions - Approve/Reject/Edit - visible on mobile */}
+                <div className="pt-2 border-t border-gray-100">
+                  <div className="flex flex-col gap-2">
+                    <ApprovalActions r={r} userRole={userRole} />
                     {r.approval_remark && (
-                      <span className="text-gray-600 text-xs block mt-1">
-                        {r.approval_remark}
+                      <span
+                        className="text-xs text-gray-600 block"
+                        title={r.approval_remark}
+                      >
+                        Remark: {r.approval_remark}
                       </span>
                     )}
                   </div>
-                )}
+                </div>
+
               </div>
             );
           })
@@ -621,7 +627,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       {isOpen && (
         <div
           ref={popRef}
-          className="absolute right-0 mt-2 w-56 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border"
+          className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border"
         >
           <div className="py-1 text-sm">
             {canViewSales && (
