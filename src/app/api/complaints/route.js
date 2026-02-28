@@ -150,14 +150,21 @@ export async function POST(req) {
   }
 }
 
-// You might also want a GET route to fetch available users for the dropdown
+// GET: Fetch available users for the "Assign to" dropdown
+// Queries both emplist and rep_list (login uses both tables)
 export async function GET(req) {
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      `SELECT username FROM rep_list WHERE userRole='SERVICE ENGINEER'`,
+      `(SELECT username FROM rep_list 
+        WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE HEAD') 
+        AND (status = 1 OR status IS NULL))
+       UNION
+       (SELECT username FROM emplist 
+        WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE HEAD') 
+        AND (status = 1 OR status IS NULL))
+       ORDER BY username`,
     );
-    // await conn.end();
     return NextResponse.json(rows.map((row) => row.username));
   } catch (error) {
     console.error("Failed to fetch users:", error);
