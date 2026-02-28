@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useMemo } from "react";
-
-const GOOGLE_MAPS_API_KEY = "AIzaSyBtEwXb_p-wIXl4Ts3GPIBWJb42zUIYuZ0";
+import { loadGoogleMaps } from "@/lib/loadGoogleMaps";
 
 export default function ServiceMapView({ services = [] }) {
   const mapRef = useRef(null);
@@ -15,27 +14,7 @@ export default function ServiceMapView({ services = [] }) {
   const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
-    // Dynamically load Google Maps API
-    const loadGoogleMaps = async () => {
-      if (typeof window === "undefined") return;
-
-      // Check if Google Maps is already loaded
-      if (!window.google || !window.google.maps) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=marker`;
-          script.async = true;
-          script.defer = true;
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      setIsLoading(false);
-    };
-
-    loadGoogleMaps();
+    loadGoogleMaps().then(() => setIsLoading(false));
   }, []);
 
   // Get unique service types and statuses for filters
