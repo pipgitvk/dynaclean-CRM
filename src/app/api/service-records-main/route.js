@@ -15,9 +15,10 @@ export async function GET(req) {
       SELECT
         sr.*,
         wp.customer_name AS customer_name_from_wp,
+        wp.contact_person AS contact_person_from_wp,
         wp.installed_address AS installed_address_from_wp
       FROM service_records sr
-      LEFT JOIN warranty_products wp ON sr.serial_number COLLATE utf8mb3_unicode_ci = wp.serial_number
+      LEFT JOIN warranty_products wp ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
 
     `;
     const params = [];
@@ -71,10 +72,10 @@ export async function GET(req) {
     const [rows] = await conn.execute(sql, params);
 
     // Map the results to ensure customer_name and installed_address are always present
-    // and correctly derived, prioritizing values from the JOIN if available
+    // Fallback: customer_name -> contact_person -> customer_address -> N/A
     const serviceRecords = rows.map(row => ({
       ...row,
-      customer_name: row.customer_name_from_wp || 'N/A',
+      customer_name: row.customer_name_from_wp || row.contact_person_from_wp || 'N/A',
       installed_address: row.installed_address_from_wp || 'N/A',
     }));
 
