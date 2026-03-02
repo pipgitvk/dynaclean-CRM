@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
 
+// app first - expense_attachments live in Next.js public folder on app server
 const DOMAINS = [
-  "https://service.dynacleanindustries.com",
   "https://app.dynacleanindustries.com",
+  "https://service.dynacleanindustries.com",
 ];
 
 async function tryHead(url) {
@@ -79,6 +80,12 @@ export async function GET(request) {
     trailing = cleaned.replace(/^expense_attachments\//, "");
   }
 
+  // If path is completion_files/expense_attachments/file or attachments/expense_attachments/file,
+  // the actual file lives at expense_attachments/file on app server - extract for correct lookup
+  const expenseFilename =
+    trailing.startsWith("expense_attachments/") ?
+      trailing.replace(/^expense_attachments\//, "") : null;
+
   const folders = ["completion_files", "attachments", "expense_attachments"];
   const pathsToTry = [];
 
@@ -92,6 +99,16 @@ export async function GET(request) {
     localOrigin &&
     (localOrigin.includes("localhost") || localOrigin.includes("127.0.0.1"));
   const domainsToTry = isLocal ? [localOrigin, ...DOMAINS] : DOMAINS;
+
+  // When path is completion_files/expense_attachments/file, try expense_attachments/file FIRST
+  // (expense files live there on app server, not under completion_files)
+  if (expenseFilename) {
+    for (const domain of domainsToTry) {
+      pathsToTry.push(
+        `${domain}/expense_attachments/${encodePath(expenseFilename)}`
+      );
+    }
+  }
 
   // Try all domains x all folders with the trailing segment (properly encoded)
   for (const domain of domainsToTry) {

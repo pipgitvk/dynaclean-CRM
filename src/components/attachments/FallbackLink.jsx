@@ -4,7 +4,13 @@ import { useCallback, useState } from "react";
 
 export default function FallbackLink({ pathOnly, fileName }) {
   const [resolving, setResolving] = useState(false);
-  const primaryHref = `https://service.dynacleanindustries.com${pathOnly}`;
+    // expense_attachments live on app server; others on service
+  const base =
+    pathOnly?.startsWith("/expense_attachments") ||
+    pathOnly?.includes("/expense_attachments/")
+      ? "https://app.dynacleanindustries.com"
+      : "https://service.dynacleanindustries.com";
+  const primaryHref = `${base}${pathOnly}`;
 
   const onClick = useCallback(
     async (e) => {
