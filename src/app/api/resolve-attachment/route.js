@@ -62,27 +62,47 @@ export async function GET(request) {
   // Clean any public/ prefix and leading slashes for uniform joining
   const cleaned = path.replace(/^\/public\//, "/").replace(/^\/+/, "");
 
+  // Encode path segments so spaces/special chars in filenames work (e.g. "Best Walk Behind.csv" -> "Best%20Walk%20Behind.csv")
+  const encodePath = (p) =>
+    p
+      .split("/")
+      .map((seg) => encodeURIComponent(seg))
+      .join("/");
+
   // Determine trailing after removing known folder prefix (if present)
   let trailing = cleaned;
   if (cleaned.startsWith("completion_files/")) {
     trailing = cleaned.replace(/^completion_files\//, "");
   } else if (cleaned.startsWith("attachments/")) {
     trailing = cleaned.replace(/^attachments\//, "");
+  } else if (cleaned.startsWith("expense_attachments/")) {
+    trailing = cleaned.replace(/^expense_attachments\//, "");
   }
 
-  const folders = ["completion_files", "attachments"]; 
+  const folders = ["completion_files", "attachments", "expense_attachments"];
   const pathsToTry = [];
 
-  // Try both domains x both folder with the trailing segment
-  for (const domain of DOMAINS) {
+  // In dev, try request origin first (localhost) so local public/ files work
+  let localOrigin = "";
+  try {
+    const ref = request.headers.get("referer") || request.headers.get("origin");
+    if (ref) localOrigin = new URL(ref).origin;
+  } catch {}
+  const isLocal =
+    localOrigin &&
+    (localOrigin.includes("localhost") || localOrigin.includes("127.0.0.1"));
+  const domainsToTry = isLocal ? [localOrigin, ...DOMAINS] : DOMAINS;
+
+  // Try all domains x all folders with the trailing segment (properly encoded)
+  for (const domain of domainsToTry) {
     for (const folder of folders) {
-      pathsToTry.push(`${domain}/${folder}/${trailing}`);
+      pathsToTry.push(`${domain}/${folder}/${encodePath(trailing)}`);
     }
   }
 
-  // Also try the original cleaned as-is on both domains (in case of deeper nesting)
-  for (const domain of DOMAINS) {
-    pathsToTry.push(`${domain}/${cleaned}`);
+  // Also try the original cleaned as-is on all domains (encoded, in case of deeper nesting)
+  for (const domain of domainsToTry) {
+    pathsToTry.push(`${domain}/${encodePath(cleaned)}`);
   }
 
   // Deduplicate while preserving order
@@ -108,9 +128,10 @@ export async function GET(request) {
     }
   }
 
-  // If all checks failed, return first candidate as fallback with found=false
+  // If all checks failed, return first candidate as fallback with found=false (encoded URL for proper opening)
   console.log('[resolve-attachment] No working URL found, using fallback');
-  const fallback = uniqueToTry[0] || `${DOMAINS[0]}/${cleaned}`;
+  const fallback =
+    uniqueToTry[0] || `${DOMAINS[0]}/${encodePath(cleaned)}`;
   return new Response(JSON.stringify({ url: fallback, found: false }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
