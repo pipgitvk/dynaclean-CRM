@@ -1,18 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProfileForm from "@/app/empcrm/admin-dashboard/profile/ProfileForm";
 import { Check, X, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function SubmissionDetailsPage({ params }) {
-    // params is a promise in Next.js 15? Or standard object?
-    // Assuming standard or using Unwrap if needed (Next 15 breaking change).
-    // But standard Next.js 13/14 App Router params is sync or async? 
-    // It's just { id: ... } usually. 
-    // I'll assume safe access.
-    const id = params.id;
+    // Next.js 15+: params is a Promise, must use use() to unwrap
+    const { id } = use(params);
 
     const router = useRouter();
     const [submission, setSubmission] = useState(null);
