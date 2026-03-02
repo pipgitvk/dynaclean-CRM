@@ -8,32 +8,32 @@ const DOMAINS = [
 
 async function tryHead(url) {
   try {
-    // Try HEAD request first
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(url, { 
-      method: "HEAD", 
+    const res = await fetch(url, {
+      method: "HEAD",
       signal: controller.signal,
-      cache: "no-store"
+      cache: "no-store",
     });
     clearTimeout(timeout);
-    console.log(`[tryHead] HEAD ${url} -> ${res.status}`);
+    console.log(`[resolve-attachment][tryHead] HEAD ${url} -> ${res.status}`);
     if (res.ok) return true;
-    
-    // If HEAD failed, try GET with range
+
     const controllerGet = new AbortController();
     const timeoutGet = setTimeout(() => controllerGet.abort(), 5000);
     const resGet = await fetch(url, {
       method: "GET",
       headers: { Range: "bytes=0-0" },
       signal: controllerGet.signal,
-      cache: "no-store"
+      cache: "no-store",
     });
     clearTimeout(timeoutGet);
-    console.log(`[tryHead] GET ${url} -> ${resGet.status}`);
+    console.log(`[resolve-attachment][tryHead] GET ${url} -> ${resGet.status}`);
     return resGet.ok;
   } catch (err) {
-    console.log(`[tryHead] Error checking ${url}:`, err.message);
+    console.error(
+      `[resolve-attachment][tryHead] ERROR url=${url} err=${err?.message || err}`
+    );
     return false;
   }
 }
@@ -51,13 +51,15 @@ export async function GET(request) {
   } catch { }
   if (path && !path.startsWith("/")) path = `/${path}`;
 
-  // Allow all incoming root-based paths; previously we restricted with prefixes
   if (!path) {
+    console.error("[resolve-attachment] ERROR: missing or invalid path");
     return new Response(
       JSON.stringify({ error: "Invalid or missing path" }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
+
+  console.log(`[resolve-attachment] REQUEST path="${path}"`);
 
   // Build all combinations across domains and folder.
   // Clean any public/ prefix and leading slashes for uniform joining
@@ -99,6 +101,9 @@ export async function GET(request) {
     localOrigin &&
     (localOrigin.includes("localhost") || localOrigin.includes("127.0.0.1"));
   const domainsToTry = isLocal ? [localOrigin, ...DOMAINS] : DOMAINS;
+  console.log(
+    `[resolve-attachment] parsed cleaned="${cleaned}" trailing="${trailing}" expenseFilename=${expenseFilename ?? "null"} isLocal=${isLocal} domains=${domainsToTry.join(",")}`
+  );
 
   // When path is completion_files/expense_attachments/file, try expense_attachments/file FIRST
   // (expense files live there on app server, not under completion_files)
@@ -130,14 +135,17 @@ export async function GET(request) {
     return true;
   });
 
-  // Try each URL
-  console.log('[resolve-attachment] Trying URLs:', uniqueToTry);
-  for (const candidate of uniqueToTry) {
-    console.log('[resolve-attachment] Checking:', candidate);
+  console.log(
+    `[resolve-attachment] Trying ${uniqueToTry.length} URLs:`,
+    uniqueToTry
+  );
+  for (let i = 0; i < uniqueToTry.length; i++) {
+    const candidate = uniqueToTry[i];
+    console.log(`[resolve-attachment] [${i + 1}/${uniqueToTry.length}] Checking:`, candidate);
     const ok = await tryHead(candidate);
-    console.log('[resolve-attachment] Result:', candidate, ok);
+    console.log(`[resolve-attachment] [${i + 1}/${uniqueToTry.length}] Result: ${ok ? "FOUND" : "404"}`);
     if (ok) {
-      console.log('[resolve-attachment] Found working URL:', candidate);
+      console.log(`[resolve-attachment] SUCCESS returning url=${candidate}`);
       return new Response(JSON.stringify({ url: candidate, found: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -145,8 +153,10 @@ export async function GET(request) {
     }
   }
 
-  // If all checks failed, return first candidate as fallback with found=false (encoded URL for proper opening)
-  console.log('[resolve-attachment] No working URL found, using fallback');
+  console.error(
+    `[resolve-attachment] FAILED all ${uniqueToTry.length} URLs returned 404 - file may not exist on server. Fallback:`,
+    uniqueToTry[0]
+  );
   const fallback =
     uniqueToTry[0] || `${DOMAINS[0]}/${encodePath(cleaned)}`;
   return new Response(JSON.stringify({ url: fallback, found: false }), {

@@ -4,15 +4,11 @@ import { useCallback, useState } from "react";
 
 export default function ServiceAttachmentLink({ filePath, fileName, className = "" }) {
   const [resolving, setResolving] = useState(false);
-  const [instanceId] = useState(() => Math.random().toString(36).substr(2, 9));
-  
-  console.log(`[ServiceAttachmentLink:${instanceId}] Created for:`, filePath, fileName);
   
   // Normalize the path - similar to FallbackLink
   const normalizePath = (path) => {
     if (!path) return "";
     
-    console.log(`[ServiceAttachmentLink:${instanceId}] Original path:`, path);
     
     // If path starts with http, extract pathname
     if (path.startsWith('http')) {
@@ -32,17 +28,14 @@ export default function ServiceAttachmentLink({ filePath, fileName, className = 
       path = '/' + path;
     }
     
-    console.log(`[ServiceAttachmentLink:${instanceId}] After cleanup:`, path);
     
     // If path doesn't contain completion_files or attachments, prepend completion_files
     if (!path.includes('/completion_files/') && !path.includes('/attachments/')) {
       // Remove leading slash temporarily
       const cleanPath = path.replace(/^\/+/, '');
       path = `/completion_files/${cleanPath}`;
-      console.log(`[ServiceAttachmentLink:${instanceId}] Added completion_files:`, path);
     }
     
-    console.log(`[ServiceAttachmentLink:${instanceId}] Final path:`, path);
     return path;
   };
   
@@ -50,13 +43,13 @@ export default function ServiceAttachmentLink({ filePath, fileName, className = 
   const primaryHref = `https://service.dynacleanindustries.com${pathOnly}`;
   const displayName = fileName || filePath?.split('/').pop() || 'Download';
   
-  console.log(`[ServiceAttachmentLink:${instanceId}] Render:`, { filePath, fileName, pathOnly, primaryHref, displayName });
 
   const onClick = useCallback(
     async (e) => {
       e.preventDefault();
       if (resolving) return;
       setResolving(true);
+      console.log("[ServiceAttachmentLink] Click pathOnly=", pathOnly, "fileName=", displayName);
       try {
         const res = await fetch(`/api/resolve-attachment?path=${encodeURIComponent(pathOnly)}`, {
           method: "GET",
@@ -65,16 +58,13 @@ export default function ServiceAttachmentLink({ filePath, fileName, className = 
         const data = await res.json().catch(() => ({}));
         const url = data?.url || primaryHref;
         
-        // Log if file wasn't found
         if (data?.found === false) {
-          console.warn(`[ServiceAttachmentLink:${instanceId}] File not found, trying fallback URL:`, url, 'for path:', pathOnly);
-        } else {
-          console.log(`[ServiceAttachmentLink:${instanceId}] Opening resolved URL:`, url, 'for path:', pathOnly);
+          console.warn("[ServiceAttachmentLink] File NOT FOUND pathOnly=", pathOnly, "fallbackUrl=", url);
         }
         
         window.open(url, "_blank", "noopener");
       } catch (err) {
-        console.error(`[ServiceAttachmentLink:${instanceId}] Error resolving attachment:`, err, 'for path:', pathOnly);
+        console.error("[ServiceAttachmentLink] ERROR:", err?.message || err, "pathOnly=", pathOnly);
         window.open(primaryHref, "_blank", "noopener");
       } finally {
         setResolving(false);
