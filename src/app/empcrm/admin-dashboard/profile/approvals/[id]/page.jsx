@@ -7,9 +7,7 @@ import { Check, X, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function SubmissionDetailsPage({ params }) {
-    // Next.js 15+: params is a Promise. Older builds may pass object. Promise.resolve handles both.
-    const resolved = use(Promise.resolve(params));
-    const id = resolved?.id;
+    const { id } = use(params);
 
     const router = useRouter();
     const [submission, setSubmission] = useState(null);
