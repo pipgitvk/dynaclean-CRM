@@ -1,42 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProfileForm from "@/app/empcrm/admin-dashboard/profile/ProfileForm";
 import { Check, X, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function SubmissionDetailsPage({ params }) {
-    // params is a promise in Next.js 15? Or standard object?
-    // Assuming standard or using Unwrap if needed (Next 15 breaking change).
-    // But standard Next.js 13/14 App Router params is sync or async? 
-    // It's just { id: ... } usually. 
-    // I'll assume safe access.
-    const id = params.id;
+    const { id } = use(params);
 
     const router = useRouter();
     const [submission, setSubmission] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!id) return;
+        if (!id) {
+            setLoading(false);
+            return;
+        }
+        let cancelled = false;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
         (async () => {
             try {
-                const res = await fetch(`/api/empcrm/profile/submissions?id=${id}&status=pending`);
+                const res = await fetch(`/api/empcrm/profile/submissions?id=${id}&status=pending`, {
+                    signal: controller.signal,
+                });
+                if (cancelled) return;
                 const data = await res.json();
                 if (data.success && data.submissions?.length > 0) {
                     setSubmission(data.submissions[0]);
                 } else {
                     toast.error("Submission not found");
-                    // setTimeout(() => router.push("/empcrm/admin-dashboard/profile/approvals"), 2000);
                 }
             } catch (e) {
-                toast.error("Error loading submission");
+                if (!cancelled) {
+                    toast.error(e.name === "AbortError" ? "Request timed out" : "Error loading submission");
+                }
             } finally {
-                setLoading(false);
+                clearTimeout(timeoutId);
+                if (!cancelled) setLoading(false);
             }
         })();
-    }, [id, router]);
+        return () => { cancelled = true; controller.abort(); };
+    }, [id]);
 
     const handleAction = async (action, reason = "") => {
         if (!confirm(`Are you sure you want to ${action} this profile?`)) return;

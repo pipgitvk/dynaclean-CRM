@@ -99,41 +99,43 @@ const UPLOAD_DIR = path.join(process.cwd(), "public", "expense_attachments");
 
 export async function POST(req) {
   try {
+    console.log("[expense-api] POST /api/expenses - new expense submission");
     const token = req.cookies.get("token")?.value;
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!token) {
+      console.error("[expense-api] ERROR: Unauthorized - no token");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { payload } = await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
     const username = payload.username;
+    console.log(`[expense-api] user=${username}`);
 
     const data = await req.formData();
-
-    // Extract fields
     const fields = Object.fromEntries(data.entries());
-    const attachments = data.getAll("attachments"); // This will contain File objects
+    const attachments = data.getAll("attachments");
 
     const savedFilePaths = [];
+    console.log(`[expense-api] UPLOAD_DIR=${UPLOAD_DIR} attachmentsCount=${attachments?.length || 0}`);
 
-    // Ensure the upload directory exists
     await fs.mkdir(UPLOAD_DIR, { recursive: true });
 
     for (const file of attachments) {
-      // Check if 'file' is actually a File object and not a string or other data
       if (file instanceof File) {
         const buffer = Buffer.from(await file.arrayBuffer());
-        // Create a unique filename to prevent clashes
         const fileName = `${Date.now()}-${file.name}`;
         const filePath = path.join(UPLOAD_DIR, fileName);
 
         await fs.writeFile(filePath, buffer);
-        console.log(`✅ File saved locally: ${filePath}`);
-        // Store the public URL path that can be accessed from the browser
-        savedFilePaths.push(`/expense_attachments/${fileName}`);
+        const publicPath = `/expense_attachments/${fileName}`;
+        savedFilePaths.push(publicPath);
+        console.log(`[expense-api] SAVED file="${file.name}" -> ${filePath} (public: ${publicPath})`);
       } else {
-        console.warn("⚠️ Skipped non-file attachment:", file);
+        console.warn("[expense-api] SKIPPED non-File attachment:", typeof file, file);
       }
     }
 
-    const attachmentsStr = savedFilePaths.join(", "); // Join all saved paths into a single string
+    const attachmentsStr = savedFilePaths.join(", ");
+    console.log(`[expense-api] DB will store attachments="${attachmentsStr}"`);
 
     const conn = await getDbConnection();
 
@@ -165,9 +167,11 @@ export async function POST(req) {
 
         // await conn.end();
 
+    console.log("[expense-api] SUCCESS expense created");
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("❌ Expense submission error:", err);
+    console.error("[expense-api] ERROR:", err?.message || err);
+    console.error("[expense-api] ERROR stack:", err?.stack);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
