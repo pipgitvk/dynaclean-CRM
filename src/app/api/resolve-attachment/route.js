@@ -1,10 +1,21 @@
 export const dynamic = "force-dynamic";
 
+import { existsSync } from "fs";
+import { join } from "path";
+
 // app first - expense_attachments live in Next.js public folder on app server
 const DOMAINS = [
   "https://app.dynacleanindustries.com",
   "https://service.dynacleanindustries.com",
 ];
+
+function getRequestOrigin(request) {
+  try {
+    const ref = request.headers.get("referer") || request.headers.get("origin");
+    if (ref) return new URL(ref).origin;
+  } catch {}
+  return DOMAINS[0];
+}
 
 async function tryHead(url) {
   try {
@@ -61,9 +72,29 @@ export async function GET(request) {
 
   console.log(`[resolve-attachment] REQUEST path="${path}"`);
 
-  // Build all combinations across domains and folder.
-  // Clean any public/ prefix and leading slashes for uniform joining
   const cleaned = path.replace(/^\/public\//, "/").replace(/^\/+/, "");
+  const safeForLocal =
+    !cleaned.includes("..") &&
+    (cleaned.startsWith("attachments/") ||
+      cleaned.startsWith("expense_attachments/") ||
+      cleaned.startsWith("completion_files/"));
+
+  // STEP 1: Check if file exists locally (public/attachments, expense_attachments, completion_files)
+  // Fixes 404 when file is on same server but nginx/external URL doesn't serve static files
+  if (safeForLocal) {
+    const localPath = join(process.cwd(), "public", cleaned);
+    if (existsSync(localPath)) {
+      const origin = getRequestOrigin(request);
+      const serveUrl = `${origin}/api/serve-attachment?path=${encodeURIComponent(cleaned)}`;
+      console.log(`[resolve-attachment] LOCAL FOUND: ${localPath} -> ${serveUrl}`);
+      return new Response(JSON.stringify({ url: serveUrl, found: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  // Build all combinations across domains and folder.
 
   // Encode path segments so spaces/special chars in filenames work (e.g. "Best Walk Behind.csv" -> "Best%20Walk%20Behind.csv")
   const encodePath = (p) =>
