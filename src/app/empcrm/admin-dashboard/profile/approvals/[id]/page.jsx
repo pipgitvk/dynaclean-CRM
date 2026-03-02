@@ -7,32 +7,45 @@ import { Check, X, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function SubmissionDetailsPage({ params }) {
-    // Next.js 15+: params is a Promise, must use use() to unwrap
-    const { id } = use(params);
+    // Next.js 15+: params is a Promise. Older builds may pass object. Promise.resolve handles both.
+    const resolved = use(Promise.resolve(params));
+    const id = resolved?.id;
 
     const router = useRouter();
     const [submission, setSubmission] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!id) return;
+        if (!id) {
+            setLoading(false);
+            return;
+        }
+        let cancelled = false;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
         (async () => {
             try {
-                const res = await fetch(`/api/empcrm/profile/submissions?id=${id}&status=pending`);
+                const res = await fetch(`/api/empcrm/profile/submissions?id=${id}&status=pending`, {
+                    signal: controller.signal,
+                });
+                if (cancelled) return;
                 const data = await res.json();
                 if (data.success && data.submissions?.length > 0) {
                     setSubmission(data.submissions[0]);
                 } else {
                     toast.error("Submission not found");
-                    // setTimeout(() => router.push("/empcrm/admin-dashboard/profile/approvals"), 2000);
                 }
             } catch (e) {
-                toast.error("Error loading submission");
+                if (!cancelled) {
+                    toast.error(e.name === "AbortError" ? "Request timed out" : "Error loading submission");
+                }
             } finally {
-                setLoading(false);
+                clearTimeout(timeoutId);
+                if (!cancelled) setLoading(false);
             }
         })();
-    }, [id, router]);
+        return () => { cancelled = true; controller.abort(); };
+    }, [id]);
 
     const handleAction = async (action, reason = "") => {
         if (!confirm(`Are you sure you want to ${action} this profile?`)) return;
