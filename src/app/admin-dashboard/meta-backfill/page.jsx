@@ -33,7 +33,7 @@ export default function MetaBackfillPage() {
       }
       setLeads(data.leads || []);
       setMessage(
-        `Total from Meta: ${data.total_from_meta}, In range: ${data.total_in_range}, Existing in DB: ${data.existing_in_db}, New: ${data.new_count}`,
+        `Total in DB: ${data.total_leads_in_db ?? "—"}, Total from Meta: ${data.total_from_meta}, In range: ${data.total_in_range}, Existing in DB: ${data.existing_in_db}, New: ${data.new_count}`,
       );
     } catch (err) {
       console.error(err);
@@ -57,7 +57,7 @@ export default function MetaBackfillPage() {
       }
       setLeads(data.leads || []);
       setMessage(
-        `Total from Meta: ${data.total_from_meta}, New (not in DB): ${data.new_count}`,
+        `Total in DB: ${data.total_leads_in_db ?? "—"}, Total from Meta: ${data.total_from_meta}, New (not in DB): ${data.new_count}`,
       );
     } catch (err) {
       console.error(err);
