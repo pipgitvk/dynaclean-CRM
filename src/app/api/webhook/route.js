@@ -32,19 +32,19 @@ import { getDbConnection } from "@/lib/db";
 // //   return null;
 // // }
 
-// // ✅ Verify webhook subscription
-// export async function GET(request) {
-//   const { searchParams } = new URL(request.url);
-//   const mode = searchParams.get("hub.mode");
-//   const token = searchParams.get("hub.verify_token");
-//   const challenge = searchParams.get("hub.challenge");
+// // ✅ Verify webhook subscription (required for Meta to verify callback URL)
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const mode = searchParams.get("hub.mode");
+  const token = searchParams.get("hub.verify_token");
+  const challenge = searchParams.get("hub.challenge");
 
-//   if (mode === "subscribe" && token === process.env.FB_VERIFY_TOKEN) {
-//     return new Response(challenge);
-//   }
+  if (mode === "subscribe" && token === process.env.FB_VERIFY_TOKEN) {
+    return new Response(challenge);
+  }
 
-//   return new Response("Forbidden", { status: 403 });
-// }
+  return new Response("Forbidden", { status: 403 });
+}
 
 
 
