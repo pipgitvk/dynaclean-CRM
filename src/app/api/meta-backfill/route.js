@@ -191,9 +191,15 @@ export async function GET(request) {
     const phones = leadsInRange.map((l) => l.phone).filter((p) => !!p);
 
     let existingPhones = new Set();
+    const conn = await getDbConnection();
+
+    // Get total leads count in database
+    const [countRows] = await conn.execute(
+      `SELECT COUNT(*) AS total FROM customers`,
+    );
+    const total_leads_in_db = countRows[0]?.total ?? 0;
 
     if (phones.length) {
-      const conn = await getDbConnection();
       const placeholders = phones.map(() => "?").join(",");
       const [rows] = await conn.execute(
         `SELECT phone FROM customers WHERE phone IN (${placeholders})`,
@@ -234,6 +240,7 @@ export async function GET(request) {
       total_in_range: leadsInRange.length,
       existing_in_db: existingPhones.size,
       new_count: newLeads.length,
+      total_leads_in_db,
       leads: newLeads,
     });
   } catch (err) {
