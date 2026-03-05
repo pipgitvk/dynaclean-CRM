@@ -7,7 +7,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 export async function POST(req, { params }) {
   const { customerId } = await params;
-  console.log("custome id", params);
   const data = await req.json();
 
   // Identify current user from JWT cookie
