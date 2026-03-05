@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 
 export default async function FollowUpPage({ params }) {
   const { customerId } = await params;
-  console.log("customer id", params);
 
   const conn = await getDbConnection();
 
