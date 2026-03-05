@@ -98,6 +98,11 @@ export async function GET(request) {
   const since = searchParams.get("since"); // e.g. 2025-01-01
   const until = searchParams.get("until"); // e.g. 2025-01-03
   const mode = searchParams.get("mode") || "range"; // "range" or "all"
+  const autoImportParam = searchParams.get("autoImport");
+  const autoImport =
+    autoImportParam === "1" ||
+    autoImportParam === "true" ||
+    autoImportParam === "yes";
 
   // For normal mode we require a date range; for mode=all we don't
   if (mode !== "all" && (!since || !until)) {
@@ -235,12 +240,44 @@ export async function GET(request) {
       }
     }
 
+    // If requested, automatically import all new leads into DB
+    let importSummary = null;
+    if (autoImport && newLeads.length) {
+      const results = [];
+
+      for (const lead of newLeads) {
+        try {
+          const insertResult = await insertLeadIntoDb(lead);
+          results.push({ leadgen_id: lead.leadgen_id, ...insertResult });
+        } catch (err) {
+          console.error(
+            "❌ Auto-import error for lead",
+            lead.leadgen_id,
+            err,
+          );
+          results.push({ leadgen_id: lead.leadgen_id, error: "exception" });
+        }
+      }
+
+      importSummary = {
+        totalNewLeads: newLeads.length,
+        imported: results.filter(
+          (r) => !r.skipped && !r.error,
+        ).length,
+        skipped: results.filter((r) => r.skipped).length,
+        errors: results.filter((r) => r.error).length,
+        results,
+      };
+    }
+
     return Response.json({
       total_from_meta: allLeads.length,
       total_in_range: leadsInRange.length,
       existing_in_db: existingPhones.size,
       new_count: newLeads.length,
       total_leads_in_db,
+      autoImported: autoImport,
+      importSummary,
       leads: newLeads,
     });
   } catch (err) {

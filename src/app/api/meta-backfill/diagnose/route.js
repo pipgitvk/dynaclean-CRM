@@ -320,7 +320,7 @@ export async function GET() {
               message: `${result.metaVsDb.notInDbCount} of last ${metaLeads.length} Meta leads NOT in database.`,
             });
             result.suggestions.push(
-              "Leads from Meta are not reaching DB. Check: (1) Webhook subscribed in Meta App? (2) Webhook URL must be HTTPS in production. (3) Use 'Fetch Leads' + 'Import' on this page to manually backfill."
+              "Leads from Meta are not reaching DB. Check: (1) Webhook subscribed in Meta App? (2) Webhook URL must be HTTPS in production. (3) Use 'Fetch Leads' on this page to backfill (it will now auto-import new leads)."
             );
           } else {
             result.checks.push({
