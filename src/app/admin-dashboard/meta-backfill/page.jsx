@@ -116,24 +116,30 @@ export default function MetaBackfillPage() {
     <div className="p-4 space-y-4 max-w-full">
       <h1 className="text-xl font-semibold">Meta Leads Backfill</h1>
 
-      {/* Check connection - commented out
-      <div className="border rounded p-4 bg-gray-50">
-        <h2 className="font-medium mb-2">Check connection</h2>
-        <p className="text-sm text-gray-600 mb-2">
-          Run this to verify token, form ID, and permissions before fetching leads.
+      {/* Detailing Diagnosis - Why leads not in DB */}
+      <div className="border rounded-lg p-4 bg-amber-50/50 border-amber-200">
+        <h2 className="font-medium mb-2 text-amber-900">Detailing Diagnosis</h2>
+        <p className="text-sm text-amber-800 mb-3">
+          Leads are coming from Meta but not showing in the database? Use this button to check — token, webhook, lead distribution, and Meta vs DB comparison.
         </p>
         <button
           type="button"
           onClick={handleDiagnose}
           disabled={diagnoseLoading}
-          className="px-3 py-1.5 rounded bg-amber-600 text-white text-sm disabled:opacity-50"
+          className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium disabled:opacity-50 transition-colors"
         >
-          {diagnoseLoading ? "Checking..." : "Check connection"}
+          {diagnoseLoading ? "Checking..." : "Detailing Diagnosis"}
         </button>
         {diagnoseResult && (
-          <div className="mt-4 space-y-2 text-sm">
+          <div className="mt-4 space-y-4 text-sm">
             {diagnoseResult.error && (
-              <p className="text-red-600">{diagnoseResult.error}</p>
+              <p className="text-red-600 font-medium">{diagnoseResult.error}</p>
+            )}
+            {diagnoseResult.webhookUrl && (
+              <div className="bg-white rounded p-3 border">
+                <strong className="text-gray-700">Webhook URL (configure in Meta App):</strong>
+                <p className="mt-1 text-xs font-mono text-blue-600 break-all">{diagnoseResult.webhookUrl}</p>
+              </div>
             )}
             {diagnoseResult.checks?.map((c, i) => (
               <div key={i} className="flex items-start gap-2">
@@ -160,10 +166,54 @@ export default function MetaBackfillPage() {
                 </span>
               </div>
             ))}
+            {diagnoseResult.dbDiagnosis && (
+              <div className="bg-white rounded p-3 border">
+                <strong className="text-gray-700">DB Status:</strong>
+                <ul className="mt-1 list-disc list-inside text-gray-600">
+                  <li>Total customers in DB: {diagnoseResult.dbDiagnosis.totalCustomersInDb ?? "—"}</li>
+                  <li>Lead distribution reps: {diagnoseResult.dbDiagnosis.leadDistributionCount ?? 0}</li>
+                  {diagnoseResult.dbDiagnosis.reps?.length > 0 && (
+                    <li className="mt-1">
+                      Reps: {diagnoseResult.dbDiagnosis.reps.map((r) => `${r.username} (priority: ${r.priority})`).join(", ")}
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {diagnoseResult.metaVsDb && diagnoseResult.metaVsDb.metaLeadsSample?.length > 0 && (
+              <div className="bg-white rounded p-3 border overflow-x-auto">
+                <strong className="text-gray-700">Last {diagnoseResult.metaVsDb.metaLeadsCount} Meta leads vs DB:</strong>
+                <table className="mt-2 min-w-full text-xs">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-1 pr-2">Name</th>
+                      <th className="text-left py-1 pr-2">Phone</th>
+                      <th className="text-left py-1 pr-2">In DB?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diagnoseResult.metaVsDb.metaLeadsSample.map((l, i) => (
+                      <tr key={i} className="border-b border-gray-100">
+                        <td className="py-1 pr-2">{l.name || "—"}</td>
+                        <td className="py-1 pr-2">{l.phone || "—"}</td>
+                        <td className={l.inDb ? "text-green-600" : "text-red-600"}>
+                          {l.inDb ? "✓ Yes" : "✗ No"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-2 text-amber-700">
+                  {diagnoseResult.metaVsDb.notInDbCount > 0
+                    ? `${diagnoseResult.metaVsDb.notInDbCount} lead(s) exist in Meta but not in DB — check webhook or manually Import.`
+                    : "All sample leads found in DB."}
+                </p>
+              </div>
+            )}
             {diagnoseResult.suggestions?.length > 0 && (
-              <div className="mt-2 pt-2 border-t">
-                <strong className="text-amber-700">Suggestions:</strong>
-                <ul className="list-disc list-inside text-amber-800 mt-1">
+              <div className="mt-2 pt-2 border-t border-amber-200">
+                <strong className="text-amber-800">Suggestions:</strong>
+                <ul className="list-disc list-inside text-amber-900 mt-1 space-y-1">
                   {diagnoseResult.suggestions.map((s, i) => (
                     <li key={i}>{s}</li>
                   ))}
@@ -173,7 +223,6 @@ export default function MetaBackfillPage() {
           </div>
         )}
       </div>
-      */}
 
       <form onSubmit={handleFetch} className="space-y-2">
         <div className="flex flex-wrap gap-3 items-end">

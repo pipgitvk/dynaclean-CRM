@@ -1,5 +1,9 @@
 import { getDbConnection } from "@/lib/db";
 
+// Disable caching - fixes 405 Method Not Allowed on production (Vercel, nginx, etc.)
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // const dbConfig = {
 //   host: process.env.DB_HOST,
 //   user: process.env.DB_USER,
@@ -46,8 +50,10 @@ export async function GET(request) {
   return new Response("Forbidden", { status: 403 });
 }
 
-
-
+// Allow OPTIONS for CORS preflight (some proxies/firewalls send this first)
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: { Allow: "GET, POST, OPTIONS" } });
+}
 
 
 
