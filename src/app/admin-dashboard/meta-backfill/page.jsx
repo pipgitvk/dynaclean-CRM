@@ -7,10 +7,10 @@ export default function MetaBackfillPage() {
   const [until, setUntil] = useState("");
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [diagnoseLoading, setDiagnoseLoading] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState(null);
+  const [autoImportEnabled, setAutoImportEnabled] = useState(true);
 
   const handleFetch = async (e) => {
     e.preventDefault();
@@ -22,9 +22,9 @@ export default function MetaBackfillPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/meta-backfill?since=${since}&until=${until}`,
-      );
+      const baseUrl = `/api/meta-backfill?since=${since}&until=${until}`;
+      const url = autoImportEnabled ? `${baseUrl}&autoImport=1` : baseUrl;
+      const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) {
         const metaMsg = data?.metaError?.message || data?.metaError?.error?.message || data?.message;
@@ -32,8 +32,12 @@ export default function MetaBackfillPage() {
         return;
       }
       setLeads(data.leads || []);
+      const importInfo =
+        autoImportEnabled && data.importSummary
+          ? ` Auto-imported: ${data.importSummary.imported}, Skipped: ${data.importSummary.skipped}, Errors: ${data.importSummary.errors}.`
+          : "";
       setMessage(
-        `Total in DB: ${data.total_leads_in_db ?? "—"}, Total from Meta: ${data.total_from_meta}, In range: ${data.total_in_range}, Existing in DB: ${data.existing_in_db}, New: ${data.new_count}`,
+        `Total in DB: ${data.total_leads_in_db ?? "—"}, Total from Meta: ${data.total_from_meta}, In range: ${data.total_in_range}, Existing in DB: ${data.existing_in_db}, New: ${data.new_count}.${importInfo}`,
       );
     } catch (err) {
       console.error(err);
@@ -48,7 +52,9 @@ export default function MetaBackfillPage() {
     setLeads([]);
     setLoading(true);
     try {
-      const res = await fetch(`/api/meta-backfill?mode=all`);
+      const baseUrl = `/api/meta-backfill?mode=all`;
+      const url = autoImportEnabled ? `${baseUrl}&autoImport=1` : baseUrl;
+      const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) {
         const metaMsg = data?.metaError?.message || data?.metaError?.error?.message || data?.message;
@@ -56,8 +62,12 @@ export default function MetaBackfillPage() {
         return;
       }
       setLeads(data.leads || []);
+      const importInfo =
+        autoImportEnabled && data.importSummary
+          ? ` Auto-imported: ${data.importSummary.imported}, Skipped: ${data.importSummary.skipped}, Errors: ${data.importSummary.errors}.`
+          : "";
       setMessage(
-        `Total in DB: ${data.total_leads_in_db ?? "—"}, Total from Meta: ${data.total_from_meta}, New (not in DB): ${data.new_count}`,
+        `Total in DB: ${data.total_leads_in_db ?? "—"}, Total from Meta: ${data.total_from_meta}, New (not in DB): ${data.new_count}.${importInfo}`,
       );
     } catch (err) {
       console.error(err);
@@ -82,36 +92,6 @@ export default function MetaBackfillPage() {
     }
   };
 
-  const handleImport = async () => {
-    setMessage("");
-    if (!leads.length) {
-      setMessage("No leads to import");
-      return;
-    }
-    setImportLoading(true);
-    try {
-      const leadIds = leads.map((l) => l.leadgen_id);
-      const res = await fetch("/api/meta-backfill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leadIds }),
-      });
-      if (!res.ok) {
-        setMessage("Failed to import leads");
-        return;
-      }
-      const data = await res.json();
-      setMessage(
-        `Imported / processed ${data.count} leads. Check DB/logs for details.`,
-      );
-    } catch (err) {
-      console.error(err);
-      setMessage("Error importing leads");
-    } finally {
-      setImportLoading(false);
-    }
-  };
-
   return (
     <div className="p-4 space-y-4 max-w-full">
       <h1 className="text-xl font-semibold">Meta Leads Backfill</h1>
@@ -119,9 +99,9 @@ export default function MetaBackfillPage() {
       {/* Detailing Diagnosis - Why leads not in DB */}
       <div className="border rounded-lg p-4 bg-amber-50/50 border-amber-200">
         <h2 className="font-medium mb-2 text-amber-900">Detailing Diagnosis</h2>
-        <p className="text-sm text-amber-800 mb-3">
+        {/* <p className="text-sm text-amber-800 mb-3">
           Leads are coming from Meta but not showing in the database? Use this button to check — token, webhook, lead distribution, and Meta vs DB comparison.
-        </p>
+        </p> */}
         <button
           type="button"
           onClick={handleDiagnose}
@@ -224,6 +204,43 @@ export default function MetaBackfillPage() {
         )}
       </div>
 
+      <div className="border rounded-lg p-3 bg-gray-50">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-gray-800">
+              Automatic import new Meta leads to DB
+            </p>
+            <p className="text-xs text-gray-600">
+              Yes: backfill requests will save new leads into customers table. No: backfill will only show leads without saving them.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAutoImportEnabled(true)}
+              className={`px-3 py-1 rounded text-sm border ${
+                autoImportEnabled
+                  ? "bg-green-600 text-white border-green-600"
+                  : "bg-white text-gray-700 border-gray-300"
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoImportEnabled(false)}
+              className={`px-3 py-1 rounded text-sm border ${
+                !autoImportEnabled
+                  ? "bg-red-600 text-white border-red-600"
+                  : "bg-white text-gray-700 border-gray-300"
+              }`}
+            >
+              No
+            </button>
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleFetch} className="space-y-2">
         <div className="flex flex-wrap gap-3 items-end">
           <label className="flex flex-col text-sm">
@@ -266,14 +283,6 @@ export default function MetaBackfillPage() {
 
       {leads.length > 0 && (
         <div className="space-y-3">
-          <button
-            onClick={handleImport}
-            disabled={importLoading}
-            className="px-3 py-1 rounded bg-green-600 text-white text-sm disabled:opacity-50"
-          >
-            {importLoading ? "Importing..." : "Import All New Leads"}
-          </button>
-
           <div className="overflow-x-auto border rounded">
             <table className="min-w-full text-xs sm:text-sm">
               <thead className="bg-gray-100">
