@@ -1,20 +1,35 @@
 /**
  * GET /api/meta-backfill/diagnose
- * Diagnose Meta/Facebook Lead Ads API configuration
- * Helps identify: wrong form ID, token permissions, token expiry
+         * Diagnose Meta/Facebook Lead Ads API configuration + DB setup
+ * Helps identify: wrong form ID, token permissions, lead_distribution, webhook, why leads not in DB
  */
+import { getDbConnection } from "@/lib/db";
+
+function normalizePhone(phone) {
+  if (!phone) return null;
+  let p = typeof phone === "string" ? phone : String(phone);
+  p = p.replace(/\D/g, "");
+  if (p.startsWith("91") && p.length > 10) p = p.slice(-10);
+  if (p.length > 10) p = p.slice(-10);
+  return p || null;
+}
+
 export async function GET() {
   const token = process.env.FB_PAGE_TOKEN;
   const formId = process.env.FB_LEAD_FORM_ID;
   const pageId = process.env.FB_PAGE_ID;
   const adAccountId = process.env.FB_AD_ACCOUNT_ID;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
   const result = {
     configured: { token: !!token, formId: !!formId, pageId: !!pageId, adAccountId: !!adAccountId },
     formId: formId || null,
     pageId: pageId || null,
+    webhookUrl: `${baseUrl.replace(/\/$/, "")}/api/webhook`,
     checks: [],
     suggestions: [],
+    dbDiagnosis: null,
+    metaVsDb: null,
   };
 
   if (!token) {
@@ -179,6 +194,149 @@ export async function GET() {
             : adFormsData.error.message,
         });
       }
+    }
+
+    // 6. DB Diagnosis: lead_distribution, customers count, Meta vs DB comparison
+    try {
+      const conn = await getDbConnection();
+
+      // 6a. Lead distribution - reps for assigning leads
+      let leadDistRows = [];
+      try {
+        const [ldRows] = await conn.execute(
+          "SELECT username, priority, max_leads, assigned_count, is_active FROM lead_distribution ORDER BY priority ASC"
+        );
+        leadDistRows = ldRows || [];
+      } catch (e) {
+        try {
+          const [ldRows] = await conn.execute(
+            "SELECT username, priority, max_leads, assigned_count FROM lead_distribution ORDER BY priority ASC"
+          );
+          leadDistRows = ldRows || [];
+        } catch (_) {}
+      }
+
+      const activeReps = leadDistRows.filter((r) => r.is_active === 1 || r.is_active === true);
+      const hasActiveReps = activeReps.length > 0 || leadDistRows.length > 0;
+
+      result.dbDiagnosis = {
+        leadDistributionCount: leadDistRows.length,
+        activeRepsCount: activeReps.length,
+        reps: leadDistRows.map((r) => ({
+          username: r.username,
+          priority: r.priority,
+          max_leads: r.max_leads,
+          assigned_count: r.assigned_count,
+          is_active: r.is_active,
+        })),
+      };
+
+      if (!hasActiveReps) {
+        result.checks.push({
+          name: "Lead Distribution",
+          status: "error",
+          message: "No reps in lead_distribution. Webhook & backfill need reps to assign leads.",
+        });
+        result.suggestions.push(
+          "Go to Lead Distribution page and add at least one rep (username, priority, max_leads). Enable is_active if column exists."
+        );
+      } else {
+        result.checks.push({
+          name: "Lead Distribution",
+          status: "ok",
+          message: `${activeReps.length || leadDistRows.length} rep(s) configured`,
+        });
+      }
+
+      // 6b. Total customers in DB
+      const [countRows] = await conn.execute("SELECT COUNT(*) AS total FROM customers");
+      result.dbDiagnosis.totalCustomersInDb = countRows[0]?.total ?? 0;
+
+      // 6c. Fetch last 5 leads from Meta and check if they exist in DB
+      if (formId && token) {
+        const leadsRes = await fetch(
+          `https://graph.facebook.com/v18.0/${formId}/leads?limit=5&fields=field_data,ad_id,created_time,id&access_token=${token}`
+        );
+        const leadsData = await leadsRes.json();
+
+        if (!leadsData?.error && Array.isArray(leadsData?.data) && leadsData.data.length > 0) {
+          const getValue = (fieldData, name) =>
+            fieldData.find((f) => f.name === name)?.values?.[0] || null;
+
+          const metaLeads = leadsData.data.map((lead) => {
+            const fd = lead.field_data || [];
+            const rawPhone = getValue(fd, "phone_number");
+            const phone = normalizePhone(rawPhone);
+            return {
+              leadgen_id: lead.id,
+              created_time: lead.created_time,
+              first_name: getValue(fd, "full_name") || getValue(fd, "first_name"),
+              email: getValue(fd, "email"),
+              phone,
+              address: getValue(fd, "city"),
+            };
+          });
+
+          const phonesToCheck = metaLeads.map((l) => l.phone).filter(Boolean);
+          const foundPhones = new Set();
+
+          if (phonesToCheck.length > 0) {
+            const normalizedPhones = phonesToCheck.map((p) =>
+              (p || "").replace(/\D/g, "").slice(-10)
+            ).filter(Boolean);
+            const conditions = normalizedPhones.map(() => "phone LIKE ?").join(" OR ");
+            const params = normalizedPhones.map((p) => `%${p}%`);
+            const [dbRows] = await conn.execute(
+              `SELECT phone FROM customers WHERE ${conditions}`,
+              params
+            );
+            (dbRows || []).forEach((r) => {
+              const p = String(r.phone || "").replace(/\D/g, "").slice(-10);
+              if (p) foundPhones.add(p);
+            });
+          }
+
+          result.metaVsDb = {
+            metaLeadsCount: metaLeads.length,
+            metaLeadsSample: metaLeads.map((l) => ({
+              name: l.first_name,
+              phone: l.phone,
+              email: l.email,
+              created: l.created_time,
+              inDb: l.phone ? foundPhones.has(String(l.phone).replace(/\D/g, "").slice(-10)) : false,
+            })),
+            inDbCount: metaLeads.filter((l) =>
+              l.phone ? foundPhones.has(String(l.phone).replace(/\D/g, "").slice(-10)) : false
+            ).length,
+            notInDbCount: metaLeads.filter((l) =>
+              l.phone ? !foundPhones.has(String(l.phone).replace(/\D/g, "").slice(-10)) : true
+            ).length,
+          };
+
+          if (result.metaVsDb.notInDbCount > 0) {
+            result.checks.push({
+              name: "Meta vs DB",
+              status: "warning",
+              message: `${result.metaVsDb.notInDbCount} of last ${metaLeads.length} Meta leads NOT in database.`,
+            });
+            result.suggestions.push(
+              "Leads from Meta are not reaching DB. Check: (1) Webhook subscribed in Meta App? (2) Webhook URL must be HTTPS in production. (3) Use 'Fetch Leads' + 'Import' on this page to manually backfill."
+            );
+          } else {
+            result.checks.push({
+              name: "Meta vs DB",
+              status: "ok",
+              message: `Last ${metaLeads.length} Meta leads found in DB`,
+            });
+          }
+        } else if (leadsData?.data?.length === 0) {
+          result.metaVsDb = { metaLeadsCount: 0, message: "No leads in Meta form yet" };
+        }
+      }
+    } catch (dbErr) {
+      result.dbDiagnosis = result.dbDiagnosis || {};
+      result.dbDiagnosis.error = dbErr.message;
+      result.checks.push({ name: "DB Diagnosis", status: "error", message: dbErr.message });
     }
 
     return Response.json(result);
