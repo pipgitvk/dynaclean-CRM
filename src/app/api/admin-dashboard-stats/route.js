@@ -66,7 +66,7 @@ export async function GET(req) {
       SELECT 
         SUM(COALESCE(qi.total_price, 0)) as total_revenue,
         SUM(COALESCE(qi.total_taxable_amt, 0)) as total_base_amount,
-        SUM(COALESCE(qi.cgsttxamt, 0) + COALESCE(qi.sgsttxamt, 0) + COALESCE(qi.igsttamt, 0)) as total_tax_gst
+        SUM(COALESCE(qi.cgsttxamt, 0) + COALESCE(qi.sgstxamt, 0) + COALESCE(qi.igsttamt, 0)) as total_tax_gst
       FROM neworder no
       JOIN quotation_items qi ON no.quote_number = qi.quote_number
       WHERE DATE(no.created_at) >= ? AND DATE(no.created_at) <= ?
