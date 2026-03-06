@@ -40,8 +40,9 @@ export async function POST(request) {
     if (imageFile && imageFile instanceof File) {
       const buffer = Buffer.from(await imageFile.arrayBuffer());
       const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-      const filePath = path.join(process.cwd(), "public", "blogs", fileName);
-
+      const blogsDir = path.join(process.cwd(), "public", "blogs");
+      await fs.mkdir(blogsDir, { recursive: true });
+      const filePath = path.join(blogsDir, fileName);
       await fs.writeFile(filePath, buffer);
       image_path = `/blogs/${fileName}`;
     }

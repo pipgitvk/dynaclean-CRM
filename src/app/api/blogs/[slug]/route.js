@@ -1,6 +1,8 @@
 // app/api/blogs/[slug]/route.js
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import fs from "fs/promises";
+import path from "path";
 
 // GET single blog by slug
 export async function GET(request, { params }) {
@@ -40,11 +42,23 @@ export async function PUT(request, { params }) {
 
     const db = await getDbConnection();
 
-    let finalImagePath = image_path;
-    if (imageFile) {
-      // const filePath = await saveImage(imageFile);
-      // finalImagePath = filePath;
-      console.log("New image file received but not processed yet.");
+    let finalImagePath = image_path || "";
+    if (imageFile && imageFile instanceof File) {
+      const buffer = Buffer.from(await imageFile.arrayBuffer());
+      const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+      const blogsDir = path.join(process.cwd(), "public", "blogs");
+      await fs.mkdir(blogsDir, { recursive: true });
+      const filePath = path.join(blogsDir, fileName);
+      await fs.writeFile(filePath, buffer);
+      finalImagePath = `/blogs/${fileName}`;
+      // Remove old image if it existed
+      if (image_path && image_path.startsWith("/blogs/")) {
+        try {
+          await fs.unlink(path.join(process.cwd(), "public", image_path));
+        } catch (e) {
+          console.warn("Could not remove old image:", image_path, e.message);
+        }
+      }
     }
 
     const [result] = await db.query(
