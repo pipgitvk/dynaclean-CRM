@@ -334,7 +334,7 @@ export default function AdminStatsDashboard() {
                             type="button"
                             onClick={openTopOrdersModal}
                             className="absolute top-3 right-14 p-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors z-10"
-                            title="Top 5 orders by sales"
+                            title="Top 5 products (sabse jyada bike)"
                             aria-label="View top 5 orders by sales"
                         >
                             <BarChart2 className="w-5 h-5" />
@@ -634,7 +634,7 @@ export default function AdminStatsDashboard() {
                         <div className="flex items-center justify-between p-4 border-b border-gray-200">
                             <h2 id="top-orders-title" className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                                 <BarChart2 className="w-6 h-6 text-blue-600" />
-                                Top 5 Orders by Sales
+                                Top 5 Products (sabse jyada bike)
                             </h2>
                             <button
                                 type="button"
@@ -651,37 +651,28 @@ export default function AdminStatsDashboard() {
                                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
                                 </div>
                             ) : topOrders.length === 0 ? (
-                                <p className="text-gray-500 text-center py-8">No orders in this period.</p>
+                                <p className="text-gray-500 text-center py-8">No products sold in this period.</p>
                             ) : (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-gray-200 text-left text-gray-600">
                                                 <th className="pb-2 pr-2">#</th>
-                                                <th className="pb-2 pr-2">Order ID</th>
-                                                <th className="pb-2 pr-2">Client</th>
-                                                <th className="pb-2 pr-2">Company</th>
-                                                <th className="pb-2 pr-2 text-right">Amount</th>
-                                                <th className="pb-2">Action</th>
+                                                <th className="pb-2 pr-2">Product</th>
+                                                <th className="pb-2 pr-2">Item Code</th>
+                                                <th className="pb-2 pr-2 text-right">Qty Sold</th>
+                                                <th className="pb-2 text-right">Amount</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {topOrders.map((order, idx) => (
-                                                <tr key={order.order_id} className="border-b border-gray-100 hover:bg-gray-50">
+                                            {topOrders.map((product, idx) => (
+                                                <tr key={product.item_code || idx} className="border-b border-gray-100 hover:bg-gray-50">
                                                     <td className="py-3 pr-2 font-medium text-gray-700">{idx + 1}</td>
-                                                    <td className="py-3 pr-2">{order.order_id}</td>
-                                                    <td className="py-3 pr-2">{order.client_name || "—"}</td>
-                                                    <td className="py-3 pr-2">{order.company_name || "—"}</td>
+                                                    <td className="py-3 pr-2 font-medium">{product.item_name || "—"}</td>
+                                                    <td className="py-3 pr-2 text-gray-600">{product.item_code || "—"}</td>
+                                                    <td className="py-3 pr-2 text-right font-medium">{product.total_quantity}</td>
                                                     <td className="py-3 pr-2 text-right font-medium text-green-700">
-                                                        {formatCurrency(order.totalamt)}
-                                                    </td>
-                                                    <td className="py-3">
-                                                        <a
-                                                            href={`/admin-dashboard/order/view/${order.order_id}`}
-                                                            className="text-blue-600 hover:underline font-medium"
-                                                        >
-                                                            View
-                                                        </a>
+                                                        {formatCurrency(product.total_sales)}
                                                     </td>
                                                 </tr>
                                             ))}
