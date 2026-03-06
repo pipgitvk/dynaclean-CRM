@@ -1,8 +1,28 @@
 // app/api/blogs/[slug]/route.js
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import fs from "fs/promises";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+async function uploadBlogImageToCloudinary(file) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream(
+        { folder: "blogs" },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result?.secure_url || "");
+        }
+      )
+      .end(buffer);
+  });
+}
 
 // GET single blog by slug
 export async function GET(request, { params }) {
@@ -44,20 +64,14 @@ export async function PUT(request, { params }) {
 
     let finalImagePath = image_path || "";
     if (imageFile && imageFile instanceof File) {
-      const buffer = Buffer.from(await imageFile.arrayBuffer());
-      const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-      const blogsDir = path.join(process.cwd(), "public", "blogs");
-      await fs.mkdir(blogsDir, { recursive: true });
-      const filePath = path.join(blogsDir, fileName);
-      await fs.writeFile(filePath, buffer);
-      finalImagePath = `/blogs/${fileName}`;
-      // Remove old image if it existed
-      if (image_path && image_path.startsWith("/blogs/")) {
-        try {
-          await fs.unlink(path.join(process.cwd(), "public", image_path));
-        } catch (e) {
-          console.warn("Could not remove old image:", image_path, e.message);
-        }
+      try {
+        finalImagePath = await uploadBlogImageToCloudinary(imageFile);
+      } catch (err) {
+        console.error("Cloudinary upload error:", err);
+        return NextResponse.json(
+          { message: "Failed to upload image. Check Cloudinary config." },
+          { status: 500 }
+        );
       }
     }
 
@@ -95,7 +109,7 @@ export async function PUT(request, { params }) {
 // DELETE a blog by slug
 export async function DELETE(request, { params }) {
   try {
-    const { slug } = params;
+    const { slug } = await params;
     const db = await getDbConnection();
 
     const [result] = await db.query(`DELETE FROM blogs WHERE slug = ?`, [slug]);
