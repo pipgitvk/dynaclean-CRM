@@ -589,7 +589,7 @@ export default function AdminStatsDashboard() {
                 {/* Top Performers */}
                 <div className="bg-white rounded-xl shadow-md p-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Sales Performers</h3>
-                    <div className="space-y-3">
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
                         {stats?.sales?.topPerformers?.length > 0 ? (
                             stats.sales.topPerformers.map((performer, index) => (
                                 <div
