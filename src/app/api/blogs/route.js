@@ -24,6 +24,13 @@ async function uploadBlogImageToCloudinary(file) {
   });
 }
 
+function toAbsoluteImageUrl(imagePath) {
+  if (!imagePath) return "";
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) return imagePath;
+  const base = process.env.NEXT_PUBLIC_BASE_URL || "";
+  return base ? `${base.replace(/\/$/, "")}${imagePath}` : imagePath;
+}
+
 // GET all blogs
 export async function GET() {
   try {
@@ -31,8 +38,11 @@ export async function GET() {
     const [rows] = await db.query(
       `SELECT id, title, slug, image_path, created_at, updated_at, status, category FROM blogs`
     );
-    // db.end();
-    return NextResponse.json({ blogs: rows });
+    const blogs = rows.map((b) => ({
+      ...b,
+      image_path: toAbsoluteImageUrl(b.image_path),
+    }));
+    return NextResponse.json({ blogs });
   } catch (error) {
     console.error("Error fetching blogs:", error);
     return NextResponse.json(
