@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { notFound } from "next/navigation";
 import OrderDetailsClient from "./OrderDetailsClient";
 import dayjs from "dayjs";
+import { getSessionPayload } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,17 @@ export default async function Page({ params }) {
   const orderId = parseInt(order_id);
   if (isNaN(orderId)) notFound();
 
+  let userRole = "";
+  const payload = await getSessionPayload();
+  if (payload?.username) {
+    const connAuth = await getDbConnection();
+    const [roleRows] = await connAuth.execute(
+      "SELECT userRole FROM emplist WHERE username = ?",
+      [payload.username]
+    );
+    userRole = roleRows[0]?.userRole || "";
+  }
+
   const { orderDetails, items, statuses, gstin } =
     await fetchOrderData(orderId);
 
@@ -96,6 +108,7 @@ export default async function Page({ params }) {
         statuses={statuses}
         orderId={orderId}
         gstin={gstin}
+        userRole={userRole}
       />
     </div>
   );

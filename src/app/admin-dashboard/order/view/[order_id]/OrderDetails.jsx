@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import OrderApprovalActions from "../../OrderApprovalActions";
 
-export default function OrderDetails({ data }) {
+export default function OrderDetails({ data, userRole }) {
   const {
     orderDetails,
     items,
@@ -216,6 +217,16 @@ export default function OrderDetails({ data }) {
             </a>
           </div>
         )}
+      </div>
+
+      {/* Approval Actions - only for Admin (SUPERADMIN) */}
+      <div className="mt-8 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col items-center">
+        <p className="text-sm text-gray-600 mb-2">Approval status</p>
+        <OrderApprovalActions
+          orderId={orderDetails.order_id}
+          approvalStatus={orderDetails.approval_status || "pending"}
+          userRole={userRole}
+        />
       </div>
 
       <div className="mt-8 text-center">

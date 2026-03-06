@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import dayjs from "dayjs";
 import Image from "next/image";
+import OrderApprovalActions from "../OrderApprovalActions";
 
 const stages = [
   "Sales",
@@ -20,6 +21,7 @@ export default function OrderDetailsClient({
   statuses,
   orderId,
   gstin,
+  userRole,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -294,10 +296,20 @@ export default function OrderDetailsClient({
         </div>
       )}
 
+      {/* Approval Actions - only for Admin (SUPERADMIN) */}
+      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 flex flex-col items-center">
+        <p className="text-sm text-gray-600 mb-2">Approval status</p>
+        <OrderApprovalActions
+          orderId={orderId}
+          approvalStatus={orderDetails.approval_status || "pending"}
+          userRole={userRole}
+        />
+      </div>
+
       {/* Back Link */}
       <div className="text-center mt-6">
         <a
-          href="/user-dashboard/order"
+          href="/admin-dashboard/order"
           className="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
         >
           ← Back to Order List

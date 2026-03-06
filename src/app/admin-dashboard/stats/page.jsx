@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
     TrendingUp,
     TrendingDown,
@@ -15,7 +16,9 @@ import {
     Clock,
     Users,
     BarChart3,
-    Calendar
+    Calendar,
+    BarChart2,
+    X
 } from "lucide-react";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
@@ -48,9 +51,13 @@ ChartJS.register(
 );
 
 export default function AdminStatsDashboard() {
+    const router = useRouter();
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState("thisMonth");
+    const [topOrdersModalOpen, setTopOrdersModalOpen] = useState(false);
+    const [topOrders, setTopOrders] = useState([]);
+    const [topOrdersLoading, setTopOrdersLoading] = useState(false);
 
     useEffect(() => {
         fetchDashboardStats();
@@ -73,6 +80,27 @@ export default function AdminStatsDashboard() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchTopOrders = async () => {
+        setTopOrdersLoading(true);
+        try {
+            const res = await fetch(`/api/admin-dashboard-stats/top-orders?timeRange=${timeRange}`);
+            const data = await res.json();
+            if (data.success) setTopOrders(data.data || []);
+            else toast.error(data.error || "Failed to load top orders");
+        } catch (err) {
+            toast.error("Error loading top orders");
+            setTopOrders([]);
+        } finally {
+            setTopOrdersLoading(false);
+        }
+    };
+
+    const openTopOrdersModal = (e) => {
+        e.stopPropagation();
+        setTopOrdersModalOpen(true);
+        fetchTopOrders();
     };
 
     // Format currency (NaN/undefined → 0)
@@ -293,13 +321,25 @@ export default function AdminStatsDashboard() {
                     Sales Statistics
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <KPICard
-                        title="Total Orders"
-                        value={stats?.sales?.totalOrders || 0}
-                        icon={ShoppingCart}
-                        color="bg-gradient-to-br from-blue-500 to-blue-600"
-                        subtitle="New orders received"
-                    />
+                    <div className="relative">
+                        <KPICard
+                            title="Total Orders"
+                            value={stats?.sales?.totalOrders || 0}
+                            icon={ShoppingCart}
+                            color="bg-gradient-to-br from-blue-500 to-blue-600"
+                            subtitle="New orders received"
+                            onClick={() => router.push("/admin-dashboard/order")}
+                        />
+                        <button
+                            type="button"
+                            onClick={openTopOrdersModal}
+                            className="absolute top-3 right-14 p-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors z-10"
+                            title="Top 5 orders by sales"
+                            aria-label="View top 5 orders by sales"
+                        >
+                            <BarChart2 className="w-5 h-5" />
+                        </button>
+                    </div>
                     <KPICard
                         title="Total Revenue"
                         value={formatCurrency(stats?.sales?.totalRevenue)}
@@ -315,6 +355,7 @@ export default function AdminStatsDashboard() {
                                 })()
                                 : "Order total (totalamt)"
                         }
+                        onClick={() => router.push("/admin-dashboard/order")}
                     />
                     <KPICard
                         title="Conversion Rate"
@@ -322,6 +363,7 @@ export default function AdminStatsDashboard() {
                         icon={TrendingUp}
                         color="bg-gradient-to-br from-purple-500 to-purple-600"
                         subtitle="Quotation to order"
+                        onClick={() => router.push("/admin-dashboard/quotations")}
                     />
                     <KPICard
                         title="Active Salespeople"
@@ -329,6 +371,7 @@ export default function AdminStatsDashboard() {
                         icon={Users}
                         color="bg-gradient-to-br from-indigo-500 to-indigo-600"
                         subtitle="Team members"
+                        onClick={() => router.push("/admin-dashboard/assign-targets")}
                     />
                 </div>
             </div>
@@ -345,30 +388,35 @@ export default function AdminStatsDashboard() {
                         value={stats?.delivery?.totalDeliveries || 0}
                         icon={Package}
                         color="bg-gradient-to-br from-gray-500 to-gray-600"
+                        onClick={() => router.push("/admin-dashboard/order/delivery-status")}
                     />
                     <KPICard
                         title="Completed"
                         value={stats?.delivery?.completedDeliveries || 0}
                         icon={CheckCircle}
                         color="bg-gradient-to-br from-green-500 to-green-600"
+                        onClick={() => router.push("/admin-dashboard/order/delivery-status")}
                     />
                     <KPICard
                         title="On-Time Rate"
                         value={`${stats?.delivery?.onTimeRate || 0}%`}
                         icon={Clock}
                         color="bg-gradient-to-br from-blue-500 to-blue-600"
+                        onClick={() => router.push("/admin-dashboard/order/delivery-status")}
                     />
                     <KPICard
                         title="Delayed"
                         value={stats?.delivery?.delayedDeliveries || 0}
                         icon={AlertCircle}
                         color="bg-gradient-to-br from-red-500 to-red-600"
+                        onClick={() => router.push("/admin-dashboard/order/delivery-status")}
                     />
                     <KPICard
                         title="Pending"
                         value={stats?.delivery?.pendingDeliveries || 0}
                         icon={Clock}
                         color="bg-gradient-to-br from-yellow-500 to-yellow-600"
+                        onClick={() => router.push("/admin-dashboard/order/delivery-status")}
                     />
                 </div>
             </div>
@@ -386,6 +434,7 @@ export default function AdminStatsDashboard() {
                         icon={Clock}
                         color="bg-gradient-to-br from-yellow-500 to-yellow-600"
                         subtitle={formatCurrency(stats?.payments?.totalPendingAmount)}
+                        onClick={() => router.push("/admin-dashboard/manual-payments")}
                     />
                     <KPICard
                         title="Overdue Payments"
@@ -393,18 +442,21 @@ export default function AdminStatsDashboard() {
                         icon={AlertCircle}
                         color="bg-gradient-to-br from-red-500 to-red-600"
                         subtitle={formatCurrency(stats?.payments?.overdueAmount)}
+                        onClick={() => router.push("/admin-dashboard/manual-payments")}
                     />
                     <KPICard
                         title="Partially Paid"
                         value={stats?.payments?.partialCount || 0}
                         icon={CreditCard}
                         color="bg-gradient-to-br from-orange-500 to-orange-600"
+                        onClick={() => router.push("/admin-dashboard/manual-payments")}
                     />
                     <KPICard
                         title="Paid Orders"
                         value={stats?.payments?.paidCount || 0}
                         icon={CheckCircle}
                         color="bg-gradient-to-br from-green-500 to-green-600"
+                        onClick={() => router.push("/admin-dashboard/manual-payments")}
                     />
                 </div>
             </div>
@@ -421,24 +473,28 @@ export default function AdminStatsDashboard() {
                         value={stats?.services?.totalServices || 0}
                         icon={Wrench}
                         color="bg-gradient-to-br from-purple-500 to-purple-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports")}
                     />
                     <KPICard
                         title="Completed"
                         value={stats?.services?.completedServices || 0}
                         icon={CheckCircle}
                         color="bg-gradient-to-br from-green-500 to-green-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports")}
                     />
                     <KPICard
                         title="Pending"
                         value={stats?.services?.pendingServices || 0}
                         icon={Clock}
                         color="bg-gradient-to-br from-yellow-500 to-yellow-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports")}
                     />
                     <KPICard
                         title="Avg. Completion"
                         value={`${stats?.services?.avgCompletionDays || 0} days`}
                         icon={Calendar}
                         color="bg-gradient-to-br from-blue-500 to-blue-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports")}
                     />
                 </div>
             </div>
@@ -455,30 +511,35 @@ export default function AdminStatsDashboard() {
                         value={stats?.installations?.totalInstallations || 0}
                         icon={Package}
                         color="bg-gradient-to-br from-teal-500 to-teal-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports/upcoming-installation")}
                     />
                     <KPICard
                         title="Completed"
                         value={stats?.installations?.completedInstallations || 0}
                         icon={CheckCircle}
                         color="bg-gradient-to-br from-green-500 to-green-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports/upcoming-installation")}
                     />
                     <KPICard
                         title="Upcoming (10 days)"
                         value={stats?.installations?.upcomingInstallations || 0}
                         icon={Clock}
                         color="bg-gradient-to-br from-blue-500 to-blue-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports/upcoming-installation")}
                     />
                     <KPICard
                         title="Pending"
                         value={stats?.installations?.pendingInstallations || 0}
                         icon={AlertCircle}
                         color="bg-gradient-to-br from-yellow-500 to-yellow-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports/upcoming-installation")}
                     />
                     <KPICard
                         title="Overdue"
                         value={stats?.installations?.overdueInstallations || 0}
                         icon={AlertCircle}
                         color="bg-gradient-to-br from-red-500 to-red-600"
+                        onClick={() => router.push("/admin-dashboard/view_service_reports/upcoming-installation")}
                     />
                 </div>
             </div>
@@ -556,6 +617,91 @@ export default function AdminStatsDashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* Top 5 Orders by Sales - Modal */}
+            {topOrdersModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                    onClick={() => setTopOrdersModalOpen(false)}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="top-orders-title"
+                >
+                    <div
+                        className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <h2 id="top-orders-title" className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                                <BarChart2 className="w-6 h-6 text-blue-600" />
+                                Top 5 Orders by Sales
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => setTopOrdersModalOpen(false)}
+                                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+                                aria-label="Close"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-auto flex-1">
+                            {topOrdersLoading ? (
+                                <div className="flex justify-center py-12">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+                                </div>
+                            ) : topOrders.length === 0 ? (
+                                <p className="text-gray-500 text-center py-8">No orders in this period.</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-200 text-left text-gray-600">
+                                                <th className="pb-2 pr-2">#</th>
+                                                <th className="pb-2 pr-2">Order ID</th>
+                                                <th className="pb-2 pr-2">Client</th>
+                                                <th className="pb-2 pr-2">Company</th>
+                                                <th className="pb-2 pr-2 text-right">Amount</th>
+                                                <th className="pb-2">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {topOrders.map((order, idx) => (
+                                                <tr key={order.order_id} className="border-b border-gray-100 hover:bg-gray-50">
+                                                    <td className="py-3 pr-2 font-medium text-gray-700">{idx + 1}</td>
+                                                    <td className="py-3 pr-2">{order.order_id}</td>
+                                                    <td className="py-3 pr-2">{order.client_name || "—"}</td>
+                                                    <td className="py-3 pr-2">{order.company_name || "—"}</td>
+                                                    <td className="py-3 pr-2 text-right font-medium text-green-700">
+                                                        {formatCurrency(order.totalamt)}
+                                                    </td>
+                                                    <td className="py-3">
+                                                        <a
+                                                            href={`/admin-dashboard/order/view/${order.order_id}`}
+                                                            className="text-blue-600 hover:underline font-medium"
+                                                        >
+                                                            View
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-gray-200 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setTopOrdersModalOpen(false)}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-gray-700"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
