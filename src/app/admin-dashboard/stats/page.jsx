@@ -334,7 +334,7 @@ export default function AdminStatsDashboard() {
                             type="button"
                             onClick={openTopOrdersModal}
                             className="absolute top-3 right-14 p-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors z-10"
-                            title="Top 5 products by sales"
+                            title="All products (qty wise)"
                             aria-label="View top 5 orders by sales"
                         >
                             <BarChart2 className="w-5 h-5" />
@@ -617,7 +617,7 @@ export default function AdminStatsDashboard() {
                 </div>
             </div>
 
-            {/* Top 5 Orders by Sales - Modal */}
+            {/* All Products (Qty wise) - Modal */}
             {topOrdersModalOpen && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
@@ -633,7 +633,7 @@ export default function AdminStatsDashboard() {
                         <div className="flex items-center justify-between p-4 border-b border-gray-200">
                             <h2 id="top-orders-title" className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                                 <BarChart2 className="w-6 h-6 text-blue-600" />
-                                Top 5 Products by Sales
+                                All Products (Qty wise)
                             </h2>
                             <button
                                 type="button"

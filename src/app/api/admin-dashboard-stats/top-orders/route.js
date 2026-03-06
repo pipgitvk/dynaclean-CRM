@@ -1,5 +1,5 @@
 // GET /api/admin-dashboard-stats/top-orders?timeRange=thisMonth
-// Returns top 5 products by quantity sold (jyada bika) in the given time range
+// Returns all products by quantity sold (qty wise) in the given time range
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
@@ -61,8 +61,7 @@ export async function GET(req) {
        JOIN quotation_items qi ON no.quote_number = qi.quote_number
        WHERE DATE(no.created_at) >= ? AND DATE(no.created_at) <= ?
        GROUP BY qi.item_code
-       ORDER BY total_quantity DESC
-       LIMIT 5`,
+       ORDER BY total_quantity DESC`,
       [startDateStr, endDateStr]
     );
 
