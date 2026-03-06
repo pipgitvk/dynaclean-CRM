@@ -83,11 +83,14 @@ const BlogManagementPage = () => {
             <Link key={blog.id} href={`/user-dashboard/blogs/${blog.slug}`}>
               <div className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden cursor-pointer">
                 {blog.image_path && (
-                  <div className="relative w-full h-48">
+                  <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
                     <img
                       src={blog.image_path}
                       alt={blog.title}
                       className="w-full h-48 object-cover transition-transform duration-300 hover:scale-105"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                      }}
                     />
                   </div>
                 )}
