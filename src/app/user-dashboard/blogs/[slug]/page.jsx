@@ -208,11 +208,11 @@ const BlogEditorPage = () => {
               onChange={handleImageChange}
               className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
-            {blogData.image_path && (
+            {(blogData.image_url || blogData.image_path) && (
               <div className="mt-4">
                 <p className="text-sm text-gray-600">Current Image:</p>
                 <img
-                  src={blogData.image_path}
+                  src={blogData.image_url || blogData.image_path}
                   alt="Current featured image"
                   className="mt-2 h-32 w-auto rounded-md object-cover"
                 />
