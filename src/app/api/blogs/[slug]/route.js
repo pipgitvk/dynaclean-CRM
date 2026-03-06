@@ -24,6 +24,13 @@ async function uploadBlogImageToCloudinary(file) {
   });
 }
 
+function toAbsoluteImageUrl(imagePath) {
+  if (!imagePath) return "";
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) return imagePath;
+  const base = process.env.NEXT_PUBLIC_BASE_URL || "";
+  return base ? `${base.replace(/\/$/, "")}${imagePath}` : imagePath;
+}
+
 // GET single blog by slug
 export async function GET(request, { params }) {
   try {
@@ -35,7 +42,8 @@ export async function GET(request, { params }) {
     if (rows.length === 0) {
       return NextResponse.json({ message: "Blog not found." }, { status: 404 });
     }
-    return NextResponse.json({ blog: rows[0] });
+    const blog = { ...rows[0], image_path: toAbsoluteImageUrl(rows[0].image_path) };
+    return NextResponse.json({ blog });
   } catch (error) {
     console.error("Error fetching blog data:", error);
     return NextResponse.json(
