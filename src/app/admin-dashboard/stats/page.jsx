@@ -334,7 +334,7 @@ export default function AdminStatsDashboard() {
                             type="button"
                             onClick={openTopOrdersModal}
                             className="absolute top-3 right-14 p-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors z-10"
-                            title="Top 5 products (sabse jyada bike)"
+                            title="Top 5 products by sales"
                             aria-label="View top 5 orders by sales"
                         >
                             <BarChart2 className="w-5 h-5" />
@@ -633,7 +633,7 @@ export default function AdminStatsDashboard() {
                         <div className="flex items-center justify-between p-4 border-b border-gray-200">
                             <h2 id="top-orders-title" className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                                 <BarChart2 className="w-6 h-6 text-blue-600" />
-                                Top 5 Products (sabse jyada bike)
+                                Top 5 Products by Sales
                             </h2>
                             <button
                                 type="button"
