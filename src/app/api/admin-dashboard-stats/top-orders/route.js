@@ -1,5 +1,5 @@
 // GET /api/admin-dashboard-stats/top-orders?timeRange=thisMonth
-// Returns top 5 orders by totalamt (sales) for the given time range
+// Returns top 5 products by quantity sold (jyada bika) in the given time range
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
@@ -52,10 +52,16 @@ export async function GET(req) {
     const endDateStr = endDate.toISOString().slice(0, 10);
 
     const [rows] = await conn.execute(
-      `SELECT order_id, quote_number, client_name, company_name, totalamt, created_at
-       FROM neworder
-       WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
-       ORDER BY COALESCE(totalamt, 0) DESC
+      `SELECT 
+        qi.item_code,
+        MAX(qi.item_name) AS item_name,
+        SUM(COALESCE(qi.quantity, 0)) AS total_quantity,
+        SUM(COALESCE(qi.total_price, 0)) AS total_sales
+       FROM neworder no
+       JOIN quotation_items qi ON no.quote_number = qi.quote_number
+       WHERE DATE(no.created_at) >= ? AND DATE(no.created_at) <= ?
+       GROUP BY qi.item_code
+       ORDER BY total_quantity DESC
        LIMIT 5`,
       [startDateStr, endDateStr]
     );
@@ -63,18 +69,16 @@ export async function GET(req) {
     return NextResponse.json({
       success: true,
       data: rows.map((r) => ({
-        order_id: r.order_id,
-        quote_number: r.quote_number,
-        client_name: r.client_name,
-        company_name: r.company_name,
-        totalamt: r.totalamt,
-        created_at: r.created_at,
+        item_code: r.item_code,
+        item_name: r.item_name,
+        total_quantity: Number(r.total_quantity) || 0,
+        total_sales: r.total_sales,
       })),
     });
   } catch (error) {
-    console.error("Top orders API error:", error);
+    console.error("Top products API error:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to fetch top orders" },
+      { success: false, error: "Failed to fetch top products" },
       { status: 500 }
     );
   }
