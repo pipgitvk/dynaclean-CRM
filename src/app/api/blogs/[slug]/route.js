@@ -42,7 +42,11 @@ export async function GET(request, { params }) {
     if (rows.length === 0) {
       return NextResponse.json({ message: "Blog not found." }, { status: 404 });
     }
-    const blog = { ...rows[0], image_path: toAbsoluteImageUrl(rows[0].image_path) };
+    const displayUrl = toAbsoluteImageUrl(rows[0].image_path);
+    const blog = {
+      ...rows[0],
+      image_url: displayUrl,
+    };
     return NextResponse.json({ blog });
   } catch (error) {
     console.error("Error fetching blog data:", error);

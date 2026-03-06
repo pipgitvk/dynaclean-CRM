@@ -38,10 +38,14 @@ export async function GET() {
     const [rows] = await db.query(
       `SELECT id, title, slug, image_path, created_at, updated_at, status, category FROM blogs`
     );
-    const blogs = rows.map((b) => ({
-      ...b,
-      image_path: toAbsoluteImageUrl(b.image_path),
-    }));
+    const blogs = rows.map((b) => {
+      const displayUrl = toAbsoluteImageUrl(b.image_path);
+      return {
+        ...b,
+        image_path: b.image_path,
+        image_url: displayUrl,
+      };
+    });
     return NextResponse.json({ blogs });
   } catch (error) {
     console.error("Error fetching blogs:", error);
