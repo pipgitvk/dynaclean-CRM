@@ -346,12 +346,11 @@ export default function AdminStatsDashboard() {
                         icon={DollarSign}
                         color="bg-gradient-to-br from-green-500 to-green-600"
                         subtitle={
-                            (stats?.sales?.totalGst != null || stats?.sales?.totalTax != null)
+                            (stats?.sales?.totalBaseAmount != null || stats?.sales?.totalTaxGst != null)
                                 ? (() => {
-                                    const totalRev = parseFloat(stats?.sales?.totalRevenue) || 0;
-                                    const taxGst = (parseFloat(stats?.sales?.totalGst) || 0) + (parseFloat(stats?.sales?.totalTax) || 0);
-                                    const base = Math.max(0, totalRev - taxGst);
-                                    return `Base ${formatCurrency(base)} | Tax ${formatCurrency(taxGst)}`;
+                                    const base = parseFloat(stats?.sales?.totalBaseAmount) || 0;
+                                    const tax = parseFloat(stats?.sales?.totalTaxGst) || 0;
+                                    return `Base ${formatCurrency(base)} | Tax ${formatCurrency(tax)}`;
                                 })()
                                 : "Order total (totalamt)"
                         }
