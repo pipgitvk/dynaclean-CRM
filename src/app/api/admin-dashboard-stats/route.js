@@ -56,15 +56,23 @@ export async function GET(req) {
     const [salesStats] = await conn.execute(`
       SELECT 
         COUNT(*) as total_orders,
-        SUM(COALESCE(totalamt, 0)) as total_revenue,
-        SUM(COALESCE(taxamt, 0)) as total_tax_gst,
-        SUM(COALESCE(baseAmount, 0)) as total_base_amount,
         COUNT(DISTINCT created_by) as active_salespeople
       FROM neworder
       WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
     `, [startDateStr, endDateStr]);
 
-    // GST (CGST+SGST) and Tax (IGST) from quotation_items - column is sgstxamt (not sgsttxamt)
+    // Revenue, Base, Tax from quotation_items (accurate - neworder.totalamt often NULL for many orders)
+    const [revenueFromItems] = await conn.execute(`
+      SELECT 
+        SUM(COALESCE(qi.total_price, 0)) as total_revenue,
+        SUM(COALESCE(qi.total_taxable_amt, 0)) as total_base_amount,
+        SUM(COALESCE(qi.cgsttxamt, 0) + COALESCE(qi.sgsttxamt, 0) + COALESCE(qi.igsttamt, 0)) as total_tax_gst
+      FROM neworder no
+      JOIN quotation_items qi ON no.quote_number = qi.quote_number
+      WHERE DATE(no.created_at) >= ? AND DATE(no.created_at) <= ?
+    `, [startDateStr, endDateStr]);
+
+    // GST (CGST+SGST) and Tax (IGST) from quotation_items - for reference
     const [gstTaxBreakdown] = await conn.execute(`
       SELECT 
         SUM(COALESCE(qi.cgsttxamt, 0) + COALESCE(qi.sgstxamt, 0)) as total_gst,
@@ -85,16 +93,17 @@ export async function GET(req) {
       ? ((salesStats[0].total_orders / quotationStats[0].total_quotations) * 100).toFixed(2)
       : 0;
 
-    // Top 20 performing salespeople (sorted by revenue, highest first)
+    // Top 20 performing salespeople (sorted by revenue from quotation_items)
     const [topSalespeople] = await conn.execute(`
       SELECT 
-        created_by as salesperson,
-        COUNT(*) as orders_count,
-        SUM(COALESCE(totalamt, 0)) as revenue
-      FROM neworder
-      WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
-        AND created_by IS NOT NULL
-      GROUP BY created_by
+        no.created_by as salesperson,
+        COUNT(DISTINCT no.order_id) as orders_count,
+        SUM(COALESCE(qi.total_price, 0)) as revenue
+      FROM neworder no
+      JOIN quotation_items qi ON no.quote_number = qi.quote_number
+      WHERE DATE(no.created_at) >= ? AND DATE(no.created_at) <= ?
+        AND no.created_by IS NOT NULL
+      GROUP BY no.created_by
       ORDER BY revenue DESC
       LIMIT 20
     `, [startDateStr, endDateStr]);
@@ -224,8 +233,11 @@ export async function GET(req) {
       ORDER BY date ASC
     `);
 
-    // Total Revenue = totalamt (order total from neworder)
-    const totalRevenue = parseFloat(salesStats[0].total_revenue) || 0;
+    // Total Revenue, Base, Tax from quotation_items (accurate for all orders in period)
+    const rev = revenueFromItems[0];
+    const totalRevenue = parseFloat(rev?.total_revenue) || 0;
+    const totalBaseAmount = parseFloat(rev?.total_base_amount) || 0;
+    const totalTaxGst = parseFloat(rev?.total_tax_gst) || 0;
 
     // Return aggregated data
     return NextResponse.json({
@@ -235,8 +247,8 @@ export async function GET(req) {
         sales: {
           totalOrders: salesStats[0].total_orders || 0,
           totalRevenue: totalRevenue,
-          totalTaxGst: salesStats[0].total_tax_gst || 0,
-          totalBaseAmount: salesStats[0].total_base_amount || 0,
+          totalTaxGst: totalTaxGst,
+          totalBaseAmount: totalBaseAmount,
           totalGst: gstTaxBreakdown[0]?.total_gst || 0,
           totalTax: gstTaxBreakdown[0]?.total_tax || 0,
           activeSalespeople: salesStats[0].active_salespeople || 0,
