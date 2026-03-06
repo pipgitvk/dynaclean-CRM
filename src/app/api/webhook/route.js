@@ -4,6 +4,16 @@ import { getDbConnection } from "@/lib/db";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+// Same as meta-backfill: normalize phone so duplicate check & storage match
+function normalizePhone(phone) {
+  if (!phone) return null;
+  let p = typeof phone === "string" ? phone : String(phone);
+  p = p.replace(/\D/g, "");
+  if (p.startsWith("91") && p.length > 10) p = p.slice(-10);
+  if (p.length > 10) p = p.slice(-10);
+  return p || null;
+}
+
 // const dbConfig = {
 //   host: process.env.DB_HOST,
 //   user: process.env.DB_USER,
@@ -118,9 +128,9 @@ export async function POST(request) {
       fieldData.find((f) => f.name === name)?.values?.[0] || null;
     const first_name = getValue("full_name") || getValue("first_name");
     const email = getValue("email");
-    let phone = getValue("phone_number");
+    const rawPhone = getValue("phone_number");
+    const phone = normalizePhone(rawPhone) || (rawPhone ? String(rawPhone).trim() : null);
     const address = getValue("city");
-    // const pincode = getValue("postcode") || getValue("post_code");
     const language = getValue("preferred_language_to_communicate");
     const lead_campaign = "social_media";
     const products_interest = campaignName;
@@ -128,10 +138,6 @@ export async function POST(request) {
 
     if (!phone && !email)
       return new Response("Missing contact info", { status: 400 });
-
-    if (phone && typeof phone === "string" && phone.startsWith("+91"))
-      phone = phone.slice(3);
-    else if (phone && typeof phone !== "string") phone = String(phone);
 
     // --- Fetch all active reps ---
     const [repRows] = await conn.execute(`
@@ -178,16 +184,16 @@ let customerId = null;
 
 if (phone) {
   const [rows] = await conn.execute(
-    `SELECT id FROM customers WHERE phone = ? LIMIT 1`,
+    `SELECT customer_id FROM customers WHERE phone = ? LIMIT 1`,
     [phone]
   );
 
   if (rows.length > 0) {
-    customerId = rows[0].id;
+    customerId = rows[0].customer_id;
 
     // ✅ 1️⃣ Update customer status to 'Average'
     await conn.execute(
-      `UPDATE customers SET status = ? WHERE id = ?`,
+      `UPDATE customers SET status = ? WHERE customer_id = ?`,
       ["Average", customerId]
     );
 
