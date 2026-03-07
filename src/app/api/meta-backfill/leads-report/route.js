@@ -30,17 +30,37 @@ export async function GET(request) {
 
     const conn = await getDbConnection();
 
-    // Leads per employee (assigned_to) in date range
+    // All reps from lead_distribution (who receive leads)
+    const [allReps] = await conn.execute(
+      `SELECT username FROM lead_distribution WHERE is_active = 1 ORDER BY priority ASC`
+    );
+
+    // Leads count per employee in date range
     const [byEmployee] = await conn.execute(
       `SELECT 
         COALESCE(assigned_to, 'Unassigned') as employee,
         COUNT(*) as lead_count
        FROM customers
        WHERE DATE(date_created) BETWEEN ? AND ?
-       GROUP BY COALESCE(assigned_to, 'Unassigned')
-       ORDER BY lead_count DESC`,
+       GROUP BY COALESCE(assigned_to, 'Unassigned')`,
       [from, to]
     );
+
+    // Build map: employee -> count
+    const countMap = Object.fromEntries(
+      byEmployee.map((r) => [r.employee, Number(r.lead_count)])
+    );
+
+    // Combine: all reps from lead_distribution + any others from customers (e.g. Unassigned)
+    const repSet = new Set(allReps.map((r) => r.username));
+    byEmployee.forEach((r) => repSet.add(r.employee));
+
+    const byEmployeeFull = [...repSet]
+      .map((emp) => ({
+        employee: emp,
+        leadCount: countMap[emp] ?? 0,
+      }))
+      .sort((a, b) => b.leadCount - a.leadCount);
 
     // Total leads in date range
     const [totalResult] = await conn.execute(
@@ -55,10 +75,7 @@ export async function GET(request) {
       from,
       to,
       total,
-      byEmployee: byEmployee.map((r) => ({
-        employee: r.employee,
-        leadCount: Number(r.lead_count),
-      })),
+      byEmployee: byEmployeeFull,
     });
   } catch (err) {
     console.error("/api/meta-backfill/leads-report error:", err);
