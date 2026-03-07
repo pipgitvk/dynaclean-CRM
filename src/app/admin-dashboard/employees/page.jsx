@@ -4,11 +4,20 @@ import { getDbConnection } from "@/lib/db";
 
 async function getEmployees() {
   const connection = await getDbConnection();
-  const [rows] = await connection.execute(
-    "SELECT username, email, gender, password, number, empId, userRole , status FROM rep_list"
-  );
-  // connection.end(); // Close the connection after fetching
-  return rows;
+  try {
+    const [rows] = await connection.execute(
+      "SELECT username, email, gender, password, number, empId, userRole, reporting_manager, status FROM rep_list"
+    );
+    return rows;
+  } catch (e) {
+    if (e.message?.includes("reporting_manager")) {
+      const [rows] = await connection.execute(
+        "SELECT username, email, gender, password, number, empId, userRole, status FROM rep_list"
+      );
+      return rows.map((r) => ({ ...r, reporting_manager: null }));
+    }
+    throw e;
+  }
 }
 
 export default async function Home() {

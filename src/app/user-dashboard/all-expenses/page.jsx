@@ -1,79 +1,46 @@
 import { getDbConnection } from "@/lib/db";
 import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
 import ExpenseTable from "./ExpenseTable";
 import { getSessionPayload } from "@/lib/auth";
-
-const JWT_SECRET = process.env.JWT_SECRET;
 
 export const dynamic = "force-dynamic";
 
 export default async function ExpensesPage() {
-  console.log("📌 ExpensesPage loaded");
-
-  // 🔐 Read token from cookies
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
-  console.log("📥 Token from cookies:", token ? "[REDACTED]" : "❌ No token");
 
   if (!token) {
-    console.error("❌ Unauthorized access - no token");
     return <p className="text-red-600 p-4">Unauthorized</p>;
   }
 
-  let username = "";
-  let role = "";
-
   const payload = await getSessionPayload();
+  if (!payload) return null;
 
-  // Handle case where no valid session exists
-  if (!payload) {
-    // You can handle unauthorized access here, e.g., redirect or return an error
-    return null;
-  }
+  const username = payload.username;
+  const role = payload.role;
 
-  username = payload.username;
-  role = payload.role;
-
-  console.log("👤 Username:", username);
-  console.log("🔐 Role:", role);
-
-  // ✅ DB connection
   let conn;
   try {
-    console.log("🛠️ Connecting to DB...");
     conn = await getDbConnection();
-    console.log("✅ DB connection successful");
   } catch (dbErr) {
-    console.error("❌ DB connection failed:", dbErr);
     return <p className="text-red-600 p-4">Database connection error</p>;
   }
 
-  // ✅ Fetch expenses
-  const query = `
-    SELECT ID, TravelDate, FromLocation, Tolocation,
-           TicketCost, HotelCost, MealsCost, OtherExpenses,
-           approved_amount, payment_date, approval_status, username
-    FROM expenses 
-    ORDER BY TravelDate DESC
-  `;
-
   let rows = [];
-
   try {
-    console.log("📦 Fetching expenses...");
-    const [results] = await conn.execute(query);
+    const [results] = await conn.execute(
+      `SELECT ID, TravelDate, FromLocation, Tolocation,
+              TicketCost, HotelCost, MealsCost, OtherExpenses,
+              approved_amount, payment_date, approval_status, username
+       FROM expenses 
+       ORDER BY TravelDate DESC`
+    );
     rows = results;
-    console.log("✅ Expenses fetched:", rows.length);
   } catch (queryErr) {
-    console.error("❌ Query failed:", queryErr);
+    console.error("Query failed:", queryErr);
     return <p className="text-red-600 p-4">Query error</p>;
-  } finally {
-    // await conn.end();
-    console.log("🔌 DB connection closed");
   }
 
-  // ✅ Render UI
   return (
     <div className="max-w-8xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">

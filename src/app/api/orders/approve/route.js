@@ -23,31 +23,53 @@ export async function POST(req) {
 
         const conn = await getDbConnection();
 
-        // Ensure approval_remark column exists (ignore if already exists)
+        // Ensure approval_remark and approval_date columns exist
         try {
             await conn.execute(
                 "ALTER TABLE neworder ADD COLUMN approval_remark TEXT NULL DEFAULT NULL"
             );
-        } catch (_) {
-            // Column may already exist
-        }
+        } catch (_) {}
+        try {
+            await conn.execute(
+                "ALTER TABLE neworder ADD COLUMN approval_date DATETIME NULL DEFAULT NULL"
+            );
+        } catch (_) {}
 
         const remarkVal = typeof remark === "string" ? remark.trim() || null : null;
 
         if (action === 'approve') {
             await conn.execute(
-                "UPDATE neworder SET approval_status = 'approved', sales_status = 1, approval_remark = ? WHERE order_id = ?",
+                "UPDATE neworder SET approval_status = 'approved', sales_status = 1, approval_remark = ?, approval_date = NOW() WHERE order_id = ?",
                 [remarkVal, orderId]
             );
         } else if (action === 'reject') {
             await conn.execute(
-                "UPDATE neworder SET approval_status = 'rejected', is_cancelled = 1, approval_remark = ? WHERE order_id = ?",
+                "UPDATE neworder SET approval_status = 'rejected', is_cancelled = 1, approval_remark = ?, approval_date = NOW() WHERE order_id = ?",
                 [remarkVal, orderId]
             );
         } else {
-            // Reset to pending (undo approve/reject)
+            // Reset to pending (undo approve/reject) - only within 4 hours
+            const [orderRows] = await conn.execute(
+                "SELECT approval_date FROM neworder WHERE order_id = ?",
+                [orderId]
+            );
+            const approvalDate = orderRows[0]?.approval_date;
+            if (!approvalDate) {
+                return NextResponse.json(
+                    { success: false, error: "Revert is only allowed within 4 hours of approval/rejection." },
+                    { status: 400 }
+                );
+            }
+            const approvedAt = new Date(approvalDate).getTime();
+            const hoursPassed = (Date.now() - approvedAt) / (1000 * 60 * 60);
+            if (hoursPassed >= 4) {
+                return NextResponse.json(
+                    { success: false, error: "Revert is only allowed within 4 hours of approval/rejection." },
+                    { status: 400 }
+                );
+            }
             await conn.execute(
-                "UPDATE neworder SET approval_status = 'pending', is_cancelled = 0, sales_status = 0, approval_remark = NULL WHERE order_id = ?",
+                "UPDATE neworder SET approval_status = 'pending', is_cancelled = 0, sales_status = 0, approval_remark = NULL, approval_date = NULL WHERE order_id = ?",
                 [orderId]
             );
         }
