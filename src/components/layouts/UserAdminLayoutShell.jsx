@@ -31,7 +31,7 @@ function LayoutContent({ children, menuItems, showBackButton, backButtonPath }) 
       <div className="flex flex-col flex-1 transition-all duration-300 overflow-hidden">
         <Navbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <UserProvider>
-          <main className={`p-3 sm:p-4 md:p-6 lg:p-8 overflow-auto ${theme.body.text}`}>{children}</main>
+          <main className={`p-3 sm:p-4 md:p-6 lg:p-8 overflow-auto min-w-0 ${theme.body.text}`}>{children}</main>
         </UserProvider>
       </div>
       <ThemeSwitcher />

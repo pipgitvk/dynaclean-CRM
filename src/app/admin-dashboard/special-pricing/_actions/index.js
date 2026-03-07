@@ -127,5 +127,5 @@ export async function rejectSpecialPrice(formData) {
     ["admin", Number(id)]
   );
 
-  redirect("/admin-dashboard/view-customer");
+  redirect("/admin-dashboard/special-pricing");
 }
