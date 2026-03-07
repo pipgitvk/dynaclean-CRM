@@ -56,23 +56,23 @@ export default function SpecialPriceDetailsModal({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-2">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between border-b px-4 py-3">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col my-auto">
+            <div className="flex items-center justify-between border-b px-3 sm:px-4 py-3 flex-shrink-0">
               <h2 className="text-sm font-semibold">
                 Special Price Details
               </h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="text-gray-500 hover:text-gray-700 text-sm"
+                className="text-gray-500 hover:text-gray-700 text-sm p-1 -m-1"
               >
                 ✕
               </button>
             </div>
 
-            <div className="px-4 py-3 space-y-2 text-sm">
-              <div className="grid grid-cols-2 gap-2">
+            <div className="px-3 sm:px-4 py-3 space-y-2 text-sm flex-1 overflow-y-auto min-h-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <div>
                   <div className="font-semibold text-gray-600">Customer ID</div>
                   <div className="text-gray-800">{customerId}</div>
@@ -99,7 +99,7 @@ export default function SpecialPriceDetailsModal({
                 </div>
               </div>
 
-              <div className="border-t pt-2 grid grid-cols-2 gap-2">
+              <div className="border-t pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <div>
                   <div className="font-semibold text-gray-600">
                     Original Price
@@ -136,7 +136,7 @@ export default function SpecialPriceDetailsModal({
                 )}
               </div>
 
-              <div className="border-t pt-2 grid grid-cols-2 gap-2 text-xs">
+              <div className="border-t pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs">
                 <div>
                   <div className="font-semibold text-gray-600">Set By</div>
                   <div className="text-gray-800">
@@ -152,32 +152,34 @@ export default function SpecialPriceDetailsModal({
               </div>
             </div>
 
-            <div className="flex justify-end border-t px-4 py-3">
-              <div className="flex items-center justify-between w-full gap-2">
-                <div className="flex gap-2 items-center">
+            <div className="flex justify-end border-t px-3 sm:px-4 py-3 flex-shrink-0">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center w-full gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                   {onUpdate && (
                     <form
                       action={onUpdate}
-                      className="flex items-center gap-2 text-xs"
+                      className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs"
                     >
                       <input type="hidden" name="id" value={id} />
                       <label className="text-gray-600 font-medium">
                         Update Price
                       </label>
-                      <input
-                        type="number"
-                        name="special_price"
-                        defaultValue={specialPrice ?? 0}
-                        step="0.01"
-                        required
-                        className="w-24 border rounded px-2 py-1 text-right"
-                      />
-                      <button
-                        type="submit"
-                        className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
-                      >
-                        Save
-                      </button>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          name="special_price"
+                          defaultValue={specialPrice ?? 0}
+                          step="0.01"
+                          required
+                          className="flex-1 min-w-0 sm:w-24 border rounded px-2 py-1.5 sm:py-1 text-right"
+                        />
+                        <button
+                          type="submit"
+                          className="px-3 py-1.5 sm:py-1 rounded bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap"
+                        >
+                          Save
+                        </button>
+                      </div>
                     </form>
                   )}
 
@@ -198,7 +200,7 @@ export default function SpecialPriceDetailsModal({
                       <input type="hidden" name="id" value={id} />
                       <button
                         type="submit"
-                        className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+                        className="w-full sm:w-auto px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700"
                       >
                         Delete
                       </button>
@@ -208,7 +210,7 @@ export default function SpecialPriceDetailsModal({
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="px-4 py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-sm"
+                  className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-sm w-full sm:w-auto"
                 >
                   Close
                 </button>

@@ -51,7 +51,7 @@ export default function SpecialPricingSearch({ initialSearch, suggestions }) {
     }, 300);
 
     return () => clearTimeout(handler);
-  }, [value, router, searchParams]);
+  }, [value, router]);
 
   return (
     <div className="flex flex-wrap items-center gap-2">

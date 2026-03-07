@@ -9,6 +9,7 @@ import {
   deleteSpecialPrice,
 } from "./_actions";
 import SpecialPricingSearch from "./SpecialPricingSearch";
+import StatusFilter from "./StatusFilter";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   const pageParam = Number(searchParamsResolved?.page || 1) || 1;
   const currentPage = pageParam < 1 ? 1 : pageParam;
   const searchQuery = String(searchParamsResolved?.search || "").trim();
+  const statusFilter = String(searchParamsResolved?.status || "").toLowerCase().trim();
 
   const conn = await getDbConnection();
 
@@ -36,18 +38,27 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
 
   let whereClause = "";
   const whereParams = [];
+  const conditions = [];
 
   if (searchQuery) {
     const like = `%${searchQuery}%`;
-    whereClause = `
-      WHERE
-        c.first_name LIKE ? OR
-        c.last_name LIKE ? OR
-        p.item_name LIKE ? OR
-        sp.product_code LIKE ? OR
-        sp.status LIKE ?
-    `;
+    conditions.push(`(
+      c.first_name LIKE ? OR
+      c.last_name LIKE ? OR
+      p.item_name LIKE ? OR
+      sp.product_code LIKE ? OR
+      sp.status LIKE ?
+    )`);
     whereParams.push(like, like, like, like, like);
+  }
+
+  if (statusFilter && ["approved", "rejected", "pending"].includes(statusFilter)) {
+    conditions.push("LOWER(TRIM(sp.status)) = ?");
+    whereParams.push(statusFilter);
+  }
+
+  if (conditions.length > 0) {
+    whereClause = `WHERE ${conditions.join(" AND ")}`;
   }
 
   const [rows] = await conn.execute(
@@ -108,132 +119,130 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
   );
 
   return (
-    <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Special Price Approvals</h1>
+    <div className="p-4 sm:p-6 space-y-4 overflow-x-hidden min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Special Price Approvals</h1>
         <span className="text-sm text-gray-600">
           Total records: {totalCount}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-xs w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4 w-full">
           <div className="text-sm text-gray-600">Approved</div>
-          <div className="mt-1 text-2xl font-bold text-green-700">
+          <div className="mt-1 text-xl sm:text-2xl font-bold text-green-700">
             {statusCounts.approved}
           </div>
         </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-xs w-full">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 sm:p-4 w-full">
           <div className="text-sm text-gray-600">Pending</div>
-          <div className="mt-1 text-2xl font-bold text-yellow-700">
+          <div className="mt-1 text-xl sm:text-2xl font-bold text-yellow-700">
             {statusCounts.pending}
           </div>
         </div>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-xs w-full">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 sm:p-4 w-full">
           <div className="text-sm text-gray-600">Rejected</div>
-          <div className="mt-1 text-2xl font-bold text-red-700">
+          <div className="mt-1 text-xl sm:text-2xl font-bold text-red-700">
             {statusCounts.rejected}
           </div>
         </div>
       </div>
 
-      <SpecialPricingSearch
-        initialSearch={searchQuery}
-        suggestions={rows.map((row) => ({
-          id: row.id,
-          customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
-          productName: row.item_name,
-          productCode: row.product_code,
-        }))}
-      />
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:gap-4">
+        <SpecialPricingSearch
+          initialSearch={searchQuery}
+          suggestions={rows.map((row) => ({
+            id: row.id,
+            customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+            productName: row.item_name,
+            productCode: row.product_code,
+          }))}
+        />
+        <StatusFilter initialStatus={statusFilter} />
+      </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full border-collapse text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="p-3 text-left">Customer</th>
-              <th className="p-3 text-left">Image</th>
-              <th className="p-3 text-left">Product</th>
-              <th className="p-3 text-right">Original Price</th>
-              <th className="p-3 text-right">Special Price</th>
-              <th className="p-3 text-center">Status</th>
-              <th className="p-3 text-left">Set By</th>
-              <th className="p-3 text-left">Set Date</th>
-              <th className="p-3 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
+      <div className="bg-white shadow rounded-lg overflow-hidden min-w-0">
+        <div
+          className="overflow-x-scroll w-full min-w-0 touch-pan-x"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <table className="min-w-[900px] w-full border-collapse text-sm">
+            <thead className="bg-gray-100">
               <tr>
-                <td
-                  colSpan={8}
-                  className="p-4 text-center text-gray-500 text-sm"
-                >
-                  {searchQuery ? "No data found" : "No special prices found."}
-                </td>
+                <th className="p-3 text-left">Customer</th>
+                <th className="p-3 text-left">Image</th>
+                <th className="p-3 text-left">Product</th>
+                <th className="p-3 text-right">Original Price</th>
+                <th className="p-3 text-right">Special Price</th>
+                <th className="p-3 text-center">Status</th>
+                <th className="p-3 text-left">Set By</th>
+                <th className="p-3 text-left">Set Date</th>
+                <th className="p-3 text-left min-w-[160px] sm:sticky sm:right-0 sm:bg-gray-100 sm:shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)]">Actions</th>
               </tr>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="p-3">
-                    {row.first_name} {row.last_name || ""}
-                    <div className="text-xs text-gray-500">
-                      ID: {row.customer_id}
-                    </div>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={9}
+                    className="p-4 text-center text-gray-500 text-sm"
+                  >
+                    {searchQuery || statusFilter ? "No data found" : "No special prices found."}
                   </td>
-                  <td className="p-3">
-                    {row.product_image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={row.product_image}
-                        alt={row.item_name || "Product"}
-                        className="w-10 h-10 object-cover rounded"
-                      />
-                    ) : (
-                      <span className="text-gray-400 text-xs">No image</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <div>{row.item_name}</div>
-                    <div className="text-xs text-gray-500">
-                      Code: {row.product_code}
-                    </div>
-                  </td>
-                  <td className="p-3 text-right text-gray-600">
-                    ₹ {row.price_per_unit}
-                  </td>
-                  <td className="p-3 text-right font-semibold">
-                    ₹ {row.special_price}
-                  </td>
-                  <td className="p-3 text-center">
-                    {(() => {
-                      const status = (row.status || "").toLowerCase();
-                      const isApproved = status === "approved";
-                      const isRejected = status === "rejected";
-                      const badgeClass = isApproved
-                        ? "bg-green-100 text-green-700"
-                        : isRejected
-                        ? "bg-red-100 text-red-700"
-                        : "bg-yellow-100 text-yellow-700";
+                </tr>
+              ) : (
+                rows.map((row) => {
+                  const status = (row.status || "").toLowerCase();
+                  const isApproved = status === "approved";
+                  const isRejected = status === "rejected";
+                  const badgeClass = isApproved
+                    ? "bg-green-100 text-green-700"
+                    : isRejected
+                    ? "bg-red-100 text-red-700"
+                    : "bg-yellow-100 text-yellow-700";
+                  const label = isApproved ? "approved" : isRejected ? "rejected" : "pending";
+                  const approvedMeta =
+                    isApproved && row.approved_by
+                      ? `Approved by ${row.approved_by}${
+                          row.approved_date
+                            ? ` on ${new Date(row.approved_date).toLocaleString()}`
+                            : ""
+                        }`
+                      : null;
 
-                      const label = isApproved
-                        ? "approved"
-                        : isRejected
-                        ? "rejected"
-                        : "pending";
-
-                      const approvedMeta =
-                        isApproved && row.approved_by
-                          ? `Approved by ${row.approved_by}${
-                              row.approved_date
-                                ? ` on ${new Date(
-                                    row.approved_date,
-                                  ).toLocaleString()}`
-                                : ""
-                            }`
-                          : null;
-
-                      return (
+                  return (
+                    <tr key={row.id} className="border-t">
+                      <td className="p-3">
+                        {row.first_name} {row.last_name || ""}
+                        <div className="text-xs text-gray-500">
+                          ID: {row.customer_id}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        {row.product_image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={row.product_image}
+                            alt={row.item_name || "Product"}
+                            className="w-10 h-10 object-cover rounded"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-xs">No image</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div>{row.item_name}</div>
+                        <div className="text-xs text-gray-500">
+                          Code: {row.product_code}
+                        </div>
+                      </td>
+                      <td className="p-3 text-right text-gray-600">
+                        ₹ {row.price_per_unit}
+                      </td>
+                      <td className="p-3 text-right font-semibold">
+                        ₹ {row.special_price}
+                      </td>
+                      <td className="p-3 text-center">
                         <div className="flex flex-col items-center gap-1">
                           <span
                             className={`px-3 py-1 rounded text-xs capitalize ${badgeClass}`}
@@ -246,82 +255,90 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                             </span>
                           )}
                         </div>
-                      );
-                    })()}
-                  </td>
-                  <td className="p-3 text-sm">{row.set_by}</td>
-                  <td className="p-3 text-xs text-gray-600">
-                    {row.set_date
-                      ? new Date(row.set_date).toLocaleString()
-                      : "-"}
-                  </td>
-                  <td className="p-3 space-y-1">
-                    <div className="flex flex-wrap gap-2">
-                      <SpecialPriceDetailsModal
-                        details={{
-                          id: row.id,
-                          customerId: row.customer_id,
-                          customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
-                          productName: row.item_name,
-                          productCode: row.product_code,
-                          originalPrice: row.price_per_unit,
-                          specialPrice: row.special_price,
-                          status: row.status,
-                          setBy: row.set_by,
-                          setDate: row.set_date,
-                          approvedBy: row.approved_by,
-                          approvedDate: row.approved_date,
-                        }}
-                        onUpdate={updateSpecialPrice}
-                        onDelete={deleteSpecialPrice}
-                      />
-                    </div>
-                    {row.status === "pending" && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <form action={approveSpecialPrice}>
-                          <input type="hidden" name="id" value={row.id} />
-                          <button
-                            type="submit"
-                            className="bg-green-600 text-white text-xs px-3 py-1 rounded"
-                          >
-                            Approve
-                          </button>
-                        </form>
-                        <form action={rejectSpecialPrice}>
-                          <input type="hidden" name="id" value={row.id} />
-                          <button
-                            type="submit"
-                            className="bg-red-600 text-white text-xs px-3 py-1 rounded"
-                          >
-                            Reject
-                          </button>
-                        </form>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                      </td>
+                      <td className="p-3 text-sm">{row.set_by}</td>
+                      <td className="p-3 text-xs text-gray-600">
+                        {row.set_date
+                          ? new Date(row.set_date).toLocaleString()
+                          : "-"}
+                      </td>
+                      <td className="p-3 space-y-2 min-w-[160px] sm:sticky sm:right-0 sm:bg-white sm:shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.1)]">
+                        <div className="flex flex-wrap gap-2">
+                          <SpecialPriceDetailsModal
+                            details={{
+                              id: row.id,
+                              customerId: row.customer_id,
+                              customerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+                              productName: row.item_name,
+                              productCode: row.product_code,
+                              originalPrice: row.price_per_unit,
+                              specialPrice: row.special_price,
+                              status: row.status,
+                              setBy: row.set_by,
+                              setDate: row.set_date,
+                              approvedBy: row.approved_by,
+                              approvedDate: row.approved_date,
+                            }}
+                            onUpdate={updateSpecialPrice}
+                            onDelete={deleteSpecialPrice}
+                          />
+                        </div>
+                        {!isApproved && !isRejected && (
+                          <div className="flex flex-wrap gap-2">
+                            <form action={approveSpecialPrice} className="inline">
+                              <input type="hidden" name="id" value={row.id} />
+                              <button
+                                type="submit"
+                                className="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-green-700"
+                              >
+                                Approve
+                              </button>
+                            </form>
+                            <form action={rejectSpecialPrice} className="inline">
+                              <input type="hidden" name="id" value={row.id} />
+                              <button
+                                type="submit"
+                                className="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-red-700"
+                              >
+                                Reject
+                              </button>
+                            </form>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        <div className="flex justify-between items-center p-4 border-t text-sm">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 p-4 border-t text-sm">
           <span>
             Page {currentPage} of {totalPages}
           </span>
           <div className="flex gap-2">
             {currentPage > 1 && (
               <Link
-                href={`/admin-dashboard/special-pricing?page=${currentPage - 1}`}
-                className="px-3 py-1 border rounded hover:bg-gray-50"
+                href={`/admin-dashboard/special-pricing?${new URLSearchParams({
+                  ...(searchQuery && { search: searchQuery }),
+                  ...(statusFilter && { status: statusFilter }),
+                  page: String(currentPage - 1),
+                }).toString()}`}
+                className="px-3 py-1.5 border rounded hover:bg-gray-50"
               >
                 Previous
               </Link>
             )}
             {currentPage < totalPages && (
               <Link
-                href={`/admin-dashboard/special-pricing?page=${currentPage + 1}`}
-                className="px-3 py-1 border rounded hover:bg-gray-50"
+                href={`/admin-dashboard/special-pricing?${new URLSearchParams({
+                  ...(searchQuery && { search: searchQuery }),
+                  ...(statusFilter && { status: statusFilter }),
+                  page: String(currentPage + 1),
+                }).toString()}`}
+                className="px-3 py-1.5 border rounded hover:bg-gray-50"
               >
                 Next
               </Link>
