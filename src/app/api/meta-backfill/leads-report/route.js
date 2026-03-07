@@ -36,13 +36,18 @@ export async function GET(request) {
     );
 
     // Leads count per employee in date range
+    // When assigned_to = 'Automatic', use lead_source/sales_representative (actual rep)
     const [byEmployee] = await conn.execute(
       `SELECT 
-        COALESCE(assigned_to, 'Unassigned') as employee,
+        CASE 
+          WHEN assigned_to IS NULL OR assigned_to = '' OR assigned_to = 'Automatic' 
+          THEN COALESCE(lead_source, sales_representative, 'Unassigned')
+          ELSE assigned_to 
+        END as employee,
         COUNT(*) as lead_count
        FROM customers
        WHERE DATE(date_created) BETWEEN ? AND ?
-       GROUP BY COALESCE(assigned_to, 'Unassigned')`,
+       GROUP BY employee`,
       [from, to]
     );
 
