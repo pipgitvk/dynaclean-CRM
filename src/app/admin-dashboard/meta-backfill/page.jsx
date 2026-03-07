@@ -11,6 +11,8 @@ export default function MetaBackfillPage() {
   const [diagnoseLoading, setDiagnoseLoading] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState(null);
   const [autoImportEnabled, setAutoImportEnabled] = useState(true);
+  const [leadsReportLoading, setLeadsReportLoading] = useState(false);
+  const [leadsReport, setLeadsReport] = useState(null);
 
   const handleFetch = async (e) => {
     e.preventDefault();
@@ -74,6 +76,30 @@ export default function MetaBackfillPage() {
       setMessage("Error fetching all leads");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLeadsReport = async () => {
+    setLeadsReport(null);
+    if (!since || !until) {
+      setMessage("Please select both From and To dates");
+      return;
+    }
+    setLeadsReportLoading(true);
+    try {
+      const res = await fetch(`/api/meta-backfill/leads-report?from=${since}&to=${until}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data?.error || "Failed to fetch leads report");
+        return;
+      }
+      setLeadsReport(data);
+      setMessage("");
+    } catch (err) {
+      console.error(err);
+      setMessage("Error fetching leads report");
+    } finally {
+      setLeadsReportLoading(false);
     }
   };
 
@@ -276,10 +302,47 @@ export default function MetaBackfillPage() {
           >
             {loading ? "Fetching..." : "Fetch ALL Leads (form history)"}
           </button>
+          <button
+            type="button"
+            onClick={handleLeadsReport}
+            disabled={leadsReportLoading || !since || !until}
+            className="px-3 py-1 rounded bg-emerald-600 text-white text-sm disabled:opacity-50 hover:bg-emerald-700"
+          >
+            {leadsReportLoading ? "Checking..." : "Check Leads Report"}
+          </button>
         </div>
       </form>
 
       {message && <p className="text-sm text-gray-700">{message}</p>}
+
+      {leadsReport && (
+        <div className="border rounded-lg p-4 bg-emerald-50/50 border-emerald-200">
+          <h2 className="font-medium mb-2 text-emerald-900">
+            Leads Report ({leadsReport.from} to {leadsReport.to})
+          </h2>
+          <p className="text-sm text-emerald-800 mb-3">
+            <strong>Total leads:</strong> {leadsReport.total}
+          </p>
+          <div className="overflow-x-auto border rounded bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-emerald-100">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-emerald-900">Employee</th>
+                  <th className="px-3 py-2 text-right font-medium text-emerald-900">Leads Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leadsReport.byEmployee?.map((row, i) => (
+                  <tr key={i} className="border-t border-emerald-100">
+                    <td className="px-3 py-2">{row.employee}</td>
+                    <td className="px-3 py-2 text-right font-medium">{row.leadCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {leads.length > 0 && (
         <div className="space-y-3">
