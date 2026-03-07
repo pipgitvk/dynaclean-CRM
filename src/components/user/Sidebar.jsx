@@ -107,6 +107,7 @@ import {
   UserPlus,
   Mail,
   Settings,
+  CheckSquare,
 } from "lucide-react";
 
 // Icon map
@@ -137,6 +138,7 @@ const iconMap = {
   UserPlus,
   Mail,
   Settings,
+  CheckSquare,
 };
 
 //this is test

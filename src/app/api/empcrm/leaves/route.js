@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { getReportees } from "@/lib/reportingManager";
 
-// GET: Fetch leaves (admin sees all, users see only their own)
+// GET: Fetch leaves (admin sees all, users see only their own, reporting manager sees reportees only)
 export async function GET(request) {
   try {
     const session = await getSessionPayload();
@@ -16,21 +17,33 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const usernameParam = searchParams.get("username");
+    const mode = searchParams.get("mode");
 
     const conn = await getDbConnection();
 
-    // Determine caller using referer
     const referer = request.headers.get("referer") || "";
-
-    // Force mode based on URL
     const forceUserMode = referer.includes("user-dashboard");
     const forceAdminMode = referer.includes("admin-dashboard");
+    const isRealAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].includes(session.role);
 
-    // Actual admin role
-    const isRealAdmin = ["SUPERADMIN", "HR HEAD", "HR"].includes(session.role);
+    // Reporting manager mode: user has reportees and is fetching for approval
+    const reportees = await getReportees(session.username);
+    const isReportingManager = reportees.length > 0 && !isRealAdmin;
+    const requestingApprovalMode = mode === "approve" || referer.includes("leave-approvals");
 
-    // Final admin permission
-    const isAdmin = forceAdminMode ? true : forceUserMode ? false : isRealAdmin;
+    // If requesting approval mode but no reportees, return empty
+    if (requestingApprovalMode && !isReportingManager) {
+      return NextResponse.json({
+        success: true,
+        leaves: [],
+        isAdmin: false,
+      });
+    }
+
+    const reportingManagerMode = requestingApprovalMode && isReportingManager;
+
+    let isAdmin = forceAdminMode ? true : forceUserMode ? false : isRealAdmin;
+    if (reportingManagerMode) isAdmin = true;
 
     let query = `
       SELECT el.*, ep.employment_status, ep.leave_policy 
@@ -40,19 +53,18 @@ export async function GET(request) {
     `;
     const params = [];
 
-    // If user-dashboard → show only logged-in user's leaves
-    if (!isAdmin) {
+    if (reportingManagerMode) {
+      const placeholders = reportees.map(() => "?").join(", ");
+      query += ` AND el.username IN (${placeholders})`;
+      params.push(...reportees);
+    } else if (!isAdmin) {
       query += ` AND el.username = ?`;
       params.push(session.username);
-    }
-
-    // If admin-dashboard AND ?username= provided → filter specific user
-    if (isAdmin && usernameParam) {
+    } else if (isAdmin && usernameParam) {
       query += ` AND el.username = ?`;
       params.push(usernameParam);
     }
 
-    // Status filter
     if (status) {
       query += ` AND el.status = ?`;
       params.push(status);
@@ -305,7 +317,7 @@ export async function POST(request) {
   }
 }
 
-// PATCH: Update leave status (approve/reject) - Admin only
+// PATCH: Update leave status (approve/reject) - Admin/HR or Reporting Manager
 export async function PATCH(request) {
   try {
     const session = await getSessionPayload();
@@ -316,11 +328,13 @@ export async function PATCH(request) {
       );
     }
 
-    // Check if user is admin/HR
-    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR"].includes(session.role);
-    if (!isAdmin) {
+    // Only reporting managers can approve - HR can only view
+    const reportees = await getReportees(session.username);
+    const isReportingManager = reportees.length > 0;
+
+    if (!isReportingManager) {
       return NextResponse.json(
-        { success: false, error: "Access denied. Only HR/Admin can approve/reject leaves." },
+        { success: false, error: "Access denied. Only Reporting Manager can approve/reject leaves." },
         { status: 403 }
       );
     }
@@ -351,9 +365,19 @@ export async function PATCH(request) {
 
     const conn = await getDbConnection();
 
-    // Fetch leave details for possible payroll action
     const [leaveRows] = await conn.execute(`SELECT * FROM employee_leaves WHERE id = ?`, [leaveId]);
     const leave = leaveRows[0];
+    if (!leave) {
+      return NextResponse.json({ success: false, error: "Leave not found" }, { status: 404 });
+    }
+
+    // Reporting manager can only approve their reportees' leaves
+    if (!reportees.includes(leave.username)) {
+      return NextResponse.json(
+        { success: false, error: "Access denied. You can only approve leaves of your reportees." },
+        { status: 403 }
+      );
+    }
     const [emailRows] = await conn.execute(`SELECT * FROM email_credentials WHERE username = ?`, [leave.username]);
     const email = emailRows[0];
 

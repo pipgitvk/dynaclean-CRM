@@ -17,6 +17,7 @@ import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
+import toast from "react-hot-toast";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -1311,6 +1312,15 @@ function UpdateDeliveryMenuItem({ order }) {
   );
 }
 
+const REVERT_WINDOW_HOURS = 4;
+function canRevertOrder(approvalDate) {
+  if (!approvalDate) return false;
+  const approvedAt = new Date(approvalDate).getTime();
+  const now = Date.now();
+  const hoursPassed = (now - approvedAt) / (1000 * 60 * 60);
+  return hoursPassed < REVERT_WINDOW_HOURS;
+}
+
 function ApprovalActions({ r, userRole }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -1318,6 +1328,7 @@ function ApprovalActions({ r, userRole }) {
   const [remark, setRemark] = useState("");
   const isSuperAdmin =
     (userRole || "").toString().trim().toUpperCase() === "SUPERADMIN";
+  const revertAllowed = canRevertOrder(r.approval_date);
 
   const submitAction = async (action, remarkVal) => {
     setLoading(true);
@@ -1350,6 +1361,10 @@ function ApprovalActions({ r, userRole }) {
 
   const handleAction = async (action) => {
     if (action === "pending") {
+      if (!revertAllowed) {
+        toast.error("Revert is only allowed within 4 hours of approval/rejection.");
+        return;
+      }
       if (!confirm("Reset this order to Pending approval?")) return;
       await submitAction("pending");
       return;
@@ -1373,8 +1388,8 @@ function ApprovalActions({ r, userRole }) {
           <button
             onClick={() => handleAction("pending")}
             disabled={loading}
-            className="text-xs text-gray-500 hover:text-orange-600 underline"
-            title="Reset to Pending"
+            className={`text-xs ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
+            title={revertAllowed ? "Reset to Pending (within 4 hours)" : "Revert disabled after 4 hours"}
           >
             Revert
           </button>
@@ -1393,8 +1408,8 @@ function ApprovalActions({ r, userRole }) {
           <button
             onClick={() => handleAction("pending")}
             disabled={loading}
-            className="text-xs text-gray-500 hover:text-orange-600 underline"
-            title="Reset to Pending"
+            className={`text-xs ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
+            title={revertAllowed ? "Reset to Pending (within 4 hours)" : "Revert disabled after 4 hours"}
           >
             Revert
           </button>

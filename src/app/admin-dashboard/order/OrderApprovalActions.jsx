@@ -3,11 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
+import toast from "react-hot-toast";
+
+const REVERT_WINDOW_HOURS = 4;
+
+function canRevert(approvalDate) {
+  if (!approvalDate) return false;
+  const approvedAt = new Date(approvalDate).getTime();
+  const now = Date.now();
+  const hoursPassed = (now - approvedAt) / (1000 * 60 * 60);
+  return hoursPassed < REVERT_WINDOW_HOURS;
+}
 
 export default function OrderApprovalActions({
   orderId,
   approvalStatus,
   userRole,
+  approvalDate,
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -15,6 +27,7 @@ export default function OrderApprovalActions({
   const [remark, setRemark] = useState("");
   const isSuperAdmin =
     (userRole || "").toString().trim().toUpperCase() === "SUPERADMIN";
+  const revertAllowed = canRevert(approvalDate);
 
   const submitAction = async (action, remarkVal) => {
     setLoading(true);
@@ -47,6 +60,10 @@ export default function OrderApprovalActions({
 
   const handleAction = async (action) => {
     if (action === "pending") {
+      if (!revertAllowed) {
+        toast.error("Revert is only allowed within 4 hours of approval/rejection.");
+        return;
+      }
       if (!confirm("Reset this order to Pending approval?")) return;
       await submitAction("pending");
       return;
@@ -69,8 +86,8 @@ export default function OrderApprovalActions({
           <button
             onClick={() => handleAction("pending")}
             disabled={loading}
-            className="text-sm text-gray-500 hover:text-orange-600 underline mt-1"
-            title="Reset to Pending"
+            className={`text-sm mt-1 ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
+            title={revertAllowed ? "Reset to Pending (within 4 hours)" : "Revert disabled after 4 hours"}
           >
             Revert
           </button>
@@ -89,8 +106,8 @@ export default function OrderApprovalActions({
           <button
             onClick={() => handleAction("pending")}
             disabled={loading}
-            className="text-sm text-gray-500 hover:text-orange-600 underline mt-1"
-            title="Reset to Pending"
+            className={`text-sm mt-1 ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
+            title={revertAllowed ? "Reset to Pending (within 4 hours)" : "Revert disabled after 4 hours"}
           >
             Revert
           </button>

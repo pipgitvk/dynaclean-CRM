@@ -35,9 +35,6 @@ export default async function ExpenseDetailPage({ params }) {
       token,
       new TextEncoder().encode(process.env.JWT_SECRET),
     );
-    console.log("**************************************");
-    console.log("this is the role:", payload);
-
     loggedInUser = payload.username;
     role = payload.role;
   }

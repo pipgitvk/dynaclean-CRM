@@ -303,6 +303,7 @@ export default function OrderDetailsClient({
           orderId={orderId}
           approvalStatus={orderDetails.approval_status || "pending"}
           userRole={userRole}
+          approvalDate={orderDetails.approval_date}
         />
       </div>
 

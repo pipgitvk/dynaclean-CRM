@@ -248,7 +248,9 @@ export default function AdminLeaveManagement() {
           <Calendar className="w-8 h-8 text-blue-600" />
           Leave Management
         </h1>
-        <p className="text-gray-600 mt-2">Review and manage employee leave applications</p>
+        <p className="text-gray-600 mt-2">
+          View leave applications. Only Reporting Managers can approve — use Leave Approvals in EmpCRM User Dashboard.
+        </p>
       </div>
 
       {/* Tabs */}
@@ -401,27 +403,15 @@ export default function AdminLeaveManagement() {
                       {getStatusBadge(leave.status)}
                     </td>
                     <td className="px-6 py-4">
-                      {leave.status === "pending" ? (
-                        <button
-                          onClick={() => {
-                            setSelectedLeave(leave);
-                            setShowApprovalModal(true);
-                          }}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
-                        >
-                          Review
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setSelectedLeave(leave);
-                            setShowApprovalModal(true);
-                          }}
-                          className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-medium"
-                        >
-                          View
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedLeave(leave);
+                          setShowApprovalModal(true);
+                        }}
+                        className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                      >
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -619,23 +609,9 @@ export default function AdminLeaveManagement() {
                 </div>
               )}
 
-              {selectedLeave.status === "pending" && (
-                <div className="space-y-4 pt-4 border-t border-gray-200">
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">Rejection Reason (if rejecting)</label>
-                    <textarea
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      placeholder="Enter reason for rejection..."
-                      rows={3}
-                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              )}
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-gray-200 flex justify-end">
               <button
                 onClick={() => {
                   setShowApprovalModal(false);
@@ -643,32 +619,9 @@ export default function AdminLeaveManagement() {
                   setSelectedLeave(null);
                 }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                disabled={actionLoading}
               >
                 Close
               </button>
-
-              {selectedLeave.status === "pending" && (
-                <>
-                  <button
-                    onClick={() => handleReject(selectedLeave.id)}
-                    disabled={actionLoading}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <XCircle className="w-4 h-4" />
-                    {actionLoading ? "Processing..." : "Reject"}
-                  </button>
-
-                  <button
-                    onClick={() => handleApprove(selectedLeave.id)}
-                    disabled={actionLoading}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    {actionLoading ? "Processing..." : "Approve"}
-                  </button>
-                </>
-              )}
             </div>
           </div>
         </div>

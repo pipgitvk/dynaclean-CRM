@@ -14,7 +14,6 @@ export async function POST(req) {
       approved_by,
     } = body;
 
-    // Optional: Verify JWT from cookies (if you want to secure this)
     const token = req.cookies.get("token")?.value;
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

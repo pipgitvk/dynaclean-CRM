@@ -23,14 +23,17 @@ export default async function OrdersPage() {
 
   const conn = await getDbConnection();
 
-  // Ensure approval_remark column exists
+  // Ensure approval_remark and approval_date columns exist
   try {
     await conn.execute(
       "ALTER TABLE neworder ADD COLUMN approval_remark TEXT NULL DEFAULT NULL"
     );
-  } catch (_) {
-    // Column may already exist
-  }
+  } catch (_) {}
+  try {
+    await conn.execute(
+      "ALTER TABLE neworder ADD COLUMN approval_date DATETIME NULL DEFAULT NULL"
+    );
+  } catch (_) {}
 
   // 1. Fetch the user role
   const [roleRows] = await conn.execute(
@@ -47,7 +50,7 @@ export default async function OrdersPage() {
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
-                no.installation_status, no.is_returned, no.approval_status, no.approval_remark,
+                no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
                 qr.company_name, qr.emp_name, qr.state,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
                 GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code

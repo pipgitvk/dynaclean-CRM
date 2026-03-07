@@ -1,16 +1,36 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, FileText, Calendar, Clock, DollarSign, Receipt, Settings } from "lucide-react";
+import { User, FileText, Calendar, Clock, DollarSign, Receipt, Settings, CheckSquare } from "lucide-react";
 import AttendanceTracker from "@/components/empcrm/AttendanceTracker";
 
 export default function UserEmpCrmDashboard() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reportingManagerStatus, setReportingManagerStatus] = useState({
+    hasReportees: false,
+    pendingLeavesCount: 0,
+  });
 
   useEffect(() => {
     fetchUserData();
+    fetchReportingManagerStatus();
   }, []);
+
+  const fetchReportingManagerStatus = async () => {
+    try {
+      const res = await fetch("/api/empcrm/reporting-manager-status");
+      const data = await res.json();
+      if (data.success && data.hasReportees) {
+        setReportingManagerStatus({
+          hasReportees: true,
+          pendingLeavesCount: data.pendingLeavesCount || 0,
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching reporting manager status:", e);
+    }
+  };
 
   const fetchUserData = async () => {
     try {
@@ -46,6 +66,18 @@ export default function UserEmpCrmDashboard() {
       href: "/empcrm/user-dashboard/leave",
       available: true,
     },
+    ...(reportingManagerStatus.hasReportees
+      ? [
+          {
+            title: "Leave Approvals",
+            description: `Approve leave applications from your reportees${reportingManagerStatus.pendingLeavesCount > 0 ? ` (${reportingManagerStatus.pendingLeavesCount} pending)` : ""}`,
+            icon: CheckSquare,
+            color: "bg-amber-500",
+            href: "/empcrm/user-dashboard/leave-approvals",
+            available: true,
+          },
+        ]
+      : []),
     {
       title: "Attendance",
       description: "View your attendance records",

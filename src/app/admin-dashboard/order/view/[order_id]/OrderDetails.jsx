@@ -226,6 +226,7 @@ export default function OrderDetails({ data, userRole }) {
           orderId={orderDetails.order_id}
           approvalStatus={orderDetails.approval_status || "pending"}
           userRole={userRole}
+          approvalDate={orderDetails.approval_date}
         />
       </div>
 
