@@ -523,6 +523,9 @@ export default function OrderTable({ orders, userRole }) {
                 <div>
                   <strong>Order Id:</strong> {r.order_id}
                 </div>
+                <div>
+                  <strong>Created By:</strong> {r.created_by || "-"}
+                </div>
 
                 <div>
                   <strong>Client:</strong> {r.client_name}
