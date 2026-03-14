@@ -9,9 +9,12 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const secret = searchParams.get("secret");
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && secret !== cronSecret) {
+    // Accept: ?secret=xxx (cron-job.org, Hostinger) OR Authorization: Bearer xxx (Vercel Cron)
+    if (cronSecret && secret !== cronSecret && bearerToken !== cronSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

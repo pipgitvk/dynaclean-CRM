@@ -341,6 +341,13 @@ export default function MetaBackfillPage() {
       {/* Automatic Cron - fetches leads from Meta */}
       <div className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
         <h2 className="font-medium mb-2 text-blue-900">Automatic Cron (every 10 min)</h2>
+        <p className="text-xs text-blue-800 mb-3">
+          <strong>Auto-poll:</strong> sirf jab ye page open hai tab chalega. <strong>Background 24/7:</strong> Vercel pe deploy karo (vercel.json already set hai) ya{" "}
+          <a href="https://cron-job.org" target="_blank" rel="noopener noreferrer" className="underline font-medium">
+            cron-job.org
+          </a>{" "}
+          par free setup karo — CRON_SETUP.md dekho.
+        </p>
         <div className="flex flex-wrap gap-2 items-center">
           <button
             type="button"
