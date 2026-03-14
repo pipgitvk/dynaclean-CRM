@@ -1,6 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+
+const CRON_HISTORY_KEY = "meta-backfill-cron-history";
+const MAX_HISTORY = 50;
+
+function getCronHistory() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CRON_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addCronHistory(entry) {
+  const list = getCronHistory();
+  list.unshift({
+    ...entry,
+    timestamp: new Date().toISOString(),
+  });
+  localStorage.setItem(CRON_HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)));
+}
 
 export default function MetaBackfillPage() {
   const [since, setSince] = useState("");
@@ -13,6 +35,57 @@ export default function MetaBackfillPage() {
   const [autoImportEnabled, setAutoImportEnabled] = useState(true);
   const [leadsReportLoading, setLeadsReportLoading] = useState(false);
   const [leadsReport, setLeadsReport] = useState(null);
+  const [cronTestLoading, setCronTestLoading] = useState(false);
+  const [cronTestResult, setCronTestResult] = useState(null);
+  const [autoPollEnabled, setAutoPollEnabled] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [cronHistory, setCronHistory] = useState([]);
+  const pollCountRef = useRef(0);
+
+  // Har 10 min par API call jab auto-poll on ho (direct meta-backfill - fast response)
+  useEffect(() => {
+    if (!autoPollEnabled) return;
+    const run = async () => {
+      pollCountRef.current += 1;
+      setCronTestResult({ ok: null, data: { loading: true }, count: pollCountRef.current });
+      try {
+        const ctrl = new AbortController();
+        const timeout = setTimeout(() => ctrl.abort(), 120000); // 2 min max
+        const res = await fetch("/api/meta-backfill?mode=all&autoImport=1", { signal: ctrl.signal });
+        clearTimeout(timeout);
+        const data = await res.json();
+        setCronTestResult({
+          ok: res.ok,
+          data: res.ok
+            ? { imported: data?.importSummary?.imported ?? 0, skipped: data?.importSummary?.skipped ?? 0 }
+            : { error: data?.error || data?.message || "Failed" },
+          count: pollCountRef.current,
+        });
+      } catch (err) {
+        setCronTestResult({
+          ok: false,
+          data: { error: err.name === "AbortError" ? "Timeout (2 min)" : err.message },
+          count: pollCountRef.current,
+        });
+      }
+    };
+    run(); // pehli call turant
+    const id = setInterval(run, 10 * 60 * 1000); // phir har 10 min
+    return () => clearInterval(id);
+  }, [autoPollEnabled]);
+
+  // Save to history when result comes (skip loading state)
+  useEffect(() => {
+    if (cronTestResult?.data?.loading || cronTestResult?.ok === undefined || cronTestResult?.ok === null) return;
+    addCronHistory({
+      status: cronTestResult.ok ? "success" : "failed",
+      imported: cronTestResult.data?.imported ?? 0,
+      skipped: cronTestResult.data?.skipped ?? 0,
+      error: cronTestResult.data?.error,
+      source: autoPollEnabled ? "auto-poll" : "test-cron",
+      callNum: cronTestResult.count,
+    });
+  }, [cronTestResult?.ok, cronTestResult?.data?.loading, cronTestResult?.data?.imported, cronTestResult?.data?.skipped, cronTestResult?.data?.error, cronTestResult?.count, autoPollEnabled]);
 
   const handleFetch = async (e) => {
     e.preventDefault();
@@ -100,6 +173,20 @@ export default function MetaBackfillPage() {
       setMessage("Error fetching leads report");
     } finally {
       setLeadsReportLoading(false);
+    }
+  };
+
+  const handleCronTest = async () => {
+    setCronTestResult(null);
+    setCronTestLoading(true);
+    try {
+      const res = await fetch("/api/cron/meta-backfill");
+      const data = await res.json();
+      setCronTestResult({ ok: res.ok, data });
+    } catch (err) {
+      setCronTestResult({ ok: false, data: { error: err.message } });
+    } finally {
+      setCronTestLoading(false);
     }
   };
 
@@ -226,6 +313,120 @@ export default function MetaBackfillPage() {
                 </ul>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Automatic Cron - fetches leads from Meta */}
+      <div className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
+        <h2 className="font-medium mb-2 text-blue-900">Automatic Cron (every 10 min)</h2>
+        <div className="flex flex-wrap gap-2 items-center">
+          <button
+            type="button"
+            onClick={handleCronTest}
+            disabled={cronTestLoading || autoPollEnabled}
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium disabled:opacity-50"
+          >
+            {cronTestLoading ? "Testing..." : "Test Cron Now"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAutoPollEnabled((p) => !p);
+              if (!autoPollEnabled) pollCountRef.current = 0;
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              autoPollEnabled ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+            }`}
+          >
+            {autoPollEnabled ? "Stop (every 10 min)" : "Auto-poll every 10 min"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowHistory((h) => !h);
+              if (!showHistory) setCronHistory(getCronHistory());
+            }}
+            className="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium"
+          >
+            History
+          </button>
+        </div>
+        {cronTestResult && (
+          <div
+            className={`mt-3 p-3 rounded text-sm ${
+              cronTestResult.data?.loading ? "bg-blue-100 text-blue-800" : cronTestResult.ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}
+          >
+            {cronTestResult.data?.loading ? (
+              <>⏳ Fetching from Meta... (call #{cronTestResult.count})</>
+            ) : cronTestResult.ok ? (
+              <>
+                ✓ Success — Imported: {cronTestResult.data?.imported ?? 0}, Skipped: {cronTestResult.data?.skipped ?? 0}
+                {autoPollEnabled && <span className="ml-2 opacity-80">(call #{cronTestResult.count})</span>}
+              </>
+            ) : (
+              <>
+                ✗ Failed — {cronTestResult.data?.error || JSON.stringify(cronTestResult.data)}
+                {autoPollEnabled && <span className="ml-2 opacity-80">(call #{cronTestResult.count})</span>}
+              </>
+            )}
+          </div>
+        )}
+        {showHistory && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={() => setShowHistory(false)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center p-4 border-b">
+                <strong className="text-lg text-blue-900">Cron / Auto-poll History</strong>
+                <button
+                  type="button"
+                  onClick={() => setShowHistory(false)}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm font-medium"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto flex-1">
+                {cronHistory.length === 0 ? (
+                  <p className="text-sm text-gray-500">No history yet</p>
+                ) : (
+                  <table className="text-sm w-full">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="py-2 pr-3">Time</th>
+                        <th className="py-2 pr-3">Status</th>
+                        <th className="py-2 pr-3">Source</th>
+                        <th className="py-2 pr-3">Imported</th>
+                        <th className="py-2 pr-3">Skipped</th>
+                        <th className="py-2 pr-3">Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cronHistory.map((h, i) => (
+                        <tr key={i} className="border-b border-gray-100">
+                          <td className="py-2 pr-3">{new Date(h.timestamp).toLocaleString()}</td>
+                          <td className={`py-2 pr-3 font-medium ${h.status === "success" ? "text-green-600" : "text-red-600"}`}>
+                            {h.status === "success" ? "✓ Success" : "✗ Failed"}
+                          </td>
+                          <td className="py-2 pr-3">{h.source}</td>
+                          <td className="py-2 pr-3">{h.imported ?? 0}</td>
+                          <td className="py-2 pr-3">{h.skipped ?? 0}</td>
+                          <td className="py-2 pr-3 text-red-600 max-w-[150px] truncate" title={h.error}>
+                            {h.error || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
