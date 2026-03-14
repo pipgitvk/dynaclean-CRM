@@ -3,7 +3,23 @@
 import { useState, useEffect, useRef } from "react";
 
 const CRON_HISTORY_KEY = "meta-backfill-cron-history";
+const AUTO_POLL_KEY = "meta-backfill-auto-poll-enabled";
 const MAX_HISTORY = 50;
+
+function getAutoPollEnabled() {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(AUTO_POLL_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setAutoPollEnabled(value) {
+  try {
+    localStorage.setItem(AUTO_POLL_KEY, value ? "1" : "0");
+  } catch {}
+}
 
 function getCronHistory() {
   if (typeof window === "undefined") return [];
@@ -37,10 +53,15 @@ export default function MetaBackfillPage() {
   const [leadsReport, setLeadsReport] = useState(null);
   const [cronTestLoading, setCronTestLoading] = useState(false);
   const [cronTestResult, setCronTestResult] = useState(null);
-  const [autoPollEnabled, setAutoPollEnabled] = useState(false);
+  const [autoPollEnabled, setAutoPollEnabledState] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [cronHistory, setCronHistory] = useState([]);
   const pollCountRef = useRef(0);
+
+  // Hydrate auto-poll from localStorage (persists across refresh)
+  useEffect(() => {
+    setAutoPollEnabledState(getAutoPollEnabled());
+  }, []);
 
   // Har 10 min par API call jab auto-poll on ho (direct meta-backfill - fast response)
   useEffect(() => {
@@ -332,8 +353,12 @@ export default function MetaBackfillPage() {
           <button
             type="button"
             onClick={() => {
-              setAutoPollEnabled((p) => !p);
-              if (!autoPollEnabled) pollCountRef.current = 0;
+              setAutoPollEnabledState((p) => {
+                const next = !p;
+                setAutoPollEnabled(next);
+                if (next) pollCountRef.current = 0;
+                return next;
+              });
             }}
             className={`px-4 py-2 rounded-lg text-sm font-medium ${
               autoPollEnabled ? "bg-amber-600 hover:bg-amber-700 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-700"
