@@ -25,9 +25,12 @@ export default async function ClientExpensesPage() {
   try {
     const conn = await getDbConnection();
     const [result] = await conn.execute(
-      `SELECT id, expense_name, client_name, group_name, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, gst_rate, amount, created_at
-       FROM client_expenses
-       ORDER BY id DESC`
+      `SELECT ce.id, ce.expense_name, ce.client_name, ce.group_name, ce.main_head, ce.head, ce.supply, ce.type_of_ledger, ce.cgst, ce.sgst, ce.igst, ce.hsn, ce.gst_rate, ce.amount, ce.created_at,
+              GROUP_CONCAT(cesh.sub_head SEPARATOR ', ') as sub_head
+       FROM client_expenses ce
+       LEFT JOIN client_expense_sub_heads cesh ON ce.id = cesh.client_expense_id
+       GROUP BY ce.id
+       ORDER BY ce.id DESC`
     );
     rows = result;
   } catch (err) {

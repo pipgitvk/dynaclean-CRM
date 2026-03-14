@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2, X } from "lucide-react";
 
 export default function StatementTable({ rows }) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [deletingId, setDeletingId] = useState(null);
+  const [modalId, setModalId] = useState(null);
+  const [expense, setExpense] = useState(null);
+  const [expenseLoading, setExpenseLoading] = useState(false);
 
   const totalSettled = rows.filter((r) => r.client_expense_id).length;
   const totalUnsettled = rows.filter((r) => !r.client_expense_id).length;
@@ -93,6 +96,33 @@ export default function StatementTable({ rows }) {
 
   const handleReset = () => setStatusFilter("");
 
+  useEffect(() => {
+    if (!modalId) {
+      setExpense(null);
+      setExpenseLoading(false);
+      return;
+    }
+    setExpenseLoading(true);
+    setExpense(null);
+    fetch(`/api/statements/${modalId}`)
+      .then((r) => r.json())
+      .then((row) => {
+        if (row?.error) throw new Error(row.error);
+        if (row.client_expense_id) {
+          return fetch(`/api/client-expenses/${row.client_expense_id}`).then((r) => r.json());
+        }
+        return null;
+      })
+      .then((exp) => {
+        setExpense(exp && !exp.error ? exp : null);
+      })
+      .catch((e) => {
+        toast.error(e.message || "Failed to load");
+        setModalId(null);
+      })
+      .finally(() => setExpenseLoading(false));
+  }, [modalId]);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -168,13 +198,14 @@ export default function StatementTable({ rows }) {
                     </span>
                   </td>
                   <td className="p-3 flex gap-2 items-center">
-                    <Link
-                      href={`/admin-dashboard/statements/${row.id}`}
+                    <button
+                      type="button"
+                      onClick={() => setModalId(row.id)}
                       className="text-blue-600 hover:underline"
                       title="View"
                     >
                       <Eye size={16} />
-                    </Link>
+                    </button>
                     <Link
                       href={`/admin-dashboard/statements/edit/${row.id}`}
                       className="text-yellow-600 hover:text-yellow-800"
@@ -225,11 +256,11 @@ export default function StatementTable({ rows }) {
             <div><strong>Amount:</strong> ₹{Number(row.amount || 0).toFixed(2)}</div>
             <div><strong>Status:</strong> <span className={row.client_expense_id ? "text-green-600" : "text-amber-600"}>{row.client_expense_id ? "Settled" : "Unsettled"}</span></div>
             <div className="flex items-center gap-4 pt-2">
-              <Link href={`/admin-dashboard/statements/${row.id}`} className="text-blue-600 hover:underline">
-                <Eye size={16} />
-              </Link>
+              <button type="button" onClick={() => setModalId(row.id)} className="text-blue-600 hover:underline">
+                <Eye size={16} /> View
+              </button>
               <Link href={`/admin-dashboard/statements/edit/${row.id}`} className="text-yellow-600 hover:text-yellow-800">
-                <Pencil size={16} />
+                <Pencil size={16} /> Edit
               </Link>
               <button
                 type="button"
@@ -243,6 +274,74 @@ export default function StatementTable({ rows }) {
           </div>
         ))}
       </div>
+
+      {/* Expense View Modal */}
+      {modalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Client Expense Details</h3>
+              <button
+                type="button"
+                onClick={() => setModalId(null)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              {expenseLoading ? (
+                <div className="py-8 text-center text-gray-500">Loading...</div>
+              ) : expense ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                    <div className="space-y-2">
+                      <p><span className="font-medium">ID:</span> {expense.id}</p>
+                      <p><span className="font-medium">Expense Name:</span> {expense.expense_name}</p>
+                      <p><span className="font-medium">Client Name:</span> {expense.client_name}</p>
+                      <p><span className="font-medium">Group Name:</span> {expense.group_name || "-"}</p>
+                      <p><span className="font-medium">Tax applicable:</span> {expense.tax_applicable ? "Yes" : "No"}</p>
+                      {expense.tax_applicable && (
+                        <>
+                          {expense.gst_rate != null && <p><span className="font-medium">Tax Rate:</span> {Number(expense.gst_rate)}%</p>}
+                          {expense.tax_type && <p><span className="font-medium">Tax type:</span> {expense.tax_type}</p>}
+                          {expense.tax_type === "CGST+SGST" && (
+                            <>
+                              <p><span className="font-medium">CGST:</span> {expense.cgst != null ? `₹${Number(expense.cgst).toFixed(2)}` : "-"}</p>
+                              <p><span className="font-medium">SGST:</span> {expense.sgst != null ? `₹${Number(expense.sgst).toFixed(2)}` : "-"}</p>
+                            </>
+                          )}
+                          {expense.tax_type === "IGST" && <p><span className="font-medium">IGST:</span> {expense.igst != null ? `₹${Number(expense.igst).toFixed(2)}` : "-"}</p>}
+                        </>
+                      )}
+                      <p><span className="font-medium">Main Head:</span> <span className={expense.main_head === "Direct" ? "text-blue-600" : "text-amber-600"}>{expense.main_head}</span></p>
+                      <p><span className="font-medium">Head:</span> {expense.head || "-"}</p>
+                      <p><span className="font-medium">Supply:</span> {expense.supply || "-"}</p>
+                      {expense.sub_heads?.length > 0 && <p><span className="font-medium">Sub-head:</span> {expense.sub_heads[0]}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <p><span className="font-medium">Type of Ledger:</span> {expense.type_of_ledger || "-"}</p>
+                      <p><span className="font-medium">HSN:</span> {expense.hsn || "-"}</p>
+                      <p><span className="font-medium">Amount:</span> {expense.amount != null ? `₹${Number(expense.amount).toFixed(2)}` : "-"}</p>
+                      <p><span className="font-medium">Created:</span> {expense.created_at ? dayjs(expense.created_at).format("DD MMM YYYY HH:mm") : "-"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-6 flex justify-end">
+                    <Link
+                      href={`/admin-dashboard/client-expenses/edit/${expense.id}?from=statements`}
+                      className="px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                    >
+                      Edit Expenses
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <div className="py-8 text-center text-gray-500">No expense linked to this statement</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
