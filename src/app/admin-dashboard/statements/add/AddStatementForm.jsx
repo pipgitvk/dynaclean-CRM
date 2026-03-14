@@ -1,0 +1,168 @@
+"use client";
+
+import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+import { useState, useEffect } from "react";
+
+export default function AddStatementForm({ expenseId, defaultAmount }) {
+  const router = useRouter();
+  const [isSubmitting, setSubmitting] = useState(false);
+  const [expenses, setExpenses] = useState([]);
+  const { register, handleSubmit, reset } = useForm({
+    defaultValues: {
+      client_expense_id: expenseId || "",
+      amount: defaultAmount ?? "",
+    },
+  });
+
+  useEffect(() => {
+    fetch("/api/client-expenses", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setExpenses(data?.clientExpenses || []))
+      .catch(() => {});
+  }, []);
+
+  const onSubmit = async (data) => {
+    setSubmitting(true);
+
+    try {
+      const res = await fetch("/api/statements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trans_id: data.trans_id,
+          date: data.date,
+          txn_dated_deb: data.txn_dated_deb || null,
+          cheq_no: data.cheq_no || null,
+          description: data.description || null,
+          type: data.type,
+          amount: data.amount,
+          client_expense_id: data.client_expense_id ? Number(data.client_expense_id) : null,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        toast.success("Statement added successfully!");
+        router.push("/admin-dashboard/statements");
+      } else {
+        toast.error(result.error || "Failed to add statement");
+      }
+    } catch (err) {
+      toast.error("Network error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReset = () => {
+    reset();
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="max-w-7xl mx-auto p-6 space-y-6 bg-white rounded-xl shadow"
+    >
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">Add Statement</h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div>
+          <label className="block text-sm font-medium mb-1">Trans ID *</label>
+          <input
+            {...register("trans_id", { required: true })}
+            className="w-full border p-2 rounded-md"
+            placeholder="Transaction ID"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Date *</label>
+          <input
+            type="date"
+            {...register("date", { required: true })}
+            className="w-full border p-2 rounded-md"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Txn Dated Deb</label>
+          <input
+            type="date"
+            {...register("txn_dated_deb")}
+            className="w-full border p-2 rounded-md"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Cheq No</label>
+          <input
+            {...register("cheq_no")}
+            className="w-full border p-2 rounded-md"
+            placeholder="Cheque number"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Type (Credit/Debit) *</label>
+          <select
+            {...register("type", { required: true })}
+            className="w-full border p-2 rounded-md"
+          >
+            <option value="Credit">Credit</option>
+            <option value="Debit">Debit</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Amount *</label>
+          <input
+            type="number"
+            step="0.01"
+            {...register("amount", { required: true })}
+            className="w-full border p-2 rounded-md"
+            placeholder="0.00"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Expense ID</label>
+          <select
+            {...register("client_expense_id")}
+            className="w-full border p-2 rounded-md"
+          >
+            <option value="">Select expense</option>
+            {expenses.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.id} - {e.expense_name || ""} ({e.client_name || ""})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Description</label>
+        <textarea
+          {...register("description")}
+          className="w-full border p-3 rounded-md"
+          rows={4}
+          placeholder="Transaction description"
+        />
+      </div>
+
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <button
+          type="button"
+          onClick={handleReset}
+          className="w-full sm:w-auto px-6 py-3 bg-gray-500 text-gray-100 rounded-lg hover:bg-gray-600 cursor-pointer"
+        >
+          Reset
+        </button>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+        >
+          {isSubmitting ? "Submitting..." : "Add Statement"}
+        </button>
+      </div>
+    </form>
+  );
+}

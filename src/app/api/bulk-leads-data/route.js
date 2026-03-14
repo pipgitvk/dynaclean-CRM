@@ -78,8 +78,8 @@ export async function GET(request) {
             params.push(`%${products_interest}%`);
         }
 
-        // Order by most recent first and limit results
-        query += ` ORDER BY c.date_created DESC LIMIT 500`;
+        // Order by most recent first (no limit - show all leads)
+        query += ` ORDER BY c.date_created DESC`;
 
         const [rows] = await connection.execute(query, params);
 

@@ -601,6 +601,18 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "DollarSign",
       },
+      {
+        path: "/admin-dashboard/statements",
+        name: "Statement",
+        roles: ["SUPERADMIN"],
+        icon: "Receipt",
+      },
+      {
+        path: "/admin-dashboard/client-expenses",
+        name: "Client Expenses",
+        roles: ["SUPERADMIN"],
+        icon: "Users",
+      },
     ],
   },
 ];

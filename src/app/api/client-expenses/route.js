@@ -1,0 +1,104 @@
+import { NextResponse } from "next/server";
+import { getDbConnection } from "@/lib/db";
+import { jwtVerify } from "jose";
+
+export async function GET(req) {
+  try {
+    const token = req.cookies.get("token")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
+
+    const conn = await getDbConnection();
+    const [rows] = await conn.execute(
+      `SELECT id, expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, gst_rate, amount, created_at
+       FROM client_expenses
+       ORDER BY id DESC`
+    );
+
+    return NextResponse.json({ clientExpenses: rows });
+  } catch (err) {
+    console.error("[client-expenses-api] GET error:", err?.message || err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+export async function POST(req) {
+  try {
+    const token = req.cookies.get("token")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
+
+    const data = await req.json();
+    const { expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, sub_heads, type_of_ledger, cgst, sgst, igst, hsn, gst_rate, amount } = data;
+
+    if (!expense_name || !client_name || !main_head) {
+      return NextResponse.json(
+        { error: "expense_name, client_name, and main_head are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!["Direct", "Indirect"].includes(main_head)) {
+      return NextResponse.json(
+        { error: "main_head must be Direct or Indirect" },
+        { status: 400 }
+      );
+    }
+
+    const conn = await getDbConnection();
+    try {
+      await conn.execute("SELECT tax_applicable, tax_type FROM client_expenses LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE client_expenses ADD COLUMN tax_applicable TINYINT(1) NOT NULL DEFAULT 0 AFTER group_name");
+      } catch (__) {}
+      try {
+        await conn.execute("ALTER TABLE client_expenses ADD COLUMN tax_type VARCHAR(50) NULL AFTER tax_applicable");
+      } catch (__) {}
+    }
+    const validSupply = ["goods", "services"].includes(supply) ? supply : null;
+    const [insertResult] = await conn.execute(
+      `INSERT INTO client_expenses (expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, gst_rate, amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        expense_name,
+        client_name,
+        group_name || null,
+        tax_applicable ? 1 : 0,
+        tax_applicable && tax_type ? tax_type : null,
+        main_head,
+        head || null,
+        validSupply,
+        type_of_ledger || null,
+        cgst != null && cgst !== "" ? Number(cgst) : null,
+        sgst != null && sgst !== "" ? Number(sgst) : null,
+        igst != null && igst !== "" ? Number(igst) : null,
+        hsn || null,
+        gst_rate != null && gst_rate !== "" ? Number(gst_rate) : null,
+        amount != null && amount !== "" ? Number(amount) : null,
+      ]
+    );
+
+    const clientExpenseId = insertResult.insertId;
+    const subHeadsList = Array.isArray(sub_heads) ? sub_heads : [];
+    for (const sh of subHeadsList) {
+      if (sh && typeof sh === "string" && sh.trim()) {
+        await conn.execute(
+          `INSERT INTO client_expense_sub_heads (client_expense_id, sub_head) VALUES (?, ?)`,
+          [clientExpenseId, sh.trim()]
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[client-expenses-api] POST error:", err?.message || err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
