@@ -129,18 +129,19 @@ export default function Navbar({ onToggleSidebar }) {
         </div>
       </div>
 
-      {/* Right Section - Actions */}
-      <div className="flex items-center gap-2 md:gap-4">
-        <div className="relative">
-          <div className="flex items-center gap-2 border rounded-lg px-3 py-2.5 w-72 bg-white">
+      {/* Right Section - Actions - scroll on very small screens so Logout stays accessible */}
+      <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1 justify-end overflow-x-auto hide-scrollbar">
+        {/* Search - Narrower on mobile so Logout stays visible */}
+        <div className="relative flex-shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 border rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 w-28 sm:w-48 md:w-72 bg-white">
             <input
               type="text"
               placeholder="Search customer..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 outline-none text-sm"
+              className="flex-1 min-w-0 outline-none text-sm"
             />
-            <Search size={18} className="text-gray-600" />
+            <Search size={18} className="text-gray-600 flex-shrink-0" />
           </div>
 
           {/* Search Results Dropdown */}
@@ -187,7 +188,7 @@ export default function Navbar({ onToggleSidebar }) {
         {/* add cutomer button  */}
         <Link
           href="/admin-dashboard/add-customer"
-          className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700 px-3 py-2.5 md:px-4 md:py-2.5 rounded-lg transition-all shadow-md hover:shadow-lg font-medium"
+          className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700 px-3 py-2.5 md:px-4 md:py-2.5 rounded-lg transition-all shadow-md hover:shadow-lg font-medium flex-shrink-0"
           aria-label="Add Customer"
         >
           <UserPlus size={20} />
@@ -195,36 +196,17 @@ export default function Navbar({ onToggleSidebar }) {
         {/* New Task Button */}
         <button
           onClick={handleNewTask}
-          className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 md:px-4 md:py-2 rounded-lg transition-all shadow-md hover:shadow-lg"
+          className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 md:px-4 md:py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex-shrink-0"
           aria-label="New Task"
         >
           <Plus size={18} />
           <span className="hidden sm:inline font-medium">New Task</span>
         </button>
 
-        {/* Notifications - Hidden on small mobile */}
-        {/* <button
-          className={`hidden sm:flex ${theme.sidebar.text} ${theme.sidebar.hover} p-2 rounded-lg transition-all relative`}
-          aria-label="Notifications"
-        >
-          <Bell size={20} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button> */}
-
-        {/* User Avatar - Hidden on mobile, shown on tablet+ */}
-        {/* <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-lg">
-          <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center ${theme.sidebar.text} font-semibold text-sm`}>
-            {username ? username.charAt(0).toUpperCase() : "U"}
-          </div>
-          <span className={`${theme.sidebar.text} text-sm font-medium max-w-[100px] truncate`}>
-            {username || "User"}
-          </span>
-        </div> */}
-
-        {/* Logout Button */}
+        {/* Logout Button - Always visible on mobile */}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 text-white bg-red-500 hover:bg-red-600 px-3 py-2 md:px-4 md:py-2 rounded-lg transition-all shadow-md hover:shadow-lg"
+          className="flex items-center gap-2 text-white bg-red-500 hover:bg-red-600 px-3 py-2 md:px-4 md:py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex-shrink-0"
           aria-label="Logout"
         >
           <LogOut size={18} />
