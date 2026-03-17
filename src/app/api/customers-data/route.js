@@ -12,7 +12,7 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const role = (payload.role || "").toUpperCase().trim();
+    const role = (payload.role || payload.userRole || "").toUpperCase().trim();
     const username = payload.username || null;
     const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "HR", "SERVICE HEAD"];
     const isPrivileged = privilegedRoles.includes(role);
@@ -75,7 +75,7 @@ export async function GET(req) {
       params.push(employeeName, employeeName, employeeName);
     }
 
-    // search functionality
+    // search functionality (ID, phone, name, email - matches All Clients)
     const search = searchParams.get("search");
 
     if (search && search.trim()) {
@@ -84,7 +84,9 @@ export async function GET(req) {
       whereClause += `
     AND (
       first_name LIKE ?
+      OR last_name LIKE ?
       OR company LIKE ?
+      OR email LIKE ?
       OR CAST(phone AS CHAR) LIKE ?
       OR CAST(customer_id AS CHAR) LIKE ?
       OR lead_source LIKE ?
@@ -93,7 +95,7 @@ export async function GET(req) {
     )
   `;
 
-      params.push(like, like, like, like, like, like, like);
+      params.push(like, like, like, like, like, like, like, like, like);
     }
 
     if (mode === "charts") {

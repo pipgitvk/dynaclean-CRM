@@ -126,10 +126,10 @@ export default async function HomePage({ searchParams }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
-      <h2 className="text-3xl text-center text-gray-900 mb-0.5">All Clients</h2>
+    <div className="min-h-screen bg-gray-100 p-3 sm:p-4 md:p-6 lg:p-8">
+      <h2 className="text-xl sm:text-2xl md:text-3xl text-center text-gray-900 mb-2 sm:mb-0.5">All Clients</h2>
 
-      <div className="max-w-7xl mx-auto bg-white shadow-xl rounded-xl p-6 md:p-8">
+      <div className="max-w-7xl mx-auto bg-white shadow-xl rounded-xl p-3 sm:p-4 md:p-6 lg:p-8 overflow-hidden">
         {/* Render the CustomerTable component, passing the fetched data and error */}
         <CustomerTable
           data={customers}
