@@ -75,30 +75,32 @@ export default function CustomerTable({
   return (
     <div className="space-y-4">
       <form onSubmit={handleSearch}>
-        <div className="flex justify-between items-center space-x-2 w-full mb-4">
+        {/* Search + Daily Follow-Ups - stack on mobile */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full mb-4">
           <input
             type="text"
             value={search}
             placeholder="Search customers (ID, phone, name, email)..."
             onChange={(e) => setSearch(e.target.value)}
-            className="border p-2 rounded flex-1"
+            className="border border-gray-300 p-2.5 sm:p-2 rounded-lg flex-1 min-w-0 text-sm"
           />
           <Link
             href={`/admin-dashboard/customers/followups`}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            className="bg-blue-500 text-white px-4 py-2.5 sm:py-2 rounded-lg hover:bg-blue-600 text-center text-sm font-medium whitespace-nowrap"
           >
             Daily Follow-Ups
           </Link>
         </div>
         
-        <div className="flex flex-wrap items-center gap-4">
+        {/* Filters - wrap on small screens */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER") && (
             <select
               value={filters.lead_source}
               onChange={(e) =>
                 setFilters({ ...filters, lead_source: e.target.value })
               }
-              className="border rounded px-3 py-2"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
             >
               <option value="">All Employees</option>
               {leadSources.map((src) => (
@@ -113,7 +115,7 @@ export default function CustomerTable({
             onChange={(e) =>
               setFilters({ ...filters, lead_campaign: e.target.value })
             }
-            className="border rounded px-3 py-2"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[140px] sm:min-w-0"
           >
             <option value="">All Lead Campaigns</option>
             <option value="india_mart">India Mart</option>
@@ -126,7 +128,7 @@ export default function CustomerTable({
           <select
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="border rounded px-3 py-2"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[110px] sm:min-w-0"
           >
             <option value="">All Status</option>
             <option value="New">New</option>
@@ -139,7 +141,7 @@ export default function CustomerTable({
           <select
             value={filters.stage}
             onChange={(e) => setFilters({ ...filters, stage: e.target.value })}
-            className="border rounded px-3 py-2"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[140px] sm:min-w-0"
           >
             <option value="">All Stages</option>
             <option value="New">New</option>
@@ -160,19 +162,19 @@ export default function CustomerTable({
             type="date"
             value={filters.from}
             onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-            className="border rounded px-3 py-2"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
           />
           <input
             type="date"
             value={filters.to}
             onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-            className="border rounded px-3 py-2"
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
           />
           
           <button
             type="submit"
             disabled={isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
           >
             {isPending ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
             {isPending ? "Searching..." : "Search"}
@@ -182,7 +184,7 @@ export default function CustomerTable({
             type="button"
             onClick={resetFilters}
             disabled={isPending}
-            className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 text-sm font-medium"
           >
             {isPending ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
             Reset
@@ -190,15 +192,58 @@ export default function CustomerTable({
         </div>
       </form>
       
-      <div className="text-sm text-gray-600 font-medium px-4">
+      <div className="text-sm text-gray-600 font-medium px-2 sm:px-4">
         Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalRecords)} of {totalRecords} customers
       </div>
 
-      {/* 🧾 Table */}
-      <div className="hidden md:flex justify-center px-4">
-        <div className="w-full max-w-full overflow-x-auto">
-          <div className="bg-white shadow-lg rounded-lg border border-gray-200 inline-block min-w-[1000px] max-h-[600px] overflow-y-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
+      {/* Mobile: Card layout */}
+      <div className="md:hidden space-y-3 p-2">
+        {data.map((row, i) => (
+          <div
+            key={i}
+            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm"
+          >
+            <div className="flex justify-between items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-gray-900 truncate">{row.first_name}</div>
+                <div className="text-xs text-gray-500 truncate">{row.email || "—"}</div>
+                <div className="text-xs text-gray-500">{row.phone}</div>
+                {row.lead_source && (
+                  <div className="text-xs text-gray-600 mt-1">Source: {row.lead_source}</div>
+                )}
+                <div className="flex flex-wrap gap-1 mt-2">
+                  <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">{row.status}</span>
+                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded">{row.stage}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  title="View"
+                  onClick={() => router.push(`/admin-dashboard/view-customer/${row.customer_id}`)}
+                  className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+                >
+                  <Eye className="w-5 h-5 text-gray-600" />
+                </button>
+                <button
+                  title="Edit"
+                  onClick={() => router.push(`/admin-dashboard/view-customer/${row.customer_id}/edit`)}
+                  className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+                >
+                  <Pencil className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {data.length === 0 && (
+          <div className="text-center py-8 text-gray-500">No results found.</div>
+        )}
+      </div>
+
+      {/* Desktop: Table with horizontal scroll */}
+      <div className="hidden md:block overflow-x-auto">
+        <div className="min-w-[900px] max-h-[500px] sm:max-h-[600px] overflow-y-auto rounded-lg border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-100 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-2 text-left">Customer</th>
@@ -259,7 +304,7 @@ export default function CustomerTable({
                 {data.length === 0 && (
                   <tr>
                     <td
-                      colSpan={10}
+                      colSpan={9}
                       className="px-4 py-4 text-center text-gray-400"
                     >
                       No results found.
@@ -268,29 +313,28 @@ export default function CustomerTable({
                 )}
               </tbody>
             </table>
-          </div>
         </div>
       </div>
 
       {/* Pagination Controls */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 sm:px-4 py-3 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center">
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1 || isPending}
-            className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 sm:px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Previous
           </button>
           
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap justify-center">
             {/* First page */}
             {currentPage > 3 && (
               <>
                 <button
                   onClick={() => handlePageChange(1)}
                   disabled={isPending}
-                  className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-2 sm:px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   1
                 </button>
@@ -312,7 +356,7 @@ export default function CustomerTable({
                   key={page}
                   onClick={() => handlePageChange(page)}
                   disabled={isPending}
-                  className={`px-3 py-1 border rounded-md text-sm font-medium ${
+                  className={`px-2 sm:px-3 py-1.5 border rounded-md text-xs sm:text-sm font-medium ${
                     page === currentPage
                       ? 'bg-blue-600 text-white border-blue-600'
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -329,7 +373,7 @@ export default function CustomerTable({
                 <button
                   onClick={() => handlePageChange(totalPages)}
                   disabled={isPending}
-                  className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-2 sm:px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   {totalPages}
                 </button>
@@ -340,7 +384,7 @@ export default function CustomerTable({
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages || isPending}
-            className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-2 sm:px-3 py-1.5 bg-white border border-gray-300 rounded-md text-xs sm:text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Next
           </button>

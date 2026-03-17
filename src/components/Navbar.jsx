@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { Menu, LogOut, User, Bell, Plus, UserPlus, Search } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Menu, LogOut, User, Plus, UserPlus, Search } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
 export default function Navbar({ onToggleSidebar }) {
@@ -16,6 +17,8 @@ export default function Navbar({ onToggleSidebar }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const searchRef = useRef(null);
 
   useEffect(() => {
     // Get username from localStorage or session
@@ -40,6 +43,31 @@ export default function Navbar({ onToggleSidebar }) {
 
     return () => clearTimeout(delay);
   }, [query]);
+
+  // Update dropdown position for portal
+  useEffect(() => {
+    if (showDropdown && searchRef.current && typeof window !== "undefined") {
+      const rect = searchRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+        width: Math.max(rect.width, 280),
+      });
+    }
+  }, [showDropdown, results.length, loading]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handleClickOutside = (e) => {
+      const target = e.target;
+      const isSearchInput = searchRef.current?.contains(target);
+      const isDropdown = target.closest?.("[data-header-search-dropdown]");
+      if (!isSearchInput && !isDropdown) setShowDropdown(false);
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showDropdown]);
 
   const handleUser = async () => {
     try {
@@ -132,7 +160,7 @@ export default function Navbar({ onToggleSidebar }) {
       {/* Right Section - Actions - scroll on very small screens so Logout stays accessible */}
       <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1 justify-end overflow-x-auto hide-scrollbar">
         {/* Search - Narrower on mobile so Logout stays visible */}
-        <div className="relative flex-shrink-0">
+        <div ref={searchRef} className="relative flex-shrink-0">
           <div className="flex items-center gap-1 sm:gap-2 border rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 w-28 sm:w-48 md:w-72 bg-white">
             <input
               type="text"
@@ -144,45 +172,75 @@ export default function Navbar({ onToggleSidebar }) {
             <Search size={18} className="text-gray-600 flex-shrink-0" />
           </div>
 
-          {/* Search Results Dropdown */}
-          {showDropdown && results.length > 0 && (
-            <div className="absolute top-full mt-2 w-full bg-white border rounded-lg shadow-lg z-50 max-h-72 overflow-y-auto">
-              {results.map((c) => (
+          {/* Search Results Dropdown - Portal to avoid overflow clipping */}
+          {typeof window !== "undefined" &&
+            showDropdown &&
+            createPortal(
+              results.length > 0 ? (
                 <div
-                  key={c.customer_id}
-                  className="flex justify-between items-center px-3 py-2 hover:bg-gray-100 border-b last:border-b-0"
+                  data-header-search-dropdown
+                  className="fixed bg-white border rounded-lg shadow-xl z-[9999] max-h-72 overflow-y-auto"
+                  style={{
+                    top: dropdownPosition.top,
+                    left: dropdownPosition.left,
+                    width: dropdownPosition.width,
+                  }}
                 >
-                  <div className="text-sm">
-                    <div className="font-medium">
-                      {c.first_name} {c.company && `(${c.company})`}
+                  {results.map((c) => (
+                    <div
+                      key={c.customer_id}
+                      className="flex justify-between items-center px-3 py-2 hover:bg-gray-100 border-b last:border-b-0 cursor-pointer"
+                    >
+                      <div className="text-sm">
+                        <div className="font-medium">
+                          {c.first_name} {c.company && `(${c.company})`}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          ID: {c.customer_id} • {c.lead_source || "—"}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowDropdown(false);
+                          setResults([]);
+                          setQuery("");
+                          const base = pathname?.startsWith("/admin-dashboard") ? "admin-dashboard" : "user-dashboard";
+                          router.push(`/${base}/view-customer/${c.customer_id}`);
+                        }}
+                        className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        View
+                      </button>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      ID: {c.customer_id} • Source: {c.lead_source}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setShowDropdown(false);
-                      setResults([]);
-                      setQuery("");
-                      const base = pathname?.startsWith("/admin-dashboard") ? "admin-dashboard" : "user-dashboard";
-                      router.push(`/${base}/view-customer/${c.customer_id}`);
-                    }}
-                    className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    View
-                  </button>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {showDropdown && results.length === 0 && !loading && (
-            <div className="absolute top-full mt-2 w-full bg-white border rounded-lg shadow-lg z-50 p-3 text-sm text-gray-500">
-              No results found
-            </div>
-          )}
+              ) : loading ? (
+                <div
+                  data-header-search-dropdown
+                  className="fixed bg-white border rounded-lg shadow-xl z-[9999] p-3 text-sm text-gray-500"
+                  style={{
+                    top: dropdownPosition.top,
+                    left: dropdownPosition.left,
+                    width: dropdownPosition.width,
+                  }}
+                >
+                  Searching...
+                </div>
+              ) : (
+                <div
+                  data-header-search-dropdown
+                  className="fixed bg-white border rounded-lg shadow-xl z-[9999] p-3 text-sm text-gray-500"
+                  style={{
+                    top: dropdownPosition.top,
+                    left: dropdownPosition.left,
+                    width: dropdownPosition.width,
+                  }}
+                >
+                  No results found
+                </div>
+              ),
+              document.body
+            )}
         </div>
 
         {/* add cutomer button  */}
