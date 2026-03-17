@@ -30,6 +30,9 @@ export async function POST(req) {
       products_interest = "",
       tags = "",
       notes = "",
+      report_to = null,
+      working = 1,
+      contact_status = null,
     } = body;
 
     if (!parent_customer_id || !first_name || !phone) {
@@ -72,6 +75,16 @@ export async function POST(req) {
         );
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT report_to FROM customers LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE customers ADD COLUMN report_to INT NULL");
+        await conn.execute("ALTER TABLE customers ADD COLUMN working TINYINT(1) DEFAULT 1");
+        await conn.execute("ALTER TABLE customers ADD COLUMN designation VARCHAR(100) NULL");
+        await conn.execute("ALTER TABLE customers ADD COLUMN contact_status VARCHAR(50) NULL");
+      } catch (__) {}
+    }
 
     const [customerResult] = await conn.execute(
       `INSERT INTO customers (
@@ -79,8 +92,8 @@ export async function POST(req) {
         lead_source, lead_campaign, status,
         followup_notes, communication_history, products_interest,
         sales_representative, assigned_to, tags, notes, gstin,
-        next_follow_date, date_created
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        next_follow_date, date_created, designation, report_to, working, contact_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         parent_customer_id,
         first_name,
@@ -102,6 +115,10 @@ export async function POST(req) {
         "",
         null,
         now,
+        designation || null,
+        report_to || null,
+        working !== undefined ? (working ? 1 : 0) : 1,
+        contact_status || null,
       ]
     );
 

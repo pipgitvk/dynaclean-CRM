@@ -8,6 +8,7 @@ export default function AddMemberContactForm({
   basePath = "user-dashboard",
   onSuccess,
   onCancel,
+  existingContacts = [],
 }) {
   const [formData, setFormData] = useState({
     first_name: "",
@@ -20,6 +21,8 @@ export default function AddMemberContactForm({
     products_interest: "",
     tags: "",
     notes: "",
+    report_to: "",
+    working: 1,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,7 +30,10 @@ export default function AddMemberContactForm({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "working" ? parseInt(value, 10) : value,
+    }));
     if (name === "phone") setDuplicateWarning("");
   };
 
@@ -69,6 +75,8 @@ export default function AddMemberContactForm({
         body: JSON.stringify({
           parent_customer_id: parentCustomerId,
           ...formData,
+          report_to: formData.report_to || null,
+          working: formData.working,
         }),
       });
 
@@ -86,6 +94,8 @@ export default function AddMemberContactForm({
           products_interest: "",
           tags: "",
           notes: "",
+          report_to: "",
+          working: 1,
         });
         onSuccess(data.customerId);
       } else {
@@ -216,6 +226,40 @@ export default function AddMemberContactForm({
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reports To
+            </label>
+            <select
+              name="report_to"
+              value={formData.report_to}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- None (Top Level) --</option>
+              {existingContacts?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {(c.name || [c.first_name, c.last_name].filter(Boolean).join(" "))} ({c.designation || "No designation"})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              name="working"
+              value={formData.working}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={1}>Working</option>
+              <option value={0}>Not Working</option>
+            </select>
           </div>
 
           <div className="md:col-span-2">

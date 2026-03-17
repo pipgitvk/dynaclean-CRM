@@ -54,7 +54,8 @@ export default function AddCustomerForm() {
 
       if (res.ok) {
         toast.success("Customer added successfully!");
-        router.push("/admin-dashboard");
+        router.refresh();
+        router.push("/admin-dashboard/customers");
       } else {
         const text = await res.text();
         try {

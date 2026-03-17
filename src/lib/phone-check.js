@@ -8,8 +8,8 @@ export function normalizePhone(phone) {
 }
 
 /**
- * Check if phone exists in customers or customer_contact.
- * Returns { duplicate: true, source: 'customers'|'customer_contact', customerId?: number } or { duplicate: false }
+ * Check if phone exists in customers table (contacts are now in customers).
+ * Returns { duplicate: true, source: 'customers', customerId?: number } or { duplicate: false }
  */
 export async function checkPhoneDuplicate(phone) {
   const normalized = normalizePhone(phone);
@@ -26,18 +26,6 @@ export async function checkPhoneDuplicate(phone) {
       duplicate: true,
       source: "customers",
       customerId: custRows[0].customer_id,
-    };
-  }
-
-  const [contactRows] = await conn.execute(
-    `SELECT customer_id FROM customer_contact WHERE contact = ? LIMIT 1`,
-    [normalized]
-  );
-  if (contactRows.length > 0) {
-    return {
-      duplicate: true,
-      source: "customer_contact",
-      customerId: contactRows[0].customer_id,
     };
   }
 

@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, User, Phone, Briefcase, CheckCircle, XCircle, Edit, ExternalLink } from "lucide-react";
 
-function ContactNode({ contact, children, level = 0, onEdit }) {
+function ContactNode({ contact, children, level = 0, onEdit, basePath = "user-dashboard" }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = children && children.length > 0;
+  const customerId = contact.customer_id ?? contact.id;
 
   return (
     <div className={`${level > 0 ? 'ml-4 sm:ml-8 mt-2' : 'mt-3'}`}>
@@ -56,19 +57,30 @@ function ContactNode({ contact, children, level = 0, onEdit }) {
           </div>
         </div>
 
-        <button
-          onClick={() => onEdit && onEdit(contact)}
-          className="self-start sm:ml-3 px-3 py-1.5 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors text-sm flex items-center gap-1 flex-shrink-0"
-        >
-          <Edit size={14} />
-          Edit
-        </button>
+        <div className="flex items-center gap-2 self-start sm:ml-3 flex-shrink-0">
+          {customerId && (
+            <Link
+              href={`/${basePath}/view-customer/${customerId}`}
+              className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm flex items-center gap-1"
+            >
+              <ExternalLink size={14} />
+              View
+            </Link>
+          )}
+          <button
+            onClick={() => onEdit && onEdit(contact)}
+            className="px-3 py-1.5 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 transition-colors text-sm flex items-center gap-1"
+          >
+            <Edit size={14} />
+            Edit
+          </button>
+        </div>
       </div>
 
       {hasChildren && isExpanded && (
         <div className="border-l-2 border-gray-300 ml-3">
           {children.map((child) => (
-            <ContactNode key={child.contact.id} {...child} level={level + 1} onEdit={onEdit} />
+            <ContactNode key={child.contact.id} {...child} level={level + 1} onEdit={onEdit} basePath={basePath} />
           ))}
         </div>
       )}
@@ -157,12 +169,12 @@ export default function ViewContactsHierarchy({ contacts, memberCustomers = [], 
       {hasContacts && (
         <div className="space-y-2">
           {hierarchy.map((node) => (
-            <ContactNode key={node.contact.id} {...node} onEdit={onEdit} />
+            <ContactNode key={node.contact.id} {...node} onEdit={onEdit} basePath={basePath} />
           ))}
         </div>
       )}
 
-      {hasMembers && (
+      {hasMembers && !hasContacts && (
         <div className="mt-6">
           <h4 className="text-base sm:text-lg font-medium text-gray-700 mb-3">Member Customers (Linked)</h4>
           <div className="space-y-2">

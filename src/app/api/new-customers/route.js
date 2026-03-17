@@ -155,6 +155,9 @@ export async function POST(req) {
     return NextResponse.json({ success: true, customerId });
   } catch (error) {
     console.error("❌ API Error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Server error", detail: error?.message },
+      { status: 500 }
+    );
   }
 }

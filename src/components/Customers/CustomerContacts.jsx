@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Plus, Users, List, Network, UserPlus } from "lucide-react";
+import { Plus, List, Network } from "lucide-react";
 import AddContactForm from "./AddContactForm";
-import AddMemberContactForm from "./AddMemberContactForm";
 import EditContactForm from "./EditContactForm";
 import ViewContactsHierarchy from "./ViewContactsHierarchy";
 import ContactTableView from "./ContactTableView";
@@ -16,13 +15,14 @@ export default function CustomerContacts({ customerId }) {
   const [memberCustomers, setMemberCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [view, setView] = useState("hierarchy"); // "hierarchy", "table", "add", "addMember", "edit"
+  const [view, setView] = useState("hierarchy"); // "hierarchy", "table", "add", "edit"
   const [editingContact, setEditingContact] = useState(null);
 
   const fetchContacts = async () => {
+    if (!customerId) return;
     try {
       setLoading(true);
-      const response = await fetch(`/api/customer-contact?customer_id=${customerId}`, {
+      const response = await fetch(`/api/customer-contact?customer_id=${encodeURIComponent(customerId)}`, {
         cache: "no-store",
         headers: { "Cache-Control": "no-cache" },
       });
@@ -44,7 +44,11 @@ export default function CustomerContacts({ customerId }) {
 
   useEffect(() => {
     if (customerId) {
+      setError("");
       fetchContacts();
+    } else {
+      setLoading(false);
+      setError("Customer ID is required");
     }
   }, [customerId]);
 
@@ -111,18 +115,6 @@ export default function CustomerContacts({ customerId }) {
           <Plus size={18} className="flex-shrink-0" />
           <span>Add Contact</span>
         </button>
-        <button
-          onClick={() => setView("addMember")}
-          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-md transition-colors text-sm ${
-            view === "addMember"
-              ? "bg-purple-600 text-white"
-              : "bg-purple-500 text-white hover:bg-purple-600"
-          }`}
-        >
-          <UserPlus size={18} className="flex-shrink-0" />
-          <span className="md:hidden">Add Member</span>
-          <span className="hidden md:inline">Add Member (New Customer)</span>
-        </button>
       </div>
 
       {error && (
@@ -137,15 +129,6 @@ export default function CustomerContacts({ customerId }) {
           <AddContactForm
             customerId={customerId}
             existingContacts={contacts}
-            onSuccess={handleContactAdded}
-            onCancel={() => setView("hierarchy")}
-          />
-        )}
-
-        {view === "addMember" && (
-          <AddMemberContactForm
-            parentCustomerId={customerId}
-            basePath={basePath}
             onSuccess={handleContactAdded}
             onCancel={() => setView("hierarchy")}
           />

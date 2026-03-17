@@ -1,40 +1,99 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldAlert, ArrowLeft, Save, Users } from "lucide-react";
+import { ShieldAlert, ArrowLeft, Users, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 export default function GlobalIpRestrictionPage() {
     const router = useRouter();
+    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [allIps, setAllIps] = useState([]);
+    const [newIp, setNewIp] = useState("");
     const [data, setData] = useState({
-        allowed_ips: "",
         ip_restriction_enabled: 0,
     });
 
-    const handleSave = async (e) => {
-        e.preventDefault();
-        const confirmed = confirm("Are you sure you want to apply these settings to EVERY user? This will overwrite individual user settings.");
-        if (!confirmed) return;
+    const fetchData = async () => {
+        try {
+            const res = await fetch("/api/admin/ip-restrictions");
+            const json = await res.json();
+            if (res.ok) {
+                setAllIps(json.allIps || []);
+                if (json.globalRestrictionEnabled !== undefined) {
+                    setData((d) => ({ ...d, ip_restriction_enabled: json.globalRestrictionEnabled }));
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const handleAddIp = async (e) => {
+        e.preventDefault();
+        const ip = newIp.trim();
+        if (!ip) return;
         setSaving(true);
         try {
             const res = await fetch("/api/admin/ip-restrictions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    bulk: true,
-                    allowed_ips: data.allowed_ips,
-                    ip_restriction_enabled: data.ip_restriction_enabled,
-                }),
+                body: JSON.stringify({ addIp: ip }),
             });
             const result = await res.json();
             if (res.ok) {
-                alert("Global settings applied successfully!");
-                router.push("/admin-dashboard/employees");
+                setNewIp("");
+                await fetchData();
+                alert("IP added to all users successfully!");
             } else {
-                alert(result.error || "Failed to save settings");
+                alert(result.error || "Failed to add IP");
+            }
+        } catch (err) {
+            alert("An error occurred");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteIp = async (ip) => {
+        if (!confirm(`Remove IP ${ip} from all users?`)) return;
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/admin/ip-restrictions?ip=${encodeURIComponent(ip)}`, { method: "DELETE" });
+            const result = await res.json();
+            if (res.ok) {
+                await fetchData();
+                alert("IP removed from all users.");
+            } else {
+                alert(result.error || "Failed to remove IP");
+            }
+        } catch (err) {
+            alert("An error occurred");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleToggle = async (e) => {
+        const enabled = e.target.checked ? 1 : 0;
+        if (!confirm(enabled ? "Enable IP restriction for ALL users?" : "Disable IP restriction for ALL users?")) return;
+        setSaving(true);
+        try {
+            const res = await fetch("/api/admin/ip-restrictions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ bulk: true, bulkToggleOnly: true, ip_restriction_enabled: enabled }),
+            });
+            if (res.ok) {
+                setData({ ...data, ip_restriction_enabled: enabled });
+                alert("Settings updated.");
             }
         } catch (err) {
             alert("An error occurred");
@@ -67,7 +126,7 @@ export default function GlobalIpRestrictionPage() {
                 </p>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-6">
+            <div className="space-y-6">
                 {/* Toggle */}
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                     <div>
@@ -79,27 +138,68 @@ export default function GlobalIpRestrictionPage() {
                             type="checkbox"
                             className="sr-only peer"
                             checked={data.ip_restriction_enabled === 1}
-                            onChange={(e) => setData({ ...data, ip_restriction_enabled: e.target.checked ? 1 : 0 })}
+                            onChange={handleToggle}
                         />
                         <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
                     </label>
                 </div>
 
-                {/* IPs Textarea */}
+                {/* All IPs List */}
                 <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">Global Allowed IP Addresses</label>
-                    <textarea
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all h-32"
-                        placeholder="Enter IPs separated by commas (e.g., 192.168.1.1, 103.44.12.5)"
-                        value={data.allowed_ips}
-                        onChange={(e) => setData({ ...data, allowed_ips: e.target.value })}
-                        disabled={data.ip_restriction_enabled === 0}
-                    />
-                    <p className="text-xs text-gray-400 italic">This list will be applied to all users. Useful for when entire team works from the same static IP(s).</p>
+                    <label className="block text-sm font-medium text-gray-700">All IPs (across users)</label>
+                    {loading ? (
+                        <p className="text-gray-500 text-sm">Loading...</p>
+                    ) : allIps.length === 0 ? (
+                        <p className="text-gray-500 text-sm">No IPs added yet.</p>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {allIps.map((ip) => (
+                                <div
+                                    key={ip}
+                                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg border border-gray-200"
+                                >
+                                    <span className="font-mono text-sm">{ip}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteIp(ip)}
+                                        disabled={saving}
+                                        className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                        title="Remove from all users"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <p className="text-xs text-gray-400 italic">Delete removes this IP from all users. Add new IPs below.</p>
+                </div>
+
+                {/* Add New IP */}
+                <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Add New IP</label>
+                    <form onSubmit={handleAddIp} className="flex gap-2">
+                        <input
+                            type="text"
+                            value={newIp}
+                            onChange={(e) => setNewIp(e.target.value)}
+                            placeholder="e.g. 192.168.1.1"
+                            className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                        />
+                        <button
+                            type="submit"
+                            disabled={saving || !newIp.trim()}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 disabled:bg-red-400"
+                        >
+                            <Plus size={18} />
+                            Add
+                        </button>
+                    </form>
+                    <p className="text-xs text-gray-400 italic">New IP will be added to all users (existing IPs remain).</p>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex justify-end space-x-4 pt-4 border-t">
+                <div className="flex justify-end pt-4 border-t">
                     <button
                         type="button"
                         onClick={() => router.back()}
@@ -107,16 +207,8 @@ export default function GlobalIpRestrictionPage() {
                     >
                         Cancel
                     </button>
-                    <button
-                        type="submit"
-                        disabled={saving}
-                        className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center space-x-2 disabled:bg-red-400 shadow-md"
-                    >
-                        <ShieldAlert size={18} />
-                        <span>{saving ? "Applying..." : "Apply to Everyone"}</span>
-                    </button>
                 </div>
-            </form>
+            </div>
         </div>
     );
 }

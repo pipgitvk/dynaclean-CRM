@@ -31,7 +31,7 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
       const data = await res.json();
       if (data.duplicate) {
         setDuplicateWarning(
-          `Duplicate: This number exists${data.customerId ? ` (Customer ID: ${data.customerId})` : " in contacts"}`
+          `Duplicate: This number exists${data.customerId ? ` (Customer ID: ${data.customerId})` : ""}`
         );
       } else {
         setDuplicateWarning("");
@@ -53,14 +53,22 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
     setLoading(true);
     setError("");
 
+    const designationVal = (formData.designation || "").trim() || null;
+    const reportToVal = formData.report_to && String(formData.report_to).trim()
+      ? parseInt(formData.report_to, 10)
+      : null;
+
     try {
       const response = await fetch("/api/customer-contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer_id: customerId,
-          ...formData,
-          report_to: formData.report_to || null
+          name: formData.name.trim(),
+          contact: formData.contact,
+          designation: designationVal,
+          report_to: reportToVal,
+          working: formData.working ?? 1,
         })
       });
 
@@ -76,10 +84,9 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
         });
         onSuccess();
       } else {
-        setError(
-          data.error ||
-          (data.duplicate ? `Duplicate phone number${data.existingCustomerId ? ` (Customer ID: ${data.existingCustomerId})` : ""}` : "Failed to add contact")
-        );
+        const errMsg = data.error ||
+          (data.duplicate ? `Duplicate phone number${data.existingCustomerId ? ` (Customer ID: ${data.existingCustomerId})` : ""}` : "Failed to add contact");
+        setError(data.detail ? `${errMsg}: ${data.detail}` : errMsg);
       }
     } catch (err) {
       console.error("Error adding contact:", err);
@@ -133,13 +140,15 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contact
+              Contact <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               name="contact"
               value={formData.contact}
               onChange={handleChange}
+              required
+              placeholder="10 digits"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -168,7 +177,7 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- None (Top Level) --</option>
-              {existingContacts && existingContacts.map((contact) => (
+              {existingContacts?.map((contact) => (
                 <option key={contact.id} value={contact.id}>
                   {contact.name} ({contact.designation || "No designation"})
                 </option>
