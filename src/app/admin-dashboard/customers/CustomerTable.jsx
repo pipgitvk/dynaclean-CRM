@@ -326,6 +326,8 @@ export default function CustomerTable({
           >
             Previous
           </button>
+
+          
           
           <div className="flex items-center gap-1 flex-wrap justify-center">
             {/* First page */}
