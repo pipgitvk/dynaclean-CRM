@@ -601,17 +601,24 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "DollarSign",
       },
+    ],
+  },
+  {
+    name: "Tally Payments",
+    roles: ["SUPERADMIN"],
+    icon: "Receipt",
+    children: [
+      {
+        path: "/admin-dashboard/client-expenses/cards",
+        name: "Client Expenses",
+        roles: ["SUPERADMIN"],
+        icon: "Users",
+      },
       {
         path: "/admin-dashboard/statements",
         name: "Statement",
         roles: ["SUPERADMIN"],
         icon: "Receipt",
-      },
-      {
-        path: "/admin-dashboard/client-expenses",
-        name: "Client Expenses",
-        roles: ["SUPERADMIN"],
-        icon: "Users",
       },
     ],
   },

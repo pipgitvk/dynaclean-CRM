@@ -6,14 +6,14 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Eye, Pencil, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Eye, Pencil, Trash2, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X } from "lucide-react";
 
 export default function ClientExpensesTable({ rows }) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [deletingId, setDeletingId] = useState(null);
-  const [expandedHeads, setExpandedHeads] = useState(new Set());
+  const [expandedHeads] = useState(new Set());
 
   const handleDelete = async (id, e) => {
     e?.preventDefault();
@@ -91,7 +91,7 @@ export default function ClientExpensesTable({ rows }) {
 
   const SortIcon = ({ column }) => {
     if (sortConfig.key !== column) return null;
-    return <span className="ml-1">{sortConfig.direction === "asc" ? "▲" : "▼"}</span>;
+    return sortConfig.direction === "asc" ? <ChevronUp className="inline w-4 h-4 ml-0.5" /> : <ChevronDown className="inline w-4 h-4 ml-0.5" />;
   };
 
   const handleReset = () => {
@@ -102,154 +102,119 @@ export default function ClientExpensesTable({ rows }) {
     if (!str || typeof str !== "string") return [];
     return str.split(",").map((s) => s.trim()).filter(Boolean);
   };
-  const rowsNoSubHead = sortedRows.filter((r) => !subHeadsList(r.sub_head).length);
-  const rowsWithSubHead = sortedRows.filter((r) => subHeadsList(r.sub_head).length > 0);
 
-  // Group by head (same head + has sub_head). First created (min id) = parent, rest = children
-  const headGroups = {};
-  rowsWithSubHead.forEach((r) => {
-    const h = (r.head || "").trim();
-    if (!h) return;
-    if (!headGroups[h]) headGroups[h] = [];
-    headGroups[h].push(r);
-  });
-  Object.keys(headGroups).forEach((h) => {
-    headGroups[h].sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
-  });
-  const parentRows = Object.values(headGroups)
-    .map((arr) => arr[0])
-    .sort((a, b) => Number(a.id || 0) - Number(b.id || 0));
-  const childRowsByHead = {};
-  Object.entries(headGroups).forEach(([h, arr]) => {
-    if (arr.length > 1) childRowsByHead[h] = arr.slice(1);
-  });
-
-  const toggleExpand = (head) => {
-    setExpandedHeads((prev) => {
-      const next = new Set(prev);
-      if (next.has(head)) next.delete(head);
-      else next.add(head);
-      return next;
-    });
-  };
-
-  const renderRow = (row, isChild = false, isParentWithChildren = false, childCount = 0) => (
+  const renderRow = (row) => (
     <tr
       key={row.id}
-      className={
-        isChild
-          ? "bg-gray-50/50"
-          : isParentWithChildren && childCount > 0
-            ? "bg-blue-50/80 border-l-4 border-l-blue-400"
-            : ""
-      }
+      className="hover:bg-blue-50/50 transition-colors duration-150 border-b border-gray-100 last:border-0"
     >
-      <td className="p-3">{row.id}</td>
-      <td className={`p-3 ${isChild ? "pl-8" : ""}`}>{row.expense_name}</td>
-      <td className="p-3">{row.client_name}</td>
-      <td className="p-3">{row.group_name || "-"}</td>
+      <td className="p-3 font-medium text-gray-600">{row.id}</td>
+      <td className="p-3">{row.expense_name}</td>
+      <td className="p-3 font-medium text-gray-800">{row.client_name}</td>
+      <td className="p-3 text-gray-600">{row.group_name || "-"}</td>
       <td className="p-3">
-        <span className={row.main_head === "Direct" ? "text-blue-600" : "text-amber-600"}>
+        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${row.main_head === "Direct" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
           {row.main_head}
         </span>
       </td>
+      <td className="p-3 text-gray-600">{row.head || "-"}</td>
+      <td className="p-3 text-gray-600">{row.sub_head || "-"}</td>
+      <td className="p-3 text-gray-600">{row.supply || "-"}</td>
+      <td className="p-3 font-semibold text-emerald-700 tabular-nums">{row.amount != null ? `₹${Number(row.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "-"}</td>
+      <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</td>
       <td className="p-3">
-        {isParentWithChildren && childCount > 0 ? (
+        <div className="flex gap-1.5 items-center">
+          <Link href={`/admin-dashboard/client-expenses/${row.id}`} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors" title="View">
+            <Eye size={16} />
+          </Link>
+          <Link href={`/admin-dashboard/client-expenses/edit/${row.id}`} className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 hover:text-amber-700 transition-colors" title="Edit">
+            <Pencil size={16} />
+          </Link>
           <button
             type="button"
-            onClick={() => toggleExpand((row.head || "").trim())}
-            className="flex items-center gap-1 text-left hover:underline cursor-pointer"
-            title="Click to show/hide children"
+            onClick={(e) => handleDelete(row.id, e)}
+            disabled={deletingId === row.id}
+            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 transition-colors"
+            title="Delete"
           >
-            {expandedHeads.has((row.head || "").trim()) ? (
-              <><ChevronDown size={14} className="text-blue-600" /> {row.head || "-"}</>
-            ) : (
-              <><ChevronRight size={14} className="text-blue-600" /> {row.head || "-"}</>
-            )}
+            <Trash2 size={16} />
           </button>
-        ) : (
-          (row.head || "-")
-        )}
-      </td>
-      <td className="p-3">{row.sub_head || "-"}</td>
-      <td className="p-3">{row.supply || "-"}</td>
-      <td className="p-3">{row.amount != null ? `₹${Number(row.amount).toFixed(2)}` : "-"}</td>
-      <td className="p-3">{row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</td>
-      <td className="p-3 flex gap-2 items-center">
-        <Link href={`/admin-dashboard/client-expenses/${row.id}`} className="text-blue-600 hover:underline" title="View">
-          <Eye size={16} />
-        </Link>
-        <Link href={`/admin-dashboard/client-expenses/edit/${row.id}`} className="text-yellow-600 hover:text-yellow-800" title="Edit">
-          <Pencil size={16} />
-        </Link>
-        <button
-          type="button"
-          onClick={(e) => handleDelete(row.id, e)}
-          disabled={deletingId === row.id}
-          className="text-red-600 hover:text-red-800 disabled:opacity-50"
-          title="Delete"
-        >
-          <Trash2 size={16} />
-        </button>
+        </div>
       </td>
     </tr>
   );
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-4">
-        <input
-          type="text"
-          placeholder="Search anything..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="px-4 py-2 border rounded-lg w-full sm:w-auto"
-        />
-        <button
-          onClick={handleReset}
-          className="px-4 py-2 bg-gray-300 rounded-lg text-sm cursor-pointer w-full sm:w-auto"
-        >
-          Reset
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:shadow transition-all"
+          >
+            <RotateCcw size={16} />
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/admin-dashboard/client-expenses/cards")}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:shadow transition-all"
+          >
+            <ArrowLeft size={16} />
+            Back
+          </button>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search anything..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            />
+          </div>
+          <button
+            onClick={handleReset}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
+          >
+            <X size={14} />
+            Reset
+          </button>
+        </div>
       </div>
 
-      <div className="hidden md:block overflow-auto bg-white shadow rounded-lg">
+      <div className="hidden lg:block overflow-auto bg-white shadow-lg rounded-xl border border-gray-200">
         <table className="min-w-full table-auto text-sm">
-          <thead className="bg-gray-100 sticky top-0 z-10">
-            <tr className="text-left font-semibold text-gray-700">
-              <th onClick={() => handleSort("id")} className="p-3 cursor-pointer select-none">ID<SortIcon column="id" /></th>
-              <th onClick={() => handleSort("expense_name")} className="p-3 cursor-pointer select-none">Expense Name<SortIcon column="expense_name" /></th>
-              <th onClick={() => handleSort("client_name")} className="p-3 cursor-pointer select-none">Client Name<SortIcon column="client_name" /></th>
-              <th onClick={() => handleSort("group_name")} className="p-3 cursor-pointer select-none">Group Name<SortIcon column="group_name" /></th>
-              <th onClick={() => handleSort("main_head")} className="p-3 cursor-pointer select-none">Main Head<SortIcon column="main_head" /></th>
-              <th onClick={() => handleSort("head")} className="p-3 cursor-pointer select-none">Head<SortIcon column="head" /></th>
-              <th onClick={() => handleSort("sub_head")} className="p-3 cursor-pointer select-none">Sub-head<SortIcon column="sub_head" /></th>
-              <th onClick={() => handleSort("supply")} className="p-3 cursor-pointer select-none">Supply<SortIcon column="supply" /></th>
-              <th onClick={() => handleSort("amount")} className="p-3 cursor-pointer select-none">Amount<SortIcon column="amount" /></th>
-              <th onClick={() => handleSort("created_at")} className="p-3 cursor-pointer select-none">Created<SortIcon column="created_at" /></th>
-              <th className="p-3">Action</th>
+          <thead className="bg-gradient-to-r from-slate-700 to-slate-800 sticky top-0 z-10">
+            <tr className="text-left font-medium text-white">
+              <th onClick={() => handleSort("id")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors rounded-tl-xl">ID<SortIcon column="id" /></th>
+              <th onClick={() => handleSort("expense_name")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Expense Name<SortIcon column="expense_name" /></th>
+              <th onClick={() => handleSort("client_name")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Client Name<SortIcon column="client_name" /></th>
+              <th onClick={() => handleSort("group_name")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Group Name<SortIcon column="group_name" /></th>
+              <th onClick={() => handleSort("main_head")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Main Head<SortIcon column="main_head" /></th>
+              <th onClick={() => handleSort("head")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Head<SortIcon column="head" /></th>
+              <th onClick={() => handleSort("sub_head")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Sub-head<SortIcon column="sub_head" /></th>
+              <th onClick={() => handleSort("supply")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Supply<SortIcon column="supply" /></th>
+              <th onClick={() => handleSort("amount")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Amount<SortIcon column="amount" /></th>
+              <th onClick={() => handleSort("created_at")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Created<SortIcon column="created_at" /></th>
+              <th className="p-3 rounded-tr-xl">Action</th>
             </tr>
           </thead>
-          <tbody className="text-gray-800 divide-y divide-gray-200">
+          <tbody className="text-gray-800 bg-white">
             {sortedRows.length > 0 ? (
               <>
-                {rowsNoSubHead.map((row) => renderRow(row, false, false, 0))}
-                {parentRows.map((row) => {
-                  const head = (row.head || "").trim();
-                  const children = childRowsByHead[head] || [];
-                  const childCount = children.length;
-                  return (
-                    <React.Fragment key={row.id}>
-                      {renderRow(row, false, childCount > 0, childCount)}
-                      {expandedHeads.has(head) && children.map((child) => renderRow(child, true, false, 0))}
-                    </React.Fragment>
-                  );
-                })}
+                {sortedRows.map((row) => renderRow(row))}
               </>
             ) : (
               <tr>
-                <td colSpan="11" className="p-4 text-center text-gray-500">
-                  No entries found.
+                <td colSpan="11" className="p-12 text-center text-gray-500">
+                  <div className="flex flex-col items-center gap-2">
+                    <Inbox className="w-12 h-12 text-gray-300" />
+                    <span className="font-medium">No entries found.</span>
+                  </div>
                 </td>
               </tr>
             )}
@@ -257,76 +222,41 @@ export default function ClientExpensesTable({ rows }) {
         </table>
       </div>
 
-      <div className="md:hidden flex flex-col gap-4">
+      <div className="lg:hidden flex flex-col gap-4">
         {sortedRows.length === 0 && (
-          <div className="text-center text-gray-500">No entries found.</div>
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-gray-500">
+            <Inbox className="w-12 h-12 text-gray-300" />
+            <span className="font-medium">No entries found.</span>
+          </div>
         )}
-        {rowsNoSubHead.map((row) => (
-          <div key={row.id} className="border rounded-lg p-4 shadow-sm bg-white text-sm space-y-1">
-            <div><strong>ID:</strong> {row.id}</div>
-            <div><strong>Expense Name:</strong> {row.expense_name}</div>
-            <div><strong>Client Name:</strong> {row.client_name}</div>
-            <div><strong>Group Name:</strong> {row.group_name || "-"}</div>
-            <div><strong>Main Head:</strong> <span className={row.main_head === "Direct" ? "text-blue-600" : "text-amber-600"}>{row.main_head}</span></div>
-            <div><strong>Head:</strong> {row.head || "-"}</div>
-            <div><strong>Sub-head:</strong> {row.sub_head || "-"}</div>
-            <div><strong>Supply:</strong> {row.supply || "-"}</div>
-            <div><strong>Amount:</strong> {row.amount != null ? `₹${Number(row.amount).toFixed(2)}` : "-"}</div>
-            <div><strong>Created:</strong> {row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</div>
-            <div className="flex items-center gap-4 pt-2">
-              <Link href={`/admin-dashboard/client-expenses/${row.id}`} className="text-blue-600 hover:underline"><Eye size={16} /></Link>
-              <Link href={`/admin-dashboard/client-expenses/edit/${row.id}`} className="text-yellow-600 hover:text-yellow-800"><Pencil size={16} /></Link>
-              <button type="button" onClick={(e) => handleDelete(row.id, e)} disabled={deletingId === row.id} className="text-red-600 hover:text-red-800 disabled:opacity-50"><Trash2 size={16} /></button>
+        {sortedRows.map((row) => (
+          <div key={row.id} className="border border-gray-200 rounded-xl p-4 shadow-md bg-white text-sm space-y-2 hover:shadow-lg transition-shadow">
+            <div className="flex justify-between items-start gap-2">
+              <div>
+                <span className="text-xs font-medium text-gray-500">ID {row.id}</span>
+                <div className="font-semibold text-gray-800 mt-0.5">{row.expense_name}</div>
+              </div>
+              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${row.main_head === "Direct" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>{row.main_head}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-gray-600">
+              <div><span className="text-gray-500">client_name:</span> {row.client_name}</div>
+              <div><span className="text-gray-500">group_name:</span> {row.group_name || "-"}</div>
+              <div><span className="text-gray-500">Head:</span> {row.head || "-"}</div>
+              <div><span className="text-gray-500">Sub-head:</span> {row.sub_head || "-"}</div>
+              <div><span className="text-gray-500">Supply:</span> {row.supply || "-"}</div>
+              <div><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</div>
+            </div>
+            <div className="pt-3 border-t border-gray-100 flex justify-between items-center">
+              <span className="font-semibold text-emerald-700">₹{row.amount != null ? Number(row.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}</span>
+              <div className="flex gap-1.5">
+                <Link href={`/admin-dashboard/client-expenses/${row.id}`} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100" title="View"><Eye size={16} /></Link>
+                <Link href={`/admin-dashboard/client-expenses/edit/${row.id}`} className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100" title="Edit"><Pencil size={16} /></Link>
+                <button type="button" onClick={(e) => handleDelete(row.id, e)} disabled={deletingId === row.id} className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50" title="Delete"><Trash2 size={16} /></button>
+              </div>
             </div>
           </div>
         ))}
-        {parentRows.map((row) => {
-          const head = (row.head || "").trim();
-          const children = childRowsByHead[head] || [];
-          const childCount = children.length;
-          const isExpanded = expandedHeads.has(head);
-          const hasChildren = childCount > 0;
-          return (
-            <div
-              key={row.id}
-              className={`rounded-lg p-4 shadow-sm text-sm space-y-1 border ${
-                hasChildren ? "bg-blue-50/80 border-l-4 border-l-blue-400 border-gray-200" : "bg-white border-gray-200"
-              }`}
-            >
-              <div><strong>ID:</strong> {row.id}</div>
-              <div><strong>Expense Name:</strong> {row.expense_name}</div>
-              <div><strong>Client Name:</strong> {row.client_name}</div>
-              <div><strong>Group Name:</strong> {row.group_name || "-"}</div>
-              <div><strong>Main Head:</strong> <span className={row.main_head === "Direct" ? "text-blue-600" : "text-amber-600"}>{row.main_head}</span></div>
-              <div><strong>Head:</strong> {childCount > 0 ? (
-                <button type="button" onClick={() => toggleExpand(head)} className="flex items-center gap-1 text-blue-600 hover:underline">
-                  {isExpanded ? <><ChevronDown size={14} /> {row.head || "-"}</> : <><ChevronRight size={14} /> {row.head || "-"}</>}
-                </button>
-              ) : (row.head || "-")}</div>
-              <div><strong>Sub-head:</strong> {row.sub_head || "-"}</div>
-              <div><strong>Supply:</strong> {row.supply || "-"}</div>
-              <div><strong>Amount:</strong> {row.amount != null ? `₹${Number(row.amount).toFixed(2)}` : "-"}</div>
-              <div><strong>Created:</strong> {row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</div>
-              <div className="flex items-center gap-4 pt-2">
-                <Link href={`/admin-dashboard/client-expenses/${row.id}`} className="text-blue-600 hover:underline"><Eye size={16} /></Link>
-                <Link href={`/admin-dashboard/client-expenses/edit/${row.id}`} className="text-yellow-600 hover:text-yellow-800"><Pencil size={16} /></Link>
-                <button type="button" onClick={(e) => handleDelete(row.id, e)} disabled={deletingId === row.id} className="text-red-600 hover:text-red-800 disabled:opacity-50"><Trash2 size={16} /></button>
-              </div>
-              {isExpanded && children.map((child) => (
-                <div key={child.id} className="mt-3 pl-4 border-l-2 border-gray-200 rounded p-3 bg-gray-50 text-sm space-y-1">
-                  <div><strong>ID:</strong> {child.id}</div>
-                  <div><strong>Sub-head:</strong> {child.sub_head || "-"}</div>
-                  <div><strong>Amount:</strong> {child.amount != null ? `₹${Number(child.amount).toFixed(2)}` : "-"}</div>
-                  <div className="flex items-center gap-4 pt-2">
-                    <Link href={`/admin-dashboard/client-expenses/${child.id}`} className="text-blue-600 hover:underline"><Eye size={16} /></Link>
-                    <Link href={`/admin-dashboard/client-expenses/edit/${child.id}`} className="text-yellow-600 hover:text-yellow-800"><Pencil size={16} /></Link>
-                    <button type="button" onClick={(e) => handleDelete(child.id, e)} disabled={deletingId === child.id} className="text-red-600 hover:text-red-800 disabled:opacity-50"><Trash2 size={16} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        })}
+        {/* mobile cards already simple list; no expand/collapse now */}
       </div>
     </div>
   );

@@ -99,7 +99,7 @@ export default async function ClientExpenseDetailPage({ params, searchParams }) 
 
       <div className="flex flex-col sm:flex-row gap-4 justify-between mt-10">
         <Link
-          href={fromStatements ? "/admin-dashboard/statements" : "/admin-dashboard/client-expenses"}
+          href={fromStatements ? "/admin-dashboard/statements" : "/admin-dashboard/client-expenses/cards"}
           className="inline-block px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-center"
         >
           Back
@@ -113,7 +113,7 @@ export default async function ClientExpenseDetailPage({ params, searchParams }) 
           </Link>
           <ClientExpenseDeleteButton
             id={id}
-            backHref={fromStatements ? "/admin-dashboard/statements" : "/admin-dashboard/client-expenses"}
+            backHref={fromStatements ? "/admin-dashboard/statements" : "/admin-dashboard/client-expenses/cards"}
           />
         </div>
       </div>

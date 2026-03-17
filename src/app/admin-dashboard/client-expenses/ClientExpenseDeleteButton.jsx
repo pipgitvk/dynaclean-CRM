@@ -17,7 +17,7 @@ export default function ClientExpenseDeleteButton({ id, backHref }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete");
       toast.success("Client expense deleted successfully!");
-      router.push(backHref || "/admin-dashboard/client-expenses");
+      router.push(backHref || "/admin-dashboard/client-expenses/cards");
     } catch (err) {
       toast.error(err.message || "Failed to delete");
     } finally {

@@ -3,21 +3,15 @@
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Eye, Pencil, Trash2, X } from "lucide-react";
+import { Eye, Pencil, X } from "lucide-react";
 
 export default function StatementTable({ rows }) {
-  const router = useRouter();
   const [statusFilter, setStatusFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-  const [deletingId, setDeletingId] = useState(null);
   const [modalId, setModalId] = useState(null);
   const [expense, setExpense] = useState(null);
   const [expenseLoading, setExpenseLoading] = useState(false);
-
-  const totalSettled = rows.filter((r) => r.client_expense_id).length;
-  const totalUnsettled = rows.filter((r) => !r.client_expense_id).length;
 
   const filteredRows = rows.filter((row) => {
     if (!statusFilter) return true;
@@ -25,23 +19,6 @@ export default function StatementTable({ rows }) {
     if (statusFilter === "Unsettled") return !row.client_expense_id;
     return true;
   });
-
-  const handleDelete = async (id, e) => {
-    e?.preventDefault();
-    if (!confirm("Are you sure you want to delete this statement? This cannot be undone.")) return;
-    setDeletingId(id);
-    try {
-      const res = await fetch(`/api/statements/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete");
-      toast.success("Statement deleted successfully!");
-      router.refresh();
-    } catch (err) {
-      toast.error(err.message || "Failed to delete");
-    } finally {
-      setDeletingId(null);
-    }
-  };
 
   const handleSort = (key) => {
     setSortConfig((prev) =>
@@ -125,17 +102,6 @@ export default function StatementTable({ rows }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 shadow-sm">
-          <p className="text-sm text-green-700 font-medium">Total Settled</p>
-          <p className="text-2xl font-bold text-green-800">{totalSettled}</p>
-        </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 shadow-sm">
-          <p className="text-sm text-amber-700 font-medium">Total Unsettled</p>
-          <p className="text-2xl font-bold text-amber-800">{totalUnsettled}</p>
-        </div>
-      </div>
-
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
         <select
           value={statusFilter}
@@ -213,15 +179,6 @@ export default function StatementTable({ rows }) {
                     >
                       <Pencil size={16} />
                     </Link>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDelete(row.id, e)}
-                      disabled={deletingId === row.id}
-                      className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                      title="Delete"
-                    >
-                      <Trash2 size={16} />
-                    </button>
                   </td>
                 </tr>
               ))
@@ -262,14 +219,6 @@ export default function StatementTable({ rows }) {
               <Link href={`/admin-dashboard/statements/edit/${row.id}`} className="text-yellow-600 hover:text-yellow-800">
                 <Pencil size={16} /> Edit
               </Link>
-              <button
-                type="button"
-                onClick={(e) => handleDelete(row.id, e)}
-                disabled={deletingId === row.id}
-                className="text-red-600 hover:text-red-800 disabled:opacity-50"
-              >
-                <Trash2 size={16} />
-              </button>
             </div>
           </div>
         ))}

@@ -80,7 +80,7 @@ export default function AddClientExpenseForm() {
 
       if (res.ok) {
         toast.success("Client expense added successfully!");
-        router.push("/admin-dashboard/client-expenses");
+        router.push("/admin-dashboard/client-expenses/cards");
       } else {
         toast.error(result.error || "Failed to add client expense");
       }
