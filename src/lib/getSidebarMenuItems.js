@@ -133,6 +133,25 @@ const allMenuItems = [
     icon: "Receipt",
   },
   {
+    name: "Tally Payments",
+    roles: ["SUPERADMIN", "ACCOUNTANT"],
+    icon: "Receipt",
+    children: [
+      {
+        path: "/admin-dashboard/client-expenses/cards",
+        name: "Client Expenses",
+        roles: ["SUPERADMIN", "ACCOUNTANT"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/statements",
+        name: "Statement",
+        roles: ["SUPERADMIN", "ACCOUNTANT"],
+        icon: "Receipt",
+      },
+    ],
+  },
+  {
     name: "Orders",
     roles: ["ALL"],
     icon: "ListOrdered",
