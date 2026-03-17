@@ -78,6 +78,13 @@ export default async function TLCustomersPage({ searchParams }) {
     params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
+  // For non-admin users: only show their leads (manual + automatic)
+  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER"];
+  if (!privilegedRoles.includes(payload?.role || "")) {
+    query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
+    params.push(payload?.username || "", payload?.username || "");
+  }
+
   // Filter by employee (lead_source)
   if (employee) {
     query += ` AND c.lead_source = ?`;
@@ -106,9 +113,9 @@ export default async function TLCustomersPage({ searchParams }) {
     }
   }
 
-  // Filter to show only TL entries (customers with TL followup records)
+  // Filter to show only TL entries (customers with TL followup OR regular followup - includes new automatic leads)
   if (showTLOnly) {
-    query += ` AND tlf.customer_id IS NOT NULL`;
+    query += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
   }
 
   // Filter by follow-up date range (when status/stage was set)
@@ -204,6 +211,11 @@ export default async function TLCustomersPage({ searchParams }) {
     kpiParams.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
+  if (!privilegedRoles.includes(payload?.role || "")) {
+    kpiQuery += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
+    kpiParams.push(payload?.username || "", payload?.username || "");
+  }
+
   if (employee) {
     kpiQuery += ` AND c.lead_source = ?`;
     kpiParams.push(employee);
@@ -229,7 +241,7 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   if (showTLOnly) {
-    kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
+    kpiQuery += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
   }
 
   // Filter by follow-up date range (same logic as main query)

@@ -6,11 +6,13 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { Eye, Pencil, Trash2, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X } from "lucide-react";
+import { Eye, Pencil, Trash2, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X, Calendar } from "lucide-react";
 
-export default function ClientExpensesTable({ rows }) {
+export default function ClientExpensesTable({ rows, client, group }) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [deletingId, setDeletingId] = useState(null);
   const [expandedHeads] = useState(new Set());
@@ -34,11 +36,20 @@ export default function ClientExpensesTable({ rows }) {
 
   const filteredRows = rows.filter((row) => {
     const matchesSearch =
+      !searchQuery ||
       Object.values(row)
         .join(" ")
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
-    return matchesSearch;
+    if (!matchesSearch) return false;
+
+    if (fromDate || toDate) {
+      const rowDate = row.created_at ? dayjs(row.created_at).format("YYYY-MM-DD") : null;
+      if (!rowDate) return false;
+      if (fromDate && rowDate < fromDate) return false;
+      if (toDate && rowDate > toDate) return false;
+    }
+    return true;
   });
 
   const handleSort = (key) => {
@@ -96,11 +107,8 @@ export default function ClientExpensesTable({ rows }) {
 
   const handleReset = () => {
     setSearchQuery("");
-  };
-
-  const subHeadsList = (str) => {
-    if (!str || typeof str !== "string") return [];
-    return str.split(",").map((s) => s.trim()).filter(Boolean);
+    setFromDate("");
+    setToDate("");
   };
 
   const renderRow = (row) => (
@@ -146,43 +154,71 @@ export default function ClientExpensesTable({ rows }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => router.refresh()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:shadow transition-all"
-          >
-            <RotateCcw size={16} />
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/admin-dashboard/client-expenses/cards")}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:shadow transition-all"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </button>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search anything..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full sm:w-64 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-            />
+      <div className="flex flex-col gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:shadow transition-all w-full sm:w-auto"
+            >
+              <RotateCcw size={16} />
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  client && group
+                    ? `/admin-dashboard/client-expenses/sub-head-cards?client=${encodeURIComponent(client)}&group=${encodeURIComponent(group)}`
+                    : "/admin-dashboard/client-expenses/cards"
+                )
+              }
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:shadow transition-all w-full sm:w-auto"
+            >
+              <ArrowLeft size={16} />
+              Back
+            </button>
           </div>
-          <button
-            onClick={handleReset}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
-          >
-            <X size={14} />
-            Reset
-          </button>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 w-full">
+            <div className="relative w-full sm:w-[300px] sm:min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search anything..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                />
+              </div>
+              <span className="text-gray-400 shrink-0">to</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="flex-1 min-w-0 w-full sm:w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
+            </div>
+            <button
+              onClick={handleReset}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors w-full sm:w-auto shrink-0"
+            >
+              <X size={14} />
+              Reset
+            </button>
+          </div>
         </div>
       </div>
 
