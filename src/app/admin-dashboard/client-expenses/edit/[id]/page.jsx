@@ -144,7 +144,7 @@ export default function EditClientExpensePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update");
       toast.success("Client expense updated successfully!");
-      router.push(`/admin-dashboard/client-expenses/${id}`);
+      router.push("/admin-dashboard/client-expenses/cards");
     } catch (e) {
       setError(e.message || "Failed to save");
       toast.error(e.message);

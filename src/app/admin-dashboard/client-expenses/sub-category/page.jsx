@@ -77,7 +77,7 @@ export default function SubCategoryPage() {
   return (
     <div className="max-w-2xl mx-auto p-6">
       <div className="flex items-center gap-4 mb-6">
-        <Link href="/admin-dashboard/client-expenses" className="text-gray-600 hover:text-gray-800">
+        <Link href="/admin-dashboard/client-expenses/cards" className="text-gray-600 hover:text-gray-800">
           ← Back
         </Link>
         <h1 className="text-2xl font-bold text-gray-700">Sub-category</h1>
