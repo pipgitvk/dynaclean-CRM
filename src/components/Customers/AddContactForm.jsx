@@ -13,6 +13,7 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -20,12 +21,42 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
       ...prev,
       [name]: name === "working" ? parseInt(value) : value
     }));
+    if (name === "contact") setDuplicateWarning("");
   };
+
+  const checkPhoneDuplicate = async (phone) => {
+    if (!phone || String(phone).replace(/\D/g, "").length < 10) return;
+    try {
+      const res = await fetch(`/api/check-phone?phone=${encodeURIComponent(phone)}`);
+      const data = await res.json();
+      if (data.duplicate) {
+        setDuplicateWarning(
+          `Duplicate: This number exists${data.customerId ? ` (Customer ID: ${data.customerId})` : ""}`
+        );
+      } else {
+        setDuplicateWarning("");
+      }
+    } catch {
+      setDuplicateWarning("");
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.contact) checkPhoneDuplicate(formData.contact);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData.contact]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    const designationVal = (formData.designation || "").trim() || null;
+    const reportToVal = formData.report_to && String(formData.report_to).trim()
+      ? parseInt(formData.report_to, 10)
+      : null;
 
     try {
       const response = await fetch("/api/customer-contact", {
@@ -33,8 +64,11 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customer_id: customerId,
-          ...formData,
-          report_to: formData.report_to || null
+          name: formData.name.trim(),
+          contact: formData.contact,
+          designation: designationVal,
+          report_to: reportToVal,
+          working: formData.working ?? 1,
         })
       });
 
@@ -50,7 +84,9 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
         });
         onSuccess();
       } else {
-        setError(data.error || "Failed to add contact");
+        const errMsg = data.error ||
+          (data.duplicate ? `Duplicate phone number${data.existingCustomerId ? ` (Customer ID: ${data.existingCustomerId})` : ""}` : "Failed to add contact");
+        setError(data.detail ? `${errMsg}: ${data.detail}` : errMsg);
       }
     } catch (err) {
       console.error("Error adding contact:", err);
@@ -61,9 +97,9 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
   };
 
   return (
-    <div className="bg-white rounded-lg p-6 shadow-md">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold text-gray-800">Add New Contact</h3>
+    <div className="bg-white rounded-lg p-4 sm:p-6 shadow-md">
+      <div className="flex justify-between items-center mb-4 gap-2">
+        <h3 className="text-base sm:text-xl font-semibold text-gray-800">Add New Contact</h3>
         {onCancel && (
           <button
             onClick={onCancel}
@@ -77,6 +113,12 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
           {error}
+        </div>
+      )}
+
+      {duplicateWarning && (
+        <div className="mb-4 p-3 bg-amber-100 text-amber-800 rounded-md">
+          {duplicateWarning}
         </div>
       )}
 
@@ -98,13 +140,15 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contact
+              Contact <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               name="contact"
               value={formData.contact}
               onChange={handleChange}
+              required
+              placeholder="10 digits"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -133,7 +177,7 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- None (Top Level) --</option>
-              {existingContacts && existingContacts.map((contact) => (
+              {existingContacts?.map((contact) => (
                 <option key={contact.id} value={contact.id}>
                   {contact.name} ({contact.designation || "No designation"})
                 </option>
@@ -169,8 +213,8 @@ export default function AddContactForm({ customerId, existingContacts, onSuccess
           )}
           <button
             type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-300"
+            disabled={loading || !!duplicateWarning}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
           >
             {loading ? "Adding..." : "Add Contact"}
           </button>
