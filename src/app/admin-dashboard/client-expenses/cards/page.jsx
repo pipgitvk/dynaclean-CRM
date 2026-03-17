@@ -104,7 +104,7 @@ export default async function ClientExpensesCardsPage() {
         {summaryCards.map((card) => (
           <Link
             key={card.key}
-            href={`/admin-dashboard/client-expenses?client=${encodeURIComponent(
+            href={`/admin-dashboard/client-expenses/sub-head-cards?client=${encodeURIComponent(
               card.client_name,
             )}&group=${encodeURIComponent(card.group_name)}`}
             className={[

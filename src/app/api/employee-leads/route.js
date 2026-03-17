@@ -57,28 +57,28 @@ export async function GET(req) {
     `;
       [orders] = await db.execute(ordersQuery);
     } else {
-      // Total leads assigned to the logged-in user
-      const customerQuery = `SELECT * FROM customers WHERE assigned_to = ? ORDER BY date_created DESC`;
-      [customers] = await db.execute(customerQuery, [username]);
+      // Total leads: manually assigned (assigned_to) OR auto-assigned (lead_source)
+      const customerQuery = `SELECT * FROM customers WHERE assigned_to = ? OR lead_source = ? ORDER BY date_created DESC`;
+      [customers] = await db.execute(customerQuery, [username, username]);
 
-      // Quotations created for leads assigned to the logged-in user
+      // Quotations for leads owned by the logged-in user
       const quotationsQuery = `
       SELECT * FROM quotations_records 
-      WHERE customer_id IN (SELECT customer_id FROM customers WHERE assigned_to = ?)
+      WHERE customer_id IN (SELECT customer_id FROM customers WHERE assigned_to = ? OR lead_source = ?)
       ORDER BY quote_date DESC
     `;
-      [quotations] = await db.execute(quotationsQuery, [username]);
+      [quotations] = await db.execute(quotationsQuery, [username, username]);
 
-      // Orders created for leads assigned to the logged-in user
+      // Orders for leads owned by the logged-in user
       const ordersQuery = `
       SELECT * FROM neworder 
       WHERE quote_number IN (
         SELECT quote_number FROM quotations_records 
-        WHERE customer_id IN (SELECT customer_id FROM customers WHERE assigned_to = ?)
+        WHERE customer_id IN (SELECT customer_id FROM customers WHERE assigned_to = ? OR lead_source = ?)
       ) AND account_status = 1
       ORDER BY invoice_date DESC
     `;
-      [orders] = await db.execute(ordersQuery, [username]);
+      [orders] = await db.execute(ordersQuery, [username, username]);
     }
 
     // Create lookup maps

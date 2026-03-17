@@ -12,6 +12,7 @@ export default async function ClientExpensesPage({ searchParams }) {
   const sp = await searchParams;
   const selectedClient = sp?.client || null;
   const selectedGroup = sp?.group || null;
+  const selectedSubHead = sp?.sub_head || null;
 
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
@@ -46,15 +47,26 @@ export default async function ClientExpensesPage({ searchParams }) {
     console.error("[client-expenses] DB error:", err?.message);
   }
 
-  const filteredRows =
-    selectedClient && selectedGroup
-      ? rows.filter((r) => {
-          const client = r.client_name || "—";
-          const group = r.group_name || "—";
-          return client === selectedClient && group === selectedGroup;
-        })
-      : rows;
+  const filteredRows = rows.filter((r) => {
+    const client = r.client_name || "—";
+    const group = r.group_name || "—";
+    return client === selectedClient && group === selectedGroup;
+  });
 
-  return <ClientExpensesTable rows={filteredRows} />;
+  const rowsBySubHead = selectedSubHead
+    ? filteredRows.filter((r) => {
+        const sh = (r.sub_head || "").split(",").map((s) => s.trim()).filter(Boolean);
+        if (selectedSubHead === "—") return sh.length === 0;
+        return sh.includes(selectedSubHead);
+      })
+    : filteredRows;
+
+  return (
+    <ClientExpensesTable
+      rows={rowsBySubHead}
+      client={selectedClient}
+      group={selectedGroup}
+    />
+  );
 }
 

@@ -100,9 +100,9 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     }
   }
 
-  // Filter to show only TL entries (customers with TL followup records)
+  // Filter to show only TL entries (customers with TL followup OR regular followup - includes new automatic leads)
   if (showTLOnly) {
-    query += ` AND tlf.customer_id IS NOT NULL`;
+    query += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
   }
 
   // Filter by follow-up date range (when status/stage was set)
@@ -223,7 +223,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   if (showTLOnly) {
-    kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
+    kpiQuery += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
   }
 
   // Filter by follow-up date range (same logic as main query)
