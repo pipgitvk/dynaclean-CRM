@@ -1,7 +1,7 @@
 /**
  * GET /api/cron/meta-backfill
- * Cron endpoint - har 10 min par call karo to Meta se leads auto-fetch + DB me save
- * Optional: ?secret=YOUR_CRON_SECRET (agar .env me CRON_SECRET set hai)
+ * Cron endpoint - call every 10 min to auto-fetch leads from Meta and save to DB
+ * Optional: ?secret=YOUR_CRON_SECRET (if CRON_SECRET is set in .env)
  */
 import { NextResponse } from "next/server";
 
