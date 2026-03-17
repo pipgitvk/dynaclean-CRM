@@ -63,7 +63,7 @@ export default function MetaBackfillPage() {
     setAutoPollEnabledState(getAutoPollEnabled());
   }, []);
 
-  // Har 10 min par API call jab auto-poll on ho (direct meta-backfill - fast response)
+  // API call every 10 min when auto-poll is on (direct meta-backfill - fast response)
   useEffect(() => {
     if (!autoPollEnabled) return;
     const run = async () => {
@@ -90,8 +90,8 @@ export default function MetaBackfillPage() {
         });
       }
     };
-    run(); // pehli call turant
-    const id = setInterval(run, 10 * 60 * 1000); // phir har 10 min
+    run(); // first call immediately
+    const id = setInterval(run, 10 * 60 * 1000); // then every 10 min
     return () => clearInterval(id);
   }, [autoPollEnabled]);
 
@@ -340,10 +340,7 @@ export default function MetaBackfillPage() {
 
       {/* Automatic Cron - fetches leads from Meta */}
       <div className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
-        <h2 className="font-medium mb-2 text-blue-900">Automatic Cron (every 10 min)</h2>
-        <p className="text-xs text-blue-800 mb-3">
-          <strong>Auto-poll:</strong> sirf jab ye page open hai tab chalega.
-        </p>
+        <h2 className="font-medium mb-3 text-blue-900">Automatic Cron (every 10 min)</h2>
         <div className="flex flex-wrap gap-2 items-center">
           <button
             type="button"
