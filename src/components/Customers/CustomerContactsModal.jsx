@@ -34,21 +34,21 @@ export default function CustomerContactsModal({ customerId }) {
         <div className="fixed inset-0 z-50 overflow-y-auto">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-opacity-70 transition-opacity"
+            className="fixed inset-0 bg-black/50 transition-opacity"
             onClick={() => setIsOpen(false)}
           />
 
           {/* Modal Container */}
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="relative bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+          <div className="flex min-h-full items-center justify-center p-2 sm:p-4">
+            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden mx-auto sm:mx-4">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b">
-                <h2 className="text-xl font-semibold text-gray-900">
+              <div className="flex items-center justify-between p-3 sm:p-4 border-b gap-2">
+                <h2 className="text-base sm:text-xl font-semibold text-gray-900 truncate">
                   Alternate Contacts
                 </h2>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                 >
                   <svg
                     className="w-6 h-6"
@@ -67,7 +67,7 @@ export default function CustomerContactsModal({ customerId }) {
               </div>
 
               {/* Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(95vh-60px)] sm:max-h-[calc(90vh-80px)]">
                 <CustomerContacts customerId={customerId} />
               </div>
             </div>

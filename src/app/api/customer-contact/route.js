@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { checkPhoneDuplicate, normalizePhone } from "@/lib/phone-check";
 
 // GET - Fetch all contacts for a customer
 export async function GET(request) {
@@ -35,7 +36,28 @@ export async function GET(request) {
       [customerId],
     );
 
-    return NextResponse.json({ success: true, contacts });
+    let memberCustomers = [];
+    try {
+      await connection.execute("SELECT parent_customer_id FROM customers LIMIT 1");
+    } catch (_) {
+      try {
+        await connection.execute("ALTER TABLE customers ADD COLUMN parent_customer_id INT NULL");
+      } catch (__) {}
+    }
+    try {
+      const [members] = await connection.execute(
+        `SELECT customer_id, first_name, last_name, phone, email, company, date_created
+         FROM customers
+         WHERE parent_customer_id = ?
+         ORDER BY date_created ASC`,
+        [customerId],
+      );
+      memberCustomers = members || [];
+    } catch (e) {
+      console.error("Error fetching member customers:", e);
+    }
+
+    return NextResponse.json({ success: true, contacts, memberCustomers });
   } catch (error) {
     console.error("Error fetching contacts:", error);
     return NextResponse.json(
@@ -59,7 +81,27 @@ export async function POST(request) {
       );
     }
 
+    if (contact && contact.toString().trim()) {
+      const normalizedPhone = normalizePhone(contact);
+      if (normalizedPhone.length === 10) {
+        const dupCheck = await checkPhoneDuplicate(normalizedPhone);
+        if (dupCheck.duplicate) {
+          return NextResponse.json(
+            {
+              error: "Duplicate phone number",
+              duplicate: true,
+              source: dupCheck.source,
+              existingCustomerId: dupCheck.customerId,
+            },
+            { status: 409 },
+          );
+        }
+      }
+    }
+
     const connection = await getDbConnection();
+
+    const normalizedContact = contact ? normalizePhone(contact) || contact : null;
 
     const [result] = await connection.execute(
       `INSERT INTO customer_contact (customer_id, name, contact, designation, report_to, working)
@@ -67,7 +109,7 @@ export async function POST(request) {
       [
         customer_id,
         name,
-        contact || null,
+        normalizedContact || null,
         designation || null,
         report_to || null,
         working !== undefined ? working : 1,

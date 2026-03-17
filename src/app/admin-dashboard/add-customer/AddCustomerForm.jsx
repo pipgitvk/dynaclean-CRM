@@ -1,16 +1,44 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 export default function AddCustomerForm() {
   const router = useRouter();
+  const [duplicateWarning, setDuplicateWarning] = useState("");
   const {
     register,
+    watch,
     handleSubmit,
     formState: { isSubmitting },
   } = useForm();
+
+  const phoneValue = watch("phone");
+
+  useEffect(() => {
+    if (!phoneValue || String(phoneValue).replace(/\D/g, "").length < 10) {
+      setDuplicateWarning("");
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/check-phone?phone=${encodeURIComponent(phoneValue)}`);
+        const data = await res.json();
+        if (data.duplicate) {
+          setDuplicateWarning(
+            `Duplicate: This number exists${data.customerId ? ` (Customer ID: ${data.customerId})` : ""}`
+          );
+        } else {
+          setDuplicateWarning("");
+        }
+      } catch {
+        setDuplicateWarning("");
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [phoneValue]);
 
   const onSubmit = async (data) => {
     const form = new FormData();
@@ -78,7 +106,9 @@ export default function AddCustomerForm() {
             {...register("phone", { required: true, pattern: /^\s*\d{10}\s*$/ })}
             className="w-full p-2 border rounded-md"
           />
-          {/* We should probably show errors too if we can, but let's stick to the requested behavior first */}
+          {duplicateWarning && (
+            <p className="mt-1 text-sm text-amber-600">{duplicateWarning}</p>
+          )}
         </div>
       </div>
 
@@ -196,8 +226,8 @@ export default function AddCustomerForm() {
 
       <button
         type="submit"
-        disabled={isSubmitting}
-        className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        disabled={isSubmitting || !!duplicateWarning}
+        className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSubmitting ? "Submitting..." : "Add Customer"}
       </button>
