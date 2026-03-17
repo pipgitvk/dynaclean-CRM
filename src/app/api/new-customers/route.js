@@ -4,22 +4,9 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { convertISTtoUTC } from "@/lib/timezone";
+import { checkPhoneDuplicate, normalizePhone } from "@/lib/phone-check";
 
 const JWT_SECRET = process.env.JWT_SECRET;
-
-const normalizePhone = (phone) => {
-  if (!phone) return "";
-
-  // Remove spaces, hyphens, brackets
-  let cleaned = phone.replace(/[^\d]/g, "");
-
-  // Take last 10 digits (Indian mobile standard)
-  if (cleaned.length > 10) {
-    cleaned = cleaned.slice(-10);
-  }
-
-  return cleaned;
-};
 
 export async function POST(req) {
   try {
@@ -90,19 +77,20 @@ export async function POST(req) {
 
     if (fields.phone.length !== 10) {
       return NextResponse.json(
-        { error: "Duplicate phone number" },
+        { error: "Invalid phone number (must be 10 digits)" },
         { status: 400 },
       );
     }
 
-    const [dupRows] = await conn.execute(
-      `SELECT COUNT(*) AS c FROM customers WHERE phone = ?`,
-      [fields.phone],
-    );
-    if (dupRows[0].c > 0) {
-      // await conn.end();
+    const dupCheck = await checkPhoneDuplicate(fields.phone);
+    if (dupCheck.duplicate) {
       return NextResponse.json(
-        { error: "Duplicate phone number" },
+        {
+          error: "Duplicate phone number",
+          duplicate: true,
+          source: dupCheck.source,
+          existingCustomerId: dupCheck.customerId,
+        },
         { status: 409 },
       );
     }
@@ -167,6 +155,9 @@ export async function POST(req) {
     return NextResponse.json({ success: true, customerId });
   } catch (error) {
     console.error("❌ API Error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Server error", detail: error?.message },
+      { status: 500 }
+    );
   }
 }
