@@ -34,6 +34,7 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
           trans_id: data.trans_id,
           date: data.date,
           txn_dated_deb: data.txn_dated_deb || null,
+          txn_posted_date: data.txn_posted_date || null,
           cheq_no: data.cheq_no || null,
           description: data.description || null,
           type: data.type,
@@ -90,6 +91,14 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
           <input
             type="date"
             {...register("txn_dated_deb")}
+            className="w-full border p-2 rounded-md"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Txn Posted Date</label>
+          <input
+            type="date"
+            {...register("txn_posted_date")}
             className="w-full border p-2 rounded-md"
           />
         </div>

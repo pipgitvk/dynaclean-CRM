@@ -15,10 +15,17 @@ export async function GET(req) {
     const expenseId = searchParams.get("expense_id");
 
     const conn = await getDbConnection();
+    try {
+      await conn.execute("SELECT txn_posted_date FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN txn_posted_date DATE NULL AFTER txn_dated_deb");
+      } catch (__) {}
+    }
     let rows;
     if (expenseId) {
       [rows] = await conn.execute(
-        `SELECT id, trans_id, date, txn_dated_deb, cheq_no, description, type, amount, client_expense_id, created_at
+        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, created_at
          FROM statements
          WHERE client_expense_id = ?
          ORDER BY id DESC`,
@@ -26,7 +33,7 @@ export async function GET(req) {
       );
     } else {
       [rows] = await conn.execute(
-        `SELECT id, trans_id, date, txn_dated_deb, cheq_no, description, type, amount, client_expense_id, created_at
+        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, created_at
          FROM statements
          ORDER BY date DESC, id DESC`
       );
@@ -49,7 +56,7 @@ export async function POST(req) {
     await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
     const data = await req.json();
-    const { trans_id, date, txn_dated_deb, cheq_no, description, type, amount, client_expense_id } = data;
+    const { trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id } = data;
 
     if (!trans_id || !date || !type || amount == null || amount === "") {
       return NextResponse.json(
@@ -59,6 +66,13 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
+    try {
+      await conn.execute("SELECT txn_posted_date FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN txn_posted_date DATE NULL AFTER txn_dated_deb");
+      } catch (__) {}
+    }
     const [existing] = await conn.execute(
       "SELECT id FROM statements WHERE trans_id = ?",
       [trans_id]
@@ -71,12 +85,13 @@ export async function POST(req) {
     }
     const expenseIdVal = client_expense_id ? Number(client_expense_id) : null;
     await conn.execute(
-      `INSERT INTO statements (trans_id, date, txn_dated_deb, cheq_no, description, type, amount, client_expense_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO statements (trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         trans_id,
         date,
         txn_dated_deb || null,
+        txn_posted_date || null,
         cheq_no || null,
         description || null,
         type,

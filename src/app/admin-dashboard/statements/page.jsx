@@ -24,8 +24,15 @@ export default async function StatementsPage() {
   let rows = [];
   try {
     const conn = await getDbConnection();
+    try {
+      await conn.execute("SELECT txn_posted_date FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN txn_posted_date DATE NULL AFTER txn_dated_deb");
+      } catch (__) {}
+    }
     const [result] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, cheq_no, description, type, amount, client_expense_id, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, created_at
        FROM statements
        ORDER BY date DESC, id DESC`
     );

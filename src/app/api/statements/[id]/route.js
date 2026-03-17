@@ -14,7 +14,7 @@ export async function GET(req, { params }) {
     const { id } = await params;
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, cheq_no, description, type, amount, client_expense_id, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, created_at
        FROM statements WHERE id = ?`,
       [id]
     );
@@ -41,7 +41,7 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const data = await req.json();
-    const { trans_id, date, txn_dated_deb, cheq_no, description, type, amount, client_expense_id } = data;
+    const { trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id } = data;
 
     if (!trans_id || !date || !type || amount == null || amount === "") {
       return NextResponse.json(
@@ -64,13 +64,14 @@ export async function PUT(req, { params }) {
     const expenseIdVal = client_expense_id ? Number(client_expense_id) : null;
     const [result] = await conn.execute(
       `UPDATE statements SET
-        trans_id = ?, date = ?, txn_dated_deb = ?, cheq_no = ?,
+        trans_id = ?, date = ?, txn_dated_deb = ?, txn_posted_date = ?, cheq_no = ?,
         description = ?, type = ?, amount = ?, client_expense_id = ?
        WHERE id = ?`,
       [
         trans_id,
         date,
         txn_dated_deb || null,
+        txn_posted_date || null,
         cheq_no || null,
         description || null,
         type,

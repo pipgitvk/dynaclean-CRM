@@ -1,24 +1,63 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
-import { Eye, Pencil, X } from "lucide-react";
+import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export default function StatementTable({ rows }) {
+  const router = useRouter();
+  const fileInputRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [modalId, setModalId] = useState(null);
   const [expense, setExpense] = useState(null);
   const [expenseLoading, setExpenseLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const filteredRows = rows.filter((row) => {
-    if (!statusFilter) return true;
-    if (statusFilter === "Settled") return !!row.client_expense_id;
-    if (statusFilter === "Unsettled") return !row.client_expense_id;
+    if (statusFilter) {
+      if (statusFilter === "Settled" && !row.client_expense_id) return false;
+      if (statusFilter === "Unsettled" && row.client_expense_id) return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const transId = (row.trans_id || "").toLowerCase();
+      const desc = (row.description || "").toLowerCase();
+      const cheqNo = (row.cheq_no || "").toLowerCase();
+      const amount = String(row.amount || "");
+      if (!transId.includes(q) && !desc.includes(q) && !cheqNo.includes(q) && !amount.includes(q)) return false;
+    }
+    if (dateFrom || dateTo) {
+      const rowDate = row.date ? dayjs(row.date).valueOf() : 0;
+      if (dateFrom && rowDate < dayjs(dateFrom).startOf("day").valueOf()) return false;
+      if (dateTo && rowDate > dayjs(dateTo).endOf("day").valueOf()) return false;
+    }
     return true;
   });
+
+  // Compute running balance (chronological order: date ASC, id ASC)
+  const balanceMap = {};
+  const chronoRows = [...filteredRows].sort((a, b) => {
+    const da = a.date ? dayjs(a.date).valueOf() : 0;
+    const db = b.date ? dayjs(b.date).valueOf() : 0;
+    if (da !== db) return da - db;
+    return (a.id || 0) - (b.id || 0);
+  });
+  // Bank/ledger convention: Debit = money in (balance up), Credit = money out (balance down)
+  let runningBalance = 0;
+  for (const row of chronoRows) {
+    const amt = Number(row.amount || 0);
+    runningBalance += row.type === "Debit" ? amt : -amt;
+    balanceMap[row.id] = runningBalance;
+  }
 
   const handleSort = (key) => {
     setSortConfig((prev) =>
@@ -43,6 +82,8 @@ export default function StatementTable({ rows }) {
           return row.date ? dayjs(row.date).valueOf() : 0;
         case "txn_dated_deb":
           return row.txn_dated_deb ? dayjs(row.txn_dated_deb).valueOf() : 0;
+        case "txn_posted_date":
+          return row.txn_posted_date ? dayjs(row.txn_posted_date).valueOf() : 0;
         case "cheq_no":
           return (row.cheq_no || "").toLowerCase();
         case "description":
@@ -71,7 +112,90 @@ export default function StatementTable({ rows }) {
     return <span className="ml-1">{sortConfig.direction === "asc" ? "▲" : "▼"}</span>;
   };
 
-  const handleReset = () => setStatusFilter("");
+  const handleReset = () => {
+    setStatusFilter("");
+    setSearchQuery("");
+    setDateFrom("");
+    setDateTo("");
+  };
+
+  const formatPdfAmount = (n) => {
+    const num = Number(n) || 0;
+    return num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(14);
+    doc.text("Statements", 14, 15);
+    autoTable(doc, {
+      startY: 22,
+      theme: "plain",
+      head: [
+        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Type", "Amount", "Status", "Balance"],
+      ],
+      body: sortedRows.map((row) => [
+        String(row.id),
+        (row.trans_id || "-").toString().slice(0, 14),
+        row.date ? dayjs(row.date).format("DD MMM YYYY") : "-",
+        row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD MMM YYYY") : "-",
+        row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-",
+        (row.cheq_no || "-").toString().slice(0, 12),
+        (row.description || "-").toString().slice(0, 22),
+        row.type || "-",
+        formatPdfAmount(row.amount),
+        row.client_expense_id ? "Settled" : "Unsettled",
+        formatPdfAmount(balanceMap[row.id] ?? 0),
+      ]),
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
+      columnStyles: {
+        0: { cellWidth: 12 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 24 },
+        3: { cellWidth: 24 },
+        4: { cellWidth: 24 },
+        5: { cellWidth: 24 },
+        6: { cellWidth: 40 },
+        7: { cellWidth: 18 },
+        8: { cellWidth: 22 },
+        9: { cellWidth: 20 },
+        10: { cellWidth: 28 },
+      },
+      margin: { left: 14, right: 14 },
+    });
+    doc.save(`statements_${dayjs().format("YYYY-MM-DD")}.pdf`);
+    toast.success("PDF exported");
+  };
+
+  const handleImport = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/statements/import", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Import failed");
+      toast.success(`Imported: ${data.inserted} inserted, ${data.skipped} skipped`);
+      router.refresh();
+    } catch (err) {
+      toast.error(err.message || "Import failed");
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleDownloadDemo = (format) => {
+    window.open(`/api/statements/demo?format=${format}`, "_blank");
+    toast.success(`Demo ${format.toUpperCase()} downloaded`);
+  };
 
   useEffect(() => {
     if (!modalId) {
@@ -102,13 +226,37 @@ export default function StatementTable({ rows }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-wrap">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+          <input
+            type="text"
+            placeholder="Search Trans ID, Description, Cheq No..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-4 py-2 border rounded-lg w-full sm:w-48 text-sm"
+          />
+        </div>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-36 text-sm"
+          title="From date"
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-36 text-sm"
+          title="To date"
+        />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border rounded-lg w-full sm:w-48"
+          className="px-4 py-2 border rounded-lg w-full sm:w-40"
         >
-          <option value="">All</option>
+          <option value="">All Status</option>
           <option value="Settled">Settled</option>
           <option value="Unsettled">Unsettled</option>
         </select>
@@ -118,6 +266,41 @@ export default function StatementTable({ rows }) {
         >
           Reset
         </button>
+        <div className="flex flex-wrap gap-2 ml-auto">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={handleImport}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+          >
+            <Upload size={16} />
+            {importing ? "Importing..." : "Import (CSV/Excel)"}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+          >
+            <Download size={16} />
+            Export PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDownloadDemo("xlsx")}
+            className="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+            title="Download sample file with correct format (no field mismatch)"
+          >
+            <FileSpreadsheet size={16} />
+            Demo (.xlsx)
+          </button>
+        </div>
       </div>
 
       <div className="hidden md:block overflow-auto bg-white shadow rounded-lg">
@@ -128,11 +311,13 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("trans_id")} className="p-3 cursor-pointer select-none">Trans ID<SortIcon column="trans_id" /></th>
               <th onClick={() => handleSort("date")} className="p-3 cursor-pointer select-none">Date<SortIcon column="date" /></th>
               <th onClick={() => handleSort("txn_dated_deb")} className="p-3 cursor-pointer select-none">Txn Dated Deb<SortIcon column="txn_dated_deb" /></th>
+              <th onClick={() => handleSort("txn_posted_date")} className="p-3 cursor-pointer select-none">Txn Posted Date<SortIcon column="txn_posted_date" /></th>
               <th onClick={() => handleSort("cheq_no")} className="p-3 cursor-pointer select-none">Cheq No<SortIcon column="cheq_no" /></th>
               <th onClick={() => handleSort("description")} className="p-3 cursor-pointer select-none">Description<SortIcon column="description" /></th>
               <th onClick={() => handleSort("type")} className="p-3 cursor-pointer select-none">Type<SortIcon column="type" /></th>
               <th onClick={() => handleSort("amount")} className="p-3 cursor-pointer select-none">Amount<SortIcon column="amount" /></th>
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
+              <th className="p-3">Balance</th>
               <th className="p-3">Action</th>
             </tr>
           </thead>
@@ -150,6 +335,11 @@ export default function StatementTable({ rows }) {
                       ? dayjs(row.txn_dated_deb).format("DD MMM YYYY")
                       : "-"}
                   </td>
+                  <td className="p-3">
+                    {row.txn_posted_date && row.txn_posted_date !== "0000-00-00"
+                      ? dayjs(row.txn_posted_date).format("DD MMM YYYY")
+                      : "-"}
+                  </td>
                   <td className="p-3">{row.cheq_no || "-"}</td>
                   <td className="p-3 max-w-[200px] truncate" title={row.description}>{row.description || "-"}</td>
                   <td className="p-3">
@@ -163,6 +353,8 @@ export default function StatementTable({ rows }) {
                       {row.client_expense_id ? "Settled" : "Unsettled"}
                     </span>
                   </td>
+                  <td className="p-3 font-medium">
+                    ₹{(balanceMap[row.id] ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                   <td className="p-3 flex gap-2 items-center">
                     <button
                       type="button"
@@ -184,7 +376,7 @@ export default function StatementTable({ rows }) {
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="p-4 text-center text-gray-500">
+                <td colSpan="12" className="p-4 text-center text-gray-500">
                   No entries found.
                 </td>
               </tr>
@@ -207,11 +399,13 @@ export default function StatementTable({ rows }) {
             <div><strong>Trans ID:</strong> {row.trans_id}</div>
             <div><strong>Date:</strong> {row.date ? dayjs(row.date).format("DD MMM YYYY") : "-"}</div>
             <div><strong>Txn Dated Deb:</strong> {row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD MMM YYYY") : "-"}</div>
+            <div><strong>Txn Posted Date:</strong> {row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-"}</div>
             <div><strong>Cheq No:</strong> {row.cheq_no || "-"}</div>
             <div><strong>Description:</strong> {row.description || "-"}</div>
             <div><strong>Type:</strong> <span className={row.type === "Credit" ? "text-green-600" : "text-red-600"}>{row.type}</span></div>
             <div><strong>Amount:</strong> ₹{Number(row.amount || 0).toFixed(2)}</div>
             <div><strong>Status:</strong> <span className={row.client_expense_id ? "text-green-600" : "text-amber-600"}>{row.client_expense_id ? "Settled" : "Unsettled"}</span></div>
+            <div><strong>Balance:</strong> ₹{(balanceMap[row.id] ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
             <div className="flex items-center gap-4 pt-2">
               <button type="button" onClick={() => setModalId(row.id)} className="text-blue-600 hover:underline">
                 <Eye size={16} /> View

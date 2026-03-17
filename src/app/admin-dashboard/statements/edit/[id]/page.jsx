@@ -15,6 +15,7 @@ export default function EditStatementPage() {
     trans_id: "",
     date: "",
     txn_dated_deb: "",
+    txn_posted_date: "",
     cheq_no: "",
     description: "",
     type: "Credit",
@@ -43,6 +44,7 @@ export default function EditStatementPage() {
           trans_id: row.trans_id || "",
           date: row.date ? dayjs(row.date).format("YYYY-MM-DD") : "",
           txn_dated_deb: row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("YYYY-MM-DD") : "",
+          txn_posted_date: row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("YYYY-MM-DD") : "",
           cheq_no: row.cheq_no || "",
           description: row.description || "",
           type: row.type || "Credit",
@@ -75,6 +77,7 @@ export default function EditStatementPage() {
           trans_id: form.trans_id,
           date: form.date,
           txn_dated_deb: form.txn_dated_deb || null,
+          txn_posted_date: form.txn_posted_date || null,
           cheq_no: form.cheq_no || null,
           description: form.description || null,
           type: form.type,
@@ -128,6 +131,16 @@ export default function EditStatementPage() {
             name="txn_dated_deb"
             type="date"
             value={form.txn_dated_deb}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Txn Posted Date</label>
+          <input
+            name="txn_posted_date"
+            type="date"
+            value={form.txn_posted_date}
             onChange={handleChange}
             className="w-full border p-2 rounded"
           />
