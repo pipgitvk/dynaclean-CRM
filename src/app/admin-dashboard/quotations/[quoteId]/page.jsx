@@ -17,8 +17,20 @@ async function getQuotationData(quoteId) {
     [quoteId],
   );
 
-  // await conn.end();
-  return { header: headerRows, items: itemRows };
+  let customerEmail = "";
+  let customerPhone = "";
+  if (headerRows?.customer_id) {
+    const [[cust]] = await conn.execute(
+      "SELECT email, phone FROM customers WHERE customer_id = ?",
+      [headerRows.customer_id],
+    );
+    if (cust) {
+      customerEmail = cust.email || "";
+      customerPhone = cust.phone || "";
+    }
+  }
+
+  return { header: headerRows, items: itemRows, customerEmail, customerPhone };
 }
 
 export default async function QuotationPage({ params }) {
@@ -29,12 +41,12 @@ export default async function QuotationPage({ params }) {
 
   await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
-  const { header, items } = await getQuotationData(quoteId);
+  const { header, items, customerEmail, customerPhone } = await getQuotationData(quoteId);
   if (!header) return <p className="p-6 text-red-600">Quote not found</p>;
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <QuotationViewer header={header} items={items} />
+      <QuotationViewer header={header} items={items} customerEmail={customerEmail} customerPhone={customerPhone} />
     </div>
   );
 }

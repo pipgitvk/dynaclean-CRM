@@ -1,5 +1,28 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
+import fs from "fs/promises";
+import path from "path";
+
+const UPLOAD_DIR = path.join(process.cwd(), "public", "task_followup_images");
+
+async function ensureUploadDir() {
+  try {
+    await fs.access(UPLOAD_DIR);
+  } catch {
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+  }
+}
+
+async function saveImage(file) {
+  if (!file || typeof file === "string") return null;
+  await ensureUploadDir();
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const ext = path.extname(file.name) || ".jpg";
+  const filename = `followup-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+  const filepath = path.join(UPLOAD_DIR, filename);
+  await fs.writeFile(filepath, buffer);
+  return `/task_followup_images/${filename}`;
+}
 
 export async function POST(req, { params }) {
   // 1. Await params (Required in Next.js 15+)
@@ -15,9 +38,21 @@ export async function POST(req, { params }) {
     const followed = data.get("followdate")?.toString();
     const status = data.get("status")?.toString();
     const completion = data.get("task_completion_date")?.toString() || null;
+    const imageFile = data.get("image");
 
     if (!notes || !followed || !status) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    const imagePath = await saveImage(imageFile);
+
+    // Ensure image_path column exists (auto-migration)
+    try {
+      await conn.execute(
+        `ALTER TABLE task_followup ADD COLUMN image_path VARCHAR(500) NULL`
+      );
+    } catch (e) {
+      if (e.errno !== 1060) throw e; // 1060 = Duplicate column name (already exists)
     }
 
     await conn.beginTransaction();
@@ -33,7 +68,8 @@ export async function POST(req, { params }) {
         notes,
         task_id,
         createdby,
-        taskassignto
+        taskassignto,
+        image_path
       )
       SELECT 
         taskname, 
@@ -44,10 +80,11 @@ export async function POST(req, { params }) {
         ?, 
         ?, 
         createdby, 
-        taskassignto 
+        taskassignto,
+        ?
       FROM task 
       WHERE task_id = ?`,
-      [status, followed, completion, notes, taskId, taskId]
+      [status, followed, completion, notes, taskId, imagePath || null, taskId]
     );
 
     // Update Task table based on status

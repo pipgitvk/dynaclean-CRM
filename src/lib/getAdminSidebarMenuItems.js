@@ -261,6 +261,12 @@ const allMenuItems = [
         ],
       },
       {
+        path: "/admin-dashboard/quotations",
+        name: "Quotation",
+        roles: ["SUPERADMIN"],
+        icon: "FileSignature",
+      },
+      {
         path: "/admin-dashboard/bulk-reassign",
         name: "Bulk Reassign Leads",
         roles: ["SUPERADMIN"],
