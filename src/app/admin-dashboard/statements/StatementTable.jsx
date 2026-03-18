@@ -241,8 +241,25 @@ export default function StatementTable({ rows }) {
       .finally(() => setExpenseLoading(false));
   }, [modalId]);
 
+  const filteredUnsettled = filteredRows.filter((r) => !r.client_expense_id).length;
+  const filteredSettled = filteredRows.filter((r) => r.client_expense_id).length;
+
   return (
     <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-700">Statements</h1>
+          <span className="text-gray-600 font-normal text-base">
+            Unsettled: {filteredUnsettled}, Settled: {filteredSettled}
+          </span>
+        </div>
+        <Link
+          href="/admin-dashboard/statements/add"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow w-fit"
+        >
+          Add New Statement
+        </Link>
+      </div>
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-wrap">
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
