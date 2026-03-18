@@ -29,7 +29,7 @@ function maskMobile(phone) {
   return digits.slice(0, -4) + "****";
 }
 
-export default function QuotationViewer({ header, items, customerEmail = "", customerPhone = "" }) {
+export default function QuotationViewer({ header, items, customerEmail = "", customerPhone = "", customerFirstName = "" }) {
   const containerRef = useRef();
   const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
   // Map payment_term_days to readable text
@@ -83,7 +83,6 @@ export default function QuotationViewer({ header, items, customerEmail = "", cus
 
     // Mask PII before PDF capture
     const maskEls = [
-      { sel: '[data-pdf-mask="name"]', val: header?.company_name, fn: maskName },
       { sel: '[data-pdf-mask="email"]', val: customerEmail, fn: maskEmail },
       { sel: '[data-pdf-mask="mobile"]', val: customerPhone, fn: maskMobile },
     ];
@@ -397,8 +396,13 @@ export default function QuotationViewer({ header, items, customerEmail = "", cus
         <div className="p-4 border rounded bg-gray-50 text-sm space-y-2 sm:space-y-0 sm:flex sm:justify-between">
           <div className="flex-1">
             <p>
-              <strong>Name:</strong> <span data-pdf-mask="name">{header.company_name}</span>
+              <strong>Company:</strong> {header.company_name}
             </p>
+            {customerFirstName ? (
+              <p>
+                <strong>Contact Person:</strong> {customerFirstName}
+              </p>
+            ) : null}
             <p>
               <strong>Address:</strong> {header.company_address}
             </p>
