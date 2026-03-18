@@ -334,7 +334,7 @@ export default function StatementTable({ rows }) {
             <FileSpreadsheet size={16} />
             Demo (.xlsx)
           </button>
-          <button
+          {/* <button
             type="button"
             onClick={handleDeleteAll}
             disabled={deletingAll || rows.length === 0}
@@ -343,7 +343,7 @@ export default function StatementTable({ rows }) {
           >
             <Trash2 size={16} />
             {deletingAll ? "Deleting..." : "Delete All"}
-          </button>
+          </button> */}
         </div>
       </div>
 
