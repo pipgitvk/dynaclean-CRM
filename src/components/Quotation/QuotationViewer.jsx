@@ -4,9 +4,32 @@ import { useRef, useState, useMemo } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Image from "next/image";
-import { set } from "date-fns";
 
-export default function QuotationViewer({ header, items }) {
+// Mask PII for PDF download
+function maskName(name) {
+  if (!name || typeof name !== "string") return "***";
+  const parts = name.trim().split(/\s+/);
+  return parts.map((p) => (p.length > 0 ? p[0] + "***" : "***")).join(" ");
+}
+
+function maskEmail(email) {
+  if (!email || typeof email !== "string") return "***@***.***";
+  const s = email.trim();
+  const at = s.indexOf("@");
+  if (at <= 0) return "***@***.***";
+  const dot = s.lastIndexOf(".");
+  const domain = dot > at ? s.slice(dot) : ".***";
+  return (s[0] || "*") + "***@" + "***" + domain;
+}
+
+function maskMobile(phone) {
+  if (!phone || typeof phone !== "string") return "****";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length <= 4) return "****";
+  return digits.slice(0, -4) + "****";
+}
+
+export default function QuotationViewer({ header, items, customerEmail = "", customerPhone = "" }) {
   const containerRef = useRef();
   const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
   // Map payment_term_days to readable text
@@ -57,6 +80,21 @@ export default function QuotationViewer({ header, items }) {
     const originalMaxWidth = el.style.maxWidth;
     el.style.width = "1123px"; // ~ A4 width at 96dpi
     el.style.maxWidth = "1123px";
+
+    // Mask PII before PDF capture
+    const maskEls = [
+      { sel: '[data-pdf-mask="name"]', val: header?.company_name, fn: maskName },
+      { sel: '[data-pdf-mask="email"]', val: customerEmail, fn: maskEmail },
+      { sel: '[data-pdf-mask="mobile"]', val: customerPhone, fn: maskMobile },
+    ];
+    const originalTexts = [];
+    maskEls.forEach(({ sel, val, fn }) => {
+      const node = el.querySelector(sel);
+      if (node) {
+        originalTexts.push({ node, original: node.textContent });
+        node.textContent = fn(val);
+      }
+    });
 
     // Convert all <img> tags to base64
     const images = el.querySelectorAll("img");
@@ -148,6 +186,11 @@ export default function QuotationViewer({ header, items }) {
     } catch (error) {
       console.error("Error during PDF generation:", error);
     } finally {
+      // Restore masked PII
+      originalTexts.forEach(({ node, original }) => {
+        if (node) node.textContent = original;
+      });
+
       // Revert to original display styles and Tailwind classes
       lgViewElements.forEach(
         (e, i) => (e.style.display = originalLgDisplay[i]),
@@ -354,11 +397,21 @@ export default function QuotationViewer({ header, items }) {
         <div className="p-4 border rounded bg-gray-50 text-sm space-y-2 sm:space-y-0 sm:flex sm:justify-between">
           <div className="flex-1">
             <p>
-              <strong>Name:</strong> {header.company_name}
+              <strong>Name:</strong> <span data-pdf-mask="name">{header.company_name}</span>
             </p>
             <p>
               <strong>Address:</strong> {header.company_address}
             </p>
+            {customerEmail ? (
+              <p>
+                <strong>Email:</strong> <span data-pdf-mask="email">{customerEmail}</span>
+              </p>
+            ) : null}
+            {customerPhone ? (
+              <p>
+                <strong>Mobile:</strong> <span data-pdf-mask="mobile">{customerPhone}</span>
+              </p>
+            ) : null}
             <p>
               <strong>GST :</strong> {header.gstin}
             </p>

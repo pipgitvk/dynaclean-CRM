@@ -4,9 +4,18 @@ import dayjs from "dayjs";
 import FollowupForm from "./FollowupForm";
 
 export default async function FollowupTaskPage({ params }) {
-  const taskId = params.taskId;
+  const { taskId } = await params;
 
   const conn = await getDbConnection();
+
+  // Ensure image_path column exists (auto-migration)
+  try {
+    await conn.execute(
+      `ALTER TABLE task_followup ADD COLUMN image_path VARCHAR(500) NULL`
+    );
+  } catch (e) {
+    if (e.errno !== 1060) throw e; // 1060 = Duplicate column name (already exists)
+  }
 
   const [[taskRow]] = await conn.execute(
     `SELECT * FROM task WHERE task_id = ?`,
@@ -14,7 +23,7 @@ export default async function FollowupTaskPage({ params }) {
   );
 
   const [followups] = await conn.execute(
-    `SELECT followed_date, notes, status FROM task_followup WHERE task_id = ? ORDER BY followed_date DESC`,
+    `SELECT followed_date, notes, status, image_path FROM task_followup WHERE task_id = ? ORDER BY followed_date DESC`,
     [taskId]
   );
 
@@ -69,6 +78,20 @@ export default async function FollowupTaskPage({ params }) {
                   {dayjs(f.followed_date).format("DD MMM YYYY, hh:mm A")}
                 </p>
                 <p>{f.notes}</p>
+                {f.image_path && (
+                  <a
+                    href={f.image_path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-2"
+                  >
+                    <img
+                      src={f.image_path}
+                      alt="Follow-up"
+                      className="max-w-32 max-h-32 rounded border object-cover"
+                    />
+                  </a>
+                )}
                 <p className="italic text-xs text-gray-600">
                   Status: {f.status}
                 </p>

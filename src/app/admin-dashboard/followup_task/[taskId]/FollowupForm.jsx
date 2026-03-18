@@ -1,17 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 
 export default function FollowupForm({ taskId, status }) {
   const router = useRouter();
+  const fileInputRef = useRef(null);
   const [notes, setNotes] = useState("");
   const [currentStatus, setCurrentStatus] = useState(status);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image file (JPEG, PNG, etc.)");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size should be less than 5MB");
+        return;
+      }
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    } else {
+      setImageFile(null);
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -28,6 +58,7 @@ export default function FollowupForm({ taskId, status }) {
     formData.append("followdate", followDate);
     formData.append("status", currentStatus);
     formData.append("task_completion_date", taskCompletionDate);
+    if (imageFile) formData.append("image", imageFile);
 
     try {
       const res = await fetch(`/api/followup_task/${taskId}`, {
@@ -70,6 +101,39 @@ export default function FollowupForm({ taskId, status }) {
           className="w-full border rounded-md p-2 focus:ring focus:border-blue-300"
           required
         />
+      </div>
+
+      <div>
+        <label htmlFor="image" className="block font-medium mb-1">
+          Image (Optional)
+        </label>
+        <input
+          ref={fileInputRef}
+          id="image"
+          type="file"
+          accept="image/*"
+          onChange={handleImageChange}
+          className="w-full border rounded-md p-2 focus:ring focus:border-blue-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-50 file:text-blue-600 file:text-sm"
+        />
+        {imagePreview && (
+          <div className="mt-2 relative inline-block">
+            <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-gray-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={removeImage}
+              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
 
       <div>
