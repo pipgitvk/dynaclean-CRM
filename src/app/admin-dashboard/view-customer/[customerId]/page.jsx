@@ -13,9 +13,16 @@ export default async function CustomerPage({ params }) {
   // Fetch current user info if needed
   // (e.g., role to conditionally render buttons)
 
-  // Fetch customer
+  // Fetch customer with parent info (for Add Contact / member customers)
   const [custs] = await conn.execute(
-    `SELECT * FROM customers WHERE customer_id = ?`,
+    `SELECT c.*,
+       p.customer_id AS parent_id,
+       CONCAT(TRIM(p.first_name), ' ', TRIM(COALESCE(p.last_name, ''))) AS parent_name,
+       p.phone AS parent_phone,
+       p.company AS parent_company
+     FROM customers c
+     LEFT JOIN customers p ON c.parent_customer_id = p.customer_id
+     WHERE c.customer_id = ?`,
     [customerId],
   );
   const customer = custs[0];
@@ -131,7 +138,29 @@ export default async function CustomerPage({ params }) {
         </dd>
       </div>
 
-      {/* Row 5 */}
+      {/* Row 5 - Parent (for Add Contact / member customers) */}
+      {customer.parent_id && (
+        <>
+          <div>
+            <dt className="text-sm font-medium text-gray-500">Parent Customer</dt>
+            <dd className="mt-1 text-gray-800">
+              <Link
+                href={`/admin-dashboard/view-customer/${customer.parent_id}`}
+                className="text-blue-600 hover:text-blue-800 font-medium underline"
+              >
+                {customer.parent_name?.trim() || "—"} (ID: {customer.parent_id})
+              </Link>
+            </dd>
+          </div>
+          {customer.parent_phone && (
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Parent Phone</dt>
+              <dd className="mt-1 text-gray-800">{customer.parent_phone}</dd>
+            </div>
+          )}
+        </>
+      )}
+
       <div>
         <dt className="text-sm font-medium text-gray-500">Address</dt>
         <dd className="mt-1 text-gray-800 break-words">

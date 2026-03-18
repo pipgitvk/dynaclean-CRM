@@ -57,7 +57,67 @@ export async function GET(request) {
       [customerId],
     );
 
-    const contacts = memberRows || [];
+    let contacts = memberRows || [];
+
+    // When viewing a contact who has a parent, include full ancestor chain + current
+    // e.g. Vaccum Cleaners → show Ravindra → shalini → Vaccum Cleaners
+    const [currentRows] = await connection.execute(
+      `SELECT c.customer_id, c.parent_customer_id, c.first_name, c.last_name, c.phone, c.designation, COALESCE(c.working, 1) as working
+       FROM customers c WHERE c.customer_id = ?`,
+      [customerId],
+    );
+    const currentCustomer = currentRows?.[0];
+    if (currentCustomer?.parent_customer_id) {
+      // Walk up parent_customer_id chain to get full ancestor list (root first)
+      const ancestors = [];
+      let pid = currentCustomer.parent_customer_id;
+      const seen = new Set();
+      while (pid && !seen.has(pid)) {
+        seen.add(pid);
+        const [pRows] = await connection.execute(
+          `SELECT customer_id, parent_customer_id, first_name, last_name, phone, designation, COALESCE(working, 1) as working
+           FROM customers WHERE customer_id = ?`,
+          [pid],
+        );
+        const p = pRows?.[0];
+        if (!p) break;
+        ancestors.unshift(p); // add at start so root comes first
+        pid = p.parent_customer_id;
+      }
+      const currentName = [currentCustomer.first_name, currentCustomer.last_name].filter(Boolean).join(" ").trim() || "Unnamed";
+      const ancestorContacts = ancestors.map((a, i) => {
+        const name = [a.first_name, a.last_name].filter(Boolean).join(" ").trim() || "Unnamed";
+        const prevId = i === 0 ? null : ancestors[i - 1].customer_id;
+        const reportToName = i === 0 ? null : [ancestors[i - 1].first_name, ancestors[i - 1].last_name].filter(Boolean).join(" ").trim() || "Unnamed";
+        return {
+          id: a.customer_id,
+          customer_id: a.customer_id,
+          name,
+          contact: a.phone || "",
+          designation: a.designation || null,
+          report_to: prevId,
+          working: a.working ?? 1,
+          report_to_name: reportToName,
+          created_at: null,
+          updated_at: null,
+        };
+      });
+      const immediateParent = ancestors[ancestors.length - 1];
+      const immediateParentName = immediateParent ? [immediateParent.first_name, immediateParent.last_name].filter(Boolean).join(" ").trim() || "Unnamed" : null;
+      const currentContact = {
+        id: currentCustomer.customer_id,
+        customer_id: currentCustomer.customer_id,
+        name: currentName,
+        contact: currentCustomer.phone || "",
+        designation: currentCustomer.designation || null,
+        report_to: immediateParent?.customer_id ?? null,
+        working: currentCustomer.working ?? 1,
+        report_to_name: immediateParentName,
+        created_at: null,
+        updated_at: null,
+      };
+      contacts = [...ancestorContacts, currentContact, ...contacts];
+    }
     const memberCustomers = memberRows?.map((r) => ({
       customer_id: r.customer_id,
       first_name: r.first_name || "",
@@ -136,6 +196,7 @@ export async function POST(request) {
     const workingVal = working !== undefined && working !== null ? (working ? 1 : 0) : 1;
     const contactStatusVal = workingVal ? "Working" : "Not Working";
 
+    const now = new Date();
     const [result] = await connection.execute(
       `INSERT INTO customers (
         parent_customer_id, first_name, last_name, email, phone, address, company,
@@ -164,7 +225,7 @@ export async function POST(request) {
         "",
         "",
         null,
-        new Date(),
+        now,
         designationVal,
         reportToId,
         workingVal,
@@ -172,10 +233,31 @@ export async function POST(request) {
       ],
     );
 
+    const newCustomerId = result.insertId;
+
+    // Insert into customers_followup so Follow-up page finds the contact
+    await connection.execute(
+      `INSERT INTO customers_followup (
+        customer_id, name, contact, next_followup_date, followed_by,
+        followed_date, communication_mode, notes, email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        newCustomerId,
+        first_name,
+        phone,
+        null,
+        "Manual",
+        now,
+        "Manual",
+        `Contact added from parent customer ${customer_id}`,
+        "",
+      ],
+    );
+
     return NextResponse.json({
       success: true,
       message: "Contact added successfully",
-      contactId: result.insertId,
+      contactId: newCustomerId,
     });
   } catch (error) {
     console.error("Error creating contact:", error);
