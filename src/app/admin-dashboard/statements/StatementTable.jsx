@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
-import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search } from "lucide-react";
+import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -14,13 +14,14 @@ export default function StatementTable({ rows }) {
   const fileInputRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+  const [dateFrom, setDateFrom] = useState(() => dayjs().startOf("month").format("YYYY-MM-DD"));
+  const [dateTo, setDateTo] = useState(() => dayjs().endOf("month").format("YYYY-MM-DD"));
+  const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [modalId, setModalId] = useState(null);
   const [expense, setExpense] = useState(null);
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const filteredRows = rows.filter((row) => {
     if (statusFilter) {
@@ -51,11 +52,11 @@ export default function StatementTable({ rows }) {
     if (da !== db) return da - db;
     return (a.id || 0) - (b.id || 0);
   });
-  // Bank/ledger convention: Debit = money in (balance up), Credit = money out (balance down)
+  // Debit = minus from balance, Credit = add to balance
   let runningBalance = 0;
   for (const row of chronoRows) {
     const amt = Number(row.amount || 0);
-    runningBalance += row.type === "Debit" ? amt : -amt;
+    runningBalance += row.type === "Credit" ? amt : -amt;
     balanceMap[row.id] = runningBalance;
   }
 
@@ -88,10 +89,10 @@ export default function StatementTable({ rows }) {
           return (row.cheq_no || "").toLowerCase();
         case "description":
           return (row.description || "").toLowerCase();
-        case "type":
-          return (row.type || "").toLowerCase();
-        case "amount":
-          return Number(row.amount || 0);
+        case "debit":
+          return row.type === "Debit" ? Number(row.amount || 0) : 0;
+        case "credit":
+          return row.type === "Credit" ? Number(row.amount || 0) : 0;
         case "status":
           return (row.client_expense_id ? "settled" : "unsettled");
         default:
@@ -132,7 +133,7 @@ export default function StatementTable({ rows }) {
       startY: 22,
       theme: "plain",
       head: [
-        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Type", "Amount", "Status", "Balance"],
+        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Debit", "Credit", "Status", "Balance"],
       ],
       body: sortedRows.map((row) => [
         String(row.id),
@@ -142,10 +143,10 @@ export default function StatementTable({ rows }) {
         row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-",
         (row.cheq_no || "-").toString().slice(0, 12),
         (row.description || "-").toString().slice(0, 22),
-        row.type || "-",
-        formatPdfAmount(row.amount),
+        row.type === "Debit" ? formatPdfAmount(row.amount) : "-",
+        row.type === "Credit" ? formatPdfAmount(row.amount) : "-",
         row.client_expense_id ? "Settled" : "Unsettled",
-        formatPdfAmount(balanceMap[row.id] ?? 0),
+        formatPdfAmount(Math.abs(balanceMap[row.id] ?? 0)),
       ]),
       styles: { fontSize: 7 },
       headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
@@ -195,6 +196,22 @@ export default function StatementTable({ rows }) {
   const handleDownloadDemo = (format) => {
     window.open(`/api/statements/demo?format=${format}`, "_blank");
     toast.success(`Demo ${format.toUpperCase()} downloaded`);
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm("Delete all statements? This cannot be undone.")) return;
+    setDeletingAll(true);
+    try {
+      const res = await fetch("/api/statements/delete-all", { method: "DELETE", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Delete failed");
+      toast.success(`Deleted ${data.deleted ?? 0} statement(s)`);
+      router.refresh();
+    } catch (err) {
+      toast.error(err.message || "Delete failed");
+    } finally {
+      setDeletingAll(false);
+    }
   };
 
   useEffect(() => {
@@ -300,6 +317,16 @@ export default function StatementTable({ rows }) {
             <FileSpreadsheet size={16} />
             Demo (.xlsx)
           </button>
+          <button
+            type="button"
+            onClick={handleDeleteAll}
+            disabled={deletingAll || rows.length === 0}
+            className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Delete all statements"
+          >
+            <Trash2 size={16} />
+            {deletingAll ? "Deleting..." : "Delete All"}
+          </button>
         </div>
       </div>
 
@@ -314,8 +341,8 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("txn_posted_date")} className="p-3 cursor-pointer select-none">Txn Posted Date<SortIcon column="txn_posted_date" /></th>
               <th onClick={() => handleSort("cheq_no")} className="p-3 cursor-pointer select-none">Cheq No<SortIcon column="cheq_no" /></th>
               <th onClick={() => handleSort("description")} className="p-3 cursor-pointer select-none">Description<SortIcon column="description" /></th>
-              <th onClick={() => handleSort("type")} className="p-3 cursor-pointer select-none">Type<SortIcon column="type" /></th>
-              <th onClick={() => handleSort("amount")} className="p-3 cursor-pointer select-none">Amount<SortIcon column="amount" /></th>
+              <th onClick={() => handleSort("debit")} className="p-3 cursor-pointer select-none">Debit<SortIcon column="debit" /></th>
+              <th onClick={() => handleSort("credit")} className="p-3 cursor-pointer select-none">Credit<SortIcon column="credit" /></th>
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
               <th className="p-3">Balance</th>
               <th className="p-3">Action</th>
@@ -342,19 +369,19 @@ export default function StatementTable({ rows }) {
                   </td>
                   <td className="p-3">{row.cheq_no || "-"}</td>
                   <td className="p-3 max-w-[200px] truncate" title={row.description}>{row.description || "-"}</td>
-                  <td className="p-3">
-                    <span className={row.type === "Credit" ? "text-green-600" : "text-red-600"}>
-                      {row.type}
-                    </span>
+                  <td className="p-3 text-red-600">
+                    {row.type === "Debit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}
                   </td>
-                  <td className="p-3">₹{Number(row.amount || 0).toFixed(2)}</td>
+                  <td className="p-3 text-green-600">
+                    {row.type === "Credit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}
+                  </td>
                   <td className="p-3">
                     <span className={row.client_expense_id ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
                       {row.client_expense_id ? "Settled" : "Unsettled"}
                     </span>
                   </td>
                   <td className="p-3 font-medium">
-                    ₹{(balanceMap[row.id] ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    ₹{Math.abs(balanceMap[row.id] ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                   <td className="p-3 flex gap-2 items-center">
                     <button
                       type="button"
@@ -402,10 +429,9 @@ export default function StatementTable({ rows }) {
             <div><strong>Txn Posted Date:</strong> {row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-"}</div>
             <div><strong>Cheq No:</strong> {row.cheq_no || "-"}</div>
             <div><strong>Description:</strong> {row.description || "-"}</div>
-            <div><strong>Type:</strong> <span className={row.type === "Credit" ? "text-green-600" : "text-red-600"}>{row.type}</span></div>
-            <div><strong>Amount:</strong> ₹{Number(row.amount || 0).toFixed(2)}</div>
+            <div><strong>Debit:</strong> <span className="text-red-600">{row.type === "Debit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}</span></div>
+            <div><strong>Credit:</strong> <span className="text-green-600">{row.type === "Credit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}</span></div>
             <div><strong>Status:</strong> <span className={row.client_expense_id ? "text-green-600" : "text-amber-600"}>{row.client_expense_id ? "Settled" : "Unsettled"}</span></div>
-            <div><strong>Balance:</strong> ₹{(balanceMap[row.id] ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
             <div className="flex items-center gap-4 pt-2">
               <button type="button" onClick={() => setModalId(row.id)} className="text-blue-600 hover:underline">
                 <Eye size={16} /> View

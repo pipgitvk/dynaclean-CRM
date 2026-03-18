@@ -41,10 +41,18 @@ export default async function StatementsPage() {
     console.error("[statements] DB error:", err?.message);
   }
 
+  const unsettledCount = rows.filter((r) => !r.client_expense_id).length;
+  const settledCount = rows.filter((r) => r.client_expense_id).length;
+
   return (
     <div className="max-w-[1600px] mx-auto p-6 w-full">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-700">Statements</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-700">Statements</h1>
+          <span className="text-gray-600 font-normal text-base">
+            Unsettled: {unsettledCount}, Settled: {settledCount}
+          </span>
+        </div>
         <a
           href="/admin-dashboard/statements/add"
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
