@@ -14,7 +14,7 @@ import dayjs from "dayjs";
 import ReassignModal from "@/components/models/ReassignModal";
 import toast from "react-hot-toast";
 
-const TaskTable = ({ tasks = [] }) => {
+const TaskTable = ({ tasks = [], currentUser = "" }) => {
   const [isClient, setIsClient] = useState(false);
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -128,12 +128,14 @@ const TaskTable = ({ tasks = [] }) => {
                       >
                         <PenLine size={14} /> Follow
                       </a>
-                      <button
-                        onClick={() => openReassign(task)}
-                        className="flex items-center gap-1 text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-md text-xs cursor-pointer"
-                      >
-                        <Repeat size={14} /> Reassign
-                      </button>
+                      {currentUser && task.createdby === currentUser && (
+                        <button
+                          onClick={() => openReassign(task)}
+                          className="flex items-center gap-1 text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-md text-xs cursor-pointer"
+                        >
+                          <Repeat size={14} /> Reassign
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -210,12 +212,14 @@ const TaskTable = ({ tasks = [] }) => {
                   >
                     <PenLine size={14} /> Follow
                   </a>
-                  <button
-                    onClick={() => openReassign(task)}
-                    className="flex items-center gap-1 text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-md text-xs"
-                  >
-                    <Repeat size={14} /> Reassign
-                  </button>
+                  {currentUser && task.createdby === currentUser && (
+                    <button
+                      onClick={() => openReassign(task)}
+                      className="flex items-center gap-1 text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1 rounded-md text-xs"
+                    >
+                      <Repeat size={14} /> Reassign
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -77,7 +77,7 @@ export default async function UpcomingTasks({ leadSource }) {
         </div>
       </div>
 
-      <TaskTable tasks={rows} />
+      <TaskTable tasks={rows} currentUser={leadSource} />
     </div>
   );
 }
