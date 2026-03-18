@@ -54,18 +54,12 @@ async function getTasks(username) {
       task t
     WHERE 
       t.createdby = ? 
-      OR t.taskassignto = ? 
-      OR EXISTS (
-        SELECT 1 
-        FROM task_followup tf 
-        WHERE tf.task_id = t.task_id 
-        AND tf.taskassignto = ?
-      )
+      OR t.taskassignto = ?
     ORDER BY 
       t.task_id DESC
   `;
 
-  const [rows] = await conn.execute(query, [username, username, username]);
+  const [rows] = await conn.execute(query, [username, username]);
   // await conn.end();
   return rows;
 }
@@ -89,7 +83,7 @@ export default async function TaskPage() {
           </button>
         </a>
       </div>
-      <ClientTaskTable initialTasks={tasks} />
+      <ClientTaskTable initialTasks={tasks} currentUser={username} />
     </div>
   );
 }

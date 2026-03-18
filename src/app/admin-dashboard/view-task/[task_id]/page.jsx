@@ -3,6 +3,8 @@ import { getDbConnection } from "@/lib/db";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import dayjs from "dayjs";
+import ViewTaskActions from "@/components/task/ViewTaskActions";
+import { getSessionPayload } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +23,9 @@ async function getTaskDetails(taskId) {
 
   const task = taskRows[0];
 
-  // Follow-ups
+  // Follow-ups (includes reassign entries)
   const [followupRows] = await connection.execute(
-    `SELECT followed_date, notes FROM task_followup WHERE task_id = ?`,
+    `SELECT followed_date, notes FROM task_followup WHERE task_id = ? ORDER BY followed_date DESC`,
     [taskId]
   );
 
@@ -38,6 +40,9 @@ export default async function ViewTaskPage({ params }) {
   const data = await getTaskDetails(taskId);
 
   if (!data) return notFound();
+
+  const payload = await getSessionPayload();
+  const currentUser = (payload?.username || payload?.name || "").trim();
 
   const { task, followups } = data;
   const images = task.visiting_card?.split(",") || [];
@@ -202,14 +207,7 @@ export default async function ViewTaskPage({ params }) {
           )}
         </div>
 
-        <div className="mt-6">
-          <a
-            href={`/admin-dashboard/followup_task/${taskId}`}
-            className="inline-block bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm"
-          >
-            Follow Task
-          </a>
-        </div>
+        <ViewTaskActions task={task} currentUser={currentUser} basePath="admin-dashboard" />
       </div>
     </div>
   );
