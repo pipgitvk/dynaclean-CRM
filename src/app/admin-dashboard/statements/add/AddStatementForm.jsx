@@ -9,8 +9,10 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
   const router = useRouter();
   const [isSubmitting, setSubmitting] = useState(false);
   const [expenses, setExpenses] = useState([]);
-  const { register, handleSubmit, reset } = useForm({
+  const [lastBalance, setLastBalance] = useState(0);
+  const { register, handleSubmit, reset, watch } = useForm({
     defaultValues: {
+      type: "Credit",
       client_expense_id: expenseId || "",
       amount: defaultAmount ?? "",
     },
@@ -22,6 +24,18 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
       .then((data) => setExpenses(data?.clientExpenses || []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    fetch("/api/statements/last-balance", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => setLastBalance(Number(data?.lastBalance ?? 0)))
+      .catch(() => {});
+  }, []);
+
+  const type = watch("type", "Credit");
+  const amount = Number(watch("amount", 0)) || 0;
+  // Credit = add, Debit = subtract. If dropdown sends swapped values, invert: treat "Credit" as subtract, "Debit" as add for display.
+  const newBalance = String(type).toLowerCase() === "credit" ? lastBalance - amount : lastBalance + amount;
 
   const onSubmit = async (data) => {
     setSubmitting(true);
@@ -129,6 +143,21 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
             className="w-full border p-2 rounded-md"
             placeholder="0.00"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Last Balance</label>
+          <div className="w-full border p-2 rounded-md bg-gray-50">
+            ₹{Math.abs(lastBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">New Balance (after this tx)</label>
+          <div className="w-full border p-2 rounded-md bg-blue-50 font-medium">
+            ₹{Math.abs(newBalance).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {String(type).toLowerCase() === "credit" ? "Last balance − amount" : "Last balance + amount"}
+          </p>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Expense ID</label>

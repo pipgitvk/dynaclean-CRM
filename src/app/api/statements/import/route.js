@@ -6,9 +6,31 @@ import ExcelJS from "exceljs";
 const JWT_SECRET = process.env.JWT_SECRET;
 
 function parseDate(val) {
-  if (!val) return null;
+  if (val == null || val === "") return null;
+  // Excel serial date (number of days since 1899-12-30)
+  if (typeof val === "number" && val > 0) {
+    const d = new Date((val - 25569) * 86400 * 1000);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  // Date object from Excel
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return val.toISOString().slice(0, 10);
+  }
   const s = String(val).trim();
   if (!s || s === "-" || s.toLowerCase() === "null") return null;
+  // Excel serial as string (e.g. "44927")
+  const serial = Number(s);
+  if (!isNaN(serial) && serial > 10000) {
+    const d = new Date((serial - 25569) * 86400 * 1000);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  // DD/MM/YYYY or DD-MM-YYYY (India format)
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const [, day, month, year] = dmy;
+    const d = new Date(Number(year), Number(month) - 1, Number(day));
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
   const d = new Date(s);
   if (isNaN(d.getTime())) return null;
   return d.toISOString().slice(0, 10);
@@ -98,9 +120,9 @@ export async function POST(req) {
       for (let i = 1; i < lines.length; i++) {
         const cells = parseCSVLine(lines[i]);
         const transId = getCol(cells, ["trans_id", "transid", "transaction_id"]) || `IMP-${Date.now()}-${i}`;
-        const date = parseDate(getCol(cells, ["date", "txn_date", "transaction_date"]));
-        const txnDatedDeb = parseDate(getCol(cells, ["txn_dated_deb", "txndateddeb"]));
-        const txnPostedDate = parseDate(getCol(cells, ["txn_posted_date", "txnposteddate", "posted_date"]));
+        const date = parseDate(getCol(cells, ["date", "txn_date", "transaction_date", "value_date", "transactiondate"]));
+        const txnDatedDeb = parseDate(getCol(cells, ["txn_dated_deb", "txndateddeb", "txn_dated", "datedeb"]));
+        const txnPostedDate = parseDate(getCol(cells, ["txn_posted_date", "txnposteddate", "posted_date", "posting_date", "posteddate"]));
         const cheqNo = getCol(cells, ["cheq_no", "cheqno", "cheque_no"]) || null;
         const description = getCol(cells, ["description", "desc", "remarks"]) || "";
         const ta = getTypeAndAmountFromDebitCredit(
@@ -109,6 +131,7 @@ export async function POST(req) {
           getCol(cells, ["type", "credit_debit", "dr_cr"]),
           getCol(cells, ["amount", "amt"])
         );
+        const balanceVal = parseAmount(getCol(cells, ["balance", "bal"]));
         if (!date || !transId || !ta) continue;
         rows.push({
           trans_id: transId,
@@ -119,6 +142,7 @@ export async function POST(req) {
           description,
           type: ta.type,
           amount: ta.amount,
+          balance: balanceVal,
         });
       }
     } else if (["xlsx", "xls"].includes(ext) || file.type?.includes("spreadsheet")) {
@@ -154,9 +178,9 @@ export async function POST(req) {
       for (let i = 1; i < dataRows.length; i++) {
         const vals = dataRows[i]?.values || [];
         const transId = getCol(vals, ["trans_id", "transid", "transaction_id"]) || `IMP-${Date.now()}-${i}`;
-        const date = parseDate(getCol(vals, ["date", "txn_date", "transaction_date"]));
-        const txnDatedDeb = parseDate(getCol(vals, ["txn_dated_deb", "txndateddeb"]));
-        const txnPostedDate = parseDate(getCol(vals, ["txn_posted_date", "txnposteddate", "posted_date"]));
+        const date = parseDate(getCol(vals, ["date", "txn_date", "transaction_date", "value_date", "transactiondate"]));
+        const txnDatedDeb = parseDate(getCol(vals, ["txn_dated_deb", "txndateddeb", "txn_dated", "datedeb"]));
+        const txnPostedDate = parseDate(getCol(vals, ["txn_posted_date", "txnposteddate", "posted_date", "posting_date", "posteddate"]));
         const cheqNo = getCol(vals, ["cheq_no", "cheqno", "cheque_no"]) || null;
         const description = getCol(vals, ["description", "desc", "remarks"]) || "";
         const ta = getTypeAndAmountFromDebitCredit(
@@ -165,6 +189,7 @@ export async function POST(req) {
           getCol(vals, ["type", "credit_debit", "dr_cr"]),
           getCol(vals, ["amount", "amt"])
         );
+        const balanceVal = parseAmount(getCol(vals, ["balance", "bal"]));
         if (!date || !transId || !ta) continue;
         rows.push({
           trans_id: transId,
@@ -175,6 +200,7 @@ export async function POST(req) {
           description,
           type: ta.type,
           amount: ta.amount,
+          balance: balanceVal,
         });
       }
     } else if (ext === "pdf" || file.type === "application/pdf") {
@@ -192,6 +218,41 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
+
+    // Validation: last record (type + balance) must match first row of import
+    const [allRows] = await conn.execute(
+      `SELECT id, date, type, amount FROM statements ORDER BY date ASC, id ASC`
+    );
+    if (allRows.length > 0) {
+      // Compute last record's closing balance (Debit = -, Credit = +)
+      let lastClosingBalance = 0;
+      for (const r of allRows) {
+        const amt = Number(r.amount || 0);
+        lastClosingBalance += r.type === "Credit" ? amt : -amt;
+      }
+      const lastBalance = Math.round(lastClosingBalance * 100) / 100;
+
+      // First row of import: balance in file is closing balance after that tx
+      // Opening balance = closing + amount (Debit) or closing - amount (Credit)
+      const firstRow = rows[0];
+      const firstType = firstRow.type || "Credit";
+      const firstClosingBalance = Number(firstRow.balance ?? 0);
+      const firstAmount = Number(firstRow.amount || 0);
+      const firstOpeningBalance =
+        firstType === "Debit"
+          ? Math.round((firstClosingBalance + firstAmount) * 100) / 100
+          : Math.round((firstClosingBalance - firstAmount) * 100) / 100;
+
+      if (Math.abs(lastBalance - firstOpeningBalance) > 0.01) {
+        return NextResponse.json(
+          {
+            error: `Import rejected: Last balance (₹${lastBalance.toLocaleString("en-IN")}) does not match first row opening balance (₹${firstOpeningBalance.toLocaleString("en-IN")}). Ensure continuity.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     let inserted = 0;
     let skipped = 0;
     for (const r of rows) {
