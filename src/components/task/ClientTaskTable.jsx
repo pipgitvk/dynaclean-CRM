@@ -5,11 +5,15 @@ import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import { Repeat } from "lucide-react";
+import ReassignModal from "@/components/models/ReassignModal";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
-export default function ClientTaskTable({ initialTasks }) {
+export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [modalTask, setModalTask] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [assignedToFilter, setAssignedToFilter] = useState("");
@@ -371,12 +375,26 @@ export default function ClientTaskTable({ initialTasks }) {
                       : "-"}
                   </td>
                   <td className="px-4 py-2">
-                    <a
-                      href={`/user-dashboard/view-task/${task.task_id}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      View
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`/user-dashboard/view-task/${task.task_id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        View
+                      </a>
+                      {currentUser && (task.createdby || "").trim().toLowerCase() === currentUser.trim().toLowerCase() && (
+                        <button
+                          onClick={() => {
+                            setModalTask(task);
+                            setReassignOpen(true);
+                          }}
+                          className="text-emerald-600 hover:text-emerald-700 p-1 rounded"
+                          title="Reassign"
+                        >
+                          <Repeat size={16} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -439,13 +457,25 @@ export default function ClientTaskTable({ initialTasks }) {
                     ? dayjs(task.task_completion_date).format("DD/MM/YYYY")
                     : "-"}
                 </div>
-                <div className="text-sm mt-2">
+                <div className="text-sm mt-2 flex items-center gap-2">
                   <a
                     href={`/user-dashboard/view-task/${task.task_id}`}
                     className="text-blue-600 hover:underline font-medium"
                   >
                     View Task →
                   </a>
+                  {currentUser && (task.createdby || "").trim().toLowerCase() === currentUser.trim().toLowerCase() && (
+                    <button
+                      onClick={() => {
+                        setModalTask(task);
+                        setReassignOpen(true);
+                      }}
+                      className="text-emerald-600 hover:text-emerald-700 p-1 rounded"
+                      title="Reassign"
+                    >
+                      <Repeat size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -456,6 +486,14 @@ export default function ClientTaskTable({ initialTasks }) {
           )}
         </div>
       </div>
+      <ReassignModal
+        open={reassignOpen}
+        onClose={() => {
+          setReassignOpen(false);
+          setModalTask(null);
+        }}
+        task={modalTask}
+      />
     </>
   );
 }

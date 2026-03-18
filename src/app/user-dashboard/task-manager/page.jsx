@@ -82,7 +82,7 @@ export default async function TaskPage() {
   return (
     <div className="p-6 mx-auto">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">📋 My Tasks</h1>
-      <ClientTaskTable initialTasks={tasks} />
+      <ClientTaskTable initialTasks={tasks} currentUser={username || ""} />
     </div>
   );
 }

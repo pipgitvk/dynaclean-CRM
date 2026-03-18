@@ -83,7 +83,7 @@ export default async function TaskPage() {
           </button>
         </a>
       </div>
-      <ClientTaskTable initialTasks={tasks} />
+      <ClientTaskTable initialTasks={tasks} currentUser={username} />
     </div>
   );
 }

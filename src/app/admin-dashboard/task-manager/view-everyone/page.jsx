@@ -6,6 +6,18 @@ import ClientTaskTable from "@/components/task//ClientTaskTableAdmin";
 const JWT_SECRET = process.env.JWT_SECRET;
 export const dynamic = "force-dynamic";
 
+async function getUsernameFromToken() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+    return payload.username;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function getTasks() {
   const conn = await getDbConnection();
 
@@ -44,7 +56,7 @@ async function getTasks() {
 }
 
 export default async function TaskPage() {
-  const tasks = await getTasks();
+  const [tasks, username] = await Promise.all([getTasks(), getUsernameFromToken()]);
 
   return (
     <div className="p-6 mx-auto">
@@ -58,7 +70,7 @@ export default async function TaskPage() {
           </button>
         </a>
       </div>
-      <ClientTaskTable initialTasks={tasks} />
+      <ClientTaskTable initialTasks={tasks} currentUser={username || ""} />
     </div>
   );
 }
