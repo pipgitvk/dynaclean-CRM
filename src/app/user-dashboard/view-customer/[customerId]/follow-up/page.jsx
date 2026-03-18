@@ -8,14 +8,7 @@ export default async function FollowUpPage({ params }) {
 
   const conn = await getDbConnection();
 
-  // const [rows] = await conn.execute(
-  //   `SELECT name, contact, email, followed_date, notes
-  //    FROM customers_followup
-  //    WHERE customer_id = ?
-  //    ORDER BY followed_date DESC LIMIT 1`,
-  //   [customerId]
-  // );
-  const [rows] = await conn.execute(
+  let [rows] = await conn.execute(
     `SELECT 
      cf.name AS followup_name, 
      cf.contact AS followup_contact, 
@@ -31,7 +24,24 @@ export default async function FollowUpPage({ params }) {
     [customerId],
   );
 
-  // await conn.end();
+  // Fallback: if no followup yet (e.g. Add Contact), get from customers table
+  if (!rows.length) {
+    const [custRows] = await conn.execute(
+      `SELECT CONCAT(first_name, ' ', COALESCE(last_name, '')) as name, phone as contact, email, status
+       FROM customers WHERE customer_id = ?`,
+      [customerId],
+    );
+    if (custRows.length) {
+      rows = [{
+        followup_name: custRows[0].name?.trim() || "—",
+        followup_contact: custRows[0].contact || "—",
+        followup_email: custRows[0].email || "—",
+        followed_date: null,
+        notes: "No previous follow-up.",
+        status: custRows[0].status || "N/A",
+      }];
+    }
+  }
 
   if (!rows.length) {
     return (
@@ -64,7 +74,9 @@ export default async function FollowUpPage({ params }) {
         </p>
         <p>
           <strong>Last Called:</strong>{" "}
-          {dayjs(customer.followed_date).format("DD MMM YYYY, hh:mm A")}
+          {customer.followed_date
+            ? dayjs(customer.followed_date).format("DD MMM YYYY, hh:mm A")
+            : "—"}
         </p>
         <p>
           <strong>Last Notes:</strong> {customer.notes}
