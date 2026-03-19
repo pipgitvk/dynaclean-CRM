@@ -1022,7 +1022,7 @@ export default function TLCustomersTable({
                         customer.multi_tag.split(", ").map((tag, index) => (
                           <span
                             key={index}
-                            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded"
+                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded font-medium"
                           >
                             {tag.trim()}
                           </span>
