@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import TLCustomersTable from "@/app/user-dashboard/tl-customers/TLCustomersTable";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -275,9 +276,17 @@ export default async function AdminTLCustomersPage({ searchParams }) {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">
-        TL Customer Management (Admin)
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">
+          TL Customer Management (Admin)
+        </h1>
+        <Link
+          href="/admin-dashboard/tl-customers/bulk-follow-uploads"
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
+        >
+          Bulk Follow Uploads
+        </Link>
+      </div>
 
       <TLCustomersTable
         customers={customers}

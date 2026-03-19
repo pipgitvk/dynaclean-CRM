@@ -16,6 +16,15 @@ export default async function AdminTLFollowupPage({ params }) {
   const { customerId } = paramsResolved;
   const conn = await getDbConnection();
 
+  // Ensure model column exists in TL_followups (auto-migration)
+  try {
+    await conn.execute(
+      `ALTER TABLE TL_followups ADD COLUMN model VARCHAR(255) NULL`
+    );
+  } catch (e) {
+    if (e.errno !== 1060) throw e; // 1060 = Duplicate column name (already exists)
+  }
+
   // Fetch customer details
   const [customers] = await conn.execute(
     `SELECT 
@@ -147,6 +156,11 @@ export default async function AdminTLFollowupPage({ params }) {
               <p>
                 <strong>Tags:</strong> {latestTLFollowup.multi_tag || "N/A"}
               </p>
+              {latestTLFollowup.model && (
+                <p>
+                  <strong>Model:</strong> {latestTLFollowup.model}
+                </p>
+              )}
               <p className="md:col-span-2">
                 <strong>TL Notes:</strong>{" "}
                 {latestTLFollowup.notes || "No notes"}
