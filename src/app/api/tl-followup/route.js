@@ -115,6 +115,28 @@ export async function POST(request) {
       );
     }
 
+    // Fetch last follow-up: use its estimated_order_date, lead_quality_score, model for new record
+    let lastEstimatedOrderDate = null;
+    let lastLeadQualityScore = null;
+    let lastModel = null;
+    const [lastRows] = await connection.execute(
+      `SELECT estimated_order_date, lead_quality_score, model
+       FROM TL_followups
+       WHERE customer_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [customer_id]
+    );
+    if (lastRows && lastRows.length > 0) {
+      lastEstimatedOrderDate = lastRows[0].estimated_order_date;
+      lastLeadQualityScore = lastRows[0].lead_quality_score;
+      lastModel = lastRows[0].model;
+    }
+
+    const finalEstimatedOrderDate = lastEstimatedOrderDate != null ? lastEstimatedOrderDate : (estimatedOrderDateUTC || null);
+    const finalLeadQualityScore = lastLeadQualityScore ?? lead_quality_score ?? null;
+    const finalModel = (model && String(model).trim()) ? model : (lastModel || null);
+
     // Start transaction to update both tables
     await connection.beginTransaction();
 
@@ -126,15 +148,15 @@ export async function POST(request) {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           customer_id,
-          estimatedOrderDateUTC || null,
-          lead_quality_score || null,
-          model || null,
+          finalEstimatedOrderDate,
+          finalLeadQualityScore,
+          finalModel,
           multi_tag || null,
           notes || null,
           followedDateUTC,
           nextFollowupDateUTC || null,
           followed_by,
-          assigned_employee || null
+          (assigned_employee && String(assigned_employee).trim()) ? assigned_employee : null
         ]
       );
 
@@ -217,7 +239,7 @@ export async function PUT(request) {
           notes || null,
           followedDateUTC || null,
           nextFollowupDateUTC || null,
-          assigned_employee || null,
+          (assigned_employee && String(assigned_employee).trim()) ? assigned_employee : null,
           id
         ]
       );
