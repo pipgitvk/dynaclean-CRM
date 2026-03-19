@@ -1,32 +1,8 @@
 import { getDbConnection } from "@/lib/db";
+import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
 
 // Allow up to 5 min for Meta API (mode=all can be slow)
 export const maxDuration = 300;
-
-// Helper: normalize phone
-// - convert to string
-// - keep only digits
-// - drop leading 91 if present
-// - keep last 10 digits (typical Indian mobile)
-function normalizePhone(phone) {
-  if (!phone) return null;
-  let p = typeof phone === "string" ? phone : String(phone);
-
-  // keep only digits
-  p = p.replace(/\D/g, "");
-
-  // if starts with 91 and length > 10, drop country code
-  if (p.startsWith("91") && p.length > 10) {
-    p = p.slice(-10);
-  }
-
-  // if still longer than 10, keep last 10 digits
-  if (p.length > 10) {
-    p = p.slice(-10);
-  }
-
-  return p || null;
-}
 
 // get state from pincode
 // async function getStateFromPincode(pincode) {
@@ -378,11 +354,12 @@ if (!selectedRep) {
   const assignedTo = selectedRep.username;
   const now = new Date();
 
-  // Final safety: skip if phone already exists
-  if (lead.phone) {
+  // Final safety: skip if phone already exists (last 10 digits only)
+  const normalizedLeadPhone = normalizePhone(lead.phone);
+  if (normalizedLeadPhone && normalizedLeadPhone.length === 10) {
     const [rows] = await conn.execute(
-      `SELECT customer_id FROM customers WHERE phone = ? LIMIT 1`,
-      [lead.phone],
+      `SELECT customer_id FROM customers WHERE ${PHONE_LAST10_WHERE} LIMIT 1`,
+      [normalizedLeadPhone],
     );
     if (rows.length) {
       console.log("ℹ️ Skipping lead, phone already exists:", lead.phone);
@@ -399,6 +376,9 @@ if (!selectedRep) {
     products_interest = "",
   } = lead;
 
+  // Store normalized phone (last 10 digits) when valid
+  const phoneToStore = (normalizedLeadPhone && normalizedLeadPhone.length === 10) ? normalizedLeadPhone : phone;
+
   const [customerResult] = await conn.execute(
     `INSERT INTO customers (
         first_name, email, phone, address, lead_campaign,
@@ -407,7 +387,7 @@ if (!selectedRep) {
     [
       first_name,
       email,
-      phone,
+      phoneToStore,
       address || "",
       lead_campaign,
       assignedTo,
@@ -429,7 +409,7 @@ if (!selectedRep) {
     [
       customerId,
       first_name,
-      phone,
+      phoneToStore,
       null,
       assignedTo,
       now,
