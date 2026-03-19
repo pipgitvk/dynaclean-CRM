@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
 
 export async function POST(req) {
   try {
@@ -12,12 +13,18 @@ export async function POST(req) {
 
     const conn = await getDbConnection();
 
-    // ✅ Check for duplicate phone
-    if (fields.phone) fields.phone = fields.phone.trim();
+    // ✅ Normalize phone to last 10 digits & check duplicate (last 10 digits only)
+    const phone = normalizePhone(fields.phone);
+    if (!phone || phone.length !== 10) {
+      return NextResponse.json(
+        { error: "Invalid phone number (must be 10 digits)" },
+        { status: 400 },
+      );
+    }
 
     const [dupRows] = await conn.execute(
-      `SELECT COUNT(*) AS c FROM customers WHERE phone = ?`,
-      [fields.phone],
+      `SELECT COUNT(*) AS c FROM customers WHERE ${PHONE_LAST10_WHERE}`,
+      [phone],
     );
     if (dupRows[0].c > 0) {
       // await conn.end();
@@ -41,7 +48,7 @@ export async function POST(req) {
         fields.first_name,
         fields.last_name || "",
         fields.email || "",
-        fields.phone,
+        phone,
         fields.address || "",
         fields.company || "",
         createdby,
@@ -72,7 +79,7 @@ export async function POST(req) {
       [
         customerId,
         fields.first_name,
-        fields.phone,
+        phone,
         next_followup_date,
         now,
         createdby,

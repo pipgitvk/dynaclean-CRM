@@ -1,18 +1,9 @@
 import { getDbConnection } from "@/lib/db";
+import { checkPhoneDuplicate, normalizePhone } from "@/lib/phone-check";
 
 // Disable caching - fixes 405 Method Not Allowed on production (Vercel, nginx, etc.)
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-// Same as meta-backfill: normalize phone so duplicate check & storage match
-function normalizePhone(phone) {
-  if (!phone) return null;
-  let p = typeof phone === "string" ? phone : String(phone);
-  p = p.replace(/\D/g, "");
-  if (p.startsWith("91") && p.length > 10) p = p.slice(-10);
-  if (p.length > 10) p = p.slice(-10);
-  return p || null;
-}
 
 // const dbConfig = {
 //   host: process.env.DB_HOST,
@@ -129,7 +120,7 @@ export async function POST(request) {
     const first_name = getValue("full_name") || getValue("first_name");
     const email = getValue("email");
     const rawPhone = getValue("phone_number");
-    const phone = normalizePhone(rawPhone) || (rawPhone ? String(rawPhone).trim() : null);
+    const phone = normalizePhone(rawPhone) || (rawPhone ? String(rawPhone).replace(/\D/g, "").slice(-10) : null);
     const address = getValue("city");
     const language = getValue("preferred_language_to_communicate");
     const lead_campaign = "social_media";
@@ -179,17 +170,13 @@ export async function POST(request) {
     const assignedTo = assignedRep.username;
 
 
-    // --- Check if customer already exists (PHONE ONLY) ---
+    // --- Check if customer already exists (PHONE - last 10 digits only) ---
 let customerId = null;
 
 if (phone) {
-  const [rows] = await conn.execute(
-    `SELECT customer_id FROM customers WHERE phone = ? LIMIT 1`,
-    [phone]
-  );
-
-  if (rows.length > 0) {
-    customerId = rows[0].customer_id;
+  const dupCheck = await checkPhoneDuplicate(phone);
+  if (dupCheck.duplicate) {
+    customerId = dupCheck.customerId;
 
     // ✅ 1️⃣ Update customer status to 'Average'
     await conn.execute(

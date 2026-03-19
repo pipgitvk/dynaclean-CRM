@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-
-const normalizePhone = (phone) => {
-  if (!phone) return "";
-  let cleaned = String(phone).replace(/[^\d]/g, "");
-  if (cleaned.length > 10) cleaned = cleaned.slice(-10);
-  return cleaned;
-};
+import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
 
 export async function POST(request) {
   let connection;
@@ -83,9 +77,9 @@ export async function POST(request) {
           continue;
         }
 
-        // Duplicate phone check
+        // Duplicate phone check (last 10 digits only)
         const [dupRows] = await connection.execute(
-          `SELECT COUNT(*) AS c FROM customers WHERE phone = ?`,
+          `SELECT COUNT(*) AS c FROM customers WHERE ${PHONE_LAST10_WHERE}`,
           [phone]
         );
         if (dupRows[0].c > 0) {
