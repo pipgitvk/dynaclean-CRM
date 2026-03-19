@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import { useUser } from "@/context/UserContext";
 import Link from "next/link";
 import { ArrowLeft, Loader2, History, X } from "lucide-react";
+import { resolveToCanonical } from "../../../../lib/productCodeUtils";
 
 const TL_TAG_OPTIONS = [
   "Demo",
@@ -145,8 +146,10 @@ export default function BulkFollowUploadsPage() {
   const [rawText, setRawText] = useState("");
   const [parsedEntries, setParsedEntries] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [validProductCodes, setValidProductCodes] = useState([]);
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     fetch("/api/lead-sources")
@@ -155,7 +158,14 @@ export default function BulkFollowUploadsPage() {
       .catch(() => setEmployees([]));
   }, []);
 
-  const handleAnalyze = () => {
+  useEffect(() => {
+    fetch("/api/products/list")
+      .then((res) => res.json())
+      .then((data) => setValidProductCodes((Array.isArray(data) ? data : []).map((p) => p.item_code).filter(Boolean)))
+      .catch(() => setValidProductCodes([]));
+  }, []);
+
+  const handleAnalyze = async () => {
     const results = parseBulkTLFollowupFormat(rawText);
     if (results.length === 0) {
       toast.error(
@@ -163,8 +173,45 @@ export default function BulkFollowUploadsPage() {
       );
       return;
     }
-    setParsedEntries(results);
-    toast.success(`Parsed ${results.length} entr${results.length === 1 ? "y" : "ies"}`);
+
+    if (validProductCodes.length === 0) {
+      toast.error("Product list is loading. Please wait a moment and try again.");
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      const codes = validProductCodes;
+      const invalidCodes = [];
+      const normalizedEntries = results.map((entry) => {
+        const modelStr = String(entry.model || "").trim();
+        if (!modelStr) return { ...entry, model: "" };
+        const parts = modelStr.split(",").map((s) => s.trim()).filter(Boolean);
+        const canonicalParts = [];
+        for (const part of parts) {
+          const resolved = resolveToCanonical(part, codes);
+          if (!resolved) {
+            if (!invalidCodes.includes(part)) invalidCodes.push(part);
+          } else {
+            canonicalParts.push(resolved.canonical);
+          }
+        }
+        return { ...entry, model: canonicalParts.join(", ") };
+      });
+
+      if (invalidCodes.length > 0) {
+        toast.error(
+          `Invalid product code(s): ${invalidCodes.join(", ")}. These codes do not exist in the product list. Please correct and try again.`,
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      setParsedEntries(normalizedEntries);
+      toast.success(`Parsed ${results.length} entr${results.length === 1 ? "y" : "ies"}`);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const updateEntry = (index, field, value) => {
@@ -341,9 +388,17 @@ export default function BulkFollowUploadsPage() {
               </Link>
               <button
                 onClick={handleAnalyze}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
+                disabled={analyzing}
+                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Analyze
+                {analyzing ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Validating...
+                  </>
+                ) : (
+                  "Analyze"
+                )}
               </button>
             </div>
           </div>
