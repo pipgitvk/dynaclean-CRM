@@ -196,6 +196,13 @@ export async function POST(request) {
     const workingVal = working !== undefined && working !== null ? (working ? 1 : 0) : 1;
     const contactStatusVal = workingVal ? "Working" : "Not Working";
 
+    // Inherit lead_source from parent customer (child contacts inherit parent's lead source)
+    const [parentRows] = await connection.execute(
+      `SELECT lead_source FROM customers WHERE customer_id = ?`,
+      [customer_id],
+    );
+    const parentLeadSource = parentRows?.[0]?.lead_source || "Manual";
+
     const now = new Date();
     const [result] = await connection.execute(
       `INSERT INTO customers (
@@ -213,14 +220,14 @@ export async function POST(request) {
         phone,
         "",
         "",
-        "Manual",
+        parentLeadSource,
         "member",
         "New",
         "",
         "",
         "",
-        "Manual",
-        "Manual",
+        parentLeadSource,
+        parentLeadSource,
         "",
         "",
         "",
