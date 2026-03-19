@@ -69,6 +69,7 @@ export async function POST(request) {
       customer_id,
       estimated_order_date,
       lead_quality_score,
+      model,
       multi_tag,
       status,
       notes,
@@ -101,6 +102,19 @@ export async function POST(request) {
       );
     }
 
+    // Verify customer exists before creating follow-up
+    const [custRows] = await connection.execute(
+      `SELECT customer_id FROM customers WHERE customer_id = ?`,
+      [customer_id]
+    );
+    if (!custRows || custRows.length === 0) {
+      connection.release();
+      return NextResponse.json(
+        { error: `Customer ${customer_id} not found. Add the customer first.` },
+        { status: 404 }
+      );
+    }
+
     // Start transaction to update both tables
     await connection.beginTransaction();
 
@@ -108,12 +122,13 @@ export async function POST(request) {
       // Insert into TL_followups table (no status/stage columns in this table)
       const [result] = await connection.execute(
         `INSERT INTO TL_followups
-         (customer_id, estimated_order_date, lead_quality_score, multi_tag, notes, followed_date, next_followup_date, followed_by, assigned_employee)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (customer_id, estimated_order_date, lead_quality_score, model, multi_tag, notes, followed_date, next_followup_date, followed_by, assigned_employee)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           customer_id,
           estimatedOrderDateUTC || null,
           lead_quality_score || null,
+          model || null,
           multi_tag || null,
           notes || null,
           followedDateUTC,
@@ -147,8 +162,9 @@ export async function POST(request) {
     }
   } catch (error) {
     console.error("Error creating TL follow-up:", error);
+    const msg = error?.message || "Failed to create TL follow-up";
     return NextResponse.json(
-      { error: "Failed to create TL follow-up" },
+      { error: msg },
       { status: 500 }
     );
   }
@@ -168,6 +184,7 @@ export async function PUT(request) {
       id,
       estimated_order_date,
       lead_quality_score,
+      model,
       multi_tag,
       notes,
       followed_date,
@@ -190,11 +207,12 @@ export async function PUT(request) {
     try {
       await connection.execute(
         `UPDATE TL_followups
-         SET estimated_order_date = ?, lead_quality_score = ?, multi_tag = ?, notes = ?, followed_date = ?, next_followup_date = ?, assigned_employee = ?
+         SET estimated_order_date = ?, lead_quality_score = ?, model = ?, multi_tag = ?, notes = ?, followed_date = ?, next_followup_date = ?, assigned_employee = ?
          WHERE id = ?`,
         [
           estimatedOrderDateUTC || null,
           lead_quality_score || null,
+          model || null,
           multi_tag || null,
           notes || null,
           followedDateUTC || null,

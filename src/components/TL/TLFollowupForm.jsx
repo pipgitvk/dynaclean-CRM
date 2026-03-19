@@ -20,6 +20,7 @@ export default function TLFollowupForm({
   const [formData, setFormData] = useState({
     estimated_order_date: "",
     lead_quality_score: "",
+    model: "",
     multi_tag: [],
     status: "",
     notes: "",
@@ -99,6 +100,7 @@ export default function TLFollowupForm({
       ...prev,
       // estimated_order_date: latestfollowup.estimated_order_date || "",
       lead_quality_score: latestfollowup.lead_quality_score || "",
+      model: latestfollowup.model || "",
       status: latestfollowup.status || "",
       notes: latestfollowup.notes || "",
       next_followup_date: latestfollowup.next_followup_date
@@ -285,6 +287,21 @@ export default function TLFollowupForm({
               onChange={handleChange}
               min="0"
               max="10"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Model */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Model
+            </label>
+            <input
+              type="text"
+              name="model"
+              value={formData.model}
+              onChange={handleChange}
+              placeholder="Product / Model name"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

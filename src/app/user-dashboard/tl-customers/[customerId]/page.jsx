@@ -299,6 +299,14 @@ export default async function TLCustomerDetailPage({ params }) {
                                 </p>
                               </div>
                             )}
+                            {followup.model && (
+                              <div className="bg-white rounded p-1.5">
+                                <span className="text-gray-500">Model:</span>
+                                <p className="text-gray-800 font-medium truncate">
+                                  {followup.model}
+                                </p>
+                              </div>
+                            )}
                             {followup.comm_mode && (
                               <div className="bg-white rounded p-1.5">
                                 <span className="text-gray-500">Mode:</span>
