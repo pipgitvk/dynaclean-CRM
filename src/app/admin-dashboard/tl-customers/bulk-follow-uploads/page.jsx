@@ -20,9 +20,6 @@ const TL_TAG_OPTIONS = [
   "Clear",
 ];
 
-const DATE_REGEX = /^\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s*$/;
-const DATE_REGEX_ALT = /^\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s*$/;
-
 function parseFirstLine(firstLine) {
   // 2459||DRS 90T or 2459||
   const pipeMatch = firstLine.match(/^(\d+)\s*\|\|\s*(.*)$/);
@@ -42,32 +39,53 @@ function parseFirstLine(firstLine) {
   return null;
 }
 
-function toISODateFromLine(line) {
-  const ddmmyy = line.match(DATE_REGEX);
-  if (ddmmyy) {
-    const [, d, m, y] = ddmmyy;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+const DATETIME_REGEX = /^\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/;
+const DATETIME_DDMMYY = /^\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/;
+const DATE_ONLY_DDMMYY = /^\s*(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s*$/;
+const DATE_ONLY_YYYYMMDD = /^\s*(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s*$/;
+
+function parseNextFollowupDate(line) {
+  const m = line.match(DATETIME_REGEX);
+  if (m) {
+    const [, y, mo, d, h, min] = m;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}T${h.padStart(2, "0")}:${min}`;
   }
-  const yyyymmdd = line.match(DATE_REGEX_ALT);
-  if (yyyymmdd) {
-    const [, y, m, d] = yyyymmdd;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  const m2 = line.match(DATETIME_DDMMYY);
+  if (m2) {
+    const [, d, mo, y, h, min] = m2;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}T${h.padStart(2, "0")}:${min}`;
+  }
+  const m3 = line.match(DATE_ONLY_DDMMYY);
+  if (m3) {
+    const [, d, mo, y] = m3;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}T09:00`;
+  }
+  const m4 = line.match(DATE_ONLY_YYYYMMDD);
+  if (m4) {
+    const [, y, mo, d] = m4;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}T09:00`;
   }
   return "";
 }
 
-function extractTagsFromLine(tagLine) {
-  const lineLower = String(tagLine || "").toLowerCase();
-  if (!lineLower) return [];
+function normalizeTagForMatch(s) {
+  return String(s || "").toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function parseTagString(tagLine) {
+  const line = String(tagLine || "").trim();
+  if (!line) return [];
 
   const tags = [];
-  for (const tag of TL_TAG_OPTIONS) {
-    if (lineLower === tag.toLowerCase() || lineLower.includes(tag.toLowerCase())) {
-      if (!tags.includes(tag)) tags.push(tag);
+  const parts = line.split(",").map((s) => s.trim()).filter(Boolean);
+  for (const part of parts) {
+    const norm = normalizeTagForMatch(part);
+    if (!norm) continue;
+    const found = TL_TAG_OPTIONS.find((t) => normalizeTagForMatch(t) === norm);
+    if (found && !tags.includes(found)) tags.push(found);
+    else if ((norm === "running order" || norm.includes("running order")) && !tags.includes("Running Orders")) {
+      tags.push("Running Orders");
     }
-  }
-  if (!tags.includes("Running Orders") && (lineLower === "running order" || lineLower.includes("running order"))) {
-    tags.push("Running Orders");
   }
   return tags;
 }
@@ -75,52 +93,127 @@ function extractTagsFromLine(tagLine) {
 function isBlockStartLine(line) {
   const normalized = String(line || "").trim();
   if (!normalized) return false;
-  if (toISODateFromLine(normalized)) return false; // prevent date from becoming new block
+  if (parseNextFollowupDate(normalized)) return false;
   return !!parseFirstLine(normalized);
 }
 
-// Strict mapping requested (fixed order after first line):
-// 1) notes
-// 2) Est. Order Date
-// 3) tags
-// 4) Assign To
-function parseSingleBlock(lines) {
-  const filtered = lines.map((l) => String(l).trim()).filter((l) => l.length > 0);
-  if (filtered.length === 0) return null;
+function parseLabeledBlock(blockText) {
+  const lines = blockText.split("\n").map((l) => l.trim());
+  let customer_id = "";
+  let model = "";
+  let notes = "";
+  let next_followup_date = "";
+  let tagStr = "";
 
-  const firstLine = filtered[0];
-  const parsed = parseFirstLine(firstLine);
-  if (!parsed) return null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const cidMatch = line.match(/^Customer ID:\s*(.+)$/i);
+    if (cidMatch) {
+      customer_id = String(cidMatch[1] || "").trim();
+      continue;
+    }
+    const modelMatch = line.match(/^Model:\s*(.+)$/i);
+    if (modelMatch) {
+      model = String(modelMatch[1] || "").trim();
+      continue;
+    }
+    const notesMatch = line.match(/^Follow-up Notes:\s*(.*)$/i);
+    if (notesMatch) {
+      notes = String(notesMatch[1] || "").trim();
+      if (!notes && i + 1 < lines.length && !lines[i + 1].match(/^(Customer ID|Model|Next Follow-up Date|Tag):/i)) {
+        notes = lines[++i].trim();
+      }
+      continue;
+    }
+    const dateMatch = line.match(/^Next Follow-up Date:\s*(.*)$/i);
+    if (dateMatch) {
+      let dateVal = String(dateMatch[1] || "").trim();
+      if (!dateVal && i + 1 < lines.length) dateVal = lines[i + 1].trim();
+      next_followup_date = parseNextFollowupDate(dateVal);
+      continue;
+    }
+    const tagMatch = line.match(/^Tag:\s*(.+)$/i);
+    if (tagMatch) {
+      tagStr = String(tagMatch[1] || "").trim();
+      if (!tagStr && i + 1 < lines.length && !lines[i + 1].match(/^(Customer ID|Model|Follow-up Notes|Next Follow-up Date):/i)) {
+        tagStr = lines[++i].trim();
+      }
+      continue;
+    }
+    if (notes && !line.match(/^(Customer ID|Model|Follow-up Notes|Next Follow-up Date|Tag):/i) && line) {
+      notes = (notes + "\n" + line).trim();
+    }
+  }
 
-  const customer_id = parsed.customer_id;
-  const model = parsed.model;
-  const bodyLines = filtered.slice(1);
-
-  const notes = bodyLines[0] || "";
-  const estimated_order_date = toISODateFromLine(bodyLines[1] || "");
-  const multi_tag = extractTagsFromLine(bodyLines[2] || "");
-  const assigned_employee = bodyLines[3] || "";
-
+  if (!customer_id) return null;
   return {
     customer_id,
     model,
     notes,
-    multi_tag,
-    estimated_order_date,
-    assigned_employee,
+    next_followup_date,
+    multi_tag: parseTagString(tagStr),
+    assigned_employee: "",
     stage: "Negotiation / Follow-up",
     status: "Good",
   };
 }
 
-// Split text into blocks - each block starts with valid customer line only
+function parseSingleBlock(lines) {
+  const filtered = lines.map((l) => String(l).trim()).filter((l) => l.length > 0);
+  if (filtered.length === 0) return null;
+
+  const firstLine = filtered[0];
+  if (/^Customer ID:/i.test(firstLine)) {
+    return parseLabeledBlock(filtered.join("\n"));
+  }
+
+  const parsed = parseFirstLine(firstLine);
+  if (!parsed) return null;
+
+  const customer_id = parsed.customer_id;
+  let model = parsed.model || "";
+  const bodyLines = filtered.slice(1);
+
+  const notes = bodyLines[0] || "";
+  const next_followup_date = parseNextFollowupDate(bodyLines[1] || "");
+  const multi_tag = parseTagString(bodyLines[2] || "");
+
+  return {
+    customer_id,
+    model,
+    notes,
+    next_followup_date,
+    multi_tag,
+    assigned_employee: "",
+    stage: "Negotiation / Follow-up",
+    status: "Good",
+  };
+}
+
+function isLabeledFormat(text) {
+  return /^\s*Customer ID:/im.test(text);
+}
+
+// Split text into blocks - labeled format by "Customer ID:", else by customer line
 function parseBulkTLFollowupFormat(text) {
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-  const allLines = normalized.split("\n").map((l) => String(l).trim());
+  const allLines = normalized.split("\n");
+
+  if (isLabeledFormat(normalized)) {
+    const blocks = normalized.split(/(?=Customer ID:)/i).filter((b) => b.trim());
+    const results = [];
+    for (const block of blocks) {
+      const parsed = parseLabeledBlock(block.trim());
+      if (parsed) results.push(parsed);
+    }
+    return results;
+  }
+
+  const trimmedLines = allLines.map((l) => String(l).trim());
   const blocks = [];
   let currentBlock = [];
 
-  for (const line of allLines) {
+  for (const line of trimmedLines) {
     if (isBlockStartLine(line)) {
       if (currentBlock.length > 0) {
         blocks.push([...currentBlock]);
@@ -169,45 +262,87 @@ export default function BulkFollowUploadsPage() {
     const results = parseBulkTLFollowupFormat(rawText);
     if (results.length === 0) {
       toast.error(
-        "Format not recognized. Expected first line: customer_id and model (e.g. 2461||DRS 90T or 2461 DRS 90T). Separate entries with blank lines."
+        "Format not recognized. Expected: customer_id||model, notes, next_followup_date, tags. Separate entries with blank lines."
       );
       return;
     }
 
-    if (validProductCodes.length === 0) {
-      toast.error("Product list is loading. Please wait a moment and try again.");
+    const invalid = [];
+    for (const r of results) {
+      const missing = [];
+      if (!r.customer_id || !String(r.customer_id).trim()) missing.push("customer_id");
+      if (!String(r.notes || "").trim()) missing.push("notes");
+      if (!String(r.next_followup_date || "").trim()) missing.push("next_followup_date");
+      if (missing.length > 0) {
+        invalid.push({ customer_id: r.customer_id || "?", missing });
+      }
+    }
+    if (invalid.length > 0) {
+      const msg = invalid
+        .map((i) => `Customer ${i.customer_id}: missing ${i.missing.join(", ")}`)
+        .join("; ");
+      toast.error(`Invalid entries: ${msg}`, { duration: 6000 });
       return;
     }
 
     setAnalyzing(true);
     try {
-      const codes = validProductCodes;
-      const invalidCodes = [];
-      const normalizedEntries = results.map((entry) => {
-        const modelStr = String(entry.model || "").trim();
-        if (!modelStr) return { ...entry, model: "" };
-        const parts = modelStr.split(",").map((s) => s.trim()).filter(Boolean);
-        const canonicalParts = [];
-        for (const part of parts) {
-          const resolved = resolveToCanonical(part, codes);
-          if (!resolved) {
-            if (!invalidCodes.includes(part)) invalidCodes.push(part);
-          } else {
-            canonicalParts.push(resolved.canonical);
-          }
+      const customerIds = [...new Set(results.map((r) => r.customer_id))];
+      let lastFollowups = {};
+      try {
+        const res = await fetch("/api/tl-followup/last-by-customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ customer_ids: customerIds }),
+        });
+        const data = await res.json();
+        if (res.ok && data.lastFollowups) lastFollowups = data.lastFollowups;
+      } catch {}
+
+      const merged = results.map((entry) => {
+        const last = lastFollowups[String(entry.customer_id)] || {};
+        let model = String(entry.model || "").trim() || (last.model || "");
+        const lastTags = last.multi_tag ? parseTagString(last.multi_tag) : [];
+        const userTags = Array.isArray(entry.multi_tag) ? entry.multi_tag : [];
+        const multi_tag = [...lastTags];
+        for (const t of userTags) {
+          if (!multi_tag.includes(t)) multi_tag.push(t);
         }
-        return { ...entry, model: canonicalParts.join(", ") };
+        const assigned_employee = last.assigned_employee || "";
+
+        return { ...entry, model, multi_tag, assigned_employee };
       });
 
-      if (invalidCodes.length > 0) {
-        toast.error(
-          `Invalid product code(s): ${invalidCodes.join(", ")}. These codes do not exist in the product list. Please correct and try again.`,
-          { duration: 6000 }
-        );
-        return;
-      }
+      if (validProductCodes.length > 0) {
+        const codes = validProductCodes;
+        const invalidCodes = [];
+        const normalizedEntries = merged.map((entry) => {
+          const modelStr = String(entry.model || "").trim();
+          if (!modelStr) return { ...entry, model: "" };
+          const parts = modelStr.split(",").map((s) => s.trim()).filter(Boolean);
+          const canonicalParts = [];
+          for (const part of parts) {
+            const resolved = resolveToCanonical(part, codes);
+            if (!resolved) {
+              if (!invalidCodes.includes(part)) invalidCodes.push(part);
+            } else {
+              canonicalParts.push(resolved.canonical);
+            }
+          }
+          return { ...entry, model: canonicalParts.join(", ") };
+        });
 
-      setParsedEntries(normalizedEntries);
+        if (invalidCodes.length > 0) {
+          toast.error(
+            `Invalid product code(s): ${invalidCodes.join(", ")}. These codes do not exist in the product list. Please correct and try again.`,
+            { duration: 6000 }
+          );
+          return;
+        }
+        setParsedEntries(normalizedEntries);
+      } else {
+        setParsedEntries(merged);
+      }
       toast.success(`Parsed ${results.length} entr${results.length === 1 ? "y" : "ies"}`);
     } finally {
       setAnalyzing(false);
@@ -269,8 +404,8 @@ export default function BulkFollowUploadsPage() {
             model: entry.model || null,
             notes: entry.notes || null,
             multi_tag: entry.multi_tag?.length ? entry.multi_tag.join(", ") : null,
-            estimated_order_date: entry.estimated_order_date || null,
-            assigned_employee: entry.assigned_employee || null,
+            next_followup_date: entry.next_followup_date || null,
+            assigned_employee: (entry.assigned_employee && String(entry.assigned_employee).trim()) ? entry.assigned_employee : null,
             stage: entry.stage || "Negotiation / Follow-up",
             status: entry.status || "Good",
             followed_date,
@@ -354,9 +489,6 @@ export default function BulkFollowUploadsPage() {
         <h1 className="text-2xl font-bold text-gray-800 mb-2">
           Bulk Follow Uploads
         </h1>
-        <p className="text-sm text-gray-500 mb-6">
-          Paste multiple entries. Each entry starts with <code className="bg-gray-100 px-1 rounded">customer_id || model</code> or <code className="bg-gray-100 px-1 rounded">customer_id model</code>. Separate entries with a blank line.
-        </p>
 
         {parsedEntries.length === 0 ? (
           <div className="space-y-4">
@@ -367,7 +499,7 @@ export default function BulkFollowUploadsPage() {
               <textarea
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
-                placeholder={`2461||DRS 90T or 2461 DRS 90T\nNext week going to finalize.\n23/03/2026\nRunning order\nAB\n\n2462 DRS 100T\n...`}
+                placeholder={`Customer ID: 2436\nModel: DRS 90T\n\nFollow-up Notes:\nClient interested, price discussion ongoing\n\nNext Follow-up Date:\n28/03/2026 11:30\n\nTag:\nPrime\n\nCustomer ID: 2437\nModel: Dyna-40\n\nFollow-up Notes:\nDemo scheduled\n\nNext Follow-up Date:\n29/03/2026 10:00\n\nTag:\nDemo`}
                 className="w-full h-64 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
               />
             </div>
@@ -492,11 +624,11 @@ export default function BulkFollowUploadsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-0.5">Est. Order Date</label>
+                      <label className="block text-xs text-gray-500 mb-0.5">Next Follow-up Date</label>
                       <input
-                        type="date"
-                        value={entry.estimated_order_date}
-                        onChange={(e) => updateEntry(idx, "estimated_order_date", e.target.value)}
+                        type="datetime-local"
+                        value={entry.next_followup_date}
+                        onChange={(e) => updateEntry(idx, "next_followup_date", e.target.value)}
                         className="w-full border border-gray-300 rounded p-1.5 text-sm"
                       />
                     </div>

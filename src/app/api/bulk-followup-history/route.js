@@ -82,7 +82,7 @@ export async function POST(request) {
       model: e.model || "",
       notes: (e.notes || "").slice(0, 100),
       tags: e.multi_tag?.join(", ") || "",
-      estimated_order_date: e.estimated_order_date || "",
+      estimated_order_date: e.next_followup_date || e.estimated_order_date || "",
       assigned_employee: e.assigned_employee || "",
     }));
 
