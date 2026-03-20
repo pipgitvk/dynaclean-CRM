@@ -236,7 +236,7 @@ export default function UpcomingInstallationsPage() {
               </p>
             </div>
 
-            {/* Actions */}
+            {/* Actions — hidden on user dashboard
             <div className="flex gap-2 mt-3">
               <button
                 onClick={() => handleAction(r.order_id, "INSTALLED")}
@@ -259,6 +259,7 @@ export default function UpcomingInstallationsPage() {
                 Full Return
               </button>
             </div>
+            */}
           </div>
         ))}
       </div>
@@ -277,7 +278,7 @@ export default function UpcomingInstallationsPage() {
               <th className="p-3">Emp</th>
               <th className="p-3">Delivery</th>
               <th className="p-3">Days</th>
-              <th className="p-3">Actions</th>
+              {/* <th className="p-3">Actions</th> */}
             </tr>
           </thead>
           <tbody>
@@ -296,7 +297,7 @@ export default function UpcomingInstallationsPage() {
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
                   {formatDays(r.days_until_installation)}
                 </td>
-                <td className="p-3 space-x-2">
+                {/* <td className="p-3 space-x-2">
                   <button
                     onClick={() => handleAction(r.order_id, "INSTALLED")}
                     className="px-3 py-1 bg-green-600 text-white rounded text-xs"
@@ -315,7 +316,7 @@ export default function UpcomingInstallationsPage() {
                   >
                     Full Return
                   </button>
-                </td>
+                </td> */}
               </tr>
             ))}
           </tbody>

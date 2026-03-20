@@ -527,7 +527,7 @@ export default function ServiceForm({ service }) {
       );
 
       if (!response.ok) throw new Error("Failed to save service record.");
-      
+
       // Generate PDF after successful save
       try {
         // Get signature data URLs

@@ -546,7 +546,7 @@ export default function ProspectsListCard({
         <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Admin filters — search, commitment & employee
+              Admin filters
             </p>
             <button
               type="button"
