@@ -2,6 +2,21 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
+/** Map bulk-reassign / customers-table filter values to all status strings used in DB (forms vs legacy). */
+function statusValuesForFilter(statusParam) {
+    if (!statusParam) return null;
+    const key = String(statusParam).trim();
+    const map = {
+        verygud: ["verygud", "Very Good"],
+        average: ["average", "Average"],
+        poor: ["poor", "Poor"],
+        denied: ["denied", "Denied"],
+        New: ["New"],
+    };
+    if (map[key]) return map[key];
+    return [key];
+}
+
 // GET - Fetch filtered leads for bulk operations
 export async function GET(request) {
     try {
@@ -49,8 +64,11 @@ export async function GET(request) {
 
         // Apply filters
         if (status) {
-            query += ` AND c.status = ?`;
-            params.push(status);
+            const statusVariants = statusValuesForFilter(status);
+            if (statusVariants?.length) {
+                query += ` AND c.status IN (${statusVariants.map(() => "?").join(", ")})`;
+                params.push(...statusVariants);
+            }
         }
 
         if (tags) {
