@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getDbConnection } from "@/lib/db";
 import { ensureProspectsTable } from "@/lib/ensureProspectsTable";
 import { getSessionPayload } from "@/lib/auth";
@@ -9,6 +10,7 @@ import ProspectsListCard from "./ProspectsListCard";
 import {
   parseCustomerIdsParam,
   parseQuoteNumbersParam,
+  parseProspectsAdminFiltersFromSearchParams,
 } from "@/lib/prospectFilterUtils";
 import { buildProspectsListWhereClause } from "@/lib/prospectListQuery";
 import {
@@ -38,26 +40,55 @@ export default async function ProspectsPage({ searchParams }) {
   );
   const like = searchRaw ? `%${searchRaw}%` : null;
 
+  const viewerIsAdmin = isProspectsAdminRole(payload.role);
+  const adminFilters = viewerIsAdmin
+    ? parseProspectsAdminFiltersFromSearchParams(resolved)
+    : null;
+
   let rows = [];
   let loadError = null;
+  let prospectCreatorUsernames = [];
 
   try {
     await ensureProspectsTable();
     const conn = await getDbConnection();
+
+    if (viewerIsAdmin) {
+      try {
+        const [cr] = await conn.execute(
+          `SELECT DISTINCT TRIM(created_by) AS u
+           FROM prospects
+           WHERE created_by IS NOT NULL AND TRIM(created_by) <> ''
+           ORDER BY u ASC`,
+        );
+        prospectCreatorUsernames = (cr || [])
+          .map((r) => String(r.u ?? "").trim())
+          .filter(Boolean);
+      } catch {
+        prospectCreatorUsernames = [];
+      }
+    }
 
     const { whereSql, params } = buildProspectsListWhereClause({
       customerIds,
       like,
       role: payload.role,
       username: payload.username,
+      adminFilters,
     });
 
     let query = `
-      SELECT id, customer_id, order_id, quote_number, status, model, qty, amount, commitment_date, notes, created_by, finalized_at
-      FROM prospects
+      SELECT p.id, p.customer_id, p.order_id, p.quote_number, p.status, p.model, p.qty, p.amount,
+             p.commitment_date, p.notes, p.created_by, p.finalized_at,
+             COALESCE(
+               NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''),
+               NULLIF(TRIM(c.company), '')
+             ) AS customer_name
+      FROM prospects p
+      LEFT JOIN customers c ON TRIM(c.customer_id) = TRIM(p.customer_id)
     `;
     query += whereSql;
-    query += ` ORDER BY commitment_date IS NULL, commitment_date ASC, updated_at DESC`;
+    query += ` ORDER BY p.commitment_date IS NULL, p.commitment_date ASC, p.updated_at DESC`;
 
     const [data] = await conn.execute(query, params);
     rows = await enrichProspectRowsWithPaymentStatus(conn, data || []);
@@ -74,6 +105,10 @@ export default async function ProspectsPage({ searchParams }) {
   const serializableRows = (rows || []).map((row) => ({
     id: row.id,
     customer_id: row.customer_id,
+    customer_name:
+      row.customer_name != null && String(row.customer_name).trim() !== ""
+        ? String(row.customer_name).trim()
+        : null,
     status:
       row.status != null && String(row.status).trim() !== ""
         ? String(row.status).trim()
@@ -102,7 +137,6 @@ export default async function ProspectsPage({ searchParams }) {
   }));
 
   const viewerUsername = String(payload.username ?? "").trim();
-  const viewerIsAdmin = isProspectsAdminRole(payload.role);
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:p-8 dark:border-slate-200 dark:bg-white">
@@ -110,15 +144,25 @@ export default async function ProspectsPage({ searchParams }) {
         Prospects
       </h1>
 
-      <ProspectsListCard
-        initialRows={serializableRows}
-        initialSearch={searchRaw}
-        initialCustomerIds={customerIds}
-        initialQuoteNumbers={quoteNumbers}
-        loadError={loadError}
-        viewerUsername={viewerUsername}
-        viewerIsAdmin={viewerIsAdmin}
-      />
+      <Suspense
+        fallback={
+          <div className="rounded-[10px] border border-slate-200 bg-slate-50 py-12 text-center text-sm text-slate-500">
+            Loading prospects…
+          </div>
+        }
+      >
+        <ProspectsListCard
+          initialRows={serializableRows}
+          initialSearch={searchRaw}
+          initialCustomerIds={customerIds}
+          initialQuoteNumbers={quoteNumbers}
+          initialAdminFilters={adminFilters}
+          prospectCreatorUsernames={prospectCreatorUsernames}
+          loadError={loadError}
+          viewerUsername={viewerUsername}
+          viewerIsAdmin={viewerIsAdmin}
+        />
+      </Suspense>
     </div>
   );
 }

@@ -35,15 +35,96 @@ export function parseQuoteNumbersParam(raw) {
     .slice(0, 50);
 }
 
-export function buildProspectsRowsApiUrl(customerIds, searchText) {
+/**
+ * @param {{ commitmentYear?: number|null, commitmentMonth?: number|null, commitmentDay?: number|null, createdBy?: string|null, adminSearch?: string|null }|null|undefined} adminFilters
+ */
+export function buildProspectsRowsApiUrl(
+  customerIds,
+  searchText,
+  adminFilters = null,
+) {
   const params = new URLSearchParams();
   if (customerIds.length > 0) {
     params.set("customers", customerIds.join(","));
   }
   const s = String(searchText ?? "").trim();
   if (s) params.set("search", s);
+  if (adminFilters) {
+    const y = adminFilters.commitmentYear;
+    if (y != null && Number.isFinite(Number(y))) {
+      params.set("commitment_year", String(Number(y)));
+    }
+    const m = adminFilters.commitmentMonth;
+    if (m != null && Number.isFinite(Number(m))) {
+      params.set("commitment_month", String(Number(m)));
+    }
+    const d = adminFilters.commitmentDay;
+    if (d != null && Number.isFinite(Number(d))) {
+      params.set("commitment_day", String(Number(d)));
+    }
+    const cb = String(adminFilters.createdBy ?? "").trim();
+    if (cb) params.set("created_by", cb.slice(0, 128));
+    const aq = String(adminFilters.adminSearch ?? "").trim();
+    if (aq) params.set("admin_search", aq.slice(0, 200));
+  }
   const q = params.toString();
   return q ? `/api/prospects/rows?${q}` : "/api/prospects/rows";
+}
+
+function parseYear(raw) {
+  const n = parseInt(String(raw ?? ""), 10);
+  if (!Number.isFinite(n) || n < 2000 || n > 2100) return null;
+  return n;
+}
+
+function parseMonth(raw) {
+  const n = parseInt(String(raw ?? ""), 10);
+  if (!Number.isFinite(n) || n < 1 || n > 12) return null;
+  return n;
+}
+
+function parseDay(raw) {
+  const n = parseInt(String(raw ?? ""), 10);
+  if (!Number.isFinite(n) || n < 1 || n > 31) return null;
+  return n;
+}
+
+function buildAdminFiltersFromGetter(get) {
+  const year = parseYear(get("commitment_year"));
+  const month = parseMonth(get("commitment_month"));
+  const day = parseDay(get("commitment_day"));
+  const createdByRaw = String(get("created_by") ?? "").trim();
+  const createdBy =
+    createdByRaw.length > 0 ? createdByRaw.slice(0, 128) : null;
+  const adminSearchRaw = String(get("admin_search") ?? "").trim();
+  const adminSearch =
+    adminSearchRaw.length > 0 ? adminSearchRaw.slice(0, 200) : null;
+  if (
+    year == null &&
+    month == null &&
+    day == null &&
+    !createdBy &&
+    !adminSearch
+  ) {
+    return null;
+  }
+  return {
+    commitmentYear: year,
+    commitmentMonth: month,
+    commitmentDay: day,
+    createdBy,
+    adminSearch,
+  };
+}
+
+/** Parse admin-only query params from Next.js `searchParams` (caller must verify role). */
+export function parseProspectsAdminFiltersFromSearchParams(resolved) {
+  return buildAdminFiltersFromGetter((k) => firstSearchParam(resolved?.[k]));
+}
+
+/** Parse admin-only params from `URLSearchParams` (e.g. API route). */
+export function parseProspectsAdminFiltersFromUrlSearchParams(sp) {
+  return buildAdminFiltersFromGetter((k) => String(sp.get(k) ?? "").trim());
 }
 
 export function buildProspectsPageUrl(customerIds, searchText, quoteNumbers = []) {

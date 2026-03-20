@@ -53,9 +53,28 @@ function buildLinesFromQuotation(initialQuotationLines, seedUnit, orderLocked) {
 /**
  * Bulk block per customer: multiple Model+Qty+Amount rows, shared commitment + notes.
  */
+function CustomerLegend({ customerId, customerName }) {
+  return (
+    <legend className="max-w-full px-1 text-sm font-semibold text-slate-800">
+      <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+        <span>
+          Customer ID:{" "}
+          <span className="font-mono text-slate-900">{customerId}</span>
+        </span>
+        {customerName ? (
+          <span className="font-normal text-slate-600">
+            — <span className="text-slate-800">{customerName}</span>
+          </span>
+        ) : null}
+      </span>
+    </legend>
+  );
+}
+
 export default function BulkProspectRowClient({
   i,
   customerId,
+  customerName = null,
   initialQuoteAmount,
   initialQuotationLines,
   orderLocked,
@@ -89,10 +108,7 @@ export default function BulkProspectRowClient({
     const total = Number(orderCtx.total_amount);
     return (
       <fieldset className="rounded-[10px] border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
-        <legend className="px-1 text-sm font-semibold text-slate-800">
-          Customer ID:{" "}
-          <span className="font-mono text-slate-900">{customerId}</span>
-        </legend>
+        <CustomerLegend customerId={customerId} customerName={customerName} />
         {prefillQuoteNumber ? (
           <p className="mt-2 text-xs text-slate-600">
             Quotation{" "}
@@ -228,10 +244,7 @@ export default function BulkProspectRowClient({
 
   return (
     <fieldset className="rounded-[10px] border border-slate-200 bg-slate-50/50 p-4 sm:p-5">
-      <legend className="px-1 text-sm font-semibold text-slate-800">
-        Customer ID:{" "}
-        <span className="font-mono text-slate-900">{customerId}</span>
-      </legend>
+      <CustomerLegend customerId={customerId} customerName={customerName} />
       <input type="hidden" name={`customer_id_${i}`} value={customerId} />
       <input type="hidden" name={`line_count_${i}`} value={lines.length} />
 

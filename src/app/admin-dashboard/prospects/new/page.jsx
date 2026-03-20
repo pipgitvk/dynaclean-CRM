@@ -24,6 +24,7 @@ import {
 import { getOrderProspectAmountContext } from "@/lib/getOrderProspectAmountContext";
 import SingleProspectFormClient from "./SingleProspectFormClient";
 import BulkProspectRowClient from "./BulkProspectRowClient";
+import { getCustomerDisplayNamesByCustomerIds } from "@/lib/getCustomerDisplayNamesByCustomerIds";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +141,11 @@ export default async function NewProspectPage({ searchParams }) {
       }
     }
 
+    const customerNamesById = await getCustomerDisplayNamesByCustomerIds(
+      conn,
+      allowedCustomerIds,
+    );
+
     return (
       <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-200 dark:bg-white">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -229,6 +235,7 @@ export default async function NewProspectPage({ searchParams }) {
                 key={id}
                 i={i}
                 customerId={id}
+                customerName={customerNamesById[String(id)] ?? null}
                 initialQuoteAmount={quoteAmounts[String(id)]}
                 initialQuotationLines={
                   quotationLinesByCustomer[String(id)]?.lines?.length
@@ -248,7 +255,7 @@ export default async function NewProspectPage({ searchParams }) {
             type="submit"
             className="w-full rounded-[10px] bg-slate-900 py-3 text-sm font-medium text-white transition hover:bg-slate-800 sm:w-auto sm:min-w-[200px]"
           >
-            Final submit
+            Submit
           </button>
         </form>
       </div>

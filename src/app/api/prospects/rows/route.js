@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureProspectsTable } from "@/lib/ensureProspectsTable";
-import { parseCustomerIdsParam } from "@/lib/prospectFilterUtils";
-import { canAccessProspectsRole } from "@/lib/prospectAccess";
+import {
+  parseCustomerIdsParam,
+  parseProspectsAdminFiltersFromUrlSearchParams,
+} from "@/lib/prospectFilterUtils";
+import {
+  canAccessProspectsRole,
+  isProspectsAdminRole,
+} from "@/lib/prospectAccess";
 import { buildProspectsListWhereClause } from "@/lib/prospectListQuery";
 import {
   enrichProspectRowsWithPaymentStatus,
@@ -13,6 +19,10 @@ import {
 function mapRows(data) {
   return (data || []).map((row) => ({
     ...row,
+    customer_name:
+      row.customer_name != null && String(row.customer_name).trim() !== ""
+        ? String(row.customer_name).trim()
+        : null,
     status:
       row.status != null && String(row.status).trim() !== ""
         ? String(row.status).trim()
@@ -55,19 +65,30 @@ export async function GET(req) {
     await ensureProspectsTable();
     const conn = await getDbConnection();
 
+    const adminFilters = isProspectsAdminRole(payload.role)
+      ? parseProspectsAdminFiltersFromUrlSearchParams(searchParams)
+      : null;
+
     const { whereSql, params } = buildProspectsListWhereClause({
       customerIds,
       like,
       role: payload.role,
       username: payload.username,
+      adminFilters,
     });
 
     let query = `
-      SELECT id, customer_id, order_id, quote_number, status, model, qty, amount, commitment_date, notes, created_by, finalized_at
-      FROM prospects
+      SELECT p.id, p.customer_id, p.order_id, p.quote_number, p.status, p.model, p.qty, p.amount,
+             p.commitment_date, p.notes, p.created_by, p.finalized_at,
+             COALESCE(
+               NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''),
+               NULLIF(TRIM(c.company), '')
+             ) AS customer_name
+      FROM prospects p
+      LEFT JOIN customers c ON TRIM(c.customer_id) = TRIM(p.customer_id)
     `;
     query += whereSql;
-    query += ` ORDER BY commitment_date IS NULL, commitment_date ASC, updated_at DESC`;
+    query += ` ORDER BY p.commitment_date IS NULL, p.commitment_date ASC, p.updated_at DESC`;
 
     const [data] = await conn.execute(query, params);
     const baseRows = mapRows(data);

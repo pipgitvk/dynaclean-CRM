@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 
 function formatDate(v) {
@@ -32,8 +31,8 @@ export default function ProspectsSearchBar({
   onAddSuggestion,
   onRemoveCustomer,
   onSubmitSearch,
+  onAddProspects,
 }) {
-  const router = useRouter();
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -129,17 +128,7 @@ export default function ProspectsSearchBar({
 
   function handleFormSubmit(e) {
     e.preventDefault();
-    if (typeof onSubmitSearch === "function") {
-      onSubmitSearch();
-      return;
-    }
-    const params = new URLSearchParams();
-    const ids = selectedCustomers.map((c) => c.customer_id).join(",");
-    if (ids) params.set("customers", ids);
-    const s = String(searchText ?? "").trim();
-    if (s) params.set("search", s);
-    const q = params.toString();
-    router.push(q ? `/admin-dashboard/prospects?${q}` : "/admin-dashboard/prospects");
+    onSubmitSearch?.();
   }
 
   return (
@@ -267,10 +256,11 @@ export default function ProspectsSearchBar({
           ) : null}
         </div>
         <button
-          type="submit"
-          className="h-11 w-full shrink-0 rounded-[10px] border border-slate-200 bg-white px-5 text-sm font-medium text-slate-600 shadow-none transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200/90 sm:mt-0 sm:w-auto sm:min-w-[6.5rem]"
+          type="button"
+          onClick={() => onAddProspects?.()}
+          className="h-11 w-full shrink-0 rounded-[10px] bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:min-w-[10.5rem]"
         >
-          Search
+          Add Prospects
         </button>
       </div>
 
