@@ -14,9 +14,9 @@ export function buildProspectsListWhereClause({ customerIds, like, role, usernam
     params.push(...customerIds);
   } else if (like) {
     parts.push(
-      `(customer_id LIKE ? OR model LIKE ? OR CAST(qty AS CHAR) LIKE ? OR CAST(amount AS CHAR) LIKE ? OR COALESCE(notes,'') LIKE ?)`,
+      `(customer_id LIKE ? OR model LIKE ? OR CAST(qty AS CHAR) LIKE ? OR CAST(amount AS CHAR) LIKE ? OR COALESCE(notes,'') LIKE ? OR customer_id IN (SELECT customer_id FROM quotations_records WHERE quote_number LIKE ?))`,
     );
-    params.push(like, like, like, like, like);
+    params.push(like, like, like, like, like, like);
   }
 
   if (!isAdmin) {

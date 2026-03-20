@@ -1,13 +1,26 @@
 import Link from "next/link";
 import { getSessionPayload } from "@/lib/auth";
+import { getDbConnection } from "@/lib/db";
 import {
   canAccessProspectsRole,
+  isProspectsAdminRole,
   isProspectsSalesOnlyRole,
 } from "@/lib/prospectAccess";
+import {
+  filterCustomerIdsForProspectUser,
+  userMayUseCustomerForProspect,
+} from "@/lib/prospectCustomerAccess";
 import { createProspectsBulk } from "../actions";
-import { parseCustomerIdsParam } from "@/lib/prospectFilterUtils";
+import {
+  firstSearchParam,
+  parseCustomerIdsParam,
+  parseQuoteNumbersParam,
+} from "@/lib/prospectFilterUtils";
 import { getLatestQuotationGrandTotalsByCustomerIds } from "@/lib/getLatestQuotationGrandTotals";
-import { getLatestQuotationItemsByCustomerIds } from "@/lib/getLatestQuotationItemsByCustomerIds";
+import {
+  getGrandTotalForQuotation,
+  getQuotationPrefillForProspects,
+} from "@/lib/getQuotationPrefillForProspects";
 import { getOrderProspectAmountContext } from "@/lib/getOrderProspectAmountContext";
 import SingleProspectFormClient from "./SingleProspectFormClient";
 import BulkProspectRowClient from "./BulkProspectRowClient";
@@ -22,6 +35,8 @@ const errorMessages = {
   commitment_past:
     "Commitment date cannot be before today (India time). Use today or a future date.",
   too_many: "Too many prospect lines in one save (max 100). Remove some lines or save in batches.",
+  forbidden_customer:
+    "You can only add prospects for customers assigned to you (your leads).",
 };
 
 const inputClass =
@@ -44,19 +59,86 @@ export default async function NewProspectPage({ searchParams }) {
   const customerIds = parseCustomerIdsParam(
     String(resolved?.customers ?? ""),
   );
+  const quoteNumberParam = firstSearchParam(resolved?.quote_number);
+  const quoteNumbersParam = parseQuoteNumbersParam(
+    String(resolved?.quote_numbers ?? ""),
+  );
 
   const amountReadOnly = isProspectsSalesOnlyRole(payload.role);
 
+  const conn = await getDbConnection();
+  const allowedCustomerIds = await filterCustomerIdsForProspectUser(
+    conn,
+    customerIds,
+    payload,
+  );
+
   const orderIdParam = String(resolved?.order_id ?? "").trim();
-  const orderCtx = orderIdParam
+  let orderCtx = orderIdParam
     ? await getOrderProspectAmountContext(orderIdParam)
     : null;
+  if (orderCtx?.customer_id) {
+    const okOrder = await userMayUseCustomerForProspect(
+      conn,
+      orderCtx.customer_id,
+      payload,
+    );
+    if (!okOrder) orderCtx = null;
+  }
 
   if (customerIds.length > 0) {
-    const [quoteAmounts, quotationLinesByCustomer] = await Promise.all([
-      getLatestQuotationGrandTotalsByCustomerIds(customerIds),
-      getLatestQuotationItemsByCustomerIds(customerIds),
-    ]);
+    if (allowedCustomerIds.length === 0) {
+      return (
+        <div className="mx-auto max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 p-6 shadow-sm sm:p-8">
+          <h1 className="text-xl font-semibold text-amber-950">
+            No allowed customers in this selection
+          </h1>
+          <p className="mt-2 text-sm text-amber-900">
+            {isProspectsAdminRole(payload.role)
+              ? "The customer IDs in the link were invalid or missing."
+              : "You can only add prospects for customers assigned to you (same as your leads list). None of the selected IDs match your account."}
+          </p>
+          <Link
+            href="/admin-dashboard/prospects"
+            className="mt-4 inline-block text-sm font-medium text-amber-950 underline"
+          >
+            ← Back to Prospects
+          </Link>
+        </div>
+      );
+    }
+
+    let quoteAmounts = {};
+    let quotationLinesByCustomer = {};
+    for (const id of allowedCustomerIds) {
+      quotationLinesByCustomer[String(id)] = { quote_number: null, lines: [] };
+    }
+
+    const customerToQuote = new Map();
+    const allowedSet = new Set(allowedCustomerIds.map(String));
+    if (quoteNumbersParam.length > 0 && quoteNumbersParam.length === customerIds.length) {
+      customerIds.forEach((cid, idx) => {
+        if (allowedSet.has(String(cid)) && quoteNumbersParam[idx]) {
+          customerToQuote.set(String(cid), quoteNumbersParam[idx]);
+        }
+      });
+    } else if (quoteNumberParam) {
+      allowedCustomerIds.forEach((cid) =>
+        customerToQuote.set(String(cid), quoteNumberParam),
+      );
+    }
+
+    if (customerToQuote.size > 0) {
+      const prefillPromises = [...customerToQuote.entries()].map(
+        ([cid, qn]) =>
+          getQuotationPrefillForProspects(conn, qn, [cid], payload),
+      );
+      const prefillResults = await Promise.all(prefillPromises);
+      for (const pre of prefillResults) {
+        Object.assign(quoteAmounts, pre.quoteAmounts);
+        Object.assign(quotationLinesByCustomer, pre.quotationLinesByCustomer);
+      }
+    }
 
     return (
       <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-200 dark:bg-white">
@@ -65,10 +147,25 @@ export default async function NewProspectPage({ searchParams }) {
             <h1 className="text-xl font-semibold text-slate-900">
               Add prospects
             </h1>
+            {customerToQuote.size > 0 ? (
+              <p className="mt-2 text-xs font-medium text-slate-700">
+                Lines and amounts use selected quotation(s) only.
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-amber-700">
+                No quotation selected. Search by quotation number on the Prospects page, select it, then click Add Prospects for pre-filled items.
+              </p>
+            )}
             <p className="mt-1 text-sm text-slate-500">
-              {customerIds.length} customer
-              {customerIds.length === 1 ? "" : "s"} from your selection — fill
-              each row below.
+              {allowedCustomerIds.length} customer
+              {allowedCustomerIds.length === 1 ? "" : "s"} from your selection
+              — fill each row below.
+              {!isProspectsAdminRole(payload.role) &&
+              customerIds.length > allowedCustomerIds.length ? (
+                <span className="mt-1 block text-amber-800">
+                  Some IDs from the link were skipped (not assigned to you).
+                </span>
+              ) : null}
             </p>
             {orderCtx?.order_id ? (
               <p className="mt-2 text-xs text-slate-600">
@@ -96,13 +193,36 @@ export default async function NewProspectPage({ searchParams }) {
         ) : null}
 
         <form action={createProspectsBulk} className="space-y-6">
-          <input type="hidden" name="customer_count" value={customerIds.length} />
-          {customerIds.map((id, i) => {
+          {customerToQuote.size === 1 ? (
+            <input
+              type="hidden"
+              name="prospects_quote_number"
+              value={[...customerToQuote.values()][0] ?? ""}
+            />
+          ) : null}
+          {customerToQuote.size > 1 ? (
+            <input
+              type="hidden"
+              name="prospects_quote_numbers"
+              value={allowedCustomerIds.map((id) => customerToQuote.get(String(id)) ?? "").filter(Boolean).join(",")}
+            />
+          ) : null}
+          <input
+            type="hidden"
+            name="customer_count"
+            value={allowedCustomerIds.length}
+          />
+          {allowedCustomerIds.map((id, i) => {
             const orderLocked =
               orderCtx?.customer_id &&
               String(orderCtx.customer_id) === String(id) &&
               orderCtx.total_amount != null &&
               !Number.isNaN(Number(orderCtx.total_amount));
+
+            const prefillQuoteNumberForCustomer = orderLocked
+              ? orderCtx?.quote_number ?? null
+              : quotationLinesByCustomer[String(id)]?.quote_number ??
+                null;
 
             return (
               <BulkProspectRowClient
@@ -117,6 +237,7 @@ export default async function NewProspectPage({ searchParams }) {
                 }
                 orderLocked={orderLocked}
                 orderCtx={orderLocked ? orderCtx : null}
+                prefillQuoteNumber={prefillQuoteNumberForCustomer}
                 inputClass={inputClass}
                 amountReadOnly={amountReadOnly}
               />
@@ -148,12 +269,22 @@ export default async function NewProspectPage({ searchParams }) {
         amountSource: "order",
       };
     } else {
-      const qMap = await getLatestQuotationGrandTotalsByCustomerIds([cid]);
-      const qv = qMap[cid];
+      let qv = 0;
+      if (orderCtx.quote_number) {
+        const gt = await getGrandTotalForQuotation(
+          conn,
+          orderCtx.quote_number,
+          cid,
+        );
+        if (gt != null) qv = gt;
+      } else {
+        const qMap = await getLatestQuotationGrandTotalsByCustomerIds([cid]);
+        qv = qMap[cid] !== undefined ? Number(qMap[cid]) : 0;
+      }
       singleOrderLock = {
         order_id: orderCtx.order_id,
         customer_id: cid,
-        readonlyAmount: qv !== undefined ? Number(qv) : 0,
+        readonlyAmount: qv,
         amountSource: "quotation",
       };
     }
@@ -189,6 +320,7 @@ export default async function NewProspectPage({ searchParams }) {
         inputClass={inputClass}
         orderLock={singleOrderLock}
         amountReadOnly={amountReadOnly}
+        prefillQuoteNumber={quoteNumberParam || undefined}
       />
     </div>
   );

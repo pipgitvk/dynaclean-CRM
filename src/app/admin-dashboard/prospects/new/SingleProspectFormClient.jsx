@@ -148,6 +148,8 @@ export default function SingleProspectFormClient({
   inputClass,
   orderLock,
   amountReadOnly = false,
+  /** When set (e.g. from ?quote_number=), customer blur loads this quote only, not latest. */
+  prefillQuoteNumber,
 }) {
   const minCommitmentYmd = useMemo(() => getTodayYmdIST(), []);
   const [unitPrice, setUnitPrice] = useState(0);
@@ -179,11 +181,19 @@ export default function SingleProspectFormClient({
       return;
     }
     try {
+      const q =
+        prefillQuoteNumber != null && String(prefillQuoteNumber).trim() !== ""
+          ? `&quote_number=${encodeURIComponent(String(prefillQuoteNumber).trim())}`
+          : "";
       const res = await fetch(
-        `/api/prospects/customer-quotation-total?customer_id=${encodeURIComponent(id)}`,
+        `/api/prospects/customer-quotation-total?customer_id=${encodeURIComponent(id)}${q}`,
       );
-      const data = await res.json();
-      if (data.success && data.grand_total != null) {
+      const data = await res.json().catch(() => ({}));
+      if (
+        res.ok &&
+        data.success &&
+        data.grand_total != null
+      ) {
         setUnitPrice(Number(data.grand_total));
         setQtyStr("");
       } else {
@@ -197,6 +207,13 @@ export default function SingleProspectFormClient({
 
   return (
     <form action={createProspect} className="space-y-4">
+      {prefillQuoteNumber ? (
+        <div className="text-xs text-slate-600">
+          Quotation{" "}
+          <span className="font-mono font-medium">{prefillQuoteNumber}</span>{" "}
+          prefill
+        </div>
+      ) : null}
       <div>
         <label
           htmlFor="customer_id"

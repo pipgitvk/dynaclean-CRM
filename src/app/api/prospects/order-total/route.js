@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import { getOrderProspectAmountContext } from "@/lib/getOrderProspectAmountContext";
 import { canAccessProspectsRole } from "@/lib/prospectAccess";
+import { userMayUseCustomerForProspect } from "@/lib/prospectCustomerAccess";
+import { getDbConnection } from "@/lib/db";
 
 export async function GET(req) {
   try {
@@ -19,7 +21,16 @@ export async function GET(req) {
       });
     }
 
-    const context = await getOrderProspectAmountContext(orderId);
+    let context = await getOrderProspectAmountContext(orderId);
+    if (context?.customer_id) {
+      const conn = await getDbConnection();
+      const ok = await userMayUseCustomerForProspect(
+        conn,
+        context.customer_id,
+        payload,
+      );
+      if (!ok) context = null;
+    }
     return NextResponse.json({ success: true, context });
   } catch (e) {
     console.error("prospects order-total:", e);

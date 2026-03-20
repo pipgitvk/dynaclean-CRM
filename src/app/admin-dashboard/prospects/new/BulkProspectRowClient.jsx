@@ -60,6 +60,7 @@ export default function BulkProspectRowClient({
   initialQuotationLines,
   orderLocked,
   orderCtx,
+  prefillQuoteNumber,
   inputClass,
   amountReadOnly = false,
 }) {
@@ -92,6 +93,12 @@ export default function BulkProspectRowClient({
           Customer ID:{" "}
           <span className="font-mono text-slate-900">{customerId}</span>
         </legend>
+        {prefillQuoteNumber ? (
+          <p className="mt-2 text-xs text-slate-600">
+            Quotation{" "}
+            <span className="font-mono font-medium">{prefillQuoteNumber}</span>
+          </p>
+        ) : null}
         <input type="hidden" name={`customer_id_${i}`} value={customerId} />
         {orderCtx?.order_id ? (
           <input
@@ -227,6 +234,13 @@ export default function BulkProspectRowClient({
       </legend>
       <input type="hidden" name={`customer_id_${i}`} value={customerId} />
       <input type="hidden" name={`line_count_${i}`} value={lines.length} />
+
+      {prefillQuoteNumber ? (
+        <p className="mt-2 text-xs text-slate-600">
+          Quotation{" "}
+          <span className="font-mono font-medium">{prefillQuoteNumber}</span>
+        </p>
+      ) : null}
 
       <div className="mt-4 space-y-3">
         {lines.map((line, j) => {

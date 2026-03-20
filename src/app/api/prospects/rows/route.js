@@ -13,6 +13,10 @@ import {
 function mapRows(data) {
   return (data || []).map((row) => ({
     ...row,
+    quote_number:
+      row.quote_number != null && String(row.quote_number).trim() !== ""
+        ? String(row.quote_number).trim()
+        : null,
     order_id:
       row.order_id != null && String(row.order_id).trim() !== ""
         ? String(row.order_id).trim()
@@ -55,7 +59,7 @@ export async function GET(req) {
     });
 
     let query = `
-      SELECT id, customer_id, order_id, model, qty, amount, commitment_date, notes, created_by, finalized_at
+      SELECT id, customer_id, order_id, quote_number, model, qty, amount, commitment_date, notes, created_by, finalized_at
       FROM prospects
     `;
     query += whereSql;

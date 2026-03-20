@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useMemo } from "react";
+import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import Image from "next/image";
@@ -624,8 +625,16 @@ export default function QuotationViewer({ header, items, customerEmail = "", cus
         </div>
       </div>
 
-      {/* Download Button */}
+      {/* Download & Add prospect */}
       <div className="flex gap-5 items-center justify-end w-full">
+        {header?.customer_id && header?.quote_number ? (
+          <Link
+            href={`/admin-dashboard/prospects/new?customers=${encodeURIComponent(header.customer_id)}&quote_number=${encodeURIComponent(header.quote_number)}`}
+            className="px-4 py-2 bg-slate-800 text-white rounded hover:bg-slate-700 text-sm"
+          >
+            Add as Prospect
+          </Link>
+        ) : null}
         <div className="text-right">
           <button
             onClick={downloadPDF}

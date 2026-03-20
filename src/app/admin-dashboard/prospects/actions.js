@@ -14,6 +14,7 @@ import {
   validateCommitmentDateForCreate,
   canFinalSubmitWithCommitment,
 } from "@/lib/prospectCommitmentRules";
+import { userMayUseCustomerForProspect } from "@/lib/prospectCustomerAccess";
 
 const NOTES_MAX = 4000;
 
@@ -63,6 +64,11 @@ export async function createProspect(formData) {
 
   await ensureProspectsTable();
   const conn = await getDbConnection();
+  const mayUse = await userMayUseCustomerForProspect(conn, customer_id, payload);
+  if (!mayUse) {
+    redirect("/admin-dashboard/prospects/new?error=forbidden_customer");
+  }
+
   await conn.execute(
     `INSERT INTO prospects (customer_id, order_id, model, qty, amount, commitment_date, notes, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -215,14 +221,32 @@ export async function createProspectsBulk(formData) {
     redirect("/admin-dashboard/prospects/new?error=required");
   }
 
+  const formQuoteNumber = String(
+    formData.get("prospects_quote_number") ?? "",
+  ).trim();
+  const formQuoteNumbers = String(
+    formData.get("prospects_quote_numbers") ?? "",
+  ).trim();
+  const quoteNumbersArr = formQuoteNumbers
+    ? formQuoteNumbers.split(",").map((s) => s.trim())
+    : [];
+  const quoteForCustomer = (i) =>
+    (quoteNumbersArr[i] || formQuoteNumber || "").trim() || null;
+
   function redirectCustomers(suffix) {
     const ids = [];
     for (let j = 0; j < customerCount; j++) {
       const id = String(formData.get(`customer_id_${j}`) ?? "").trim();
       if (id) ids.push(id);
     }
+    let quoteQs = "";
+    if (formQuoteNumbers) {
+      quoteQs = `&quote_numbers=${encodeURIComponent(formQuoteNumbers)}`;
+    } else if (formQuoteNumber) {
+      quoteQs = `&quote_number=${encodeURIComponent(formQuoteNumber)}`;
+    }
     redirect(
-      `/admin-dashboard/prospects/new?${suffix}&customers=${encodeURIComponent(ids.join(","))}`,
+      `/admin-dashboard/prospects/new?${suffix}&customers=${encodeURIComponent(ids.join(","))}${quoteQs}`,
     );
   }
 
@@ -286,11 +310,13 @@ export async function createProspectsBulk(formData) {
     }
 
     // One prospect row per customer per submit (all quotation lines merged).
+    const quote_number = quoteForCustomer(i);
     if (lineRows.length === 1) {
       const [only] = lineRows;
       collected.push({
         customer_id,
         order_id: order_id_i,
+        quote_number,
         model: only.model,
         qty: only.qty,
         amount: only.amount,
@@ -305,6 +331,8 @@ export async function createProspectsBulk(formData) {
         .join(" · ");
       collected.push({
         customer_id,
+        order_id: order_id_i,
+        quote_number,
         model: modelDisplay,
         qty: totalQty,
         amount: totalAmount,
@@ -321,14 +349,25 @@ export async function createProspectsBulk(formData) {
   const connection = await pool.getConnection();
 
   try {
+    for (const r of collected) {
+      const ok = await userMayUseCustomerForProspect(
+        connection,
+        r.customer_id,
+        payload,
+      );
+      if (!ok) {
+        redirectCustomers("error=forbidden_customer");
+      }
+    }
     await connection.beginTransaction();
     for (const r of collected) {
       await connection.execute(
-        `INSERT INTO prospects (customer_id, order_id, model, qty, amount, commitment_date, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO prospects (customer_id, order_id, quote_number, model, qty, amount, commitment_date, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           r.customer_id,
           r.order_id ?? null,
+          r.quote_number ?? null,
           r.model,
           r.qty,
           r.amount,
@@ -342,8 +381,11 @@ export async function createProspectsBulk(formData) {
   } catch {
     await connection.rollback();
     const ids = collected.map((r) => r.customer_id).join(",");
+    const quoteQs = formQuoteNumber
+      ? `&quote_number=${encodeURIComponent(formQuoteNumber)}`
+      : "";
     redirect(
-      `/admin-dashboard/prospects/new?error=db&customers=${encodeURIComponent(ids)}`,
+      `/admin-dashboard/prospects/new?error=db&customers=${encodeURIComponent(ids)}${quoteQs}`,
     );
   } finally {
     connection.release();

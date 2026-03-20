@@ -6,7 +6,10 @@ import {
   isProspectsAdminRole,
 } from "@/lib/prospectAccess";
 import ProspectsListCard from "./ProspectsListCard";
-import { parseCustomerIdsParam } from "@/lib/prospectFilterUtils";
+import {
+  parseCustomerIdsParam,
+  parseQuoteNumbersParam,
+} from "@/lib/prospectFilterUtils";
 import { buildProspectsListWhereClause } from "@/lib/prospectListQuery";
 import {
   enrichProspectRowsWithPaymentStatus,
@@ -30,6 +33,9 @@ export default async function ProspectsPage({ searchParams }) {
   const customerIds = parseCustomerIdsParam(
     String(resolved?.customers ?? ""),
   );
+  const quoteNumbers = parseQuoteNumbersParam(
+    String(resolved?.quote_numbers ?? ""),
+  );
   const like = searchRaw ? `%${searchRaw}%` : null;
 
   let rows = [];
@@ -47,7 +53,7 @@ export default async function ProspectsPage({ searchParams }) {
     });
 
     let query = `
-      SELECT id, customer_id, order_id, model, qty, amount, commitment_date, notes, created_by, finalized_at
+      SELECT id, customer_id, order_id, quote_number, model, qty, amount, commitment_date, notes, created_by, finalized_at
       FROM prospects
     `;
     query += whereSql;
@@ -68,6 +74,10 @@ export default async function ProspectsPage({ searchParams }) {
   const serializableRows = (rows || []).map((row) => ({
     id: row.id,
     customer_id: row.customer_id,
+    quote_number:
+      row.quote_number != null && String(row.quote_number).trim() !== ""
+        ? String(row.quote_number).trim()
+        : null,
     order_id:
       row.order_id != null && String(row.order_id).trim() !== ""
         ? String(row.order_id).trim()
@@ -100,6 +110,7 @@ export default async function ProspectsPage({ searchParams }) {
         initialRows={serializableRows}
         initialSearch={searchRaw}
         initialCustomerIds={customerIds}
+        initialQuoteNumbers={quoteNumbers}
         loadError={loadError}
         viewerUsername={viewerUsername}
         viewerIsAdmin={viewerIsAdmin}

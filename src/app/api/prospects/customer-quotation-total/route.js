@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canAccessProspectsRole } from "@/lib/prospectAccess";
+import { userMayUseCustomerForProspect } from "@/lib/prospectCustomerAccess";
 
 export async function GET(req) {
   try {
@@ -12,6 +13,7 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const customerId = String(searchParams.get("customer_id") ?? "").trim();
+    const quoteNumber = String(searchParams.get("quote_number") ?? "").trim();
     if (!customerId) {
       return NextResponse.json({
         success: true,
@@ -21,14 +23,44 @@ export async function GET(req) {
     }
 
     const conn = await getDbConnection();
-    const [rows] = await conn.execute(
-      `SELECT quote_number, grand_total
-       FROM quotations_records
-       WHERE customer_id = ?
-       ORDER BY quote_date DESC, created_at DESC
-       LIMIT 1`,
-      [customerId],
+    const allowed = await userMayUseCustomerForProspect(
+      conn,
+      customerId,
+      payload,
     );
+    if (!allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "not_allowed",
+          grand_total: null,
+          quote_number: null,
+        },
+        { status: 403 },
+      );
+    }
+
+    let rows;
+    if (quoteNumber) {
+      [rows] = await conn.execute(
+        `SELECT quote_number, grand_total
+         FROM quotations_records
+         WHERE customer_id = ?
+           AND (TRIM(quote_number) = TRIM(?)
+             OR UPPER(TRIM(quote_number)) = UPPER(TRIM(?)))
+         LIMIT 1`,
+        [customerId, quoteNumber, quoteNumber],
+      );
+    } else {
+      [rows] = await conn.execute(
+        `SELECT quote_number, grand_total
+         FROM quotations_records
+         WHERE customer_id = ?
+         ORDER BY quote_date DESC, created_at DESC
+         LIMIT 1`,
+        [customerId],
+      );
+    }
 
     const row = rows?.[0];
     if (!row) {

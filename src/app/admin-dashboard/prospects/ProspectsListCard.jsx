@@ -7,8 +7,8 @@ import { Eye, Pencil, Trash2 } from "lucide-react";
 import ProspectsSearchBar from "./ProspectsSearchBar";
 import { deleteProspect } from "./actions";
 import {
-  buildProspectsPageUrl,
   buildProspectsRowsApiUrl,
+  extractQuoteNumberFromProspectSearch,
 } from "@/lib/prospectFilterUtils";
 
 function formatAmount(value) {
@@ -88,8 +88,11 @@ function ModelCodesChips({ rowId, model }) {
 }
 
 function formatSuggestionSubtitle(s) {
-  const name = [s.first_name, s.last_name].filter(Boolean).join(" ").trim();
+  const name =
+    s.client_name ||
+    [s.first_name, s.last_name].filter(Boolean).join(" ").trim();
   const parts = [];
+  if (s.quote_number) parts.push(s.quote_number);
   if (name) parts.push(name);
   if (s.phone) parts.push(s.phone);
   return parts.length ? parts.join(" · ") : "";
@@ -101,10 +104,19 @@ function canDeleteProspectRow(row, viewerIsAdmin, viewerUsername) {
   return String(row.created_by) === viewerUsername;
 }
 
+function buildSelectedFromIdsAndQuotes(customerIds, quoteNumbers = []) {
+  return customerIds.map((id, idx) => ({
+    customer_id: id,
+    subtitle: "",
+    quote_number: quoteNumbers[idx] || undefined,
+  }));
+}
+
 export default function ProspectsListCard({
   initialRows = [],
   initialSearch = "",
   initialCustomerIds = [],
+  initialQuoteNumbers = [],
   loadError = null,
   viewerUsername = "",
   viewerIsAdmin = false,
@@ -114,10 +126,7 @@ export default function ProspectsListCard({
   const [rows, setRows] = useState(initialRows);
   const [searchText, setSearchText] = useState(initialSearch);
   const [selectedCustomers, setSelectedCustomers] = useState(() =>
-    initialCustomerIds.map((id) => ({
-      customer_id: id,
-      subtitle: "",
-    })),
+    buildSelectedFromIdsAndQuotes(initialCustomerIds, initialQuoteNumbers),
   );
   const [tableLoading, setTableLoading] = useState(false);
 
@@ -126,21 +135,18 @@ export default function ProspectsListCard({
   const selectedRef = useRef(selectedCustomers);
   selectedRef.current = selectedCustomers;
 
-  const syncKey = `${initialCustomerIds.join("|")}__${initialSearch}`;
+  const syncKey = `${initialCustomerIds.join("|")}__${initialQuoteNumbers.join("|")}__${initialSearch}`;
 
   useEffect(() => {
     setRows(initialRows);
     setSearchText(initialSearch);
     setSelectedCustomers(
-      initialCustomerIds.map((id) => ({
-        customer_id: id,
-        subtitle: "",
-      })),
+      buildSelectedFromIdsAndQuotes(initialCustomerIds, initialQuoteNumbers),
     );
-  }, [initialRows, syncKey, initialCustomerIds, initialSearch]);
+  }, [initialRows, syncKey, initialCustomerIds, initialQuoteNumbers, initialSearch]);
 
   const refreshRows = useCallback(
-    async (customerIds, text) => {
+    async (customerIds, text, quoteNums = []) => {
       setTableLoading(true);
       try {
         const url = buildProspectsRowsApiUrl(customerIds, text);
@@ -149,30 +155,42 @@ export default function ProspectsListCard({
         if (data.success && Array.isArray(data.rows)) {
           setRows(data.rows);
         }
-        router.replace(buildProspectsPageUrl(customerIds, text));
       } catch {
         /* keep rows */
       } finally {
         setTableLoading(false);
       }
     },
-    [router],
+    [],
   );
 
   const addSuggestion = useCallback((s) => {
     setSelectedCustomers((prev) => {
-      if (prev.some((p) => p.customer_id === s.customer_id)) return prev;
+      const qn = s.quote_number ?? extractQuoteNumberFromProspectSearch(searchTextRef.current);
+      if (
+        prev.some(
+          (p) =>
+            p.customer_id === s.customer_id &&
+            (p.quote_number || null) === (qn || null),
+        )
+      )
+        return prev;
+      // If the dropdown item doesn't contain quote_number, try to recover it
+      // from the current search text (e.g. user typed QUOTE... and selected a customer).
+      const quoteNumber = qn ?? undefined;
       const next = [
         ...prev,
         {
           customer_id: s.customer_id,
           subtitle: formatSuggestionSubtitle(s),
+          quote_number: quoteNumber,
         },
       ];
       queueMicrotask(() =>
         refreshRows(
           next.map((x) => x.customer_id),
           searchTextRef.current,
+          next.map((x) => x.quote_number ?? ""),
         ),
       );
       return next;
@@ -180,13 +198,20 @@ export default function ProspectsListCard({
   }, [refreshRows]);
 
   const removeCustomer = useCallback(
-    (customerId) => {
+    (customerId, quoteNumber) => {
       setSelectedCustomers((prev) => {
-        const next = prev.filter((p) => p.customer_id !== customerId);
+        const next =
+          quoteNumber != null
+            ? prev.filter(
+                (p) =>
+                  !(p.customer_id === customerId && p.quote_number === quoteNumber),
+              )
+            : prev.filter((p) => p.customer_id !== customerId);
         queueMicrotask(() =>
           refreshRows(
             next.map((x) => x.customer_id),
             searchTextRef.current,
+            next.map((x) => x.quote_number ?? ""),
           ),
         );
         return next;
@@ -197,9 +222,11 @@ export default function ProspectsListCard({
 
   const submitSearch = useCallback(() => {
     const text = searchTextRef.current.trim();
+    const sel = selectedRef.current;
     void refreshRows(
-      selectedRef.current.map((c) => c.customer_id),
+      sel.map((c) => c.customer_id),
       text,
+      sel.map((c) => c.quote_number ?? ""),
     );
   }, [refreshRows]);
 
@@ -212,9 +239,11 @@ export default function ProspectsListCard({
           window.alert(res?.error || "Could not delete.");
           return;
         }
+        const sel = selectedRef.current;
         await refreshRows(
-          selectedRef.current.map((c) => c.customer_id),
+          sel.map((c) => c.customer_id),
           searchTextRef.current.trim(),
+          sel.map((c) => c.quote_number ?? ""),
         );
         router.refresh();
       });
@@ -245,6 +274,7 @@ export default function ProspectsListCard({
 
   const tableHeaders = [
     "Customer_id",
+    "Quotation",
     "Model",
     "Qty",
     "Total amount",
@@ -277,10 +307,26 @@ export default function ProspectsListCard({
               );
               return;
             }
-            const q = encodeURIComponent(
-              selectedCustomers.map((c) => c.customer_id).join(","),
+            const customerIds = selectedCustomers.map((c) => c.customer_id);
+            const quoteNums = selectedCustomers
+              .map((c) => c.quote_number)
+              .filter(Boolean)
+              .map(String);
+            const fromSearch = extractQuoteNumberFromProspectSearch(
+              searchTextRef.current,
             );
-            router.push(`/admin-dashboard/prospects/new?customers=${q}`);
+            const q = encodeURIComponent(customerIds.join(","));
+            let quoteQs = "";
+            if (quoteNums.length === customerIds.length) {
+              quoteQs = `&quote_numbers=${encodeURIComponent(quoteNums.join(","))}`;
+            } else if (quoteNums.length === 1) {
+              quoteQs = `&quote_number=${encodeURIComponent(quoteNums[0])}`;
+            } else if (fromSearch) {
+              quoteQs = `&quote_number=${encodeURIComponent(fromSearch)}`;
+            }
+            router.push(
+              `/admin-dashboard/prospects/new?customers=${q}${quoteQs}`,
+            );
           }}
           className="inline-flex h-10 items-center justify-center rounded-[10px] bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
         >
@@ -338,6 +384,9 @@ export default function ProspectsListCard({
                   >
                     <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
                       {row.customer_id}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-slate-700">
+                      {row.quote_number || "—"}
                     </td>
                     <td
                       className="min-w-[14rem] max-w-xl px-4 py-3 align-top text-slate-800"

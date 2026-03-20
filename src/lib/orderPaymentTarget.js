@@ -189,10 +189,72 @@ function prospectRowAmount(row) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+function prospectQuotePairKey(customerId, quoteNumber) {
+  const cid = String(customerId ?? "").trim();
+  const qn = String(quoteNumber ?? "").trim();
+  if (!cid || !qn) return null;
+  return `${cid}|${qn}`;
+}
+
+/**
+ * Payment context for orders created from specific quotations (neworder.quote_number ↔ quotations_records).
+ * One entry per (customer_id, quote_number); prefers latest order by created_at when duplicates exist.
+ * @param {import("mysql2/promise").PoolConnection} conn
+ * @param {Array<{ customer_id: string, quote_number: string }>} pairs
+ * @returns {Promise<Record<string, { payment_status: string | null, payment_date: string | null }>>}
+ */
+export async function getOrderPaymentContextMapByQuotePairs(conn, pairs) {
+  const seen = new Set();
+  const uniquePairs = [];
+  for (const p of pairs || []) {
+    const cid = String(p.customer_id ?? "").trim();
+    const qn = String(p.quote_number ?? "").trim();
+    if (!cid || !qn) continue;
+    const k = `${cid}|${qn}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    uniquePairs.push({ customer_id: cid, quote_number: qn });
+  }
+  if (!uniquePairs.length) return {};
+
+  const quoteNums = [...new Set(uniquePairs.map((p) => p.quote_number))];
+  const ph = quoteNums.map(() => "?").join(",");
+  const [rows] = await conn.execute(
+    `SELECT no.payment_status, no.payment_date,
+            TRIM(qr.customer_id) AS qr_customer_id,
+            TRIM(qr.quote_number) AS qr_quote_number,
+            no.created_at
+     FROM neworder no
+     INNER JOIN quotations_records qr
+       ON TRIM(no.quote_number) = TRIM(qr.quote_number)
+          OR UPPER(TRIM(no.quote_number)) = UPPER(TRIM(qr.quote_number))
+     WHERE TRIM(no.quote_number) IN (${ph})
+     ORDER BY no.created_at DESC`,
+    quoteNums,
+  );
+
+  /** @type {Record<string, ReturnType<typeof normalizePaymentCtx>>} */
+  const out = {};
+  for (const r of rows || []) {
+    const cid = String(r.qr_customer_id ?? "").trim();
+    const qn = String(r.qr_quote_number ?? "").trim();
+    const key = prospectQuotePairKey(cid, qn);
+    if (!key || out[key]) continue;
+    const ctxVal = normalizePaymentCtx(r);
+    out[key] = ctxVal;
+    const keyUpper = prospectQuotePairKey(cid, qn.toUpperCase());
+    if (keyUpper && keyUpper !== key && !out[keyUpper]) {
+      out[keyUpper] = ctxVal;
+    }
+  }
+  return out;
+}
+
 /**
  * Attaches order_payment_target to each prospect row (does not remove other fields).
+ * Resolution order: explicit order_id → order from same quotation (quote_number) → amount / latest order for customer.
  * @param {import("mysql2/promise").PoolConnection} conn
- * @param {object[]} rows — raw DB or mapped rows with customer_id, optional order_id, amount, commitment_date
+ * @param {object[]} rows — raw DB or mapped rows with customer_id, optional order_id, quote_number, amount, commitment_date
  */
 export async function enrichProspectRowsWithPaymentStatus(conn, rows) {
   const list = rows || [];
@@ -204,6 +266,19 @@ export async function enrichProspectRowsWithPaymentStatus(conn, rows) {
     ),
   ];
   const orderMap = await getOrderPaymentContextMapByOrderIds(conn, orderIds);
+
+  const quotePairs = list
+    .filter((r) => !String(r.order_id ?? "").trim())
+    .map((r) => ({
+      customer_id: String(r.customer_id ?? "").trim(),
+      quote_number: String(r.quote_number ?? "").trim(),
+    }))
+    .filter((p) => p.customer_id && p.quote_number);
+
+  const quoteOrderMap = await getOrderPaymentContextMapByQuotePairs(
+    conn,
+    quotePairs,
+  );
 
   const fallbackCustomerIds = [
     ...new Set(
@@ -226,10 +301,21 @@ export async function enrichProspectRowsWithPaymentStatus(conn, rows) {
       ctx = orderMap[oid] ?? null;
     } else {
       const cid = String(row.customer_id ?? "").trim();
-      ctx = pickPaymentContextFromCustomerOrders(
-        byCustomer[cid],
-        prospectRowAmount(row),
-      );
+      const qn = String(row.quote_number ?? "").trim();
+      let qKey = prospectQuotePairKey(cid, qn);
+      if (qKey) {
+        ctx = quoteOrderMap[qKey] ?? null;
+        if (!ctx) {
+          qKey = prospectQuotePairKey(cid, qn.toUpperCase());
+          if (qKey) ctx = quoteOrderMap[qKey] ?? null;
+        }
+      }
+      if (!ctx) {
+        ctx = pickPaymentContextFromCustomerOrders(
+          byCustomer[cid],
+          prospectRowAmount(row),
+        );
+      }
     }
     const order_payment_target = ctx
       ? getProspectStatusFromOrderAndCommitment(ctx, commitmentYmd)
