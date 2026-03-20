@@ -53,7 +53,7 @@ export default async function ProspectsPage({ searchParams }) {
     });
 
     let query = `
-      SELECT id, customer_id, order_id, quote_number, model, qty, amount, commitment_date, notes, created_by, finalized_at
+      SELECT id, customer_id, order_id, quote_number, status, model, qty, amount, commitment_date, notes, created_by, finalized_at
       FROM prospects
     `;
     query += whereSql;
@@ -74,6 +74,10 @@ export default async function ProspectsPage({ searchParams }) {
   const serializableRows = (rows || []).map((row) => ({
     id: row.id,
     customer_id: row.customer_id,
+    status:
+      row.status != null && String(row.status).trim() !== ""
+        ? String(row.status).trim()
+        : "open",
     quote_number:
       row.quote_number != null && String(row.quote_number).trim() !== ""
         ? String(row.quote_number).trim()
@@ -101,8 +105,8 @@ export default async function ProspectsPage({ searchParams }) {
   const viewerIsAdmin = isProspectsAdminRole(payload.role);
 
   return (
-    <div className="mx-auto w-full max-w-screen-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-200 dark:bg-white">
-      <h1 className="mb-6 text-2xl font-semibold tracking-tight text-slate-900">
+    <div className="mx-auto w-full max-w-screen-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:p-8 dark:border-slate-200 dark:bg-white">
+      <h1 className="mb-4 text-xl font-semibold tracking-tight text-slate-900 sm:mb-6 sm:text-2xl">
         Prospects
       </h1>
 

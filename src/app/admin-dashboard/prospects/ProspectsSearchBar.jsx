@@ -145,162 +145,182 @@ export default function ProspectsSearchBar({
   return (
     <form
       onSubmit={handleFormSubmit}
-      className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start"
+      className="mb-4 flex flex-col gap-4"
     >
-      <div ref={rootRef} className="relative min-w-0 flex-1">
-        <Search
-          className="pointer-events-none absolute left-3.5 top-[13px] z-[1] h-[18px] w-[18px] text-slate-400"
-          strokeWidth={1.75}
-          aria-hidden
-        />
-        <input
-          type="search"
-          value={searchText}
-          onChange={(e) => {
-            onSearchTextChange?.(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => {
-            if (suggestions.length > 0) setOpen(true);
-          }}
-          onKeyDown={onKeyDown}
-          placeholder="Search by quotation number (e.g. QUOTE20260320011) — add multiple"
-          autoComplete="off"
-          aria-autocomplete="list"
-          aria-expanded={open}
-          className="h-11 w-full rounded-[10px] border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 shadow-none outline-none ring-0 placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/90"
-        />
-        {loading ? (
-          <span className="pointer-events-none absolute right-3 top-[13px] text-xs text-slate-400">
-            …
-          </span>
-        ) : null}
-        {open && suggestions.length > 0 ? (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto rounded-[10px] border border-slate-200 bg-white shadow-lg">
-            <table className="w-full text-left text-sm">
-              <thead className="sticky top-0 bg-slate-50">
-                <tr>
-                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    Quotation ID
-                  </th>
-                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    Client Name
-                  </th>
-                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    Email
-                  </th>
-                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    Phone
-                  </th>
-                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    Date
-                  </th>
-                  <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {suggestions.map((s, i) => {
-                  const key = s.quote_number
-                    ? `${s.customer_id}:${s.quote_number}`
-                    : s.customer_id;
-                  const taken = selectedKeys.has(key);
-                  return (
-                    <tr
-                      key={key}
-                      role="option"
-                      aria-selected={i === highlight}
-                      className={`cursor-pointer border-t border-slate-100 ${
-                        taken
-                          ? "bg-slate-50 text-slate-400"
-                          : i === highlight
-                            ? "bg-slate-100"
-                            : "hover:bg-slate-50"
-                      } ${taken ? "cursor-not-allowed" : ""}`}
-                      onMouseEnter={() => setHighlight(i)}
-                      onClick={() => !taken && pickSuggestion(s)}
-                    >
-                      <td className="px-4 py-2.5 font-medium text-slate-900">
-                        {s.quote_number || "—"}
-                        {taken ? (
-                          <span className="ml-1.5 text-xs font-normal text-emerald-600">
-                            (added)
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-700">
-                        {s.client_name || "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-700">
-                        {s.email || "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-700">
-                        {s.phone || "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-700">
-                        {formatDate(s.quote_date)}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-700">
-                        {formatTotal(s.grand_total)}
-                      </td>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div ref={rootRef} className="min-w-0 flex-1 space-y-2">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 z-[1] h-[18px] w-[18px] -translate-y-1/2 text-slate-400"
+              strokeWidth={1.75}
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={searchText}
+              onChange={(e) => {
+                onSearchTextChange?.(e.target.value);
+                setOpen(true);
+              }}
+              onFocus={() => {
+                if (suggestions.length > 0) setOpen(true);
+              }}
+              onKeyDown={onKeyDown}
+              placeholder="Search quotation (e.g. QUOTE20260320011) — add multiple"
+              autoComplete="off"
+              aria-autocomplete="list"
+              aria-expanded={open}
+              className="h-11 w-full rounded-[10px] border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 shadow-none outline-none ring-0 placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/90"
+            />
+            {loading ? (
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+                …
+              </span>
+            ) : null}
+          </div>
+          {open && suggestions.length > 0 ? (
+            <div
+              className="max-h-[min(22rem,50vh)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md ring-1 ring-slate-900/5"
+              role="listbox"
+            >
+              <div className="overflow-x-auto overscroll-x-contain">
+                <table className="w-full min-w-[36rem] text-left text-sm">
+                  <thead className="sticky top-0 z-[1] bg-slate-50 shadow-sm">
+                    <tr>
+                      <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                        Quotation ID
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                        Client
+                      </th>
+                      <th className="hidden px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:table-cell sm:px-3 sm:text-xs">
+                        Email
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                        Phone
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                        Date
+                      </th>
+                      <th className="whitespace-nowrap px-2 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                        Total
+                      </th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-
-        {selectedCustomers.length > 0 ? (
-          <div className="mt-3 rounded-[10px] border border-slate-200 bg-slate-50/80 p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {selectedCustomers.some((c) => c.quote_number)
-                ? `Selected quotations (${selectedCustomers.length})`
-                : `Selected (${selectedCustomers.length})`}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {selectedCustomers.map((c) => {
-                const key = c.quote_number
-                  ? `${c.customer_id}:${c.quote_number}`
-                  : c.customer_id;
-                const primaryLabel = c.quote_number
-                  ? c.quote_number
-                  : `Customer ${c.customer_id}`;
-                return (
-                  <span
-                    key={key}
-                    className="inline-flex max-w-full items-center gap-1 rounded-lg border border-slate-200 bg-white py-1 pl-2.5 pr-1 text-xs text-slate-800 shadow-sm"
-                  >
-                    <span className="min-w-0 truncate">
-                      <span className="font-semibold">{primaryLabel}</span>
-                      {c.subtitle ? (
-                        <span className="text-slate-500"> — {c.subtitle}</span>
-                      ) : null}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onRemoveCustomer?.(c.customer_id, c.quote_number)
-                      }
-                      className="shrink-0 rounded p-0.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
-                      aria-label={`Remove ${c.quote_number || c.customer_id}`}
-                    >
-                      <X className="h-3.5 w-3.5" strokeWidth={2} />
-                    </button>
-                  </span>
-                );
-              })}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {suggestions.map((s, i) => {
+                      const key = s.quote_number
+                        ? `${s.customer_id}:${s.quote_number}`
+                        : s.customer_id;
+                      const taken = selectedKeys.has(key);
+                      return (
+                        <tr
+                          key={key}
+                          role="option"
+                          aria-selected={i === highlight}
+                          className={`cursor-pointer ${
+                            taken
+                              ? "bg-slate-50 text-slate-400"
+                              : i === highlight
+                                ? "bg-slate-100"
+                                : "hover:bg-slate-50"
+                          } ${taken ? "cursor-not-allowed" : ""}`}
+                          onMouseEnter={() => setHighlight(i)}
+                          onClick={() => !taken && pickSuggestion(s)}
+                        >
+                          <td className="max-w-[10rem] px-2 py-2 align-top font-medium text-slate-900 sm:max-w-none sm:px-3 sm:py-2.5">
+                            <span className="break-all font-mono text-xs sm:text-sm">
+                              {s.quote_number || "—"}
+                            </span>
+                            {taken ? (
+                              <span className="ml-1 block text-[10px] font-normal text-emerald-600 sm:inline sm:ml-1.5 sm:text-xs">
+                                (added)
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="max-w-[8rem] px-2 py-2 align-top text-slate-700 sm:max-w-none sm:px-3 sm:py-2.5">
+                            <span className="line-clamp-2 text-xs sm:text-sm">
+                              {s.client_name || "—"}
+                            </span>
+                          </td>
+                          <td className="hidden max-w-[12rem] px-2 py-2 align-top text-slate-700 sm:table-cell sm:px-3 sm:py-2.5">
+                            <span className="line-clamp-2 break-all text-xs sm:text-sm">
+                              {s.email || "—"}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-slate-700 sm:px-3 sm:py-2.5 sm:text-sm">
+                            {s.phone || "—"}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 align-top text-xs text-slate-700 sm:px-3 sm:py-2.5 sm:text-sm">
+                            {formatDate(s.quote_date)}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 text-right align-top text-xs text-slate-700 sm:px-3 sm:py-2.5 sm:text-sm">
+                            {formatTotal(s.grand_total)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
+        <button
+          type="submit"
+          className="h-11 w-full shrink-0 rounded-[10px] border border-slate-200 bg-white px-5 text-sm font-medium text-slate-600 shadow-none transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200/90 sm:mt-0 sm:w-auto sm:min-w-[6.5rem]"
+        >
+          Search
+        </button>
       </div>
-      <button
-        type="submit"
-        className="h-11 shrink-0 rounded-[10px] border border-slate-200 bg-white px-5 text-sm font-medium text-slate-600 shadow-none transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200/90 sm:mt-0"
-      >
-        Search
-      </button>
+
+      {selectedCustomers.length > 0 ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {selectedCustomers.some((c) => c.quote_number)
+              ? `Selected quotations (${selectedCustomers.length})`
+              : `Selected (${selectedCustomers.length})`}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {selectedCustomers.map((c) => {
+              const key = c.quote_number
+                ? `${c.customer_id}:${c.quote_number}`
+                : c.customer_id;
+              const primaryLabel = c.quote_number
+                ? c.quote_number
+                : `Customer ${c.customer_id}`;
+              return (
+                <span
+                  key={key}
+                  className="inline-flex max-w-full items-start gap-1 rounded-lg border border-slate-200 bg-white py-1.5 pl-2.5 pr-1 text-xs text-slate-800 shadow-sm sm:items-center"
+                >
+                  <span className="min-w-0 break-words">
+                    <span className="font-semibold">{primaryLabel}</span>
+                    {c.subtitle ? (
+                      <>
+                        <span className="hidden sm:inline"> — </span>
+                        <span className="block text-slate-500 sm:inline">
+                          {c.subtitle}
+                        </span>
+                      </>
+                    ) : null}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onRemoveCustomer?.(c.customer_id, c.quote_number)
+                    }
+                    className="shrink-0 rounded p-0.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                    aria-label={`Remove ${c.quote_number || c.customer_id}`}
+                  >
+                    <X className="h-3.5 w-3.5" strokeWidth={2} />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }

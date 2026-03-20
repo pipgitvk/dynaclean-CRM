@@ -89,4 +89,11 @@ export async function ensureProspectsTable() {
   } catch (e) {
     if (e?.errno !== 1061) throw e;
   }
+  try {
+    await conn.execute(
+      `ALTER TABLE prospects ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'open'`,
+    );
+  } catch (e) {
+    if (e?.errno !== 1060) throw e;
+  }
 }

@@ -297,7 +297,7 @@ export default function ProspectsListCard({
         onSubmitSearch={submitSearch}
       />
 
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
         <button
           type="button"
           onClick={() => {
@@ -328,7 +328,7 @@ export default function ProspectsListCard({
               `/admin-dashboard/prospects/new?customers=${q}${quoteQs}`,
             );
           }}
-          className="inline-flex h-10 items-center justify-center rounded-[10px] bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+          className="inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 sm:w-auto"
         >
           Add Prospects
         </button>
@@ -340,15 +340,15 @@ export default function ProspectsListCard({
             Loading…
           </div>
         ) : null}
-        <div className="overflow-x-auto">
-          <table className="min-w-[56rem] w-full divide-y divide-slate-200 text-sm">
+        <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+          <table className="min-w-[52rem] w-full divide-y divide-slate-200 text-sm sm:min-w-[56rem]">
             <thead className="bg-slate-50">
               <tr>
                 {tableHeaders.map((h) => (
                   <th
                     key={h}
                     scope="col"
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600"
+                    className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-4 sm:py-3 sm:text-xs"
                   >
                     {h}
                   </th>
@@ -360,7 +360,7 @@ export default function ProspectsListCard({
                 <tr>
                   <td
                     colSpan={tableColSpan}
-                    className="px-4 py-12 text-center text-slate-500"
+                    className="px-3 py-10 text-center text-sm text-slate-500 sm:px-4 sm:py-12"
                   >
                     {hasFilter
                       ? "No prospects match this filter."
@@ -382,34 +382,34 @@ export default function ProspectsListCard({
                     key={row.id}
                     className="bg-white hover:bg-slate-50/80"
                   >
-                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
+                    <td className="whitespace-nowrap px-2 py-2.5 font-medium text-slate-900 sm:px-4 sm:py-3">
                       {row.customer_id}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 font-mono text-sm text-slate-700">
+                    <td className="max-w-[9rem] whitespace-nowrap px-2 py-2.5 font-mono text-xs text-slate-700 sm:max-w-none sm:px-4 sm:py-3 sm:text-sm">
                       {row.quote_number || "—"}
                     </td>
                     <td
-                      className="min-w-[14rem] max-w-xl px-4 py-3 align-top text-slate-800"
+                      className="min-w-[10rem] max-w-xl px-2 py-2.5 align-top text-slate-800 sm:min-w-[14rem] sm:px-4 sm:py-3"
                       title={row.model ? String(row.model) : undefined}
                     >
                       <ModelCodesChips rowId={row.id} model={row.model} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-800">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-slate-800 sm:px-4 sm:py-3">
                       {row.qty}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-800">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-xs text-slate-800 sm:px-4 sm:py-3 sm:text-sm">
                       {formatAmount(row.amount)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-800">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-xs text-slate-800 sm:px-4 sm:py-3 sm:text-sm">
                       {formatDate(row.commitment_date)}
                     </td>
                     <td
-                      className="min-w-[10rem] max-w-md px-4 py-3 text-slate-700"
+                      className="min-w-[8rem] max-w-md px-2 py-2.5 text-slate-700 sm:min-w-[10rem] sm:px-4 sm:py-3"
                       title={row.notes ? String(row.notes) : undefined}
                     >
-                      {formatNotesPreview(row.notes)}
+                      {formatNotesPreview(row.notes, 48)}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3">
+                    <td className="whitespace-nowrap px-2 py-2.5 sm:px-4 sm:py-3">
                       {row.order_payment_target?.label ? (
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${row.order_payment_target.cls}`}
@@ -423,7 +423,7 @@ export default function ProspectsListCard({
                     </td>
                     {viewerIsAdmin ? (
                       <td
-                        className="max-w-[10rem] truncate px-4 py-3 text-slate-600"
+                        className="max-w-[6rem] truncate px-2 py-2.5 text-slate-600 sm:max-w-[10rem] sm:px-4 sm:py-3"
                         title={
                           row.created_by
                             ? String(row.created_by)
@@ -439,8 +439,8 @@ export default function ProspectsListCard({
                         )}
                       </td>
                     ) : null}
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex items-center gap-1.5">
+                    <td className="whitespace-nowrap px-2 py-2.5 sm:px-4 sm:py-3">
+                      <div className="flex items-center gap-1 sm:gap-1.5">
                         {canEdit ? (
                           <Link
                             href={`/admin-dashboard/prospects/${row.id}/edit`}

@@ -251,7 +251,28 @@ export async function getOrderPaymentContextMapByQuotePairs(conn, pairs) {
 }
 
 /**
+ * Writes computed payment-target label to prospects.status (achieved | pending | not-achieved | open).
+ * Skips UPDATE when value unchanged to limit writes.
+ * @param {import("mysql2/promise").PoolConnection} conn
+ * @param {object[]} enrichedRows — rows with id and status
+ */
+export async function persistProspectPaymentStatusesToDb(conn, enrichedRows) {
+  for (const row of enrichedRows || []) {
+    const id = row.id;
+    if (id == null) continue;
+    const idNum = Number(id);
+    if (!Number.isFinite(idNum) || idNum < 1) continue;
+    const status = String(row.status ?? "open").trim() || "open";
+    await conn.execute(
+      `UPDATE prospects SET status = ? WHERE id = ? AND (status IS NULL OR status <> ?)`,
+      [status, idNum, status],
+    );
+  }
+}
+
+/**
  * Attaches order_payment_target to each prospect row (does not remove other fields).
+ * Persists status to prospects.status after compute.
  * Resolution order: explicit order_id → order from same quotation (quote_number) → amount / latest order for customer.
  * @param {import("mysql2/promise").PoolConnection} conn
  * @param {object[]} rows — raw DB or mapped rows with customer_id, optional order_id, quote_number, amount, commitment_date
@@ -293,7 +314,7 @@ export async function enrichProspectRowsWithPaymentStatus(conn, rows) {
     fallbackCustomerIds,
   );
 
-  return list.map((row) => {
+  const enriched = list.map((row) => {
     const commitmentYmd = commitmentValueToYmd(row.commitment_date);
     const oid = String(row.order_id ?? "").trim();
     let ctx = null;
@@ -320,6 +341,10 @@ export async function enrichProspectRowsWithPaymentStatus(conn, rows) {
     const order_payment_target = ctx
       ? getProspectStatusFromOrderAndCommitment(ctx, commitmentYmd)
       : null;
-    return { ...row, order_payment_target };
+    const status = order_payment_target?.label ?? "open";
+    return { ...row, order_payment_target, status };
   });
+
+  await persistProspectPaymentStatusesToDb(conn, enriched);
+  return enriched;
 }
