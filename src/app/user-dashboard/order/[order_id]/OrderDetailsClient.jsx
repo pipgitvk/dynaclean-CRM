@@ -19,6 +19,7 @@ export default function OrderDetailsClient({
   statuses,
   orderId,
   gstin,
+  quoteCustomerId,
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -288,6 +289,24 @@ export default function OrderDetailsClient({
           </div>
         </div>
       )}
+
+      {quoteCustomerId ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+          <p className="mb-2 font-medium text-slate-800">Prospects (admin)</p>
+          <p className="mb-3 text-slate-600">
+            Add this order’s <strong>Total Amount</strong> (from accounts) as a
+            read-only prospect amount on the admin Prospects form.
+          </p>
+          <a
+            href={`/admin-dashboard/prospects/new?order_id=${encodeURIComponent(
+              String(orderId),
+            )}&customers=${encodeURIComponent(String(quoteCustomerId))}`}
+            className="inline-block rounded-md bg-slate-900 px-4 py-2 text-white hover:bg-slate-800"
+          >
+            Add prospect from this order
+          </a>
+        </div>
+      ) : null}
 
       {/* Back Link */}
       <div className="text-center mt-6">

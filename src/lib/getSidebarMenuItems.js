@@ -133,6 +133,12 @@ const allMenuItems = [
     icon: "Receipt",
   },
   {
+    path: "/admin-dashboard/prospects",
+    name: "Prospects",
+    roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
+    icon: "UserPlus",
+  },
+  {
     name: "Tally Payments",
     roles: ["SUPERADMIN", "ACCOUNTANT"],
     icon: "Receipt",
