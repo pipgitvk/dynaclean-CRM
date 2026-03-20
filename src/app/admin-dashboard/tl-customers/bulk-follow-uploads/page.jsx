@@ -5,8 +5,6 @@ import { toast } from "react-hot-toast";
 import { useUser } from "@/context/UserContext";
 import Link from "next/link";
 import { ArrowLeft, Loader2, History, X } from "lucide-react";
-import { resolveToCanonical } from "../../../../lib/productCodeUtils";
-
 const TL_TAG_OPTIONS = [
   "Demo",
   "Prime",
@@ -239,7 +237,6 @@ export default function BulkFollowUploadsPage() {
   const [rawText, setRawText] = useState("");
   const [parsedEntries, setParsedEntries] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [validProductCodes, setValidProductCodes] = useState([]);
   const { user } = useUser();
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -249,13 +246,6 @@ export default function BulkFollowUploadsPage() {
       .then((res) => res.json())
       .then((data) => setEmployees(Array.isArray(data) ? data : []))
       .catch(() => setEmployees([]));
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/products/list")
-      .then((res) => res.json())
-      .then((data) => setValidProductCodes((Array.isArray(data) ? data : []).map((p) => p.item_code).filter(Boolean)))
-      .catch(() => setValidProductCodes([]));
   }, []);
 
   const handleAnalyze = async () => {
@@ -313,36 +303,7 @@ export default function BulkFollowUploadsPage() {
         return { ...entry, model, multi_tag, assigned_employee };
       });
 
-      if (validProductCodes.length > 0) {
-        const codes = validProductCodes;
-        const invalidCodes = [];
-        const normalizedEntries = merged.map((entry) => {
-          const modelStr = String(entry.model || "").trim();
-          if (!modelStr) return { ...entry, model: "" };
-          const parts = modelStr.split(",").map((s) => s.trim()).filter(Boolean);
-          const canonicalParts = [];
-          for (const part of parts) {
-            const resolved = resolveToCanonical(part, codes);
-            if (!resolved) {
-              if (!invalidCodes.includes(part)) invalidCodes.push(part);
-            } else {
-              canonicalParts.push(resolved.canonical);
-            }
-          }
-          return { ...entry, model: canonicalParts.join(", ") };
-        });
-
-        if (invalidCodes.length > 0) {
-          toast.error(
-            `Invalid product code(s): ${invalidCodes.join(", ")}. These codes do not exist in the product list. Please correct and try again.`,
-            { duration: 6000 }
-          );
-          return;
-        }
-        setParsedEntries(normalizedEntries);
-      } else {
-        setParsedEntries(merged);
-      }
+      setParsedEntries(merged);
       toast.success(`Parsed ${results.length} entr${results.length === 1 ? "y" : "ies"}`);
     } finally {
       setAnalyzing(false);
