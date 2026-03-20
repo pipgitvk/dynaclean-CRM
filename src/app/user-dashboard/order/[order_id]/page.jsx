@@ -29,14 +29,16 @@ async function fetchOrderData(orderId) {
 
   const statuses = statusRows[0];
 
-  // Fetch GSTIN from quotations_records using quote_number
+  // Fetch GSTIN + customer_id from quotations_records using quote_number
   let gstin = null;
+  let quoteCustomerId = null;
   try {
     const [quoteRows] = await conn.execute(
-      "SELECT gstin FROM quotations_records WHERE quote_number = ?",
+      "SELECT gstin, customer_id FROM quotations_records WHERE quote_number = ? LIMIT 1",
       [orderDetails.quote_number],
     );
     gstin = quoteRows?.[0]?.gstin || null;
+    quoteCustomerId = quoteRows?.[0]?.customer_id ?? null;
   } catch (_) {
     gstin = null;
   }
@@ -48,6 +50,7 @@ async function fetchOrderData(orderId) {
     items,
     statuses,
     gstin,
+    quoteCustomerId,
   };
 }
 
@@ -56,7 +59,7 @@ export default async function Page({ params }) {
   const orderId = parseInt(order_id);
   if (isNaN(orderId)) notFound();
 
-  const { orderDetails, items, statuses, gstin } =
+  const { orderDetails, items, statuses, gstin, quoteCustomerId } =
     await fetchOrderData(orderId);
 
   if (!orderDetails) {
@@ -94,6 +97,7 @@ export default async function Page({ params }) {
         statuses={statuses}
         orderId={orderId}
         gstin={gstin}
+        quoteCustomerId={quoteCustomerId}
       />
     </div>
   );

@@ -287,6 +287,12 @@ const allMenuItems = [
       },
     ],
   },
+  {
+    path: "/admin-dashboard/prospects",
+    name: "Prospects",
+    roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
+    icon: "UserPlus",
+  },
   // tl management section
   {
     name: "TL Management",
