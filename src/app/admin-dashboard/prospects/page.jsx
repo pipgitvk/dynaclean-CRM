@@ -11,6 +11,7 @@ import {
   parseCustomerIdsParam,
   parseQuoteNumbersParam,
   parseProspectsAdminFiltersFromSearchParams,
+  mergeProspectAdminCalendarDefaults,
 } from "@/lib/prospectFilterUtils";
 import { buildProspectsListWhereClause } from "@/lib/prospectListQuery";
 import {
@@ -41,8 +42,11 @@ export default async function ProspectsPage({ searchParams }) {
   const like = searchRaw ? `%${searchRaw}%` : null;
 
   const viewerIsAdmin = isProspectsAdminRole(payload.role);
-  const adminFilters = viewerIsAdmin
+  const adminFiltersParsed = viewerIsAdmin
     ? parseProspectsAdminFiltersFromSearchParams(resolved)
+    : null;
+  const adminFilters = viewerIsAdmin
+    ? mergeProspectAdminCalendarDefaults(resolved, adminFiltersParsed)
     : null;
 
   let rows = [];

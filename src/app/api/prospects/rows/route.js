@@ -5,6 +5,7 @@ import { ensureProspectsTable } from "@/lib/ensureProspectsTable";
 import {
   parseCustomerIdsParam,
   parseProspectsAdminFiltersFromUrlSearchParams,
+  mergeProspectAdminCalendarDefaultsFromUrlSearchParams,
 } from "@/lib/prospectFilterUtils";
 import {
   canAccessProspectsRole,
@@ -65,8 +66,14 @@ export async function GET(req) {
     await ensureProspectsTable();
     const conn = await getDbConnection();
 
-    const adminFilters = isProspectsAdminRole(payload.role)
+    const adminParsed = isProspectsAdminRole(payload.role)
       ? parseProspectsAdminFiltersFromUrlSearchParams(searchParams)
+      : null;
+    const adminFilters = isProspectsAdminRole(payload.role)
+      ? mergeProspectAdminCalendarDefaultsFromUrlSearchParams(
+          searchParams,
+          adminParsed,
+        )
       : null;
 
     const { whereSql, params } = buildProspectsListWhereClause({

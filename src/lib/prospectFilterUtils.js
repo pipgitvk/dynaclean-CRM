@@ -1,3 +1,5 @@
+import { getTodayYmdIST } from "@/lib/prospectCommitmentRules";
+
 /**
  * If the user typed a quotation id in the prospects search box (e.g. QUOTE20260320011),
  * return it so Add Prospects can pass quote_number and load all quotation_items lines.
@@ -53,10 +55,14 @@ export function buildProspectsRowsApiUrl(
     const y = adminFilters.commitmentYear;
     if (y != null && Number.isFinite(Number(y))) {
       params.set("commitment_year", String(Number(y)));
+    } else {
+      params.set("commitment_year", "all");
     }
     const m = adminFilters.commitmentMonth;
     if (m != null && Number.isFinite(Number(m))) {
       params.set("commitment_month", String(Number(m)));
+    } else {
+      params.set("commitment_month", "all");
     }
     const d = adminFilters.commitmentDay;
     if (d != null && Number.isFinite(Number(d))) {
@@ -87,6 +93,76 @@ function parseDay(raw) {
   const n = parseInt(String(raw ?? ""), 10);
   if (!Number.isFinite(n) || n < 1 || n > 31) return null;
   return n;
+}
+
+function getIstCalendarYearMonth() {
+  const ymd = getTodayYmdIST();
+  const parts = ymd.split("-").map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  if (!Number.isFinite(y) || !Number.isFinite(m)) {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  }
+  return { year: y, month: m };
+}
+
+/**
+ * When commitment_year / commitment_month are absent from the URL, default to current
+ * calendar month & year (IST). Use explicit `all` in the URL to mean no filter.
+ * @param {(key: string) => string} get
+ * @param {object|null|undefined} basePartial
+ */
+function mergeProspectAdminCalendarDefaultsWithGetter(get, basePartial) {
+  const b = basePartial
+    ? { ...basePartial }
+    : {
+        commitmentYear: null,
+        commitmentMonth: null,
+        commitmentDay: null,
+        createdBy: null,
+        adminSearch: null,
+      };
+  const cyRaw = String(get("commitment_year") ?? "").trim();
+  const cmRaw = String(get("commitment_month") ?? "").trim();
+  const { year: defY, month: defM } = getIstCalendarYearMonth();
+
+  if (cyRaw === "" || cyRaw.toLowerCase() === "default") {
+    b.commitmentYear = defY;
+  } else if (cyRaw.toLowerCase() === "all") {
+    b.commitmentYear = null;
+  } else {
+    b.commitmentYear = parseYear(cyRaw);
+  }
+
+  if (cmRaw === "" || cmRaw.toLowerCase() === "default") {
+    b.commitmentMonth = defM;
+  } else if (cmRaw.toLowerCase() === "all") {
+    b.commitmentMonth = null;
+  } else {
+    b.commitmentMonth = parseMonth(cmRaw);
+  }
+
+  return b;
+}
+
+/** Merge calendar defaults for admin prospects list (Next.js searchParams). */
+export function mergeProspectAdminCalendarDefaults(resolved, basePartial) {
+  return mergeProspectAdminCalendarDefaultsWithGetter(
+    (k) => firstSearchParam(resolved?.[k]),
+    basePartial,
+  );
+}
+
+/** Same for Request URLSearchParams (API route). */
+export function mergeProspectAdminCalendarDefaultsFromUrlSearchParams(
+  sp,
+  basePartial,
+) {
+  return mergeProspectAdminCalendarDefaultsWithGetter(
+    (k) => String(sp.get(k) ?? "").trim(),
+    basePartial,
+  );
 }
 
 function buildAdminFiltersFromGetter(get) {
