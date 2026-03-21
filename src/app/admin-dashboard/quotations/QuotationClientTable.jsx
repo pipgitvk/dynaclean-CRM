@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
 export default function QuotationTableClient({ username, customerId }) {
@@ -154,23 +153,13 @@ export default function QuotationTableClient({ username, customerId }) {
                   <td className="px-4 py-2">₹{q.grand_total}</td>
                   <td className="px-4 py-2">{q.emp_name}</td>
                   <td className="px-4 py-2 text-center">
-                    <div className="flex flex-wrap gap-1 justify-center items-center">
-                      <button
-                        type="button"
-                        onClick={() => setModalQuote(q.quote_number)}
-                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 inline-block"
-                      >
-                        View
-                      </button>
-                      <Link
-                        href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm border border-gray-400 text-gray-700 px-2 py-1 rounded hover:bg-gray-50 inline-block"
-                      >
-                        Full page
-                      </Link>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setModalQuote(q.quote_number)}
+                      className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 inline-block"
+                    >
+                      View
+                    </button>
                   </td>
                 </tr>
               ))
@@ -223,7 +212,7 @@ export default function QuotationTableClient({ username, customerId }) {
                 <strong className="font-medium">Created By:</strong>{" "}
                 {q.emp_name}
               </p>
-              <div className="flex flex-wrap gap-2 justify-end">
+              <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={() => setModalQuote(q.quote_number)}
@@ -231,14 +220,6 @@ export default function QuotationTableClient({ username, customerId }) {
                 >
                   View
                 </button>
-                <Link
-                  href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="border border-gray-400 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 text-sm text-center"
-                >
-                  Full page
-                </Link>
               </div>
             </div>
           ))
