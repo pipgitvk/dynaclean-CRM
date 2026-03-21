@@ -337,7 +337,7 @@ export default function ProspectsListCard({
       const sel = selectedRef.current;
       void refreshRows(
         sel.map((c) => c.customer_id),
-        searchTextRef.current,
+        "",
         sel.map((c) => c.quote_number ?? ""),
         next,
       );
@@ -373,7 +373,7 @@ export default function ProspectsListCard({
     const sel = selectedRef.current;
     void refreshRows(
       sel.map((c) => c.customer_id),
-      searchTextRef.current,
+      "",
       sel.map((c) => c.quote_number ?? ""),
       next,
     );
@@ -405,7 +405,7 @@ export default function ProspectsListCard({
       queueMicrotask(() =>
         refreshRows(
           next.map((x) => x.customer_id),
-          searchTextRef.current,
+          "",
           next.map((x) => x.quote_number ?? ""),
         ),
       );
@@ -426,7 +426,7 @@ export default function ProspectsListCard({
         queueMicrotask(() =>
           refreshRows(
             next.map((x) => x.customer_id),
-            searchTextRef.current,
+            "",
             next.map((x) => x.quote_number ?? ""),
           ),
         );
@@ -437,11 +437,11 @@ export default function ProspectsListCard({
   );
 
   const submitSearch = useCallback(() => {
-    const text = searchTextRef.current.trim();
     const sel = selectedRef.current;
+    if (sel.length === 0) return;
     void refreshRows(
       sel.map((c) => c.customer_id),
-      text,
+      "",
       sel.map((c) => c.quote_number ?? ""),
     );
   }, [refreshRows]);
@@ -523,9 +523,7 @@ export default function ProspectsListCard({
       fCreatedBy !== "" ||
       fAdminSearch.trim() !== "");
   const hasFilter =
-    selectedCustomers.length > 0 ||
-    searchText.trim().length > 0 ||
-    hasAdminUiFilter;
+    selectedCustomers.length > 0 || hasAdminUiFilter;
 
   const tableHeaders = [
     "Customer_id",

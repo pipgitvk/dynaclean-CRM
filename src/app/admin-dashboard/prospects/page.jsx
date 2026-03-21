@@ -76,6 +76,7 @@ export default async function ProspectsPage({ searchParams }) {
     const { whereSql, params } = buildProspectsListWhereClause({
       customerIds,
       like,
+      searchRaw: searchRaw || null,
       role: payload.role,
       username: payload.username,
       adminFilters,

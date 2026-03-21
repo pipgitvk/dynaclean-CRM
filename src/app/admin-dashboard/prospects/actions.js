@@ -309,7 +309,7 @@ export async function createProspectsBulk(formData) {
       redirectCustomers("error=required");
     }
 
-    // One prospect row per customer per submit (all quotation lines merged).
+    // One prospect row per bulk form block (each block may be same customer, different quotation).
     const quote_number = quoteForCustomer(i);
     if (lineRows.length === 1) {
       const [only] = lineRows;

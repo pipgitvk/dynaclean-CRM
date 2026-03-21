@@ -79,6 +79,7 @@ export async function GET(req) {
     const { whereSql, params } = buildProspectsListWhereClause({
       customerIds,
       like,
+      searchRaw: searchRaw || null,
       role: payload.role,
       username: payload.username,
       adminFilters,

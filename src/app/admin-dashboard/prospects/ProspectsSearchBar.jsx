@@ -155,7 +155,7 @@ export default function ProspectsSearchBar({
                 if (suggestions.length > 0) setOpen(true);
               }}
               onKeyDown={onKeyDown}
-              placeholder="Search quotation (e.g. QUOTE20260320011) — add multiple"
+              placeholder="Quotation ID, customer ID (e.g. QUOTE…, 721091) — add multiple"
               autoComplete="off"
               aria-autocomplete="list"
               aria-expanded={open}
