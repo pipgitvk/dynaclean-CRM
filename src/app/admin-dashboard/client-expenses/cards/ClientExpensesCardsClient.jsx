@@ -198,12 +198,15 @@ export default function ClientExpensesCardsClient({ rows }) {
 
       {!isTxnSearchActive && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {summaryCards.map((card) => (
+          {summaryCards.map((card) => {
+            const clientQs = encodeURIComponent(card.client_name);
+            const groupQs = encodeURIComponent(card.group_name);
+            const tableHref = `/admin-dashboard/client-expenses?client=${clientQs}&group=${groupQs}`;
+            const subHeadHref = `/admin-dashboard/client-expenses/sub-head-cards?client=${clientQs}&group=${groupQs}`;
+            return (
             <Link
               key={card.key}
-              href={`/admin-dashboard/client-expenses/sub-head-cards?client=${encodeURIComponent(
-                card.client_name,
-              )}&group=${encodeURIComponent(card.group_name)}`}
+              href={card.hasSubHead ? subHeadHref : tableHref}
               className={[
                 "group relative block text-left rounded-xl border overflow-hidden",
                 "shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1",
@@ -275,7 +278,8 @@ export default function ClientExpensesCardsClient({ rows }) {
                 </div>
               </div>
             </Link>
-          ))}
+            );
+          })}
 
           {rows.length === 0 && (
             <p className="text-sm text-gray-500 col-span-full">No client expenses found.</p>
