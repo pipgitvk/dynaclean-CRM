@@ -14,6 +14,15 @@ export default function QuotationViewModal({
   const [payload, setPayload] = useState(null);
 
   useEffect(() => {
+    if (!quoteNumber) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [quoteNumber, onClose]);
+
+  useEffect(() => {
     if (!quoteNumber) {
       setPayload(null);
       setErr("");
@@ -67,6 +76,7 @@ export default function QuotationViewModal({
           role="dialog"
           aria-modal="true"
           aria-labelledby="quotation-modal-title"
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between gap-2 p-3 border-b bg-white shrink-0">
             <h2
