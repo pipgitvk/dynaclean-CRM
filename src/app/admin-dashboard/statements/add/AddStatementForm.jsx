@@ -168,7 +168,8 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
             <option value="">Select expense</option>
             {expenses.map((e) => (
               <option key={e.id} value={e.id}>
-                {e.id} - {e.expense_name || ""} ({e.client_name || ""})
+                {e.id} — {e.expense_name || ""} ({e.client_name || ""}
+                {e.transaction_id ? ` · Txn: ${e.transaction_id}` : ""})
               </option>
             ))}
           </select>

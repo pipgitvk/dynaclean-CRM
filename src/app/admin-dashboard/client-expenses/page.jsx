@@ -13,6 +13,8 @@ export default async function ClientExpensesPage({ searchParams }) {
   const selectedClient = sp?.client || null;
   const selectedGroup = sp?.group || null;
   const selectedSubHead = sp?.sub_head || null;
+  const rawTxn = sp?.txn;
+  const initialTxn = Array.isArray(rawTxn) ? String(rawTxn[0] ?? "") : typeof rawTxn === "string" ? rawTxn : "";
 
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
@@ -34,8 +36,15 @@ export default async function ClientExpensesPage({ searchParams }) {
   let rows = [];
   try {
     const conn = await getDbConnection();
+    try {
+      await conn.execute("SELECT transaction_id FROM client_expenses LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE client_expenses ADD COLUMN transaction_id VARCHAR(255) NULL AFTER hsn");
+      } catch (__) {}
+    }
     const [result] = await conn.execute(
-      `SELECT ce.id, ce.expense_name, ce.client_name, ce.group_name, ce.main_head, ce.head, ce.supply, ce.type_of_ledger, ce.cgst, ce.sgst, ce.igst, ce.hsn, ce.gst_rate, ce.amount, ce.created_at,
+      `SELECT ce.id, ce.expense_name, ce.client_name, ce.group_name, ce.main_head, ce.head, ce.supply, ce.type_of_ledger, ce.cgst, ce.sgst, ce.igst, ce.hsn, ce.transaction_id, ce.gst_rate, ce.amount, ce.created_at,
               GROUP_CONCAT(cesh.sub_head SEPARATOR ', ') as sub_head
        FROM client_expenses ce
        LEFT JOIN client_expense_sub_heads cesh ON ce.id = cesh.client_expense_id
@@ -66,6 +75,7 @@ export default async function ClientExpensesPage({ searchParams }) {
       rows={rowsBySubHead}
       client={selectedClient}
       group={selectedGroup}
+      initialSearchQuery={initialTxn}
     />
   );
 }

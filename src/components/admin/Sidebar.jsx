@@ -33,6 +33,7 @@ import {
   UserPlus,
   Mail,
   Settings,
+  Import,
 } from "lucide-react";
 
 // Icon map
@@ -65,6 +66,7 @@ const iconMap = {
   UserPlus,
   Mail,
   Settings,
+  Import,
 };
 
 export default function Sidebar({

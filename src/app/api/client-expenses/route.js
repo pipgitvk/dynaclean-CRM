@@ -12,8 +12,15 @@ export async function GET(req) {
     await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
     const conn = await getDbConnection();
+    try {
+      await conn.execute("SELECT transaction_id FROM client_expenses LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE client_expenses ADD COLUMN transaction_id VARCHAR(255) NULL AFTER hsn");
+      } catch (__) {}
+    }
     const [rows] = await conn.execute(
-      `SELECT id, expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, gst_rate, amount, created_at
+      `SELECT id, expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount, created_at
        FROM client_expenses
        ORDER BY id DESC`
     );
@@ -35,13 +42,20 @@ export async function POST(req) {
     await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
     const data = await req.json();
-    const { expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, sub_heads, type_of_ledger, cgst, sgst, igst, hsn, gst_rate, amount } = data;
+    const { expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, sub_heads, type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount } = data;
+
+    const txnId =
+      transaction_id != null && String(transaction_id).trim() !== "" ? String(transaction_id).trim() : null;
 
     if (!expense_name || !client_name || !main_head) {
       return NextResponse.json(
         { error: "expense_name, client_name, and main_head are required" },
         { status: 400 }
       );
+    }
+
+    if (!txnId) {
+      return NextResponse.json({ error: "transaction_id is required" }, { status: 400 });
     }
 
     if (!["Direct", "Indirect"].includes(main_head)) {
@@ -62,10 +76,17 @@ export async function POST(req) {
         await conn.execute("ALTER TABLE client_expenses ADD COLUMN tax_type VARCHAR(50) NULL AFTER tax_applicable");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT transaction_id FROM client_expenses LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE client_expenses ADD COLUMN transaction_id VARCHAR(255) NULL AFTER hsn");
+      } catch (__) {}
+    }
     const validSupply = ["goods", "services"].includes(supply) ? supply : null;
     const [insertResult] = await conn.execute(
-      `INSERT INTO client_expenses (expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, gst_rate, amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO client_expenses (expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         expense_name,
         client_name,
@@ -80,6 +101,7 @@ export async function POST(req) {
         sgst != null && sgst !== "" ? Number(sgst) : null,
         igst != null && igst !== "" ? Number(igst) : null,
         hsn || null,
+        txnId,
         gst_rate != null && gst_rate !== "" ? Number(gst_rate) : null,
         amount != null && amount !== "" ? Number(amount) : null,
       ]

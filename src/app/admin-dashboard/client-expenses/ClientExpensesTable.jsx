@@ -8,9 +8,9 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Eye, Pencil, Trash2, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X, Calendar } from "lucide-react";
 
-export default function ClientExpensesTable({ rows, client, group }) {
+export default function ClientExpensesTable({ rows, client, group, initialSearchQuery = "" }) {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => initialSearchQuery || "");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -83,6 +83,8 @@ export default function ClientExpensesTable({ rows, client, group }) {
           return (row.sub_head || "").toLowerCase();
         case "supply":
           return (row.supply || "").toLowerCase();
+        case "transaction_id":
+          return (row.transaction_id || "").toLowerCase();
         case "amount":
           return Number(row.amount || 0);
         case "created_at":
@@ -128,6 +130,7 @@ export default function ClientExpensesTable({ rows, client, group }) {
       <td className="p-3 text-gray-600">{row.head || "-"}</td>
       <td className="p-3 text-gray-600">{row.sub_head || "-"}</td>
       <td className="p-3 text-gray-600">{row.supply || "-"}</td>
+      <td className="p-3 text-gray-600 font-mono text-xs max-w-[140px] truncate" title={row.transaction_id || ""}>{row.transaction_id || "-"}</td>
       <td className="p-3 font-semibold text-emerald-700 tabular-nums">{row.amount != null ? `₹${Number(row.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "-"}</td>
       <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</td>
       <td className="p-3">
@@ -234,6 +237,7 @@ export default function ClientExpensesTable({ rows, client, group }) {
               <th onClick={() => handleSort("head")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Head<SortIcon column="head" /></th>
               <th onClick={() => handleSort("sub_head")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Sub-head<SortIcon column="sub_head" /></th>
               <th onClick={() => handleSort("supply")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Supply<SortIcon column="supply" /></th>
+              <th onClick={() => handleSort("transaction_id")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Trans. ID<SortIcon column="transaction_id" /></th>
               <th onClick={() => handleSort("amount")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Amount<SortIcon column="amount" /></th>
               <th onClick={() => handleSort("created_at")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Created<SortIcon column="created_at" /></th>
               <th className="p-3 rounded-tr-xl">Action</th>
@@ -246,7 +250,7 @@ export default function ClientExpensesTable({ rows, client, group }) {
               </>
             ) : (
               <tr>
-                <td colSpan="11" className="p-12 text-center text-gray-500">
+                <td colSpan="12" className="p-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-2">
                     <Inbox className="w-12 h-12 text-gray-300" />
                     <span className="font-medium">No entries found.</span>
@@ -280,6 +284,7 @@ export default function ClientExpensesTable({ rows, client, group }) {
               <div><span className="text-gray-500">Head:</span> {row.head || "-"}</div>
               <div><span className="text-gray-500">Sub-head:</span> {row.sub_head || "-"}</div>
               <div><span className="text-gray-500">Supply:</span> {row.supply || "-"}</div>
+              <div className="col-span-2"><span className="text-gray-500">Trans. ID:</span> <span className="font-mono text-xs break-all">{row.transaction_id || "-"}</span></div>
               <div><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</div>
             </div>
             <div className="pt-3 border-t border-gray-100 flex justify-between items-center">

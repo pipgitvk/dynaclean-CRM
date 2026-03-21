@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS client_expenses (
   sgst DECIMAL(15, 2) NULL,
   igst DECIMAL(15, 2) NULL,
   hsn VARCHAR(50) NULL,
+  transaction_id VARCHAR(255) NOT NULL,
   gst_rate DECIMAL(5, 2) NULL,
   amount DECIMAL(15, 2) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
 import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2 } from "lucide-react";
 import jsPDF from "jspdf";
@@ -22,27 +22,90 @@ export default function StatementTable({ rows }) {
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  /** When search is numeric expense id: expense.transaction_id for trans_id match (unsettled rows). */
+  const [expenseTxnForIdSearch, setExpenseTxnForIdSearch] = useState(null);
+  const [expenseIdResolved, setExpenseIdResolved] = useState(null);
 
-  const filteredRows = rows.filter((row) => {
-    if (statusFilter) {
-      if (statusFilter === "Settled" && !row.client_expense_id) return false;
-      if (statusFilter === "Unsettled" && row.client_expense_id) return false;
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!/^\d+$/.test(q)) {
+      setExpenseTxnForIdSearch(null);
+      setExpenseIdResolved(null);
+      return;
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      const transId = (row.trans_id || "").toLowerCase();
-      const desc = (row.description || "").toLowerCase();
-      const cheqNo = (row.cheq_no || "").toLowerCase();
-      const amount = String(row.amount || "");
-      if (!transId.includes(q) && !desc.includes(q) && !cheqNo.includes(q) && !amount.includes(q)) return false;
-    }
-    if (dateFrom || dateTo) {
-      const rowDate = row.date ? dayjs(row.date).valueOf() : 0;
-      if (dateFrom && rowDate < dayjs(dateFrom).startOf("day").valueOf()) return false;
-      if (dateTo && rowDate > dayjs(dateTo).endOf("day").valueOf()) return false;
-    }
-    return true;
-  });
+    setExpenseIdResolved(q);
+    setExpenseTxnForIdSearch(null);
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/client-expenses/${q}`, { credentials: "include" });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setExpenseTxnForIdSearch(null);
+          return;
+        }
+        const tid = data.transaction_id != null ? String(data.transaction_id).trim() : "";
+        setExpenseTxnForIdSearch(tid || null);
+      } catch {
+        if (!cancelled) setExpenseTxnForIdSearch(null);
+      }
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [searchQuery]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (statusFilter) {
+        if (statusFilter === "Settled" && !row.client_expense_id) return false;
+        if (statusFilter === "Unsettled" && row.client_expense_id) return false;
+      }
+      if (searchQuery.trim()) {
+        const qRaw = searchQuery.trim();
+        const q = qRaw.toLowerCase();
+        const isNumericExpenseSearch = /^\d+$/.test(qRaw);
+        const matchesExpenseLinked =
+          isNumericExpenseSearch &&
+          row.client_expense_id != null &&
+          String(row.client_expense_id) === qRaw;
+        const rowTransNorm = String(row.trans_id || "").trim().toLowerCase();
+        const expenseTxnNorm = expenseTxnForIdSearch ? expenseTxnForIdSearch.toLowerCase() : "";
+        const matchesExpenseByTransId =
+          isNumericExpenseSearch &&
+          expenseIdResolved === qRaw &&
+          expenseTxnNorm !== "" &&
+          rowTransNorm === expenseTxnNorm;
+
+        // Digits-only = expense ID: only linked row OR statement.trans_id === that expense's transaction_id.
+        // (Do not use substring on Trans ID / amount — e.g. "2" must not match S69523907 or ₹2183.)
+        if (isNumericExpenseSearch) {
+          if (!matchesExpenseLinked && !matchesExpenseByTransId) return false;
+        } else {
+          const transId = (row.trans_id || "").toLowerCase();
+          const desc = (row.description || "").toLowerCase();
+          const cheqNo = (row.cheq_no || "").toLowerCase();
+          const amount = String(row.amount || "");
+          if (
+            !transId.includes(q) &&
+            !desc.includes(q) &&
+            !cheqNo.includes(q) &&
+            !amount.includes(q)
+          ) {
+            return false;
+          }
+        }
+      }
+      if (dateFrom || dateTo) {
+        const rowDate = row.date ? dayjs(row.date).valueOf() : 0;
+        if (dateFrom && rowDate < dayjs(dateFrom).startOf("day").valueOf()) return false;
+        if (dateTo && rowDate > dayjs(dateTo).endOf("day").valueOf()) return false;
+      }
+      return true;
+    });
+  }, [rows, statusFilter, searchQuery, dateFrom, dateTo, expenseTxnForIdSearch, expenseIdResolved]);
 
   // Compute running balance (chronological order: date ASC, id ASC)
   const balanceMap = {};
@@ -261,14 +324,20 @@ export default function StatementTable({ rows }) {
         </Link>
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-wrap">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+        <div className="relative w-full sm:w-auto sm:min-w-[min(100%,20rem)] md:min-w-[24rem] lg:min-w-[28rem] sm:max-w-xl">
+          <label htmlFor="statements-search" className="sr-only">
+            Search statements by Trans ID, expense ID, description, cheque number, or amount
+          </label>
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 pointer-events-none" />
           <input
-            type="text"
-            placeholder="Search Trans ID, Description, Cheq No..."
+            id="statements-search"
+            type="search"
+            enterKeyHint="search"
+            placeholder="Trans ID, text search… · Digits only = expense ID"
+            title="Letters/text: filter Trans ID, description, cheque, amount. Numbers only (e.g. 2): that expense — settled link OR expense Transaction ID = statement Trans ID."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 pr-4 py-2 border rounded-lg w-full sm:w-48 text-sm"
+            className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 outline-none"
           />
         </div>
         <input
@@ -508,6 +577,7 @@ export default function StatementTable({ rows }) {
                     <div className="space-y-2">
                       <p><span className="font-medium">Type of Ledger:</span> {expense.type_of_ledger || "-"}</p>
                       <p><span className="font-medium">HSN:</span> {expense.hsn || "-"}</p>
+                      <p><span className="font-medium">Transaction ID:</span> <span className="font-mono text-xs">{expense.transaction_id || "-"}</span></p>
                       <p><span className="font-medium">Amount:</span> {expense.amount != null ? `₹${Number(expense.amount).toFixed(2)}` : "-"}</p>
                       <p><span className="font-medium">Created:</span> {expense.created_at ? dayjs(expense.created_at).format("DD MMM YYYY HH:mm") : "-"}</p>
                     </div>
