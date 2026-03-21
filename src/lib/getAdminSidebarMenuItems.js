@@ -510,6 +510,26 @@ const allMenuItems = [
     ],
   },
 
+  // {
+  //   name: "Import CRM",
+  //   roles: ["SUPERADMIN"],
+  //   icon: "Import",
+  //   children: [
+  //     {
+  //       path: "/admin-dashboard/import-crm/suppliers",
+  //       name: "Suppliers",
+  //       roles: ["SUPERADMIN"],
+  //       icon: "Users",
+  //     },
+  //     {
+  //       path: "/admin-dashboard/import-crm/purchase-orders",
+  //       name: "Purchase Orders",
+  //       roles: ["SUPERADMIN"],
+  //       icon: "FileText",
+  //     },
+  //   ],
+  // },
+
   // employee section
   {
     name: "Employee",

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
+import TransactionIdSuggestInput from "../../TransactionIdSuggestInput";
 
 export default function EditClientExpensePage() {
   const { id } = useParams();
@@ -28,6 +29,7 @@ export default function EditClientExpensePage() {
     type_of_ledger: "",
     amount: "",
     hsn: "",
+    transaction_id: "",
     cgst: "",
     sgst: "",
     igst: "",
@@ -70,6 +72,7 @@ export default function EditClientExpensePage() {
           type_of_ledger: row.type_of_ledger || "",
           amount: row.amount != null ? String(row.amount) : "",
           hsn: row.hsn || "",
+          transaction_id: row.transaction_id || "",
           cgst: row.cgst != null ? String(row.cgst) : "",
           sgst: row.sgst != null ? String(row.sgst) : "",
           igst: row.igst != null ? String(row.igst) : "",
@@ -116,6 +119,11 @@ export default function EditClientExpensePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const tid = (form.transaction_id || "").trim();
+    if (!tid) {
+      toast.error("Transaction ID is required");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -139,6 +147,7 @@ export default function EditClientExpensePage() {
           type_of_ledger: form.type_of_ledger || null,
           amount: form.amount != null && form.amount !== "" ? Number(form.amount) : null,
           hsn: form.hsn || null,
+          transaction_id: tid,
         }),
       });
       const data = await res.json();
@@ -206,6 +215,16 @@ export default function EditClientExpensePage() {
               </select>
             </div>
           )}
+          <div>
+            <label className="block text-sm mb-1">Transaction ID *</label>
+            <TransactionIdSuggestInput
+              name="transaction_id"
+              value={form.transaction_id}
+              onChange={(v) => setForm((p) => ({ ...p, transaction_id: v }))}
+              className="w-full border p-2 rounded"
+              placeholder="Type or pick from statement Trans IDs"
+            />
+          </div>
           <div>
             <label className="block text-sm mb-1">Expense Name *</label>
             <input

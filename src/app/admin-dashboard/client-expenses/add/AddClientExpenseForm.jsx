@@ -1,6 +1,7 @@
 "use client";
 
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, Controller } from "react-hook-form";
+import TransactionIdSuggestInput from "../TransactionIdSuggestInput";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useState, useEffect } from "react";
@@ -10,7 +11,19 @@ export default function AddClientExpenseForm() {
   const [headOptions, setHeadOptions] = useState([]);
   const [subHeadOptions, setSubHeadOptions] = useState([]);
   const { register, handleSubmit, reset, control, setValue } = useForm({
-    defaultValues: { main_head: "Direct", supply: "goods", head: "", sub_head: "", tax_rate: "", tax_applicable: "No", tax_type: "", cgst: "", sgst: "", igst: "" },
+    defaultValues: {
+      main_head: "Direct",
+      supply: "goods",
+      head: "",
+      sub_head: "",
+      transaction_id: "",
+      tax_rate: "",
+      tax_applicable: "No",
+      tax_type: "",
+      cgst: "",
+      sgst: "",
+      igst: "",
+    },
   });
 
   const mainHead = useWatch({ control, name: "main_head", defaultValue: "Direct" });
@@ -71,6 +84,7 @@ export default function AddClientExpenseForm() {
           supply: data.supply || null,
           type_of_ledger: data.type_of_ledger || null,
           hsn: data.hsn || null,
+          transaction_id: String(data.transaction_id).trim(),
           sub_heads: data.sub_head ? [data.sub_head] : [],
           amount: data.amount != null && data.amount !== "" ? Number(data.amount) : null,
         }),
@@ -139,6 +153,31 @@ export default function AddClientExpenseForm() {
             </select>
           </div>
         )}
+        <div>
+          <label className="block text-sm font-medium mb-1">Transaction ID *</label>
+          <Controller
+            name="transaction_id"
+            control={control}
+            rules={{
+              required: "Transaction ID is required",
+              validate: (v) => (v != null && String(v).trim() !== "") || "Transaction ID is required",
+            }}
+            render={({ field, fieldState }) => (
+              <TransactionIdSuggestInput
+                value={field.value}
+                onChange={(v) =>
+                  field.onChange({ target: { value: v, name: field.name } })
+                }
+                onBlur={field.onBlur}
+                name={field.name}
+                inputRef={field.ref}
+                className="w-full border p-2 rounded-md"
+                placeholder="Type or pick from statement Trans IDs"
+                error={fieldState.error}
+              />
+            )}
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium mb-1">Expense Name *</label>
           <input

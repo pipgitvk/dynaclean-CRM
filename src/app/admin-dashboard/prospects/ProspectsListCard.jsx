@@ -5,14 +5,13 @@ import {
   useState,
   useCallback,
   useRef,
-  useTransition,
   useMemo,
 } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, Pencil, Search, Trash2 } from "lucide-react";
+import { Eye, Pencil, Search } from "lucide-react";
 import ProspectsSearchBar from "./ProspectsSearchBar";
-import { deleteProspect } from "./actions";
+// import { deleteProspect } from "./actions";
 import {
   buildProspectsRowsApiUrl,
   extractQuoteNumberFromProspectSearch,
@@ -188,7 +187,6 @@ export default function ProspectsListCard({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
   const [rows, setRows] = useState(initialRows);
   const [searchText, setSearchText] = useState(initialSearch);
   const [selectedCustomers, setSelectedCustomers] = useState(() =>
@@ -476,26 +474,27 @@ export default function ProspectsListCard({
     router.push(`/admin-dashboard/prospects/new?customers=${q}${quoteQs}`);
   }, [router]);
 
-  const handleDelete = useCallback(
-    (rowId) => {
-      if (!confirm("Delete this prospect? This cannot be undone.")) return;
-      startTransition(async () => {
-        const res = await deleteProspect(rowId);
-        if (!res?.ok) {
-          window.alert(res?.error || "Could not delete.");
-          return;
-        }
-        const sel = selectedRef.current;
-        await refreshRows(
-          sel.map((c) => c.customer_id),
-          searchTextRef.current.trim(),
-          sel.map((c) => c.quote_number ?? ""),
-        );
-        router.refresh();
-      });
-    },
-    [refreshRows, router],
-  );
+  // Delete disabled for all roles (admin + sales).
+  // const handleDelete = useCallback(
+  //   (rowId) => {
+  //     if (!confirm("Delete this prospect? This cannot be undone.")) return;
+  //     startTransition(async () => {
+  //       const res = await deleteProspect(rowId);
+  //       if (!res?.ok) {
+  //         window.alert(res?.error || "Could not delete.");
+  //         return;
+  //       }
+  //       const sel = selectedRef.current;
+  //       await refreshRows(
+  //         sel.map((c) => c.customer_id),
+  //         searchTextRef.current.trim(),
+  //         sel.map((c) => c.quote_number ?? ""),
+  //       );
+  //       router.refresh();
+  //     });
+  //   },
+  //   [refreshRows, router],
+  // );
 
   if (loadError) {
     return (
@@ -906,6 +905,7 @@ export default function ProspectsListCard({
                             <Eye className="h-4 w-4" />
                           </Link>
                         ) : null}
+                        {/* Delete hidden for admin + user — restore with handleDelete + deleteProspect if needed.
                         {canMutate ? (
                           <button
                             type="button"
@@ -918,6 +918,7 @@ export default function ProspectsListCard({
                             <Trash2 className="h-4 w-4" />
                           </button>
                         ) : null}
+                        */}
                       </div>
                     </td>
                   </tr>

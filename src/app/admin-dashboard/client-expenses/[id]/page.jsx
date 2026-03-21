@@ -9,6 +9,13 @@ export const dynamic = "force-dynamic";
 
 async function getClientExpenseById(id) {
   const conn = await getDbConnection();
+  try {
+    await conn.execute("SELECT transaction_id FROM client_expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE client_expenses ADD COLUMN transaction_id VARCHAR(255) NULL AFTER hsn");
+    } catch (__) {}
+  }
   const [rows] = await conn.execute(
     "SELECT * FROM client_expenses WHERE id = ?",
     [id]
@@ -92,6 +99,7 @@ export default async function ClientExpenseDetailPage({ params, searchParams }) 
         <div className="space-y-2 bg-gray-50 p-4 rounded shadow-sm">
           <p><span className="font-medium">Type of Ledger:</span> {expense.type_of_ledger || "-"}</p>
           <p><span className="font-medium">HSN:</span> {expense.hsn || "-"}</p>
+          <p><span className="font-medium">Transaction ID:</span> {expense.transaction_id || "-"}</p>
           <p><span className="font-medium">Amount:</span> {expense.amount != null ? `₹${Number(expense.amount).toFixed(2)}` : "-"}</p>
           <p><span className="font-medium">Created:</span> {expense.created_at ? dayjs(expense.created_at).format("DD MMM YYYY HH:mm") : "-"}</p>
         </div>
