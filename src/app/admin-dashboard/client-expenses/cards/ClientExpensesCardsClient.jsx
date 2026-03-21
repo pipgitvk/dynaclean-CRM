@@ -27,6 +27,7 @@ function buildSummary(rows) {
         totalAmount: 0,
         hasSubHead: false,
         expenseIdSet: new Set(),
+        expenseNameSet: new Set(),
         statementTransIdSet: new Set(),
       };
     }
@@ -36,6 +37,8 @@ function buildSummary(rows) {
       card.hasSubHead = true;
     }
     if (row.id != null) card.expenseIdSet.add(String(row.id));
+    const en = row.expense_name != null ? String(row.expense_name).trim() : "";
+    if (en) card.expenseNameSet.add(en);
     for (const tid of parseIdTokens(row.statement_trans_ids)) {
       card.statementTransIdSet.add(tid);
     }
@@ -43,6 +46,7 @@ function buildSummary(rows) {
   return Object.values(summaryMap)
     .map((c) => {
       const expenseIds = [...c.expenseIdSet].sort((a, b) => Number(a) - Number(b));
+      const expenseNames = [...c.expenseNameSet].sort((a, b) => a.localeCompare(b));
       const statementTransIds = [...c.statementTransIdSet].sort((a, b) => a.localeCompare(b));
       return {
         key: c.key,
@@ -50,6 +54,7 @@ function buildSummary(rows) {
         group_name: c.group_name,
         totalAmount: c.totalAmount,
         hasSubHead: c.hasSubHead,
+        expenseNamesLabel: expenseNames.length ? expenseNames.join(", ") : "—",
         expenseIdsLabel: expenseIds.length ? expenseIds.join(", ") : "—",
         statementTransIdsLabel: statementTransIds.length ? statementTransIds.join(", ") : "—",
       };
@@ -256,6 +261,12 @@ export default function ClientExpensesCardsClient({ rows }) {
                   </div>
                 </div>
                 <div className="mt-3 space-y-1.5 text-xs text-gray-600 border-t border-gray-100 pt-3">
+                  <div className="flex gap-1.5 min-w-0">
+                    <span className="font-medium text-gray-500 shrink-0">Expense name:</span>
+                    <span className="break-words font-semibold text-gray-800" title={card.expenseNamesLabel}>
+                      {card.expenseNamesLabel}
+                    </span>
+                  </div>
                   <div className="flex gap-1.5 min-w-0">
                     <span className="font-medium text-gray-500 shrink-0">Expense ID:</span>
                     <span className="font-mono break-all" title={card.expenseIdsLabel}>
