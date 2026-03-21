@@ -288,10 +288,24 @@ const allMenuItems = [
     ],
   },
   {
-    path: "/admin-dashboard/prospects",
     name: "Prospects",
     roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
     icon: "UserPlus",
+    children: [
+      {
+        path: "/user-dashboard",
+        name: "Back to user dashboard",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "ArrowLeft",
+        sidebarVariant: "lightRed",
+      },
+      {
+        path: "/admin-dashboard/prospects",
+        name: "View prospects",
+        roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
+        icon: "UserPlus",
+      },
+    ],
   },
   // tl management section
   {
@@ -636,6 +650,13 @@ const allMenuItems = [
     icon: "Receipt",
     children: [
       {
+        path: "/user-dashboard",
+        name: "Back to user dashboard",
+        roles: ["ACCOUNTANT"],
+        icon: "ArrowLeft",
+        sidebarVariant: "lightRed",
+      },
+      {
         path: "/admin-dashboard/client-expenses/cards",
         name: "Client Expenses",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
@@ -650,6 +671,27 @@ const allMenuItems = [
     ],
   },
 ];
+
+function filterMenuItemsByRole(items, role) {
+  if (!items?.length) return [];
+  return items
+    .map((item) => {
+      const roleOk =
+        item.roles?.includes("ALL") || item.roles?.includes(role);
+      if (!roleOk) return null;
+
+      if (!item.children?.length) {
+        return item;
+      }
+
+      const children = filterMenuItemsByRole(item.children, role);
+      if (children.length === 0) {
+        return null;
+      }
+      return { ...item, children };
+    })
+    .filter(Boolean);
+}
 
 export default async function getSidebarMenuItems() {
   const cookieStore = await cookies();
@@ -669,7 +711,6 @@ export default async function getSidebarMenuItems() {
     }
   }
 
-  return allMenuItems.filter(
-    (item) => item.roles.includes("ALL") || item.roles.includes(role),
-  );
+  const roleKey = String(role || "GUEST").trim().toUpperCase();
+  return filterMenuItemsByRole(allMenuItems, roleKey);
 }

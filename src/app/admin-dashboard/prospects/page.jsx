@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { getDbConnection } from "@/lib/db";
 import { ensureProspectsTable } from "@/lib/ensureProspectsTable";
 import { getSessionPayload } from "@/lib/auth";
@@ -145,6 +146,14 @@ export default async function ProspectsPage({ searchParams }) {
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:p-8 dark:border-slate-200 dark:bg-white">
+      {!viewerIsAdmin && (
+        <Link
+          href="/user-dashboard"
+          className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:text-blue-900 hover:underline"
+        >
+          ← Back to user dashboard
+        </Link>
+      )}
       <h1 className="mb-4 text-xl font-semibold tracking-tight text-slate-900 sm:mb-6 sm:text-2xl">
         Prospects
       </h1>
