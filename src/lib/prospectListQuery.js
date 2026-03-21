@@ -6,11 +6,12 @@
 /**
  * Builds WHERE clause + params for listing prospects.
  * Admins see all rows; sales roles only see rows they created (created_by = username).
- * @param {{ customerIds: string[], like: string|null, role: string, username: string, adminFilters?: AdminProspectFilters|null }} args
+ * @param {{ customerIds: string[], like: string|null, searchRaw?: string|null, role: string, username: string, adminFilters?: AdminProspectFilters|null }} args
  */
 export function buildProspectsListWhereClause({
   customerIds,
   like,
+  searchRaw = null,
   role,
   username,
   adminFilters = null,
@@ -25,10 +26,20 @@ export function buildProspectsListWhereClause({
     parts.push(`p.customer_id IN (${ph})`);
     params.push(...customerIds);
   } else if (like) {
-    parts.push(
-      `(p.customer_id LIKE ? OR p.model LIKE ? OR CAST(p.qty AS CHAR) LIKE ? OR CAST(p.amount AS CHAR) LIKE ? OR COALESCE(p.notes,'') LIKE ? OR p.customer_id IN (SELECT customer_id FROM quotations_records WHERE quote_number LIKE ?) OR COALESCE(NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''), NULLIF(TRIM(c.company), '')) LIKE ?)`,
-    );
-    params.push(like, like, like, like, like, like, like);
+    const raw = String(searchRaw ?? "").trim();
+    const numericCustomer =
+      raw.length > 0 && /^\d{1,20}$/.test(raw) ? raw : null;
+    if (numericCustomer) {
+      parts.push(
+        `(TRIM(CAST(p.customer_id AS CHAR)) = ? OR p.model LIKE ? OR CAST(p.qty AS CHAR) LIKE ? OR CAST(p.amount AS CHAR) LIKE ? OR COALESCE(p.notes,'') LIKE ? OR p.customer_id IN (SELECT customer_id FROM quotations_records WHERE quote_number LIKE ?) OR COALESCE(NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''), NULLIF(TRIM(c.company), '')) LIKE ?)`,
+      );
+      params.push(numericCustomer, like, like, like, like, like, like);
+    } else {
+      parts.push(
+        `(p.customer_id LIKE ? OR p.model LIKE ? OR CAST(p.qty AS CHAR) LIKE ? OR CAST(p.amount AS CHAR) LIKE ? OR COALESCE(p.notes,'') LIKE ? OR p.customer_id IN (SELECT customer_id FROM quotations_records WHERE quote_number LIKE ?) OR COALESCE(NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''), NULLIF(TRIM(c.company), '')) LIKE ?)`,
+      );
+      params.push(like, like, like, like, like, like, like);
+    }
   }
 
   if (!isAdmin) {

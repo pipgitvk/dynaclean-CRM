@@ -43,6 +43,19 @@ const errorMessages = {
 const inputClass =
   "h-11 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200/90";
 
+function pairKey(customerId, quoteNumber) {
+  return `${String(customerId)}:::${String(quoteNumber)}`;
+}
+
+function sumLineTotalPrices(lines) {
+  if (!lines?.length) return 0;
+  const n = lines.reduce(
+    (a, row) => a + (Number(row.total_price) || 0),
+    0,
+  );
+  return Number.isFinite(n) ? n : 0;
+}
+
 export default async function NewProspectPage({ searchParams }) {
   const payload = await getSessionPayload();
   if (!payload || !canAccessProspectsRole(payload.role)) {
@@ -109,35 +122,94 @@ export default async function NewProspectPage({ searchParams }) {
       );
     }
 
-    let quoteAmounts = {};
-    let quotationLinesByCustomer = {};
-    for (const id of allowedCustomerIds) {
-      quotationLinesByCustomer[String(id)] = { quote_number: null, lines: [] };
-    }
-
     const customerToQuote = new Map();
+    /** @type {Map<string, string[]>} */
+    const quotesByCustomer = new Map();
     const allowedSet = new Set(allowedCustomerIds.map(String));
-    if (quoteNumbersParam.length > 0 && quoteNumbersParam.length === customerIds.length) {
+
+    const parallelQuotes =
+      quoteNumbersParam.length > 0 &&
+      quoteNumbersParam.length === customerIds.length;
+
+    if (parallelQuotes) {
       customerIds.forEach((cid, idx) => {
-        if (allowedSet.has(String(cid)) && quoteNumbersParam[idx]) {
-          customerToQuote.set(String(cid), quoteNumbersParam[idx]);
-        }
+        if (!allowedSet.has(String(cid)) || !quoteNumbersParam[idx]) return;
+        const s = String(cid);
+        const qn = quoteNumbersParam[idx];
+        if (!quotesByCustomer.has(s)) quotesByCustomer.set(s, []);
+        quotesByCustomer.get(s).push(qn);
+        customerToQuote.set(s, qn);
       });
     } else if (quoteNumberParam) {
-      allowedCustomerIds.forEach((cid) =>
-        customerToQuote.set(String(cid), quoteNumberParam),
-      );
+      for (const cid of allowedCustomerIds) {
+        const s = String(cid);
+        quotesByCustomer.set(s, [quoteNumberParam]);
+        customerToQuote.set(s, quoteNumberParam);
+      }
+    } else if (
+      allowedCustomerIds.length === 1 &&
+      quoteNumbersParam.length > 0
+    ) {
+      const s = String(allowedCustomerIds[0]);
+      if (allowedSet.has(s)) {
+        quotesByCustomer.set(s, [...quoteNumbersParam]);
+        customerToQuote.set(s, quoteNumbersParam[0]);
+      }
     }
 
-    if (customerToQuote.size > 0) {
-      const prefillPromises = [...customerToQuote.entries()].map(
-        ([cid, qn]) =>
+    /** Prefill lines keyed by pairKey(customerId, quoteNumber). */
+    const prefillByPair = new Map();
+    if (quotesByCustomer.size > 0) {
+      const pairs = [];
+      for (const [cid, qns] of quotesByCustomer) {
+        for (const qn of qns) {
+          pairs.push({ cid: String(cid), qn });
+        }
+      }
+      const prefillResults = await Promise.all(
+        pairs.map(({ cid, qn }) =>
           getQuotationPrefillForProspects(conn, qn, [cid], payload),
+        ),
       );
-      const prefillResults = await Promise.all(prefillPromises);
-      for (const pre of prefillResults) {
-        Object.assign(quoteAmounts, pre.quoteAmounts);
-        Object.assign(quotationLinesByCustomer, pre.quotationLinesByCustomer);
+      pairs.forEach(({ cid, qn }, idx) => {
+        const pre = prefillResults[idx];
+        const block = pre.quotationLinesByCustomer?.[cid];
+        const lines = block?.lines?.length ? [...block.lines] : [];
+        prefillByPair.set(pairKey(cid, qn), { lines });
+      });
+    }
+
+    /** One form card per quotation (same customer_id may repeat). */
+    const bulkFormRows = [];
+    for (const id of allowedCustomerIds) {
+      const s = String(id);
+      const qns = quotesByCustomer.get(s) ?? [];
+      if (qns.length === 0) {
+        bulkFormRows.push({
+          customerId: s,
+          quoteNumber: null,
+          lines: [],
+          quoteAmount: 0,
+        });
+      } else if (qns.length === 1) {
+        const qn = qns[0];
+        const lines = prefillByPair.get(pairKey(s, qn))?.lines ?? [];
+        bulkFormRows.push({
+          customerId: s,
+          quoteNumber: qn,
+          lines,
+          quoteAmount: sumLineTotalPrices(lines),
+        });
+      } else {
+        for (const qn of qns) {
+          const lines = prefillByPair.get(pairKey(s, qn))?.lines ?? [];
+          bulkFormRows.push({
+            customerId: s,
+            quoteNumber: qn,
+            lines,
+            quoteAmount: sumLineTotalPrices(lines),
+          });
+        }
       }
     }
 
@@ -145,6 +217,17 @@ export default async function NewProspectPage({ searchParams }) {
       conn,
       allowedCustomerIds,
     );
+
+    const bulkCustomerCount = bulkFormRows.length;
+    const quoteNumbersAligned = bulkFormRows.map((r) =>
+      r.quoteNumber ? String(r.quoteNumber).trim() : "",
+    );
+    const bulkHiddenQuoteNumberSingle =
+      bulkCustomerCount === 1 && quoteNumbersAligned[0]
+        ? quoteNumbersAligned[0]
+        : "";
+    const bulkHiddenQuoteNumbersCsv =
+      bulkCustomerCount > 1 ? quoteNumbersAligned.join(",") : "";
 
     return (
       <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-200 dark:bg-white">
@@ -165,7 +248,15 @@ export default async function NewProspectPage({ searchParams }) {
             <p className="mt-1 text-sm text-slate-500">
               {allowedCustomerIds.length} customer
               {allowedCustomerIds.length === 1 ? "" : "s"} from your selection
-              — fill each row below.
+              {bulkFormRows.length > allowedCustomerIds.length ? (
+                <>
+                  {" "}
+                  · {bulkFormRows.length} quotation
+                  {bulkFormRows.length === 1 ? "" : "s"} (one card each)
+                </>
+              ) : null}
+              {" "}
+              — fill each block below.
               {!isProspectsAdminRole(payload.role) &&
               customerIds.length > allowedCustomerIds.length ? (
                 <span className="mt-1 block text-amber-800">
@@ -199,52 +290,49 @@ export default async function NewProspectPage({ searchParams }) {
         ) : null}
 
         <form action={createProspectsBulk} className="space-y-6">
-          {customerToQuote.size === 1 ? (
+          {bulkHiddenQuoteNumberSingle ? (
             <input
               type="hidden"
               name="prospects_quote_number"
-              value={[...customerToQuote.values()][0] ?? ""}
+              value={bulkHiddenQuoteNumberSingle}
             />
           ) : null}
-          {customerToQuote.size > 1 ? (
+          {bulkCustomerCount > 1 ? (
             <input
               type="hidden"
               name="prospects_quote_numbers"
-              value={allowedCustomerIds.map((id) => customerToQuote.get(String(id)) ?? "").filter(Boolean).join(",")}
+              value={bulkHiddenQuoteNumbersCsv}
             />
           ) : null}
           <input
             type="hidden"
             name="customer_count"
-            value={allowedCustomerIds.length}
+            value={bulkCustomerCount}
           />
-          {allowedCustomerIds.map((id, i) => {
+          {bulkFormRows.map((row, i) => {
             const orderLocked =
-              orderCtx?.customer_id &&
-              String(orderCtx.customer_id) === String(id) &&
+              Boolean(orderCtx?.customer_id) &&
+              String(orderCtx.customer_id) === String(row.customerId) &&
               orderCtx.total_amount != null &&
               !Number.isNaN(Number(orderCtx.total_amount));
 
-            const prefillQuoteNumberForCustomer = orderLocked
-              ? orderCtx?.quote_number ?? null
-              : quotationLinesByCustomer[String(id)]?.quote_number ??
-                null;
+            const prefillQuoteNumberForRow = orderLocked
+              ? orderCtx?.quote_number ?? row.quoteNumber
+              : row.quoteNumber;
 
             return (
               <BulkProspectRowClient
-                key={id}
+                key={`${row.customerId}-${row.quoteNumber ?? "nq"}-${i}`}
                 i={i}
-                customerId={id}
-                customerName={customerNamesById[String(id)] ?? null}
-                initialQuoteAmount={quoteAmounts[String(id)]}
+                customerId={row.customerId}
+                customerName={customerNamesById[String(row.customerId)] ?? null}
+                initialQuoteAmount={row.quoteAmount}
                 initialQuotationLines={
-                  quotationLinesByCustomer[String(id)]?.lines?.length
-                    ? quotationLinesByCustomer[String(id)].lines
-                    : null
+                  row.lines?.length ? row.lines : null
                 }
                 orderLocked={orderLocked}
                 orderCtx={orderLocked ? orderCtx : null}
-                prefillQuoteNumber={prefillQuoteNumberForCustomer}
+                prefillQuoteNumber={prefillQuoteNumberForRow}
                 inputClass={inputClass}
                 amountReadOnly={amountReadOnly}
               />

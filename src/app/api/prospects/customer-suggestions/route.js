@@ -44,7 +44,9 @@ export async function GET(req) {
     const quoteToken =
       extractQuoteNumberFromProspectSearch(q) ||
       (q.toUpperCase().startsWith("QUOTE") ? q.trim() : null);
-    if (!quoteToken) {
+    const numericCustomerId = /^\d{1,20}$/.test(q) ? q : null;
+
+    if (!quoteToken && !numericCustomerId) {
       return NextResponse.json({ success: true, suggestions: [] });
     }
 
@@ -59,20 +61,37 @@ export async function GET(req) {
       return NextResponse.json({ success: true, suggestions: [] });
     }
 
-    const quoteParams = [`%${quoteToken}%`];
-    if (!admin) quoteParams.push(username, username);
-
-    const [quoteHits] = await conn.execute(
-      `SELECT qr.quote_number, qr.quote_date, qr.grand_total, qr.emp_name, qr.company_name,
+    const selectSql = `SELECT qr.quote_number, qr.quote_date, qr.grand_total, qr.emp_name, qr.company_name,
         c.customer_id, c.first_name, c.last_name, c.phone, c.company, c.email
        FROM quotations_records qr
-       INNER JOIN customers c ON c.customer_id = qr.customer_id
+       INNER JOIN customers c ON c.customer_id = qr.customer_id`;
+
+    let quoteHits;
+    if (quoteToken) {
+      const quoteParams = [`%${quoteToken}%`];
+      if (!admin) quoteParams.push(username, username);
+      const [rows] = await conn.execute(
+        `${selectSql}
        WHERE qr.quote_number LIKE ?
        ${ownerCustomer}
        ORDER BY qr.quote_date DESC, qr.created_at DESC
        LIMIT 20`,
-      quoteParams,
-    );
+        quoteParams,
+      );
+      quoteHits = rows;
+    } else {
+      const idParams = [numericCustomerId];
+      if (!admin) idParams.push(username, username);
+      const [rows] = await conn.execute(
+        `${selectSql}
+       WHERE TRIM(CAST(c.customer_id AS CHAR)) = ?
+       ${ownerCustomer}
+       ORDER BY qr.quote_date DESC, qr.created_at DESC
+       LIMIT 50`,
+        idParams,
+      );
+      quoteHits = rows;
+    }
 
     const suggestions = (quoteHits || []).map(mapQuoteRow);
 
