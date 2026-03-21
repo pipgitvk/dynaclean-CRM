@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link"; // Import Link for Next.js navigation
 
-export default function QuotationTableClient({ username }) {
+export default function QuotationTableClient({ username, customerId }) {
   const [quotations, setQuotations] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,11 +14,13 @@ export default function QuotationTableClient({ username }) {
   const fetchData = async () => {
     console.log("Fetching quotations for user:", username);
     setLoading(true);
-    let url = `/api/quotations-show?username=${username}`;
+    let url = `/api/quotations-show?username=${encodeURIComponent(username || "")}`;
 
     // Append filters to the API request URL
     if (fromDate) url += `&from_date=${fromDate}`;
     if (toDate) url += `&to_date=${toDate}`;
+    if (customerId)
+      url += `&customer_id=${encodeURIComponent(String(customerId))}`;
 
     try {
       const res = await fetch(url);
@@ -39,7 +41,7 @@ export default function QuotationTableClient({ username }) {
 
   useEffect(() => {
     fetchData(); // Load data initially
-  }, [username, fromDate, toDate]);
+  }, [username, fromDate, toDate, customerId]);
 
   useEffect(() => {
     if (!search) {

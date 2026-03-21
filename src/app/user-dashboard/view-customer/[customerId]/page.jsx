@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
+import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
 import Link from "next/link";
 import axios from "axios";
 
@@ -224,35 +225,40 @@ export default async function CustomerPage({ params }) {
         {/* Actions and Follow-up History Block */}
         <div className="bg-white shadow-lg rounded-lg p-6 flex flex-col">
           <h2 className="text-2xl font-bold text-gray-800 mb-5">Actions</h2>
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-10 gap-4">
+          <div className="flex flex-col gap-3 mb-10 w-full md:flex-row md:flex-wrap md:items-stretch md:gap-3">
             <a
               href={`/user-dashboard/view-customer/${customerId}/follow-up`}
-              className="btn text-white bg-green-600 hover:bg-green-700 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
+              className="btn text-white bg-green-600 hover:bg-green-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
             >
               Follow-up
             </a>
             <a
               href={`/user-dashboard/view-customer/${customerId}/edit`}
-              className="btn text-white bg-yellow-600 hover:bg-yellow-700 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
+              className="btn text-white bg-yellow-600 hover:bg-yellow-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
             >
               Edit
             </a>
             <a
               href={`/user-dashboard/view-customer/${customerId}/demo`}
-              className="btn text-white bg-blue-600 hover:bg-blue-700 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
+              className="btn text-white bg-blue-600 hover:bg-blue-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
             >
               Demo Registration
             </a>
             <CustomerContactsModal customerId={customerId} />
+            <ViewCustomerQuotationsLink
+              customerId={customerId}
+              dashboardBase="user-dashboard"
+              variant="user"
+            />
             <Link
               href={`/user-dashboard/quotations/new?customerId=${customerId}`}
-              className="btn text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
+              className="btn text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
             >
               add Quotation
             </Link>
             <Link
               href={`/user-dashboard/special-pricing/${customerId}`}
-              className="btn text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md w-full sm:w-1/3 text-center transition duration-300"
+              className="btn text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
             >
               Special Price
             </Link>

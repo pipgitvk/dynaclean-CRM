@@ -5,7 +5,7 @@ import { getSessionPayload } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 // FETCH QUOTATIONS
-async function getQuotations(username, role, { search, date_from, date_to }) {
+async function getQuotations(username, role, { search, date_from, date_to, customer_id }) {
   const conn = await getDbConnection();
 
   let query = "";
@@ -85,6 +85,11 @@ async function getQuotations(username, role, { search, date_from, date_to }) {
     values.push(date_from, date_to);
   }
 
+  if (customer_id) {
+    query += ` AND qr.customer_id = ? `;
+    values.push(customer_id);
+  }
+
   // ---------------------------------------------------------
   // ⭐ ORDER BY LATEST FIRST
   // ---------------------------------------------------------
@@ -107,6 +112,7 @@ export default async function QuotationPage({ searchParams }) {
     search: params?.search ?? "",
     date_from: params?.date_from ?? "",
     date_to: params?.date_to ?? "",
+    customer_id: params?.customer_id ? String(params.customer_id).trim() : "",
   };
 
   const quotations = await getQuotations(username, role, filters);
@@ -129,6 +135,13 @@ export default async function QuotationPage({ searchParams }) {
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 bg-white p-3 rounded shadow"
         method="get"
       >
+        {filters.customer_id ? (
+          <input
+            type="hidden"
+            name="customer_id"
+            value={filters.customer_id}
+          />
+        ) : null}
         <input
           type="text"
           name="search"

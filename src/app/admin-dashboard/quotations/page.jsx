@@ -5,7 +5,7 @@ import QuotationTableClient from "./QuotationClientTable";
 
 export const dynamic = "force-dynamic";
 
-export default async function QuotationPage() {
+export default async function QuotationPage({ searchParams }) {
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
   let username = "";
@@ -17,6 +17,9 @@ export default async function QuotationPage() {
     );
     username = payload.username;
   }
+
+  const sp = await searchParams;
+  const customerId = sp?.customer_id ? String(sp.customer_id).trim() : "";
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -33,7 +36,7 @@ export default async function QuotationPage() {
       </div>
 
       {/* Send username to client component */}
-      <QuotationTableClient username={username} />
+      <QuotationTableClient username={username} customerId={customerId} />
     </div>
   );
 }
