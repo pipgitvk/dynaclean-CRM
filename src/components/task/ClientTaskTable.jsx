@@ -5,6 +5,10 @@ import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+import {
+  formatTaskDateOnly,
+  dayjsTaskCalendarStart,
+} from "@/lib/formatTaskDate";
 import { Repeat } from "lucide-react";
 import ReassignModal from "@/components/models/ReassignModal";
 
@@ -45,7 +49,9 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
       // Date range filter
       let matchesDateRange = true;
       if (fromDate || toDate) {
-        const assignDate = task.followed_date ? dayjs(task.followed_date) : null;
+        const assignDate = task.followed_date
+          ? dayjsTaskCalendarStart(task.followed_date)
+          : null;
         if (assignDate && assignDate.isValid()) {
           if (fromDate && toDate) {
             matchesDateRange = assignDate.isSameOrAfter(dayjs(fromDate), 'day') && 
@@ -104,7 +110,7 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
   const completedTasks = filteredTasks.filter(task => task.status === "Completed").length;
   const workingTasks = filteredTasks.filter(task => task.status === "Working").length;
   const delayedTasks = filteredTasks.filter(task => {
-    const deadline = dayjs(task.next_followup_date).startOf("day");
+    const deadline = dayjsTaskCalendarStart(task.next_followup_date);
     return task.status !== "Completed" && today.isAfter(deadline);
   }).length;
 
@@ -136,9 +142,9 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
 
   const getTableRowColor = (task) => {
     const today = dayjs().startOf("day");
-    const deadline = dayjs(task.next_followup_date).startOf("day");
+    const deadline = dayjsTaskCalendarStart(task.next_followup_date);
     const completionDate = task.task_completion_date
-      ? dayjs(task.task_completion_date).startOf("day")
+      ? dayjsTaskCalendarStart(task.task_completion_date)
       : null;
 
     if (task.status === "Working") {
@@ -360,18 +366,18 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                   <td className="px-4 py-2">{task.reassign}</td>
                   <td className="px-4 py-2">
                     {task.followed_date
-                      ? dayjs(task.followed_date).format("DD/MM/YYYY")
+                      ? formatTaskDateOnly(task.followed_date)
                       : "-"}
                   </td>
                   <td className="px-4 py-2">
                     {task.next_followup_date
-                      ? dayjs(task.next_followup_date).format("DD/MM/YYYY")
+                      ? formatTaskDateOnly(task.next_followup_date)
                       : "-"}
                   </td>
                   <td className="px-4 py-2">{task.status}</td>
                   <td className="px-4 py-2">
                     {task.task_completion_date
-                      ? dayjs(task.task_completion_date).format("DD/MM/YYYY")
+                      ? formatTaskDateOnly(task.task_completion_date)
                       : "-"}
                   </td>
                   <td className="px-4 py-2">
@@ -439,13 +445,13 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                 <div className="text-sm mb-2">
                   <strong>Assign Date:</strong>{" "}
                   {task.followed_date
-                    ? dayjs(task.followed_date).format("DD/MM/YYYY")
+                    ? formatTaskDateOnly(task.followed_date)
                     : "-"}
                 </div>
                 <div className="text-sm mb-2">
                   <strong>Deadline:</strong>{" "}
                   {task.next_followup_date
-                    ? dayjs(task.next_followup_date).format("DD/MM/YYYY")
+                    ? formatTaskDateOnly(task.next_followup_date)
                     : "-"}
                 </div>
                 <div className="text-sm mb-2">
@@ -454,7 +460,7 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                 <div className="text-sm mb-2">
                   <strong>Completion:</strong>{" "}
                   {task.task_completion_date
-                    ? dayjs(task.task_completion_date).format("DD/MM/YYYY")
+                    ? formatTaskDateOnly(task.task_completion_date)
                     : "-"}
                 </div>
                 <div className="text-sm mt-2 flex items-center gap-2">
