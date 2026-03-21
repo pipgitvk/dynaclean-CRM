@@ -2,9 +2,7 @@
 import { getDbConnection } from "@/lib/db";
 
 export async function GET(req, { params }) {
-  console.log("params:", params);
   const { quoteId } = await params;
-  // console.log("quoteId:", quoteId);
   const quoteNumber = quoteId;
   if (!quoteNumber) {
     return Response.json(
@@ -16,53 +14,56 @@ export async function GET(req, { params }) {
   const conn = await getDbConnection();
 
   try {
-    const response = { success: true };
-
-    response.quote_number = quoteNumber;
-
-    // Get quotation details from quotations_records table
-    const [details] = await conn.execute(
-      `SELECT customer_id, company_name, company_address, state, ship_to, gstin, payment_term_days
-       FROM quotations_records WHERE quote_number = ?`,
+    const [headerRows] = await conn.execute(
+      "SELECT * FROM quotations_records WHERE quote_number = ?",
       [quoteNumber],
     );
 
-    if (!details.length) {
+    if (!headerRows.length) {
       return Response.json(
         { success: false, message: "Quotation not found" },
         { status: 404 },
       );
     }
 
+    const header = headerRows[0];
+
     const [customerDetails] = await conn.execute(
-      `SELECT first_name, email, phone from customers where customer_id = ?`,
-      [details[0].customer_id],
+      `SELECT first_name, email, phone FROM customers WHERE customer_id = ?`,
+      [header.customer_id],
     );
 
-    const data = details[0];
-    response.company_name = data.company_name;
-    response.company_address = data.company_address;
-    response.state = data.state;
-    response.ship_to = data.ship_to;
-    response.gstin = data.gstin;
-    response.payment_term_days = data.payment_term_days;
-    response.client_name = data.client_name;
-    response.contact = data.contact;
-    response.email = data.email;
-    response.delivery_location = data.delivery_location;
-    response.client_name = customerDetails[0]?.first_name || "";
-    response.phone = customerDetails[0]?.phone || "";
-    response.email = customerDetails[0]?.email || "";
+    const cust = customerDetails[0];
+    const customerFirstName = cust?.first_name || "";
+    const customerPhone = cust?.phone || "";
+    const customerEmail = cust?.email || "";
 
-    // Get quotation items
     const [items] = await conn.execute(
-      `SELECT img_url, item_name, item_code, specification, quantity, unit, price_per_unit,
-              taxable_price, gst, total_price
-       FROM quotation_items WHERE quote_number = ?`,
+      "SELECT * FROM quotation_items WHERE quote_number = ?",
       [quoteNumber],
     );
 
-    response.items = items ?? [];
+    // Full payload for QuotationViewer modal
+    const response = {
+      success: true,
+      header,
+      items: items ?? [],
+      customerEmail,
+      customerPhone,
+      customerFirstName,
+      // Backward compatibility (order forms, upload, etc.)
+      quote_number: header.quote_number,
+      company_name: header.company_name,
+      company_address: header.company_address,
+      state: header.state,
+      ship_to: header.ship_to,
+      gstin: header.gstin,
+      payment_term_days: header.payment_term_days,
+      client_name: customerFirstName,
+      phone: customerPhone,
+      email: customerEmail,
+      delivery_location: header.delivery_location ?? "",
+    };
 
     return Response.json(response);
   } catch (err) {
@@ -71,7 +72,5 @@ export async function GET(req, { params }) {
       { success: false, message: "Server error" },
       { status: 500 },
     );
-  } finally {
-    // await conn.end();
   }
 }
