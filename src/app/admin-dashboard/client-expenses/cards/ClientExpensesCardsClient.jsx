@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Building2, User, IndianRupee, ListChecks, ChevronRight, Search, LayoutList } from "lucide-react";
 
 function parseIdTokens(raw) {
@@ -60,7 +61,16 @@ function buildSummary(rows) {
 }
 
 export default function ClientExpensesCardsClient({ rows }) {
+  const router = useRouter();
   const [txnSearch, setTxnSearch] = useState("");
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [router]);
 
   const filteredRows = useMemo(() => {
     const q = txnSearch.trim().toLowerCase();

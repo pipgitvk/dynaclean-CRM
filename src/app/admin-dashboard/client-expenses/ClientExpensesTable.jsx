@@ -3,13 +3,22 @@
 import React from "react";
 import Link from "next/link";
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Eye, Pencil, Trash2, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X, Calendar } from "lucide-react";
 
 export default function ClientExpensesTable({ rows, client, group, initialSearchQuery = "" }) {
   const router = useRouter();
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [router]);
+
   const [searchQuery, setSearchQuery] = useState(() => initialSearchQuery || "");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");

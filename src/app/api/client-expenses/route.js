@@ -11,6 +11,9 @@ export async function GET(req) {
 
     await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
+    const { searchParams } = new URL(req.url);
+    const rootOnly = searchParams.get("root_only") === "1";
+
     const conn = await getDbConnection();
     try {
       await conn.execute("SELECT transaction_id FROM client_expenses LIMIT 1");
@@ -19,11 +22,25 @@ export async function GET(req) {
         await conn.execute("ALTER TABLE client_expenses ADD COLUMN transaction_id VARCHAR(255) NULL AFTER hsn");
       } catch (__) {}
     }
-    const [rows] = await conn.execute(
-      `SELECT id, expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount, created_at
-       FROM client_expenses
-       ORDER BY id DESC`
-    );
+
+    const selectCols = `ce.id, ce.expense_name, ce.client_name, ce.group_name, ce.tax_applicable, ce.tax_type, ce.main_head, ce.head, ce.supply, ce.type_of_ledger, ce.cgst, ce.sgst, ce.igst, ce.hsn, ce.transaction_id, ce.gst_rate, ce.amount, ce.created_at`;
+
+    const [rows] = rootOnly
+      ? await conn.execute(
+          `SELECT ${selectCols}
+           FROM client_expenses ce
+           INNER JOIN (
+             SELECT MIN(id) AS id
+             FROM client_expenses
+             GROUP BY client_name, COALESCE(group_name, ''), expense_name
+           ) r ON ce.id = r.id
+           ORDER BY ce.id DESC`,
+        )
+      : await conn.execute(
+          `SELECT id, expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount, created_at
+           FROM client_expenses
+           ORDER BY id DESC`,
+        );
 
     return NextResponse.json({ clientExpenses: rows });
   } catch (err) {
@@ -52,10 +69,6 @@ export async function POST(req) {
         { error: "expense_name, client_name, and main_head are required" },
         { status: 400 }
       );
-    }
-
-    if (!txnId) {
-      return NextResponse.json({ error: "transaction_id is required" }, { status: 400 });
     }
 
     if (!["Direct", "Indirect"].includes(main_head)) {
