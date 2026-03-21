@@ -67,6 +67,7 @@ const iconMap = {
   Mail,
   Settings,
   Import,
+  ArrowLeft,
 };
 
 export default function Sidebar({
@@ -125,11 +126,16 @@ export default function Sidebar({
         );
       }
 
+      const isLightRedNav = item.sidebarVariant === "lightRed";
+      const leafLinkClass = isLightRedNav
+        ? "flex items-center gap-2 rounded-md border border-red-300/90 bg-red-100 p-2 text-sm font-medium text-red-950 shadow-sm transition-colors hover:bg-red-200 dark:border-red-500/50 dark:bg-red-950/55 dark:text-red-50 dark:hover:bg-red-900/60"
+        : `flex items-center gap-2 ${theme.sidebar.hover} rounded-md transition-colors p-2`;
+
       return (
         <li key={itemKey} className="m-2">
           <Link
             href={item.path}
-            className={`flex items-center gap-2 ${theme.sidebar.hover} rounded-md transition-colors p-2`}
+            className={leafLinkClass}
             onClick={handleLinkClick}
           >
             {Icon && <Icon size={20} />}

@@ -25,39 +25,74 @@ export default function EditStatementPage() {
   const [expenses, setExpenses] = useState([]);
 
   useEffect(() => {
-    fetch("/api/client-expenses", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setExpenses(data?.clientExpenses || []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const fetchStatement = async () => {
+    let cancelled = false;
+    (async () => {
       try {
         const res = await fetch(`/api/statements/${id}`);
         const row = await res.json();
         if (!res.ok) {
-          setError("Statement not found");
+          if (!cancelled) {
+            setError("Statement not found");
+            setLoading(false);
+          }
           return;
         }
+
+        const linked =
+          row.client_expense_id != null && Number(row.client_expense_id) >= 1
+            ? Number(row.client_expense_id)
+            : null;
+
+        const rRoot = await fetch("/api/client-expenses?root_only=1", {
+          credentials: "include",
+        });
+        const rootData = await rRoot.json();
+        let list = rootData?.clientExpenses || [];
+
+        if (
+          linked &&
+          !list.some((e) => Number(e.id) === linked)
+        ) {
+          const rOne = await fetch(`/api/client-expenses/${linked}`, {
+            credentials: "include",
+          });
+          const one = await rOne.json();
+          if (one?.id && !one.error) {
+            const { sub_heads: _s, ...rest } = one;
+            list = [...list, rest];
+          }
+        }
+
+        list.sort((a, b) => Number(b.id) - Number(a.id));
+
+        if (cancelled) return;
+        setExpenses(list);
         setForm({
           trans_id: row.trans_id || "",
           date: row.date ? dayjs(row.date).format("YYYY-MM-DD") : "",
-          txn_dated_deb: row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("YYYY-MM-DD") : "",
-          txn_posted_date: row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("YYYY-MM-DD") : "",
+          txn_dated_deb:
+            row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00"
+              ? dayjs(row.txn_dated_deb).format("YYYY-MM-DD")
+              : "",
+          txn_posted_date:
+            row.txn_posted_date && row.txn_posted_date !== "0000-00-00"
+              ? dayjs(row.txn_posted_date).format("YYYY-MM-DD")
+              : "",
           cheq_no: row.cheq_no || "",
           description: row.description || "",
           type: row.type || "Credit",
           amount: row.amount ?? "",
-          client_expense_id: row.client_expense_id ? String(row.client_expense_id) : "",
+          client_expense_id: linked ? String(linked) : "",
         });
       } catch (e) {
-        setError("Failed to load statement");
+        if (!cancelled) setError("Failed to load statement");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    fetchStatement();
   }, [id]);
 
   const handleChange = (e) => {
@@ -88,6 +123,7 @@ export default function EditStatementPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to update");
       toast.success("Statement updated successfully!");
+      router.refresh();
       router.push("/admin-dashboard/statements");
     } catch (e) {
       setError(e.message || "Failed to save");
@@ -110,7 +146,8 @@ export default function EditStatementPage() {
             name="trans_id"
             value={form.trans_id}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            readOnly
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
             required
           />
         </div>
@@ -121,7 +158,8 @@ export default function EditStatementPage() {
             type="date"
             value={form.date}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            readOnly
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
             required
           />
         </div>
@@ -132,7 +170,8 @@ export default function EditStatementPage() {
             type="date"
             value={form.txn_dated_deb}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            readOnly
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
           />
         </div>
         <div>
@@ -175,7 +214,8 @@ export default function EditStatementPage() {
             step="0.01"
             value={form.amount}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            readOnly
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
             required
           />
         </div>

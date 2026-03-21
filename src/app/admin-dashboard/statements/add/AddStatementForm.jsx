@@ -19,11 +19,35 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
   });
 
   useEffect(() => {
-    fetch("/api/client-expenses", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setExpenses(data?.clientExpenses || []))
-      .catch(() => {});
-  }, []);
+    let cancelled = false;
+    (async () => {
+      try {
+        const rRoot = await fetch("/api/client-expenses?root_only=1", {
+          credentials: "include",
+        });
+        const rootData = await rRoot.json();
+        let list = rootData?.clientExpenses || [];
+        const n = expenseId ? Number(expenseId) : null;
+        if (n && Number.isFinite(n) && n >= 1 && !list.some((e) => Number(e.id) === n)) {
+          const rOne = await fetch(`/api/client-expenses/${n}`, {
+            credentials: "include",
+          });
+          const one = await rOne.json();
+          if (one?.id && !one.error) {
+            const { sub_heads: _s, ...rest } = one;
+            list = [...list, rest];
+          }
+        }
+        list.sort((a, b) => Number(b.id) - Number(a.id));
+        if (!cancelled) setExpenses(list);
+      } catch {
+        if (!cancelled) setExpenses([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [expenseId]);
 
   useEffect(() => {
     fetch("/api/statements/last-balance", { credentials: "include" })

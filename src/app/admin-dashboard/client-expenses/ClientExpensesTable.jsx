@@ -3,36 +3,26 @@
 import React from "react";
 import Link from "next/link";
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import toast from "react-hot-toast";
-import { Eye, Pencil, Trash2, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X, Calendar } from "lucide-react";
+import { Eye, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X, Calendar } from "lucide-react";
 
 export default function ClientExpensesTable({ rows, client, group, initialSearchQuery = "" }) {
   const router = useRouter();
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [router]);
+
   const [searchQuery, setSearchQuery] = useState(() => initialSearchQuery || "");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-  const [deletingId, setDeletingId] = useState(null);
   const [expandedHeads] = useState(new Set());
-
-  const handleDelete = async (id, e) => {
-    e?.preventDefault();
-    if (!confirm("Are you sure you want to delete this client expense? This cannot be undone.")) return;
-    setDeletingId(id);
-    try {
-      const res = await fetch(`/api/client-expenses/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to delete");
-      toast.success("Client expense deleted successfully!");
-      router.refresh();
-    } catch (err) {
-      toast.error(err.message || "Failed to delete");
-    } finally {
-      setDeletingId(null);
-    }
-  };
 
   const filteredRows = rows.filter((row) => {
     const matchesSearch =
@@ -138,18 +128,6 @@ export default function ClientExpensesTable({ rows, client, group, initialSearch
           <Link href={`/admin-dashboard/client-expenses/${row.id}`} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors" title="View">
             <Eye size={16} />
           </Link>
-          <Link href={`/admin-dashboard/client-expenses/edit/${row.id}`} className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 hover:text-amber-700 transition-colors" title="Edit">
-            <Pencil size={16} />
-          </Link>
-          <button
-            type="button"
-            onClick={(e) => handleDelete(row.id, e)}
-            disabled={deletingId === row.id}
-            className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-50 transition-colors"
-            title="Delete"
-          >
-            <Trash2 size={16} />
-          </button>
         </div>
       </td>
     </tr>
@@ -291,8 +269,6 @@ export default function ClientExpensesTable({ rows, client, group, initialSearch
               <span className="font-semibold text-emerald-700">₹{row.amount != null ? Number(row.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}</span>
               <div className="flex gap-1.5">
                 <Link href={`/admin-dashboard/client-expenses/${row.id}`} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100" title="View"><Eye size={16} /></Link>
-                <Link href={`/admin-dashboard/client-expenses/edit/${row.id}`} className="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100" title="Edit"><Pencil size={16} /></Link>
-                <button type="button" onClick={(e) => handleDelete(row.id, e)} disabled={deletingId === row.id} className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50" title="Delete"><Trash2 size={16} /></button>
               </div>
             </div>
           </div>
