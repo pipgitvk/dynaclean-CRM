@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useTransition } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useTransition,
+  useMemo,
+} from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, Pencil, Search, Trash2 } from "lucide-react";
@@ -264,15 +271,21 @@ export default function ProspectsListCard({
     (snapshot) => {
       if (!viewerIsAdmin) return;
       const p = new URLSearchParams(searchParams.toString());
-      if (snapshot.commitmentYear != null) {
-        p.set("commitment_year", String(snapshot.commitmentYear));
+      if (
+        snapshot.commitmentYear != null &&
+        Number.isFinite(Number(snapshot.commitmentYear))
+      ) {
+        p.set("commitment_year", String(Number(snapshot.commitmentYear)));
       } else {
-        p.delete("commitment_year");
+        p.set("commitment_year", "all");
       }
-      if (snapshot.commitmentMonth != null) {
-        p.set("commitment_month", String(snapshot.commitmentMonth));
+      if (
+        snapshot.commitmentMonth != null &&
+        Number.isFinite(Number(snapshot.commitmentMonth))
+      ) {
+        p.set("commitment_month", String(Number(snapshot.commitmentMonth)));
       } else {
-        p.delete("commitment_month");
+        p.set("commitment_month", "all");
       }
       if (snapshot.commitmentDay != null) {
         p.set("commitment_day", String(snapshot.commitmentDay));
@@ -530,6 +543,15 @@ export default function ProspectsListCard({
   ];
   const tableColSpan = tableHeaders.length;
 
+  const tableTotalAmount = useMemo(() => {
+    let sum = 0;
+    for (const row of rows) {
+      const n = Number(row.amount);
+      if (Number.isFinite(n)) sum += n;
+    }
+    return sum;
+  }, [rows]);
+
   return (
     <>
       <ProspectsSearchBar
@@ -545,9 +567,22 @@ export default function ProspectsListCard({
       {viewerIsAdmin ? (
         <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Admin filters
-            </p>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Admin filters
+              </p>
+              <div
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm"
+                title="Sum of Total amount for rows currently shown in the table"
+              >
+                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  Total amount
+                </p>
+                <p className="text-sm font-semibold tabular-nums text-slate-900">
+                  {formatAmount(tableTotalAmount)}
+                </p>
+              </div>
+            </div>
             <button
               type="button"
               onClick={clearAdminFilters}
