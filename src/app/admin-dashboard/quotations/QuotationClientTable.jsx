@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link"; // Import Link for Next.js navigation
+import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
 export default function QuotationTableClient({ username, customerId }) {
   const [quotations, setQuotations] = useState([]);
   const [filtered, setFiltered] = useState([]);
+  const [modalQuote, setModalQuote] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -77,6 +78,12 @@ export default function QuotationTableClient({ username, customerId }) {
 
   return (
     <div className="bg-white rounded shadow p-4">
+      <QuotationViewModal
+        quoteNumber={modalQuote}
+        onClose={() => setModalQuote(null)}
+        showAddProspectLink
+      />
+
       {/* Filters */}
       <div className="flex flex-col md:flex-row justify-between gap-2 mb-4">
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
@@ -146,12 +153,13 @@ export default function QuotationTableClient({ username, customerId }) {
                   <td className="px-4 py-2">₹{q.grand_total}</td>
                   <td className="px-4 py-2">{q.emp_name}</td>
                   <td className="px-4 py-2 text-center">
-                    <Link
-                      href={`/admin-dashboard/quotations/${q.quote_number}`}
+                    <button
+                      type="button"
+                      onClick={() => setModalQuote(q.quote_number)}
                       className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 inline-block"
                     >
                       View
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               ))
@@ -205,12 +213,13 @@ export default function QuotationTableClient({ username, customerId }) {
                 {q.emp_name}
               </p>
               <div className="flex justify-end">
-                <Link
-                  href={`/admin-dashboard/quotations/${q.quote_number}`}
+                <button
+                  type="button"
+                  onClick={() => setModalQuote(q.quote_number)}
                   className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm"
                 >
                   View Quotation
-                </Link>
+                </button>
               </div>
             </div>
           ))

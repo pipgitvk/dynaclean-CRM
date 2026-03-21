@@ -30,7 +30,14 @@ function maskMobile(phone) {
   return digits.slice(0, -4) + "****";
 }
 
-export default function QuotationViewer({ header, items, customerEmail = "", customerPhone = "", customerFirstName = "" }) {
+export default function QuotationViewer({
+  header,
+  items,
+  customerEmail = "",
+  customerPhone = "",
+  customerFirstName = "",
+  showAddProspectLink = true,
+}) {
   const containerRef = useRef();
   const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
   // Map payment_term_days to readable text
@@ -627,7 +634,7 @@ export default function QuotationViewer({ header, items, customerEmail = "", cus
 
       {/* Download & Add prospect */}
       <div className="flex gap-5 items-center justify-end w-full">
-        {header?.customer_id && header?.quote_number ? (
+        {showAddProspectLink && header?.customer_id && header?.quote_number ? (
           <Link
             href={`/admin-dashboard/prospects/new?customers=${encodeURIComponent(header.customer_id)}&quote_number=${encodeURIComponent(header.quote_number)}`}
             className="px-4 py-2 bg-slate-800 text-white rounded hover:bg-slate-700 text-sm"
