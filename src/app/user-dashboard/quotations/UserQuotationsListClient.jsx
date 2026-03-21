@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
 export default function UserQuotationsListClient({ quotations }) {
@@ -11,7 +12,7 @@ export default function UserQuotationsListClient({ quotations }) {
       <QuotationViewModal
         quoteNumber={modalQuote}
         onClose={() => setModalQuote(null)}
-        showAddProspectLink={false}
+        showAddProspectLink
       />
 
       <div className="hidden md:block overflow-x-auto bg-white rounded shadow">
@@ -57,13 +58,23 @@ export default function UserQuotationsListClient({ quotations }) {
                   <td className="px-4 py-2">₹{q.grand_total}</td>
                   <td className="px-4 py-2">{q.created_by}</td>
                   <td className="px-4 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setModalQuote(q.quote_number)}
-                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                    >
-                      View
-                    </button>
+                    <div className="flex flex-wrap gap-1 justify-center items-center">
+                      <button
+                        type="button"
+                        onClick={() => setModalQuote(q.quote_number)}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                      >
+                        View
+                      </button>
+                      <Link
+                        href={`/user-dashboard/quotations/${encodeURIComponent(q.quote_number)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm border border-gray-400 text-gray-700 px-2 py-1 rounded hover:bg-gray-50"
+                      >
+                        Full page
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -111,7 +122,7 @@ export default function UserQuotationsListClient({ quotations }) {
                 <strong>Created By:</strong> {q.created_by}
               </div>
 
-              <div className="text-right">
+              <div className="text-right flex flex-wrap gap-2 justify-end">
                 <button
                   type="button"
                   onClick={() => setModalQuote(q.quote_number)}
@@ -119,6 +130,14 @@ export default function UserQuotationsListClient({ quotations }) {
                 >
                   View
                 </button>
+                <Link
+                  href={`/user-dashboard/quotations/${encodeURIComponent(q.quote_number)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-sm border border-gray-400 text-gray-700 px-3 py-1 rounded hover:bg-gray-50"
+                >
+                  Full page
+                </Link>
               </div>
             </div>
           ))

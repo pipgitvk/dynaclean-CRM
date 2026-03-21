@@ -79,11 +79,17 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
   }
 
   // ---------------------------------------------------------
-  // ⭐ DATE FILTER
+  // ⭐ DATE FILTER (full range, or open-ended if only one date)
   // ---------------------------------------------------------
   if (date_from && date_to) {
     query += ` AND qr.quote_date BETWEEN ? AND ? `;
     values.push(date_from, date_to);
+  } else if (date_from) {
+    query += ` AND qr.quote_date >= ? `;
+    values.push(date_from);
+  } else if (date_to) {
+    query += ` AND qr.quote_date <= ? `;
+    values.push(date_to);
   }
 
   if (customer_id) {
@@ -125,7 +131,11 @@ export default async function QuotationPage({ searchParams }) {
           Quotation Management
         </h1>
         <Link
-          href="/user-dashboard/quotations/new"
+          href={
+            filters.customer_id
+              ? `/user-dashboard/quotations/new?customerId=${encodeURIComponent(filters.customer_id)}`
+              : "/user-dashboard/quotations/new"
+          }
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-center"
         >
           + New Quotation
@@ -165,7 +175,14 @@ export default async function QuotationPage({ searchParams }) {
         <button type="submit" className="p-2 bg-green-600 text-white rounded">
           Apply
         </button>
-        <a href="?" className="p-2 border rounded text-center">
+        <a
+          href={
+            filters.customer_id
+              ? `?customer_id=${encodeURIComponent(filters.customer_id)}`
+              : "?"
+          }
+          className="p-2 border rounded text-center"
+        >
           Reset
         </a>
       </form>

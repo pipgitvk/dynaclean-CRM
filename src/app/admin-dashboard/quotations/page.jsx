@@ -28,7 +28,11 @@ export default async function QuotationPage({ searchParams }) {
           Quotation Management
         </h1>
         <a
-          href="/admin-dashboard/quotations/new"
+          href={
+            customerId
+              ? `/admin-dashboard/quotations/new?customerId=${encodeURIComponent(customerId)}`
+              : "/admin-dashboard/quotations/new"
+          }
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           New Quotation
