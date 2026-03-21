@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { resetMysqlAutoIncrementIfEmpty } from "@/lib/resetMysqlAutoIncrementIfEmpty";
 import { jwtVerify } from "jose";
 
 export async function GET(req, { params }) {
@@ -161,10 +162,7 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: "Client expense not found" }, { status: 404 });
     }
 
-    const [countRows] = await conn.execute("SELECT COUNT(*) as cnt FROM client_expenses");
-    if (countRows[0].cnt === 0) {
-      await conn.execute("ALTER TABLE client_expenses AUTO_INCREMENT = 1");
-    }
+    await resetMysqlAutoIncrementIfEmpty(conn, "client_expenses");
 
     return NextResponse.json({ success: true });
   } catch (err) {

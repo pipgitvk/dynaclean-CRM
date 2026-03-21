@@ -146,7 +146,8 @@ export default function EditStatementPage() {
             name="trans_id"
             value={form.trans_id}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            readOnly
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
             required
           />
         </div>
@@ -157,7 +158,8 @@ export default function EditStatementPage() {
             type="date"
             value={form.date}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            readOnly
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
             required
           />
         </div>
@@ -168,7 +170,8 @@ export default function EditStatementPage() {
             type="date"
             value={form.txn_dated_deb}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            readOnly
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
           />
         </div>
         <div>
@@ -211,7 +214,8 @@ export default function EditStatementPage() {
             step="0.01"
             value={form.amount}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            readOnly
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
             required
           />
         </div>

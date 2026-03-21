@@ -6,6 +6,7 @@ import {
   deleteDedicatedExpenseForStatement,
 } from "@/lib/statementClientExpenseLink";
 import { revalidateClientExpensePages } from "@/lib/revalidateClientExpensePages";
+import { resetMysqlAutoIncrementIfEmpty } from "@/lib/resetMysqlAutoIncrementIfEmpty";
 
 export async function GET(req, { params }) {
   try {
@@ -175,6 +176,14 @@ export async function PUT(req, { params }) {
 
     revalidateClientExpensePages([...revalidateExpenseIds]);
 
+    const poolAfter = await getDbConnection();
+    const connReset = await poolAfter.getConnection();
+    try {
+      await resetMysqlAutoIncrementIfEmpty(connReset, "client_expenses");
+    } finally {
+      connReset.release();
+    }
+
     return NextResponse.json({ success: true });
   } catch (err) {
     if (err?.code === "ER_DUP_ENTRY") {
@@ -234,10 +243,8 @@ export async function DELETE(req, { params }) {
 
     const conn2 = await pool.getConnection();
     try {
-      const [countRows] = await conn2.execute("SELECT COUNT(*) as cnt FROM statements");
-      if (countRows[0].cnt === 0) {
-        await conn2.execute("ALTER TABLE statements AUTO_INCREMENT = 1");
-      }
+      await resetMysqlAutoIncrementIfEmpty(conn2, "statements");
+      await resetMysqlAutoIncrementIfEmpty(conn2, "client_expenses");
     } finally {
       conn2.release();
     }

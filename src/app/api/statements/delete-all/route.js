@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { resetMysqlAutoIncrementIfEmpty } from "@/lib/resetMysqlAutoIncrementIfEmpty";
 import { jwtVerify } from "jose";
 
 export async function DELETE(req) {
@@ -12,7 +13,7 @@ export async function DELETE(req) {
 
     const conn = await getDbConnection();
     const [result] = await conn.execute("DELETE FROM statements");
-    await conn.execute("ALTER TABLE statements AUTO_INCREMENT = 1");
+    await resetMysqlAutoIncrementIfEmpty(conn, "statements");
 
     return NextResponse.json({
       success: true,
