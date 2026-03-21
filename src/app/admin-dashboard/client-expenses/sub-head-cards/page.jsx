@@ -9,6 +9,16 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 export const dynamic = "force-dynamic";
 
+/** Cards UI uses this when `group_name` is null/empty in DB — must not match SQL as literal. */
+function isBlankGroupQueryParam(g) {
+  const s = String(g ?? "").trim();
+  if (s === "") return true;
+  if (s === "—") return true;
+  if (s === "\u2014") return true;
+  if (s === "–" || s === "\u2013") return true;
+  return false;
+}
+
 function getUniqueSubHeads(rows) {
   const seen = new Set();
   const result = [];
@@ -64,15 +74,25 @@ export default async function SubHeadCardsPage({ searchParams }) {
   let rows = [];
   try {
     const conn = await getDbConnection();
+    const blankGroup = isBlankGroupQueryParam(group);
     const [result] = await conn.execute(
-      `SELECT ce.id, ce.amount,
-              GROUP_CONCAT(cesh.sub_head SEPARATOR ', ') as sub_head
-       FROM client_expenses ce
-       LEFT JOIN client_expense_sub_heads cesh ON ce.id = cesh.client_expense_id
-       WHERE ce.client_name = ? AND ce.group_name = ?
-       GROUP BY ce.id
-       ORDER BY ce.id DESC`,
-      [client, group],
+      blankGroup
+        ? `SELECT ce.id, ce.amount,
+                  GROUP_CONCAT(cesh.sub_head SEPARATOR ', ') as sub_head
+           FROM client_expenses ce
+           LEFT JOIN client_expense_sub_heads cesh ON ce.id = cesh.client_expense_id
+           WHERE ce.client_name = ?
+             AND (ce.group_name IS NULL OR TRIM(COALESCE(ce.group_name, '')) = '')
+           GROUP BY ce.id
+           ORDER BY ce.id DESC`
+        : `SELECT ce.id, ce.amount,
+                  GROUP_CONCAT(cesh.sub_head SEPARATOR ', ') as sub_head
+           FROM client_expenses ce
+           LEFT JOIN client_expense_sub_heads cesh ON ce.id = cesh.client_expense_id
+           WHERE ce.client_name = ? AND ce.group_name = ?
+           GROUP BY ce.id
+           ORDER BY ce.id DESC`,
+      blankGroup ? [client] : [client, group],
     );
     rows = result;
   } catch (err) {
