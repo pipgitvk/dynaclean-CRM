@@ -140,10 +140,10 @@ export default function OrderDetails({ data, userRole }) {
                     {currency(item.price_per_unit)}
                   </td>
                   <td className="px-4 py-3 text-gray-700">
-                    {currency(item.taxable_price)}
+                    {currency(item.total_taxable_amt || item.taxable_price || 0)}
                   </td>
                   <td className="px-4 py-3 text-gray-700">
-                    {currency(item.gst)}
+                    {Number(item.gst || 0).toFixed(0)}%
                   </td>
                   <td className="px-4 py-3 text-gray-900 font-semibold">
                     {currency(item.total_price)}

@@ -47,25 +47,16 @@ export default function UploadForm({ orderDetails }) {
         if (!res.ok || !data?.items) return;
 
         const items = data.items;
+        // total_taxable_amt = base amount (always correct), fallback to taxable_price
         const taxableSum = items.reduce(
-          (acc, it) => acc + Number(it.taxable_price || 0),
+          (acc, it) => acc + Number(it.total_taxable_amt || it.taxable_price || 0),
           0
         );
-        // Prefer summing CGST/SGST/IGST amounts if present; fallback to (total - taxable)
-        let taxSum = items.reduce(
-          (acc, it) =>
-            acc +
-            Number(it.cgsttxamt || 0) +
-            Number(it.sgstxamt || 0) +
-            Number(it.igsttamt || 0),
+        // Tax = total - base (most reliable for both old and new data)
+        const taxSum = items.reduce(
+          (acc, it) => acc + (Number(it.total_price || 0) - Number(it.total_taxable_amt || it.taxable_price || 0)),
           0
         );
-        if (taxSum === 0) {
-          taxSum = items.reduce(
-            (acc, it) => acc + (Number(it.total_price || 0) - Number(it.taxable_price || 0)),
-            0
-          );
-        }
         const totalSum = taxableSum + taxSum;
 
         setForm((prev) => ({
@@ -248,7 +239,7 @@ export default function UploadForm({ orderDetails }) {
           name="baseAmount"
           label="Taxable Amount"
           type="number"
-          value={form.taxamt}
+          value={form.baseAmount}
           onChange={handleChange}
           required
         />
@@ -256,7 +247,7 @@ export default function UploadForm({ orderDetails }) {
           name="taxamt"
           label="Tax Amount"
           type="number"
-          value={form.baseAmount}
+          value={form.taxamt}
           onChange={handleChange}
           required={form.baseAmount !== ""}
         />

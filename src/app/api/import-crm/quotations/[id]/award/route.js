@@ -54,7 +54,7 @@ export async function POST(request, { params }) {
     await connection.beginTransaction();
 
     const [found] = await connection.execute(
-      `SELECT id, shipment_id, submitter_email
+      `SELECT id, shipment_id, submitter_email, awarded_at, award_form_submitted_at
        FROM import_crm_shipment_link_quotes WHERE id = ? LIMIT 1`,
       [id],
     );
@@ -67,6 +67,24 @@ export async function POST(request, { params }) {
     const submitterEmail = row.submitter_email;
 
     if (clear) {
+      if (!row.awarded_at) {
+        await connection.rollback();
+        return NextResponse.json(
+          { message: "This quote is not awarded." },
+          { status: 400 },
+        );
+      }
+      if (row.award_form_submitted_at) {
+        await connection.rollback();
+        return NextResponse.json(
+          {
+            message:
+              "Cannot revoke: follow-up form is already submitted for this award.",
+            code: "AWARD_REVOKE_BLOCKED",
+          },
+          { status: 409 },
+        );
+      }
       await connection.execute(
         `UPDATE import_crm_shipment_link_quotes
          SET awarded_at = NULL, award_portal_token = NULL

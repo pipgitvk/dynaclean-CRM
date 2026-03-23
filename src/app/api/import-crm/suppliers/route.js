@@ -7,6 +7,13 @@ function isImportCrmAdmin(role) {
   return role === "SUPERADMIN";
 }
 
+function str(body, key) {
+  const v = body?.[key];
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === "" ? null : s;
+}
+
 export async function GET() {
   try {
     const payload = await getSessionPayload();
@@ -19,8 +26,42 @@ export async function GET() {
     await ensureImportCrmTables();
     const db = await getDbConnection();
     const [rows] = await db.query(
-      `SELECT id, supplier_name, country, contact_person, email, phone, address,
-              created_at, updated_at
+      `SELECT
+         id,
+         supplier_name,
+         contact_person,
+         email,
+         phone,
+         alt_phone,
+         country,
+         state,
+         city,
+         address,
+         pincode,
+         factory_name,
+         supplier_type,
+         main_products,
+         pickup_address,
+         gst_no,
+         pan_no,
+         iec_no,
+         tax_registration_no,
+         registration_no,
+         default_origin_country,
+         default_origin_city,
+         nearest_port,
+         default_incoterm,
+         cargo_ready_lead_time,
+         bank_name,
+         account_holder_name,
+         account_number,
+         swift_code,
+         branch_name,
+         available_documents,
+         remarks,
+         status,
+         created_at,
+         updated_at
        FROM import_crm_suppliers
        ORDER BY supplier_name ASC`,
     );
@@ -53,27 +94,82 @@ export async function POST(request) {
       );
     }
 
-    const country = body?.country != null ? String(body.country).trim() : null;
-    const contact_person =
-      body?.contact_person != null ? String(body.contact_person).trim() : null;
-    const email = body?.email != null ? String(body.email).trim() : null;
-    const phone = body?.phone != null ? String(body.phone).trim() : null;
-    const address = body?.address != null ? String(body.address).trim() : null;
+    const status = str(body, "status") || "Active";
 
     await ensureImportCrmTables();
     const db = await getDbConnection();
 
     const [result] = await db.query(
-      `INSERT INTO import_crm_suppliers
-        (supplier_name, country, contact_person, email, phone, address, quote_link_token)
-       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+      `INSERT INTO import_crm_suppliers (
+        supplier_name,
+        contact_person,
+        email,
+        phone,
+        alt_phone,
+        country,
+        state,
+        city,
+        address,
+        pincode,
+        factory_name,
+        supplier_type,
+        main_products,
+        pickup_address,
+        gst_no,
+        pan_no,
+        iec_no,
+        tax_registration_no,
+        registration_no,
+        default_origin_country,
+        default_origin_city,
+        nearest_port,
+        default_incoterm,
+        cargo_ready_lead_time,
+        bank_name,
+        account_holder_name,
+        account_number,
+        swift_code,
+        branch_name,
+        available_documents,
+        remarks,
+        status,
+        quote_link_token
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL
+      )`,
       [
         supplier_name,
-        country || null,
-        contact_person || null,
-        email || null,
-        phone || null,
-        address || null,
+        str(body, "contact_person"),
+        str(body, "email"),
+        str(body, "phone"),
+        str(body, "alt_phone"),
+        str(body, "country"),
+        str(body, "state"),
+        str(body, "city"),
+        str(body, "address"),
+        str(body, "pincode"),
+        str(body, "factory_name"),
+        str(body, "supplier_type"),
+        str(body, "main_products"),
+        str(body, "pickup_address"),
+        str(body, "gst_no"),
+        str(body, "pan_no"),
+        str(body, "iec_no"),
+        str(body, "tax_registration_no"),
+        str(body, "registration_no"),
+        str(body, "default_origin_country"),
+        str(body, "default_origin_city"),
+        str(body, "nearest_port"),
+        str(body, "default_incoterm"),
+        str(body, "cargo_ready_lead_time"),
+        str(body, "bank_name"),
+        str(body, "account_holder_name"),
+        str(body, "account_number"),
+        str(body, "swift_code"),
+        str(body, "branch_name"),
+        str(body, "available_documents"),
+        str(body, "remarks"),
+        status,
       ],
     );
 

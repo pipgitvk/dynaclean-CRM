@@ -12,9 +12,29 @@ const textareaClass =
 const fileClass =
   "block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-800 hover:file:bg-slate-200";
 
-function Section({ title, children }) {
+function SectionMaybeReadOnly({ title, active, lockedValue, isFile, children }) {
+  if (!active) {
+    // Not in the re-assign list — show locked / read-only
+    const display =
+      lockedValue != null && String(lockedValue).trim() !== ""
+        ? String(lockedValue)
+        : "—";
+    return (
+      <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 opacity-60">
+        <div className="mb-1 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-slate-600">{title}</h2>
+          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Locked
+          </span>
+        </div>
+        <p className={`whitespace-pre-wrap text-sm text-slate-700 ${isFile ? "font-mono text-xs" : ""}`}>
+          {display}
+        </p>
+      </section>
+    );
+  }
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-xl border border-orange-200 bg-white p-4 shadow-sm ring-1 ring-orange-100">
       <h2 className="mb-3 text-sm font-semibold text-slate-800">{title}</h2>
       <div className="grid gap-4">{children}</div>
     </section>
@@ -32,12 +52,26 @@ function Label({ children, htmlFor }) {
   );
 }
 
+const FIELD_LABELS = {
+  pickup_person_details: "Pickup person details",
+  supplier_address: "Supplier address",
+  cargo_ready_confirmation: "Cargo ready confirmation",
+  booking_details: "Booking details",
+  vessel_flight_details: "Vessel / flight details",
+  container_details: "Container details",
+  bl_file: "BL upload",
+  invoice_file: "Invoice upload",
+  packing_list_file: "Packing list upload",
+  other_documents: "Other documents",
+};
+
 export default function PublicAwardFollowupClient({ token }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [shipment, setShipment] = useState(null);
   const [savedForm, setSavedForm] = useState(null);
+  const [reassignFields, setReassignFields] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const [pickup_person_details, setPickup] = useState("");
@@ -64,8 +98,17 @@ export default function PublicAwardFollowupClient({ token }) {
         }
         setShipment(data.shipment || null);
         setSubmitted(Boolean(data.submitted));
-        if (data.submitted && data.form) {
-          setSavedForm(data.form);
+        setReassignFields(data.reassign_fields || null);
+        const f = data.form;
+        if (f) {
+          setSavedForm(f);
+          // Pre-fill state with existing values (re-assign: agent edits only selected)
+          setPickup(f.pickup_person_details || "");
+          setSupplier(f.supplier_address || "");
+          setCargoReady(f.cargo_ready_confirmation || "");
+          setBooking(f.booking_details || "");
+          setVessel(f.vessel_flight_details || "");
+          setContainer(f.container_details || "");
         }
       } catch {
         if (!cancelled) setError("Could not load this link");
@@ -103,9 +146,10 @@ export default function PublicAwardFollowupClient({ token }) {
           `/api/import-crm/public-award/${encodeURIComponent(token)}`,
         );
         const d2 = await r2.json().catch(() => ({}));
-        if (r2.ok && d2.submitted && d2.form) {
-          setSubmitted(true);
-          setSavedForm(d2.form);
+        if (r2.ok) {
+          setSubmitted(Boolean(d2.submitted));
+          setReassignFields(d2.reassign_fields || null);
+          if (d2.form) setSavedForm(d2.form);
         } else {
           setSubmitted(true);
         }
@@ -190,16 +234,31 @@ export default function PublicAwardFollowupClient({ token }) {
     );
   }
 
+  const needs = (key) => !reassignFields || reassignFields.includes(key);
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 pb-16">
       <header className="mb-8">
         <h1 className="text-xl font-semibold text-slate-900 sm:text-2xl">
           Awarded shipment — details & documents
         </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Please complete each section below and upload the requested files where
-          applicable.
-        </p>
+        {reassignFields ? (
+          <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-900">
+            <p className="font-semibold">Admin has requested corrections for the following fields:</p>
+            <ul className="mt-1 list-inside list-disc text-orange-800">
+              {reassignFields.map((f) => (
+                <li key={f}>{FIELD_LABELS[f] || f}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-orange-700">
+              Only the highlighted sections are editable. The rest are locked as previously submitted.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-slate-600">
+            Please complete each section below and upload the requested files where applicable.
+          </p>
+        )}
         {shipment ? (
           <p className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
             <span className="font-semibold text-slate-800">Shipment #{shipment.id}</span>
@@ -216,154 +275,180 @@ export default function PublicAwardFollowupClient({ token }) {
       </header>
 
       <form className="space-y-6" onSubmit={onSubmit}>
-        <Section title="Pickup person details">
-          <div>
-            <Label htmlFor="pickup_person_details">Name, phone, timing *</Label>
-            <textarea
-              id="pickup_person_details"
-              name="pickup_person_details"
-              required
-              value={pickup_person_details}
-              onChange={(e) => setPickup(e.target.value)}
-              className={textareaClass}
-              placeholder="Contact name, mobile, pickup window / instructions"
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Pickup person details"
+          active={needs("pickup_person_details")}
+          lockedValue={savedForm?.pickup_person_details}
+        >
+          <Label htmlFor="pickup_person_details">Name, phone, timing *</Label>
+          <textarea
+            id="pickup_person_details"
+            name="pickup_person_details"
+            required={needs("pickup_person_details") && !reassignFields}
+            value={pickup_person_details}
+            onChange={(e) => setPickup(e.target.value)}
+            className={textareaClass}
+            placeholder="Contact name, mobile, pickup window / instructions"
+          />
+        </SectionMaybeReadOnly>
 
-        <Section title="Supplier address">
-          <div>
-            <Label htmlFor="supplier_address">Full address *</Label>
-            <textarea
-              id="supplier_address"
-              name="supplier_address"
-              required
-              value={supplier_address}
-              onChange={(e) => setSupplier(e.target.value)}
-              className={textareaClass}
-              placeholder="Factory / supplier address for pickup"
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Supplier address"
+          active={needs("supplier_address")}
+          lockedValue={savedForm?.supplier_address}
+        >
+          <Label htmlFor="supplier_address">Full address *</Label>
+          <textarea
+            id="supplier_address"
+            name="supplier_address"
+            required={needs("supplier_address") && !reassignFields}
+            value={supplier_address}
+            onChange={(e) => setSupplier(e.target.value)}
+            className={textareaClass}
+            placeholder="Factory / supplier address for pickup"
+          />
+        </SectionMaybeReadOnly>
 
-        <Section title="Cargo ready confirmation">
-          <div>
-            <Label htmlFor="cargo_ready_confirmation">Ready date / remarks</Label>
-            <textarea
-              id="cargo_ready_confirmation"
-              name="cargo_ready_confirmation"
-              value={cargo_ready_confirmation}
-              onChange={(e) => setCargoReady(e.target.value)}
-              className={textareaClass}
-              placeholder="When is cargo ready, any special handling"
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Cargo ready confirmation"
+          active={needs("cargo_ready_confirmation")}
+          lockedValue={savedForm?.cargo_ready_confirmation}
+        >
+          <Label htmlFor="cargo_ready_confirmation">Ready date / remarks</Label>
+          <textarea
+            id="cargo_ready_confirmation"
+            name="cargo_ready_confirmation"
+            value={cargo_ready_confirmation}
+            onChange={(e) => setCargoReady(e.target.value)}
+            className={textareaClass}
+            placeholder="When is cargo ready, any special handling"
+          />
+        </SectionMaybeReadOnly>
 
-        <Section title="Booking details">
-          <div>
-            <Label htmlFor="booking_details">Booking / reference</Label>
-            <textarea
-              id="booking_details"
-              name="booking_details"
-              value={booking_details}
-              onChange={(e) => setBooking(e.target.value)}
-              className={textareaClass}
-              placeholder="Carrier booking ref, SO number, etc."
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Booking details"
+          active={needs("booking_details")}
+          lockedValue={savedForm?.booking_details}
+        >
+          <Label htmlFor="booking_details">Booking / reference</Label>
+          <textarea
+            id="booking_details"
+            name="booking_details"
+            value={booking_details}
+            onChange={(e) => setBooking(e.target.value)}
+            className={textareaClass}
+            placeholder="Carrier booking ref, SO number, etc."
+          />
+        </SectionMaybeReadOnly>
 
-        <Section title="Vessel / flight details">
-          <div>
-            <Label htmlFor="vessel_flight_details">Vessel or flight</Label>
-            <input
-              id="vessel_flight_details"
-              name="vessel_flight_details"
-              value={vessel_flight_details}
-              onChange={(e) => setVessel(e.target.value)}
-              className={inputClass}
-              placeholder="Vessel name / voyage or flight no. & date"
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Vessel / flight details"
+          active={needs("vessel_flight_details")}
+          lockedValue={savedForm?.vessel_flight_details}
+        >
+          <Label htmlFor="vessel_flight_details">Vessel or flight</Label>
+          <input
+            id="vessel_flight_details"
+            name="vessel_flight_details"
+            value={vessel_flight_details}
+            onChange={(e) => setVessel(e.target.value)}
+            className={inputClass}
+            placeholder="Vessel name / voyage or flight no. & date"
+          />
+        </SectionMaybeReadOnly>
 
-        <Section title="Container details (if FCL)">
-          <div>
-            <Label htmlFor="container_details">Container no. / type / seal</Label>
-            <textarea
-              id="container_details"
-              name="container_details"
-              value={container_details}
-              onChange={(e) => setContainer(e.target.value)}
-              className={textareaClass}
-              placeholder="If FCL: container number(s), type, seal numbers"
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Container details (if FCL)"
+          active={needs("container_details")}
+          lockedValue={savedForm?.container_details}
+        >
+          <Label htmlFor="container_details">Container no. / type / seal</Label>
+          <textarea
+            id="container_details"
+            name="container_details"
+            value={container_details}
+            onChange={(e) => setContainer(e.target.value)}
+            className={textareaClass}
+            placeholder="If FCL: container number(s), type, seal numbers"
+          />
+        </SectionMaybeReadOnly>
 
-        <Section title="BL upload (HBL / MBL)">
-          <div>
-            <Label htmlFor="bl_upload">Bill of lading</Label>
-            <input
-              id="bl_upload"
-              name="bl_upload"
-              type="file"
-              className={fileClass}
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
-            />
-            <p className="mt-1 text-[11px] text-slate-500">
-              PDF or image, max 15 MB
-            </p>
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="BL upload (HBL / MBL)"
+          active={needs("bl_file")}
+          lockedValue={savedForm?.bl_file}
+          isFile
+        >
+          <Label htmlFor="bl_upload">Bill of lading</Label>
+          <input
+            id="bl_upload"
+            name="bl_upload"
+            type="file"
+            className={fileClass}
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+          />
+          <p className="mt-1 text-[11px] text-slate-500">PDF or image, max 15 MB</p>
+        </SectionMaybeReadOnly>
 
-        <Section title="Invoice upload">
-          <div>
-            <Label htmlFor="invoice_upload">Commercial invoice</Label>
-            <input
-              id="invoice_upload"
-              name="invoice_upload"
-              type="file"
-              className={fileClass}
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Invoice upload"
+          active={needs("invoice_file")}
+          lockedValue={savedForm?.invoice_file}
+          isFile
+        >
+          <Label htmlFor="invoice_upload">Commercial invoice</Label>
+          <input
+            id="invoice_upload"
+            name="invoice_upload"
+            type="file"
+            className={fileClass}
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
+          />
+        </SectionMaybeReadOnly>
 
-        <Section title="Packing list upload">
-          <div>
-            <Label htmlFor="packing_list_upload">Packing list</Label>
-            <input
-              id="packing_list_upload"
-              name="packing_list_upload"
-              type="file"
-              className={fileClass}
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Packing list upload"
+          active={needs("packing_list_file")}
+          lockedValue={savedForm?.packing_list_file}
+          isFile
+        >
+          <Label htmlFor="packing_list_upload">Packing list</Label>
+          <input
+            id="packing_list_upload"
+            name="packing_list_upload"
+            type="file"
+            className={fileClass}
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
+          />
+        </SectionMaybeReadOnly>
 
-        <Section title="Other documents">
-          <div>
-            <Label htmlFor="other_documents">Additional files</Label>
-            <input
-              id="other_documents"
-              name="other_documents"
-              type="file"
-              multiple
-              className={fileClass}
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
-            />
-          </div>
-        </Section>
+        <SectionMaybeReadOnly
+          title="Other documents"
+          active={needs("other_documents")}
+          lockedValue={
+            savedForm?.other_documents?.length
+              ? `${savedForm.other_documents.length} file(s)`
+              : null
+          }
+          isFile
+        >
+          <Label htmlFor="other_documents">Additional files</Label>
+          <input
+            id="other_documents"
+            name="other_documents"
+            type="file"
+            multiple
+            className={fileClass}
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx"
+          />
+        </SectionMaybeReadOnly>
 
         <button
           type="submit"
           disabled={saving}
           className="w-full rounded-[10px] bg-teal-700 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-teal-800 disabled:opacity-60 sm:w-auto sm:min-w-[200px]"
         >
-          {saving ? "Submitting…" : "Submit"}
+          {saving ? "Submitting…" : reassignFields ? "Re-submit corrections" : "Submit"}
         </button>
       </form>
     </div>

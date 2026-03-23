@@ -4,13 +4,42 @@ const CREATE_SUPPLIERS = `
 CREATE TABLE IF NOT EXISTS import_crm_suppliers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   supplier_name VARCHAR(255) NOT NULL,
-  country VARCHAR(128) NULL,
-  contact_person VARCHAR(255) NULL,
+  contact_person VARCHAR(150) NULL,
   email VARCHAR(255) NULL,
-  phone VARCHAR(64) NULL,
+  phone VARCHAR(50) NULL,
+  alt_phone VARCHAR(50) NULL,
+  country VARCHAR(100) NULL,
+  state VARCHAR(100) NULL,
+  city VARCHAR(100) NULL,
   address TEXT NULL,
+  pincode VARCHAR(20) NULL,
+  factory_name VARCHAR(255) NULL,
+  supplier_type VARCHAR(100) NULL,
+  main_products VARCHAR(255) NULL,
+  pickup_address TEXT NULL,
+  gst_no VARCHAR(50) NULL,
+  pan_no VARCHAR(20) NULL,
+  iec_no VARCHAR(50) NULL,
+  tax_registration_no VARCHAR(100) NULL,
+  registration_no VARCHAR(100) NULL,
+  default_origin_country VARCHAR(100) NULL,
+  default_origin_city VARCHAR(100) NULL,
+  nearest_port VARCHAR(100) NULL,
+  default_incoterm VARCHAR(20) NULL,
+  cargo_ready_lead_time VARCHAR(50) NULL,
+  bank_name VARCHAR(150) NULL,
+  account_holder_name VARCHAR(150) NULL,
+  account_number VARCHAR(100) NULL,
+  swift_code VARCHAR(50) NULL,
+  branch_name VARCHAR(100) NULL,
+  available_documents TEXT NULL,
+  remarks TEXT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'Active',
+  quote_link_token VARCHAR(64) NULL,
+  import_quote_submitted_at TIMESTAMP NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_import_crm_suppliers_quote_token (quote_link_token),
   INDEX idx_import_crm_suppliers_name (supplier_name(64))
 )`;
 
@@ -202,6 +231,48 @@ export async function ensureImportCrmTables() {
   } catch (e) {
     if (e?.errno !== 1060) throw e;
   }
+  const supplierExtraCols = [
+    "ADD COLUMN alt_phone VARCHAR(50) NULL",
+    "ADD COLUMN state VARCHAR(100) NULL",
+    "ADD COLUMN city VARCHAR(100) NULL",
+    "ADD COLUMN pincode VARCHAR(20) NULL",
+    "ADD COLUMN factory_name VARCHAR(255) NULL",
+    "ADD COLUMN supplier_type VARCHAR(100) NULL",
+    "ADD COLUMN main_products VARCHAR(255) NULL",
+    "ADD COLUMN pickup_address TEXT NULL",
+    "ADD COLUMN gst_no VARCHAR(50) NULL",
+    "ADD COLUMN pan_no VARCHAR(20) NULL",
+    "ADD COLUMN iec_no VARCHAR(50) NULL",
+    "ADD COLUMN tax_registration_no VARCHAR(100) NULL",
+    "ADD COLUMN registration_no VARCHAR(100) NULL",
+    "ADD COLUMN default_origin_country VARCHAR(100) NULL",
+    "ADD COLUMN default_origin_city VARCHAR(100) NULL",
+    "ADD COLUMN nearest_port VARCHAR(100) NULL",
+    "ADD COLUMN default_incoterm VARCHAR(20) NULL",
+    "ADD COLUMN cargo_ready_lead_time VARCHAR(50) NULL",
+    "ADD COLUMN bank_name VARCHAR(150) NULL",
+    "ADD COLUMN account_holder_name VARCHAR(150) NULL",
+    "ADD COLUMN account_number VARCHAR(100) NULL",
+    "ADD COLUMN swift_code VARCHAR(50) NULL",
+    "ADD COLUMN branch_name VARCHAR(100) NULL",
+    "ADD COLUMN available_documents TEXT NULL",
+    "ADD COLUMN remarks TEXT NULL",
+    "ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'Active'",
+  ];
+  for (const frag of supplierExtraCols) {
+    try {
+      await conn.execute(`ALTER TABLE import_crm_suppliers ${frag}`);
+    } catch (e) {
+      if (e?.errno !== 1060) throw e;
+    }
+  }
+  try {
+    await conn.execute(
+      `UPDATE import_crm_suppliers SET status = 'Active' WHERE status IS NULL OR TRIM(status) = ''`,
+    );
+  } catch {
+    /* ignore */
+  }
   await conn.execute(CREATE_IMPORT_CRM_QUOTATIONS);
   await conn.execute(CREATE_PURCHASE_ORDERS);
   await conn.execute(CREATE_IMPORT_CRM_SHIPMENTS);
@@ -329,6 +400,9 @@ export async function ensureImportCrmTables() {
     "ADD COLUMN af_invoice_file VARCHAR(512) NULL",
     "ADD COLUMN af_packing_list_file VARCHAR(512) NULL",
     "ADD COLUMN af_other_documents_json TEXT NULL",
+    "ADD COLUMN af_approved_at TIMESTAMP NULL DEFAULT NULL",
+    "ADD COLUMN af_approved_by VARCHAR(128) NULL",
+    "ADD COLUMN af_reassign_fields_json TEXT NULL",
   ];
   for (const frag of awardPortalCols) {
     try {
@@ -436,6 +510,78 @@ export async function ensureImportCrmTables() {
       msg.includes("Duplicate key") ||
       msg.includes("already exists");
     if (!ignorable) throw e;
+  }
+  try {
+    await conn.execute(
+      `ALTER TABLE import_crm_shipments ADD COLUMN shipment_crm_agent_ids_json TEXT NULL`,
+    );
+  } catch (e) {
+    if (e?.errno !== 1060) throw e;
+  }
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments
+       SET shipment_crm_agent_ids_json = CONCAT('[', crm_agent_id, ']')
+       WHERE crm_agent_id IS NOT NULL
+         AND (shipment_crm_agent_ids_json IS NULL OR TRIM(shipment_crm_agent_ids_json) = '' OR shipment_crm_agent_ids_json = '[]')`,
+    );
+  } catch {
+    /* ignore */
+  }
+  try {
+    await conn.execute(
+      `ALTER TABLE import_crm_shipments ADD COLUMN supplier_id INT NULL`,
+    );
+  } catch (e) {
+    if (e?.errno !== 1060) throw e;
+  }
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments s
+       LEFT JOIN import_crm_suppliers sup ON sup.id = s.supplier_id
+       SET s.supplier_id = NULL
+       WHERE s.supplier_id IS NOT NULL AND sup.id IS NULL`,
+    );
+  } catch {
+    /* ignore */
+  }
+  try {
+    await conn.execute(
+      `ALTER TABLE import_crm_shipments
+       ADD CONSTRAINT fk_import_crm_shipments_supplier
+       FOREIGN KEY (supplier_id) REFERENCES import_crm_suppliers (id)
+       ON DELETE SET NULL ON UPDATE CASCADE`,
+    );
+  } catch (e) {
+    const msg = String(e?.sqlMessage ?? e?.message ?? "");
+    const ignorable =
+      e?.errno === 1826 ||
+      e?.errno === 1215 ||
+      e?.errno === 1061 ||
+      e?.errno === 1005 ||
+      e?.code === "ER_CANT_CREATE_TABLE" ||
+      e?.code === "ER_DUP_KEYNAME" ||
+      msg.includes("errno: 121") ||
+      msg.includes("Duplicate key") ||
+      msg.includes("already exists");
+    if (!ignorable) throw e;
+  }
+  try {
+    await conn.execute(
+      `ALTER TABLE import_crm_shipments ADD COLUMN shipment_supplier_ids_json TEXT NULL`,
+    );
+  } catch (e) {
+    if (e?.errno !== 1060) throw e;
+  }
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments
+       SET shipment_supplier_ids_json = CONCAT('[', supplier_id, ']')
+       WHERE supplier_id IS NOT NULL
+         AND (shipment_supplier_ids_json IS NULL OR TRIM(shipment_supplier_ids_json) = '' OR shipment_supplier_ids_json = '[]')`,
+    );
+  } catch {
+    /* ignore */
   }
   await conn.execute(CREATE_IMPORT_CRM_AGENT_QUOTATIONS);
 

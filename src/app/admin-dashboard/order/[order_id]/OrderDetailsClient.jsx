@@ -36,9 +36,11 @@ export default function OrderDetailsClient({
       totalAmount = 0;
 
     items.forEach((item) => {
+      const base = Number(item.total_taxable_amt || item.taxable_price || 0);
+      const tax = Number(item.total_price || 0) - base;
       totalQty += Number(item.quantity || 0);
-      totalTaxable += Number(item.taxable_price || 0);
-      totalGst += Number(item.gst || 0);
+      totalTaxable += base;
+      totalGst += tax;
       totalAmount += Number(item.total_price || 0);
     });
 
@@ -154,8 +156,8 @@ export default function OrderDetailsClient({
                     <td>{item.quantity}</td>
                     <td>{item.unit}</td>
                     <td>₹{Number(item.price_per_unit).toFixed(2)}</td>
-                    <td>₹{Number(item.taxable_price).toFixed(2)}</td>
-                    <td>₹{Number(item.gst).toFixed(2)}</td>
+                    <td>₹{Number(item.total_taxable_amt || item.taxable_price || 0).toFixed(2)}</td>
+                    <td>{Number(item.gst || 0).toFixed(0)}%</td>
                     <td>₹{Number(item.total_price).toFixed(2)}</td>
                   </tr>
                 ))
@@ -218,10 +220,10 @@ export default function OrderDetailsClient({
               </p>
               <p>
                 <strong>Taxable:</strong> ₹
-                {Number(item.taxable_price).toFixed(2)}
+                {Number(item.total_taxable_amt || item.taxable_price || 0).toFixed(2)}
               </p>
               <p>
-                <strong>GST:</strong> ₹{Number(item.gst).toFixed(2)}
+                <strong>GST:</strong> {Number(item.gst || 0).toFixed(0)}%
               </p>
               <p>
                 <strong>Total:</strong> ₹{Number(item.total_price).toFixed(2)}

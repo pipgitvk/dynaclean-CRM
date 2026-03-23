@@ -13,16 +13,56 @@ import toast from "react-hot-toast";
 const inputClass =
   "h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200/90";
 
+const textareaClass = `${inputClass} min-h-[2.75rem] py-2`;
+
+const DRAFT_DEFAULTS = {
+  supplier_name: "",
+  contact_person: "",
+  email: "",
+  phone: "",
+  alt_phone: "",
+  country: "",
+  state: "",
+  city: "",
+  address: "",
+  pincode: "",
+  factory_name: "",
+  supplier_type: "",
+  main_products: "",
+  pickup_address: "",
+  gst_no: "",
+  pan_no: "",
+  iec_no: "",
+  tax_registration_no: "",
+  registration_no: "",
+  default_origin_country: "",
+  default_origin_city: "",
+  nearest_port: "",
+  default_incoterm: "",
+  cargo_ready_lead_time: "",
+  bank_name: "",
+  account_holder_name: "",
+  account_number: "",
+  swift_code: "",
+  branch_name: "",
+  available_documents: "",
+  remarks: "",
+  status: "Active",
+};
+
 function emptyDraft() {
   return {
     tempId: `d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    supplier_name: "",
-    country: "",
-    contact_person: "",
-    email: "",
-    phone: "",
-    address: "",
+    ...DRAFT_DEFAULTS,
   };
+}
+
+function draftToPayload(d) {
+  const out = {};
+  for (const k of Object.keys(DRAFT_DEFAULTS)) {
+    out[k] = d[k];
+  }
+  return out;
 }
 
 function formatTableDate(value) {
@@ -105,14 +145,7 @@ export default function SuppliersListClient() {
         const res = await fetch("/api/import-crm/suppliers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            supplier_name: d.supplier_name.trim(),
-            country: d.country.trim() || null,
-            contact_person: d.contact_person.trim() || null,
-            email: d.email.trim() || null,
-            phone: d.phone.trim() || null,
-            address: d.address.trim() || null,
-          }),
+          body: JSON.stringify(draftToPayload(d)),
         });
         const data = await res.json();
         if (res.ok) {
@@ -148,16 +181,9 @@ export default function SuppliersListClient() {
     const q = searchText.trim().toLowerCase();
     if (!q) return suppliers;
     return suppliers.filter((s) => {
-      const blob = [
-        s.id,
-        s.supplier_name,
-        s.country,
-        s.contact_person,
-        s.email,
-        s.phone,
-        s.address,
-      ]
-        .filter(Boolean)
+      const blob = Object.values(s)
+        .filter((v) => v != null && v !== "")
+        .map((v) => String(v))
         .join(" ")
         .toLowerCase();
       return blob.includes(q);
@@ -170,10 +196,13 @@ export default function SuppliersListClient() {
     "ID",
     "Supplier name",
     "Country",
-    "Contact person",
+    "City",
+    "State",
+    "Contact",
     "Email",
     "Phone",
-    "Address",
+    "GST",
+    "Status",
     "Created",
   ];
 
@@ -219,7 +248,7 @@ export default function SuppliersListClient() {
         <div className="fixed inset-0 flex justify-end overflow-hidden">
           <DialogPanel
             transition
-            className="flex h-full w-full max-w-lg transform flex-col border-l border-slate-200 bg-white shadow-2xl transition duration-300 ease-out data-[closed]:translate-x-full"
+            className="flex h-full w-full max-w-2xl transform flex-col border-l border-slate-200 bg-white shadow-2xl transition duration-300 ease-out data-[closed]:translate-x-full"
           >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
               <div className="min-w-0 pt-0.5">
@@ -272,92 +301,235 @@ export default function SuppliersListClient() {
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="grid gap-3">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Supplier name *
-                        </label>
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={d.supplier_name}
-                          onChange={(e) =>
-                            updateDraft(
-                              d.tempId,
-                              "supplier_name",
-                              e.target.value,
-                            )
-                          }
+                    <div className="grid gap-4">
+                      <SectionTitle>Basic</SectionTitle>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DraftInput
+                          label="Supplier name *"
+                          d={d}
+                          field="supplier_name"
+                          updateDraft={updateDraft}
                           placeholder="Required"
                         />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Country
-                        </label>
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={d.country}
-                          onChange={(e) =>
-                            updateDraft(d.tempId, "country", e.target.value)
-                          }
+                        <DraftInput
+                          label="Status"
+                          d={d}
+                          field="status"
+                          updateDraft={updateDraft}
+                          placeholder="Active"
                         />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Contact person
-                        </label>
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={d.contact_person}
-                          onChange={(e) =>
-                            updateDraft(
-                              d.tempId,
-                              "contact_person",
-                              e.target.value,
-                            )
-                          }
+                        <DraftInput
+                          label="Supplier type"
+                          d={d}
+                          field="supplier_type"
+                          updateDraft={updateDraft}
                         />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Email
-                        </label>
-                        <input
+                        <DraftInput
+                          label="Contact person"
+                          d={d}
+                          field="contact_person"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Email"
+                          d={d}
+                          field="email"
                           type="email"
-                          className={inputClass}
-                          value={d.email}
-                          onChange={(e) =>
-                            updateDraft(d.tempId, "email", e.target.value)
-                          }
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Phone"
+                          d={d}
+                          field="phone"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Alt. phone"
+                          d={d}
+                          field="alt_phone"
+                          updateDraft={updateDraft}
                         />
                       </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Phone
-                        </label>
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={d.phone}
-                          onChange={(e) =>
-                            updateDraft(d.tempId, "phone", e.target.value)
-                          }
+
+                      <SectionTitle>Address</SectionTitle>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DraftInput
+                          label="Country"
+                          d={d}
+                          field="country"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="State"
+                          d={d}
+                          field="state"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="City"
+                          d={d}
+                          field="city"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Pincode"
+                          d={d}
+                          field="pincode"
+                          updateDraft={updateDraft}
+                        />
+                        <div className="sm:col-span-2">
+                          <DraftTextarea
+                            label="Address"
+                            d={d}
+                            field="address"
+                            rows={2}
+                            updateDraft={updateDraft}
+                          />
+                        </div>
+                      </div>
+
+                      <SectionTitle>Factory & products</SectionTitle>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DraftInput
+                          label="Factory name"
+                          d={d}
+                          field="factory_name"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Main products"
+                          d={d}
+                          field="main_products"
+                          updateDraft={updateDraft}
+                        />
+                        <div className="sm:col-span-2">
+                          <DraftTextarea
+                            label="Pickup address"
+                            d={d}
+                            field="pickup_address"
+                            rows={2}
+                            updateDraft={updateDraft}
+                          />
+                        </div>
+                      </div>
+
+                      <SectionTitle>Tax & registration</SectionTitle>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DraftInput
+                          label="GST no."
+                          d={d}
+                          field="gst_no"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="PAN no."
+                          d={d}
+                          field="pan_no"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="IEC no."
+                          d={d}
+                          field="iec_no"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Tax registration no."
+                          d={d}
+                          field="tax_registration_no"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Registration no."
+                          d={d}
+                          field="registration_no"
+                          updateDraft={updateDraft}
                         />
                       </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Address
-                        </label>
-                        <textarea
+
+                      <SectionTitle>Origin & logistics</SectionTitle>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DraftInput
+                          label="Default origin country"
+                          d={d}
+                          field="default_origin_country"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Default origin city"
+                          d={d}
+                          field="default_origin_city"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Nearest port"
+                          d={d}
+                          field="nearest_port"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Default incoterm"
+                          d={d}
+                          field="default_incoterm"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Cargo ready lead time"
+                          d={d}
+                          field="cargo_ready_lead_time"
+                          updateDraft={updateDraft}
+                        />
+                      </div>
+
+                      <SectionTitle>Bank</SectionTitle>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <DraftInput
+                          label="Bank name"
+                          d={d}
+                          field="bank_name"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Account holder"
+                          d={d}
+                          field="account_holder_name"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Account number"
+                          d={d}
+                          field="account_number"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="SWIFT code"
+                          d={d}
+                          field="swift_code"
+                          updateDraft={updateDraft}
+                        />
+                        <DraftInput
+                          label="Branch name"
+                          d={d}
+                          field="branch_name"
+                          updateDraft={updateDraft}
+                        />
+                      </div>
+
+                      <SectionTitle>Other</SectionTitle>
+                      <div className="grid gap-3">
+                        <DraftTextarea
+                          label="Available documents"
+                          d={d}
+                          field="available_documents"
                           rows={2}
-                          className={`${inputClass} min-h-[2.75rem] py-2`}
-                          value={d.address}
-                          onChange={(e) =>
-                            updateDraft(d.tempId, "address", e.target.value)
-                          }
+                          updateDraft={updateDraft}
+                        />
+                        <DraftTextarea
+                          label="Remarks"
+                          d={d}
+                          field="remarks"
+                          rows={2}
+                          updateDraft={updateDraft}
                         />
                       </div>
                     </div>
@@ -403,7 +575,7 @@ export default function SuppliersListClient() {
           </div>
         ) : null}
         <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-          <table className="min-w-[56rem] w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-[72rem] w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50">
               <tr>
                 {tableHeaders.map((h) => (
@@ -446,24 +618,28 @@ export default function SuppliersListClient() {
                     <td className="whitespace-nowrap px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
                       {s.country || "—"}
                     </td>
-                    <td className="max-w-[10rem] px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
-                      <span className="line-clamp-2">
+                    <td className="max-w-[6rem] truncate px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
+                      {s.city || "—"}
+                    </td>
+                    <td className="max-w-[6rem] truncate px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
+                      {s.state || "—"}
+                    </td>
+                    <td className="max-w-[8rem] px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
+                      <span className="line-clamp-2 text-xs">
                         {s.contact_person || "—"}
                       </span>
                     </td>
-                    <td className="max-w-[12rem] break-all px-2 py-2.5 text-xs text-slate-700 sm:px-4 sm:py-3 sm:text-sm">
+                    <td className="max-w-[10rem] break-all px-2 py-2.5 text-xs text-slate-700 sm:px-4 sm:py-3">
                       {s.email || "—"}
                     </td>
-                    <td className="whitespace-nowrap px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
+                    <td className="whitespace-nowrap px-2 py-2.5 text-xs text-slate-700 sm:px-4 sm:py-3">
                       {s.phone || "—"}
                     </td>
-                    <td
-                      className="max-w-[14rem] px-2 py-2.5 text-slate-600 sm:max-w-[18rem] sm:px-4 sm:py-3"
-                      title={s.address || undefined}
-                    >
-                      <span className="line-clamp-2 text-xs sm:text-sm">
-                        {s.address || "—"}
-                      </span>
+                    <td className="max-w-[7rem] truncate px-2 py-2.5 font-mono text-xs text-slate-700 sm:px-4 sm:py-3">
+                      {s.gst_no || "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-xs text-slate-700 sm:px-4 sm:py-3">
+                      {s.status || "—"}
                     </td>
                     <td className="whitespace-nowrap px-2 py-2.5 text-xs text-slate-600 sm:px-4 sm:py-3">
                       {formatTableDate(s.created_at)}
@@ -476,5 +652,53 @@ export default function SuppliersListClient() {
         </div>
       </div>
     </>
+  );
+}
+
+function SectionTitle({ children }) {
+  return (
+    <p className="border-b border-slate-200 pb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+      {children}
+    </p>
+  );
+}
+
+function DraftInput({
+  label,
+  d,
+  field,
+  updateDraft,
+  type = "text",
+  placeholder,
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-600">
+        {label}
+      </label>
+      <input
+        type={type}
+        className={inputClass}
+        value={d[field] ?? ""}
+        placeholder={placeholder}
+        onChange={(e) => updateDraft(d.tempId, field, e.target.value)}
+      />
+    </div>
+  );
+}
+
+function DraftTextarea({ label, d, field, rows, updateDraft }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-600">
+        {label}
+      </label>
+      <textarea
+        rows={rows}
+        className={textareaClass}
+        value={d[field] ?? ""}
+        onChange={(e) => updateDraft(d.tempId, field, e.target.value)}
+      />
+    </div>
   );
 }

@@ -537,6 +537,12 @@ const allMenuItems = [
   //       icon: "UserPlus",
   //     },
   //     {
+  //       path: "/admin-dashboard/import-crm/suppliers",
+  //       name: "Suppliers",
+  //       roles: ["SUPERADMIN"],
+  //       icon: "Users",
+  //     },
+  //     {
   //       path: "/admin-dashboard/import-crm/shipments",
   //       name: "Shipments",
   //       roles: ["SUPERADMIN"],
@@ -549,11 +555,12 @@ const allMenuItems = [
   //       icon: "ScrollText",
   //     },
   //     {
-  //       path: "/admin-dashboard/import-crm/suppliers",
-  //       name: "Suppliers",
+  //       path: "/admin-dashboard/import-crm/award-followups",
+  //       name: "Award follow-ups",
   //       roles: ["SUPERADMIN"],
-  //       icon: "Users",
+  //       icon: "PackageCheck",
   //     },
+     
       
       
      

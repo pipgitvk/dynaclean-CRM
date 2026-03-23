@@ -332,14 +332,17 @@ export default function ImportCrmQuoteSubmissionsClient() {
                               </span>
                             ) : null}
                             {r.awarded_at ? (
-                              <button
-                                type="button"
-                                disabled={awardBusyId === r.id}
-                                onClick={() => postAward(r.id, true)}
-                                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                              >
-                                {awardBusyId === r.id ? "…" : "Revoke"}
-                              </button>
+                              r.award_form_submitted_at ? null : (
+                                <button
+                                  type="button"
+                                  disabled={awardBusyId === r.id}
+                                  title="Remove award for this shipment"
+                                  onClick={() => postAward(r.id, true)}
+                                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                                >
+                                  {awardBusyId === r.id ? "…" : "Revoke"}
+                                </button>
+                              )
                             ) : (
                               <button
                                 type="button"
