@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Search } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -39,22 +38,6 @@ function textOrDash(v) {
   if (v == null) return "—";
   const s = String(v).trim();
   return s === "" ? "—" : s;
-}
-
-function fileLabel(path) {
-  if (path == null || String(path).trim() === "") return "—";
-  const parts = String(path).replace(/\\/g, "/").split("/");
-  return parts[parts.length - 1] || path;
-}
-
-function parseOtherDocsJson(raw) {
-  if (raw == null || String(raw).trim() === "") return [];
-  try {
-    const p = JSON.parse(raw);
-    return Array.isArray(p) ? p : [];
-  } catch {
-    return [];
-  }
 }
 
 function totalInrNumber(v) {
@@ -429,79 +412,6 @@ export default function ImportCrmQuoteSubmissionsClient() {
                                   </p>
                                 ) : null}
                               </div>
-                              {r.award_form_submitted_at ? (
-                                <div className="space-y-3 sm:col-span-2 lg:col-span-3">
-                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-teal-800">
-                                    Award follow-up (submitted{" "}
-                                    {formatDate(r.award_form_submitted_at)})
-                                  </p>
-                                  <div className="grid gap-3 sm:grid-cols-2">
-                                    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
-                                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Pickup & supplier
-                                      </p>
-                                      <AwardText
-                                        label="Pickup person details"
-                                        value={r.af_pickup_person_details}
-                                      />
-                                      <AwardText
-                                        label="Supplier address"
-                                        value={r.af_supplier_address}
-                                      />
-                                      <AwardText
-                                        label="Cargo ready confirmation"
-                                        value={r.af_cargo_ready_confirmation}
-                                      />
-                                    </div>
-                                    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
-                                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                        Booking & movement
-                                      </p>
-                                      <AwardText
-                                        label="Booking details"
-                                        value={r.af_booking_details}
-                                      />
-                                      <AwardText
-                                        label="Vessel / flight"
-                                        value={r.af_vessel_flight_details}
-                                      />
-                                      <AwardText
-                                        label="Container (FCL)"
-                                        value={r.af_container_details}
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                      Uploaded files (server paths)
-                                    </p>
-                                    <ul className="space-y-1 font-mono text-[11px] text-slate-700">
-                                      <li>
-                                        BL: {fileLabel(r.af_bl_file)}
-                                      </li>
-                                      <li>
-                                        Invoice: {fileLabel(r.af_invoice_file)}
-                                      </li>
-                                      <li>
-                                        Packing list:{" "}
-                                        {fileLabel(r.af_packing_list_file)}
-                                      </li>
-                                    </ul>
-                                    {parseOtherDocsJson(r.af_other_documents_json)
-                                      .length ? (
-                                      <ul className="mt-2 space-y-0.5 border-t border-slate-100 pt-2 font-mono text-[11px] text-slate-600">
-                                        {parseOtherDocsJson(
-                                          r.af_other_documents_json,
-                                        ).map((o, i) => (
-                                          <li key={i}>
-                                            Other: {o.name || fileLabel(o.path)}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -515,21 +425,6 @@ export default function ImportCrmQuoteSubmissionsClient() {
         </div>
       </div>
 
-      <p className="mt-4 text-center text-sm text-slate-500">
-        <Link
-          href="/admin-dashboard/import-crm/shipments"
-          className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-        >
-          ← Shipments
-        </Link>
-        <span className="mx-2 text-slate-300">·</span>
-        <Link
-          href="/admin-dashboard/import-crm/purchase-orders"
-          className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-        >
-          Purchase orders →
-        </Link>
-      </p>
     </>
   );
 }
@@ -555,12 +450,3 @@ function DetailBlock({ title, items }) {
   );
 }
 
-function AwardText({ label, value }) {
-  const v = textOrDash(value);
-  return (
-    <div>
-      <p className="text-[11px] font-medium text-slate-500">{label}</p>
-      <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-800">{v}</p>
-    </div>
-  );
-}
