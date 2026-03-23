@@ -157,9 +157,17 @@ export default function ImportCrmQuoteSubmissionsClient() {
         toast.error(`Email: ${data.emailError}`, { duration: 8000 });
       }
       if (!clear && data.portalUrl) {
-        toast.success(`Share this form link with the agent:\n${data.portalUrl}`, {
-          duration: 20000,
-        });
+        if (data.emailSkipped) {
+          toast.error(
+            "No valid submitter email — the form link was not sent.",
+            { duration: 8000 },
+          );
+        } else {
+          toast.error(
+            "Email did not send — fix SMTP and NEXT_PUBLIC_BASE_URL, then award again to resend.",
+            { duration: 10000 },
+          );
+        }
       }
       await load();
     } catch (e) {

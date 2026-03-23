@@ -74,11 +74,10 @@ export async function sendImportCrmAwardPortalEmail({ to, portalUrl }) {
   const subject = "Import shipment — please complete booking & document details";
   const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;line-height:1.55;color:#1e293b">
 <p>Hello,</p>
-<p>Your quote has been <strong>awarded</strong>. Please use the secure link below to fill in pickup / booking / vessel details and upload BL, invoice, packing list, and any other documents.</p>
+<p>Your quote has been <strong>awarded</strong>. Use the button below to fill in pickup / booking / vessel details and upload BL, invoice, packing list, and any other documents.</p>
 <p style="margin:24px 0"><a href="${portalUrl}" style="background:#0f766e;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:600">Open form</a></p>
-<p style="word-break:break-all;font-size:13px;color:#64748b">${portalUrl}</p>
-<p style="font-size:13px;color:#64748b">निम्न लिंक पर जाकर फॉर्म भरें।</p>
 <p>Thank you,<br/>Dynaclean Industries</p>
 </body></html>`;
-  await sendImportCrmSmtpEmail({ to, subject, html });
+  const text = `Hello,\n\nYour quote has been awarded. Open the form:\n${portalUrl}\n\nThank you,\nDynaclean Industries`;
+  await sendImportCrmSmtpEmail({ to, subject, html, text });
 }
