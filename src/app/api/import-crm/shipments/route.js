@@ -24,6 +24,41 @@ function dateOrNull(v) {
   return s;
 }
 
+function parseIdArrayJson(raw) {
+  if (raw == null || raw === "") return [];
+  if (typeof raw !== "string") return [];
+  try {
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p)) return [];
+    const out = [];
+    const seen = new Set();
+    for (const x of p) {
+      const n = parseInt(String(x).trim(), 10);
+      if (!Number.isFinite(n) || n < 1) continue;
+      if (seen.has(n)) continue;
+      seen.add(n);
+      out.push(n);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function agentLabelFromRow(a) {
+  const c = a.company_name && String(a.company_name).trim();
+  return c || a.agent_name || `Agent #${a.id}`;
+}
+
+function supplierLabelFromRow(s) {
+  const n = s.supplier_name && String(s.supplier_name).trim();
+  return n || (s.factory_name && String(s.factory_name).trim()) || `Supplier #${s.id}`;
+}
+
+function sqlPlaceholders(n) {
+  return Array.from({ length: n }, () => "?").join(", ");
+}
+
 export async function GET() {
   try {
     const payload = await getSessionPayload();
@@ -38,12 +73,60 @@ export async function GET() {
     const [rows] = await db.query(
       `SELECT s.id, s.ship_from, s.ship_to, s.cbm, s.shipment_term, s.mode,
               s.material_ready_date, s.agent_delivery_deadline, s.remarks,
-              s.public_link_token, s.crm_agent_id, s.created_by, s.created_at, s.updated_at,
-              COALESCE(NULLIF(TRIM(a.company_name), ''), a.agent_name) AS agent_display_name
+              s.public_link_token, s.crm_agent_id, s.supplier_id,
+              s.shipment_crm_agent_ids_json, s.shipment_supplier_ids_json,
+              s.created_by, s.created_at, s.updated_at
        FROM import_crm_shipments s
-       LEFT JOIN import_crm_agents a ON a.id = s.crm_agent_id
        ORDER BY s.id DESC`,
     );
+
+    const [agentRows] = await db.query(
+      `SELECT id, agent_name, company_name FROM import_crm_agents`,
+    );
+    const idToAgentLabel = new Map();
+    for (const a of agentRows || []) {
+      idToAgentLabel.set(a.id, agentLabelFromRow(a));
+    }
+
+    const [supplierRows] = await db.query(
+      `SELECT id, supplier_name, factory_name FROM import_crm_suppliers`,
+    );
+    const idToSupplierLabel = new Map();
+    for (const sup of supplierRows || []) {
+      idToSupplierLabel.set(sup.id, supplierLabelFromRow(sup));
+    }
+
+    for (const row of rows || []) {
+      let agentIds = parseIdArrayJson(row.shipment_crm_agent_ids_json);
+      if (agentIds.length === 0 && row.crm_agent_id != null) {
+        agentIds = [row.crm_agent_id];
+      }
+      row.crm_agent_ids = agentIds;
+      const agentLabels = agentIds.map(
+        (id) => idToAgentLabel.get(id) || `Agent #${id}`,
+      );
+      row.agents_display = agentLabels.length ? agentLabels.join(", ") : "—";
+      row.agent_display_name =
+        agentIds.length > 0
+          ? idToAgentLabel.get(agentIds[0]) || `Agent #${agentIds[0]}`
+          : null;
+
+      let supplierIds = parseIdArrayJson(row.shipment_supplier_ids_json);
+      if (supplierIds.length === 0 && row.supplier_id != null) {
+        supplierIds = [row.supplier_id];
+      }
+      row.supplier_ids = supplierIds;
+      const supplierLabels = supplierIds.map(
+        (id) => idToSupplierLabel.get(id) || `Supplier #${id}`,
+      );
+      row.suppliers_display = supplierLabels.length
+        ? supplierLabels.join(", ")
+        : "—";
+
+      delete row.shipment_crm_agent_ids_json;
+      delete row.shipment_supplier_ids_json;
+    }
+
     return NextResponse.json({ shipments: rows });
   } catch (error) {
     console.error("import-crm shipments GET:", error);
@@ -120,28 +203,88 @@ export async function POST(request) {
     await ensureImportCrmTables();
     const db = await getDbConnection();
 
-    let crm_agent_id = null;
-    const rawAgentId = body?.crm_agent_id;
-    if (rawAgentId != null && String(rawAgentId).trim() !== "") {
-      const aid = Number.parseInt(String(rawAgentId).trim(), 10);
-      if (!Number.isFinite(aid) || aid < 1) {
-        return NextResponse.json(
-          { message: "Invalid agent selection" },
-          { status: 400 },
-        );
+    let agentIds = [];
+    if (Array.isArray(body?.crm_agent_ids)) {
+      const seen = new Set();
+      for (const x of body.crm_agent_ids) {
+        const n = parseInt(String(x).trim(), 10);
+        if (!Number.isFinite(n) || n < 1) continue;
+        if (seen.has(n)) continue;
+        seen.add(n);
+        agentIds.push(n);
       }
-      const [agentRows] = await db.query(
-        `SELECT id FROM import_crm_agents WHERE id = ? LIMIT 1`,
-        [aid],
-      );
-      if (!agentRows?.length) {
-        return NextResponse.json(
-          { message: "Selected agent was not found" },
-          { status: 400 },
-        );
+    } else {
+      const rawAgentId = body?.crm_agent_id;
+      if (rawAgentId != null && String(rawAgentId).trim() !== "") {
+        const aid = Number.parseInt(String(rawAgentId).trim(), 10);
+        if (!Number.isFinite(aid) || aid < 1) {
+          return NextResponse.json(
+            { message: "Invalid agent selection" },
+            { status: 400 },
+          );
+        }
+        agentIds = [aid];
       }
-      crm_agent_id = aid;
     }
+
+    if (agentIds.length > 0) {
+      const ph = sqlPlaceholders(agentIds.length);
+      const [agentRows] = await db.query(
+        `SELECT id FROM import_crm_agents WHERE id IN (${ph})`,
+        agentIds,
+      );
+      if (!agentRows?.length || agentRows.length !== agentIds.length) {
+        return NextResponse.json(
+          { message: "One or more selected agents were not found" },
+          { status: 400 },
+        );
+      }
+    }
+
+    let supplierIds = [];
+    if (Array.isArray(body?.supplier_ids)) {
+      const seen = new Set();
+      for (const x of body.supplier_ids) {
+        const n = parseInt(String(x).trim(), 10);
+        if (!Number.isFinite(n) || n < 1) continue;
+        if (seen.has(n)) continue;
+        seen.add(n);
+        supplierIds.push(n);
+      }
+    } else {
+      const rawSid = body?.supplier_id;
+      if (rawSid != null && String(rawSid).trim() !== "") {
+        const sid = Number.parseInt(String(rawSid).trim(), 10);
+        if (!Number.isFinite(sid) || sid < 1) {
+          return NextResponse.json(
+            { message: "Invalid supplier selection" },
+            { status: 400 },
+          );
+        }
+        supplierIds = [sid];
+      }
+    }
+
+    if (supplierIds.length > 0) {
+      const phS = sqlPlaceholders(supplierIds.length);
+      const [supRows] = await db.query(
+        `SELECT id FROM import_crm_suppliers WHERE id IN (${phS})`,
+        supplierIds,
+      );
+      if (!supRows?.length || supRows.length !== supplierIds.length) {
+        return NextResponse.json(
+          { message: "One or more selected suppliers were not found" },
+          { status: 400 },
+        );
+      }
+    }
+
+    const crm_agent_id = agentIds.length > 0 ? agentIds[0] : null;
+    const shipment_crm_agent_ids_json =
+      agentIds.length > 0 ? JSON.stringify(agentIds) : null;
+    const supplier_id = supplierIds.length > 0 ? supplierIds[0] : null;
+    const shipment_supplier_ids_json =
+      supplierIds.length > 0 ? JSON.stringify(supplierIds) : null;
 
     let publicToken = generateImportCrmQuoteToken();
     let insertId = null;
@@ -151,8 +294,9 @@ export async function POST(request) {
           `INSERT INTO import_crm_shipments
             (ship_from, ship_to, cbm, shipment_term, mode,
              material_ready_date, agent_delivery_deadline, remarks, created_by,
-             public_link_token, crm_agent_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             public_link_token, crm_agent_id, supplier_id,
+             shipment_crm_agent_ids_json, shipment_supplier_ids_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             ship_from,
             ship_to,
@@ -165,6 +309,9 @@ export async function POST(request) {
             payload.username || null,
             publicToken,
             crm_agent_id,
+            supplier_id,
+            shipment_crm_agent_ids_json,
+            shipment_supplier_ids_json,
           ],
         );
         insertId = result.insertId;

@@ -47,6 +47,7 @@ async function loadQuoteByAwardToken(connection, token) {
        q.shipment_id,
        q.awarded_at,
        q.award_form_submitted_at,
+       q.af_reassign_fields_json,
        q.af_pickup_person_details,
        q.af_supplier_address,
        q.af_cargo_ready_confirmation,
@@ -74,6 +75,16 @@ async function loadQuoteByAwardToken(connection, token) {
   return rows?.[0] ?? null;
 }
 
+function parseFieldsJson(raw) {
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw);
+    return Array.isArray(p) && p.length > 0 ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 /** GET — meta + read-only data if already submitted */
 export async function GET(_request, { params }) {
   try {
@@ -99,6 +110,9 @@ export async function GET(_request, { params }) {
       }
 
       const submitted = Boolean(row.award_form_submitted_at);
+      const reassignFields = parseFieldsJson(row.af_reassign_fields_json);
+      // In re-assign mode the form is open again even if previously submitted
+      const isReassign = Boolean(reassignFields);
       let otherDocs = [];
       if (row.af_other_documents_json) {
         try {
@@ -112,7 +126,8 @@ export async function GET(_request, { params }) {
       return NextResponse.json(
         {
           ok: true,
-          submitted,
+          submitted: submitted && !isReassign,
+          reassign_fields: reassignFields,
           shipment: {
             id: String(row.shipment_id),
             ship_from: row.ship_from,
@@ -124,20 +139,18 @@ export async function GET(_request, { params }) {
             agent_delivery_deadline: row.agent_delivery_deadline,
           },
           quoteId: row.id,
-          form: submitted
-            ? {
-                pickup_person_details: row.af_pickup_person_details,
-                supplier_address: row.af_supplier_address,
-                cargo_ready_confirmation: row.af_cargo_ready_confirmation,
-                booking_details: row.af_booking_details,
-                vessel_flight_details: row.af_vessel_flight_details,
-                container_details: row.af_container_details,
-                bl_file: row.af_bl_file,
-                invoice_file: row.af_invoice_file,
-                packing_list_file: row.af_packing_list_file,
-                other_documents: otherDocs,
-              }
-            : null,
+          form: {
+            pickup_person_details: row.af_pickup_person_details,
+            supplier_address: row.af_supplier_address,
+            cargo_ready_confirmation: row.af_cargo_ready_confirmation,
+            booking_details: row.af_booking_details,
+            vessel_flight_details: row.af_vessel_flight_details,
+            container_details: row.af_container_details,
+            bl_file: row.af_bl_file,
+            invoice_file: row.af_invoice_file,
+            packing_list_file: row.af_packing_list_file,
+            other_documents: otherDocs,
+          },
         },
         { headers: NO_STORE },
       );
@@ -216,7 +229,10 @@ export async function POST(request, { params }) {
         { status: 404, headers: NO_STORE },
       );
     }
-    if (row.award_form_submitted_at) {
+    const reassignFields = parseFieldsJson(row.af_reassign_fields_json);
+    const isReassign = Boolean(reassignFields);
+
+    if (row.award_form_submitted_at && !isReassign) {
       await connection.rollback();
       return NextResponse.json(
         { message: "This form was already submitted.", code: "ALREADY_SUBMITTED" },
@@ -229,22 +245,22 @@ export async function POST(request, { params }) {
 
     const pickup_person_details = strField(formData, "pickup_person_details");
     const supplier_address = strField(formData, "supplier_address");
-    const cargo_ready_confirmation = strField(
-      formData,
-      "cargo_ready_confirmation",
-    );
+    const cargo_ready_confirmation = strField(formData, "cargo_ready_confirmation");
     const booking_details = strField(formData, "booking_details");
     const vessel_flight_details = strField(formData, "vessel_flight_details");
     const container_details = strField(formData, "container_details");
 
-    if (!pickup_person_details) {
+    // For a full submission, pickup + supplier address are required.
+    // For partial re-assign, only validate fields that are in the reassign list.
+    const mustFill = isReassign ? reassignFields : ["pickup_person_details", "supplier_address"];
+    if (mustFill.includes("pickup_person_details") && !pickup_person_details) {
       await connection.rollback();
       return NextResponse.json(
         { message: "Pickup person details are required." },
         { status: 400, headers: NO_STORE },
       );
     }
-    if (!supplier_address) {
+    if (mustFill.includes("supplier_address") && !supplier_address) {
       await connection.rollback();
       return NextResponse.json(
         { message: "Supplier address is required." },
@@ -264,18 +280,10 @@ export async function POST(request, { params }) {
         af_bl_file = await saveUploadedFile(quoteId, "BL", blFile);
       }
       if (invFile && typeof invFile === "object" && invFile.size > 0) {
-        af_invoice_file = await saveUploadedFile(
-          quoteId,
-          "Invoice",
-          invFile,
-        );
+        af_invoice_file = await saveUploadedFile(quoteId, "Invoice", invFile);
       }
       if (plFile && typeof plFile === "object" && plFile.size > 0) {
-        af_packing_list_file = await saveUploadedFile(
-          quoteId,
-          "Packing list",
-          plFile,
-        );
+        af_packing_list_file = await saveUploadedFile(quoteId, "Packing list", plFile);
       }
     } catch (fileErr) {
       await connection.rollback();
@@ -291,12 +299,7 @@ export async function POST(request, { params }) {
       if (f && typeof f === "object" && f.size > 0) {
         try {
           const rel = await saveUploadedFile(quoteId, "Other document", f);
-          if (rel) {
-            otherMeta.push({
-              path: rel,
-              name: safeBaseName(f.name),
-            });
-          }
+          if (rel) otherMeta.push({ path: rel, name: safeBaseName(f.name) });
         } catch (fileErr) {
           await connection.rollback();
           return NextResponse.json(
@@ -307,34 +310,63 @@ export async function POST(request, { params }) {
       }
     }
 
+    // Build update: for re-assign, only touch the selected fields; for full, touch all.
+    const setParts = [];
+    const setVals = [];
+
+    const shouldUpdate = (key) => !isReassign || reassignFields.includes(key);
+
+    if (shouldUpdate("pickup_person_details")) {
+      setParts.push("af_pickup_person_details = ?");
+      setVals.push(pickup_person_details || null);
+    }
+    if (shouldUpdate("supplier_address")) {
+      setParts.push("af_supplier_address = ?");
+      setVals.push(supplier_address || null);
+    }
+    if (shouldUpdate("cargo_ready_confirmation")) {
+      setParts.push("af_cargo_ready_confirmation = ?");
+      setVals.push(cargo_ready_confirmation || null);
+    }
+    if (shouldUpdate("booking_details")) {
+      setParts.push("af_booking_details = ?");
+      setVals.push(booking_details || null);
+    }
+    if (shouldUpdate("vessel_flight_details")) {
+      setParts.push("af_vessel_flight_details = ?");
+      setVals.push(vessel_flight_details || null);
+    }
+    if (shouldUpdate("container_details")) {
+      setParts.push("af_container_details = ?");
+      setVals.push(container_details || null);
+    }
+    if (shouldUpdate("bl_file")) {
+      setParts.push("af_bl_file = ?");
+      setVals.push(af_bl_file);
+    }
+    if (shouldUpdate("invoice_file")) {
+      setParts.push("af_invoice_file = ?");
+      setVals.push(af_invoice_file);
+    }
+    if (shouldUpdate("packing_list_file")) {
+      setParts.push("af_packing_list_file = ?");
+      setVals.push(af_packing_list_file);
+    }
+    if (shouldUpdate("other_documents")) {
+      setParts.push("af_other_documents_json = ?");
+      setVals.push(otherMeta.length ? JSON.stringify(otherMeta) : null);
+    }
+
+    // Always update submission timestamp and clear the reassign fields marker
+    setParts.push("award_form_submitted_at = CURRENT_TIMESTAMP");
+    setParts.push("af_reassign_fields_json = NULL");
+    setVals.push(quoteId, token);
+
     await connection.execute(
-      `UPDATE import_crm_shipment_link_quotes SET
-        af_pickup_person_details = ?,
-        af_supplier_address = ?,
-        af_cargo_ready_confirmation = ?,
-        af_booking_details = ?,
-        af_vessel_flight_details = ?,
-        af_container_details = ?,
-        af_bl_file = ?,
-        af_invoice_file = ?,
-        af_packing_list_file = ?,
-        af_other_documents_json = ?,
-        award_form_submitted_at = CURRENT_TIMESTAMP
+      `UPDATE import_crm_shipment_link_quotes
+       SET ${setParts.join(", ")}
        WHERE id = ? AND award_portal_token = ? AND awarded_at IS NOT NULL`,
-      [
-        pickup_person_details || null,
-        supplier_address || null,
-        cargo_ready_confirmation || null,
-        booking_details || null,
-        vessel_flight_details || null,
-        container_details || null,
-        af_bl_file,
-        af_invoice_file,
-        af_packing_list_file,
-        otherMeta.length ? JSON.stringify(otherMeta) : null,
-        quoteId,
-        token,
-      ],
+      setVals,
     );
 
     await connection.commit();

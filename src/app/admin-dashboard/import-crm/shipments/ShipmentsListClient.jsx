@@ -35,12 +35,18 @@ const emptyForm = () => ({
   material_ready_date: "",
   agent_delivery_deadline: "",
   remarks: "",
-  crm_agent_id: "",
+  crm_agent_ids: [],
+  supplier_ids: [],
 });
 
 function agentOptionLabel(a) {
   const c = a.company_name && String(a.company_name).trim();
   return c || a.agent_name || `Agent #${a.id}`;
+}
+
+function supplierOptionLabel(s) {
+  const n = s.supplier_name && String(s.supplier_name).trim();
+  return n || (s.factory_name && String(s.factory_name).trim()) || `Supplier #${s.id}`;
 }
 
 export default function ShipmentsListClient() {
@@ -53,6 +59,8 @@ export default function ShipmentsListClient() {
   const [linkOrigin, setLinkOrigin] = useState("");
   const [agents, setAgents] = useState([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
+  const [suppliers, setSuppliers] = useState([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [regeneratingLinkId, setRegeneratingLinkId] = useState(null);
 
   const load = useCallback(async () => {
@@ -85,20 +93,35 @@ export default function ShipmentsListClient() {
     let cancelled = false;
     (async () => {
       setAgentsLoading(true);
+      setSuppliersLoading(true);
       try {
-        const res = await fetch("/api/import-crm/agents");
-        const data = await res.json();
+        const [agentsRes, suppliersRes] = await Promise.all([
+          fetch("/api/import-crm/agents"),
+          fetch("/api/import-crm/suppliers"),
+        ]);
+        const agentsData = await agentsRes.json();
+        const suppliersData = await suppliersRes.json();
         if (cancelled) return;
-        if (!res.ok) throw new Error(data.message || "Failed to load agents");
-        setAgents(data.agents || []);
+        if (!agentsRes.ok) {
+          throw new Error(agentsData.message || "Failed to load agents");
+        }
+        if (!suppliersRes.ok) {
+          throw new Error(suppliersData.message || "Failed to load suppliers");
+        }
+        setAgents(agentsData.agents || []);
+        setSuppliers(suppliersData.suppliers || []);
       } catch (e) {
         if (!cancelled) {
           console.error(e);
-          toast.error(e.message || "Could not load agents list");
+          toast.error(e.message || "Could not load agents or suppliers");
           setAgents([]);
+          setSuppliers([]);
         }
       } finally {
-        if (!cancelled) setAgentsLoading(false);
+        if (!cancelled) {
+          setAgentsLoading(false);
+          setSuppliersLoading(false);
+        }
       }
     })();
     return () => {
@@ -172,6 +195,24 @@ export default function ShipmentsListClient() {
     setForm((f) => ({ ...f, [field]: value }));
   };
 
+  const toggleAgentId = (id) => {
+    setForm((f) => {
+      const set = new Set(f.crm_agent_ids);
+      if (set.has(id)) set.delete(id);
+      else set.add(id);
+      return { ...f, crm_agent_ids: [...set].sort((a, b) => a - b) };
+    });
+  };
+
+  const toggleSupplierId = (id) => {
+    setForm((f) => {
+      const set = new Set(f.supplier_ids);
+      if (set.has(id)) set.delete(id);
+      else set.add(id);
+      return { ...f, supplier_ids: [...set].sort((a, b) => a - b) };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -188,10 +229,8 @@ export default function ShipmentsListClient() {
           material_ready_date: form.material_ready_date || null,
           agent_delivery_deadline: form.agent_delivery_deadline || null,
           remarks: form.remarks || null,
-          crm_agent_id:
-            form.crm_agent_id !== "" && form.crm_agent_id != null
-              ? Number(form.crm_agent_id)
-              : null,
+          crm_agent_ids: form.crm_agent_ids || [],
+          supplier_ids: form.supplier_ids || [],
         }),
       });
       const data = await res.json();
@@ -265,7 +304,7 @@ export default function ShipmentsListClient() {
         <div className="fixed inset-0 flex justify-end overflow-hidden">
           <DialogPanel
             transition
-            className="flex h-full w-full max-w-xl transform flex-col border-l border-slate-200 bg-white shadow-2xl transition duration-300 ease-out data-[closed]:translate-x-full"
+            className="flex h-full w-full max-w-2xl transform flex-col border-l border-slate-200 bg-white shadow-2xl transition duration-300 ease-out data-[closed]:translate-x-full"
           >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
               <DialogTitle className="text-base font-semibold text-slate-900">
@@ -356,28 +395,84 @@ export default function ShipmentsListClient() {
                     </select>
                   </div>
                   <div className="sm:col-span-2">
-                    <label className={labelClass}>Assign agent (optional)</label>
-                    <select
-                      className={inputClass}
-                      value={form.crm_agent_id === "" ? "" : String(form.crm_agent_id)}
-                      onChange={(e) =>
-                        update("crm_agent_id", e.target.value)
-                      }
-                      disabled={agentsLoading}
+                    <label className={labelClass}>
+                      Assign import agents
+                    </label>
+                    <div
+                      className="max-h-40 overflow-y-auto rounded-[10px] border border-slate-200 bg-slate-50/50 px-2 py-2"
+                      aria-busy={agentsLoading}
                     >
-                      <option value="">
-                        {agentsLoading ? "Loading agents…" : "— No agent —"}
-                      </option>
-                      {agents.map((a) => (
-                        <option key={a.id} value={String(a.id)}>
-                          {agentOptionLabel(a)}
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Assign an import CRM agent to this shipment. Add agents
-                      under Import CRM → Agents if the list is empty.
-                    </p>
+                      {agentsLoading ? (
+                        <p className="px-2 py-2 text-xs text-slate-500">
+                          Loading agents…
+                        </p>
+                      ) : agents.length === 0 ? (
+                        <p className="px-2 py-2 text-xs text-slate-500">
+                          No agents yet. Add them under Import CRM → Agents.
+                        </p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {agents.map((a) => (
+                            <li key={a.id}>
+                              <label className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-white">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                                  checked={form.crm_agent_ids.includes(a.id)}
+                                  onChange={() => toggleAgentId(a.id)}
+                                />
+                                <span className="text-slate-800">
+                                  {agentOptionLabel(a)}
+                                  <span className="ml-1 font-mono text-[11px] text-slate-500">
+                                    #{a.id}
+                                  </span>
+                                </span>
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={labelClass}>
+                      Assign suppliers
+                    </label>
+                    <div
+                      className="max-h-40 overflow-y-auto rounded-[10px] border border-slate-200 bg-slate-50/50 px-2 py-2"
+                      aria-busy={suppliersLoading}
+                    >
+                      {suppliersLoading ? (
+                        <p className="px-2 py-2 text-xs text-slate-500">
+                          Loading suppliers…
+                        </p>
+                      ) : suppliers.length === 0 ? (
+                        <p className="px-2 py-2 text-xs text-slate-500">
+                          No suppliers yet. Add them under Import CRM → Suppliers.
+                        </p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {suppliers.map((s) => (
+                            <li key={s.id}>
+                              <label className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-white">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                                  checked={form.supplier_ids.includes(s.id)}
+                                  onChange={() => toggleSupplierId(s.id)}
+                                />
+                                <span className="text-slate-800">
+                                  {supplierOptionLabel(s)}
+                                  <span className="ml-1 font-mono text-[11px] text-slate-500">
+                                    #{s.id}
+                                  </span>
+                                </span>
+                              </label>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className={labelClass}>Material ready date</label>
@@ -448,7 +543,7 @@ export default function ShipmentsListClient() {
                 <th className="px-3 py-3 sm:px-4">CBM</th>
                 <th className="px-3 py-3 sm:px-4">Term</th>
                 <th className="px-3 py-3 sm:px-4">Mode</th>
-                <th className="px-3 py-3 sm:px-4">Assigned agent</th>
+                <th className="px-3 py-3 sm:px-4">Agents / suppliers</th>
                 <th className="px-3 py-3 sm:px-4">Ready</th>
                 <th className="px-3 py-3 sm:px-4">Agent deadline</th>
                 <th className="px-3 py-3 sm:px-4">Remarks</th>
@@ -501,26 +596,35 @@ export default function ShipmentsListClient() {
                     <td className="whitespace-nowrap px-3 py-2.5 sm:px-4">
                       {s.mode}
                     </td>
-                    <td className="max-w-[14rem] px-3 py-2.5 text-xs sm:px-4">
-                      {s.crm_agent_id != null &&
-                      s.agent_display_name?.trim() ? (
-                        <div
-                          title={`Agent ID ${s.crm_agent_id}${s.agent_display_name ? ` · ${s.agent_display_name}` : ""}`}
-                        >
-                          <span className="line-clamp-2 font-medium text-slate-800">
-                            {s.agent_display_name}
+                    <td className="max-w-[16rem] px-3 py-2.5 text-xs sm:px-4">
+                      <div className="space-y-1">
+                        <div>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Agents
                           </span>
-                          <span className="mt-0.5 block font-mono text-[10px] text-slate-500">
-                            #{s.crm_agent_id}
-                          </span>
+                          <div
+                            className="line-clamp-3 text-slate-800"
+                            title={s.agents_display || ""}
+                          >
+                            {s.agents_display && s.agents_display !== "—"
+                              ? s.agents_display
+                              : "—"}
+                          </div>
                         </div>
-                      ) : s.crm_agent_id != null ? (
-                        <span className="font-mono text-slate-700" title="Agent record missing or renamed">
-                          Agent #{s.crm_agent_id}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">Unassigned</span>
-                      )}
+                        <div>
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Suppliers
+                          </span>
+                          <div
+                            className="line-clamp-3 text-slate-800"
+                            title={s.suppliers_display || ""}
+                          >
+                            {s.suppliers_display && s.suppliers_display !== "—"
+                              ? s.suppliers_display
+                              : "—"}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-xs sm:px-4">
                       {formatDate(s.material_ready_date)}
