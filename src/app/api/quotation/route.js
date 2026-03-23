@@ -168,9 +168,9 @@ export async function POST(req) {
       const quantity = item.quantity ?? 0;
       const unit = item.unit ?? null;
       const price_per_unit = item.price ?? 0;
-      const taxable_price = item.total_amount - item.taxable_amount;
+      const taxable_price = item.taxable_amount;
       const gstItem = item.gst ?? 0;
-      const igsttamt = item.IGSTamt ?? 0;
+      const igsttamt = (igst || 0) > 0 ? (item.IGSTamt ?? 0) : 0;
       const total_taxable_amt = item.taxable_amount;
       const total_price = item.total_amount;
       const img_url = item.imageUrl ?? null;
