@@ -91,6 +91,10 @@ export async function POST(request, { params }) {
          WHERE shipment_id = ?`,
         [shipmentId],
       );
+      await connection.execute(
+        `UPDATE import_crm_shipments SET status = 'PENDING' WHERE id = ?`,
+        [shipmentId],
+      );
       await connection.commit();
       return NextResponse.json({
         ok: true,
@@ -125,6 +129,11 @@ export async function POST(request, { params }) {
         af_other_documents_json = NULL
        WHERE id = ?`,
       [portalToken, id],
+    );
+
+    await connection.execute(
+      `UPDATE import_crm_shipments SET status = 'AWARDED' WHERE id = ?`,
+      [shipmentId],
     );
 
     await connection.commit();

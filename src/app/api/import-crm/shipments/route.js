@@ -75,7 +75,7 @@ export async function GET() {
               s.material_ready_date, s.agent_delivery_deadline, s.remarks,
               s.public_link_token, s.crm_agent_id, s.supplier_id,
               s.shipment_crm_agent_ids_json, s.shipment_supplier_ids_json,
-              s.created_by, s.created_at, s.updated_at
+              s.status, s.created_by, s.created_at, s.updated_at
        FROM import_crm_shipments s
        ORDER BY s.id DESC`,
     );

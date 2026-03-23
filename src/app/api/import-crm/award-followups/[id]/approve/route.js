@@ -52,12 +52,26 @@ export async function POST(_request, { params }) {
       );
     }
 
-    await db.query(
+    const [updated] = await db.query(
       `UPDATE import_crm_shipment_link_quotes
        SET af_approved_at = CURRENT_TIMESTAMP, af_approved_by = ?
        WHERE id = ?`,
       [payload.username || null, id],
     );
+
+    if (updated.affectedRows > 0) {
+      const [qrows] = await db.query(
+        `SELECT shipment_id FROM import_crm_shipment_link_quotes WHERE id = ? LIMIT 1`,
+        [id],
+      );
+      const shipmentId = qrows?.[0]?.shipment_id;
+      if (shipmentId) {
+        await db.query(
+          `UPDATE import_crm_shipments SET status = 'APPROVED_FOR_MOVEMENT' WHERE id = ?`,
+          [shipmentId],
+        );
+      }
+    }
 
     return NextResponse.json({ ok: true, message: "Follow-up approved." });
   } catch (error) {

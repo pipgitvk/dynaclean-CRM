@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS import_crm_purchase_orders (
     FOREIGN KEY (supplier_id) REFERENCES import_crm_suppliers (id)
     ON DELETE RESTRICT ON UPDATE CASCADE
 )`;
-
+  
 const CREATE_IMPORT_CRM_SHIPMENTS = `
 CREATE TABLE IF NOT EXISTS import_crm_shipments (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -584,6 +584,40 @@ export async function ensureImportCrmTables() {
     /* ignore */
   }
   await conn.execute(CREATE_IMPORT_CRM_AGENT_QUOTATIONS);
+
+  // Shipment-level status: PENDING → AWARDED → EXECUTION_APPROVED → APPROVED_FOR_MOVEMENT
+  try {
+    await conn.execute(
+      `ALTER TABLE import_crm_shipments ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'PENDING'`,
+    );
+  } catch (e) {
+    if (e?.errno !== 1060) throw e;
+  }
+  // Backfill existing rows that were created before the status column was added
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments s
+       INNER JOIN import_crm_shipment_link_quotes q ON q.shipment_id = s.id
+       SET s.status = 'APPROVED_FOR_MOVEMENT'
+       WHERE s.status = 'PENDING' AND q.af_approved_at IS NOT NULL`,
+    );
+  } catch { /* ignore */ }
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments s
+       INNER JOIN import_crm_shipment_link_quotes q ON q.shipment_id = s.id
+       SET s.status = 'EXECUTION_APPROVED'
+       WHERE s.status = 'PENDING' AND q.award_form_submitted_at IS NOT NULL AND q.af_approved_at IS NULL`,
+    );
+  } catch { /* ignore */ }
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments s
+       INNER JOIN import_crm_shipment_link_quotes q ON q.shipment_id = s.id
+       SET s.status = 'AWARDED'
+       WHERE s.status = 'PENDING' AND q.awarded_at IS NOT NULL AND q.award_form_submitted_at IS NULL`,
+    );
+  } catch { /* ignore */ }
 
   // Do NOT backfill import_quote_submitted_at from import_crm_quotations here.
   // That ran on every request and undid "regenerate link" (NULL after new token).
