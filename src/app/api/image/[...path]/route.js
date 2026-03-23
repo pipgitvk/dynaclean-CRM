@@ -23,6 +23,10 @@ export async function GET(req, { params }) {
     let filePath = resolvedPath;
 
     if (!fs.existsSync(filePath)) {
+      // Do not substitute banner for explicit follow-up uploads (wrong UX / confusing).
+      if (subfolder === "task_followup" || subfolder.startsWith("task_followup/")) {
+        return new NextResponse("Not found", { status: 404 });
+      }
       filePath = path.join(baseDir, "banner.webp");
     }
 

@@ -13,16 +13,34 @@ import toast from "react-hot-toast";
 const inputClass =
   "h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200/90";
 
+const labelClass = "mb-1 block text-xs font-medium text-slate-600";
+
 function emptyDraft() {
   return {
     tempId: `d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    supplier_name: "",
-    country: "",
+    company_name: "",
     contact_person: "",
     email: "",
     phone: "",
+    country: "",
+    state: "",
+    city: "",
     address: "",
+    service_type: "",
+    mode_supported: "",
+    shipment_type_supported: "",
+    origin_coverage: "",
+    destination_coverage: "",
+    gst_no: "",
+    pan_no: "",
+    status: "Active",
+    remarks: "",
   };
+}
+
+function companyDisplay(s) {
+  const c = s.company_name && String(s.company_name).trim();
+  return c || s.agent_name || "—";
 }
 
 function formatTableDate(value) {
@@ -36,8 +54,8 @@ function formatTableDate(value) {
   });
 }
 
-export default function SuppliersListClient() {
-  const [suppliers, setSuppliers] = useState([]);
+export default function AgentsListClient() {
+  const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tableBusy, setTableBusy] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -45,30 +63,30 @@ export default function SuppliersListClient() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const fetchSuppliers = useCallback(async () => {
+  const fetchAgents = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/import-crm/suppliers");
+      const res = await fetch("/api/import-crm/agents");
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to load");
-      setSuppliers(data.suppliers || []);
+      setAgents(data.agents || []);
     } catch (e) {
       console.error(e);
-      toast.error(e.message || "Failed to load suppliers");
+      toast.error(e.message || "Failed to load agents");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchSuppliers();
-  }, [fetchSuppliers]);
+    fetchAgents();
+  }, [fetchAgents]);
 
   const addDraftLine = useCallback(() => {
     setDraftLines((prev) => [...prev, emptyDraft()]);
   }, []);
 
-  const openSupplierDrawer = useCallback(() => {
+  const openAgentDrawer = useCallback(() => {
     setDrawerOpen(true);
     setDraftLines((prev) =>
       prev.length === 0 ? [...prev, emptyDraft()] : prev,
@@ -92,9 +110,9 @@ export default function SuppliersListClient() {
   }, []);
 
   const saveAllDrafts = useCallback(async () => {
-    const toSave = draftLines.filter((d) => d.supplier_name.trim());
+    const toSave = draftLines.filter((d) => d.company_name.trim());
     if (toSave.length === 0) {
-      toast.error("Add at least one row with a supplier name.");
+      toast.error("Add at least one row with a company name.");
       return;
     }
     setSaveLoading(true);
@@ -102,16 +120,27 @@ export default function SuppliersListClient() {
     let firstError = null;
     try {
       for (const d of toSave) {
-        const res = await fetch("/api/import-crm/suppliers", {
+        const res = await fetch("/api/import-crm/agents", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            supplier_name: d.supplier_name.trim(),
-            country: d.country.trim() || null,
+            company_name: d.company_name.trim(),
             contact_person: d.contact_person.trim() || null,
             email: d.email.trim() || null,
             phone: d.phone.trim() || null,
+            country: d.country.trim() || null,
+            state: d.state.trim() || null,
+            city: d.city.trim() || null,
             address: d.address.trim() || null,
+            service_type: d.service_type.trim() || null,
+            mode_supported: d.mode_supported.trim() || null,
+            shipment_type_supported: d.shipment_type_supported.trim() || null,
+            origin_coverage: d.origin_coverage.trim() || null,
+            destination_coverage: d.destination_coverage.trim() || null,
+            gst_no: d.gst_no.trim() || null,
+            pan_no: d.pan_no.trim() || null,
+            status: d.status.trim() || "Active",
+            remarks: d.remarks.trim() || null,
           }),
         });
         const data = await res.json();
@@ -124,8 +153,8 @@ export default function SuppliersListClient() {
       if (savedTempIds.length > 0) {
         toast.success(
           savedTempIds.length === 1
-            ? "Supplier saved"
-            : `${savedTempIds.length} suppliers saved`,
+            ? "Agent saved"
+            : `${savedTempIds.length} agents saved`,
         );
         const nextDrafts = draftLines.filter(
           (d) => !savedTempIds.includes(d.tempId),
@@ -133,7 +162,7 @@ export default function SuppliersListClient() {
         setDraftLines(nextDrafts);
         if (nextDrafts.length === 0) setDrawerOpen(false);
         setTableBusy(true);
-        await fetchSuppliers();
+        await fetchAgents();
         setTableBusy(false);
       }
       if (firstError) toast.error(firstError);
@@ -142,38 +171,53 @@ export default function SuppliersListClient() {
     } finally {
       setSaveLoading(false);
     }
-  }, [draftLines, fetchSuppliers]);
+  }, [draftLines, fetchAgents]);
 
-  const filteredSuppliers = useMemo(() => {
+  const filteredAgents = useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    if (!q) return suppliers;
-    return suppliers.filter((s) => {
+    if (!q) return agents;
+    return agents.filter((s) => {
       const blob = [
         s.id,
-        s.supplier_name,
+        s.agent_name,
+        s.company_name,
         s.country,
+        s.state,
+        s.city,
         s.contact_person,
         s.email,
         s.phone,
         s.address,
+        s.service_type,
+        s.mode_supported,
+        s.shipment_type_supported,
+        s.origin_coverage,
+        s.destination_coverage,
+        s.gst_no,
+        s.pan_no,
+        s.status,
+        s.remarks,
       ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       return blob.includes(q);
     });
-  }, [suppliers, searchText]);
+  }, [agents, searchText]);
 
   const hasFilter = searchText.trim().length > 0;
 
   const tableHeaders = [
     "ID",
-    "Supplier name",
+    "Company name",
     "Country",
+    "State / city",
     "Contact person",
     "Email",
     "Phone",
     "Address",
+    "Service type",
+    "Status",
     "Created",
   ];
 
@@ -191,7 +235,7 @@ export default function SuppliersListClient() {
               type="search"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search supplier name, country, email, phone, or ID"
+              placeholder="Search company, GST, coverage, contact, email, phone…"
               autoComplete="off"
               className="h-11 w-full rounded-[10px] border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm text-slate-900 shadow-none outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/90"
             />
@@ -199,10 +243,10 @@ export default function SuppliersListClient() {
         </div>
         <button
           type="button"
-          onClick={openSupplierDrawer}
+          onClick={openAgentDrawer}
           className="h-11 w-full shrink-0 rounded-[10px] bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:min-w-[10.5rem]"
         >
-          Add Supplier
+          Add Agent
         </button>
       </div>
 
@@ -219,12 +263,12 @@ export default function SuppliersListClient() {
         <div className="fixed inset-0 flex justify-end overflow-hidden">
           <DialogPanel
             transition
-            className="flex h-full w-full max-w-lg transform flex-col border-l border-slate-200 bg-white shadow-2xl transition duration-300 ease-out data-[closed]:translate-x-full"
+            className="flex h-full w-full max-w-2xl transform flex-col border-l border-slate-200 bg-white shadow-2xl transition duration-300 ease-out data-[closed]:translate-x-full"
           >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
               <div className="min-w-0 pt-0.5">
                 <DialogTitle className="text-base font-semibold text-slate-900">
-                  New suppliers
+                  New agents
                 </DialogTitle>
                 <p className="mt-0.5 text-xs text-slate-500">
                   {draftLines.length} row{draftLines.length === 1 ? "" : "s"}
@@ -272,42 +316,25 @@ export default function SuppliersListClient() {
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="grid gap-3">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Supplier name *
-                        </label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label className={labelClass}>Company name *</label>
                         <input
                           type="text"
                           className={inputClass}
-                          value={d.supplier_name}
+                          value={d.company_name}
                           onChange={(e) =>
                             updateDraft(
                               d.tempId,
-                              "supplier_name",
+                              "company_name",
                               e.target.value,
                             )
                           }
-                          placeholder="Required"
+                          placeholder="e.g. ABC Logistics Pvt Ltd"
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Country
-                        </label>
-                        <input
-                          type="text"
-                          className={inputClass}
-                          value={d.country}
-                          onChange={(e) =>
-                            updateDraft(d.tempId, "country", e.target.value)
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Contact person
-                        </label>
+                        <label className={labelClass}>Contact person</label>
                         <input
                           type="text"
                           className={inputClass}
@@ -322,9 +349,7 @@ export default function SuppliersListClient() {
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Email
-                        </label>
+                        <label className={labelClass}>Email</label>
                         <input
                           type="email"
                           className={inputClass}
@@ -335,9 +360,7 @@ export default function SuppliersListClient() {
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Phone
-                        </label>
+                        <label className={labelClass}>Phone</label>
                         <input
                           type="text"
                           className={inputClass}
@@ -348,15 +371,176 @@ export default function SuppliersListClient() {
                         />
                       </div>
                       <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">
-                          Address
-                        </label>
+                        <label className={labelClass}>Country</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.country}
+                          onChange={(e) =>
+                            updateDraft(d.tempId, "country", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>State</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.state}
+                          onChange={(e) =>
+                            updateDraft(d.tempId, "state", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>City</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.city}
+                          onChange={(e) =>
+                            updateDraft(d.tempId, "city", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className={labelClass}>Address</label>
                         <textarea
                           rows={2}
                           className={`${inputClass} min-h-[2.75rem] py-2`}
                           value={d.address}
                           onChange={(e) =>
                             updateDraft(d.tempId, "address", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Service type</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.service_type}
+                          onChange={(e) =>
+                            updateDraft(
+                              d.tempId,
+                              "service_type",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="e.g. Freight Forwarder"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Status</label>
+                        <select
+                          className={inputClass}
+                          value={d.status}
+                          onChange={(e) =>
+                            updateDraft(d.tempId, "status", e.target.value)
+                          }
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Mode supported</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.mode_supported}
+                          onChange={(e) =>
+                            updateDraft(
+                              d.tempId,
+                              "mode_supported",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="e.g. Sea, Air"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>
+                          Shipment type supported
+                        </label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.shipment_type_supported}
+                          onChange={(e) =>
+                            updateDraft(
+                              d.tempId,
+                              "shipment_type_supported",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="e.g. LCL, FCL"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className={labelClass}>Origin coverage</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.origin_coverage}
+                          onChange={(e) =>
+                            updateDraft(
+                              d.tempId,
+                              "origin_coverage",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="e.g. Shanghai, Guangzhou"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className={labelClass}>
+                          Destination coverage
+                        </label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.destination_coverage}
+                          onChange={(e) =>
+                            updateDraft(
+                              d.tempId,
+                              "destination_coverage",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="e.g. Delhi, Mumbai"
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>GST no.</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.gst_no}
+                          onChange={(e) =>
+                            updateDraft(d.tempId, "gst_no", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>PAN no.</label>
+                        <input
+                          type="text"
+                          className={inputClass}
+                          value={d.pan_no}
+                          onChange={(e) =>
+                            updateDraft(d.tempId, "pan_no", e.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className={labelClass}>Remarks</label>
+                        <textarea
+                          rows={2}
+                          className={`${inputClass} min-h-[2.75rem] py-2`}
+                          value={d.remarks}
+                          onChange={(e) =>
+                            updateDraft(d.tempId, "remarks", e.target.value)
                           }
                         />
                       </div>
@@ -403,7 +587,7 @@ export default function SuppliersListClient() {
           </div>
         ) : null}
         <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-          <table className="min-w-[56rem] w-full divide-y divide-slate-200 text-sm">
+          <table className="min-w-[72rem] w-full divide-y divide-slate-200 text-sm xl:min-w-0">
             <thead className="bg-slate-50">
               <tr>
                 {tableHeaders.map((h) => (
@@ -418,19 +602,19 @@ export default function SuppliersListClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {filteredSuppliers.length === 0 ? (
+              {filteredAgents.length === 0 ? (
                 <tr>
                   <td
                     colSpan={tableHeaders.length}
                     className="px-3 py-10 text-center text-sm text-slate-500 sm:px-4 sm:py-12"
                   >
                     {hasFilter
-                      ? "No suppliers match this search."
-                      : "No suppliers yet. Click Add Supplier — the form opens on the right; save to add rows here."}
+                      ? "No agents match this search."
+                      : "No agents yet. Click Add Agent — the form opens on the right; save to add rows here."}
                   </td>
                 </tr>
               ) : (
-                filteredSuppliers.map((s) => (
+                filteredAgents.map((s) => (
                   <tr
                     key={s.id}
                     className="bg-white hover:bg-slate-50/80"
@@ -438,20 +622,25 @@ export default function SuppliersListClient() {
                     <td className="whitespace-nowrap px-2 py-2.5 font-medium text-slate-900 sm:px-4 sm:py-3">
                       {s.id}
                     </td>
-                    <td className="max-w-[12rem] px-2 py-2.5 text-slate-800 sm:max-w-[16rem] sm:px-4 sm:py-3">
+                    <td className="max-w-[14rem] px-2 py-2.5 text-slate-800 sm:max-w-[18rem] sm:px-4 sm:py-3">
                       <span className="line-clamp-2 font-medium">
-                        {s.supplier_name}
+                        {companyDisplay(s)}
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
                       {s.country || "—"}
+                    </td>
+                    <td className="max-w-[10rem] px-2 py-2.5 text-xs text-slate-600 sm:px-4 sm:py-3">
+                      <span className="line-clamp-2">
+                        {[s.state, s.city].filter(Boolean).join(", ") || "—"}
+                      </span>
                     </td>
                     <td className="max-w-[10rem] px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
                       <span className="line-clamp-2">
                         {s.contact_person || "—"}
                       </span>
                     </td>
-                    <td className="max-w-[12rem] break-all px-2 py-2.5 text-xs text-slate-700 sm:px-4 sm:py-3 sm:text-sm">
+                    <td className="max-w-[11rem] break-all px-2 py-2.5 text-xs text-slate-700 sm:px-4 sm:py-3 sm:text-sm">
                       {s.email || "—"}
                     </td>
                     <td className="whitespace-nowrap px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
@@ -462,8 +651,16 @@ export default function SuppliersListClient() {
                       title={s.address || undefined}
                     >
                       <span className="line-clamp-2 text-xs sm:text-sm">
-                        {s.address || "—"}
+                        {s.address?.trim() ? s.address : "—"}
                       </span>
+                    </td>
+                    <td className="max-w-[9rem] px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
+                      <span className="line-clamp-2 text-xs sm:text-sm">
+                        {s.service_type || "—"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-2 py-2.5 text-slate-700 sm:px-4 sm:py-3">
+                      {s.status || "—"}
                     </td>
                     <td className="whitespace-nowrap px-2 py-2.5 text-xs text-slate-600 sm:px-4 sm:py-3">
                       {formatTableDate(s.created_at)}

@@ -62,15 +62,26 @@ export async function POST(request) {
 
     await ensureImportCrmTables();
     const db = await getDbConnection();
+
     const [result] = await db.query(
       `INSERT INTO import_crm_suppliers
-        (supplier_name, country, contact_person, email, phone, address)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [supplier_name, country || null, contact_person || null, email || null, phone || null, address || null],
+        (supplier_name, country, contact_person, email, phone, address, quote_link_token)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+      [
+        supplier_name,
+        country || null,
+        contact_person || null,
+        email || null,
+        phone || null,
+        address || null,
+      ],
     );
 
     return NextResponse.json(
-      { id: result.insertId, message: "Supplier created" },
+      {
+        id: result.insertId,
+        message: "Supplier created",
+      },
       { status: 201 },
     );
   } catch (error) {

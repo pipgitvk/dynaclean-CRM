@@ -108,6 +108,9 @@ import {
   Mail,
   Settings,
   CheckSquare,
+  Package,
+  Import,
+  Ship,
 } from "lucide-react";
 
 // Icon map
@@ -139,6 +142,9 @@ const iconMap = {
   Mail,
   Settings,
   CheckSquare,
+  Package,
+  Import,
+  Ship,
 };
 
 //this is test

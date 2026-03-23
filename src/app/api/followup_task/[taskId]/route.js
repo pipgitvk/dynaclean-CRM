@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "task_followup_images");
+// Use uploads/ + /api/image/... so files are served by the Node handler (same as other media).
+// public/task_followup_images often 404s behind reverse proxies or ephemeral serverless disks.
+const UPLOAD_DIR = path.join(process.cwd(), "uploads", "task_followup");
 
 async function ensureUploadDir() {
   try {
@@ -21,7 +23,7 @@ async function saveImage(file) {
   const filename = `followup-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, buffer);
-  return `/task_followup_images/${filename}`;
+  return `/api/image/task_followup/${filename}`;
 }
 
 export async function POST(req, { params }) {

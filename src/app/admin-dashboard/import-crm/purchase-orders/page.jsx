@@ -8,12 +8,20 @@ export default function ImportCrmPurchaseOrdersPage() {
         <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
           Purchase orders
         </h1>
-        <Link
-          href="/admin-dashboard/import-crm/suppliers"
-          className="text-sm font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-        >
-          ← Suppliers
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium">
+          <Link
+            href="/admin-dashboard/import-crm/suppliers"
+            className="text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+          >
+            ← Suppliers
+          </Link>
+          <Link
+            href="/admin-dashboard/import-crm/quote-submissions"
+            className="text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
+          >
+            Quote submissions
+          </Link>
+        </div>
       </div>
 
       <PurchaseOrdersListClient />
