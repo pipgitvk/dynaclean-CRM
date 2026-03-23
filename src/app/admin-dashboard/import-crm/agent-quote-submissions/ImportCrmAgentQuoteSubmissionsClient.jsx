@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Search } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -287,28 +286,6 @@ export default function ImportCrmAgentQuoteSubmissionsClient() {
         </div>
       </div>
 
-      <p className="mt-4 text-center text-sm text-slate-500">
-        <Link
-          href="/admin-dashboard/import-crm/agents"
-          className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-        >
-          ← Agents
-        </Link>
-        <span className="mx-2 text-slate-300">·</span>
-        <Link
-          href="/admin-dashboard/import-crm/quote-submissions"
-          className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-        >
-          Supplier quote submissions
-        </Link>
-        <span className="mx-2 text-slate-300">·</span>
-        <Link
-          href="/admin-dashboard/import-crm/purchase-orders"
-          className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-        >
-          Purchase orders →
-        </Link>
-      </p>
     </>
   );
 }

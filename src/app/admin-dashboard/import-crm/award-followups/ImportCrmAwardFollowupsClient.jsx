@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   Dialog,
   DialogBackdrop,
@@ -476,15 +475,6 @@ export default function ImportCrmAwardFollowupsClient() {
           </table>
         </div>
       </div>
-
-      <p className="mt-4 text-center text-sm text-slate-500">
-        <Link
-          href="/admin-dashboard/import-crm/quote-submissions"
-          className="font-medium text-slate-700 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-        >
-          ← Quote submissions
-        </Link>
-      </p>
 
       {/* ── Re-assign modal ── */}
       <Dialog
