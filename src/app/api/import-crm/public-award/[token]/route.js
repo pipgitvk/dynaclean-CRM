@@ -369,6 +369,11 @@ export async function POST(request, { params }) {
       setVals,
     );
 
+    await connection.execute(
+      `UPDATE import_crm_shipments SET status = 'EXECUTION_APPROVED' WHERE id = ?`,
+      [row.shipment_id],
+    );
+
     await connection.commit();
     return NextResponse.json(
       { ok: true, message: "Thank you — your details were submitted." },

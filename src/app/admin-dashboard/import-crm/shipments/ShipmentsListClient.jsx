@@ -547,6 +547,7 @@ export default function ShipmentsListClient() {
                 <th className="px-3 py-3 sm:px-4">Ready</th>
                 <th className="px-3 py-3 sm:px-4">Agent deadline</th>
                 <th className="px-3 py-3 sm:px-4">Remarks</th>
+                <th className="px-3 py-3 sm:px-4">Status</th>
                 <th className="px-3 py-3 sm:px-4">Created</th>
                 <th className="px-3 py-3 sm:px-4">Share link</th>
                 <th className="px-3 py-3 sm:px-4 w-12" />
@@ -556,7 +557,7 @@ export default function ShipmentsListClient() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={13}
+                    colSpan={14}
                     className="px-4 py-8 text-center text-slate-500"
                   >
                     Loading…
@@ -565,7 +566,7 @@ export default function ShipmentsListClient() {
               ) : shipments.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={13}
+                    colSpan={14}
                     className="px-4 py-8 text-center text-slate-500"
                   >
                     No shipments yet. Click &quot;Add New Shipment&quot; to add
@@ -637,6 +638,9 @@ export default function ShipmentsListClient() {
                         {s.remarks || "—"}
                       </span>
                     </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 sm:px-4">
+                      <ShipmentStatusBadge status={s.status} />
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-xs text-slate-600 sm:px-4">
                       {formatDate(s.created_at)}
                     </td>
@@ -705,5 +709,32 @@ export default function ShipmentsListClient() {
         </div>
       </section>
     </>
+  );
+}
+
+const STATUS_STYLES = {
+  PENDING: "bg-slate-100 text-slate-700",
+  AWARDED: "bg-amber-100 text-amber-900",
+  EXECUTION_APPROVED: "bg-blue-100 text-blue-900",
+  APPROVED_FOR_MOVEMENT: "bg-emerald-100 text-emerald-900",
+};
+
+const STATUS_LABELS = {
+  PENDING: "Pending",
+  AWARDED: "Awarded",
+  EXECUTION_APPROVED: "Execution approved",
+  APPROVED_FOR_MOVEMENT: "Approved for movement",
+};
+
+function ShipmentStatusBadge({ status }) {
+  const key = String(status || "PENDING").toUpperCase();
+  const cls = STATUS_STYLES[key] ?? "bg-slate-100 text-slate-600";
+  const label = STATUS_LABELS[key] ?? key;
+  return (
+    <span
+      className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${cls}`}
+    >
+      {label}
+    </span>
   );
 }
