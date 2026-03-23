@@ -9,22 +9,59 @@ export function getImportCrmPublicBaseUrl() {
   return "http://localhost:3000";
 }
 
-export async function sendImportCrmSmtpEmail({ to, subject, html, text }) {
-  const host = process.env.SMTP_HOST;
+/**
+ * Build nodemailer transport for shared hosting / cPanel style SMTP.
+ * - Trims env values (fixes common production copy/paste issues).
+ * - Port 587: requireTLS for STARTTLS (many servers reject auth without it).
+ * - Optional: SMTP_SECURE=true to force TLS (e.g. if you use port 465).
+ * - Optional: SMTP_FROM=full@address — use if "from" must differ; many hosts need SMTP_USER = full mailbox email.
+ */
+function createImportCrmTransporter() {
+  const host = process.env.SMTP_HOST?.trim();
   const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS?.trim();
   if (!host || !user) {
     throw new Error("SMTP not configured (SMTP_HOST / SMTP_USER)");
   }
-  const transporter = nodemailer.createTransport({
+  if (pass === undefined || pass === "") {
+    throw new Error("SMTP_PASS is missing or empty");
+  }
+  const secureExplicit =
+    String(process.env.SMTP_SECURE || "")
+      .toLowerCase()
+      .trim() === "true";
+  const secure = port === 465 || secureExplicit;
+  const rejectUnauthorized =
+    String(process.env.SMTP_TLS_REJECT_UNAUTHORIZED || "true")
+      .toLowerCase()
+      .trim() !== "false";
+
+  return nodemailer.createTransport({
     host,
     port,
-    secure: port === 465,
+    secure,
+    requireTLS: !secure && (port === 587 || port === 25),
     auth: { user, pass },
+    tls: {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized,
+    },
+    connectionTimeout: 25_000,
+    greetingTimeout: 25_000,
   });
+}
+
+export async function sendImportCrmSmtpEmail({ to, subject, html, text }) {
+  const user = process.env.SMTP_USER?.trim();
+  const fromOverride = process.env.SMTP_FROM?.trim();
+  const from = fromOverride
+    ? `"Dynaclean Industries" <${fromOverride}>`
+    : `"Dynaclean Industries" <${user}>`;
+
+  const transporter = createImportCrmTransporter();
   await transporter.sendMail({
-    from: `"Dynaclean Industries" <${user}>`,
+    from,
     to,
     subject,
     html,
