@@ -139,7 +139,7 @@ export async function POST(request, { params }) {
         ? "Quote awarded — email sent with form link"
         : emailSkipped
           ? "Quote awarded — no valid submitter email (link not emailed)"
-          : "Quote awarded — email failed; copy link from logs or re-check SMTP",
+          : "Quote awarded — email failed; re-check SMTP and award again to resend",
       emailSent,
       emailSkipped,
       emailError: emailError || undefined,
