@@ -524,25 +524,47 @@ const allMenuItems = [
     ],
   },
 
-  // {
-  //   name: "Import CRM",
-  //   roles: ["SUPERADMIN"],
-  //   icon: "Import",
-  //   children: [
-  //     {
-  //       path: "/admin-dashboard/import-crm/suppliers",
-  //       name: "Suppliers",
-  //       roles: ["SUPERADMIN"],
-  //       icon: "Users",
-  //     },
-  //     {
-  //       path: "/admin-dashboard/import-crm/purchase-orders",
-  //       name: "Purchase Orders",
-  //       roles: ["SUPERADMIN"],
-  //       icon: "FileText",
-  //     },
-  //   ],
-  // },
+  {
+    name: "Import CRM",
+    roles: ["SUPERADMIN"],
+    icon: "Import",
+    children: [
+      
+      {
+        path: "/admin-dashboard/import-crm/agents",
+        name: "Agents",
+        roles: ["SUPERADMIN"],
+        icon: "UserPlus",
+      },
+      {
+        path: "/admin-dashboard/import-crm/shipments",
+        name: "Shipments",
+        roles: ["SUPERADMIN"],
+        icon: "Ship",
+      },
+      {
+        path: "/admin-dashboard/import-crm/quote-submissions",
+        name: "Quote submissions",
+        roles: ["SUPERADMIN"],
+        icon: "ScrollText",
+      },
+      {
+        path: "/admin-dashboard/import-crm/suppliers",
+        name: "Suppliers",
+        roles: ["SUPERADMIN"],
+        icon: "Users",
+      },
+      
+      
+     
+      {
+        path: "/admin-dashboard/import-crm/purchase-orders",
+        name: "Purchase Orders",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+    ],
+  },
 
   // employee section
   {

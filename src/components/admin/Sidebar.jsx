@@ -34,6 +34,7 @@ import {
   Mail,
   Settings,
   Import,
+  Ship,
 } from "lucide-react";
 
 // Icon map
@@ -67,6 +68,7 @@ const iconMap = {
   Mail,
   Settings,
   Import,
+  Ship,
   ArrowLeft,
 };
 
