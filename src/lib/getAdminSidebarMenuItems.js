@@ -692,6 +692,12 @@ const allMenuItems = [
           roles: ["SUPERADMIN"],
           icon: "PackageCheck",
         },
+        {
+          path: "/admin-dashboard/import-crm/billing",
+          name: "Billing",
+          roles: ["SUPERADMIN"],
+          icon: "Receipt",
+        },
       
         
         

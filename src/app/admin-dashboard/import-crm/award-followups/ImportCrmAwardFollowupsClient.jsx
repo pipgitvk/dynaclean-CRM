@@ -81,7 +81,17 @@ function isPdfFileName(name) {
 }
 
 const REASSIGN_FIELDS = [
+  { key: "pickup_person_name", label: "Pickup person name", dbKey: "af_pickup_person_name" },
+  { key: "pickup_person_phone", label: "Pickup person phone", dbKey: "af_pickup_person_phone" },
+  { key: "pickup_person_email", label: "Pickup person email", dbKey: "af_pickup_person_email" },
   { key: "pickup_person_details", label: "Pickup person details", dbKey: "af_pickup_person_details" },
+  { key: "pickup_date", label: "Pickup date", dbKey: "af_pickup_date" },
+  { key: "picked_date", label: "Picked date", dbKey: "af_picked_date" },
+  { key: "transit_date", label: "Transit date", dbKey: "af_transit_date" },
+  { key: "delivered_date", label: "Delivered date", dbKey: "af_delivered_date" },
+  { key: "supplier_name", label: "Supplier name", dbKey: "af_supplier_name" },
+  { key: "supplier_email", label: "Supplier email", dbKey: "af_supplier_email" },
+  { key: "supplier_phone", label: "Supplier phone", dbKey: "af_supplier_phone" },
   { key: "supplier_address", label: "Supplier address", dbKey: "af_supplier_address" },
   { key: "cargo_ready_confirmation", label: "Cargo ready confirmation", dbKey: "af_cargo_ready_confirmation" },
   { key: "booking_details", label: "Booking details", dbKey: "af_booking_details" },
@@ -408,22 +418,44 @@ export default function ImportCrmAwardFollowupsClient() {
                                     </p>
                                   </div>
                                 </div>
-                                <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                   <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                                      Pickup & supplier
+                                      Pickup person
                                     </p>
-                                    <Field label="Pickup person details" value={r.af_pickup_person_details} />
-                                    <Field label="Supplier address" value={r.af_supplier_address} />
-                                    <Field label="Cargo ready confirmation" value={r.af_cargo_ready_confirmation} />
+                                    <Field label="Name" value={r.af_pickup_person_name} />
+                                    <Field label="Phone" value={r.af_pickup_person_phone} />
+                                    <Field label="Email" value={r.af_pickup_person_email} />
+                                    <Field label="Details / instructions" value={r.af_pickup_person_details} />
                                   </div>
                                   <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
                                     <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                      Dates
+                                    </p>
+                                    <Field label="Pickup date" value={r.af_pickup_date} />
+                                    <Field label="Picked date" value={r.af_picked_date} />
+                                    <Field label="Transit date" value={r.af_transit_date} />
+                                    <Field label="Delivered date" value={r.af_delivered_date} />
+                                  </div>
+                                  <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                      Supplier
+                                    </p>
+                                    <Field label="Name" value={r.af_supplier_name} />
+                                    <Field label="Email" value={r.af_supplier_email} />
+                                    <Field label="Phone" value={r.af_supplier_phone} />
+                                    <Field label="Address" value={r.af_supplier_address} />
+                                    <Field label="Cargo ready confirmation" value={r.af_cargo_ready_confirmation} />
+                                  </div>
+                                  <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3 sm:col-span-2 lg:col-span-3">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                                       Booking & movement
                                     </p>
-                                    <Field label="Booking details" value={r.af_booking_details} />
-                                    <Field label="Vessel / flight" value={r.af_vessel_flight_details} />
-                                    <Field label="Container (FCL)" value={r.af_container_details} />
+                                    <div className="grid gap-3 sm:grid-cols-3">
+                                      <Field label="Booking details" value={r.af_booking_details} />
+                                      <Field label="Vessel / flight" value={r.af_vessel_flight_details} />
+                                      <Field label="Container (FCL)" value={r.af_container_details} />
+                                    </div>
                                   </div>
                                 </div>
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">

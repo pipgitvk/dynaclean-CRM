@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensureImportCrmTables } from "@/lib/ensureImportCrmTables";
+import { generateImportCrmQuoteToken } from "@/lib/generateImportCrmQuoteToken";
+import {
+  getImportCrmPublicBaseUrl,
+  sendImportCrmBillingEmail,
+} from "@/lib/importCrmEmail";
 
 function isImportCrmAdmin(role) {
   return role === "SUPERADMIN";
@@ -28,8 +33,12 @@ export async function POST(_request, { params }) {
     const db = await getDbConnection();
 
     const [found] = await db.query(
-      `SELECT id, award_form_submitted_at, af_approved_at
-       FROM import_crm_shipment_link_quotes WHERE id = ? LIMIT 1`,
+      `SELECT q.id, q.award_form_submitted_at, q.af_approved_at,
+              q.submitter_email, q.shipment_id,
+              s.ship_from, s.ship_to
+       FROM import_crm_shipment_link_quotes q
+       INNER JOIN import_crm_shipments s ON s.id = q.shipment_id
+       WHERE q.id = ? LIMIT 1`,
       [id],
     );
     const row = found?.[0];
@@ -59,21 +68,79 @@ export async function POST(_request, { params }) {
       [payload.username || null, id],
     );
 
+    let billingUrl = null;
+    let emailSent = false;
+    let emailSkipped = false;
+    let emailError = null;
+
     if (updated.affectedRows > 0) {
-      const [qrows] = await db.query(
-        `SELECT shipment_id FROM import_crm_shipment_link_quotes WHERE id = ? LIMIT 1`,
-        [id],
-      );
-      const shipmentId = qrows?.[0]?.shipment_id;
+      const shipmentId = row.shipment_id;
       if (shipmentId) {
         await db.query(
           `UPDATE import_crm_shipments SET status = 'APPROVED_FOR_MOVEMENT' WHERE id = ?`,
           [shipmentId],
         );
       }
+
+      // Create billing record with unique portal token
+      const agentEmail = row.submitter_email || null;
+      let billingToken = generateImportCrmQuoteToken();
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          await db.query(
+            `INSERT INTO import_crm_billing
+               (link_quote_id, shipment_id, agent_email, billing_portal_token)
+             VALUES (?, ?, ?, ?)`,
+            [id, shipmentId, agentEmail, billingToken],
+          );
+          break;
+        } catch (err) {
+          if (err?.code === "ER_DUP_ENTRY" && attempt < 4) {
+            billingToken = generateImportCrmQuoteToken();
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      const baseUrl = getImportCrmPublicBaseUrl();
+      billingUrl = `${baseUrl}/import-billing/${billingToken}`;
+
+      const isRealEmail = (s) => {
+        const t = String(s ?? "").trim().toLowerCase();
+        return t && !t.includes("@shipment-quote.local") && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t);
+      };
+
+      if (!isRealEmail(agentEmail)) {
+        emailSkipped = true;
+      } else {
+        const shipmentRef = shipmentId ? String(shipmentId) : null;
+        try {
+          await sendImportCrmBillingEmail({
+            to: String(agentEmail).trim().toLowerCase(),
+            billingUrl,
+            shipmentRef,
+          });
+          emailSent = true;
+        } catch (err) {
+          emailError = String(err?.message || err);
+          console.error("import-crm billing email:", err);
+        }
+      }
     }
 
-    return NextResponse.json({ ok: true, message: "Follow-up approved." });
+    return NextResponse.json({
+      ok: true,
+      message: emailSent
+        ? "Follow-up approved — billing form sent to agent."
+        : emailSkipped
+          ? "Follow-up approved — no valid agent email (billing link not sent)."
+          : "Follow-up approved — billing email failed; check SMTP.",
+      billingUrl: emailSent ? undefined : billingUrl,
+      emailSent,
+      emailSkipped,
+      emailError: emailError || undefined,
+    });
   } catch (error) {
     console.error("import-crm award-followups approve POST:", error);
     return NextResponse.json(

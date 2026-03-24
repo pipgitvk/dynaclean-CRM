@@ -7,7 +7,7 @@ import {
   DialogPanel,
   DialogTitle,
 } from "@headlessui/react";
-import { Copy, RefreshCw, Trash2, X } from "lucide-react";
+import { Copy, Pencil, RefreshCw, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 const inputClass =
@@ -55,6 +55,7 @@ export default function ShipmentsListClient() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [deletingId, setDeletingId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [linkOrigin, setLinkOrigin] = useState("");
   const [agents, setAgents] = useState([]);
@@ -216,26 +217,31 @@ export default function ShipmentsListClient() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    const payload = {
+      ship_from: form.ship_from,
+      ship_to: form.ship_to,
+      cbm: form.cbm,
+      shipment_term: form.shipment_term,
+      mode: form.mode,
+      material_ready_date: form.material_ready_date || null,
+      agent_delivery_deadline: form.agent_delivery_deadline || null,
+      remarks: form.remarks || null,
+      crm_agent_ids: form.crm_agent_ids || [],
+      supplier_ids: form.supplier_ids || [],
+    };
     try {
-      const res = await fetch("/api/import-crm/shipments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ship_from: form.ship_from,
-          ship_to: form.ship_to,
-          cbm: form.cbm,
-          shipment_term: form.shipment_term,
-          mode: form.mode,
-          material_ready_date: form.material_ready_date || null,
-          agent_delivery_deadline: form.agent_delivery_deadline || null,
-          remarks: form.remarks || null,
-          crm_agent_ids: form.crm_agent_ids || [],
-          supplier_ids: form.supplier_ids || [],
-        }),
-      });
+      const isEdit = Boolean(editingId);
+      const res = await fetch(
+        isEdit ? `/api/import-crm/shipments/${editingId}` : "/api/import-crm/shipments",
+        {
+          method: isEdit ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Save failed");
-      if (data.public_link_token && typeof window !== "undefined") {
+      if (!isEdit && data.public_link_token && typeof window !== "undefined") {
         const url = `${window.location.origin}/import-shipment/${data.public_link_token}`;
         try {
           await navigator.clipboard.writeText(url);
@@ -247,6 +253,7 @@ export default function ShipmentsListClient() {
         toast.success(data.message || "Saved");
       }
       setForm(emptyForm());
+      setEditingId(null);
       setDrawerOpen(false);
       await load();
     } catch (err) {
@@ -275,7 +282,35 @@ export default function ShipmentsListClient() {
   };
 
   const openShipmentDrawer = () => {
+    setEditingId(null);
     setForm(emptyForm());
+    setDrawerOpen(true);
+  };
+
+  const openEditDrawer = (s) => {
+    setEditingId(s.id);
+    setForm({
+      ship_from: s.ship_from || "",
+      ship_to: s.ship_to || "",
+      cbm: s.cbm != null ? String(s.cbm) : "",
+      shipment_term: s.shipment_term || "FOB",
+      mode: s.mode || "Sea",
+      material_ready_date: s.material_ready_date
+        ? String(s.material_ready_date).slice(0, 10)
+        : "",
+      agent_delivery_deadline: s.agent_delivery_deadline
+        ? String(s.agent_delivery_deadline).slice(0, 10)
+        : "",
+      remarks: s.remarks || "",
+      crm_agent_ids: (() => {
+        try { return JSON.parse(s.shipment_crm_agent_ids_json || "[]").map(Number); }
+        catch { return s.crm_agent_id ? [Number(s.crm_agent_id)] : []; }
+      })(),
+      supplier_ids: (() => {
+        try { return JSON.parse(s.shipment_supplier_ids_json || "[]").map(Number); }
+        catch { return s.supplier_id ? [Number(s.supplier_id)] : []; }
+      })(),
+    });
     setDrawerOpen(true);
   };
 
@@ -308,22 +343,23 @@ export default function ShipmentsListClient() {
           >
             <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
               <DialogTitle className="text-base font-semibold text-slate-900">
-                New shipment
+                {editingId ? `Edit shipment #${editingId}` : "New shipment"}
               </DialogTitle>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setForm(emptyForm());
+                    setEditingId(null);
                     setDrawerOpen(false);
                   }}
                   className="text-xs font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
                 >
-                  Clear & close
+                  {editingId ? "Discard & close" : "Clear & close"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setDrawerOpen(false)}
+                  onClick={() => { setEditingId(null); setDrawerOpen(false); }}
                   className="inline-flex rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                   aria-label="Close panel"
                 >
@@ -514,7 +550,7 @@ export default function ShipmentsListClient() {
                   disabled={saving}
                   className="w-full rounded-[10px] bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 sm:w-auto"
                 >
-                  {saving ? "Saving…" : "Save shipment"}
+                  {saving ? "Saving…" : editingId ? "Update shipment" : "Save shipment"}
                 </button>
               </form>
             </div>
@@ -690,16 +726,27 @@ export default function ShipmentsListClient() {
                       </div>
                     </td>
                     <td className="px-2 py-2">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(s.id)}
-                        disabled={deletingId === s.id}
-                        className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                        title="Delete"
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openEditDrawer(s)}
+                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                          title="Edit shipment"
+                          aria-label="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(s.id)}
+                          disabled={deletingId === s.id}
+                          className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          title="Delete"
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -713,17 +760,23 @@ export default function ShipmentsListClient() {
 }
 
 const STATUS_STYLES = {
-  PENDING: "bg-slate-100 text-slate-700",
-  AWARDED: "bg-amber-100 text-amber-900",
-  EXECUTION_APPROVED: "bg-blue-100 text-blue-900",
+  PENDING:               "bg-slate-100 text-slate-700",
+  AWARDED:               "bg-amber-100 text-amber-900",
+  EXECUTION_APPROVED:    "bg-blue-100 text-blue-900",
   APPROVED_FOR_MOVEMENT: "bg-emerald-100 text-emerald-900",
+  BILL_APPROVAL_PENDING: "bg-orange-100 text-orange-900",
+  BILL_PAYMENT_PENDING:  "bg-violet-100 text-violet-900",
+  COMPLETED:             "bg-green-100 text-green-900",
 };
 
 const STATUS_LABELS = {
-  PENDING: "Pending",
-  AWARDED: "Awarded",
-  EXECUTION_APPROVED: "Execution approved",
+  PENDING:               "Pending",
+  AWARDED:               "Awarded",
+  EXECUTION_APPROVED:    "Execution approved",
   APPROVED_FOR_MOVEMENT: "Approved for movement",
+  BILL_APPROVAL_PENDING: "Bill approval pending",
+  BILL_PAYMENT_PENDING:  "Bill payment pending",
+  COMPLETED:             "Completed",
 };
 
 function ShipmentStatusBadge({ status }) {

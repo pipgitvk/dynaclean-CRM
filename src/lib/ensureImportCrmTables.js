@@ -391,6 +391,16 @@ export async function ensureImportCrmTables() {
     "ADD COLUMN award_portal_token VARCHAR(64) NULL",
     "ADD COLUMN award_form_submitted_at TIMESTAMP NULL DEFAULT NULL",
     "ADD COLUMN af_pickup_person_details TEXT NULL",
+    "ADD COLUMN af_pickup_person_name VARCHAR(255) NULL",
+    "ADD COLUMN af_pickup_person_phone VARCHAR(64) NULL",
+    "ADD COLUMN af_pickup_person_email VARCHAR(255) NULL",
+    "ADD COLUMN af_pickup_date DATE NULL",
+    "ADD COLUMN af_picked_date DATE NULL",
+    "ADD COLUMN af_transit_date DATE NULL",
+    "ADD COLUMN af_delivered_date DATE NULL",
+    "ADD COLUMN af_supplier_name VARCHAR(255) NULL",
+    "ADD COLUMN af_supplier_email VARCHAR(255) NULL",
+    "ADD COLUMN af_supplier_phone VARCHAR(64) NULL",
     "ADD COLUMN af_supplier_address TEXT NULL",
     "ADD COLUMN af_cargo_ready_confirmation TEXT NULL",
     "ADD COLUMN af_booking_details TEXT NULL",
@@ -616,6 +626,84 @@ export async function ensureImportCrmTables() {
        INNER JOIN import_crm_shipment_link_quotes q ON q.shipment_id = s.id
        SET s.status = 'AWARDED'
        WHERE s.status = 'PENDING' AND q.awarded_at IS NOT NULL AND q.award_form_submitted_at IS NULL`,
+    );
+  } catch { /* ignore */ }
+
+  // ── Billing table ──
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS import_crm_billing (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      link_quote_id INT NOT NULL,
+      shipment_id INT NOT NULL,
+      agent_email VARCHAR(255) NULL,
+      billing_portal_token VARCHAR(64) NOT NULL,
+      bill_no VARCHAR(255) NULL,
+      bill_date DATE NULL,
+      bill_amount DECIMAL(16,2) NULL,
+      bill_file VARCHAR(512) NULL,
+      remarks TEXT NULL,
+      with_invoice TINYINT(1) NOT NULL DEFAULT 0,
+      submitted_at TIMESTAMP NULL DEFAULT NULL,
+      status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+      admin_remarks TEXT NULL,
+      actioned_by VARCHAR(255) NULL,
+      actioned_at TIMESTAMP NULL DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_import_crm_billing_token (billing_portal_token),
+      INDEX idx_import_crm_billing_quote (link_quote_id),
+      INDEX idx_import_crm_billing_shipment (shipment_id),
+      CONSTRAINT fk_import_crm_billing_quote
+        FOREIGN KEY (link_quote_id) REFERENCES import_crm_shipment_link_quotes (id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+      CONSTRAINT fk_import_crm_billing_shipment
+        FOREIGN KEY (shipment_id) REFERENCES import_crm_shipments (id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+    )
+  `);
+  // Migrate: add new columns if table already existed without them
+  for (const colDef of [
+    "ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'PENDING'",
+    "ADD COLUMN admin_remarks TEXT NULL",
+    "ADD COLUMN actioned_by VARCHAR(255) NULL",
+    "ADD COLUMN actioned_at TIMESTAMP NULL DEFAULT NULL",
+    "ADD COLUMN approved_amount DECIMAL(16,2) NULL",
+    "ADD COLUMN payment_date DATE NULL",
+    "ADD COLUMN payment_mode VARCHAR(128) NULL",
+    "ADD COLUMN payment_transaction_no VARCHAR(255) NULL",
+    "ADD COLUMN amount_paid DECIMAL(16,2) NULL",
+    "ADD COLUMN payment_proof_file VARCHAR(512) NULL",
+    "ADD COLUMN payment_sent_at TIMESTAMP NULL DEFAULT NULL",
+    "ADD COLUMN payment_sent_by VARCHAR(255) NULL",
+  ]) {
+    try { await conn.execute(`ALTER TABLE import_crm_billing ${colDef}`); } catch (e) { if (e?.errno !== 1060) throw e; }
+  }
+
+  // Backfill billing-stage statuses for existing rows
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments s
+       INNER JOIN import_crm_billing b ON b.shipment_id = s.id
+       SET s.status = 'COMPLETED'
+       WHERE s.status IN ('APPROVED_FOR_MOVEMENT','BILL_APPROVAL_PENDING','BILL_PAYMENT_PENDING')
+         AND b.payment_sent_at IS NOT NULL`,
+    );
+  } catch { /* ignore */ }
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments s
+       INNER JOIN import_crm_billing b ON b.shipment_id = s.id
+       SET s.status = 'BILL_PAYMENT_PENDING'
+       WHERE s.status IN ('APPROVED_FOR_MOVEMENT','BILL_APPROVAL_PENDING')
+         AND b.status = 'APPROVED' AND b.payment_sent_at IS NULL`,
+    );
+  } catch { /* ignore */ }
+  try {
+    await conn.execute(
+      `UPDATE import_crm_shipments s
+       INNER JOIN import_crm_billing b ON b.shipment_id = s.id
+       SET s.status = 'BILL_APPROVAL_PENDING'
+       WHERE s.status = 'APPROVED_FOR_MOVEMENT'
+         AND b.submitted_at IS NOT NULL AND b.status = 'PENDING'`,
     );
   } catch { /* ignore */ }
 
