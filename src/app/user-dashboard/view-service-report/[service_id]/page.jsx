@@ -132,10 +132,47 @@ export default function ViewServiceReport({ params }) {
     }
     return traineesArray;
   };
-  const handlePrint = () => {
+  const compressImagesInClone = async (container) => {
+    const images = Array.from(container.querySelectorAll("img"));
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise((resolve) => {
+            const src = img.getAttribute("src");
+            if (!src || src.startsWith("data:image/jpeg")) {
+              resolve();
+              return;
+            }
+            const original = new Image();
+            original.crossOrigin = "anonymous";
+            original.onload = () => {
+              try {
+                const MAX = 400;
+                const scale = Math.min(1, MAX / Math.max(original.naturalWidth, original.naturalHeight));
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.round(original.naturalWidth * scale);
+                canvas.height = Math.round(original.naturalHeight * scale);
+                canvas.getContext("2d").drawImage(original, 0, 0, canvas.width, canvas.height);
+                img.setAttribute("src", canvas.toDataURL("image/jpeg", 0.82));
+              } catch {
+                // keep original if canvas fails (e.g. tainted)
+              }
+              resolve();
+            };
+            original.onerror = resolve;
+            original.src = src;
+          })
+      )
+    );
+  };
+
+  const handlePrint = async () => {
     const printContent = document
       .getElementById("print-content")
       .cloneNode(true);
+
+    await compressImagesInClone(printContent);
+
     const printWindow = window.open("", "_blank", "height=600,width=800");
     printWindow.document.write("<html><head><title>Service Report</title>");
     const styles = Array.from(document.styleSheets)
