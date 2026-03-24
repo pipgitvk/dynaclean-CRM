@@ -1,8 +1,13 @@
 // src/app/api/update-report/route.js
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(req) {
   try {
@@ -15,54 +20,44 @@ export async function POST(req) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await image.arrayBuffer());
-    const fileName = `${Date.now()}-${image.name}`;
-    let folderPath;
-    let filePath;
     let dbColumnName;
+    let cloudinaryFolder;
 
-    // Determine the folder and database column based on the status
     if (status === "COMPLETED") {
-      folderPath = path.join(process.cwd(), "public", "Final", "record");
       dbColumnName = "final_report_path";
+      cloudinaryFolder = "service_reports/completed";
     } else if (status === "PENDING FOR SPARES") {
-      folderPath = path.join(process.cwd(), "public", "Final", "reports");
       dbColumnName = "report_path";
+      cloudinaryFolder = "service_reports/pending_spares";
     } else {
       return NextResponse.json({ error: "Invalid status provided" }, { status: 400 });
     }
 
-    // Create the directory if it doesn't exist
-    await mkdir(folderPath, { recursive: true });
+    const buffer = Buffer.from(await image.arrayBuffer());
+    const base64 = buffer.toString("base64");
+    const dataUri = `data:${image.type};base64,${base64}`;
 
-    filePath = path.join(folderPath, fileName);
-    // Save the file to the public folder
-    await writeFile(filePath, buffer);
+    const uploadResult = await cloudinary.uploader.upload(dataUri, {
+      folder: cloudinaryFolder,
+      public_id: `${serviceId}_${Date.now()}`,
+      resource_type: "auto",
+    });
 
-    // Construct the public path to save in the database
-    const publicPath = `/Final/${status === "COMPLETED" ? "record" : "reports"}/${fileName}`;
+    const publicPath = uploadResult.secure_url;
 
     const conn = await getDbConnection();
 
-    // Start building the SQL query
-    let sql = `
-      UPDATE service_records 
-      SET ${dbColumnName} = ?, status = ?
-    `;
+    let sql = `UPDATE service_records SET ${dbColumnName} = ?, status = ?`;
     const params = [publicPath, status];
 
-    // Conditionally add the completed_date to the query and parameters
     if (status === "COMPLETED") {
       sql += `, completed_date = CURDATE()`;
     }
 
-    // Add the WHERE clause and the final parameter
     sql += ` WHERE service_id = ?`;
     params.push(serviceId);
 
-    // Execute the single query
     await conn.execute(sql, params);
-    //conn.end();
 
     return NextResponse.json({ message: "Report updated successfully", publicPath }, { status: 200 });
   } catch (error) {

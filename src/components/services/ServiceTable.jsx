@@ -659,7 +659,11 @@ export default function ServiceTable({ serviceRecords, role }) {
                             </a>
                           ) : record.final_report_path ? (
                             <a
-                              href={`https://service.dynacleanindustries.com/${record.final_report_path}`}
+                              href={
+                                record.final_report_path.startsWith("http")
+                                  ? record.final_report_path
+                                  : `https://service.dynacleanindustries.com/${record.final_report_path}`
+                              }
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-block px-3 py-1 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
