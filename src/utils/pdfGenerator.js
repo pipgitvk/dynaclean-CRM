@@ -500,31 +500,20 @@ export const generateServiceReportPDF = async (reportData, productData, installD
     tempContainer.style.width = '800px';
     document.body.appendChild(tempContainer);
 
-    // Convert HTML to canvas using html2canvas
-    // const canvas = await html2canvas(tempContainer, {
-    //   scale: 1.5, // Reduced scale to fit single page
-    //   useCORS: true,
-    //   allowTaint: true,
-    //   backgroundColor: '#ffffff',
-    //   width: 800,
-    //   height: tempContainer.scrollHeight
-    // });
-
     const canvas = await html2canvas(tempContainer, {
-      scale: 2,         // higher DPI for sharper text
+      scale: 1.5,
       useCORS: true,
-      allowTaint: true,  // Allow rendering of data URLs
+      allowTaint: true,
       backgroundColor: '#ffffff',
-      width: 794,       // A4 width in px
+      width: 794,
       windowWidth: 794
     });
-
 
     // Remove temporary container
     document.body.removeChild(tempContainer);
 
-    // Create PDF from canvas - SINGLE PAGE
-    const imgData = canvas.toDataURL('image/png');
+    // JPEG at 85% quality — significantly smaller than PNG
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
     const pdf = new jsPDF('p', 'mm', 'a4');
 
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -534,8 +523,7 @@ export const generateServiceReportPDF = async (reportData, productData, installD
     const imgWidth = pageWidth - 20; // 10mm margin on each side
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    // If content is too tall, scale it down to fit on one page
-    const maxHeight = pageHeight - 20; // 10mm margin top and bottom
+    const maxHeight = pageHeight - 20;
     let finalWidth = imgWidth;
     let finalHeight = imgHeight;
 
@@ -544,20 +532,10 @@ export const generateServiceReportPDF = async (reportData, productData, installD
       finalWidth = (canvas.width * finalHeight) / canvas.height;
     }
 
-    // Center the content on the page
-    // const xOffset = (pageWidth - finalWidth) / 2;
-    // const yOffset = (pageHeight - finalHeight) / 2;
-
-    // Center horizontally, but stick to top (10mm margin)
     const xOffset = (pageWidth - finalWidth) / 2;
-    const yOffset = 10; // start 10mm from top
+    const yOffset = 10;
 
-
-    // Add image to single page
-    // pdf.addImage(imgData, 'PNG', xOffset, yOffset, finalWidth, finalHeight);
-
-    // Add image to single page, aligned to top
-    pdf.addImage(imgData, 'PNG', xOffset, yOffset, finalWidth, finalHeight);
+    pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight);
 
 
     return pdf;
