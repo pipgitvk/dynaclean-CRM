@@ -54,6 +54,16 @@ function Label({ children, htmlFor }) {
 
 const FIELD_LABELS = {
   pickup_person_details: "Pickup person details",
+  pickup_person_name: "Pickup person name",
+  pickup_person_phone: "Pickup person phone",
+  pickup_person_email: "Pickup person email",
+  pickup_date: "Pickup date",
+  picked_date: "Picked date",
+  transit_date: "Transit date",
+  delivered_date: "Delivered date",
+  supplier_name: "Supplier name",
+  supplier_email: "Supplier email",
+  supplier_phone: "Supplier phone",
   supplier_address: "Supplier address",
   cargo_ready_confirmation: "Cargo ready confirmation",
   booking_details: "Booking details",
@@ -75,7 +85,17 @@ export default function PublicAwardFollowupClient({ token }) {
   const [saving, setSaving] = useState(false);
 
   const [pickup_person_details, setPickup] = useState("");
-  const [supplier_address, setSupplier] = useState("");
+  const [pickup_person_name, setPickupName] = useState("");
+  const [pickup_person_phone, setPickupPhone] = useState("");
+  const [pickup_person_email, setPickupEmail] = useState("");
+  const [pickup_date, setPickupDate] = useState("");
+  const [picked_date, setPickedDate] = useState("");
+  const [transit_date, setTransitDate] = useState("");
+  const [delivered_date, setDeliveredDate] = useState("");
+  const [supplier_name, setSupplierName] = useState("");
+  const [supplier_email, setSupplierEmail] = useState("");
+  const [supplier_phone, setSupplierPhone] = useState("");
+  const [supplier_address, setSupplierAddress] = useState("");
   const [cargo_ready_confirmation, setCargoReady] = useState("");
   const [booking_details, setBooking] = useState("");
   const [vessel_flight_details, setVessel] = useState("");
@@ -102,9 +122,18 @@ export default function PublicAwardFollowupClient({ token }) {
         const f = data.form;
         if (f) {
           setSavedForm(f);
-          // Pre-fill state with existing values (re-assign: agent edits only selected)
           setPickup(f.pickup_person_details || "");
-          setSupplier(f.supplier_address || "");
+          setPickupName(f.pickup_person_name || "");
+          setPickupPhone(f.pickup_person_phone || "");
+          setPickupEmail(f.pickup_person_email || "");
+          setPickupDate(f.pickup_date ? String(f.pickup_date).slice(0, 10) : "");
+          setPickedDate(f.picked_date ? String(f.picked_date).slice(0, 10) : "");
+          setTransitDate(f.transit_date ? String(f.transit_date).slice(0, 10) : "");
+          setDeliveredDate(f.delivered_date ? String(f.delivered_date).slice(0, 10) : "");
+          setSupplierName(f.supplier_name || "");
+          setSupplierEmail(f.supplier_email || "");
+          setSupplierPhone(f.supplier_phone || "");
+          setSupplierAddress(f.supplier_address || "");
           setCargoReady(f.cargo_ready_confirmation || "");
           setBooking(f.booking_details || "");
           setVessel(f.vessel_flight_details || "");
@@ -194,28 +223,25 @@ export default function PublicAwardFollowupClient({ token }) {
         ) : null}
         {f ? (
           <div className="space-y-4 text-sm">
+            <ReadBlock title="Pickup person name" value={f.pickup_person_name} />
+            <ReadBlock title="Pickup person phone" value={f.pickup_person_phone} />
+            <ReadBlock title="Pickup person email" value={f.pickup_person_email} />
             <ReadBlock title="Pickup person details" value={f.pickup_person_details} />
+            <ReadBlock title="Pickup date" value={f.pickup_date} />
+            <ReadBlock title="Picked date" value={f.picked_date} />
+            <ReadBlock title="Transit date" value={f.transit_date} />
+            <ReadBlock title="Delivered date" value={f.delivered_date} />
+            <ReadBlock title="Supplier name" value={f.supplier_name} />
+            <ReadBlock title="Supplier email" value={f.supplier_email} />
+            <ReadBlock title="Supplier phone" value={f.supplier_phone} />
             <ReadBlock title="Supplier address" value={f.supplier_address} />
-            <ReadBlock
-              title="Cargo ready confirmation"
-              value={f.cargo_ready_confirmation}
-            />
+            <ReadBlock title="Cargo ready confirmation" value={f.cargo_ready_confirmation} />
             <ReadBlock title="Booking details" value={f.booking_details} />
-            <ReadBlock
-              title="Vessel / flight details"
-              value={f.vessel_flight_details}
-            />
-            <ReadBlock
-              title="Container details (if FCL)"
-              value={f.container_details}
-            />
+            <ReadBlock title="Vessel / flight details" value={f.vessel_flight_details} />
+            <ReadBlock title="Container details (if FCL)" value={f.container_details} />
             <ReadBlock title="BL upload" value={f.bl_file} mono />
             <ReadBlock title="Invoice upload" value={f.invoice_file} mono />
-            <ReadBlock
-              title="Packing list upload"
-              value={f.packing_list_file}
-              mono
-            />
+            <ReadBlock title="Packing list upload" value={f.packing_list_file} mono />
             {f.other_documents?.length ? (
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -275,20 +301,189 @@ export default function PublicAwardFollowupClient({ token }) {
       </header>
 
       <form className="space-y-6" onSubmit={onSubmit}>
+
+        {/* ── Pickup person ── */}
+        <SectionMaybeReadOnly
+          title="Pickup person name *"
+          active={needs("pickup_person_name")}
+          lockedValue={savedForm?.pickup_person_name}
+        >
+          <Label htmlFor="pickup_person_name">Full name *</Label>
+          <input
+            id="pickup_person_name"
+            name="pickup_person_name"
+            required={needs("pickup_person_name") && !reassignFields}
+            value={pickup_person_name}
+            onChange={(e) => setPickupName(e.target.value)}
+            className={inputClass}
+            placeholder="Pickup person full name"
+          />
+        </SectionMaybeReadOnly>
+
+        <SectionMaybeReadOnly
+          title="Pickup person phone"
+          active={needs("pickup_person_phone")}
+          lockedValue={savedForm?.pickup_person_phone}
+        >
+          <Label htmlFor="pickup_person_phone">Phone number</Label>
+          <input
+            id="pickup_person_phone"
+            name="pickup_person_phone"
+            type="tel"
+            value={pickup_person_phone}
+            onChange={(e) => setPickupPhone(e.target.value)}
+            className={inputClass}
+            placeholder="+91 99999 00000"
+          />
+        </SectionMaybeReadOnly>
+
+        <SectionMaybeReadOnly
+          title="Pickup person email"
+          active={needs("pickup_person_email")}
+          lockedValue={savedForm?.pickup_person_email}
+        >
+          <Label htmlFor="pickup_person_email">Email address</Label>
+          <input
+            id="pickup_person_email"
+            name="pickup_person_email"
+            type="email"
+            value={pickup_person_email}
+            onChange={(e) => setPickupEmail(e.target.value)}
+            className={inputClass}
+            placeholder="pickup@example.com"
+          />
+        </SectionMaybeReadOnly>
+
         <SectionMaybeReadOnly
           title="Pickup person details"
           active={needs("pickup_person_details")}
           lockedValue={savedForm?.pickup_person_details}
         >
-          <Label htmlFor="pickup_person_details">Name, phone, timing *</Label>
+          <Label htmlFor="pickup_person_details">Additional details / instructions</Label>
           <textarea
             id="pickup_person_details"
             name="pickup_person_details"
-            required={needs("pickup_person_details") && !reassignFields}
             value={pickup_person_details}
             onChange={(e) => setPickup(e.target.value)}
             className={textareaClass}
-            placeholder="Contact name, mobile, pickup window / instructions"
+            placeholder="Pickup window, access instructions, etc."
+          />
+        </SectionMaybeReadOnly>
+
+        {/* ── Dates ── */}
+        <SectionMaybeReadOnly
+          title="Pickup date"
+          active={needs("pickup_date")}
+          lockedValue={savedForm?.pickup_date}
+        >
+          <Label htmlFor="pickup_date">Scheduled pickup date</Label>
+          <input
+            id="pickup_date"
+            name="pickup_date"
+            type="date"
+            value={pickup_date}
+            onChange={(e) => setPickupDate(e.target.value)}
+            className={inputClass}
+          />
+        </SectionMaybeReadOnly>
+
+        <SectionMaybeReadOnly
+          title="Picked date"
+          active={needs("picked_date")}
+          lockedValue={savedForm?.picked_date}
+        >
+          <Label htmlFor="picked_date">Actual picked date</Label>
+          <input
+            id="picked_date"
+            name="picked_date"
+            type="date"
+            value={picked_date}
+            onChange={(e) => setPickedDate(e.target.value)}
+            className={inputClass}
+          />
+        </SectionMaybeReadOnly>
+
+        <SectionMaybeReadOnly
+          title="Transit date"
+          active={needs("transit_date")}
+          lockedValue={savedForm?.transit_date}
+        >
+          <Label htmlFor="transit_date">Transit / departure date</Label>
+          <input
+            id="transit_date"
+            name="transit_date"
+            type="date"
+            value={transit_date}
+            onChange={(e) => setTransitDate(e.target.value)}
+            className={inputClass}
+          />
+        </SectionMaybeReadOnly>
+
+        <SectionMaybeReadOnly
+          title="Delivered date"
+          active={needs("delivered_date")}
+          lockedValue={savedForm?.delivered_date}
+        >
+          <Label htmlFor="delivered_date">Delivered date</Label>
+          <input
+            id="delivered_date"
+            name="delivered_date"
+            type="date"
+            value={delivered_date}
+            onChange={(e) => setDeliveredDate(e.target.value)}
+            className={inputClass}
+          />
+        </SectionMaybeReadOnly>
+
+        {/* ── Supplier ── */}
+        <SectionMaybeReadOnly
+          title="Supplier name *"
+          active={needs("supplier_name")}
+          lockedValue={savedForm?.supplier_name}
+        >
+          <Label htmlFor="supplier_name">Supplier / factory name *</Label>
+          <input
+            id="supplier_name"
+            name="supplier_name"
+            required={needs("supplier_name") && !reassignFields}
+            value={supplier_name}
+            onChange={(e) => setSupplierName(e.target.value)}
+            className={inputClass}
+            placeholder="Supplier or factory name"
+          />
+        </SectionMaybeReadOnly>
+
+        <SectionMaybeReadOnly
+          title="Supplier email"
+          active={needs("supplier_email")}
+          lockedValue={savedForm?.supplier_email}
+        >
+          <Label htmlFor="supplier_email">Supplier email</Label>
+          <input
+            id="supplier_email"
+            name="supplier_email"
+            type="email"
+            value={supplier_email}
+            onChange={(e) => setSupplierEmail(e.target.value)}
+            className={inputClass}
+            placeholder="supplier@example.com"
+          />
+        </SectionMaybeReadOnly>
+
+        <SectionMaybeReadOnly
+          title="Supplier phone"
+          active={needs("supplier_phone")}
+          lockedValue={savedForm?.supplier_phone}
+        >
+          <Label htmlFor="supplier_phone">Supplier phone</Label>
+          <input
+            id="supplier_phone"
+            name="supplier_phone"
+            type="tel"
+            value={supplier_phone}
+            onChange={(e) => setSupplierPhone(e.target.value)}
+            className={inputClass}
+            placeholder="+86 000 0000 0000"
           />
         </SectionMaybeReadOnly>
 
@@ -297,18 +492,18 @@ export default function PublicAwardFollowupClient({ token }) {
           active={needs("supplier_address")}
           lockedValue={savedForm?.supplier_address}
         >
-          <Label htmlFor="supplier_address">Full address *</Label>
+          <Label htmlFor="supplier_address">Full address</Label>
           <textarea
             id="supplier_address"
             name="supplier_address"
-            required={needs("supplier_address") && !reassignFields}
             value={supplier_address}
-            onChange={(e) => setSupplier(e.target.value)}
+            onChange={(e) => setSupplierAddress(e.target.value)}
             className={textareaClass}
             placeholder="Factory / supplier address for pickup"
           />
         </SectionMaybeReadOnly>
 
+        {/* ── Cargo & booking ── */}
         <SectionMaybeReadOnly
           title="Cargo ready confirmation"
           active={needs("cargo_ready_confirmation")}

@@ -49,6 +49,16 @@ async function loadQuoteByAwardToken(connection, token) {
        q.award_form_submitted_at,
        q.af_reassign_fields_json,
        q.af_pickup_person_details,
+       q.af_pickup_person_name,
+       q.af_pickup_person_phone,
+       q.af_pickup_person_email,
+       q.af_pickup_date,
+       q.af_picked_date,
+       q.af_transit_date,
+       q.af_delivered_date,
+       q.af_supplier_name,
+       q.af_supplier_email,
+       q.af_supplier_phone,
        q.af_supplier_address,
        q.af_cargo_ready_confirmation,
        q.af_booking_details,
@@ -141,6 +151,16 @@ export async function GET(_request, { params }) {
           quoteId: row.id,
           form: {
             pickup_person_details: row.af_pickup_person_details,
+            pickup_person_name: row.af_pickup_person_name,
+            pickup_person_phone: row.af_pickup_person_phone,
+            pickup_person_email: row.af_pickup_person_email,
+            pickup_date: row.af_pickup_date,
+            picked_date: row.af_picked_date,
+            transit_date: row.af_transit_date,
+            delivered_date: row.af_delivered_date,
+            supplier_name: row.af_supplier_name,
+            supplier_email: row.af_supplier_email,
+            supplier_phone: row.af_supplier_phone,
             supplier_address: row.af_supplier_address,
             cargo_ready_confirmation: row.af_cargo_ready_confirmation,
             booking_details: row.af_booking_details,
@@ -244,26 +264,36 @@ export async function POST(request, { params }) {
     const formData = await request.formData();
 
     const pickup_person_details = strField(formData, "pickup_person_details");
+    const pickup_person_name = strField(formData, "pickup_person_name");
+    const pickup_person_phone = strField(formData, "pickup_person_phone");
+    const pickup_person_email = strField(formData, "pickup_person_email");
+    const pickup_date = strField(formData, "pickup_date") || null;
+    const picked_date = strField(formData, "picked_date") || null;
+    const transit_date = strField(formData, "transit_date") || null;
+    const delivered_date = strField(formData, "delivered_date") || null;
+    const supplier_name = strField(formData, "supplier_name");
+    const supplier_email = strField(formData, "supplier_email");
+    const supplier_phone = strField(formData, "supplier_phone");
     const supplier_address = strField(formData, "supplier_address");
     const cargo_ready_confirmation = strField(formData, "cargo_ready_confirmation");
     const booking_details = strField(formData, "booking_details");
     const vessel_flight_details = strField(formData, "vessel_flight_details");
     const container_details = strField(formData, "container_details");
 
-    // For a full submission, pickup + supplier address are required.
+    // For a full submission, pickup person name + supplier name are required.
     // For partial re-assign, only validate fields that are in the reassign list.
-    const mustFill = isReassign ? reassignFields : ["pickup_person_details", "supplier_address"];
-    if (mustFill.includes("pickup_person_details") && !pickup_person_details) {
+    const mustFill = isReassign ? reassignFields : ["pickup_person_name", "supplier_name"];
+    if (mustFill.includes("pickup_person_name") && !pickup_person_name) {
       await connection.rollback();
       return NextResponse.json(
-        { message: "Pickup person details are required." },
+        { message: "Pickup person name is required." },
         { status: 400, headers: NO_STORE },
       );
     }
-    if (mustFill.includes("supplier_address") && !supplier_address) {
+    if (mustFill.includes("supplier_name") && !supplier_name) {
       await connection.rollback();
       return NextResponse.json(
-        { message: "Supplier address is required." },
+        { message: "Supplier name is required." },
         { status: 400, headers: NO_STORE },
       );
     }
@@ -319,6 +349,46 @@ export async function POST(request, { params }) {
     if (shouldUpdate("pickup_person_details")) {
       setParts.push("af_pickup_person_details = ?");
       setVals.push(pickup_person_details || null);
+    }
+    if (shouldUpdate("pickup_person_name")) {
+      setParts.push("af_pickup_person_name = ?");
+      setVals.push(pickup_person_name || null);
+    }
+    if (shouldUpdate("pickup_person_phone")) {
+      setParts.push("af_pickup_person_phone = ?");
+      setVals.push(pickup_person_phone || null);
+    }
+    if (shouldUpdate("pickup_person_email")) {
+      setParts.push("af_pickup_person_email = ?");
+      setVals.push(pickup_person_email || null);
+    }
+    if (shouldUpdate("pickup_date")) {
+      setParts.push("af_pickup_date = ?");
+      setVals.push(pickup_date || null);
+    }
+    if (shouldUpdate("picked_date")) {
+      setParts.push("af_picked_date = ?");
+      setVals.push(picked_date || null);
+    }
+    if (shouldUpdate("transit_date")) {
+      setParts.push("af_transit_date = ?");
+      setVals.push(transit_date || null);
+    }
+    if (shouldUpdate("delivered_date")) {
+      setParts.push("af_delivered_date = ?");
+      setVals.push(delivered_date || null);
+    }
+    if (shouldUpdate("supplier_name")) {
+      setParts.push("af_supplier_name = ?");
+      setVals.push(supplier_name || null);
+    }
+    if (shouldUpdate("supplier_email")) {
+      setParts.push("af_supplier_email = ?");
+      setVals.push(supplier_email || null);
+    }
+    if (shouldUpdate("supplier_phone")) {
+      setParts.push("af_supplier_phone = ?");
+      setVals.push(supplier_phone || null);
     }
     if (shouldUpdate("supplier_address")) {
       setParts.push("af_supplier_address = ?");
