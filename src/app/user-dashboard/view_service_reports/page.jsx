@@ -1,30 +1,29 @@
 // app/service-reports/page.js
 
-import { getDbConnection } from "@/lib/db"; // DB connection utility
-import ServiceTable from "@/components/services/ServiceTable"; // Import the new Table Component
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
+import { getDbConnection } from "@/lib/db";
+import ServiceTable from "@/components/services/ServiceTable";
 import { getSessionPayload } from "@/lib/auth";
+
+const PRIVILEGED_ROLES = ["ADMIN", "SUPERADMIN", "SERVICE HEAD", "TEAM LEADER"];
 
 export default async function ViewServiceReportsPage() {
   let serviceRecords = [];
 
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  let role = "Unknown";
-
   const payload = await getSessionPayload();
   if (!payload) {
-    // You can handle unauthorized access here, e.g., redirect or return an error
     return null;
   }
 
-  role = payload.role;
-
-  console.log("this is the role: ", role);
+  const role = payload.role;
+  const username = payload.username;
+  const isPrivileged = PRIVILEGED_ROLES.includes(role);
 
   try {
     const conn = await getDbConnection();
+
+    const whereClause = isPrivileged ? "" : "WHERE sr.assigned_to = ?";
+    const params = isPrivileged ? [] : [username];
+
     const sql = `
       SELECT
     sr.*,
@@ -39,10 +38,11 @@ export default async function ViewServiceReportsPage() {
 FROM service_records sr
 LEFT JOIN warranty_products wp ON TRIM(sr.serial_number) COLLATE utf8mb4_unicode_ci = TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
 LEFT JOIN service_reports sr_report ON sr.service_id = sr_report.service_id
+${whereClause}
 ORDER BY sr.service_id DESC;
     `;
 
-    const [rows] = await conn.execute(sql);
+    const [rows] = await conn.execute(sql, params);
 
     // console.log("this is the rows: ", rows);
 
