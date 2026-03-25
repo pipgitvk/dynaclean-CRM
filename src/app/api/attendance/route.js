@@ -5,6 +5,10 @@ import { NextResponse } from "next/server";
 
 
 
+function normalizeUserRole(role) {
+  return String(role ?? "").trim().toUpperCase();
+}
+
 const getReverseGeocode = async (lat, lon) => {
   try {
     const response = await fetch(
@@ -122,12 +126,41 @@ export async function POST(req) {
         );
         break;
 
-      case 'checkout':
+      case 'checkout': {
+        // Location-less checkout = automatic 6:30 PM flow. ONLY SERVICE ENGINEER — all other roles must send GPS.
+        const locationless =
+          (latitude == null || latitude === "") &&
+          (longitude == null || longitude === "");
+        if (locationless) {
+          const [roleRows] = await conn.execute(
+            `SELECT userRole FROM emplist WHERE username = ?
+             UNION
+             SELECT userRole FROM rep_list WHERE username = ?
+             LIMIT 1`,
+            [username, username]
+          );
+          if (!roleRows.length) {
+            return NextResponse.json(
+              { error: "User not found" },
+              { status: 404 }
+            );
+          }
+          if (normalizeUserRole(roleRows[0].userRole) !== "SERVICE ENGINEER") {
+            return NextResponse.json(
+              {
+                error:
+                  "Checkout without location is only allowed for service engineers",
+              },
+              { status: 403 }
+            );
+          }
+        }
         await conn.execute(
           "UPDATE attendance_logs SET checkout_time = ?, checkout_latitude = ?, checkout_longitude = ?, checkout_address = ? WHERE username = ? AND date = ?",
           [now, latitude, longitude, locationAddress, username, today]
         );
         break;
+      }
 
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
