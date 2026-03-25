@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { parseFormData } from "@/lib/parseForm";
-import fs from "fs/promises";
-import path from "path";
+import { v2 as cloudinary } from "cloudinary";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "attachments");
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-async function savePhoto(file) {
-  if (!file || !file.filepath || !file.originalFilename) return null;
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  const fileName = `${Date.now()}-${file.originalFilename}`;
-  const targetPath = path.join(UPLOAD_DIR, fileName);
-  const buf = await fs.readFile(file.filepath);
-  await fs.writeFile(targetPath, buf);
-  await fs.unlink(file.filepath).catch(() => {});
-  return `/attachments/${fileName}`;
+async function uploadPhotoToCloudinary(file) {
+  if (!file || typeof file.arrayBuffer !== "function") return null;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const base64 = buffer.toString("base64");
+  const dataUri = `data:${file.type};base64,${base64}`;
+  const result = await cloudinary.uploader.upload(dataUri, {
+    folder: "dispatch_photos",
+    resource_type: "image",
+  });
+  return result.secure_url;
 }
 
 export async function POST(req) {
@@ -29,32 +32,21 @@ export async function POST(req) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { fields, files } = await parseFormData(req);
-    // Accept either specific row update by id, or batch by ids
-    const id = Array.isArray(fields.id) ? fields.id[0] : fields.id;
-    const serialNo = Array.isArray(fields.serial_no)
-      ? fields.serial_no[0]
-      : fields.serial_no;
-    const remarks = Array.isArray(fields.remarks)
-      ? fields.remarks[0]
-      : fields.remarks;
-    const godown = Array.isArray(fields.godown)
-      ? fields.godown[0]
-      : fields.godown; // required to know which location to deduct
-    const accessoriesChecklist = Array.isArray(fields.accessories_checklist)
-      ? fields.accessories_checklist[0]
-      : fields.accessories_checklist;
-    // Files: photos[] can be multiple
-    const fileList = files.photos
-      ? Array.isArray(files.photos)
-        ? files.photos
-        : [files.photos]
-      : [];
+    const formData = await req.formData();
+    const id = formData.get("id");
+    const serialNo = formData.get("serial_no");
+    const remarks = formData.get("remarks");
+    const godown = formData.get("godown");
+    const accessoriesChecklist = formData.get("accessories_checklist");
+
+    // Photos: multiple files under key "photos"
+    const photoFiles = formData.getAll("photos").filter(
+      (f) => f && typeof f.arrayBuffer === "function" && f.size > 0
+    );
 
     const photoUrls = [];
-    for (const f of fileList) {
-      const actual = Array.isArray(f) ? f[0] : f;
-      const url = await savePhoto(actual);
+    for (const f of photoFiles) {
+      const url = await uploadPhotoToCloudinary(f);
       if (url) photoUrls.push(url);
     }
 

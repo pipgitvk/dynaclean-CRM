@@ -25,7 +25,7 @@ export default function BackOfficeDashboard({ user }) {
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
-          <AttendanceTracker username={user.username} />
+          <AttendanceTracker username={user.username} role={user.userRole} />
         </div>
 
         <div className="bg-white rounded-xl shadow-md p-4 md:p-6">

@@ -305,7 +305,6 @@ export default function DispatchFormPage({ params }) {
                         accept="image/*"
                         className="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-gray-100 file:text-gray-700 file:text-xs file:cursor-pointer overflow-hidden text-ellipsis disabled:opacity-50 disabled:cursor-not-allowed"
                         onChange={(e) => updateField(r.id, key, (e.target.files && e.target.files[0]) || null)}
-                        disabled={initialSerialNos.has(r.id)}
                       />
                       <div className="mt-1 max-w-full text-[10px] text-gray-600 truncate">
                         {(r[key] && r[key].name) ? r[key].name : "No file chosen"}
@@ -351,7 +350,6 @@ export default function DispatchFormPage({ params }) {
                             type="checkbox"
                             checked={accessoriesChecked[r.id]?.[acc.id] || false}
                             onChange={(e) => updateAccessoryCheck(r.id, acc.id, e.target.checked)}
-                            disabled={initialSerialNos.has(r.id)}
                             className="cursor-pointer"
                           />
                           <span className="flex-1">
@@ -370,19 +368,21 @@ export default function DispatchFormPage({ params }) {
                 )}
 
                 <div className="mt-3 flex items-center gap-3">
-                  <RowSaveButton
-                    r={r}
-                    uploadForRow={uploadForRow}
-                    globalSaving={saving}
-                    isSaved={savedIds.has(r.id)}
-                    hasSerialNo={r.serial_no && r.serial_no.trim() !== ""}
-                    hasGodown={r.godown && r.godown.trim() !== ""}
-                    isLocked={initialSerialNos.has(r.id)}
-                    hasLowStockWarning={!!lowStockWarnings[r.id]}
-                    isProduct={isProductItem(r.item_code)}
-                  />
+                  {!initialSerialNos.has(r.id) && (
+                    <RowSaveButton
+                      r={r}
+                      uploadForRow={uploadForRow}
+                      globalSaving={saving}
+                      isSaved={savedIds.has(r.id)}
+                      hasSerialNo={r.serial_no && r.serial_no.trim() !== ""}
+                      hasGodown={r.godown && r.godown.trim() !== ""}
+                      isLocked={false}
+                      hasLowStockWarning={!!lowStockWarnings[r.id]}
+                      isProduct={isProductItem(r.item_code)}
+                    />
+                  )}
                   {initialSerialNos.has(r.id) && (
-                    <span className="text-xs text-green-700">✓ Already saved (locked)</span>
+                    <span className="text-xs text-green-700">✓ Already saved</span>
                   )}
                 </div>
               </div>
@@ -423,18 +423,18 @@ function RowSaveButton({ r, uploadForRow, globalSaving, isSaved, hasSerialNo, ha
     }
   });
 
-  // For products serial number is mandatory; for spares it's optional
   const serialRequired = isProduct;
 
-  // Disable if: locked, already saved, currently saving, (for products) no serial number, no godown, or has low stock warning
-  const isDisabled =
-    isLocked ||
-    globalSaving ||
-    isLoading ||
-    isSaved ||
-    (serialRequired && !hasSerialNo) ||
-    !hasGodown ||
-    hasLowStockWarning;
+  // Locked rows (stock already deducted): allow updating photos/accessories anytime
+  // Unlocked rows: require serial no (for products), godown, no low stock warning, and not already saved
+  const isDisabled = isLocked
+    ? globalSaving || isLoading
+    : globalSaving ||
+      isLoading ||
+      isSaved ||
+      (serialRequired && !hasSerialNo) ||
+      !hasGodown ||
+      hasLowStockWarning;
 
   return (
     <button
@@ -442,7 +442,7 @@ function RowSaveButton({ r, uploadForRow, globalSaving, isSaved, hasSerialNo, ha
       disabled={isDisabled}
       onClick={handleClick}
     >
-      {isLoading ? "Saving..." : isLocked ? "Locked" : isSaved ? "Saved" : "Save"}
+      {isLoading ? "Saving..." : isLocked ? "Update Photos" : isSaved ? "Saved" : "Save"}
     </button>
   );
 }
