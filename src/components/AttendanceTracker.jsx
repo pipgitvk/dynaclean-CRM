@@ -292,8 +292,12 @@ function CameraCheckinModal({ onVerified, onCancel }) {
 // ---------------------------------------------------------------------------
 // Main AttendanceTracker component
 // ---------------------------------------------------------------------------
+function isServiceEngineerRole(role) {
+  return String(role ?? "").trim().toUpperCase() === "SERVICE ENGINEER";
+}
+
 const AttendanceTracker = ({ username, role }) => {
-  const isServiceEngineer = role === "SERVICE ENGINEER";
+  const isServiceEngineer = isServiceEngineerRole(role);
   const [attendanceData, setAttendanceData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -424,7 +428,8 @@ const AttendanceTracker = ({ username, role }) => {
   };
 
   // -------------------------------------------------------------------------
-  // Auto-checkout for SERVICE ENGINEER at 6:30 PM
+  // Automatic checkout at 6:30 PM — ONLY for SERVICE ENGINEER.
+  // No other role gets auto checkout (they use manual Check Out + GPS only).
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!isServiceEngineer) return;
