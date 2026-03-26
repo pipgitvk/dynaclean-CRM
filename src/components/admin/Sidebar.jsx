@@ -80,7 +80,7 @@ export default function Sidebar({
   onCloseSidebar,
   showBackButton,
   backButtonPath,
-  showBackToUserCrm = true,
+  showBackToUserCrm = false,
 }) {
   const [openMenus, setOpenMenus] = useState({});
   const { theme } = useTheme();

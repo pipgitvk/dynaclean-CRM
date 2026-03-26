@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
+import { normalizeRoleKey } from "@/lib/adminAttendanceRulesAuth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -32,4 +33,26 @@ export default async function getEmpCrmAdminSidebarMenuItems() {
   return empCrmMenuItems.filter(
     (item) => item.roles.includes("ALL") || item.roles.includes(role)
   );
+}
+
+/** “Back to user CRM” on /empcrm/admin-dashboard — only for role HR (JWT). */
+export async function getShowBackToUserCrmForEmpCrmAdmin() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+
+  let role = "GUEST";
+  if (token) {
+    try {
+      const { payload } = await jwtVerify(
+        token,
+        new TextEncoder().encode(JWT_SECRET)
+      );
+      role = (payload?.role ?? payload?.userRole) || "GUEST";
+    } catch (error) {
+      console.error("JWT decode error:", error.message);
+    }
+  }
+
+  const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
+  return roleKey === "HR";
 }
