@@ -3,8 +3,37 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
+import { renameRepListUsername } from "@/lib/renameRepListUsername";
+
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
+
+async function requireAdminOrSuperadmin() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  if (!token) {
+    return { error: NextResponse.json({ message: "Unauthorized" }, { status: 401 }) };
+  }
+  try {
+    const { payload } = await jwtVerify(
+      token,
+      new TextEncoder().encode(JWT_SECRET)
+    );
+    const role = payload?.role || "";
+    if (!["ADMIN", "SUPERADMIN"].includes(role)) {
+      return { error: NextResponse.json({ message: "Forbidden" }, { status: 403 }) };
+    }
+    return {};
+  } catch {
+    return { error: NextResponse.json({ message: "Unauthorized" }, { status: 401 }) };
+  }
+}
 
 export async function GET(request, { params }) {
+  const auth = await requireAdminOrSuperadmin();
+  if (auth.error) return auth.error;
+
   try {
     const { username } = await params;
     const db = await getDbConnection();
@@ -12,7 +41,6 @@ export async function GET(request, { params }) {
       "SELECT username, email, dob, number, address, state, userRole, profile_pic FROM rep_list WHERE username = ?",
       [username],
     );
-    // db.end();
 
     if (rows.length === 0) {
       return NextResponse.json(
@@ -32,9 +60,30 @@ export async function GET(request, { params }) {
 }
 
 export async function PUT(request, { params }) {
+  const auth = await requireAdminOrSuperadmin();
+  if (auth.error) return auth.error;
+
   try {
-    const { username } = await params;
+    const { username: usernameParam } = await params;
+    const username = String(usernameParam || "").trim();
     const formData = await request.formData();
+
+    const newUsernameRaw = formData.get("new_username");
+    const newUsername =
+      typeof newUsernameRaw === "string" ? newUsernameRaw.trim() : "";
+
+    let effectiveUsername = username;
+
+    if (newUsername && newUsername !== username) {
+      try {
+        const { actualNew } = await renameRepListUsername(username, newUsername);
+        effectiveUsername = actualNew;
+      } catch (renameErr) {
+        const msg = renameErr?.message || "Could not rename username.";
+        const status = msg.includes("not found") ? 404 : 400;
+        return NextResponse.json({ message: msg }, { status });
+      }
+    }
 
     const email = formData.get("email");
     const dob = formData.get("dob");
@@ -50,26 +99,27 @@ export async function PUT(request, { params }) {
       SET email = ?, dob = ?, number = ?, address = ?, state = ?, userRole = ?
       WHERE username = ?
     `;
-    let queryParams = [email, dob, number, address, state, userRole, username];
+    let queryParams = [email, dob, number, address, state, userRole, effectiveUsername];
 
     if (profilePic && typeof profilePic !== "string") {
       const bytes = await profilePic.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Define the user-specific directory path
-      const userDir = path.join(process.cwd(), "public", "employees", username);
+      const userDir = path.join(
+        process.cwd(),
+        "public",
+        "employees",
+        effectiveUsername
+      );
 
-      // Create the directory if it doesn't exist
       await mkdir(userDir, { recursive: true });
 
-      // Use a fixed filename
       const filename = "profile.jpg";
       const filePath = path.join(userDir, filename);
 
       await writeFile(filePath, buffer);
 
-      // Construct the database path with the fixed filename
-      profilePicPath = `/employees/${username}/${filename}`;
+      profilePicPath = `/employees/${effectiveUsername}/${filename}`;
       query = `
         UPDATE rep_list 
         SET email = ?, dob = ?, number = ?, address = ?, state = ?, userRole = ?, profile_pic = ? 
@@ -83,16 +133,15 @@ export async function PUT(request, { params }) {
         state,
         userRole,
         profilePicPath,
-        username,
+        effectiveUsername,
       ];
     }
 
     const db = await getDbConnection();
 
-    // Verify employee exists first (handles wrong username)
     const [checkRows] = await db.query(
       "SELECT username FROM rep_list WHERE username = ?",
-      [username],
+      [effectiveUsername],
     );
     if (checkRows.length === 0) {
       return NextResponse.json(
@@ -103,17 +152,17 @@ export async function PUT(request, { params }) {
 
     const [result] = await db.query(query, queryParams);
 
-    // affectedRows can be 0 when data is unchanged - still success
     return NextResponse.json({
       message:
         result.affectedRows > 0
           ? "Employee updated successfully."
           : "No changes made (data already up to date).",
+      username: effectiveUsername,
     });
   } catch (error) {
     console.error("Error updating employee data:", error);
     return NextResponse.json(
-      { message: "Internal server error." },
+      { message: error?.message || "Internal server error." },
       { status: 500 },
     );
   }
