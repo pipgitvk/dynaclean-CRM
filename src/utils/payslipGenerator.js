@@ -1,5 +1,15 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import logo1 from "@/components/logo1.jpg";
+
+const getImportedImageSrc = (mod) => {
+  if (!mod) return "";
+  if (typeof mod === "string") return mod;
+  if (typeof mod === "object" && mod !== null && "src" in mod) return mod.src;
+  return "";
+};
+
+const PAYSLIP_LOGO_SRC = getImportedImageSrc(logo1);
 
 // Helper to format currency
 const formatCurrency = (amount) => {
@@ -369,17 +379,58 @@ export const generatePayslipPDF = async (salaryData, userData) => {
     tempContainer.style.width = "794px"; // A4 width
     document.body.appendChild(tempContainer);
 
+    const images = tempContainer.querySelectorAll("img");
+    await Promise.all(
+      [...images].map(
+        (img) =>
+          new Promise((resolve) => {
+            if (img.complete && img.naturalWidth) return resolve();
+            const done = () => resolve();
+            img.onload = done;
+            img.onerror = done;
+          }),
+      ),
+    );
+
+    const doc = tempContainer.ownerDocument;
+    if (doc.fonts?.ready) {
+      try {
+        await doc.fonts.ready;
+      } catch {
+        /* ignore */
+      }
+    }
+    void tempContainer.offsetHeight;
+    const capW = Math.ceil(
+      Math.max(tempContainer.scrollWidth, tempContainer.offsetWidth, 794),
+    );
+    const capH = Math.ceil(Math.max(tempContainer.scrollHeight, 1));
+    const RENDER_SCALE = 4;
+
     const canvas = await html2canvas(tempContainer, {
-      scale: 2,
+      scale: RENDER_SCALE,
+      width: capW,
+      height: capH,
+      windowWidth: capW,
+      windowHeight: capH,
       useCORS: true,
+      allowTaint: false,
       logging: false,
       backgroundColor: "#ffffff",
-      windowWidth: 794,
+      scrollX: 0,
+      scrollY: 0,
+      onclone: (clonedDoc) => {
+        const b = clonedDoc.body;
+        if (b) {
+          b.style.setProperty("-webkit-font-smoothing", "antialiased");
+          b.style.setProperty("text-rendering", "geometricPrecision");
+        }
+      },
     });
 
     document.body.removeChild(tempContainer);
 
-    const imgData = canvas.toDataURL("image/png");
+    const imgData = canvas.toDataURL("image/png", 1.0);
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
@@ -387,7 +438,14 @@ export const generatePayslipPDF = async (salaryData, userData) => {
     const imgWidth = pageWidth;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
+    let drawW = imgWidth;
+    let drawH = imgHeight;
+    if (drawH > pageHeight) {
+      const scale = pageHeight / drawH;
+      drawW *= scale;
+      drawH = pageHeight;
+    }
+    pdf.addImage(imgData, "PNG", 0, 0, drawW, drawH);
 
     return pdf;
   } catch (error) {
@@ -399,3 +457,332 @@ export const generatePayslipPDF = async (salaryData, userData) => {
 export const downloadPayslip = (pdf, filename) => {
   pdf.save(filename || "payslip.pdf");
 };
+
+const fmtInr = (n) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(n) || 0);
+
+const getMonthYearLabel = (monthStr) => {
+  if (!monthStr) return "";
+  const [y, m] = monthStr.split("-");
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+};
+
+/** Defaults — override via NEXT_PUBLIC_PAYSLIP_* in env (client) */
+const getCompanyBlock = () => ({
+  name: process.env.NEXT_PUBLIC_PAYSLIP_COMPANY_NAME || "Dynaclean Industries Pvt Ltd",
+  line1:
+    process.env.NEXT_PUBLIC_PAYSLIP_ADDRESS_LINE1 ||
+    "1st Floor, 13-B, Kattabomman Street, Gandhi Nagar",
+  line2: process.env.NEXT_PUBLIC_PAYSLIP_ADDRESS_LINE2 || "Coimbatore - 641006",
+  email: process.env.NEXT_PUBLIC_PAYSLIP_EMAIL || "",
+  phone: process.env.NEXT_PUBLIC_PAYSLIP_PHONE || "",
+});
+
+const buildDeductionRows = (processedDeductions, maxRows) => {
+  let rows = (processedDeductions || []).map((d) => ({
+    label: d.deduction_name || "Deduction",
+    amount: Number(d.calculatedAmount) || 0,
+  }));
+  if (rows.length > maxRows) {
+    const extra = rows.slice(maxRows - 1);
+    const sum = extra.reduce((s, x) => s + x.amount, 0);
+    rows = rows.slice(0, maxRows - 1);
+    rows.push({ label: "Other deductions", amount: sum });
+  }
+  while (rows.length < maxRows) rows.push({ label: "", amount: null });
+  return rows;
+};
+
+const buildTemplatePayslipHTML = (opts) => {
+  const {
+    company = getCompanyBlock(),
+    monthStr,
+    employeeName,
+    empId,
+    designation,
+    bankName,
+    bankAccount,
+    pan,
+    dateOfJoining,
+    workingDays,
+    presentDays,
+    overtimeHours,
+    calculation,
+  } = opts;
+
+  const c = calculation;
+  const ROWS = 10;
+  const earningsLabels = [
+    "Basic",
+    "HRA",
+    "Transport Allowance",
+    "Medical Allowance",
+    "Salary (Gross)/PM",
+    "PF Employer",
+    "ESI Employer",
+    "Medical",
+    "Telephone",
+    "Others",
+  ];
+  const earningAmounts = [
+    c.basicSalary,
+    c.hra,
+    c.transportAllowance,
+    c.medicalAllowance,
+    c.totalEarnings,
+    0,
+    0,
+    0,
+    0,
+    (Number(c.specialAllowance) || 0) +
+      (Number(c.bonus) || 0) +
+      (Number(c.overtimeAmount) || 0),
+  ];
+
+  const deductionSlots = buildDeductionRows(c.processedDeductions, ROWS);
+
+  const salFont =
+    'font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:geometricPrecision;';
+  const salRow =
+    `${salFont}font-size:13px;color:#374151;padding:11px 14px;border-bottom:1px solid #e5e7eb;vertical-align:middle;`;
+  const salAmt = `${salRow}text-align:right;font-variant-numeric:tabular-nums;color:#1f2937;`;
+  /** Last data row: extra vertical room so canvas/PDF does not clip descenders (e.g. "Others") */
+  const salRowLast = `${salFont}font-size:13px;color:#374151;padding:12px 14px 16px;border-bottom:1px solid #e5e7eb;vertical-align:middle;line-height:1.45;`;
+  const salAmtLast = `${salRowLast}text-align:right;font-variant-numeric:tabular-nums;color:#1f2937;`;
+  /** Extra top padding + top alignment so "Earnings"/"Deductions" are not clipped in PDF canvas */
+  const salHdrTitle = `${salFont}padding:28px 14px 14px;font-size:14px;font-weight:700;color:#111827;text-align:left;line-height:1.5;border-bottom:2px solid #1e3a5f;vertical-align:top;`;
+  /** Column headers only — distinct from data rows; bottom totals block unchanged */
+  const salColHdr = `${salFont}padding:11px 14px 12px;font-size:11px;font-weight:700;color:#1f2937;text-transform:uppercase;letter-spacing:0.06em;border-bottom:2px solid #cbd5e1;background:#e5e7eb;vertical-align:middle;`;
+
+  const leftRowsHtml = [];
+  const rightRowsHtml = [];
+  for (let i = 0; i < ROWS; i++) {
+    const ded = deductionSlots[i] || { label: "", amount: null };
+    const dedVal =
+      ded.label && ded.amount != null ? fmtInr(ded.amount) : "";
+    const isLast = i === ROWS - 1;
+    const r = isLast ? salRowLast : salRow;
+    const a = isLast ? salAmtLast : salAmt;
+    leftRowsHtml.push(`<tr>
+      <td style="${r}text-align:left;font-weight:500;">${earningsLabels[i]}</td>
+      <td style="${a}">${fmtInr(earningAmounts[i])}</td>
+    </tr>`);
+    rightRowsHtml.push(`<tr>
+      <td style="${r}text-align:left;font-weight:500;">${ded.label || ""}</td>
+      <td style="${a}">${dedVal}</td>
+    </tr>`);
+  }
+
+  /** One full-width bar: thick left border, light blue tint, label | value per half (matches reference slip) */
+  const salarySummaryBarHtml = `<div style="height:28px;background:#fff;font-size:0;line-height:0;">&nbsp;</div>
+<div style="${salFont}display:flex;align-items:stretch;border-left:5px solid #000000;border-bottom:1px solid #6b7280;background:linear-gradient(180deg,#eff6ff 0%,#f8fafc 45%,#ffffff 100%);font-size:13px;font-weight:400;color:#4b5563;">
+  <div style="flex:1;display:flex;justify-content:space-between;align-items:center;padding:14px 16px 14px 14px;border-right:1px solid #d1d5db;min-width:0;box-sizing:border-box;">
+    <span style="flex-shrink:0;">Salary</span>
+    <span style="font-variant-numeric:tabular-nums;text-align:right;">${fmtInr(c.totalEarnings)}</span>
+  </div>
+  <div style="flex:1;display:flex;justify-content:space-between;align-items:center;padding:14px 16px;min-width:0;box-sizing:border-box;">
+    <span style="flex-shrink:0;">Total Deduction</span>
+    <span style="font-variant-numeric:tabular-nums;text-align:right;">${fmtInr(c.totalDeductions)}</span>
+  </div>
+</div>`;
+
+  const earningsTableHtml = `<table role="presentation" style="width:100%;border-collapse:collapse;border:0;table-layout:fixed;${salFont}">
+    <tr><td colspan="2" style="${salHdrTitle}">Earnings</td></tr>
+    <tr>
+      <td style="${salColHdr}text-align:left;">Salary Head</td>
+      <td style="${salColHdr}text-align:right;">Amount</td>
+    </tr>
+    ${leftRowsHtml.join("")}
+  </table>`;
+  const deductionsTableHtml = `<table role="presentation" style="width:100%;border-collapse:collapse;border:0;table-layout:fixed;${salFont}">
+    <tr><td colspan="2" style="${salHdrTitle}">Deductions</td></tr>
+    <tr>
+      <td style="${salColHdr}text-align:left;">Salary Head</td>
+      <td style="${salColHdr}text-align:right;">Amount</td>
+    </tr>
+    ${rightRowsHtml.join("")}
+  </table>`;
+
+  const monthLabel = getMonthYearLabel(monthStr);
+  const co = company;
+
+  /** Employee info grid — label/value pairs like reference (light blue labels, white values, dark grid) */
+  const empFont =
+    'font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;';
+  const empLbl = `${empFont}font-size:12px;font-weight:700;color:#111827;background:#eff7ff;border:1px solid #1f2937;padding:8px 10px;vertical-align:middle;text-align:left;`;
+  const empVal = `${empFont}font-size:12px;font-weight:400;color:#4b5563;background:#ffffff;border:1px solid #1f2937;padding:8px 10px;vertical-align:middle;text-align:left;`;
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Payslip</title></head>
+<body style="margin:0;padding:16px;background:#fff;font-family:Georgia,'Times New Roman',serif;font-size:11px;color:#000;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:geometricPrecision;">
+<div style="max-width:720px;margin:0 auto;border:3px solid #000;box-sizing:border-box;-webkit-font-smoothing:antialiased;">
+  ${
+    PAYSLIP_LOGO_SRC
+      ? `<div style="text-align:center;padding:16px 12px 8px;background:#fff;">
+    <img src="${PAYSLIP_LOGO_SRC}" alt="" crossOrigin="anonymous" style="max-height:80px;max-width:260px;object-fit:contain;display:inline-block;" />
+  </div>`
+      : ""
+  }
+  <div style="text-align:center;padding:10px 12px;line-height:1.5;">
+    <div style="font-weight:bold;font-size:13px;">${co.name}</div>
+    <div>${co.line1}</div>
+    <div>${co.line2}</div>
+    ${co.email ? `<div>Email: ${co.email}</div>` : ""}
+    ${co.phone ? `<div>Contact No: ${co.phone}</div>` : ""}
+  </div>
+  <div style="background:#1e3a5f;color:#fff;text-align:center;padding:8px;font-weight:bold;">
+    PaySlip For The Month Of ${monthLabel}
+  </div>
+  <table style="width:100%;border-collapse:collapse;border:1px solid #1f2937;background:#fff;table-layout:fixed;">
+    <tr>
+      <td style="width:25%;${empLbl}">Name</td>
+      <td style="width:25%;${empVal}">${employeeName || "-"}</td>
+      <td style="width:25%;${empLbl}">Employee ID</td>
+      <td style="width:25%;${empVal}">${empId || "-"}</td>
+    </tr>
+    <tr>
+      <td style="${empLbl}">Designation</td>
+      <td style="${empVal}">${designation || "-"}</td>
+      <td style="${empLbl}">Bank Name</td>
+      <td style="${empVal}">${bankName || "-"}</td>
+    </tr>
+    <tr>
+      <td style="${empLbl}">Bank A/C No.</td>
+      <td style="${empVal}">${bankAccount || "-"}</td>
+      <td style="${empLbl}">Date Of Joining</td>
+      <td style="${empVal}">${dateOfJoining || "-"}</td>
+    </tr>
+    <tr>
+      <td style="${empLbl}">PAN No.</td>
+      <td style="${empVal}">${pan || "-"}</td>
+      <td style="${empLbl}">Working Days</td>
+      <td style="${empVal}">${workingDays ?? "-"}</td>
+    </tr>
+    <tr>
+      <td style="${empLbl}">Present Days</td>
+      <td style="${empVal}">${presentDays ?? "-"}</td>
+      <td style="${empLbl}">Overtime Hours</td>
+      <td style="${empVal}">${overtimeHours ?? "-"}</td>
+    </tr>
+  </table>
+  <div style="padding-top:20px;margin-top:6px;padding-bottom:4px;background:#fff;overflow:visible;">
+  <table role="presentation" style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;background:#fff;table-layout:fixed;${salFont}">
+    <tr>
+      <td style="width:50%;vertical-align:top;border-right:1px solid #e5e7eb;padding:0;overflow:visible;">
+        ${earningsTableHtml}
+      </td>
+      <td style="width:50%;vertical-align:top;padding:0;overflow:visible;">
+        ${deductionsTableHtml}
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding:0;border:none;vertical-align:top;background:#fff;">
+        ${salarySummaryBarHtml}
+      </td>
+    </tr>
+  </table>
+  </div>
+  <div style="${salFont}margin-top:18px;padding:14px 14px 16px;border:1px solid #e5e7eb;border-top:none;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;color:#111827;background:#fff;">
+    <span>Net Pay</span>
+    <span>${fmtInr(c.netSalary)}</span>
+  </div>
+  <div style="padding:24px 16px 32px;display:flex;justify-content:space-between;text-align:center;">
+    <div style="flex:1;"><div style="border-top:1px solid #000;margin:0 8px 4px;"></div><div>Prepared by</div></div>
+    <div style="flex:1;"><div style="border-top:1px solid #000;margin:0 8px 4px;"></div><div>Checked by</div></div>
+    <div style="flex:1;"><div style="border-top:1px solid #000;margin:0 8px 4px;"></div><div>Authorised by</div></div>
+  </div>
+  <div style="height:10px;background:#1e3a5f;"></div>
+</div>
+</body></html>`;
+};
+
+/**
+ * Payslip PDF matching the classic blue payslip layout (Generate Salary screen data).
+ */
+export async function generateGenerateSalaryPayslipPDF(opts) {
+  const htmlContent = buildTemplatePayslipHTML(opts);
+  const tempContainer = document.createElement("div");
+  tempContainer.innerHTML = htmlContent;
+  tempContainer.style.position = "absolute";
+  tempContainer.style.left = "-9999px";
+  tempContainer.style.top = "0";
+  tempContainer.style.width = "794px";
+  document.body.appendChild(tempContainer);
+
+  const images = tempContainer.querySelectorAll("img");
+  await Promise.all(
+    [...images].map(
+      (img) =>
+        new Promise((resolve) => {
+          if (img.complete && img.naturalWidth) return resolve();
+          const done = () => resolve();
+          img.onload = done;
+          img.onerror = done;
+        }),
+    ),
+  );
+
+  const doc = tempContainer.ownerDocument;
+  if (doc.fonts?.ready) {
+    try {
+      await doc.fonts.ready;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  void tempContainer.offsetHeight;
+  const capW = Math.ceil(
+    Math.max(tempContainer.scrollWidth, tempContainer.offsetWidth, 794),
+  );
+  const capH = Math.ceil(Math.max(tempContainer.scrollHeight, 1));
+
+  /** Scale 4: sharper text in PDF after rasterize + fit-to-page (heavier than 3) */
+  const RENDER_SCALE = 4;
+
+  const canvas = await html2canvas(tempContainer, {
+    scale: RENDER_SCALE,
+    width: capW,
+    height: capH,
+    windowWidth: capW,
+    windowHeight: capH,
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    backgroundColor: "#ffffff",
+    scrollX: 0,
+    scrollY: 0,
+    onclone: (clonedDoc) => {
+      const b = clonedDoc.body;
+      if (b) {
+        b.style.setProperty("-webkit-font-smoothing", "antialiased");
+        b.style.setProperty("text-rendering", "geometricPrecision");
+      }
+    },
+  });
+
+  document.body.removeChild(tempContainer);
+
+  const imgData = canvas.toDataURL("image/png", 1.0);
+  const pdf = new jsPDF("p", "mm", "a4");
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  let drawW = imgWidth;
+  let drawH = imgHeight;
+  if (drawH > pageHeight) {
+    const scale = pageHeight / drawH;
+    drawW *= scale;
+    drawH = pageHeight;
+  }
+  pdf.addImage(imgData, "PNG", 0, 0, drawW, drawH);
+
+  return pdf;
+}
