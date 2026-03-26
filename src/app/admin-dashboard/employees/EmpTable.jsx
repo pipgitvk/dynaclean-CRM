@@ -5,13 +5,16 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Link from "next/link";
-import { LogIn, Key, Edit, Shield, UserPlus, X } from "lucide-react";
+import { LogIn, Key, Edit, Shield, UserPlus, X, Power } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 
 const EmployeeCard = ({
   employee,
   handleImpersonateLogin,
   handleOpenReportingManagerModal,
+  handleToggleStatus,
+  togglingUsername,
+  showEmployeeStatusToggle,
   maskEmail,
   maskNumber,
   maskStatus,
@@ -93,11 +96,28 @@ const EmployeeCard = ({
         <UserPlus size={16} />
         <span>Manager</span>
       </button>
+
+      {showEmployeeStatusToggle ? (
+        <button
+          type="button"
+          onClick={() => handleToggleStatus(employee)}
+          disabled={togglingUsername === employee.username}
+          className={`font-medium flex items-center space-x-1 text-sm disabled:opacity-50 ${
+            employee.status == 1
+              ? "text-rose-600 hover:text-rose-900"
+              : "text-emerald-600 hover:text-emerald-900"
+          }`}
+          title={employee.status == 1 ? "Deactivate employee" : "Activate employee"}
+        >
+          <Power size={16} />
+          <span>{togglingUsername === employee.username ? "…" : employee.status == 1 ? "Deactivate" : "Activate"}</span>
+        </button>
+      ) : null}
     </div>
   </div>
 );
 
-const EmpTable = ({ employees }) => {
+const EmpTable = ({ employees, showEmployeeStatusToggle = false }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobile, setIsMobile] = useState(false);
@@ -106,7 +126,37 @@ const EmpTable = ({ employees }) => {
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
   const [savingReportingManager, setSavingReportingManager] = useState(false);
   const [employeeList, setEmployeeList] = useState([]);
+  const [togglingUsername, setTogglingUsername] = useState("");
   const router = useRouter();
+
+  const handleToggleStatus = async (employee) => {
+    const nextStatus = employee.status == 1 ? 0 : 1;
+    if (nextStatus === 0) {
+      const ok = window.confirm(
+        `Deactivate "${employee.username}"? They will not be able to log in until activated again.`
+      );
+      if (!ok) return;
+    }
+    setTogglingUsername(employee.username);
+    try {
+      const res = await fetch("/api/employees/set-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ username: employee.username, status: nextStatus }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Failed to update status.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert("Error updating employee status.");
+    } finally {
+      setTogglingUsername("");
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -342,6 +392,9 @@ const EmpTable = ({ employees }) => {
                 employee={employee}
                 handleImpersonateLogin={handleImpersonateLogin}
                 handleOpenReportingManagerModal={handleOpenReportingManagerModal}
+                handleToggleStatus={handleToggleStatus}
+                togglingUsername={togglingUsername}
+                showEmployeeStatusToggle={showEmployeeStatusToggle}
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
@@ -436,6 +489,22 @@ const EmpTable = ({ employees }) => {
                         >
                           <UserPlus size={20} />
                         </button>
+
+                        {showEmployeeStatusToggle ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(employee)}
+                            disabled={togglingUsername === employee.username}
+                            className={
+                              employee.status == 1
+                                ? "text-rose-600 hover:text-rose-800 disabled:opacity-50"
+                                : "text-emerald-600 hover:text-emerald-800 disabled:opacity-50"
+                            }
+                            title={employee.status == 1 ? "Deactivate" : "Activate"}
+                          >
+                            <Power size={20} />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
