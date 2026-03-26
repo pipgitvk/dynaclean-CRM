@@ -11,7 +11,8 @@ export const ATTENDANCE_RULES_ALLOWED_ROLES = [
   "HR",
 ];
 
-function normalizeRoleKey(role) {
+/** Exported for admin sidebar menu filtering (same rules as API checks). */
+export function normalizeRoleKey(role) {
   if (role == null || role === "") return "";
   return String(role).trim().replace(/\s+/g, " ").toUpperCase();
 }

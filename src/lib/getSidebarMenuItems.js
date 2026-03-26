@@ -2,6 +2,10 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getSessionPayload } from "./auth";
+import {
+  ATTENDANCE_RULES_ALLOWED_ROLES,
+  normalizeRoleKey,
+} from "@/lib/adminAttendanceRulesAuth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -550,13 +554,22 @@ const allMenuItems = [
     roles: ["ALL"],
     icon: "User",
   },
+  {
+    path: "/admin-dashboard/attendance-rules",
+    name: "Attendance rules",
+    roles: [...ATTENDANCE_RULES_ALLOWED_ROLES],
+    icon: "Clock",
+  },
 ];
 
 export default async function getSidebarMenuItems() {
   const payload = await getSessionPayload();
-  let role = payload?.role || "GUEST";
+  const role = (payload?.role ?? payload?.userRole) || "GUEST";
+  const roleKey = normalizeRoleKey(role) || "GUEST";
 
   return allMenuItems.filter(
-    (item) => item.roles.includes("ALL") || item.roles.includes(role),
+    (item) =>
+      item.roles.includes("ALL") ||
+      item.roles.some((r) => normalizeRoleKey(r) === roleKey),
   );
 }

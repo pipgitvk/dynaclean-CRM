@@ -146,7 +146,10 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { TextEncoder as NodeTextEncoder } from "util";
-import { ATTENDANCE_RULES_ALLOWED_ROLES } from "@/lib/adminAttendanceRulesAuth";
+import {
+  ATTENDANCE_RULES_ALLOWED_ROLES,
+  normalizeRoleKey,
+} from "@/lib/adminAttendanceRulesAuth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -719,19 +722,20 @@ const allMenuItems = [
   },
 ];
 
-function filterMenuItemsByRole(items, role) {
+function filterMenuItemsByRole(items, roleKeyNormalized) {
   if (!items?.length) return [];
   return items
     .map((item) => {
       const roleOk =
-        item.roles?.includes("ALL") || item.roles?.includes(role);
+        item.roles?.includes("ALL") ||
+        item.roles?.some((r) => normalizeRoleKey(r) === roleKeyNormalized);
       if (!roleOk) return null;
 
       if (!item.children?.length) {
         return item;
       }
 
-      const children = filterMenuItemsByRole(item.children, role);
+      const children = filterMenuItemsByRole(item.children, roleKeyNormalized);
       if (children.length === 0) {
         return null;
       }
@@ -740,7 +744,7 @@ function filterMenuItemsByRole(items, role) {
     .filter(Boolean);
 }
 
-export default async function getSidebarMenuItems() {
+async function getAdminRoleKeyNormalized() {
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
 
@@ -752,12 +756,22 @@ export default async function getSidebarMenuItems() {
         token,
         new TextEncoderImpl().encode(JWT_SECRET),
       );
-      role = payload?.role || "GUEST";
+      role = (payload?.role ?? payload?.userRole) || "GUEST";
     } catch (error) {
       console.error("JWT decode error:", error.message);
     }
   }
 
-  const roleKey = String(role || "GUEST").trim().toUpperCase();
-  return filterMenuItemsByRole(allMenuItems, roleKey);
+  return normalizeRoleKey(role || "GUEST") || "GUEST";
+}
+
+export default async function getSidebarMenuItems() {
+  const roleKeyNormalized = await getAdminRoleKeyNormalized();
+  return filterMenuItemsByRole(allMenuItems, roleKeyNormalized);
+}
+
+/** User CRM is the default home for non–SUPERADMIN logins; hide “Back to user CRM” for SUPERADMIN. */
+export async function getShowBackToUserCrm() {
+  const roleKeyNormalized = await getAdminRoleKeyNormalized();
+  return roleKeyNormalized !== "SUPERADMIN";
 }
