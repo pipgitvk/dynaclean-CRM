@@ -36,6 +36,7 @@ import {
   Import,
   Ship,
   Receipt,
+  Clock,
 } from "lucide-react";
 
 // Icon map
@@ -59,7 +60,7 @@ const iconMap = {
   Users,
   User,
   UserCircle: User,
-  Clock: Calendar,
+  Clock,
   Receipt,
   ShoppingCart,
   FilePlus,

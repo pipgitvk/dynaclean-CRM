@@ -146,6 +146,7 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { TextEncoder as NodeTextEncoder } from "util";
+import { ATTENDANCE_RULES_ALLOWED_ROLES } from "@/lib/adminAttendanceRulesAuth";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -710,6 +711,12 @@ const allMenuItems = [
         // },
       ],
     },
+  {
+    path: "/admin-dashboard/attendance-rules",
+    name: "Attendance rules",
+    roles: [...ATTENDANCE_RULES_ALLOWED_ROLES],
+    icon: "Clock",
+  },
 ];
 
 function filterMenuItemsByRole(items, role) {
