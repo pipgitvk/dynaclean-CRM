@@ -404,8 +404,10 @@ export const generatePayslipPDF = async (salaryData, userData) => {
     const capW = Math.ceil(
       Math.max(tempContainer.scrollWidth, tempContainer.offsetWidth, 794),
     );
-    const capH = Math.ceil(Math.max(tempContainer.scrollHeight, 1));
-    const RENDER_SCALE = 4;
+    const capH =
+      Math.ceil(Math.max(tempContainer.scrollHeight, 1)) + 96;
+    /** High-res export target for near print-quality text */
+    const RENDER_SCALE = 5;
 
     const canvas = await html2canvas(tempContainer, {
       scale: RENDER_SCALE,
@@ -431,7 +433,13 @@ export const generatePayslipPDF = async (salaryData, userData) => {
     document.body.removeChild(tempContainer);
 
     const imgData = canvas.toDataURL("image/png", 1.0);
-    const pdf = new jsPDF("p", "mm", "a4");
+    const pdf = new jsPDF({
+      orientation: "p",
+      unit: "mm",
+      format: "a4",
+      compress: false,
+      precision: 16,
+    });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
@@ -483,22 +491,8 @@ const getCompanyBlock = () => ({
   phone: process.env.NEXT_PUBLIC_PAYSLIP_PHONE || "",
 });
 
-const buildDeductionRows = (processedDeductions, maxRows) => {
-  let rows = (processedDeductions || []).map((d) => ({
-    label: d.deduction_name || "Deduction",
-    amount: Number(d.calculatedAmount) || 0,
-  }));
-  if (rows.length > maxRows) {
-    const extra = rows.slice(maxRows - 1);
-    const sum = extra.reduce((s, x) => s + x.amount, 0);
-    rows = rows.slice(0, maxRows - 1);
-    rows.push({ label: "Other deductions", amount: sum });
-  }
-  while (rows.length < maxRows) rows.push({ label: "", amount: null });
-  return rows;
-};
-
-const buildTemplatePayslipHTML = (opts) => {
+/** Same HTML used for PDF export — use for on-screen preview to match download pixel-for-pixel */
+export const buildTemplatePayslipHTML = (opts) => {
   const {
     company = getCompanyBlock(),
     monthStr,
@@ -516,106 +510,58 @@ const buildTemplatePayslipHTML = (opts) => {
   } = opts;
 
   const c = calculation;
-  const ROWS = 10;
+  const ROWS = 7;
   const earningsLabels = [
     "Basic",
     "HRA",
     "Transport Allowance",
     "Medical Allowance",
-    "Salary (Gross)/PM",
-    "PF Employer",
-    "ESI Employer",
-    "Medical",
-    "Telephone",
-    "Others",
+    "Special Allowance",
+    "Bonus",
+    "Overtime",
   ];
   const earningAmounts = [
     c.basicSalary,
     c.hra,
     c.transportAllowance,
     c.medicalAllowance,
-    c.totalEarnings,
-    0,
-    0,
-    0,
-    0,
-    (Number(c.specialAllowance) || 0) +
-      (Number(c.bonus) || 0) +
-      (Number(c.overtimeAmount) || 0),
+    Number(c.specialAllowance) || 0,
+    Number(c.bonus) || 0,
+    Number(c.overtimeAmount) || 0,
   ];
 
-  const deductionSlots = buildDeductionRows(c.processedDeductions, ROWS);
+  // Deduction column: employer heads at top (manual / employee deductions not itemized here)
+  const deductionLabels = [
+    "PF Employer",
+    "ESI Employer",
+    "Medical",
+    "",
+    "",
+    "",
+    "",
+  ];
+  const deductionAmounts = [0, 0, 0, null, null, null, null];
 
   const salFont =
-    'font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:geometricPrecision;';
-  const salRow =
-    `${salFont}font-size:13px;color:#374151;padding:11px 14px;border-bottom:1px solid #e5e7eb;vertical-align:middle;`;
-  const salAmt = `${salRow}text-align:right;font-variant-numeric:tabular-nums;color:#1f2937;`;
-  /** Last data row: extra vertical room so canvas/PDF does not clip descenders (e.g. "Others") */
-  const salRowLast = `${salFont}font-size:13px;color:#374151;padding:12px 14px 16px;border-bottom:1px solid #e5e7eb;vertical-align:middle;line-height:1.45;`;
-  const salAmtLast = `${salRowLast}text-align:right;font-variant-numeric:tabular-nums;color:#1f2937;`;
-  /** Extra top padding + top alignment so "Earnings"/"Deductions" are not clipped in PDF canvas */
-  const salHdrTitle = `${salFont}padding:28px 14px 14px;font-size:14px;font-weight:700;color:#111827;text-align:left;line-height:1.5;border-bottom:2px solid #1e3a5f;vertical-align:top;`;
-  /** Column headers only — distinct from data rows; bottom totals block unchanged */
-  const salColHdr = `${salFont}padding:11px 14px 12px;font-size:11px;font-weight:700;color:#1f2937;text-transform:uppercase;letter-spacing:0.06em;border-bottom:2px solid #cbd5e1;background:#e5e7eb;vertical-align:middle;`;
-
-  const leftRowsHtml = [];
-  const rightRowsHtml = [];
+    'font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:geometricPrecision;';
+  const salRow = `${salFont}font-size:14px;font-weight:700;color:#404040;padding:7px 7px;border:1px solid #666;vertical-align:middle;line-height:1.3;`;
+  const salAmt = `${salRow}text-align:right;font-variant-numeric:tabular-nums;`;
+  const rowsHtml = [];
   for (let i = 0; i < ROWS; i++) {
-    const ded = deductionSlots[i] || { label: "", amount: null };
+    const dedLabel = deductionLabels[i] || "";
+    const dedAmt = deductionAmounts[i];
     const dedVal =
-      ded.label && ded.amount != null ? fmtInr(ded.amount) : "";
-    const isLast = i === ROWS - 1;
-    const r = isLast ? salRowLast : salRow;
-    const a = isLast ? salAmtLast : salAmt;
-    leftRowsHtml.push(`<tr>
-      <td style="${r}text-align:left;font-weight:500;">${earningsLabels[i]}</td>
-      <td style="${a}">${fmtInr(earningAmounts[i])}</td>
-    </tr>`);
-    rightRowsHtml.push(`<tr>
-      <td style="${r}text-align:left;font-weight:500;">${ded.label || ""}</td>
-      <td style="${a}">${dedVal}</td>
+      dedLabel && dedAmt != null ? fmtInr(dedAmt) : "";
+    rowsHtml.push(`<tr>
+      <td style="${salRow}text-align:left;">${earningsLabels[i]}</td>
+      <td style="${salAmt}">${fmtInr(earningAmounts[i])}</td>
+      <td style="${salRow}text-align:left;">${dedLabel}</td>
+      <td style="${salAmt}">${dedVal}</td>
     </tr>`);
   }
 
-  /** One full-width bar: thick left border, light blue tint, label | value per half (matches reference slip) */
-  const salarySummaryBarHtml = `<div style="height:28px;background:#fff;font-size:0;line-height:0;">&nbsp;</div>
-<div style="${salFont}display:flex;align-items:stretch;border-left:5px solid #000000;border-bottom:1px solid #6b7280;background:linear-gradient(180deg,#eff6ff 0%,#f8fafc 45%,#ffffff 100%);font-size:13px;font-weight:400;color:#4b5563;">
-  <div style="flex:1;display:flex;justify-content:space-between;align-items:center;padding:14px 16px 14px 14px;border-right:1px solid #d1d5db;min-width:0;box-sizing:border-box;">
-    <span style="flex-shrink:0;">Salary</span>
-    <span style="font-variant-numeric:tabular-nums;text-align:right;">${fmtInr(c.totalEarnings)}</span>
-  </div>
-  <div style="flex:1;display:flex;justify-content:space-between;align-items:center;padding:14px 16px;min-width:0;box-sizing:border-box;">
-    <span style="flex-shrink:0;">Total Deduction</span>
-    <span style="font-variant-numeric:tabular-nums;text-align:right;">${fmtInr(c.totalDeductions)}</span>
-  </div>
-</div>`;
-
-  const earningsTableHtml = `<table role="presentation" style="width:100%;border-collapse:collapse;border:0;table-layout:fixed;${salFont}">
-    <tr><td colspan="2" style="${salHdrTitle}">Earnings</td></tr>
-    <tr>
-      <td style="${salColHdr}text-align:left;">Salary Head</td>
-      <td style="${salColHdr}text-align:right;">Amount</td>
-    </tr>
-    ${leftRowsHtml.join("")}
-  </table>`;
-  const deductionsTableHtml = `<table role="presentation" style="width:100%;border-collapse:collapse;border:0;table-layout:fixed;${salFont}">
-    <tr><td colspan="2" style="${salHdrTitle}">Deductions</td></tr>
-    <tr>
-      <td style="${salColHdr}text-align:left;">Salary Head</td>
-      <td style="${salColHdr}text-align:right;">Amount</td>
-    </tr>
-    ${rightRowsHtml.join("")}
-  </table>`;
-
   const monthLabel = getMonthYearLabel(monthStr);
   const co = company;
-
-  /** Employee info grid — label/value pairs like reference (light blue labels, white values, dark grid) */
-  const empFont =
-    'font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;';
-  const empLbl = `${empFont}font-size:12px;font-weight:700;color:#111827;background:#eff7ff;border:1px solid #1f2937;padding:8px 10px;vertical-align:middle;text-align:left;`;
-  const empVal = `${empFont}font-size:12px;font-weight:400;color:#4b5563;background:#ffffff;border:1px solid #1f2937;padding:8px 10px;vertical-align:middle;text-align:left;`;
 
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Payslip</title></head>
@@ -638,59 +584,64 @@ const buildTemplatePayslipHTML = (opts) => {
   <div style="background:#1e3a5f;color:#fff;text-align:center;padding:8px;font-weight:bold;">
     PaySlip For The Month Of ${monthLabel}
   </div>
-  <table style="width:100%;border-collapse:collapse;border:1px solid #1f2937;background:#fff;table-layout:fixed;">
+  <table style="width:100%;border-collapse:collapse;border:1px solid #333;">
     <tr>
-      <td style="width:25%;${empLbl}">Name</td>
-      <td style="width:25%;${empVal}">${employeeName || "-"}</td>
-      <td style="width:25%;${empLbl}">Employee ID</td>
-      <td style="width:25%;${empVal}">${empId || "-"}</td>
+      <td style="width:25%;padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Name</td>
+      <td style="width:25%;padding:4px 6px;border:1px solid #333;">${employeeName || "-"}</td>
+      <td style="width:25%;padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Employee ID</td>
+      <td style="width:25%;padding:4px 6px;border:1px solid #333;">${empId || "-"}</td>
     </tr>
     <tr>
-      <td style="${empLbl}">Designation</td>
-      <td style="${empVal}">${designation || "-"}</td>
-      <td style="${empLbl}">Bank Name</td>
-      <td style="${empVal}">${bankName || "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Designation</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${designation || "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Bank Name</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${bankName || "-"}</td>
     </tr>
     <tr>
-      <td style="${empLbl}">Bank A/C No.</td>
-      <td style="${empVal}">${bankAccount || "-"}</td>
-      <td style="${empLbl}">Date Of Joining</td>
-      <td style="${empVal}">${dateOfJoining || "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Bank A/C No.</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${bankAccount || "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Date Of Joining</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${dateOfJoining || "-"}</td>
     </tr>
     <tr>
-      <td style="${empLbl}">PAN No.</td>
-      <td style="${empVal}">${pan || "-"}</td>
-      <td style="${empLbl}">Working Days</td>
-      <td style="${empVal}">${workingDays ?? "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">PAN No.</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${pan || "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Working Days</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${workingDays ?? "-"}</td>
     </tr>
     <tr>
-      <td style="${empLbl}">Present Days</td>
-      <td style="${empVal}">${presentDays ?? "-"}</td>
-      <td style="${empLbl}">Overtime Hours</td>
-      <td style="${empVal}">${overtimeHours ?? "-"}</td>
-    </tr>
-  </table>
-  <div style="padding-top:20px;margin-top:6px;padding-bottom:4px;background:#fff;overflow:visible;">
-  <table role="presentation" style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;background:#fff;table-layout:fixed;${salFont}">
-    <tr>
-      <td style="width:50%;vertical-align:top;border-right:1px solid #e5e7eb;padding:0;overflow:visible;">
-        ${earningsTableHtml}
-      </td>
-      <td style="width:50%;vertical-align:top;padding:0;overflow:visible;">
-        ${deductionsTableHtml}
-      </td>
-    </tr>
-    <tr>
-      <td colspan="2" style="padding:0;border:none;vertical-align:top;background:#fff;">
-        ${salarySummaryBarHtml}
-      </td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Present Days</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${presentDays ?? "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Overtime Hours</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${overtimeHours ?? "-"}</td>
     </tr>
   </table>
-  </div>
-  <div style="${salFont}margin-top:18px;padding:14px 14px 16px;border:1px solid #e5e7eb;border-top:none;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;color:#111827;background:#fff;">
-    <span>Net Pay</span>
-    <span>${fmtInr(c.netSalary)}</span>
-  </div>
+  <table style="width:100%;border-collapse:collapse;border:1px solid #666;table-layout:fixed;${salFont}">
+    <tr>
+      <td colspan="2" style="border:1px solid #666;background:#1e3a5f;color:#fff;font-weight:700;text-align:center;padding:7px 7px;font-size:15px;">Earnings</td>
+      <td colspan="2" style="border:1px solid #666;background:#1e3a5f;color:#fff;font-weight:700;text-align:center;padding:7px 7px;font-size:15px;">Deductions</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #666;background:#9dc3ee;font-weight:700;padding:7px 7px;font-size:14px;">Salary Head</td>
+      <td style="border:1px solid #666;background:#9dc3ee;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">Amount</td>
+      <td style="border:1px solid #666;background:#9dc3ee;font-weight:700;padding:7px 7px;font-size:14px;">Salary Head</td>
+      <td style="border:1px solid #666;background:#9dc3ee;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">Amount</td>
+    </tr>
+    ${rowsHtml.join("")}
+    <tr>
+      <td style="border:1px solid #666;background:#a9c4e3;font-weight:700;padding:7px 7px;font-size:14px;">Salary</td>
+      <td style="border:1px solid #666;background:#fff;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">${fmtInr(c.totalEarnings)}</td>
+      <td style="border:1px solid #666;background:#a9c4e3;font-weight:700;padding:7px 7px;font-size:14px;">Total Deduction</td>
+      <td style="border:1px solid #666;background:#fff;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">${fmtInr(c.totalDeductions)}</td>
+    </tr>
+    <tr>
+      <td colspan="4" style="border-left:1px solid #666;border-right:1px solid #666;border-bottom:1px solid #666;padding:8px 6px;font-size:0;line-height:0;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="border-left:1px solid #666;border-right:none;border-bottom:1px solid #666;padding:8px 9px;font-size:14px;line-height:1.25;font-weight:700;">Net Pay</td>
+      <td style="border-left:none;border-right:1px solid #666;border-bottom:1px solid #666;padding:8px 9px;font-size:14px;line-height:1.25;text-align:right;font-weight:700;">${fmtInr(c.netSalary)}</td>
+    </tr>
+  </table>
   <div style="padding:24px 16px 32px;display:flex;justify-content:space-between;text-align:center;">
     <div style="flex:1;"><div style="border-top:1px solid #000;margin:0 8px 4px;"></div><div>Prepared by</div></div>
     <div style="flex:1;"><div style="border-top:1px solid #000;margin:0 8px 4px;"></div><div>Checked by</div></div>
@@ -740,10 +691,11 @@ export async function generateGenerateSalaryPayslipPDF(opts) {
   const capW = Math.ceil(
     Math.max(tempContainer.scrollWidth, tempContainer.offsetWidth, 794),
   );
-  const capH = Math.ceil(Math.max(tempContainer.scrollHeight, 1));
+  const capH =
+    Math.ceil(Math.max(tempContainer.scrollHeight, 1)) + 96;
 
-  /** Scale 4: sharper text in PDF after rasterize + fit-to-page (heavier than 3) */
-  const RENDER_SCALE = 4;
+  /** High-res export target for near print-quality text */
+  const RENDER_SCALE = 5;
 
   const canvas = await html2canvas(tempContainer, {
     scale: RENDER_SCALE,
@@ -769,7 +721,13 @@ export async function generateGenerateSalaryPayslipPDF(opts) {
   document.body.removeChild(tempContainer);
 
   const imgData = canvas.toDataURL("image/png", 1.0);
-  const pdf = new jsPDF("p", "mm", "a4");
+  const pdf = new jsPDF({
+    orientation: "p",
+    unit: "mm",
+    format: "a4",
+    compress: false,
+    precision: 16,
+  });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const imgWidth = pageWidth;

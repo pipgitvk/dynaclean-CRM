@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Calculator, AlertCircle, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   generateGenerateSalaryPayslipPDF,
   downloadPayslip,
+  buildTemplatePayslipHTML,
 } from "@/utils/payslipGenerator";
 
 const GenerateSalaryPage = () => {
@@ -37,6 +38,8 @@ const GenerateSalaryPage = () => {
     // Calculated State
     const [calculation, setCalculation] = useState(null);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
+    /** Same opts as PDF — drives WYSIWYG preview */
+    const [payslipPreviewOpts, setPayslipPreviewOpts] = useState(null);
 
     // Fetch Employees on Mount
     useEffect(() => {
@@ -231,6 +234,92 @@ const GenerateSalaryPage = () => {
         });
     };
 
+    const fetchPayslipOpts = useCallback(async () => {
+        if (!calculation || !selectedEmployee) return null;
+        let profile = null;
+        try {
+            const pres = await fetch(
+                `/api/empcrm/profile?username=${encodeURIComponent(selectedEmployee)}`
+            );
+            const pdata = await pres.json();
+            if (pdata.success && pdata.profile) profile = pdata.profile;
+        } catch {
+            /* ignore */
+        }
+        const emp = employees.find((e) => e.username === selectedEmployee);
+        const employeeName =
+            profile?.full_name || emp?.full_name || emp?.username || selectedEmployee;
+        const dojRaw =
+            emp?.date_of_joining || profile?.date_of_joining || null;
+        const dateOfJoining = dojRaw
+            ? new Date(dojRaw).toLocaleDateString("en-IN")
+            : "-";
+        const bankNameFromProfile =
+            profile?.bank_name ||
+            profile?.bankName ||
+            profile?.name_as_per_bank ||
+            "-";
+        const bankAccountFromProfile =
+            profile?.bank_account_number ||
+            profile?.account_number ||
+            profile?.bank_account ||
+            profile?.bankAccountNumber ||
+            "-";
+        const panFromProfile =
+            profile?.pan_number ||
+            profile?.pan_no ||
+            profile?.pan ||
+            profile?.panNumber ||
+            "-";
+
+        return {
+            monthStr: selectedMonth,
+            employeeName,
+            empId:
+                profile?.empId ||
+                profile?.employee_code ||
+                emp?.empId ||
+                "-",
+            designation: profile?.designation || emp?.userRole || "-",
+            bankName: bankNameFromProfile,
+            bankAccount: bankAccountFromProfile,
+            pan: panFromProfile,
+            dateOfJoining,
+            workingDays: formData.working_days,
+            presentDays: formData.present_days,
+            overtimeHours: formData.overtime_hours,
+            calculation,
+        };
+    }, [
+        calculation,
+        selectedEmployee,
+        selectedMonth,
+        formData.working_days,
+        formData.present_days,
+        formData.overtime_hours,
+        employees,
+    ]);
+
+    useEffect(() => {
+        if (!calculation || !selectedEmployee) {
+            setPayslipPreviewOpts(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            const o = await fetchPayslipOpts();
+            if (!cancelled) setPayslipPreviewOpts(o);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [calculation, selectedEmployee, fetchPayslipOpts]);
+
+    const payslipPreviewHtml = useMemo(() => {
+        if (!payslipPreviewOpts) return null;
+        return buildTemplatePayslipHTML(payslipPreviewOpts);
+    }, [payslipPreviewOpts]);
+
     const handleSave = async () => {
         if (!selectedEmployee || !selectedMonth) return;
 
@@ -270,43 +359,16 @@ const GenerateSalaryPage = () => {
         }
         setDownloadingPdf(true);
         try {
-            let profile = null;
-            const pres = await fetch(
-                `/api/empcrm/profile?username=${encodeURIComponent(selectedEmployee)}`
-            );
-            const pdata = await pres.json();
-            if (pdata.success && pdata.profile) profile = pdata.profile;
+            const opts =
+                payslipPreviewOpts ?? (await fetchPayslipOpts());
+            if (!opts) {
+                toast.error("Could not build payslip data.");
+                return;
+            }
 
-            const emp = employees.find((e) => e.username === selectedEmployee);
-            const employeeName =
-                profile?.full_name || emp?.full_name || emp?.username || selectedEmployee;
+            const pdf = await generateGenerateSalaryPayslipPDF(opts);
 
-            const dojRaw =
-                emp?.date_of_joining || profile?.date_of_joining || null;
-            const dateOfJoining = dojRaw
-                ? new Date(dojRaw).toLocaleDateString("en-IN")
-                : "-";
-
-            const pdf = await generateGenerateSalaryPayslipPDF({
-                monthStr: selectedMonth,
-                employeeName,
-                empId:
-                    profile?.empId ||
-                    profile?.employee_code ||
-                    emp?.empId ||
-                    "-",
-                designation: profile?.designation || emp?.userRole || "-",
-                bankName: profile?.bank_name || "-",
-                bankAccount: profile?.bank_account_number || "-",
-                pan: profile?.pan_number || "-",
-                dateOfJoining,
-                workingDays: formData.working_days,
-                presentDays: formData.present_days,
-                overtimeHours: formData.overtime_hours,
-                calculation,
-            });
-
-            const safe = String(employeeName || selectedEmployee)
+            const safe = String(opts.employeeName || selectedEmployee)
                 .replace(/[^\w\s-]/g, "")
                 .trim()
                 .slice(0, 48)
@@ -470,6 +532,21 @@ const GenerateSalaryPage = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {payslipPreviewHtml ? (
+                                <div className="bg-slate-100 rounded-lg p-4 border border-slate-200">
+                                    <p className="text-sm font-semibold text-slate-700 mb-3">
+                                        Payslip preview — same layout as downloaded PDF
+                                    </p>
+                                    <div className="rounded-lg overflow-auto max-h-[min(88vh,1200px)] bg-white shadow-inner border border-slate-300">
+                                        <iframe
+                                            title="Salary payslip preview"
+                                            className="w-full min-h-[880px] border-0 block"
+                                            srcDoc={payslipPreviewHtml}
+                                        />
+                                    </div>
+                                </div>
+                            ) : null}
 
                             {/* Detailed Breakdown */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

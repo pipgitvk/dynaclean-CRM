@@ -122,12 +122,24 @@ export async function POST(req) {
         );
         break;
 
-      case 'checkout':
+      case 'checkout': {
+        const locationless =
+          (latitude == null || latitude === "") &&
+          (longitude == null || longitude === "");
+        if (locationless) {
+          return NextResponse.json(
+            {
+              error: "Checkout requires GPS location. Use the manual Check Out button.",
+            },
+            { status: 400 }
+          );
+        }
         await conn.execute(
           "UPDATE attendance_logs SET checkout_time = ?, checkout_latitude = ?, checkout_longitude = ?, checkout_address = ? WHERE username = ? AND date = ?",
           [now, latitude, longitude, locationAddress, username, today]
         );
         break;
+      }
 
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
