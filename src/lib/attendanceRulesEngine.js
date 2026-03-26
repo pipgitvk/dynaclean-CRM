@@ -39,6 +39,45 @@ export function parseTimeToMinutes(t) {
   return h * 60 + m;
 }
 
+/** Add minutes to a same-day "HH:mm:ss" / "HH:mm" time; wraps past midnight. */
+export function addMinutesToTimeString(hhmmss, deltaMin) {
+  const s = String(hhmmss ?? "").trim();
+  if (!s) return s;
+  const base = parseTimeToMinutes(s.slice(0, 8));
+  let total = base + Number(deltaMin);
+  total = ((total % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
+}
+
+/** e.g. "11:46 am" from "11:46:00" */
+export function formatTime12h(hhmmss) {
+  if (hhmmss == null || hhmmss === "") return "—";
+  const s = String(hhmmss).trim().slice(0, 8);
+  const parts = s.split(":");
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  const period = h >= 12 ? "pm" : "am";
+  const h12 = h % 12 || 12;
+  return `${String(h12).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/** Allowed break window as "11:46 am - 12:02 pm" (uses start + duration minutes). */
+export function formatBreakWindowRange(startHHMMSS, durationMin) {
+  if (
+    startHHMMSS == null ||
+    startHHMMSS === "" ||
+    durationMin == null ||
+    Number.isNaN(Number(durationMin))
+  ) {
+    return "—";
+  }
+  const start = formatTime12h(startHHMMSS);
+  const end = formatTime12h(addMinutesToTimeString(startHHMMSS, Number(durationMin)));
+  return `${start} - ${end}`;
+}
+
 /** @param {string|null|undefined} logTime ISO / datetime string */
 export function getCheckinStatus(logTime, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;

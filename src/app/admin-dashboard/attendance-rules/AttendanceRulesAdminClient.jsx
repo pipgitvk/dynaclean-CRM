@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import {
+  addMinutesToTimeString,
+  parseTimeToMinutes,
+} from "@/lib/attendanceRulesEngine";
 
 const inputClass =
   "h-9 w-full min-w-[6.5rem] rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200/80";
@@ -15,6 +19,14 @@ function timeForInput(hhmmss) {
   const parts = s.split(":");
   if (parts.length < 2) return "";
   return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}`;
+}
+
+/** Minutes between start (HH:mm:ss) and end (HH:mm from input); null if invalid. */
+function breakDurationFromStartEnd(startHHMMSS, endHHMM) {
+  const s = parseTimeToMinutes(String(startHHMMSS).slice(0, 8));
+  const e = parseTimeToMinutes(`${endHHMM}:00`);
+  if (e <= s) return null;
+  return Math.min(180, Math.max(1, e - s));
 }
 
 const emptyForm = () => ({
@@ -397,44 +409,54 @@ export default function AttendanceRulesAdminClient({
         </label>
       </div>
 
-      <h3 className="text-sm font-semibold text-slate-800">Break windows &amp; durations</h3>
+      <h3 className="text-sm font-semibold text-slate-800">Break windows (start &amp; end)</h3>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[
-          ["Morning break start", "break_morning_start", "morning"],
-          ["Lunch break start", "break_lunch_start", "lunch"],
-          ["Evening break start", "break_evening_start", "evening"],
+          ["Morning break", "break_morning_start", "morning"],
+          ["Lunch break", "break_lunch_start", "lunch"],
+          ["Evening break", "break_evening_start", "evening"],
         ].map(([label, key, durKey]) => (
-          <div key={key} className="flex flex-wrap items-end gap-2">
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium text-slate-700">{label}</span>
-              <input
-                type="time"
-                className={inputClass}
-                value={timeForInput(form[key])}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, [key]: `${e.target.value}:00` }))
-                }
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium text-slate-700">Min</span>
-              <input
-                type="number"
-                min={1}
-                max={180}
-                className={numClass}
-                value={form.breakDurations[durKey]}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    breakDurations: {
-                      ...f.breakDurations,
-                      [durKey]: Number(e.target.value) || 0,
-                    },
-                  }))
-                }
-              />
-            </label>
+          <div key={key} className="rounded-lg border border-slate-100 bg-white/60 p-3">
+            <span className="mb-2 block text-sm font-medium text-slate-800">{label}</span>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-slate-700">Start</span>
+                <input
+                  type="time"
+                  className={inputClass}
+                  value={timeForInput(form[key])}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, [key]: `${e.target.value}:00` }))
+                  }
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-slate-700">End</span>
+                <input
+                  type="time"
+                  className={inputClass}
+                  value={timeForInput(
+                    addMinutesToTimeString(form[key], form.breakDurations[durKey])
+                  )}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const dur = breakDurationFromStartEnd(form[key], v);
+                    if (dur == null) {
+                      toast.error("End time must be after start");
+                      return;
+                    }
+                    setForm((f) => ({
+                      ...f,
+                      breakDurations: {
+                        ...f.breakDurations,
+                        [durKey]: dur,
+                      },
+                    }));
+                  }}
+                />
+              </label>
+            </div>
           </div>
         ))}
         <label className="block text-sm">

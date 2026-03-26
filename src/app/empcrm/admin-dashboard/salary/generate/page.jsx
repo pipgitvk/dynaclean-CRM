@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Calculator, RefreshCw, AlertCircle } from "lucide-react";
+import { ArrowLeft, Save, Calculator, AlertCircle, Download } from "lucide-react";
 import toast from "react-hot-toast";
+import {
+  generateGenerateSalaryPayslipPDF,
+  downloadPayslip,
+} from "@/utils/payslipGenerator";
 
 const GenerateSalaryPage = () => {
     const router = useRouter();
@@ -32,6 +36,7 @@ const GenerateSalaryPage = () => {
 
     // Calculated State
     const [calculation, setCalculation] = useState(null);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
 
     // Fetch Employees on Mount
     useEffect(() => {
@@ -258,6 +263,64 @@ const GenerateSalaryPage = () => {
         }
     };
 
+    const handleDownloadSalary = async () => {
+        if (!calculation || !selectedEmployee) {
+            toast.error("Select an employee and wait for salary calculation.");
+            return;
+        }
+        setDownloadingPdf(true);
+        try {
+            let profile = null;
+            const pres = await fetch(
+                `/api/empcrm/profile?username=${encodeURIComponent(selectedEmployee)}`
+            );
+            const pdata = await pres.json();
+            if (pdata.success && pdata.profile) profile = pdata.profile;
+
+            const emp = employees.find((e) => e.username === selectedEmployee);
+            const employeeName =
+                profile?.full_name || emp?.full_name || emp?.username || selectedEmployee;
+
+            const dojRaw =
+                emp?.date_of_joining || profile?.date_of_joining || null;
+            const dateOfJoining = dojRaw
+                ? new Date(dojRaw).toLocaleDateString("en-IN")
+                : "-";
+
+            const pdf = await generateGenerateSalaryPayslipPDF({
+                monthStr: selectedMonth,
+                employeeName,
+                empId:
+                    profile?.empId ||
+                    profile?.employee_code ||
+                    emp?.empId ||
+                    "-",
+                designation: profile?.designation || emp?.userRole || "-",
+                bankName: profile?.bank_name || "-",
+                bankAccount: profile?.bank_account_number || "-",
+                pan: profile?.pan_number || "-",
+                dateOfJoining,
+                workingDays: formData.working_days,
+                presentDays: formData.present_days,
+                overtimeHours: formData.overtime_hours,
+                calculation,
+            });
+
+            const safe = String(employeeName || selectedEmployee)
+                .replace(/[^\w\s-]/g, "")
+                .trim()
+                .slice(0, 48)
+                .replace(/\s+/g, "_");
+            downloadPayslip(pdf, `Salary_${safe}_${selectedMonth}.pdf`);
+            toast.success("Salary slip downloaded");
+        } catch (err) {
+            console.error(err);
+            toast.error("Could not generate salary slip");
+        } finally {
+            setDownloadingPdf(false);
+        }
+    };
+
     const formatCurrency = (val) => {
         return new Intl.NumberFormat('en-IN', {
             style: 'currency',
@@ -450,7 +513,22 @@ const GenerateSalaryPage = () => {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end pt-4">
+                            <div className="flex justify-end gap-3 pt-4 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadSalary}
+                                    disabled={downloadingPdf}
+                                    className={`flex items-center px-6 py-3 bg-white border-2 border-purple-600 text-purple-700 rounded-lg hover:bg-purple-50 shadow transition-all ${downloadingPdf ? "opacity-70 cursor-wait" : ""}`}
+                                >
+                                    {downloadingPdf ? (
+                                        <>Preparing…</>
+                                    ) : (
+                                        <>
+                                            <Download className="w-5 h-5 mr-2" />
+                                            Download Salary
+                                        </>
+                                    )}
+                                </button>
                                 <button
                                     onClick={handleSave}
                                     disabled={loading}

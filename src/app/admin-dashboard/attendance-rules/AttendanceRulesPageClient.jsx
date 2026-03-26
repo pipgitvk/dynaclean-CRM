@@ -9,12 +9,20 @@ import {
 } from "@headlessui/react";
 import { Pencil, X } from "lucide-react";
 import AttendanceRulesAdminClient from "./AttendanceRulesAdminClient";
+import { formatBreakWindowRange } from "@/lib/attendanceRulesEngine";
+
+const DEFAULT_BREAK_MIN = { morning: 15, lunch: 30, evening: 15 };
 
 function fmtTime(v) {
   if (v == null || v === "") return "—";
   const s = String(v).trim();
   if (s.length >= 5) return s.slice(0, 5);
   return s;
+}
+
+function breakCell(start, durationMin, fallbackMin) {
+  if (start == null || start === "") return "—";
+  return formatBreakWindowRange(start, durationMin ?? fallbackMin);
 }
 
 export default function AttendanceRulesPageClient() {
@@ -159,9 +167,9 @@ export default function AttendanceRulesPageClient() {
                 <th className="px-4 py-3 text-left font-medium text-slate-700">Grace</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-700">Half-day in</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-700">Half-day out</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-700">Morning</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-700">Lunch</th>
-                <th className="px-4 py-3 text-left font-medium text-slate-700">Evening</th>
+                <th className="px-4 py-3 text-left font-medium text-slate-700">Morning break</th>
+                <th className="px-4 py-3 text-left font-medium text-slate-700">Lunch break</th>
+                <th className="px-4 py-3 text-left font-medium text-slate-700">Evening break</th>
                 <th className="px-4 py-3 text-left font-medium text-slate-700">Brk grace</th>
                 <th className="px-4 py-3 text-right font-medium text-slate-700">Actions</th>
               </tr>
@@ -189,13 +197,13 @@ export default function AttendanceRulesPageClient() {
                     {fmtTime(e.half_day_checkout_time)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                    {fmtTime(e.break_morning)}
+                    {breakCell(e.break_morning, e.morning_duration_minutes, DEFAULT_BREAK_MIN.morning)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                    {fmtTime(e.break_lunch)}
+                    {breakCell(e.break_lunch, e.lunch_duration_minutes, DEFAULT_BREAK_MIN.lunch)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                    {fmtTime(e.break_evening)}
+                    {breakCell(e.break_evening, e.evening_duration_minutes, DEFAULT_BREAK_MIN.evening)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-slate-700">
                     {e.break_grace_period_minutes != null
