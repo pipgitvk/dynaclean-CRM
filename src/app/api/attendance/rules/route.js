@@ -1,9 +1,20 @@
-// /api/attendance/rules.js
+import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { loadGlobalAttendanceRulesRow } from "@/lib/ensureAttendanceRulesTable";
+import { rowToAttendanceRulesShape } from "@/lib/attendanceRulesDb";
 
+/** GET — global rules (legacy path; returns normalized { rules } + raw row for compatibility) */
 export async function GET() {
-  const conn = await getDbConnection();
-  const [rows] = await conn.query("SELECT * FROM attendance_rules ORDER BY start_time ASC");
-      // await conn.end();
-  return new Response(JSON.stringify(rows));
+  try {
+    const conn = await getDbConnection();
+    const row = await loadGlobalAttendanceRulesRow(conn);
+    const rules = rowToAttendanceRulesShape(row);
+    return NextResponse.json({
+      rules,
+      row,
+    });
+  } catch (error) {
+    console.error("attendance/rules GET:", error);
+    return NextResponse.json({ message: "Server error" }, { status: 500 });
+  }
 }

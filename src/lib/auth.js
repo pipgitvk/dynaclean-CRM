@@ -29,3 +29,23 @@ export async function getSessionPayload() {
     return null;
   }
 }
+
+/**
+ * Only the main login JWT (`token` cookie), not `impersonation_token`.
+ * Use for /api/admin/* when the real admin identity must authorize (e.g. attendance rules)
+ * while the UI may still show the impersonated user elsewhere.
+ */
+export async function getMainSessionPayload() {
+  const cookieStore = await cookies();
+  const mainToken = cookieStore.get("token")?.value;
+  if (!mainToken) {
+    return null;
+  }
+  try {
+    const { payload } = await jwtVerify(mainToken, secret);
+    return payload;
+  } catch (error) {
+    console.error("Main token verification failed:", error);
+    return null;
+  }
+}

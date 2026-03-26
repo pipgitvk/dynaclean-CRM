@@ -7,7 +7,13 @@ import { UserProvider } from "@/context/UserContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 
-function LayoutContent({ children, menuItems, showBackButton, backButtonPath }) {
+function LayoutContent({
+  children,
+  menuItems,
+  showBackButton,
+  backButtonPath,
+  showBackToUserCrm,
+}) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { theme } = useTheme();
 
@@ -21,12 +27,13 @@ function LayoutContent({ children, menuItems, showBackButton, backButtonPath }) 
 
   return (
     <div className={`flex h-screen ${theme.body.bg} transition-colors duration-300`}>
-      <Sidebar 
-        isOpen={sidebarOpen} 
+      <Sidebar
+        isOpen={sidebarOpen}
         menuItems={menuItems}
         onCloseSidebar={() => setSidebarOpen(false)}
         showBackButton={showBackButton}
         backButtonPath={backButtonPath}
+        showBackToUserCrm={showBackToUserCrm}
       />
       <div className="flex flex-col flex-1 transition-all duration-300 overflow-hidden">
         <Navbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
@@ -39,10 +46,23 @@ function LayoutContent({ children, menuItems, showBackButton, backButtonPath }) 
   );
 }
 
-export default function UserLayoutShell({ children, menuItems, showBackButton, backButtonPath }) {
+export default function UserLayoutShell({
+  children,
+  menuItems,
+  showBackButton,
+  backButtonPath,
+  showBackToUserCrm,
+}) {
   return (
     <ThemeProvider>
-      <LayoutContent menuItems={menuItems} showBackButton={showBackButton} backButtonPath={backButtonPath}>{children}</LayoutContent>
+      <LayoutContent
+        menuItems={menuItems}
+        showBackButton={showBackButton}
+        backButtonPath={backButtonPath}
+        showBackToUserCrm={showBackToUserCrm}
+      >
+        {children}
+      </LayoutContent>
     </ThemeProvider>
   );
 }

@@ -3,24 +3,14 @@
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-
-const attendanceRules = {
-  checkin: "09:30:00",
-  checkout: "18:30:00",
-  halfDayCheckin: "10:00:00",        // Half-day after 10:00
-  lateCheckin: "09:46:00",           // Late window starts at 09:46
-  halfDayCheckout: "18:14:00",
-  break_morning_start: "11:15:00",
-  break_lunch_start: "13:30:00",
-  break_evening_start: "16:15:00",
-  gracePeriodMinutes: 15, // 15-min grace for check-in/out
-  breakDurations: {
-    morning: 15, // Morning break: 15 minutes
-    lunch: 30,   // Lunch break: 30 minutes  
-    evening: 15, // Evening break: 15 minutes
-  },
-  breakGracePeriodMinutes: 5, // 5-min grace for breaks
-};
+import {
+  DEFAULT_ATTENDANCE_RULES,
+  getCheckinStatus as checkinStatusFromRules,
+  getCheckoutStatus as checkoutStatusFromRules,
+  getBreakStatus as breakStatusFromRules,
+  isHalfDayByRules,
+  isLateDaySummary,
+} from "@/lib/attendanceRulesEngine";
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -31,11 +21,15 @@ const AttendancePage = () => {
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [rules, setRules] = useState(DEFAULT_ATTENDANCE_RULES);
 
   const fetchAttendance = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/empcrm/attendance/fetch");
+      const [response, rulesRes] = await Promise.all([
+        fetch("/api/empcrm/attendance/fetch"),
+        fetch("/api/empcrm/attendance-rules"),
+      ]);
 
       if (!response.ok) {
         const errorData = await response
@@ -50,6 +44,11 @@ const AttendancePage = () => {
       setLogs(data.attendance);
       setHolidays(data.holidays || []);
       setLeaves(data.leaves || []);
+
+      if (rulesRes.ok) {
+        const rulesData = await rulesRes.json().catch(() => ({}));
+        if (rulesData.rules) setRules(rulesData.rules);
+      }
     } catch (err) {
       toast.error(err.message);
       setLogs([]);
@@ -89,78 +88,14 @@ const AttendancePage = () => {
     });
   };
 
-  // Get check-in status: 'onTime', 'grace', 'late', or 'halfDay'
-  const getCheckinStatus = (logTime) => {
-    if (!logTime) return null;
-    const logDate = new Date(logTime);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
+  const getCheckinStatus = (logTime) => checkinStatusFromRules(logTime, rules);
 
-    const standardMinutes = 9 * 60 + 30;  // 09:30
-    const graceEndMinutes = 9 * 60 + 45;  // 09:45 (09:30 + 15)
-    const lateEndMinutes = 9 * 60 + 46;   // 09:46
-    const halfDayMinutes = 10 * 60;       // 10:00
+  const getCheckoutStatus = (logTime) => checkoutStatusFromRules(logTime, rules);
 
-    if (logTimeInMinutes <= standardMinutes) return 'onTime';           // 🟢 ≤ 09:30
-    if (logTimeInMinutes <= graceEndMinutes) return 'grace';            // 🟠 09:31-09:45
-    if (logTimeInMinutes < halfDayMinutes) return 'late';               // 🔴 09:46-09:59
-    return 'halfDay';                                                   // 🟡 ≥ 10:00
-  };
+  const getBreakStatus = (startTime, endTime, breakType) =>
+    breakStatusFromRules(startTime, endTime, breakType, rules);
 
-  // Get checkout status: 'onTime', 'grace', 'late', or 'halfDay'
-  const getCheckoutStatus = (logTime) => {
-    if (!logTime) return null;
-    const logDate = new Date(logTime);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
-
-    const standardMinutes = 18 * 60 + 30;  // 18:30
-    const graceStartMinutes = 18 * 60 + 15; // 18:15 (18:30 - 15)
-    const halfDayMinutes = 18 * 60 + 14;   // 18:14
-
-    if (logTimeInMinutes < halfDayMinutes) return 'halfDay';            // 🟡 < 18:14
-    if (logTimeInMinutes < graceStartMinutes) return 'late';            // 🔴 18:14
-    if (logTimeInMinutes < standardMinutes) return 'grace';             // 🟠 18:15-18:29
-    return 'onTime';                                                    // 🟢 ≥ 18:30
-  };
-
-  const isLate = (logTime, ruleTime) => {
-    if (!logTime || !ruleTime) return false;
-    const logDate = new Date(logTime);
-    const [ruleHour, ruleMinute] = ruleTime.split(":").map(Number);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
-    const ruleTimeInMinutes = ruleHour * 60 + ruleMinute;
-    return logTimeInMinutes > ruleTimeInMinutes;
-  };
-
-  const isEarly = (logTime, ruleTime) => {
-    if (!logTime || !ruleTime) return false;
-    const logDate = new Date(logTime);
-    const [ruleHour, ruleMinute] = ruleTime.split(":").map(Number);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
-    const ruleTimeInMinutes = ruleHour * 60 + ruleMinute;
-    return logTimeInMinutes < ruleTimeInMinutes;
-  };
-
-  // Calculate break duration color: green (within time), yellow (grace period), red (late)
-  const getBreakStatus = (startTime, endTime, breakType) => {
-    if (!startTime || !endTime) return null;
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    const durationMinutes = Math.floor((end - start) / (1000 * 60));
-    const allowedDuration = attendanceRules.breakDurations[breakType];
-    const graceLimit = allowedDuration + attendanceRules.breakGracePeriodMinutes;
-
-    if (durationMinutes <= allowedDuration) return 'green';
-    if (durationMinutes <= graceLimit) return 'yellow';
-    return 'red';
-  };
-
-  const isHalfDay = (log) => {
-    if (!log.checkin_time || !log.checkout_time) return false;
-    return (
-      isLate(log.checkin_time, attendanceRules.halfDayCheckin) ||
-      isEarly(log.checkout_time, attendanceRules.halfDayCheckout)
-    );
-  };
+  const isHalfDay = (log) => isHalfDayByRules(log, rules);
 
   const handleShowAll = () => {
     setFilterStatus("all");
@@ -259,10 +194,7 @@ const AttendancePage = () => {
       if (log.type === "present") {
         acc.present++;
         if (isHalfDay(log)) acc.halfDays++;
-        if (
-          isLate(log.checkin_time, attendanceRules.checkin) ||
-          isEarly(log.checkout_time, attendanceRules.checkout)
-        ) {
+        if (isLateDaySummary(log, rules)) {
           acc.lateDays++;
         }
       }

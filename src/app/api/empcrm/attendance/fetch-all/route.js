@@ -1,7 +1,12 @@
 // app/api/empcrm/attendance/fetch-all/route.js
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { getSessionPayload } from "@/lib/auth";
+import { loadGlobalAttendanceRulesRow } from "@/lib/ensureAttendanceRulesTable";
+import { ensureEmployeeAttendanceScheduleTable } from "@/lib/ensureEmployeeAttendanceScheduleTable";
+import {
+  rowToAttendanceRulesShape,
+  mergeGlobalRulesWithEmployeeSchedule,
+} from "@/lib/attendanceRulesDb";
 
 export async function GET(request) {
   try {
@@ -56,7 +61,23 @@ export async function GET(request) {
     console.log("this is the holidays", holidays);
     console.log("this is the approved leaves", leaves);
 
-    return NextResponse.json({ attendance: rows, holidays, leaves });
+    const globalRow = await loadGlobalAttendanceRulesRow(db);
+    const globalRules = rowToAttendanceRulesShape(globalRow);
+    await ensureEmployeeAttendanceScheduleTable();
+    const [schedules] = await db.query(`SELECT * FROM employee_attendance_schedule`);
+    const scheduleByUser = new Map(
+      (schedules || []).map((s) => [s.username, s])
+    );
+    const uniqueUsernames = [...new Set(rows.map((r) => r.username))];
+    const rulesByUsername = {};
+    for (const u of uniqueUsernames) {
+      rulesByUsername[u] = mergeGlobalRulesWithEmployeeSchedule(
+        globalRules,
+        scheduleByUser.get(u) || null
+      );
+    }
+
+    return NextResponse.json({ attendance: rows, holidays, leaves, rulesByUsername });
   } catch (error) {
     console.error("Error fetching attendance logs:", error);
     return NextResponse.json(

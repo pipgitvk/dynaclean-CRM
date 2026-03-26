@@ -36,6 +36,7 @@ import {
   Import,
   Ship,
   Receipt,
+  Clock,
 } from "lucide-react";
 
 // Icon map
@@ -59,7 +60,7 @@ const iconMap = {
   Users,
   User,
   UserCircle: User,
-  Clock: Calendar,
+  Clock,
   Receipt,
   ShoppingCart,
   FilePlus,
@@ -79,6 +80,7 @@ export default function Sidebar({
   onCloseSidebar,
   showBackButton,
   backButtonPath,
+  showBackToUserCrm = true,
 }) {
   const [openMenus, setOpenMenus] = useState({});
   const { theme } = useTheme();
@@ -168,11 +170,25 @@ export default function Sidebar({
     >
       {isOpen && (
         <>
-          <h2
-            className={`text-xl font-bold mb-4 ${theme.sidebar.text} border-b ${theme.sidebar.border} pb-3`}
+          <div
+            className={`mb-4 border-b ${theme.sidebar.border} pb-3`}
           >
-            Admin Dashboard
-          </h2>
+            <h2
+              className={`text-xl font-bold ${theme.sidebar.text}`}
+            >
+              Admin Dashboard
+            </h2>
+            {showBackToUserCrm && (
+              <Link
+                href="/user-dashboard"
+                className={`mt-3 flex w-full items-center gap-2 rounded-md bg-blue-600 p-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700`}
+                onClick={handleLinkClick}
+              >
+                <ArrowLeft size={20} className="shrink-0" />
+                <span>Back to user CRM</span>
+              </Link>
+            )}
+          </div>
           {showBackButton && backButtonPath && (
             <Link
               href={backButtonPath}

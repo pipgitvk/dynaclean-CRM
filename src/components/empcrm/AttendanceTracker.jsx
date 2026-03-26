@@ -1,6 +1,43 @@
 // src/components/empcrm/AttendanceTracker.jsx
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+
+const DEFAULT_BREAK_RULES = {
+  morning: { start_time: "11:15:00", duration_minutes: 15 },
+  lunch: { start_time: "13:30:00", duration_minutes: 30 },
+  evening: { start_time: "17:45:00", duration_minutes: 15 },
+};
+
+function timeToHHMMSS(t) {
+  if (t == null || t === "") return null;
+  const s = String(t).trim();
+  if (s.length === 5 && s[2] === ":") return `${s}:00`;
+  return s.slice(0, 8);
+}
+
+function scheduleToBreakRules(data) {
+  if (!data) return DEFAULT_BREAK_RULES;
+  return {
+    morning: {
+      start_time:
+        timeToHHMMSS(data.break_morning) || DEFAULT_BREAK_RULES.morning.start_time,
+      duration_minutes:
+        data.morning_duration_minutes ?? DEFAULT_BREAK_RULES.morning.duration_minutes,
+    },
+    lunch: {
+      start_time:
+        timeToHHMMSS(data.break_lunch) || DEFAULT_BREAK_RULES.lunch.start_time,
+      duration_minutes:
+        data.lunch_duration_minutes ?? DEFAULT_BREAK_RULES.lunch.duration_minutes,
+    },
+    evening: {
+      start_time:
+        timeToHHMMSS(data.break_evening) || DEFAULT_BREAK_RULES.evening.start_time,
+      duration_minutes:
+        data.evening_duration_minutes ?? DEFAULT_BREAK_RULES.evening.duration_minutes,
+    },
+  };
+}
 
 const AttendanceTracker = ({ username }) => {
   const [attendanceData, setAttendanceData] = useState(null);
@@ -11,13 +48,29 @@ const AttendanceTracker = ({ username }) => {
   const [endBreakNotification, setEndBreakNotification] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false); // getting location
   const [isSubmitting, setIsSubmitting] = useState(false); // prevent double click
+  const [schedulePayload, setSchedulePayload] = useState(null);
 
-  // Define break rules here (since we're not fetching them from the backend)
-  const breakRules = {
-    morning: { start_time: "11:15:00", duration_minutes: 15 },
-    lunch: { start_time: "13:30:00", duration_minutes: 30 },
-    evening: { start_time: "17:45:00", duration_minutes: 15 },
-  };
+  const breakRules = useMemo(
+    () => scheduleToBreakRules(schedulePayload),
+    [schedulePayload]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/empcrm/attendance-schedule");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setSchedulePayload(data);
+      } catch (e) {
+        console.error("attendance-schedule fetch:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Function to fetch the user's attendance status for today
   const fetchAttendance = async () => {
