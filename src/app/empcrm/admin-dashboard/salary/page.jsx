@@ -82,6 +82,32 @@ const SalaryManagementPage = () => {
   const netAfterPreview = Math.max(0, grossBase - totalDeductionsWithPreview);
   const netPayableCurrent = Math.max(0, grossBase - totalActiveDeductions);
 
+  const latestOvertimePay = useMemo(() => {
+    const r = salaryData?.salaryRecords?.[0];
+    if (!r) return 0;
+    const n = Number(r.overtime_amount);
+    return Number.isFinite(n) ? n : 0;
+  }, [salaryData]);
+
+  const formatCurrency = (val) => {
+    const n = Number(val);
+    const x = Number.isFinite(n) ? n : 0;
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(x);
+  };
+
+  const formatRatePerHr = (val) => {
+    const n = Number(val);
+    const x = Number.isFinite(n) ? n : 0;
+    return new Intl.NumberFormat("en-IN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(x);
+  };
+
   useEffect(() => {
     fetchEmployees();
     fetchDeductionTypes();
@@ -401,37 +427,49 @@ const SalaryManagementPage = () => {
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Basic Salary</p>
                   <p className="text-xl font-bold text-blue-600">
-                    ₹{salaryData.salaryStructure.basic_salary?.toLocaleString()}
+                    {formatCurrency(salaryData.salaryStructure.basic_salary)}
                   </p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">HRA</p>
                   <p className="text-xl font-bold text-green-600">
-                    ₹{salaryData.salaryStructure.hra?.toLocaleString()}
+                    {formatCurrency(salaryData.salaryStructure.hra)}
                   </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Transport Allowance</p>
+                  <p className="text-sm text-gray-600">Transport Allw.</p>
                   <p className="text-xl font-bold text-purple-600">
-                    ₹{salaryData.salaryStructure.transport_allowance?.toLocaleString()}
+                    {formatCurrency(salaryData.salaryStructure.transport_allowance)}
                   </p>
                 </div>
                 <div className="bg-orange-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Medical Allowance</p>
+                  <p className="text-sm text-gray-600">Medical Allw.</p>
                   <p className="text-xl font-bold text-orange-600">
-                    ₹{salaryData.salaryStructure.medical_allowance?.toLocaleString()}
+                    {formatCurrency(salaryData.salaryStructure.medical_allowance)}
                   </p>
                 </div>
                 <div className="bg-indigo-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Special Allowance</p>
+                  <p className="text-sm text-gray-600">Special Allw.</p>
                   <p className="text-xl font-bold text-indigo-600">
-                    ₹{salaryData.salaryStructure.special_allowance?.toLocaleString()}
+                    {formatCurrency(salaryData.salaryStructure.special_allowance)}
+                  </p>
+                </div>
+                <div className="bg-teal-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Bonus</p>
+                  <p className="text-xl font-bold text-teal-700">
+                    {formatCurrency(salaryData.salaryStructure.bonus)}
+                  </p>
+                </div>
+                <div className="bg-amber-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Overtime</p>
+                  <p className="text-xl font-bold text-amber-700">
+                    {formatCurrency(latestOvertimePay)}
                   </p>
                 </div>
                 <div className="bg-pink-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Overtime Rate</p>
                   <p className="text-xl font-bold text-pink-600">
-                    ₹{salaryData.salaryStructure.overtime_rate?.toLocaleString()}/hr
+                    ₹{formatRatePerHr(salaryData.salaryStructure.overtime_rate)}/hr
                   </p>
                 </div>
                 <div className="bg-gray-50 p-4 rounded-lg col-span-1 md:col-span-2 lg:col-span-3">

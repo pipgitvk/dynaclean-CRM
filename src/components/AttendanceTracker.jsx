@@ -428,47 +428,6 @@ const AttendanceTracker = ({ username, role }) => {
   };
 
   // -------------------------------------------------------------------------
-  // Automatic checkout at 6:30 PM — ONLY for SERVICE ENGINEER.
-  // No other role gets auto checkout (they use manual Check Out + GPS only).
-  // -------------------------------------------------------------------------
-  useEffect(() => {
-    if (!isServiceEngineer) return;
-    if (!attendanceData?.checkin_time || attendanceData?.checkout_time) return;
-
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    const checkoutAt = new Date(`${today}T18:30:00`);
-    const delay = checkoutAt.getTime() - now.getTime();
-
-    const doAutoCheckout = async () => {
-      try {
-        const res = await fetch("/api/attendance", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username,
-            action: "checkout",
-            latitude: null,
-            longitude: null,
-          }),
-        });
-        if (res.ok) fetchAttendance();
-      } catch (err) {
-        console.error("Auto-checkout failed:", err);
-      }
-    };
-
-    if (delay <= 0) {
-      // Already past 6:30 PM — checkout immediately
-      doAutoCheckout();
-      return;
-    }
-
-    const timer = setTimeout(doAutoCheckout, delay);
-    return () => clearTimeout(timer);
-  }, [attendanceData, isServiceEngineer, username]);
-
-  // -------------------------------------------------------------------------
   // Break timer & notification logic (unchanged)
   // -------------------------------------------------------------------------
   useEffect(() => {
