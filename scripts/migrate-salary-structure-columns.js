@@ -64,6 +64,7 @@ async function main() {
     "ALTER TABLE employee_salary_structure ADD COLUMN pf DECIMAL(12, 2) NULL DEFAULT 0 COMMENT 'Employee PF (monthly)'",
     "ALTER TABLE employee_salary_structure ADD COLUMN esi DECIMAL(12, 2) NULL DEFAULT 0 COMMENT 'Employee ESI (monthly)'",
     "ALTER TABLE employee_salary_structure ADD COLUMN health_insurance DECIMAL(12, 2) NULL DEFAULT 0 COMMENT 'Health insurance (monthly)'",
+    "ALTER TABLE employee_salary_structure ADD COLUMN gross_salary DECIMAL(12, 2) NULL COMMENT 'Manual gross; NULL = component sum'",
   ];
 
   for (const sql of stmts) {

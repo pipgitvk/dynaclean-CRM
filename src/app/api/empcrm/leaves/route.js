@@ -397,7 +397,7 @@ export async function PATCH(request) {
         if (username && totalDays > 0) {
           // Fetch active salary structure
           const [structRows] = await conn.execute(
-            `SELECT basic_salary, hra, transport_allowance, medical_allowance, special_allowance, bonus
+            `SELECT basic_salary, hra, transport_allowance, medical_allowance, special_allowance, bonus, gross_salary
              FROM employee_salary_structure
              WHERE username = ? AND is_active = 1
              ORDER BY effective_from DESC
@@ -407,7 +407,16 @@ export async function PATCH(request) {
 
           if (structRows.length > 0) {
             const s = structRows[0];
-            const monthly = Number(s.basic_salary || 0) + Number(s.hra || 0) + Number(s.transport_allowance || 0) + Number(s.medical_allowance || 0) + Number(s.special_allowance || 0) + Number(s.bonus || 0);
+            const g = s.gross_salary;
+            const monthly =
+              g !== null && g !== undefined && g !== "" && Number.isFinite(Number(g))
+                ? Number(g)
+                : Number(s.basic_salary || 0) +
+                  Number(s.hra || 0) +
+                  Number(s.transport_allowance || 0) +
+                  Number(s.medical_allowance || 0) +
+                  Number(s.special_allowance || 0) +
+                  Number(s.bonus || 0);
             const perDay = monthly / 26;
             const amount = Math.round(perDay * totalDays);
 

@@ -104,6 +104,11 @@ const SalaryPage = () => {
   const grossFromStructure = useMemo(() => {
     if (!salaryData?.salaryStructure) return 0;
     const s = salaryData.salaryStructure;
+    const g = s.gross_salary;
+    if (g !== null && g !== undefined && g !== "") {
+      const n = Number(g);
+      if (Number.isFinite(n)) return n;
+    }
     return (
       Number(s.basic_salary || 0) +
       Number(s.hra || 0) +
@@ -178,6 +183,12 @@ const SalaryPage = () => {
             Current Salary Structure
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-emerald-50 p-4 rounded-lg ring-1 ring-emerald-200">
+              <p className="text-sm text-gray-600">Gross Salary</p>
+              <p className="text-xl font-bold text-emerald-800">
+                {formatCurrency(grossFromStructure)}
+              </p>
+            </div>
             <div className="bg-blue-50 p-4 rounded-lg">
               <p className="text-sm text-gray-600">Basic Salary</p>
               <p className="text-xl font-bold text-blue-600">
@@ -245,21 +256,15 @@ const SalaryPage = () => {
               </div>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg md:col-span-2 lg:col-span-3">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                <span className="text-sm text-gray-700">Estimated Gross (structure sum)</span>
-                <span className="text-2xl font-bold text-gray-900">
-                  ₹{formatINR(grossFromStructure)}
-                </span>
-              </div>
               {totalDeductionsCurrent > 0 && (
-                <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-2 border-b border-gray-200">
                   <span className="text-sm text-gray-700">Total deductions (structure + active)</span>
                   <span className="text-xl font-bold text-gray-900">
                     ₹{formatINR(totalDeductionsCurrent)}
                   </span>
                 </div>
               )}
-              <div className="mt-2 flex flex-col md:flex-row md:items-center md:justify-between">
+              <div className={`flex flex-col md:flex-row md:items-center md:justify-between ${totalDeductionsCurrent > 0 ? "pt-3" : ""}`}>
                 <span className="text-sm text-gray-900 font-medium">Net Payable (Current)</span>
                 <span className="text-2xl font-bold text-green-700">
                   ₹{formatINR(grossFromStructure - totalDeductionsCurrent)}

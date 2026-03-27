@@ -115,6 +115,7 @@ export async function POST(request) {
       medical_allowance,
       special_allowance,
       bonus,
+      gross_salary,
       pf,
       esi,
       health_insurance,
@@ -147,15 +148,19 @@ export async function POST(request) {
       health_insurance === "" || health_insurance === undefined || health_insurance === null
         ? 0
         : Number(health_insurance);
+    const grossSalaryVal =
+      gross_salary === "" || gross_salary === undefined || gross_salary === null
+        ? null
+        : Number(gross_salary);
 
     await db.query(`
       INSERT INTO employee_salary_structure 
       (username, basic_salary, hra, transport_allowance, medical_allowance, 
-       special_allowance, bonus, pf, esi, health_insurance, overtime_rate, effective_from, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       special_allowance, bonus, gross_salary, pf, esi, health_insurance, overtime_rate, effective_from, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       username, basic_salary, hra, transport_allowance,
-      medical_allowance, special_allowance, bonus, pfVal, esiVal, healthInsuranceVal, overtime_rate,
+      medical_allowance, special_allowance, bonus, grossSalaryVal, pfVal, esiVal, healthInsuranceVal, overtime_rate,
       effective_from, payload.username
     ]);
 
@@ -169,7 +174,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           message:
-            "Database table is missing new columns (pf, esi, health_insurance). Run the SQL migration or: npm run migrate:salary-structure",
+            "Database table is missing expected columns (e.g. pf, esi, health_insurance, gross_salary). Run migrations or: npm run migrate:salary-structure",
           detail: process.env.NODE_ENV === "development" ? sqlMessage : undefined,
         },
         { status: 500 }

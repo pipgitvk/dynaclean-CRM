@@ -14,6 +14,40 @@ import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
+const FIXED_CONVENIENCE_ALLOWANCE = 2000;
+const FIXED_MEDICAL_ALLOWANCE = 1500;
+const FIXED_HEALTH_INSURANCE = 277;
+
+/** Gross → Basic 50%, HRA 50% of Basic, fixed convenience & medical, Special = remainder, PF 12% of Basic, Health fixed. */
+function applyGrossSalaryAutoSplit(prevForm, grossInput) {
+  const gross_salary = grossInput;
+  const next = { ...prevForm, gross_salary };
+  const G = Number(grossInput);
+  if (grossInput === "" || !Number.isFinite(G) || G <= 0) {
+    return next;
+  }
+  const basic = Math.round(0.5 * G);
+  const hra = Math.round(0.5 * basic);
+  const transport = FIXED_CONVENIENCE_ALLOWANCE;
+  const medical = FIXED_MEDICAL_ALLOWANCE;
+  const special = Math.max(
+    0,
+    Math.round(G - basic - hra - transport - medical),
+  );
+  const pf = Math.round(0.12 * basic);
+  return {
+    ...next,
+    basic_salary: String(basic),
+    hra: String(hra),
+    transport_allowance: String(transport),
+    medical_allowance: String(medical),
+    special_allowance: String(special),
+    bonus: "",
+    pf: String(pf),
+    health_insurance: String(FIXED_HEALTH_INSURANCE),
+  };
+}
+
 const SalaryManagementPage = () => {
   const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
@@ -35,6 +69,7 @@ const SalaryManagementPage = () => {
     medical_allowance: "",
     special_allowance: "",
     bonus: "",
+    gross_salary: "",
     pf: "",
     esi: "",
     health_insurance: "",
@@ -57,6 +92,11 @@ const SalaryManagementPage = () => {
   const grossBase = useMemo(() => {
     if (!salaryData?.salaryStructure) return 0;
     const s = salaryData.salaryStructure;
+    const g = s.gross_salary;
+    if (g !== null && g !== undefined && g !== "") {
+      const n = Number(g);
+      if (Number.isFinite(n)) return n;
+    }
     const toNumber = (v) => (v ? Number(v) : 0);
     return (
       toNumber(s.basic_salary) +
@@ -67,6 +107,21 @@ const SalaryManagementPage = () => {
       toNumber(s.bonus)
     );
   }, [salaryData]);
+
+  const salaryFormGross = useMemo(() => {
+    const n = (v) => {
+      const x = v === "" || v === undefined || v === null ? 0 : Number(v);
+      return Number.isFinite(x) ? x : 0;
+    };
+    return (
+      n(salaryForm.basic_salary) +
+      n(salaryForm.hra) +
+      n(salaryForm.transport_allowance) +
+      n(salaryForm.medical_allowance) +
+      n(salaryForm.special_allowance) +
+      n(salaryForm.bonus)
+    );
+  }, [salaryForm]);
 
   const totalActiveDeductions = useMemo(() => {
     if (!salaryData) return 0;
@@ -199,6 +254,7 @@ const SalaryManagementPage = () => {
           medical_allowance: "",
           special_allowance: "",
           bonus: "",
+          gross_salary: "",
           pf: "",
           esi: "",
           health_insurance: "",
@@ -302,6 +358,7 @@ const SalaryManagementPage = () => {
         medical_allowance: toFormVal(existing?.medical_allowance),
         special_allowance: toFormVal(existing?.special_allowance),
         bonus: toFormVal(existing?.bonus),
+        gross_salary: toFormVal(existing?.gross_salary),
         pf: toFormVal(existing?.pf),
         esi: toFormVal(existing?.esi),
         health_insurance: toFormVal(existing?.health_insurance),
@@ -453,6 +510,18 @@ const SalaryManagementPage = () => {
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="bg-emerald-50 p-4 rounded-lg ring-1 ring-emerald-200">
+                  <p className="text-sm text-gray-600">Gross Salary</p>
+                  <p className="text-xl font-bold text-emerald-800">
+                    {formatCurrency(grossBase)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {salaryData.salaryStructure.gross_salary != null &&
+                    salaryData.salaryStructure.gross_salary !== ""
+                      ? "Manual entry"
+                      : "Sum of Basic + HRA + allowances + bonus"}
+                  </p>
+                </div>
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Basic Salary</p>
                   <p className="text-xl font-bold text-blue-600">
@@ -466,7 +535,7 @@ const SalaryManagementPage = () => {
                   </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Transport Allw.</p>
+                  <p className="text-sm text-gray-600">Convenience Allw.</p>
                   <p className="text-xl font-bold text-purple-600">
                     {formatCurrency(salaryData.salaryStructure.transport_allowance)}
                   </p>
@@ -500,12 +569,6 @@ const SalaryManagementPage = () => {
                   <p className="text-xl font-bold text-pink-600">
                     ₹{formatRatePerHr(salaryData.salaryStructure.overtime_rate)}/hr
                   </p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg col-span-1 md:col-span-2 lg:col-span-3">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <p className="text-sm text-gray-600">Estimated Gross (structure sum)</p>
-                    <p className="text-2xl font-bold text-gray-800">₹{Math.round(grossBase).toLocaleString()}</p>
-                  </div>
                 </div>
               </div>
             </div>
@@ -713,6 +776,25 @@ const SalaryManagementPage = () => {
                     required
                   />
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Gross Salary
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={salaryForm.gross_salary}
+                    onChange={(e) =>
+                      setSalaryForm((prev) =>
+                        applyGrossSalaryAutoSplit(prev, e.target.value),
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter amount — Basic, HRA, allowances, PF & Health auto-filled"
+                  />
+                  
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Basic Salary</label>
                   <input
@@ -734,7 +816,9 @@ const SalaryManagementPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Transport Allowance</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Convenience Allowance
+                  </label>
                   <input
                     type="number"
                     value={salaryForm.transport_allowance}
