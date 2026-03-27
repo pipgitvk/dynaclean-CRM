@@ -86,12 +86,13 @@ export function getCheckinStatus(logTime, rules) {
   if (Number.isNaN(logDate.getTime())) return null;
   const logM = logDate.getHours() * 60 + logDate.getMinutes();
   const standardM = parseTimeToMinutes(r.checkin);
-  const graceEndM = standardM + r.gracePeriodMinutes;
   const halfDayM = parseTimeToMinutes(r.halfDayCheckin);
+  const graceEndM = standardM + r.gracePeriodMinutes;
+
   if (logM <= standardM) return "onTime";
   if (logM <= graceEndM) return "grace";
-  if (logM < halfDayM) return "late";
-  return "halfDay";
+  if (halfDayM > graceEndM && logM >= halfDayM) return "halfDay";
+  return "late";
 }
 
 /** @param {string|null|undefined} logTime */
