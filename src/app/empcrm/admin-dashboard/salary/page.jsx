@@ -14,6 +14,40 @@ import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
+const FIXED_CONVENIENCE_ALLOWANCE = 2000;
+const FIXED_MEDICAL_ALLOWANCE = 1500;
+const FIXED_HEALTH_INSURANCE = 277;
+
+/** Gross → Basic 50%, HRA 50% of Basic, fixed convenience & medical, Special = remainder, PF 12% of Basic, Health fixed. */
+function applyGrossSalaryAutoSplit(prevForm, grossInput) {
+  const gross_salary = grossInput;
+  const next = { ...prevForm, gross_salary };
+  const G = Number(grossInput);
+  if (grossInput === "" || !Number.isFinite(G) || G <= 0) {
+    return next;
+  }
+  const basic = Math.round(0.5 * G);
+  const hra = Math.round(0.5 * basic);
+  const transport = FIXED_CONVENIENCE_ALLOWANCE;
+  const medical = FIXED_MEDICAL_ALLOWANCE;
+  const special = Math.max(
+    0,
+    Math.round(G - basic - hra - transport - medical),
+  );
+  const pf = Math.round(0.12 * basic);
+  return {
+    ...next,
+    basic_salary: String(basic),
+    hra: String(hra),
+    transport_allowance: String(transport),
+    medical_allowance: String(medical),
+    special_allowance: String(special),
+    bonus: "",
+    pf: String(pf),
+    health_insurance: String(FIXED_HEALTH_INSURANCE),
+  };
+}
+
 const SalaryManagementPage = () => {
   const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
@@ -501,7 +535,7 @@ const SalaryManagementPage = () => {
                   </p>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Transport Allw.</p>
+                  <p className="text-sm text-gray-600">Convenience Allw.</p>
                   <p className="text-xl font-bold text-purple-600">
                     {formatCurrency(salaryData.salaryStructure.transport_allowance)}
                   </p>
@@ -748,14 +782,18 @@ const SalaryManagementPage = () => {
                   </label>
                   <input
                     type="number"
+                    min="0"
+                    step="1"
                     value={salaryForm.gross_salary}
                     onChange={(e) =>
-                      setSalaryForm({ ...salaryForm, gross_salary: e.target.value })
+                      setSalaryForm((prev) =>
+                        applyGrossSalaryAutoSplit(prev, e.target.value),
+                      )
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                   
+                    placeholder="Enter amount — Basic, HRA, allowances, PF & Health auto-filled"
                   />
-                 
+                  
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Basic Salary</label>
@@ -778,7 +816,9 @@ const SalaryManagementPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Transport Allowance</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Convenience Allowance
+                  </label>
                   <input
                     type="number"
                     value={salaryForm.transport_allowance}
