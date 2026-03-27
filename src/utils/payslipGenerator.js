@@ -14,6 +14,7 @@ const PAYSLIP_LOGO_SRC = getImportedImageSrc(logo1);
 /** Target ~under 3MB: html2canvas scale + JPEG (PNG was multi‑MB per page). */
 const PAYSLIP_CANVAS_MAX_BYTES = 3 * 1024 * 1024;
 const PAYSLIP_HTML2CANVAS_SCALE = 2;
+const PAYSLIP_PDF_TOP_MARGIN_MM = 8;
 
 function dataUrlByteSize(dataUrl) {
   const i = dataUrl.indexOf(",");
@@ -90,12 +91,14 @@ async function htmlFragmentToPdf(tempContainer) {
 
   let drawW = imgWidth;
   let drawH = imgHeight;
-  if (drawH > pageHeight) {
-    const s = pageHeight / drawH;
+  const availableHeight = Math.max(1, pageHeight - PAYSLIP_PDF_TOP_MARGIN_MM);
+  if (drawH > availableHeight) {
+    const s = availableHeight / drawH;
     drawW *= s;
-    drawH = pageHeight;
+    drawH = availableHeight;
   }
-  pdf.addImage(imgData, "JPEG", 0, 0, drawW, drawH);
+  const drawX = (pageWidth - drawW) / 2;
+  pdf.addImage(imgData, "JPEG", drawX, PAYSLIP_PDF_TOP_MARGIN_MM, drawW, drawH);
   return pdf;
 }
 
