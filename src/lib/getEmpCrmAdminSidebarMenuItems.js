@@ -12,7 +12,7 @@ const empCrmMenuItems = [
   { path: "/empcrm/admin-dashboard/attendance", name: "Attendance", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Clock" },
   { path: "/empcrm/admin-dashboard/documents", name: "Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "FileText" },
   { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "DollarSign" },
-  // { path: "/empcrm/admin-dashboard/payslip", name: "Payslip", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Receipt", disabled: true },
+  { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Receipt" },
 ];
 
 export default async function getEmpCrmAdminSidebarMenuItems() {
