@@ -13,12 +13,13 @@ import {
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
+import { getEffectiveGrossSalary } from "@/lib/salaryGrossSpecialAllowance";
 
 const FIXED_CONVENIENCE_ALLOWANCE = 2000;
 const FIXED_MEDICAL_ALLOWANCE = 1500;
 const FIXED_HEALTH_INSURANCE = 277;
 
-/** Gross → Basic 50%, HRA 50% of Basic, fixed convenience & medical, Special = remainder, PF 12% of Basic, Health fixed. */
+/** Gross → Basic floor(G/2), HRA floor(G/4), fixed convenience & medical, Special = remainder (matches payroll). */
 function applyGrossSalaryAutoSplit(prevForm, grossInput) {
   const gross_salary = grossInput;
   const next = { ...prevForm, gross_salary };
@@ -26,13 +27,13 @@ function applyGrossSalaryAutoSplit(prevForm, grossInput) {
   if (grossInput === "" || !Number.isFinite(G) || G <= 0) {
     return next;
   }
-  const basic = Math.round(0.5 * G);
-  const hra = Math.round(0.5 * basic);
+  const basic = Math.floor(G / 2);
+  const hra = Math.floor(G / 4);
   const transport = FIXED_CONVENIENCE_ALLOWANCE;
   const medical = FIXED_MEDICAL_ALLOWANCE;
   const special = Math.max(
     0,
-    Math.round(G - basic - hra - transport - medical),
+    Math.floor(G - basic - hra - transport - medical),
   );
   const pf = Math.round(0.12 * basic);
   return {
@@ -91,21 +92,7 @@ const SalaryManagementPage = () => {
   // Derived totals for selected employee
   const grossBase = useMemo(() => {
     if (!salaryData?.salaryStructure) return 0;
-    const s = salaryData.salaryStructure;
-    const g = s.gross_salary;
-    if (g !== null && g !== undefined && g !== "") {
-      const n = Number(g);
-      if (Number.isFinite(n)) return n;
-    }
-    const toNumber = (v) => (v ? Number(v) : 0);
-    return (
-      toNumber(s.basic_salary) +
-      toNumber(s.hra) +
-      toNumber(s.transport_allowance) +
-      toNumber(s.medical_allowance) +
-      toNumber(s.special_allowance) +
-      toNumber(s.bonus)
-    );
+    return getEffectiveGrossSalary(salaryData.salaryStructure) ?? 0;
   }, [salaryData]);
 
   const salaryFormGross = useMemo(() => {
