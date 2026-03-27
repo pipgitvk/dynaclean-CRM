@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node --no-deprecation ./node_modules/next/dist/bin/next dev --turbopack",
+    "migrate:salary-structure": "node scripts/migrate-salary-structure-columns.js",
     "build": "next build",
     "start": "node --no-deprecation ./node_modules/next/dist/bin/next start -p 3001",
     "lint": "next lint"

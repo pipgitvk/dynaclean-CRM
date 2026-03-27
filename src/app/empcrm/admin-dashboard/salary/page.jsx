@@ -35,6 +35,9 @@ const SalaryManagementPage = () => {
     medical_allowance: "",
     special_allowance: "",
     bonus: "",
+    pf: "",
+    esi: "",
+    health_insurance: "",
     overtime_rate: "",
     effective_from: ""
   });
@@ -66,11 +69,22 @@ const SalaryManagementPage = () => {
   }, [salaryData]);
 
   const totalActiveDeductions = useMemo(() => {
-    if (!salaryData?.deductions) return 0;
-    return salaryData.deductions.reduce((sum, d) => {
-      const amount = Number(d.amount || 0);
+    if (!salaryData) return 0;
+    const s = salaryData.salaryStructure;
+    const structPf = Number(s?.pf) || 0;
+    const structEsi = Number(s?.esi) || 0;
+    const structHi = Number(s?.health_insurance) || 0;
+    const fromTable = (salaryData.deductions || []).reduce((sum, d) => {
+      const code = String(d.deduction_code || "").toUpperCase();
+      const name = String(d.deduction_name || "").toUpperCase();
+      const isPF = code === "PF" || name.includes("PROVIDENT");
+      const isESI = code === "ESI" || name.includes("ESI");
+      let amount = Number(d.amount || 0);
+      if (structPf > 0 && isPF) amount = 0;
+      if (structEsi > 0 && isESI) amount = 0;
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
+    return fromTable + structPf + structEsi + structHi;
   }, [salaryData, grossBase]);
 
   const previewNewDeductionAmount = useMemo(() => {
@@ -185,6 +199,9 @@ const SalaryManagementPage = () => {
           medical_allowance: "",
           special_allowance: "",
           bonus: "",
+          pf: "",
+          esi: "",
+          health_insurance: "",
           overtime_rate: "",
           effective_from: ""
         });
@@ -270,16 +287,28 @@ const SalaryManagementPage = () => {
 
   const openSalaryForm = (employee = null) => {
     if (employee) {
+      const existing =
+        salaryData?.salaryStructure &&
+        salaryData.salaryStructure.username === employee.username
+          ? salaryData.salaryStructure
+          : null;
+      const toFormVal = (v) =>
+        v !== null && v !== undefined && v !== "" ? String(v) : "";
       setSalaryForm({
         username: employee.username,
-        basic_salary: "",
-        hra: "",
-        transport_allowance: "",
-        medical_allowance: "",
-        special_allowance: "",
-        bonus: "",
-        overtime_rate: "",
-        effective_from: new Date().toISOString().split('T')[0]
+        basic_salary: toFormVal(existing?.basic_salary),
+        hra: toFormVal(existing?.hra),
+        transport_allowance: toFormVal(existing?.transport_allowance),
+        medical_allowance: toFormVal(existing?.medical_allowance),
+        special_allowance: toFormVal(existing?.special_allowance),
+        bonus: toFormVal(existing?.bonus),
+        pf: toFormVal(existing?.pf),
+        esi: toFormVal(existing?.esi),
+        health_insurance: toFormVal(existing?.health_insurance),
+        overtime_rate: toFormVal(existing?.overtime_rate),
+        effective_from: existing?.effective_from
+          ? String(existing.effective_from).slice(0, 10)
+          : new Date().toISOString().split("T")[0],
       });
     }
     setShowSalaryForm(true);
@@ -484,6 +513,33 @@ const SalaryManagementPage = () => {
 
           {/* Deductions Management */}
           <div className="bg-white rounded-lg shadow-md p-6">
+            {salaryData.salaryStructure && (
+              <div className="mb-6 rounded-lg border border-red-100 bg-red-50/80 p-4">
+                <h4 className="text-sm font-semibold text-red-900 mb-3">
+                  Deductions (from salary structure)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                  <div className="flex justify-between gap-2 bg-white/80 rounded-md px-3 py-2 border border-red-100">
+                    <span className="text-gray-700">PF</span>
+                    <span className="font-semibold text-red-800">
+                      {formatCurrency(salaryData.salaryStructure.pf)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2 bg-white/80 rounded-md px-3 py-2 border border-red-100">
+                    <span className="text-gray-700">ESI</span>
+                    <span className="font-semibold text-red-800">
+                      {formatCurrency(salaryData.salaryStructure.esi)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-2 bg-white/80 rounded-md px-3 py-2 border border-red-100">
+                    <span className="text-gray-700">Health Insurance</span>
+                    <span className="font-semibold text-red-800">
+                      {formatCurrency(salaryData.salaryStructure.health_insurance)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Active Deductions</h3>
               <button
@@ -714,6 +770,36 @@ const SalaryManagementPage = () => {
                     value={salaryForm.bonus}
                     onChange={(e) => setSalaryForm({ ...salaryForm, bonus: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">PF (Provident Fund)</label>
+                  <input
+                    type="number"
+                    value={salaryForm.pf}
+                    onChange={(e) => setSalaryForm({ ...salaryForm, pf: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Monthly PF amount"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">ESI</label>
+                  <input
+                    type="number"
+                    value={salaryForm.esi}
+                    onChange={(e) => setSalaryForm({ ...salaryForm, esi: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Monthly ESI amount"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Health Insurance</label>
+                  <input
+                    type="number"
+                    value={salaryForm.health_insurance}
+                    onChange={(e) => setSalaryForm({ ...salaryForm, health_insurance: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Monthly health insurance"
                   />
                 </div>
                 <div>

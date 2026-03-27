@@ -11,6 +11,94 @@ const getImportedImageSrc = (mod) => {
 
 const PAYSLIP_LOGO_SRC = getImportedImageSrc(logo1);
 
+/** Target ~under 3MB: html2canvas scale + JPEG (PNG was multi‑MB per page). */
+const PAYSLIP_CANVAS_MAX_BYTES = 3 * 1024 * 1024;
+const PAYSLIP_HTML2CANVAS_SCALE = 2;
+
+function dataUrlByteSize(dataUrl) {
+  const i = dataUrl.indexOf(",");
+  if (i < 0) return 0;
+  const b64 = dataUrl.slice(i + 1);
+  const pad = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((b64.length * 3) / 4) - pad);
+}
+
+/**
+ * JPEG encode with stepped quality until under PAYSLIP_CANVAS_MAX_BYTES (~3MB).
+ */
+function canvasToCompressedJpegDataUrl(canvas) {
+  let quality = 0.92;
+  let dataUrl = canvas.toDataURL("image/jpeg", quality);
+  while (dataUrlByteSize(dataUrl) > PAYSLIP_CANVAS_MAX_BYTES && quality > 0.5) {
+    quality -= 0.06;
+    dataUrl = canvas.toDataURL("image/jpeg", quality);
+  }
+  if (dataUrlByteSize(dataUrl) > PAYSLIP_CANVAS_MAX_BYTES) {
+    dataUrl = canvas.toDataURL("image/jpeg", 0.5);
+  }
+  return dataUrl;
+}
+
+async function htmlFragmentToPdf(tempContainer) {
+  const doc = tempContainer.ownerDocument;
+  if (doc.fonts?.ready) {
+    try {
+      await doc.fonts.ready;
+    } catch {
+      /* ignore */
+    }
+  }
+  void tempContainer.offsetHeight;
+  const capW = Math.ceil(
+    Math.max(tempContainer.scrollWidth, tempContainer.offsetWidth, 794),
+  );
+  const capH = Math.ceil(Math.max(tempContainer.scrollHeight, 1)) + 96;
+
+  const canvas = await html2canvas(tempContainer, {
+    scale: PAYSLIP_HTML2CANVAS_SCALE,
+    width: capW,
+    height: capH,
+    windowWidth: capW,
+    windowHeight: capH,
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    backgroundColor: "#ffffff",
+    scrollX: 0,
+    scrollY: 0,
+    onclone: (clonedDoc) => {
+      const b = clonedDoc.body;
+      if (b) {
+        b.style.setProperty("-webkit-font-smoothing", "antialiased");
+        b.style.setProperty("text-rendering", "geometricPrecision");
+      }
+    },
+  });
+
+  const imgData = canvasToCompressedJpegDataUrl(canvas);
+  const pdf = new jsPDF({
+    orientation: "p",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+    precision: 16,
+  });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  let drawW = imgWidth;
+  let drawH = imgHeight;
+  if (drawH > pageHeight) {
+    const s = pageHeight / drawH;
+    drawW *= s;
+    drawH = pageHeight;
+  }
+  pdf.addImage(imgData, "JPEG", 0, 0, drawW, drawH);
+  return pdf;
+}
+
 // Helper to format currency
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat("en-IN", {
@@ -392,69 +480,8 @@ export const generatePayslipPDF = async (salaryData, userData) => {
       ),
     );
 
-    const doc = tempContainer.ownerDocument;
-    if (doc.fonts?.ready) {
-      try {
-        await doc.fonts.ready;
-      } catch {
-        /* ignore */
-      }
-    }
-    void tempContainer.offsetHeight;
-    const capW = Math.ceil(
-      Math.max(tempContainer.scrollWidth, tempContainer.offsetWidth, 794),
-    );
-    const capH =
-      Math.ceil(Math.max(tempContainer.scrollHeight, 1)) + 96;
-    /** High-res export target for near print-quality text */
-    const RENDER_SCALE = 5;
-
-    const canvas = await html2canvas(tempContainer, {
-      scale: RENDER_SCALE,
-      width: capW,
-      height: capH,
-      windowWidth: capW,
-      windowHeight: capH,
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      backgroundColor: "#ffffff",
-      scrollX: 0,
-      scrollY: 0,
-      onclone: (clonedDoc) => {
-        const b = clonedDoc.body;
-        if (b) {
-          b.style.setProperty("-webkit-font-smoothing", "antialiased");
-          b.style.setProperty("text-rendering", "geometricPrecision");
-        }
-      },
-    });
-
+    const pdf = await htmlFragmentToPdf(tempContainer);
     document.body.removeChild(tempContainer);
-
-    const imgData = canvas.toDataURL("image/png", 1.0);
-    const pdf = new jsPDF({
-      orientation: "p",
-      unit: "mm",
-      format: "a4",
-      compress: false,
-      precision: 16,
-    });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    let drawW = imgWidth;
-    let drawH = imgHeight;
-    if (drawH > pageHeight) {
-      const scale = pageHeight / drawH;
-      drawW *= scale;
-      drawH = pageHeight;
-    }
-    pdf.addImage(imgData, "PNG", 0, 0, drawW, drawH);
-
     return pdf;
   } catch (error) {
     console.error("Error generating Payslip PDF:", error);
@@ -510,13 +537,13 @@ export const buildTemplatePayslipHTML = (opts) => {
   } = opts;
 
   const c = calculation;
-  const ROWS = 7;
+  const EARN_ROW_COUNT = 7;
   const earningsLabels = [
-    "Basic",
+    "Basic Salary",
     "HRA",
-    "Transport Allowance",
-    "Medical Allowance",
-    "Special Allowance",
+    "Transport Allw.",
+    "Medical Allw.",
+    "Special Allw.",
     "Bonus",
     "Overtime",
   ];
@@ -530,17 +557,32 @@ export const buildTemplatePayslipHTML = (opts) => {
     Number(c.overtimeAmount) || 0,
   ];
 
-  // Deduction column: employer heads at top (manual / employee deductions not itemized here)
-  const deductionLabels = [
-    "PF Employer",
-    "ESI Employer",
-    "Medical",
-    "",
-    "",
-    "",
-    "",
-  ];
-  const deductionAmounts = [0, 0, 0, null, null, null, null];
+  const structureDeds = [
+    { deduction_name: "PF", calculatedAmount: Number(c.pf) || 0 },
+    { deduction_name: "ESI", calculatedAmount: Number(c.esi) || 0 },
+    {
+      deduction_name: "Health Insurance",
+      calculatedAmount: Number(c.healthInsurance) || 0,
+    },
+  ].filter((d) => Number(d.calculatedAmount) > 0);
+  const processedPositive = (Array.isArray(c.processedDeductions)
+    ? c.processedDeductions
+    : []
+  ).filter((d) => Number(d.calculatedAmount) > 0);
+  const dedList = [...structureDeds, ...processedPositive];
+  const ROWS = Math.max(EARN_ROW_COUNT, dedList.length);
+
+  const deductionLabels = [];
+  const deductionAmounts = [];
+  for (let i = 0; i < ROWS; i++) {
+    if (i < dedList.length) {
+      deductionLabels.push(dedList[i].deduction_name || "");
+      deductionAmounts.push(Number(dedList[i].calculatedAmount) || 0);
+    } else {
+      deductionLabels.push("");
+      deductionAmounts.push(null);
+    }
+  }
 
   const salFont =
     'font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:geometricPrecision;';
@@ -552,9 +594,11 @@ export const buildTemplatePayslipHTML = (opts) => {
     const dedAmt = deductionAmounts[i];
     const dedVal =
       dedLabel && dedAmt != null ? fmtInr(dedAmt) : "";
+    const earnLabel = i < EARN_ROW_COUNT ? earningsLabels[i] : "";
+    const earnShow = i < EARN_ROW_COUNT;
     rowsHtml.push(`<tr>
-      <td style="${salRow}text-align:left;">${earningsLabels[i]}</td>
-      <td style="${salAmt}">${fmtInr(earningAmounts[i])}</td>
+      <td style="${salRow}text-align:left;">${earnLabel}</td>
+      <td style="${salAmt}">${earnShow ? fmtInr(earningAmounts[i]) : ""}</td>
       <td style="${salRow}text-align:left;">${dedLabel}</td>
       <td style="${salAmt}">${dedVal}</td>
     </tr>`);
@@ -642,10 +686,8 @@ export const buildTemplatePayslipHTML = (opts) => {
       <td style="border-left:none;border-right:1px solid #666;border-bottom:1px solid #666;padding:8px 9px;font-size:14px;line-height:1.25;text-align:right;font-weight:700;">${fmtInr(c.netSalary)}</td>
     </tr>
   </table>
-  <div style="padding:24px 16px 32px;display:flex;justify-content:space-between;text-align:center;">
-    <div style="flex:1;"><div style="border-top:1px solid #000;margin:0 8px 4px;"></div><div>Prepared by</div></div>
-    <div style="flex:1;"><div style="border-top:1px solid #000;margin:0 8px 4px;"></div><div>Checked by</div></div>
-    <div style="flex:1;"><div style="border-top:1px solid #000;margin:0 8px 4px;"></div><div>Authorised by</div></div>
+  <div style="padding:24px 16px 32px;text-align:center;font-size:12px;color:#555;line-height:1.5;font-style:italic;">
+    This is a computer-generated document and does not require a physical signature.
   </div>
   <div style="height:10px;background:#1e3a5f;"></div>
 </div>
@@ -678,69 +720,7 @@ export async function generateGenerateSalaryPayslipPDF(opts) {
     ),
   );
 
-  const doc = tempContainer.ownerDocument;
-  if (doc.fonts?.ready) {
-    try {
-      await doc.fonts.ready;
-    } catch {
-      /* ignore */
-    }
-  }
-
-  void tempContainer.offsetHeight;
-  const capW = Math.ceil(
-    Math.max(tempContainer.scrollWidth, tempContainer.offsetWidth, 794),
-  );
-  const capH =
-    Math.ceil(Math.max(tempContainer.scrollHeight, 1)) + 96;
-
-  /** High-res export target for near print-quality text */
-  const RENDER_SCALE = 5;
-
-  const canvas = await html2canvas(tempContainer, {
-    scale: RENDER_SCALE,
-    width: capW,
-    height: capH,
-    windowWidth: capW,
-    windowHeight: capH,
-    useCORS: true,
-    allowTaint: false,
-    logging: false,
-    backgroundColor: "#ffffff",
-    scrollX: 0,
-    scrollY: 0,
-    onclone: (clonedDoc) => {
-      const b = clonedDoc.body;
-      if (b) {
-        b.style.setProperty("-webkit-font-smoothing", "antialiased");
-        b.style.setProperty("text-rendering", "geometricPrecision");
-      }
-    },
-  });
-
+  const pdf = await htmlFragmentToPdf(tempContainer);
   document.body.removeChild(tempContainer);
-
-  const imgData = canvas.toDataURL("image/png", 1.0);
-  const pdf = new jsPDF({
-    orientation: "p",
-    unit: "mm",
-    format: "a4",
-    compress: false,
-    precision: 16,
-  });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-  let drawW = imgWidth;
-  let drawH = imgHeight;
-  if (drawH > pageHeight) {
-    const scale = pageHeight / drawH;
-    drawW *= scale;
-    drawH = pageHeight;
-  }
-  pdf.addImage(imgData, "PNG", 0, 0, drawW, drawH);
-
   return pdf;
 }

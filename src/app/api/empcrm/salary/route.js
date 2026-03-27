@@ -115,6 +115,9 @@ export async function POST(request) {
       medical_allowance,
       special_allowance,
       bonus,
+      pf,
+      esi,
+      health_insurance,
       overtime_rate,
       effective_from
     } = body;
@@ -138,14 +141,21 @@ export async function POST(request) {
     );
 
     // Insert new salary structure
+    const pfVal = pf === "" || pf === undefined || pf === null ? 0 : Number(pf);
+    const esiVal = esi === "" || esi === undefined || esi === null ? 0 : Number(esi);
+    const healthInsuranceVal =
+      health_insurance === "" || health_insurance === undefined || health_insurance === null
+        ? 0
+        : Number(health_insurance);
+
     await db.query(`
       INSERT INTO employee_salary_structure 
       (username, basic_salary, hra, transport_allowance, medical_allowance, 
-       special_allowance, bonus, overtime_rate, effective_from, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       special_allowance, bonus, pf, esi, health_insurance, overtime_rate, effective_from, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       username, basic_salary, hra, transport_allowance,
-      medical_allowance, special_allowance, bonus, overtime_rate,
+      medical_allowance, special_allowance, bonus, pfVal, esiVal, healthInsuranceVal, overtime_rate,
       effective_from, payload.username
     ]);
 
@@ -153,8 +163,23 @@ export async function POST(request) {
 
   } catch (error) {
     console.error("Error updating salary structure:", error);
+    const errno = error?.errno;
+    const sqlMessage = error?.sqlMessage || error?.message;
+    if (errno === 1054 || error?.code === "ER_BAD_FIELD_ERROR") {
+      return NextResponse.json(
+        {
+          message:
+            "Database table is missing new columns (pf, esi, health_insurance). Run the SQL migration or: npm run migrate:salary-structure",
+          detail: process.env.NODE_ENV === "development" ? sqlMessage : undefined,
+        },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
-      { message: "Internal server error." },
+      {
+        message: "Internal server error.",
+        detail: process.env.NODE_ENV === "development" ? sqlMessage : undefined,
+      },
       { status: 500 }
     );
   }
