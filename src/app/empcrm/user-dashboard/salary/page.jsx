@@ -476,8 +476,10 @@ const SalaryPage = () => {
         ) : (
           <div className="text-center py-12">
             <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No salary record found</h3>
-            <p className="text-gray-500">No salary data available for the selected month.</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No payslip for this month</h3>
+            <p className="text-gray-500 max-w-md mx-auto">
+              Either no payroll was run for this month, or it is still in draft until HR approves it. Once the status is approved or paid, your slip will show in this list and under Payslips.
+            </p>
           </div>
         )}
       </div>

@@ -12,6 +12,7 @@ const empCrmUserMenuItems = [
   { path: "/empcrm/user-dashboard/attendance", name: "Attendance", roles: ["ALL"], icon: "Clock" },
   { path: "/empcrm/user-dashboard/documents", name: "Documents", roles: ["ALL"], icon: "FileText" },
   { path: "/empcrm/user-dashboard/salary", name: "Salary", roles: ["ALL"], icon: "DollarSign" },
+  { path: "/empcrm/user-dashboard/payslips", name: "Payslips", roles: ["ALL"], icon: "Receipt" },
   { path: "/empcrm/user-dashboard/settings", name: "Settings", roles: ["ALL"], icon: "Settings" },
 ];
 

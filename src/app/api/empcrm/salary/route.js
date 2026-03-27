@@ -3,12 +3,18 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
+const HR_SALARY_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
+
+/** Employees only see payslip rows after approval (paid counts as post-approval). */
+const USER_VISIBLE_SLIP_STATUSES = ["approved", "paid"];
+
 // GET - Fetch salary information for user
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username");
     const month = searchParams.get("month");
+    const historyAll = searchParams.get("history") === "all";
 
     const payload = await getSessionPayload();
     if (!payload) {
@@ -19,6 +25,13 @@ export async function GET(request) {
 
     // If username is provided, fetch for specific user (admin access)
     const targetUsername = username || payload.username;
+
+    if (username && username !== payload.username) {
+      if (!HR_SALARY_ROLES.includes(payload.role)) {
+        return NextResponse.json({ message: "Unauthorized access." }, { status: 403 });
+      }
+    }
+
 
     let query = `
       SELECT 
@@ -48,21 +61,34 @@ export async function GET(request) {
       params.push(month);
     }
 
-    query += " ORDER BY esr.salary_month DESC LIMIT 12";
+    const viewingOwnSalary =
+      !username || username === payload.username;
+    if (viewingOwnSalary) {
+      query += ` AND LOWER(TRIM(esr.status)) IN (${USER_VISIBLE_SLIP_STATUSES.map(() => "?").join(",")})`;
+      params.push(...USER_VISIBLE_SLIP_STATUSES);
+    }
+
+    query += " ORDER BY esr.salary_month DESC";
+    if (!historyAll) {
+      query += " LIMIT 12";
+    }
 
     const [salaryRecords] = await db.query(query, params);
 
     // Fetch deduction details for these records
     if (salaryRecords.length > 0) {
-      const recordIds = salaryRecords.map(r => r.id);
-      const [deductionDetails] = await db.query(`
-        SELECT * FROM salary_deduction_details 
-        WHERE salary_record_id IN (${recordIds.join(',')})
-      `);
+      const recordIds = salaryRecords.map((r) => r.id);
+      const placeholders = recordIds.map(() => "?").join(",");
+      const [deductionDetails] = await db.query(
+        `SELECT * FROM salary_deduction_details WHERE salary_record_id IN (${placeholders})`,
+        recordIds
+      );
 
       // Attach details to records
-      salaryRecords.forEach(record => {
-        record.deduction_details = deductionDetails.filter(d => d.salary_record_id === record.id);
+      salaryRecords.forEach((record) => {
+        record.deduction_details = deductionDetails.filter(
+          (d) => d.salary_record_id === record.id
+        );
       });
     }
 
