@@ -47,6 +47,7 @@ export async function GET(request) {
         ep.esic_number,
         ep.pan_number,
         ep.department,
+        ep.date_of_joining,
         rl.gender
       FROM monthly_salary_records esr
       JOIN rep_list rl ON esr.username = rl.username

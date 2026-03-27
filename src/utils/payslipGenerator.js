@@ -167,10 +167,15 @@ export function buildPayslipOptsFromMonthlyRecord(record) {
     });
   }
 
-  const dojRaw = r.date_of_joining;
-  const dateOfJoining = dojRaw
-    ? new Date(dojRaw).toLocaleDateString("en-IN")
-    : "-";
+  const dojRaw =
+    r.date_of_joining ?? r.dateOfJoining ?? null;
+  let dateOfJoining = "-";
+  if (dojRaw != null && dojRaw !== "") {
+    const d = dojRaw instanceof Date ? dojRaw : new Date(dojRaw);
+    if (!Number.isNaN(d.getTime())) {
+      dateOfJoining = d.toLocaleDateString("en-IN");
+    }
+  }
 
   const calculation = {
     basicSalary: Number(r.basic_salary) || 0,
