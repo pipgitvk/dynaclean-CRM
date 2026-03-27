@@ -1,7 +1,7 @@
 // src/app/empcrm/user-dashboard/salary/page.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Calendar, Download, Eye, AlertCircle, CheckCircle, Clock, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 import { generatePayslipPDF, downloadPayslip } from "@/utils/payslipGenerator";
@@ -101,6 +101,38 @@ const SalaryPage = () => {
 
   const formatINR = (n) => new Intl.NumberFormat('en-IN').format(Math.round(Number(n || 0)));
 
+  const grossFromStructure = useMemo(() => {
+    if (!salaryData?.salaryStructure) return 0;
+    const s = salaryData.salaryStructure;
+    return (
+      Number(s.basic_salary || 0) +
+      Number(s.hra || 0) +
+      Number(s.transport_allowance || 0) +
+      Number(s.medical_allowance || 0) +
+      Number(s.special_allowance || 0) +
+      Number(s.bonus || 0)
+    );
+  }, [salaryData]);
+
+  const totalDeductionsCurrent = useMemo(() => {
+    if (!salaryData) return 0;
+    const s = salaryData.salaryStructure;
+    const structPf = Number(s?.pf) || 0;
+    const structEsi = Number(s?.esi) || 0;
+    const structHi = Number(s?.health_insurance) || 0;
+    const fromTable = (salaryData.deductions || []).reduce((sum, d) => {
+      const code = String(d.deduction_code || "").toUpperCase();
+      const name = String(d.deduction_name || "").toUpperCase();
+      const isPF = code === "PF" || name.includes("PROVIDENT");
+      const isESI = code === "ESI" || name.includes("ESI");
+      let amount = Number(d.amount || 0);
+      if (structPf > 0 && isPF) amount = 0;
+      if (structEsi > 0 && isESI) amount = 0;
+      return sum + amount;
+    }, 0);
+    return fromTable + structPf + structEsi + structHi;
+  }, [salaryData]);
+
   const handleDownloadPayslip = async () => {
     if (!selectedSalaryRecord) return;
 
@@ -176,6 +208,12 @@ const SalaryPage = () => {
                 {formatCurrency(salaryData.salaryStructure.special_allowance)}
               </p>
             </div>
+            <div className="bg-teal-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-600">Bonus</p>
+              <p className="text-xl font-bold text-teal-700">
+                {formatCurrency(salaryData.salaryStructure.bonus)}
+              </p>
+            </div>
             <div className="bg-pink-50 p-4 rounded-lg">
               <p className="text-sm text-gray-600">Overtime Rate (per hour)</p>
               <p className="text-xl font-bold text-pink-600">
@@ -183,42 +221,48 @@ const SalaryPage = () => {
               </p>
             </div>
             {/* Totals summary */}
+            <div className="bg-red-50/90 border border-red-100 p-4 rounded-lg md:col-span-2 lg:col-span-3">
+              <p className="text-sm font-semibold text-red-900 mb-2">Deductions (from structure)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                <div className="flex justify-between bg-white/70 rounded px-2 py-1.5">
+                  <span className="text-gray-700">PF</span>
+                  <span className="font-semibold text-red-800">
+                    {formatCurrency(salaryData.salaryStructure.pf)}
+                  </span>
+                </div>
+                <div className="flex justify-between bg-white/70 rounded px-2 py-1.5">
+                  <span className="text-gray-700">ESI</span>
+                  <span className="font-semibold text-red-800">
+                    {formatCurrency(salaryData.salaryStructure.esi)}
+                  </span>
+                </div>
+                <div className="flex justify-between bg-white/70 rounded px-2 py-1.5">
+                  <span className="text-gray-700">Health Insurance</span>
+                  <span className="font-semibold text-red-800">
+                    {formatCurrency(salaryData.salaryStructure.health_insurance)}
+                  </span>
+                </div>
+              </div>
+            </div>
             <div className="bg-gray-50 p-4 rounded-lg md:col-span-2 lg:col-span-3">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <span className="text-sm text-gray-700">Estimated Gross (structure sum)</span>
                 <span className="text-2xl font-bold text-gray-900">
-                  ₹{formatINR(
-                    Number(salaryData.salaryStructure.basic_salary || 0) +
-                    Number(salaryData.salaryStructure.hra || 0) +
-                    Number(salaryData.salaryStructure.transport_allowance || 0) +
-                    Number(salaryData.salaryStructure.medical_allowance || 0) +
-                    Number(salaryData.salaryStructure.special_allowance || 0) +
-                    Number(salaryData.salaryStructure.bonus || 0)
-                  )}
+                  ₹{formatINR(grossFromStructure)}
                 </span>
               </div>
-              {salaryData?.deductions?.length > 0 && (
+              {totalDeductionsCurrent > 0 && (
                 <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between">
-                  <span className="text-sm text-gray-700">Active Deductions (current)</span>
+                  <span className="text-sm text-gray-700">Total deductions (structure + active)</span>
                   <span className="text-xl font-bold text-gray-900">
-                    ₹{formatINR(
-                      salaryData.deductions.reduce((sum, d) => sum + Number(d.amount || 0), 0)
-                    )}
+                    ₹{formatINR(totalDeductionsCurrent)}
                   </span>
                 </div>
               )}
               <div className="mt-2 flex flex-col md:flex-row md:items-center md:justify-between">
                 <span className="text-sm text-gray-900 font-medium">Net Payable (Current)</span>
                 <span className="text-2xl font-bold text-green-700">
-                  ₹{formatINR(
-                    (Number(salaryData.salaryStructure.basic_salary || 0) +
-                      Number(salaryData.salaryStructure.hra || 0) +
-                      Number(salaryData.salaryStructure.transport_allowance || 0) +
-                      Number(salaryData.salaryStructure.medical_allowance || 0) +
-                      Number(salaryData.salaryStructure.special_allowance || 0) +
-                      Number(salaryData.salaryStructure.bonus || 0)) -
-                    (salaryData?.deductions?.reduce((sum, d) => sum + Number(d.amount || 0), 0) || 0)
-                  )}
+                  ₹{formatINR(grossFromStructure - totalDeductionsCurrent)}
                 </span>
               </div>
             </div>

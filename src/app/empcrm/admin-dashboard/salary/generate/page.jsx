@@ -154,6 +154,9 @@ const GenerateSalaryPage = () => {
         const structMedical = Number(salaryStructure.medical_allowance) || 0;
         const structSpecial = Number(salaryStructure.special_allowance) || 0;
         const structBonus = Number(salaryStructure.bonus) || 0;
+        const structPf = Number(salaryStructure.pf) || 0;
+        const structEsi = Number(salaryStructure.esi) || 0;
+        const structHealthInsurance = Number(salaryStructure.health_insurance) || 0;
         const structOvertimeRate = Number(salaryStructure.overtime_rate) || 0;
 
         const dailyRate = structBasic / workingDays;
@@ -166,33 +169,37 @@ const GenerateSalaryPage = () => {
         const medicalAllowance = structMedical;
         const specialAllowance = structSpecial;
         const bonus = structBonus;
+        const pf = structPf;
+        const esi = structEsi;
+        const healthInsurance = structHealthInsurance;
         const overtimeAmount = overtimeHours * structOvertimeRate;
 
-        const totalEarnings = basicSalary + hra + transportAllowance + medicalAllowance + specialAllowance + bonus + overtimeAmount;
+        const totalEarnings =
+            basicSalary +
+            hra +
+            transportAllowance +
+            medicalAllowance +
+            specialAllowance +
+            bonus +
+            overtimeAmount;
 
-        // Deductions
-        let totalDeductions = 0;
+        // Deductions (PF / ESI / Health Insurance from salary structure — deduction side only)
+        let totalDeductions = structPf + structEsi + structHealthInsurance;
         const processedDeductions = deductions.map(deduction => {
             let amount = 0;
             const code = deduction.deduction_code;
             const name = deduction.deduction_name;
 
-            // Robust check for standard deductions
             const isPF = code === 'PF' || name === 'PF' || name.includes('Provident Fund');
             const isESI = code === 'ESI' || name === 'ESI' || name.includes('ESI');
             const isIT = code === 'IT' || name === 'IT' || name.includes('Income Tax');
             const isPT = code === 'PT' || name === 'PT' || name.includes('Professional Tax');
 
-            // 1. Priority: Fixed Amount checking
             if (deduction.calculation_type === 'fixed' || (Number(deduction.amount) > 0 && !deduction.percentage && deduction.calculation_type !== 'formula')) {
                 amount = Number(deduction.amount);
-            }
-            // 2. Priority: Percentage
-            else if (deduction.calculation_type === 'percentage' && Number(deduction.percentage) > 0) {
+            } else if (deduction.calculation_type === 'percentage' && Number(deduction.percentage) > 0) {
                 amount = (Number(deduction.percentage) / 100) * totalEarnings;
-            }
-            // 3. Priority: Standard Formula / Code-based Fallback
-            else {
+            } else {
                 if (isPF) {
                     amount = 0.12 * basicSalary;
                 } else if (isESI) {
@@ -205,17 +212,24 @@ const GenerateSalaryPage = () => {
                         amount = 0;
                     }
                 } else if (isPT) {
-                    // PT default
                     amount = 200;
                 } else {
-                    // Final fallback
                     amount = Number(deduction.amount) || 0;
                 }
             }
 
+            if (structPf > 0 && isPF) amount = 0;
+            if (structEsi > 0 && isESI) amount = 0;
+
             totalDeductions += amount;
             return { ...deduction, calculatedAmount: amount };
         });
+
+        const structureDeductions = [
+            { deduction_name: 'PF', calculatedAmount: pf, _fromStructure: true },
+            { deduction_name: 'ESI', calculatedAmount: esi, _fromStructure: true },
+            { deduction_name: 'Health Insurance', calculatedAmount: healthInsurance, _fromStructure: true },
+        ];
 
         const netSalary = totalEarnings - totalDeductions;
 
@@ -226,8 +240,12 @@ const GenerateSalaryPage = () => {
             medicalAllowance,
             specialAllowance,
             bonus,
+            pf,
+            esi,
+            healthInsurance,
             overtimeAmount,
             totalEarnings,
+            structureDeductions,
             processedDeductions,
             totalDeductions,
             netSalary
@@ -573,16 +591,24 @@ const GenerateSalaryPage = () => {
                                         <Calculator className="w-4 h-4 mr-2" /> Deductions
                                     </h4>
                                     <div className="space-y-2 text-sm">
-                                        {calculation.processedDeductions.length > 0 ? (
-                                            calculation.processedDeductions.map((d, i) => (
-                                                <div key={i} className="flex justify-between">
-                                                    <span>{d.deduction_name}</span>
-                                                    <span>{formatCurrency(d.calculatedAmount)}</span>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-gray-500 italic">No active deductions</p>
-                                        )}
+                                        {(calculation.structureDeductions || []).map((d, i) => (
+                                            <div key={`s-${i}`} className="flex justify-between">
+                                                <span>{d.deduction_name}</span>
+                                                <span>{formatCurrency(d.calculatedAmount)}</span>
+                                            </div>
+                                        ))}
+                                        {calculation.processedDeductions.filter(
+                                            (d) => Number(d.calculatedAmount) > 0
+                                        ).length > 0
+                                            ? calculation.processedDeductions
+                                                  .filter((d) => Number(d.calculatedAmount) > 0)
+                                                  .map((d, i) => (
+                                                      <div key={i} className="flex justify-between">
+                                                          <span>{d.deduction_name}</span>
+                                                          <span>{formatCurrency(d.calculatedAmount)}</span>
+                                                      </div>
+                                                  ))
+                                            : null}
                                         <div className="border-t border-red-200 mt-2 pt-2 flex justify-between font-bold text-red-900">
                                             <span>Total</span> <span>{formatCurrency(calculation.totalDeductions)}</span>
                                         </div>

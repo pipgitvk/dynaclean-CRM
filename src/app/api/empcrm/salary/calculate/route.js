@@ -60,6 +60,9 @@ export async function POST(request) {
     const structMedical = Number(structure.medical_allowance) || 0;
     const structSpecial = Number(structure.special_allowance) || 0;
     const structBonus = Number(structure.bonus) || 0;
+    const structPf = Number(structure.pf) || 0;
+    const structEsi = Number(structure.esi) || 0;
+    const structHealthInsurance = Number(structure.health_insurance) || 0;
     const structOvertimeRate = Number(structure.overtime_rate) || 0;
 
     const dailyRate = structBasic / workingDays;
@@ -79,8 +82,7 @@ export async function POST(request) {
     const totalEarnings = basicSalary + hra + transportAllowance + medicalAllowance +
       specialAllowance + bonus + overtimeAmount;
 
-    // Calculate deductions
-    let totalDeductions = 0;
+    let totalDeductions = structPf + structEsi + structHealthInsurance;
     const deductionDetails = [];
 
     for (const deduction of deductions) {
@@ -94,16 +96,11 @@ export async function POST(request) {
       const isIT = code === 'IT' || name === 'IT' || name.includes('Income Tax');
       const isPT = code === 'PT' || name === 'PT' || name.includes('Professional Tax');
 
-      // 1. Priority: Fixed Amount checking
       if (deduction.calculation_type === 'fixed' || (Number(deduction.amount) > 0 && !deduction.percentage && deduction.calculation_type !== 'formula')) {
         amount = Number(deduction.amount);
-      }
-      // 2. Priority: Percentage
-      else if (deduction.calculation_type === 'percentage' && deduction.percentage > 0) {
+      } else if (deduction.calculation_type === 'percentage' && deduction.percentage > 0) {
         amount = (deduction.percentage / 100) * totalEarnings;
-      }
-      // 3. Priority: Standard Formula / Code-based Fallback
-      else {
+      } else {
         if (isPF) {
           amount = 0.12 * basicSalary;
         } else if (isESI) {
@@ -118,10 +115,12 @@ export async function POST(request) {
         } else if (isPT) {
           amount = Number(deduction.amount) > 0 ? Number(deduction.amount) : 200;
         } else {
-          // Fallback default
           amount = Number(deduction.amount) || 0;
         }
       }
+
+      if (structPf > 0 && isPF) amount = 0;
+      if (structEsi > 0 && isESI) amount = 0;
 
       totalDeductions += amount;
       deductionDetails.push({
@@ -134,6 +133,23 @@ export async function POST(request) {
     }
 
     const netSalary = totalEarnings - totalDeductions;
+
+    const pfFromTable =
+      deductionDetails.find((d) => d.deduction_code === "PF")?.amount || 0;
+    const esiFromTable =
+      deductionDetails.find((d) => d.deduction_code === "ESI")?.amount || 0;
+    const pfStored = structPf > 0 ? structPf : pfFromTable;
+    const esiStored = structEsi > 0 ? structEsi : esiFromTable;
+    const otherBase = deductionDetails
+      .filter(
+        (d) =>
+          d.deduction_code !== "PF" &&
+          d.deduction_code !== "ESI" &&
+          d.deduction_code !== "IT" &&
+          d.deduction_code !== "PT",
+      )
+      .reduce((sum, d) => sum + d.amount, 0);
+    const otherStored = otherBase + structHealthInsurance;
 
     // Check if salary record already exists
     const [existingRecord] = await db.query(`
@@ -160,16 +176,11 @@ export async function POST(request) {
         working_days, present_days, overtime_hours,
         basicSalary, hra, transportAllowance, medicalAllowance,
         specialAllowance, bonus, overtimeAmount, totalEarnings,
-        deductionDetails.find(d => d.deduction_code === 'PF')?.amount || 0,
-        deductionDetails.find(d => d.deduction_code === 'ESI')?.amount || 0,
+        pfStored,
+        esiStored,
         deductionDetails.find(d => d.deduction_code === 'IT')?.amount || 0,
         deductionDetails.find(d => d.deduction_code === 'PT')?.amount || 0,
-        deductionDetails.filter(d =>
-          d.deduction_code !== 'PF' &&
-          d.deduction_code !== 'ESI' &&
-          d.deduction_code !== 'IT' &&
-          d.deduction_code !== 'PT'
-        ).reduce((sum, d) => sum + d.amount, 0),
+        otherStored,
         totalDeductions, totalEarnings, netSalary, status || 'draft', salaryRecordId
       ]);
 
@@ -189,16 +200,11 @@ export async function POST(request) {
         username, salary_month, working_days, present_days, overtime_hours,
         basicSalary, hra, transportAllowance, medicalAllowance, specialAllowance,
         bonus, overtimeAmount, totalEarnings,
-        deductionDetails.find(d => d.deduction_code === 'PF')?.amount || 0,
-        deductionDetails.find(d => d.deduction_code === 'ESI')?.amount || 0,
+        pfStored,
+        esiStored,
         deductionDetails.find(d => d.deduction_code === 'IT')?.amount || 0,
         deductionDetails.find(d => d.deduction_code === 'PT')?.amount || 0,
-        deductionDetails.filter(d =>
-          d.deduction_code !== 'PF' &&
-          d.deduction_code !== 'ESI' &&
-          d.deduction_code !== 'IT' &&
-          d.deduction_code !== 'PT'
-        ).reduce((sum, d) => sum + d.amount, 0),
+        otherStored,
         totalDeductions, totalEarnings, netSalary, status || 'draft', payload.username
       ]);
 
@@ -224,6 +230,9 @@ export async function POST(request) {
         medicalAllowance: Math.round(medicalAllowance * 100) / 100,
         specialAllowance: Math.round(specialAllowance * 100) / 100,
         bonus: Math.round(bonus * 100) / 100,
+        pf: Math.round(structPf * 100) / 100,
+        esi: Math.round(structEsi * 100) / 100,
+        healthInsurance: Math.round(structHealthInsurance * 100) / 100,
         overtimeAmount: Math.round(overtimeAmount * 100) / 100,
         totalEarnings: Math.round(totalEarnings * 100) / 100,
         totalDeductions: Math.round(totalDeductions * 100) / 100,
