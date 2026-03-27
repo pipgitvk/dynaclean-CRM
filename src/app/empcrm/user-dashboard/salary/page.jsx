@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Calendar, Download, Eye, AlertCircle, CheckCircle, Clock, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 import { generatePayslipPDF, downloadPayslip } from "@/utils/payslipGenerator";
+import { getEffectiveGrossSalary } from "@/lib/salaryGrossSpecialAllowance";
 
 const SalaryPage = () => {
   const [salaryData, setSalaryData] = useState(null);
@@ -103,20 +104,7 @@ const SalaryPage = () => {
 
   const grossFromStructure = useMemo(() => {
     if (!salaryData?.salaryStructure) return 0;
-    const s = salaryData.salaryStructure;
-    const g = s.gross_salary;
-    if (g !== null && g !== undefined && g !== "") {
-      const n = Number(g);
-      if (Number.isFinite(n)) return n;
-    }
-    return (
-      Number(s.basic_salary || 0) +
-      Number(s.hra || 0) +
-      Number(s.transport_allowance || 0) +
-      Number(s.medical_allowance || 0) +
-      Number(s.special_allowance || 0) +
-      Number(s.bonus || 0)
-    );
+    return getEffectiveGrossSalary(salaryData.salaryStructure) ?? 0;
   }, [salaryData]);
 
   const totalDeductionsCurrent = useMemo(() => {

@@ -2,6 +2,12 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  computeSpecialAllowanceFromGross,
+  computeBasicHraFromGrossSalary,
+  floorInr,
+  getEffectiveGrossSalary,
+} from "@/lib/salaryGrossSpecialAllowance";
 
 // POST - Calculate salary for a specific month
 export async function POST(request) {
@@ -48,9 +54,8 @@ export async function POST(request) {
       AND (esd.effective_from <= ? AND (esd.effective_to IS NULL OR esd.effective_to >= ?))
     `, [username, salary_month + '-31', salary_month + '-01']);
 
-    // Calculate daily rate
-    const workingDays = Number(working_days);
-    const presentDays = Number(present_days);
+    const workingDays = Math.max(1, Number(working_days) || 30);
+    const presentDays = Number(present_days) || 0;
     const overtimeHours = Number(overtime_hours) || 0;
 
     // Ensure structure values are numbers
@@ -65,19 +70,41 @@ export async function POST(request) {
     const structHealthInsurance = Number(structure.health_insurance) || 0;
     const structOvertimeRate = Number(structure.overtime_rate) || 0;
 
-    const dailyRate = structBasic / workingDays;
+    const effectiveGross = getEffectiveGrossSalary(structure);
+    const hasGross = effectiveGross != null && effectiveGross > 0;
 
-    // Calculate earnings
-    const basicSalary = dailyRate * presentDays;
-    // HRA logic: (HRA / Basic) * CalculatedBasic. Correct?
-    // If Structure Basic is 0, HRA calc will fail.
-    const hra = structBasic > 0 ? (structHra / structBasic) * basicSalary : 0;
+    let basicSalary;
+    let hra;
+    if (hasGross) {
+      const bh = computeBasicHraFromGrossSalary({
+        grossSalary: effectiveGross,
+        workingDays,
+        presentDays,
+      });
+      basicSalary = bh.basicSalary;
+      hra = bh.hra;
+    } else {
+      basicSalary = floorInr((structBasic * presentDays) / workingDays);
+      hra =
+        structBasic > 0
+          ? floorInr((structHra / structBasic) * basicSalary)
+          : 0;
+    }
 
-    const transportAllowance = structTransport;
-    const medicalAllowance = structMedical;
-    const specialAllowance = structSpecial;
-    const bonus = structBonus;
-    const overtimeAmount = overtimeHours * structOvertimeRate;
+    const transportAllowance = floorInr(structTransport);
+    const medicalAllowance = floorInr(structMedical);
+    const specialAllowance = computeSpecialAllowanceFromGross({
+      grossSalary: hasGross ? effectiveGross : null,
+      workingDays,
+      presentDays,
+      basicSalary,
+      hra,
+      transportAllowance,
+      medicalAllowance,
+      fallbackStructureSpecial: structSpecial,
+    });
+    const bonus = floorInr(structBonus);
+    const overtimeAmount = floorInr(overtimeHours * structOvertimeRate);
 
     const totalEarnings = basicSalary + hra + transportAllowance + medicalAllowance +
       specialAllowance + bonus + overtimeAmount;

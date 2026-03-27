@@ -9,6 +9,12 @@ import {
   downloadPayslip,
   buildTemplatePayslipHTML,
 } from "@/utils/payslipGenerator";
+import {
+  computeSpecialAllowanceFromGross,
+  computeBasicHraFromGrossSalary,
+  floorInr,
+  getEffectiveGrossSalary,
+} from "@/lib/salaryGrossSpecialAllowance";
 
 const GenerateSalaryPage = () => {
     const router = useRouter();
@@ -159,20 +165,44 @@ const GenerateSalaryPage = () => {
         const structHealthInsurance = Number(salaryStructure.health_insurance) || 0;
         const structOvertimeRate = Number(salaryStructure.overtime_rate) || 0;
 
-        const dailyRate = structBasic / workingDays;
-        const basicSalary = dailyRate * presentDays;
+        const effectiveGross = getEffectiveGrossSalary(salaryStructure);
+        const hasGross = effectiveGross != null && effectiveGross > 0;
 
-        // HRA logic
-        const hra = structBasic > 0 ? (structHra / structBasic) * basicSalary : 0;
+        let basicSalary;
+        let hra;
+        if (hasGross) {
+          const bh = computeBasicHraFromGrossSalary({
+            grossSalary: effectiveGross,
+            workingDays,
+            presentDays,
+          });
+          basicSalary = bh.basicSalary;
+          hra = bh.hra;
+        } else {
+          basicSalary = floorInr((structBasic * presentDays) / workingDays);
+          hra =
+            structBasic > 0
+              ? floorInr((structHra / structBasic) * basicSalary)
+              : 0;
+        }
 
-        const transportAllowance = structTransport;
-        const medicalAllowance = structMedical;
-        const specialAllowance = structSpecial;
-        const bonus = structBonus;
+        const transportAllowance = floorInr(structTransport);
+        const medicalAllowance = floorInr(structMedical);
+        const specialAllowance = computeSpecialAllowanceFromGross({
+          grossSalary: hasGross ? effectiveGross : null,
+          workingDays: workingDays,
+          presentDays: presentDays,
+          basicSalary,
+          hra,
+          transportAllowance,
+          medicalAllowance,
+          fallbackStructureSpecial: structSpecial,
+        });
+        const bonus = floorInr(structBonus);
         const pf = structPf;
         const esi = structEsi;
         const healthInsurance = structHealthInsurance;
-        const overtimeAmount = overtimeHours * structOvertimeRate;
+        const overtimeAmount = floorInr(overtimeHours * structOvertimeRate);
 
         const totalEarnings =
             basicSalary +
