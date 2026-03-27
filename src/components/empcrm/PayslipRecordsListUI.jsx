@@ -1,6 +1,16 @@
 "use client";
 
-import { Download, AlertCircle, CheckCircle, Clock, Receipt, RefreshCw } from "lucide-react";
+import { useEffect } from "react";
+import {
+  Download,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Receipt,
+  RefreshCw,
+  Eye,
+  X,
+} from "lucide-react";
 
 /** Matches payslip PDF chrome: navy bar, tight borders */
 export const PAYSLIP_UI = {
@@ -86,6 +96,70 @@ export function PayslipDownloadButton({ onClick, disabled }) {
       <Download className="w-3.5 h-3.5" />
       Download
     </button>
+  );
+}
+
+export function PayslipViewButton({ onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-semibold text-[#1a3a5f] bg-white border border-black hover:bg-slate-100 disabled:opacity-50"
+    >
+      <Eye className="w-3.5 h-3.5 shrink-0" />
+      View
+    </button>
+  );
+}
+
+/** Same HTML as PDF — iframe preview (Generate Salary style). */
+export function PayslipPreviewModal({ open, title, html, onClose }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="payslip-preview-title"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[92vh] flex flex-col border-2 border-black overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 border-b border-black bg-[#1a3a5f] text-white shrink-0">
+          <h2 id="payslip-preview-title" className="text-sm font-semibold truncate">
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded hover:bg-white/15 shrink-0"
+            aria-label="Close preview"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="overflow-auto flex-1 min-h-0 bg-slate-100">
+          <iframe
+            title="Payslip preview"
+            className="w-full min-h-[min(80vh,900px)] border-0 block bg-white"
+            srcDoc={html || ""}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 

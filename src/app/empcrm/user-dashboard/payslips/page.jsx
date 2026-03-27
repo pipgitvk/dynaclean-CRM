@@ -2,12 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { generatePayslipPDF, downloadPayslip } from "@/utils/payslipGenerator";
+import {
+  generatePayslipPDF,
+  downloadPayslip,
+  buildTemplatePayslipHTML,
+  buildPayslipOptsFromMonthlyRecord,
+} from "@/utils/payslipGenerator";
 import {
   PayslipRecordsShell,
   PayslipRefreshButton,
   PayslipStatusCell,
   PayslipDownloadButton,
+  PayslipViewButton,
+  PayslipPreviewModal,
   PAYSLIP_UI,
   formatPayslipCurrency,
   formatPayslipMonth,
@@ -20,6 +27,9 @@ import {
 export default function PayslipsPage() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewTitle, setPreviewTitle] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,7 +65,15 @@ export default function PayslipsPage() {
     }
   };
 
+  const handleView = (record) => {
+    const opts = buildPayslipOptsFromMonthlyRecord(record);
+    setPreviewHtml(buildTemplatePayslipHTML(opts));
+    setPreviewTitle(`Payslip — ${formatPayslipMonth(record.salary_month)}`);
+    setPreviewOpen(true);
+  };
+
   return (
+    <>
     <PayslipRecordsShell
       title="My payslips"
       subtitle="Only approved or paid months are shown. Download PDF after HR has approved your salary."
@@ -92,7 +110,8 @@ export default function PayslipsPage() {
               </td>
               <td className={payslipTdRightClass}>{formatPayslipCurrency(row.net_salary)}</td>
               <td className={`${payslipTdRightClass} align-middle`}>
-                <div className="flex justify-end">
+                <div className="flex justify-end flex-wrap gap-2">
+                  <PayslipViewButton onClick={() => handleView(row)} />
                   <PayslipDownloadButton onClick={() => handleDownload(row)} />
                 </div>
               </td>
@@ -101,5 +120,12 @@ export default function PayslipsPage() {
         </tbody>
       </table>
     </PayslipRecordsShell>
+    <PayslipPreviewModal
+      open={previewOpen}
+      title={previewTitle}
+      html={previewHtml}
+      onClose={() => setPreviewOpen(false)}
+    />
+    </>
   );
 }
