@@ -8,6 +8,12 @@ import {
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
 
+function normalizeUserKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 export async function GET(request) {
   try {
 
@@ -66,14 +72,16 @@ export async function GET(request) {
     await ensureEmployeeAttendanceScheduleTable();
     const [schedules] = await db.query(`SELECT * FROM employee_attendance_schedule`);
     const scheduleByUser = new Map(
-      (schedules || []).map((s) => [s.username, s])
+      (schedules || []).map((s) => [normalizeUserKey(s.username), s])
     );
     const uniqueUsernames = [...new Set(rows.map((r) => r.username))];
     const rulesByUsername = {};
     for (const u of uniqueUsernames) {
+      const schedule =
+        scheduleByUser.get(normalizeUserKey(u)) || null;
       rulesByUsername[u] = mergeGlobalRulesWithEmployeeSchedule(
         globalRules,
-        scheduleByUser.get(u) || null
+        schedule
       );
     }
 

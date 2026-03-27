@@ -1,27 +1,16 @@
-// app/user-dashboard/attendance/page.jsx
 "use client";
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import ExcelJS from "exceljs";
-
-const attendanceRules = {
-  checkin: "09:30:00",
-  checkout: "18:30:00",
-  halfDayCheckin: "10:00:00",        // Half-day after 10:00
-  lateCheckin: "09:46:00",           // Late window starts at 09:46
-  halfDayCheckout: "18:14:00",
-  break_morning_start: "11:15:00",
-  break_lunch_start: "13:30:00",
-  break_evening_start: "16:15:00",
-  gracePeriodMinutes: 15, // 15-min grace for check-in/out
-  breakDurations: {
-    morning: 15, // Morning break: 15 minutes
-    lunch: 30,   // Lunch break: 30 minutes  
-    evening: 15, // Evening break: 15 minutes
-  },
-  breakGracePeriodMinutes: 5, // 5-min grace for breaks
-};
+import {
+  DEFAULT_ATTENDANCE_RULES,
+  getCheckinStatus as checkinStatusFromRules,
+  getCheckoutStatus as checkoutStatusFromRules,
+  getBreakStatus as breakStatusFromRules,
+  isHalfDayByRules,
+  isLateDaySummary,
+} from "@/lib/attendanceRulesEngine";
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -34,6 +23,8 @@ const AttendancePage = () => {
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [rules, setRules] = useState(DEFAULT_ATTENDANCE_RULES);
+  const [rulesByUsername, setRulesByUsername] = useState({});
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -53,6 +44,7 @@ const AttendancePage = () => {
       setLogs(data.attendance);
       setHolidays(data.holidays || []);
       setLeaves(data.leaves || []);
+      setRulesByUsername(data.rulesByUsername || {});
 
       const users = [
         ...new Set(data.attendance.map((log) => log.username)),
@@ -63,6 +55,7 @@ const AttendancePage = () => {
       setLogs([]);
       setHolidays([]);
       setLeaves([]);
+      setRulesByUsername({});
     } finally {
       setLoading(false);
     }
@@ -70,6 +63,23 @@ const AttendancePage = () => {
 
   useEffect(() => {
     fetchAttendance();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/attendance/rules");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.rules) setRules(data.rules);
+      } catch (e) {
+        console.error("attendance/rules:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const openHolidayModal = async () => {
@@ -97,110 +107,31 @@ const AttendancePage = () => {
     });
   };
 
-  // Get check-in status: 'onTime', 'grace', 'late', or 'halfDay'
-  const getCheckinStatus = (logTime) => {
-    if (!logTime) return null;
-    const logDate = new Date(logTime);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
+  const normalizeUserKey = (value) =>
+    String(value ?? "")
+      .trim()
+      .toLowerCase();
 
-    const standardMinutes = 9 * 60 + 30;  // 09:30
-    const graceEndMinutes = 9 * 60 + 45;  // 09:45 (09:30 + 15)
-    const lateEndMinutes = 9 * 60 + 46;   // 09:46
-    const halfDayMinutes = 10 * 60;       // 10:00
-
-    if (logTimeInMinutes <= standardMinutes) return 'onTime';           // 🟢 ≤ 09:30
-    if (logTimeInMinutes <= graceEndMinutes) return 'grace';            // 🟠 09:31-09:45
-    if (logTimeInMinutes < halfDayMinutes) return 'late';               // 🔴 09:46-09:59
-    return 'halfDay';                                                   // 🟡 ≥ 10:00
-  };
-
-  // Get checkout status: 'onTime', 'grace', 'late', or 'halfDay'
-  const getCheckoutStatus = (logTime) => {
-    if (!logTime) return null;
-    const logDate = new Date(logTime);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
-
-    const standardMinutes = 18 * 60 + 30;  // 18:30
-    const graceStartMinutes = 18 * 60 + 15; // 18:15 (18:30 - 15)
-    const halfDayMinutes = 18 * 60 + 14;   // 18:14
-
-    if (logTimeInMinutes < halfDayMinutes) return 'halfDay';            // 🟡 < 18:14
-    if (logTimeInMinutes < graceStartMinutes) return 'late';            // 🔴 18:14
-    if (logTimeInMinutes < standardMinutes) return 'grace';             // 🟠 18:15-18:29
-    return 'onTime';                                                    // 🟢 ≥ 18:30
-  };
-
-  // Check if check-in is late (after grace period) - for backward compatibility
-  const isCheckinLate = (logTime) => {
-    const status = getCheckinStatus(logTime);
-    return status === 'late' || status === 'halfDay';
-  };
-
-  // Original isCheckinLate function kept for backward compatibility
-  const _isCheckinLate_Old = (logTime) => {
-    if (!logTime) return false;
-    const logDate = new Date(logTime);
-    const [ruleHour, ruleMinute] = attendanceRules.checkin.split(":").map(Number);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
-    const ruleTimeInMinutes = ruleHour * 60 + ruleMinute;
-    return logTimeInMinutes > (ruleTimeInMinutes + attendanceRules.gracePeriodMinutes);
-  };
-
-  // Check if checkout is early (before grace period) - for backward compatibility
-  const isCheckoutEarly = (logTime) => {
-    const status = getCheckoutStatus(logTime);
-    return status === 'late' || status === 'halfDay';
-  };
-
-  // Original isCheckoutEarly function kept for reference
-  const _isCheckoutEarly_Old = (logTime) => {
-    if (!logTime) return false;
-    const logDate = new Date(logTime);
-    const [ruleHour, ruleMinute] = attendanceRules.checkout.split(":").map(Number);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
-    const ruleTimeInMinutes = ruleHour * 60 + ruleMinute;
-    return logTimeInMinutes < (ruleTimeInMinutes - attendanceRules.gracePeriodMinutes);
-  };
-
-  // Calculate break duration color: green (within time), yellow (grace period), red (late)
-  const getBreakStatus = (startTime, endTime, breakType) => {
-    if (!startTime || !endTime) return null;
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    const durationMinutes = Math.floor((end - start) / (1000 * 60));
-    const allowedDuration = attendanceRules.breakDurations[breakType];
-    const graceLimit = allowedDuration + attendanceRules.breakGracePeriodMinutes;
-
-    if (durationMinutes <= allowedDuration) return 'green';
-    if (durationMinutes <= graceLimit) return 'yellow';
-    return 'red';
-  };
-
-  const isLate = (logTime, ruleTime) => {
-    if (!logTime || !ruleTime) return false;
-    const logDate = new Date(logTime);
-    const [ruleHour, ruleMinute] = ruleTime.split(":").map(Number);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
-    const ruleTimeInMinutes = ruleHour * 60 + ruleMinute;
-    return logTimeInMinutes > ruleTimeInMinutes;
-  };
-
-  const isEarly = (logTime, ruleTime) => {
-    if (!logTime || !ruleTime) return false;
-    const logDate = new Date(logTime);
-    const [ruleHour, ruleMinute] = ruleTime.split(":").map(Number);
-    const logTimeInMinutes = logDate.getHours() * 60 + logDate.getMinutes();
-    const ruleTimeInMinutes = ruleHour * 60 + ruleMinute;
-    return logTimeInMinutes < ruleTimeInMinutes;
-  };
-
-  const isHalfDay = (log) => {
-    if (!log.checkin_time || !log.checkout_time) return false;
-    return (
-      isLate(log.checkin_time, attendanceRules.halfDayCheckin) ||
-      isEarly(log.checkout_time, attendanceRules.halfDayCheckout)
+  const rulesFor = (username) => {
+    if (!username) return rules;
+    if (rulesByUsername[username] != null) return rulesByUsername[username];
+    const norm = normalizeUserKey(username);
+    const matchedKey = Object.keys(rulesByUsername).find(
+      (k) => normalizeUserKey(k) === norm
     );
+    return matchedKey ? rulesByUsername[matchedKey] : rules;
   };
+
+  const getCheckinStatus = (logTime, username) =>
+    checkinStatusFromRules(logTime, rulesFor(username));
+
+  const getCheckoutStatus = (logTime, username) =>
+    checkoutStatusFromRules(logTime, rulesFor(username));
+
+  const getBreakStatus = (startTime, endTime, breakType, username) =>
+    breakStatusFromRules(startTime, endTime, breakType, rulesFor(username));
+
+  const isHalfDay = (log) => isHalfDayByRules(log, rulesFor(log.username));
 
   const handleShowAll = () => {
     setFilterStatus("all");
@@ -324,15 +255,15 @@ const AttendancePage = () => {
 
     if (filterStatus === "late") {
       // Show only RED late status (09:46-09:59 or 18:14), NOT grace period or half day
-      const checkinStatus = getCheckinStatus(log.checkin_time);
-      const checkoutStatus = getCheckoutStatus(log.checkout_time);
+      const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
+      const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
       matchesFilter =
         log.type === "present" &&
         (checkinStatus === 'late' || checkoutStatus === 'late');
     } else if (filterStatus === "onTime") {
       // Show green on time AND orange grace period (NOT red late or yellow half day)
-      const checkinStatus = getCheckinStatus(log.checkin_time);
-      const checkoutStatus = getCheckoutStatus(log.checkout_time);
+      const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
+      const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
       matchesFilter =
         log.type === "present" &&
         checkinStatus !== 'late' &&
@@ -357,7 +288,7 @@ const AttendancePage = () => {
       if (log.type === "present") {
         acc.present++;
         if (isHalfDay(log)) acc.halfDays++;
-        if (isCheckinLate(log.checkin_time) || isCheckoutEarly(log.checkout_time)) {
+        if (isLateDaySummary(log, rulesFor(log.username))) {
           acc.lateDays++;
         }
       }
@@ -634,10 +565,10 @@ const AttendancePage = () => {
                         </span>
                         <span
                           className={`text-sm ${(() => {
-                            const status = getCheckinStatus(log.checkin_time);
+                            const status = getCheckinStatus(log.checkin_time, log.username);
                             if (status === 'halfDay') return 'text-yellow-600';
                             if (status === 'late') return 'text-red-600';
-                            if (status === 'grace') return 'text-orange-600';
+                            if (status === 'onTime' || status === 'grace') return 'text-green-600';
                             return 'text-green-600';
                           })()
                             }`}
@@ -689,7 +620,7 @@ const AttendancePage = () => {
                         </span>
                         <span
                           className={`text-sm ${(() => {
-                            const status = getCheckoutStatus(log.checkout_time);
+                            const status = getCheckoutStatus(log.checkout_time, log.username);
                             if (status === 'halfDay') return 'text-yellow-600';
                             if (status === 'late') return 'text-red-600';
                             if (status === 'grace') return 'text-orange-600';
@@ -788,11 +719,10 @@ const AttendancePage = () => {
                         <>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
-                              const status = getCheckinStatus(log.checkin_time);
+                              const status = getCheckinStatus(log.checkin_time, log.username);
                               if (status === 'halfDay') return 'bg-yellow-100';
                               if (status === 'late') return 'bg-red-100';
-                              if (status === 'grace') return 'bg-orange-100';
-                              if (status === 'onTime') return 'bg-green-100';
+                              if (status === 'onTime' || status === 'grace') return 'bg-green-100';
                               return '';
                             })()
                               }`}
@@ -809,7 +739,7 @@ const AttendancePage = () => {
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
-                              const status = getBreakStatus(log.break_morning_start, log.break_morning_end, 'morning');
+                              const status = getBreakStatus(log.break_morning_start, log.break_morning_end, 'morning', log.username);
                               return status === 'green' ? 'bg-green-100' : status === 'yellow' ? 'bg-yellow-100' : status === 'red' ? 'bg-red-100' : '';
                             })()
                               }`}
@@ -820,7 +750,7 @@ const AttendancePage = () => {
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
-                              const status = getBreakStatus(log.break_lunch_start, log.break_lunch_end, 'lunch');
+                              const status = getBreakStatus(log.break_lunch_start, log.break_lunch_end, 'lunch', log.username);
                               return status === 'green' ? 'bg-green-100' : status === 'yellow' ? 'bg-yellow-100' : status === 'red' ? 'bg-red-100' : '';
                             })()
                               }`}
@@ -831,7 +761,7 @@ const AttendancePage = () => {
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
-                              const status = getBreakStatus(log.break_evening_start, log.break_evening_end, 'evening');
+                              const status = getBreakStatus(log.break_evening_start, log.break_evening_end, 'evening', log.username);
                               return status === 'green' ? 'bg-green-100' : status === 'yellow' ? 'bg-yellow-100' : status === 'red' ? 'bg-red-100' : '';
                             })()
                               }`}
@@ -842,7 +772,7 @@ const AttendancePage = () => {
                           </td>
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
-                              const status = getCheckoutStatus(log.checkout_time);
+                              const status = getCheckoutStatus(log.checkout_time, log.username);
                               if (status === 'halfDay') return 'bg-yellow-100';
                               if (status === 'late') return 'bg-red-100';
                               if (status === 'grace') return 'bg-orange-100';

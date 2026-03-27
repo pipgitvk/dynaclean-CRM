@@ -108,10 +108,20 @@ const AttendancePage = () => {
     });
   };
 
-  const rulesFor = (username) =>
-    username && rulesByUsername[username] != null
-      ? rulesByUsername[username]
-      : rules;
+  const normalizeUserKey = (value) =>
+    String(value ?? "")
+      .trim()
+      .toLowerCase();
+
+  const rulesFor = (username) => {
+    if (!username) return rules;
+    if (rulesByUsername[username] != null) return rulesByUsername[username];
+    const norm = normalizeUserKey(username);
+    const matchedKey = Object.keys(rulesByUsername).find(
+      (k) => normalizeUserKey(k) === norm
+    );
+    return matchedKey ? rulesByUsername[matchedKey] : rules;
+  };
 
   const getCheckinStatus = (logTime, username) =>
     checkinStatusFromRules(logTime, rulesFor(username));
@@ -568,7 +578,7 @@ const AttendancePage = () => {
                             const status = getCheckinStatus(log.checkin_time, log.username);
                             if (status === 'halfDay') return 'text-yellow-600';
                             if (status === 'late') return 'text-red-600';
-                            if (status === 'grace') return 'text-orange-600';
+                            if (status === 'onTime' || status === 'grace') return 'text-green-600';
                             return 'text-green-600';
                           })()
                             }`}
@@ -722,8 +732,7 @@ const AttendancePage = () => {
                               const status = getCheckinStatus(log.checkin_time, log.username);
                               if (status === 'halfDay') return 'bg-yellow-100';
                               if (status === 'late') return 'bg-red-100';
-                              if (status === 'grace') return 'bg-orange-100';
-                              if (status === 'onTime') return 'bg-green-100';
+                              if (status === 'onTime' || status === 'grace') return 'bg-green-100';
                               return '';
                             })()
                               }`}
