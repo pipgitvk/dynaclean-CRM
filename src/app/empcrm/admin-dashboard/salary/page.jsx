@@ -35,6 +35,7 @@ const SalaryManagementPage = () => {
     medical_allowance: "",
     special_allowance: "",
     bonus: "",
+    gross_salary: "",
     pf: "",
     esi: "",
     health_insurance: "",
@@ -57,6 +58,11 @@ const SalaryManagementPage = () => {
   const grossBase = useMemo(() => {
     if (!salaryData?.salaryStructure) return 0;
     const s = salaryData.salaryStructure;
+    const g = s.gross_salary;
+    if (g !== null && g !== undefined && g !== "") {
+      const n = Number(g);
+      if (Number.isFinite(n)) return n;
+    }
     const toNumber = (v) => (v ? Number(v) : 0);
     return (
       toNumber(s.basic_salary) +
@@ -67,6 +73,21 @@ const SalaryManagementPage = () => {
       toNumber(s.bonus)
     );
   }, [salaryData]);
+
+  const salaryFormGross = useMemo(() => {
+    const n = (v) => {
+      const x = v === "" || v === undefined || v === null ? 0 : Number(v);
+      return Number.isFinite(x) ? x : 0;
+    };
+    return (
+      n(salaryForm.basic_salary) +
+      n(salaryForm.hra) +
+      n(salaryForm.transport_allowance) +
+      n(salaryForm.medical_allowance) +
+      n(salaryForm.special_allowance) +
+      n(salaryForm.bonus)
+    );
+  }, [salaryForm]);
 
   const totalActiveDeductions = useMemo(() => {
     if (!salaryData) return 0;
@@ -199,6 +220,7 @@ const SalaryManagementPage = () => {
           medical_allowance: "",
           special_allowance: "",
           bonus: "",
+          gross_salary: "",
           pf: "",
           esi: "",
           health_insurance: "",
@@ -302,6 +324,7 @@ const SalaryManagementPage = () => {
         medical_allowance: toFormVal(existing?.medical_allowance),
         special_allowance: toFormVal(existing?.special_allowance),
         bonus: toFormVal(existing?.bonus),
+        gross_salary: toFormVal(existing?.gross_salary),
         pf: toFormVal(existing?.pf),
         esi: toFormVal(existing?.esi),
         health_insurance: toFormVal(existing?.health_insurance),
@@ -453,6 +476,18 @@ const SalaryManagementPage = () => {
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="bg-emerald-50 p-4 rounded-lg ring-1 ring-emerald-200">
+                  <p className="text-sm text-gray-600">Gross Salary</p>
+                  <p className="text-xl font-bold text-emerald-800">
+                    {formatCurrency(grossBase)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {salaryData.salaryStructure.gross_salary != null &&
+                    salaryData.salaryStructure.gross_salary !== ""
+                      ? "Manual entry"
+                      : "Sum of Basic + HRA + allowances + bonus"}
+                  </p>
+                </div>
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Basic Salary</p>
                   <p className="text-xl font-bold text-blue-600">
@@ -500,12 +535,6 @@ const SalaryManagementPage = () => {
                   <p className="text-xl font-bold text-pink-600">
                     ₹{formatRatePerHr(salaryData.salaryStructure.overtime_rate)}/hr
                   </p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg col-span-1 md:col-span-2 lg:col-span-3">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <p className="text-sm text-gray-600">Estimated Gross (structure sum)</p>
-                    <p className="text-2xl font-bold text-gray-800">₹{Math.round(grossBase).toLocaleString()}</p>
-                  </div>
                 </div>
               </div>
             </div>
@@ -712,6 +741,21 @@ const SalaryManagementPage = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Gross Salary
+                  </label>
+                  <input
+                    type="number"
+                    value={salaryForm.gross_salary}
+                    onChange={(e) =>
+                      setSalaryForm({ ...salaryForm, gross_salary: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   
+                  />
+                 
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Basic Salary</label>
