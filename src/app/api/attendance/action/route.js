@@ -6,6 +6,15 @@ import dayjs from "dayjs";
 export async function POST(req) {
   const body = await req.json();
   const { username, action } = body;
+  if (action === "checkout") {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Checkout must be done through GPS-enabled attendance endpoint.",
+      },
+      { status: 400 }
+    );
+  }
 
   const conn = await getDbConnection();
   const today = dayjs().format("YYYY-MM-DD");
@@ -27,7 +36,6 @@ export async function POST(req) {
     break_morning: "break_morning_start",
     break_lunch: "break_lunch_start",
     break_evening: "break_evening_start",
-    checkout: "checkout_time",
   };
 
   const updateField = updateFields[action];
