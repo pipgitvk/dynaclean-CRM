@@ -66,7 +66,8 @@ export function computeBasicHraFromGrossSalary({
   const wd = Math.max(1, Number(workingDays) || 0);
   const pd = Math.max(0, Number(presentDays) || 0);
   const perDayGross = Math.floor(g / wd);
-  const payableGross = perDayGross * pd;
+  // Full attendance should always pay full gross (avoid 20 rupee loss on 35000/30).
+  const payableGross = pd >= wd ? g : perDayGross * pd;
   const basicSalary = Math.floor(payableGross / 2);
   const hra = Math.floor(payableGross / 4);
   const fullBasic = Math.floor(g / 2);
@@ -117,7 +118,8 @@ export function computeSpecialAllowanceFromGross({
   // Lock payable gross to per-day method:
   // payableGross = floor(gross / workingDays) * presentDays
   // so 35000/30 => 1166 and 1166*16 => 18656.
-  const payableGross = perDayGross * pd;
+  // For full attendance, pay exact monthly gross.
+  const payableGross = pd >= wd ? g : perDayGross * pd;
   const raw = payableGross - totalAddition;
   return Math.max(0, floorInr(raw));
 }
