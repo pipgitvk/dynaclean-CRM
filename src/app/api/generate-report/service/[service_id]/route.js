@@ -28,9 +28,8 @@ async function saveSignature(signatureData, serviceId, type) {
   }
 }
 
-export async function GET(request, context) {
-  const { params } = await context;
-  const serviceId = params.service_id;
+export async function GET(request, { params }) {
+  const { service_id: serviceId } = await params;
   console.log(`[GET] Received request for serviceId: ${serviceId}`);
 
   if (!serviceId) {
@@ -101,9 +100,8 @@ export async function GET(request, context) {
   }
 }
 
-export async function POST(request, context) {
-  const { params } = await context;
-  const serviceId = params.service_id;
+export async function POST(request, { params }) {
+  const { service_id: serviceId } = await params;
   console.log(`[POST] Received request for serviceId: ${serviceId}`);
   
   if (!serviceId) {
