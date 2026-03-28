@@ -96,7 +96,6 @@ const QuickEditPage = () => {
     }
 
     const formData = new FormData();
-    formData.append("new_username", (employee.username || "").trim());
     formData.append("email", employee.email);
     formData.append("dob", employee.dob);
     formData.append("number", employee.number);
@@ -120,12 +119,7 @@ const QuickEditPage = () => {
         throw new Error(payload.message || "Failed to update employee data.");
       }
       toast.success("Employee data updated successfully!");
-      const nextUser = payload.username || employee.username;
-      if (nextUser && nextUser !== username) {
-        router.push(`/admin-dashboard/quick-edit/${encodeURIComponent(nextUser)}`);
-      } else {
-        router.push("/admin-dashboard/employees");
-      }
+      router.push("/admin-dashboard/employees");
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -178,22 +172,6 @@ const QuickEditPage = () => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Login username
-            </label>
-            <input
-              type="text"
-              name="username"
-              value={employee.username || ""}
-              onChange={handleInputChange}
-              autoComplete="off"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Changing this updates the name everywhere (salary, attendance, profile, etc.).
-            </p>
-          </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700">
               Profile Picture

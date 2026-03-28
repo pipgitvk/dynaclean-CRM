@@ -5,7 +5,8 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
-import { renameRepListUsername } from "@/lib/renameRepListUsername";
+// Login username rename disabled — keep import commented if re-enabled:
+// import { renameRepListUsername } from "@/lib/renameRepListUsername";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -68,22 +69,7 @@ export async function PUT(request, { params }) {
     const username = String(usernameParam || "").trim();
     const formData = await request.formData();
 
-    const newUsernameRaw = formData.get("new_username");
-    const newUsername =
-      typeof newUsernameRaw === "string" ? newUsernameRaw.trim() : "";
-
-    let effectiveUsername = username;
-
-    if (newUsername && newUsername !== username) {
-      try {
-        const { actualNew } = await renameRepListUsername(username, newUsername);
-        effectiveUsername = actualNew;
-      } catch (renameErr) {
-        const msg = renameErr?.message || "Could not rename username.";
-        const status = msg.includes("not found") ? 404 : 400;
-        return NextResponse.json({ message: msg }, { status });
-      }
-    }
+    const effectiveUsername = username;
 
     const email = formData.get("email");
     const dob = formData.get("dob");
