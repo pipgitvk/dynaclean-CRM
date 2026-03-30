@@ -42,7 +42,7 @@ function applyGrossSalaryAutoSplit(prevForm, grossInput) {
     Math.floor(G - basic - hra - transport - medical),
   );
   const lowGross = isLowGrossPfMonthly(G);
-  const pf = lowGross ? "0" : String(Math.round(0.12 * basic));
+  const pf = String(Math.round(0.12 * basic));
   const esi = lowGross ? String(floorInr(LOW_GROSS_PF_RATE * G)) : "0";
   const health_insurance = lowGross ? "0" : String(FIXED_HEALTH_INSURANCE_INR);
   return {

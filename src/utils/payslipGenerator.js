@@ -302,36 +302,20 @@ export const buildTemplatePayslipHTML = (opts) => {
     Number(c.overtimeAmount) || 0,
   ];
 
-  const lowGrossPfRule = Boolean(c.lowGrossPfRule);
-
   const pfDisplay =
     typeof c.pf === "number" && Number.isFinite(c.pf)
       ? floorInr(c.pf)
       : 0;
   const esiFromStruct = Number(c.esi) || 0;
 
-  let structureDeds;
-  if (lowGrossPfRule) {
-    const esiCombined = pfDisplay + floorInr(esiFromStruct);
-    structureDeds = [
-      ...(esiCombined > 0
-        ? [{ deduction_name: "ESI", calculatedAmount: esiCombined }]
-        : []),
-      {
-        deduction_name: "Health Insurance",
-        calculatedAmount: Number(c.healthInsurance) || 0,
-      },
-    ].filter((d) => Number(d.calculatedAmount) > 0);
-  } else {
-    structureDeds = [
-      { deduction_name: "PF", calculatedAmount: pfDisplay },
-      { deduction_name: "ESI", calculatedAmount: esiFromStruct },
-      {
-        deduction_name: "Health Insurance",
-        calculatedAmount: Number(c.healthInsurance) || 0,
-      },
-    ].filter((d) => Number(d.calculatedAmount) > 0);
-  }
+  const structureDeds = [
+    { deduction_name: "PF", calculatedAmount: pfDisplay },
+    { deduction_name: "ESI", calculatedAmount: esiFromStruct },
+    {
+      deduction_name: "Health Insurance",
+      calculatedAmount: Number(c.healthInsurance) || 0,
+    },
+  ].filter((d) => Number(d.calculatedAmount) > 0);
 
   // Payslip shows only statutory rows (PF / ESI / Health from structure payroll).
   // "Active Deductions" from admin (processedDeductions) are not listed on the PDF.

@@ -37,8 +37,9 @@ export function getEffectiveGrossSalary(structure) {
   return null;
 }
 
-/** Monthly gross (structure) ≤ this → PF = 0.75% of period gross; no structure health insurance. */
+/** Monthly gross (structure) ≤ this → statutory ESI 0.75% of period gross when ESI enabled; no fixed health. */
 export const LOW_GROSS_PF_MONTHLY_MAX = 21000;
+/** Low-gross ESI (when structure ESI > 0): % of period gross earnings. */
 export const LOW_GROSS_PF_RATE = 0.0075;
 
 /** When PF is at 12% Basic (monthly gross > 21k), health deduction is this fixed amount — not DB column. */
@@ -49,24 +50,20 @@ export function isLowGrossPfMonthly(monthlyGross) {
   return g > 0 && g <= LOW_GROSS_PF_MONTHLY_MAX;
 }
 
-/**
- * PF: 0.75% of total earnings when monthly structure gross ≤ 21k; else 12% of basic (earned).
- */
+/** PF: 12% of earned basic (same for monthly gross above or ≤ ₹21k). */
 export function computePfFromGrossAndBasic(
-  monthlyGrossFromStructure,
+  _monthlyGrossFromStructure,
   basicSalary,
-  totalEarnings,
+  _totalEarnings,
 ) {
-  if (isLowGrossPfMonthly(monthlyGrossFromStructure)) {
-    return floorInr(LOW_GROSS_PF_RATE * (Number(totalEarnings) || 0));
-  }
   return floorInr(0.12 * (Number(basicSalary) || 0));
 }
 
 /**
  * Payroll statutory rows only when structure has that component > 0.
- * Low gross (≤21k): 0.75% applies only if ESI field is set; high gross: 12% Basic only if PF field is set;
- * fixed health only if health_insurance field is set (and not low gross).
+ * PF: 12% of earned basic if struct PF > 0 (all gross levels).
+ * Low gross ESI: 0.75% of period gross if struct ESI > 0; else struct ESI amount when high gross.
+ * Health: fixed ₹277 only if struct health > 0 and not low gross.
  */
 export function applyStatutoryDeductionsFromStructure({
   effectiveGross,
@@ -80,18 +77,21 @@ export function applyStatutoryDeductionsFromStructure({
   const structEsiN = floorInr(structEsi);
   const structHealthN = floorInr(structHealthInsurance);
   const lowGrossPfRule = isLowGrossPfMonthly(effectiveGross);
-  const raw = computePfFromGrossAndBasic(
+  const rawPf = computePfFromGrossAndBasic(
     effectiveGross,
     basicSalary,
     totalEarnings,
   );
-  let pf = 0;
+  const pf = structPfN > 0 ? rawPf : 0;
+  let esi = 0;
   if (lowGrossPfRule) {
-    pf = structEsiN > 0 ? raw : 0;
+    esi =
+      structEsiN > 0
+        ? floorInr(LOW_GROSS_PF_RATE * (Number(totalEarnings) || 0))
+        : 0;
   } else {
-    pf = structPfN > 0 ? raw : 0;
+    esi = structEsiN;
   }
-  const esi = structEsiN;
   const healthInsurance = lowGrossPfRule
     ? 0
     : structHealthN > 0
@@ -117,7 +117,7 @@ export function syncStatutoryFormFieldsFromStructureInput(form) {
   const basic = floorInr(form.basic_salary);
   if (isLowGrossPfMonthly(eff)) {
     return {
-      pf: "0",
+      pf: String(floorInr(0.12 * basic)),
       esi: String(floorInr(LOW_GROSS_PF_RATE * eff)),
       health_insurance: "0",
     };
