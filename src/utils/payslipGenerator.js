@@ -1,7 +1,10 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import logo1 from "@/components/logo1.jpg";
-import { floorInr } from "@/lib/salaryGrossSpecialAllowance";
+import {
+  floorInr,
+  isHealthInsuranceDeductionRow,
+} from "@/lib/salaryGrossSpecialAllowance";
 
 const getImportedImageSrc = (mod) => {
   if (!mod) return "";
@@ -181,6 +184,14 @@ export function buildPayslipOptsFromMonthlyRecord(record) {
     }
   }
 
+  const te = Number(r.total_earnings) || 0;
+  const pfAmt = Number(r.pf_deduction) || 0;
+  /** Saved rows: infer low-gross (0.75% of period gross) when flag not stored. */
+  const inferredLowGrossPfRule =
+    te > 0 &&
+    pfAmt > 0 &&
+    Math.abs(pfAmt / te - 0.0075) < 0.0015;
+
   const calculation = {
     basicSalary: Number(r.basic_salary) || 0,
     hra: Number(r.hra) || 0,
@@ -192,10 +203,11 @@ export function buildPayslipOptsFromMonthlyRecord(record) {
     esi: Number(r.esi_deduction) || 0,
     healthInsurance,
     overtimeAmount: Number(r.overtime_amount) || 0,
-    totalEarnings: Number(r.total_earnings) || 0,
+    totalEarnings: te,
     totalDeductions: Number(r.total_deductions) || 0,
     netSalary: Number(r.net_salary) || 0,
     processedDeductions,
+    lowGrossPfRule: inferredLowGrossPfRule,
   };
 
   return {
@@ -301,23 +313,59 @@ export const buildTemplatePayslipHTML = (opts) => {
       name === "PF" ||
       /provident/i.test(name)
     );
+  };
+  const isEsiDeductionRow = (d) => {
+    const code = String(d?.deduction_code || "");
+    const name = String(d?.deduction_name || "");
+    return code === "ESI" || name === "ESI" || /\besi\b/i.test(name);
+  };
+
+  const lowGrossPfRule = Boolean(c.lowGrossPfRule);
+
+  const pfDisplay =
+    typeof c.pf === "number" && Number.isFinite(c.pf)
+      ? floorInr(c.pf)
+      : 0;
+  const esiFromStruct = Number(c.esi) || 0;
+
+  let structureDeds;
+  if (lowGrossPfRule) {
+    const esiCombined = pfDisplay + floorInr(esiFromStruct);
+    structureDeds = [
+      ...(esiCombined > 0
+        ? [{ deduction_name: "ESI", calculatedAmount: esiCombined }]
+        : []),
+      {
+        deduction_name: "Health Insurance",
+        calculatedAmount: Number(c.healthInsurance) || 0,
+      },
+    ].filter((d) => Number(d.calculatedAmount) > 0);
+  } else {
+    structureDeds = [
+      { deduction_name: "PF", calculatedAmount: pfDisplay },
+      { deduction_name: "ESI", calculatedAmount: esiFromStruct },
+      {
+        deduction_name: "Health Insurance",
+        calculatedAmount: Number(c.healthInsurance) || 0,
+      },
+    ].filter((d) => Number(d.calculatedAmount) > 0);
   }
-  const pfFromBasic = floorInr(0.12 * (Number(c.basicSalary) || 0));
-  const structureDeds = [
-    { deduction_name: "PF", calculatedAmount: pfFromBasic },
-    { deduction_name: "ESI", calculatedAmount: Number(c.esi) || 0 },
-    {
-      deduction_name: "Health Insurance",
-      calculatedAmount: Number(c.healthInsurance) || 0,
-    },
-  ].filter((d) => Number(d.calculatedAmount) > 0);
+
   const processedPositive = (Array.isArray(c.processedDeductions)
     ? c.processedDeductions
     : []
-  ).filter(
-    (d) =>
-      Number(d.calculatedAmount) > 0 && !isPfDeductionRow(d),
-  );
+  ).filter((d) => {
+    if (Number(d.calculatedAmount) <= 0) return false;
+    if (isPfDeductionRow(d)) return false;
+    if (lowGrossPfRule && isEsiDeductionRow(d)) return false;
+    if (
+      !(Number(c.healthInsurance) > 0) &&
+      isHealthInsuranceDeductionRow(d)
+    ) {
+      return false;
+    }
+    return true;
+  });
   const dedList = [...structureDeds, ...processedPositive];
   const ROWS = Math.max(EARN_ROW_COUNT, dedList.length);
 

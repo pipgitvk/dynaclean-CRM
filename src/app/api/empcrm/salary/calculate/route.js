@@ -7,6 +7,8 @@ import {
   computeBasicHraFromGrossSalary,
   floorInr,
   getEffectiveGrossSalary,
+  applyStatutoryDeductionsFromStructure,
+  isHealthInsuranceDeductionRow,
 } from "@/lib/salaryGrossSpecialAllowance";
 
 // POST - Calculate salary for a specific month
@@ -65,6 +67,7 @@ export async function POST(request) {
     const structMedical = Number(structure.medical_allowance) || 0;
     const structSpecial = Number(structure.special_allowance) || 0;
     const structBonus = Number(structure.bonus) || 0;
+    const structPf = Number(structure.pf) || 0;
     const structEsi = Number(structure.esi) || 0;
     const structHealthInsurance = Number(structure.health_insurance) || 0;
     const structOvertimeRate = Number(structure.overtime_rate) || 0;
@@ -108,8 +111,20 @@ export async function POST(request) {
     const totalEarnings = basicSalary + hra + transportAllowance + medicalAllowance +
       specialAllowance + bonus + overtimeAmount;
 
-    const pf = floorInr(0.12 * basicSalary);
-    let totalDeductions = pf + structEsi + structHealthInsurance;
+    const {
+      pf,
+      esi,
+      healthInsurance: healthInsuranceStored,
+      lowGrossPfRule,
+    } = applyStatutoryDeductionsFromStructure({
+      effectiveGross,
+      structPf,
+      structEsi,
+      structHealthInsurance,
+      basicSalary,
+      totalEarnings,
+    });
+    let totalDeductions = pf + esi + healthInsuranceStored;
     const deductionDetails = [];
 
     for (const deduction of deductions) {
@@ -124,6 +139,28 @@ export async function POST(request) {
       const isPT = code === 'PT' || name === 'PT' || name.includes('Professional Tax');
 
       if (isPF) {
+        deductionDetails.push({
+          deduction_type_id: deduction.deduction_type_id,
+          deduction_name: deduction.deduction_name,
+          deduction_code: deduction.deduction_code,
+          amount: 0,
+          reason: deduction.reason,
+        });
+        continue;
+      }
+
+      if (lowGrossPfRule && isHealthInsuranceDeductionRow(deduction)) {
+        deductionDetails.push({
+          deduction_type_id: deduction.deduction_type_id,
+          deduction_name: deduction.deduction_name,
+          deduction_code: deduction.deduction_code,
+          amount: 0,
+          reason: deduction.reason,
+        });
+        continue;
+      }
+
+      if (isESI && structEsi <= 0) {
         deductionDetails.push({
           deduction_type_id: deduction.deduction_type_id,
           deduction_name: deduction.deduction_name,
@@ -172,7 +209,7 @@ export async function POST(request) {
     const esiFromTable =
       deductionDetails.find((d) => d.deduction_code === "ESI")?.amount || 0;
     const pfStored = pf;
-    const esiStored = structEsi > 0 ? structEsi : esiFromTable;
+    const esiStored = esi > 0 ? esi : esiFromTable;
     const otherBase = deductionDetails
       .filter(
         (d) =>
@@ -182,7 +219,7 @@ export async function POST(request) {
           d.deduction_code !== "PT",
       )
       .reduce((sum, d) => sum + d.amount, 0);
-    const otherStored = otherBase + structHealthInsurance;
+    const otherStored = otherBase + healthInsuranceStored;
 
     // Check if salary record already exists
     const [existingRecord] = await db.query(`
@@ -264,12 +301,13 @@ export async function POST(request) {
         specialAllowance: Math.round(specialAllowance * 100) / 100,
         bonus: Math.round(bonus * 100) / 100,
         pf: Math.round(pf * 100) / 100,
-        esi: Math.round(structEsi * 100) / 100,
-        healthInsurance: Math.round(structHealthInsurance * 100) / 100,
+        esi: Math.round(esi * 100) / 100,
+        healthInsurance: Math.round(healthInsuranceStored * 100) / 100,
         overtimeAmount: Math.round(overtimeAmount * 100) / 100,
         totalEarnings: Math.round(totalEarnings * 100) / 100,
         totalDeductions: Math.round(totalDeductions * 100) / 100,
         netSalary: Math.round(netSalary * 100) / 100,
+        lowGrossPfRule,
         deductionDetails
       }
     });

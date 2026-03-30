@@ -14,6 +14,8 @@ import {
   computeBasicHraFromGrossSalary,
   floorInr,
   getEffectiveGrossSalary,
+  applyStatutoryDeductionsFromStructure,
+  isHealthInsuranceDeductionRow,
 } from "@/lib/salaryGrossSpecialAllowance";
 
 const GenerateSalaryPage = () => {
@@ -160,6 +162,7 @@ const GenerateSalaryPage = () => {
         const structMedical = Number(salaryStructure.medical_allowance) || 0;
         const structSpecial = Number(salaryStructure.special_allowance) || 0;
         const structBonus = Number(salaryStructure.bonus) || 0;
+        const structPf = Number(salaryStructure.pf) || 0;
         const structEsi = Number(salaryStructure.esi) || 0;
         const structHealthInsurance = Number(salaryStructure.health_insurance) || 0;
         const structOvertimeRate = Number(salaryStructure.overtime_rate) || 0;
@@ -198,9 +201,6 @@ const GenerateSalaryPage = () => {
           fallbackStructureSpecial: structSpecial,
         });
         const bonus = floorInr(structBonus);
-        const pf = floorInr(0.12 * basicSalary);
-        const esi = structEsi;
-        const healthInsurance = structHealthInsurance;
         const overtimeAmount = floorInr(overtimeHours * structOvertimeRate);
 
         const totalEarnings =
@@ -212,8 +212,22 @@ const GenerateSalaryPage = () => {
             bonus +
             overtimeAmount;
 
-        // Deductions (PF = 12% of Basic; ESI / Health from structure; other rows from employee deductions)
-        let totalDeductions = pf + structEsi + structHealthInsurance;
+        const {
+            pf,
+            esi,
+            healthInsurance,
+            lowGrossPfRule,
+        } = applyStatutoryDeductionsFromStructure({
+            effectiveGross,
+            structPf,
+            structEsi,
+            structHealthInsurance,
+            basicSalary,
+            totalEarnings,
+        });
+
+        // Deductions (only when PF/ESI/Health set in structure; see applyStatutoryDeductionsFromStructure)
+        let totalDeductions = pf + esi + healthInsurance;
         const processedDeductions = deductions.map(deduction => {
             let amount = 0;
             const code = deduction.deduction_code;
@@ -225,6 +239,14 @@ const GenerateSalaryPage = () => {
             const isPT = code === 'PT' || name === 'PT' || name.includes('Professional Tax');
 
             if (isPF) {
+                return { ...deduction, calculatedAmount: 0 };
+            }
+
+            if (lowGrossPfRule && isHealthInsuranceDeductionRow(deduction)) {
+                return { ...deduction, calculatedAmount: 0 };
+            }
+
+            if (isESI && structEsi <= 0) {
                 return { ...deduction, calculatedAmount: 0 };
             }
 
@@ -255,11 +277,57 @@ const GenerateSalaryPage = () => {
             return { ...deduction, calculatedAmount: amount };
         });
 
-        const structureDeductions = [
-            { deduction_name: 'PF', calculatedAmount: pf, _fromStructure: true },
-            { deduction_name: 'ESI', calculatedAmount: esi, _fromStructure: true },
-            { deduction_name: 'Health Insurance', calculatedAmount: healthInsurance, _fromStructure: true },
-        ];
+        const mergedEsi = floorInr(pf + esi);
+        const structureDeductions = lowGrossPfRule
+            ? [
+                  ...(mergedEsi > 0
+                      ? [
+                            {
+                                deduction_name: 'ESI',
+                                calculatedAmount: mergedEsi,
+                                _fromStructure: true,
+                            },
+                        ]
+                      : []),
+                  ...(healthInsurance > 0
+                      ? [
+                            {
+                                deduction_name: 'Health Insurance',
+                                calculatedAmount: healthInsurance,
+                                _fromStructure: true,
+                            },
+                        ]
+                      : []),
+              ]
+            : [
+                  ...(pf > 0
+                      ? [
+                            {
+                                deduction_name: 'PF',
+                                calculatedAmount: pf,
+                                _fromStructure: true,
+                            },
+                        ]
+                      : []),
+                  ...(esi > 0
+                      ? [
+                            {
+                                deduction_name: 'ESI',
+                                calculatedAmount: esi,
+                                _fromStructure: true,
+                            },
+                        ]
+                      : []),
+                  ...(healthInsurance > 0
+                      ? [
+                            {
+                                deduction_name: 'Health Insurance',
+                                calculatedAmount: healthInsurance,
+                                _fromStructure: true,
+                            },
+                        ]
+                      : []),
+              ];
 
         const netSalary = totalEarnings - totalDeductions;
 
@@ -278,7 +346,8 @@ const GenerateSalaryPage = () => {
             structureDeductions,
             processedDeductions,
             totalDeductions,
-            netSalary
+            netSalary,
+            lowGrossPfRule,
         });
     };
 

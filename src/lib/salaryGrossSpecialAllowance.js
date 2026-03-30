@@ -37,6 +37,108 @@ export function getEffectiveGrossSalary(structure) {
   return null;
 }
 
+/** Monthly gross (structure) ≤ this → PF = 0.75% of period gross; no structure health insurance. */
+export const LOW_GROSS_PF_MONTHLY_MAX = 21000;
+export const LOW_GROSS_PF_RATE = 0.0075;
+
+/** When PF is at 12% Basic (monthly gross > 21k), health deduction is this fixed amount — not DB column. */
+export const FIXED_HEALTH_INSURANCE_INR = 277;
+
+export function isLowGrossPfMonthly(monthlyGross) {
+  const g = floorInr(monthlyGross);
+  return g > 0 && g <= LOW_GROSS_PF_MONTHLY_MAX;
+}
+
+/**
+ * PF: 0.75% of total earnings when monthly structure gross ≤ 21k; else 12% of basic (earned).
+ */
+export function computePfFromGrossAndBasic(
+  monthlyGrossFromStructure,
+  basicSalary,
+  totalEarnings,
+) {
+  if (isLowGrossPfMonthly(monthlyGrossFromStructure)) {
+    return floorInr(LOW_GROSS_PF_RATE * (Number(totalEarnings) || 0));
+  }
+  return floorInr(0.12 * (Number(basicSalary) || 0));
+}
+
+/**
+ * Payroll statutory rows only when structure has that component > 0.
+ * Low gross (≤21k): 0.75% applies only if ESI field is set; high gross: 12% Basic only if PF field is set;
+ * fixed health only if health_insurance field is set (and not low gross).
+ */
+export function applyStatutoryDeductionsFromStructure({
+  effectiveGross,
+  structPf,
+  structEsi,
+  structHealthInsurance,
+  basicSalary,
+  totalEarnings,
+}) {
+  const structPfN = floorInr(structPf);
+  const structEsiN = floorInr(structEsi);
+  const structHealthN = floorInr(structHealthInsurance);
+  const lowGrossPfRule = isLowGrossPfMonthly(effectiveGross);
+  const raw = computePfFromGrossAndBasic(
+    effectiveGross,
+    basicSalary,
+    totalEarnings,
+  );
+  let pf = 0;
+  if (lowGrossPfRule) {
+    pf = structEsiN > 0 ? raw : 0;
+  } else {
+    pf = structPfN > 0 ? raw : 0;
+  }
+  const esi = structEsiN;
+  const healthInsurance = lowGrossPfRule
+    ? 0
+    : structHealthN > 0
+      ? FIXED_HEALTH_INSURANCE_INR
+      : 0;
+  return { pf, esi, healthInsurance, lowGrossPfRule };
+}
+
+/** Admin salary form: string fields for pf, esi, health_insurance from current component values. */
+export function syncStatutoryFormFieldsFromStructureInput(form) {
+  const eff = getEffectiveGrossSalary({
+    gross_salary: form.gross_salary,
+    basic_salary: form.basic_salary,
+    hra: form.hra,
+    transport_allowance: form.transport_allowance,
+    medical_allowance: form.medical_allowance,
+    special_allowance: form.special_allowance,
+    bonus: form.bonus,
+  });
+  if (eff == null || eff <= 0) {
+    return { pf: "0", esi: "0", health_insurance: "0" };
+  }
+  const basic = floorInr(form.basic_salary);
+  if (isLowGrossPfMonthly(eff)) {
+    return {
+      pf: "0",
+      esi: String(floorInr(LOW_GROSS_PF_RATE * eff)),
+      health_insurance: "0",
+    };
+  }
+  return {
+    pf: String(floorInr(0.12 * basic)),
+    esi: "0",
+    health_insurance: String(FIXED_HEALTH_INSURANCE_INR),
+  };
+}
+
+export function isHealthInsuranceDeductionRow(d) {
+  const code = String(d?.deduction_code || "");
+  const name = String(d?.deduction_name || "");
+  return (
+    code === "HI" ||
+    code === "HEALTH_INSURANCE" ||
+    (/health/i.test(name) && /insurance/i.test(name))
+  );
+}
+
 /**
  * When gross_salary (monthly salary total) is set:
  * - Gross is taken as whole rupees (no paise).
