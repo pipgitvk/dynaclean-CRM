@@ -12,7 +12,7 @@ const empCrmMenuItems = [
   { path: "/empcrm/admin-dashboard/attendance", name: "Attendance", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Clock" },
   { path: "/empcrm/admin-dashboard/documents", name: "Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "FileText" },
   { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "DollarSign" },
-  { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Receipt" },
+  { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"], icon: "Receipt" },
 ];
 
 export default async function getEmpCrmAdminSidebarMenuItems() {
@@ -24,15 +24,41 @@ export default async function getEmpCrmAdminSidebarMenuItems() {
   if (token) {
     try {
       const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
-      role = payload?.role || "GUEST";
+      role = (payload?.role ?? payload?.userRole) || "GUEST";
     } catch (error) {
       console.error("JWT decode error:", error.message);
     }
   }
 
+  const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
+
   return empCrmMenuItems.filter(
-    (item) => item.roles.includes("ALL") || item.roles.includes(role)
+    (item) =>
+      item.roles.includes("ALL") ||
+      item.roles.some((r) => normalizeRoleKey(r) === roleKey)
   );
+}
+
+/** EMPCRM “Back to CRM”: accountants usually work from user dashboard. */
+export async function getEmpCrmAdminBackButtonPath() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+
+  let role = "GUEST";
+  if (token) {
+    try {
+      const { payload } = await jwtVerify(
+        token,
+        new TextEncoder().encode(JWT_SECRET)
+      );
+      role = (payload?.role ?? payload?.userRole) || "GUEST";
+    } catch (error) {
+      console.error("JWT decode error:", error.message);
+    }
+  }
+
+  const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
+  return roleKey === "ACCOUNTANT" ? "/user-dashboard" : "/admin-dashboard";
 }
 
 /** “Back to user CRM” on /empcrm/admin-dashboard — only for role HR (JWT). */
