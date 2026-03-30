@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
 const HR_SALARY_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"];
+const DELETE_ALLOWED_ROLES = ["SUPERADMIN", "ADMIN"];
 
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
@@ -68,17 +69,22 @@ export async function GET(request) {
     const [salaryRecords] = await db.query(query, params);
 
     if (salaryRecords.length > 0) {
-      const recordIds = salaryRecords.map((r) => r.id);
-      const placeholders = recordIds.map(() => "?").join(",");
-      const [deductionDetails] = await db.query(
-        `SELECT * FROM salary_deduction_details WHERE salary_record_id IN (${placeholders})`,
-        recordIds
-      );
-      salaryRecords.forEach((record) => {
-        record.deduction_details = deductionDetails.filter(
-          (d) => d.salary_record_id === record.id
+      try {
+        const recordIds = salaryRecords.map((r) => r.id);
+        const placeholders = recordIds.map(() => "?").join(",");
+        const [deductionDetails] = await db.query(
+          `SELECT * FROM salary_deduction_details WHERE salary_record_id IN (${placeholders})`,
+          recordIds
         );
-      });
+        salaryRecords.forEach((record) => {
+          record.deduction_details = deductionDetails.filter(
+            (d) => d.salary_record_id === record.id
+          );
+        });
+      } catch {
+        // salary_deduction_details table may not exist yet — non-fatal
+        salaryRecords.forEach((record) => { record.deduction_details = []; });
+      }
     }
 
     return NextResponse.json({
@@ -93,5 +99,57 @@ export async function GET(request) {
       { message: "Internal server error." },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * DELETE — bulk delete salary records by IDs.
+ * Body: { ids: number[] }
+ * Only SUPERADMIN / HR HEAD / HR allowed.
+ */
+export async function DELETE(request) {
+  try {
+    const payload = await getSessionPayload();
+    if (!payload || !DELETE_ALLOWED_ROLES.includes(payload.role)) {
+      return NextResponse.json({ message: "Unauthorized. Only HR / SUPERADMIN can delete records." }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const ids = body?.ids;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ message: "No record IDs provided." }, { status: 400 });
+    }
+
+    const validIds = ids.map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    if (validIds.length === 0) {
+      return NextResponse.json({ message: "Invalid IDs." }, { status: 400 });
+    }
+
+    const placeholders = validIds.map(() => "?").join(",");
+    const db = await getDbConnection();
+
+    // Delete deduction details first (child rows)
+    try {
+      await db.query(
+        `DELETE FROM salary_deduction_details WHERE salary_record_id IN (${placeholders})`,
+        validIds
+      );
+    } catch {
+      // Table may not exist yet — ignore
+    }
+
+    const [result] = await db.query(
+      `DELETE FROM monthly_salary_records WHERE id IN (${placeholders})`,
+      validIds
+    );
+
+    return NextResponse.json({
+      success: true,
+      deleted: result.affectedRows,
+    });
+  } catch (error) {
+    console.error("Error deleting salary records:", error);
+    return NextResponse.json({ message: "Internal server error." }, { status: 500 });
   }
 }

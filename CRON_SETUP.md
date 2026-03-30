@@ -1,4 +1,27 @@
-# Meta Leads Auto-Fetch – Cron Setup (har 10 min)
+# Cron Setup Guide
+
+---
+
+## 1. Auto Salary Generation (har mahine ek baar)
+
+### Cron URL
+```
+https://app.dynacleanindustries.com/api/cron/salary-generate
+```
+Agar `CRON_SECRET` set hai:
+```
+https://app.dynacleanindustries.com/api/cron/salary-generate?secret=YOUR_CRON_SECRET
+```
+
+### Schedule: Daily chalao (cron khud check karega ki aaj ka din match karta hai ya nahi)
+```
+0 8 * * * curl -s "https://app.dynacleanindustries.com/api/cron/salary-generate?secret=YOUR_SECRET"
+```
+Matlab: Roz suba 8 baje hit hoga, lekin sirf configured date par (Salary Management → Auto Payroll Settings) actually run karega.
+
+---
+
+## 2. Meta Leads Auto-Fetch – Cron Setup (har 10 min)
 
 Har 10 minute par Meta se leads **background mein** automatically fetch aur DB me save honge (page open na ho to bhi).
 
