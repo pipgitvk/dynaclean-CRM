@@ -1,10 +1,7 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import logo1 from "@/components/logo1.jpg";
-import {
-  floorInr,
-  isHealthInsuranceDeductionRow,
-} from "@/lib/salaryGrossSpecialAllowance";
+import { floorInr } from "@/lib/salaryGrossSpecialAllowance";
 
 const getImportedImageSrc = (mod) => {
   if (!mod) return "";
@@ -305,21 +302,6 @@ export const buildTemplatePayslipHTML = (opts) => {
     Number(c.overtimeAmount) || 0,
   ];
 
-  const isPfDeductionRow = (d) => {
-    const code = String(d?.deduction_code || "");
-    const name = String(d?.deduction_name || "");
-    return (
-      code === "PF" ||
-      name === "PF" ||
-      /provident/i.test(name)
-    );
-  };
-  const isEsiDeductionRow = (d) => {
-    const code = String(d?.deduction_code || "");
-    const name = String(d?.deduction_name || "");
-    return code === "ESI" || name === "ESI" || /\besi\b/i.test(name);
-  };
-
   const lowGrossPfRule = Boolean(c.lowGrossPfRule);
 
   const pfDisplay =
@@ -351,22 +333,9 @@ export const buildTemplatePayslipHTML = (opts) => {
     ].filter((d) => Number(d.calculatedAmount) > 0);
   }
 
-  const processedPositive = (Array.isArray(c.processedDeductions)
-    ? c.processedDeductions
-    : []
-  ).filter((d) => {
-    if (Number(d.calculatedAmount) <= 0) return false;
-    if (isPfDeductionRow(d)) return false;
-    if (lowGrossPfRule && isEsiDeductionRow(d)) return false;
-    if (
-      !(Number(c.healthInsurance) > 0) &&
-      isHealthInsuranceDeductionRow(d)
-    ) {
-      return false;
-    }
-    return true;
-  });
-  const dedList = [...structureDeds, ...processedPositive];
+  // Payslip shows only statutory rows (PF / ESI / Health from structure payroll).
+  // "Active Deductions" from admin (processedDeductions) are not listed on the PDF.
+  const dedList = [...structureDeds];
   const ROWS = Math.max(EARN_ROW_COUNT, dedList.length);
 
   const deductionLabels = [];
@@ -404,13 +373,10 @@ export const buildTemplatePayslipHTML = (opts) => {
   const monthLabel = getMonthYearLabel(monthStr);
   const co = company;
 
-  const displayTotalDeductions = dedList.reduce(
-    (s, d) => s + (Number(d.calculatedAmount) || 0),
-    0,
-  );
+  const displayTotalDeductions = floorInr(Number(c.totalDeductions) || 0);
   const displayNetSalary = Math.max(
     0,
-    floorInr((Number(c.totalEarnings) || 0) - displayTotalDeductions),
+    floorInr(Number(c.netSalary) || 0),
   );
 
   return `<!DOCTYPE html>
