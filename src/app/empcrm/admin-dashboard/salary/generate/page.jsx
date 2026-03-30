@@ -277,57 +277,35 @@ const GenerateSalaryPage = () => {
             return { ...deduction, calculatedAmount: amount };
         });
 
-        const mergedEsi = floorInr(pf + esi);
-        const structureDeductions = lowGrossPfRule
-            ? [
-                  ...(mergedEsi > 0
-                      ? [
-                            {
-                                deduction_name: 'ESI',
-                                calculatedAmount: mergedEsi,
-                                _fromStructure: true,
-                            },
-                        ]
-                      : []),
-                  ...(healthInsurance > 0
-                      ? [
-                            {
-                                deduction_name: 'Health Insurance',
-                                calculatedAmount: healthInsurance,
-                                _fromStructure: true,
-                            },
-                        ]
-                      : []),
-              ]
-            : [
-                  ...(pf > 0
-                      ? [
-                            {
-                                deduction_name: 'PF',
-                                calculatedAmount: pf,
-                                _fromStructure: true,
-                            },
-                        ]
-                      : []),
-                  ...(esi > 0
-                      ? [
-                            {
-                                deduction_name: 'ESI',
-                                calculatedAmount: esi,
-                                _fromStructure: true,
-                            },
-                        ]
-                      : []),
-                  ...(healthInsurance > 0
-                      ? [
-                            {
-                                deduction_name: 'Health Insurance',
-                                calculatedAmount: healthInsurance,
-                                _fromStructure: true,
-                            },
-                        ]
-                      : []),
-              ];
+        const structureDeductions = [
+            ...(pf > 0
+                ? [
+                      {
+                          deduction_name: 'PF',
+                          calculatedAmount: pf,
+                          _fromStructure: true,
+                      },
+                  ]
+                : []),
+            ...(esi > 0
+                ? [
+                      {
+                          deduction_name: 'ESI',
+                          calculatedAmount: esi,
+                          _fromStructure: true,
+                      },
+                  ]
+                : []),
+            ...(healthInsurance > 0
+                ? [
+                      {
+                          deduction_name: 'Health Insurance',
+                          calculatedAmount: healthInsurance,
+                          _fromStructure: true,
+                      },
+                  ]
+                : []),
+        ];
 
         const netSalary = totalEarnings - totalDeductions;
 
