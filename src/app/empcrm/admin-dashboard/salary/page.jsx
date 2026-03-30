@@ -9,6 +9,12 @@ import {
   Trash2,
   Calculator,
   AlertCircle,
+  Settings,
+  Zap,
+  ZapOff,
+  Play,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -69,7 +75,19 @@ const SalaryManagementPage = () => {
   const [showDeductionForm, setShowDeductionForm] = useState(false);
   const [editingDeduction, setEditingDeduction] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const router = useRouter(); // Need to import useRouter at top
+  const router = useRouter();
+
+  // Auto payroll settings state
+  const [showAutoSettings, setShowAutoSettings] = useState(false);
+  const [autoSettings, setAutoSettings] = useState(null);
+  const [autoSettingsLoading, setAutoSettingsLoading] = useState(false);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoForm, setAutoForm] = useState({
+    is_enabled: false,
+    day_of_month: 1,
+    generate_status: "draft",
+    working_days: 26,
+  });
 
   // Salary form state
   const [salaryForm, setSalaryForm] = useState({
@@ -177,6 +195,7 @@ const SalaryManagementPage = () => {
   useEffect(() => {
     fetchEmployees();
     fetchDeductionTypes();
+    fetchAutoSettings();
   }, []);
 
   useEffect(() => {
@@ -211,6 +230,73 @@ const SalaryManagementPage = () => {
       }
     } catch (error) {
       console.error("Error fetching deduction types:", error);
+    }
+  };
+
+  const fetchAutoSettings = async () => {
+    try {
+      const res = await fetch("/api/empcrm/salary/auto-settings");
+      const data = await res.json();
+      if (data.success && data.settings) {
+        setAutoSettings(data.settings);
+        setAutoForm({
+          is_enabled: !!data.settings.is_enabled,
+          day_of_month: data.settings.day_of_month ?? 1,
+          generate_status: data.settings.generate_status || "draft",
+          working_days: data.settings.working_days ?? 26,
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching auto settings:", err);
+    }
+  };
+
+  const handleAutoSettingsSave = async () => {
+    setAutoSettingsLoading(true);
+    try {
+      const res = await fetch("/api/empcrm/salary/auto-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(autoForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAutoSettings(data.settings);
+        toast.success(
+          autoForm.is_enabled
+            ? `Auto payroll ON — runs on day ${autoForm.day_of_month} of every month`
+            : "Auto payroll disabled — running in manual mode"
+        );
+      } else {
+        toast.error(data.message || "Failed to save settings");
+      }
+    } catch {
+      toast.error("Error saving auto settings");
+    } finally {
+      setAutoSettingsLoading(false);
+    }
+  };
+
+  const handleManualRun = async () => {
+    if (!confirm("Generate salary slips for all employees for the previous month now?")) return;
+    setAutoRunning(true);
+    const toastId = toast.loading("Generating salary slips…");
+    try {
+      const res = await fetch("/api/cron/salary-generate?manual=1");
+      const data = await res.json();
+      if (data.success) {
+        toast.success(
+          `Done! Generated: ${data.generated}, Skipped: ${data.skipped}, Failed: ${data.failed} (Month: ${data.salaryMonth})`,
+          { id: toastId, duration: 6000 }
+        );
+        fetchAutoSettings();
+      } else {
+        toast.error(data.message || "Run failed", { id: toastId });
+      }
+    } catch {
+      toast.error("Error running payroll", { id: toastId });
+    } finally {
+      setAutoRunning(false);
     }
   };
 
@@ -432,6 +518,178 @@ const SalaryManagementPage = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Salary Management</h1>
         <p className="text-gray-600">Manage employee salary structures and deductions</p>
+      </div>
+
+      {/* Auto Payroll Settings Panel */}
+      <div className="bg-white rounded-xl shadow-md mb-6 overflow-hidden border border-gray-100">
+        {/* Header / Toggle */}
+        <button
+          type="button"
+          onClick={() => setShowAutoSettings((v) => !v)}
+          className="w-full flex items-center justify-between px-4 sm:px-6 py-4 hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Settings className="w-5 h-5 text-gray-600 shrink-0" />
+            <span className="text-sm sm:text-base font-semibold text-gray-800 truncate">
+              Auto Payroll Settings
+            </span>
+            {autoSettings && (
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
+                  autoSettings.is_enabled
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-600"
+                }`}
+              >
+                {autoSettings.is_enabled ? (
+                  <><Zap className="w-3 h-3" />Automatic</>
+                ) : (
+                  <><ZapOff className="w-3 h-3" />Manual</>
+                )}
+              </span>
+            )}
+            {autoSettings?.is_enabled && autoSettings.last_run_month && (
+              <span className="hidden sm:inline text-xs text-gray-400 shrink-0">
+                Last: {autoSettings.last_run_month}
+              </span>
+            )}
+          </div>
+          {showAutoSettings
+            ? <ChevronUp className="w-5 h-5 text-gray-400 shrink-0" />
+            : <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />}
+        </button>
+
+        {showAutoSettings && (
+          <div className="px-4 sm:px-6 pb-6 pt-3 border-t border-gray-100 space-y-5">
+            <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">
+              In automatic mode, salary slips for all employees are auto-generated on the
+              configured date every month for the previous month (in draft or approved status).
+            </p>
+
+            {/* Mode Toggle */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setAutoForm((f) => ({ ...f, is_enabled: false }))}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm border-2 transition-all ${
+                  !autoForm.is_enabled
+                    ? "bg-gray-800 text-white border-gray-800"
+                    : "bg-white text-gray-500 border-gray-300 hover:border-gray-500"
+                }`}
+              >
+                <ZapOff className="w-4 h-4" />
+                Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setAutoForm((f) => ({ ...f, is_enabled: true }))}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm border-2 transition-all ${
+                  autoForm.is_enabled
+                    ? "bg-green-600 text-white border-green-600"
+                    : "bg-white text-gray-500 border-gray-300 hover:border-green-500"
+                }`}
+              >
+                <Zap className="w-4 h-4" />
+                Automatic
+              </button>
+            </div>
+
+            {/* Config fields — 1 col on mobile, 3 on md+ */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Day of month */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Run on Day of Month
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={autoForm.day_of_month}
+                  onChange={(e) =>
+                    setAutoForm((f) => ({ ...f, day_of_month: Number(e.target.value) }))
+                  }
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm"
+                  placeholder="1 – 28"
+                />
+                <p className="text-xs text-gray-400">Payroll will run on this day every month</p>
+              </div>
+
+              {/* Working days */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Default Working Days
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={autoForm.working_days}
+                  onChange={(e) =>
+                    setAutoForm((f) => ({ ...f, working_days: Number(e.target.value) }))
+                  }
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm"
+                />
+                <p className="text-xs text-gray-400">Total working days in the month</p>
+              </div>
+
+              {/* Status */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Auto-Generated Slip Status
+                </label>
+                <select
+                  value={autoForm.generate_status}
+                  onChange={(e) =>
+                    setAutoForm((f) => ({ ...f, generate_status: e.target.value }))
+                  }
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm bg-white"
+                >
+                  <option value="draft">Draft — HR reviews before employees see</option>
+                  <option value="approved">Approved — Employees can view immediately</option>
+                </select>
+                <p className="text-xs text-gray-400">Status assigned to each generated slip</p>
+              </div>
+            </div>
+
+            {/* Active status banner */}
+            {autoSettings?.is_enabled && (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                <span>
+                  <strong>Active:</strong> Salary slips will auto-generate on day{" "}
+                  <strong>{autoSettings.day_of_month}</strong> of every month.
+                </span>
+                {autoSettings.last_run_at && (
+                  <span className="sm:ml-2 text-xs text-green-600">
+                    Last run: {new Date(autoSettings.last_run_at).toLocaleString("en-IN")}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Action buttons — stack on mobile, row on sm+ */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={handleAutoSettingsSave}
+                disabled={autoSettingsLoading}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors w-full sm:w-auto"
+              >
+                <Settings className="w-4 h-4" />
+                {autoSettingsLoading ? "Saving…" : "Save Settings"}
+              </button>
+              <button
+                type="button"
+                onClick={handleManualRun}
+                disabled={autoRunning}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-lg font-semibold text-sm hover:bg-orange-700 disabled:opacity-50 transition-colors w-full sm:w-auto"
+              >
+                <Play className="w-4 h-4" />
+                {autoRunning ? "Running…" : "Run Now for Previous Month"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Employee Selection */}
