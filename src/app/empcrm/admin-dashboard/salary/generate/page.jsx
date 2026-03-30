@@ -160,7 +160,6 @@ const GenerateSalaryPage = () => {
         const structMedical = Number(salaryStructure.medical_allowance) || 0;
         const structSpecial = Number(salaryStructure.special_allowance) || 0;
         const structBonus = Number(salaryStructure.bonus) || 0;
-        const structPf = Number(salaryStructure.pf) || 0;
         const structEsi = Number(salaryStructure.esi) || 0;
         const structHealthInsurance = Number(salaryStructure.health_insurance) || 0;
         const structOvertimeRate = Number(salaryStructure.overtime_rate) || 0;
@@ -199,7 +198,7 @@ const GenerateSalaryPage = () => {
           fallbackStructureSpecial: structSpecial,
         });
         const bonus = floorInr(structBonus);
-        const pf = structPf;
+        const pf = floorInr(0.12 * basicSalary);
         const esi = structEsi;
         const healthInsurance = structHealthInsurance;
         const overtimeAmount = floorInr(overtimeHours * structOvertimeRate);
@@ -213,8 +212,8 @@ const GenerateSalaryPage = () => {
             bonus +
             overtimeAmount;
 
-        // Deductions (PF / ESI / Health Insurance from salary structure — deduction side only)
-        let totalDeductions = structPf + structEsi + structHealthInsurance;
+        // Deductions (PF = 12% of Basic; ESI / Health from structure; other rows from employee deductions)
+        let totalDeductions = pf + structEsi + structHealthInsurance;
         const processedDeductions = deductions.map(deduction => {
             let amount = 0;
             const code = deduction.deduction_code;
@@ -225,14 +224,16 @@ const GenerateSalaryPage = () => {
             const isIT = code === 'IT' || name === 'IT' || name.includes('Income Tax');
             const isPT = code === 'PT' || name === 'PT' || name.includes('Professional Tax');
 
+            if (isPF) {
+                return { ...deduction, calculatedAmount: 0 };
+            }
+
             if (deduction.calculation_type === 'fixed' || (Number(deduction.amount) > 0 && !deduction.percentage && deduction.calculation_type !== 'formula')) {
                 amount = Number(deduction.amount);
             } else if (deduction.calculation_type === 'percentage' && Number(deduction.percentage) > 0) {
                 amount = (Number(deduction.percentage) / 100) * totalEarnings;
             } else {
-                if (isPF) {
-                    amount = 0.12 * basicSalary;
-                } else if (isESI) {
+                if (isESI) {
                     amount = 0.0075 * totalEarnings;
                 } else if (isIT) {
                     const annualIncome = totalEarnings * 12;
@@ -248,7 +249,6 @@ const GenerateSalaryPage = () => {
                 }
             }
 
-            if (structPf > 0 && isPF) amount = 0;
             if (structEsi > 0 && isESI) amount = 0;
 
             totalDeductions += amount;
