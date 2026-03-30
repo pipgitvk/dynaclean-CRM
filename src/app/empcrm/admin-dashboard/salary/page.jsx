@@ -13,11 +13,17 @@ import {
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
-import { getEffectiveGrossSalary } from "@/lib/salaryGrossSpecialAllowance";
+import {
+  getEffectiveGrossSalary,
+  FIXED_HEALTH_INSURANCE_INR,
+  isLowGrossPfMonthly,
+  LOW_GROSS_PF_RATE,
+  floorInr,
+  syncStatutoryFormFieldsFromStructureInput,
+} from "@/lib/salaryGrossSpecialAllowance";
 
 const FIXED_CONVENIENCE_ALLOWANCE = 2000;
 const FIXED_MEDICAL_ALLOWANCE = 1500;
-const FIXED_HEALTH_INSURANCE = 277;
 
 /** Gross → Basic floor(G/2), HRA floor(G/4), fixed convenience & medical, Special = remainder (matches payroll). */
 function applyGrossSalaryAutoSplit(prevForm, grossInput) {
@@ -35,7 +41,10 @@ function applyGrossSalaryAutoSplit(prevForm, grossInput) {
     0,
     Math.floor(G - basic - hra - transport - medical),
   );
-  const pf = Math.round(0.12 * basic);
+  const lowGross = isLowGrossPfMonthly(G);
+  const pf = lowGross ? "0" : String(Math.round(0.12 * basic));
+  const esi = lowGross ? String(floorInr(LOW_GROSS_PF_RATE * G)) : "0";
+  const health_insurance = lowGross ? "0" : String(FIXED_HEALTH_INSURANCE_INR);
   return {
     ...next,
     basic_salary: String(basic),
@@ -44,8 +53,9 @@ function applyGrossSalaryAutoSplit(prevForm, grossInput) {
     medical_allowance: String(medical),
     special_allowance: String(special),
     bonus: "",
-    pf: String(pf),
-    health_insurance: String(FIXED_HEALTH_INSURANCE),
+    pf,
+    esi,
+    health_insurance,
   };
 }
 
@@ -787,7 +797,17 @@ const SalaryManagementPage = () => {
                   <input
                     type="number"
                     value={salaryForm.basic_salary}
-                    onChange={(e) => setSalaryForm({ ...salaryForm, basic_salary: e.target.value })}
+                    onChange={(e) => {
+                      const basic_salary = e.target.value;
+                      setSalaryForm((prev) => ({
+                        ...prev,
+                        basic_salary,
+                        ...syncStatutoryFormFieldsFromStructureInput({
+                          ...prev,
+                          basic_salary,
+                        }),
+                      }));
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
@@ -874,13 +894,16 @@ const SalaryManagementPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Overtime Rate (per hour)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Overtime Rate (per hour)
+                  </label>
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     value={salaryForm.overtime_rate}
                     onChange={(e) => setSalaryForm({ ...salaryForm, overtime_rate: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
                   />
                 </div>
               </div>

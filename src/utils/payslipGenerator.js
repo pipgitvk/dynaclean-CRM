@@ -1,6 +1,10 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import logo1 from "@/components/logo1.jpg";
+import {
+  floorInr,
+  isHealthInsuranceDeductionRow,
+} from "@/lib/salaryGrossSpecialAllowance";
 
 const getImportedImageSrc = (mod) => {
   if (!mod) return "";
@@ -180,6 +184,14 @@ export function buildPayslipOptsFromMonthlyRecord(record) {
     }
   }
 
+  const te = Number(r.total_earnings) || 0;
+  const pfAmt = Number(r.pf_deduction) || 0;
+  /** Saved rows: infer low-gross (0.75% of period gross) when flag not stored. */
+  const inferredLowGrossPfRule =
+    te > 0 &&
+    pfAmt > 0 &&
+    Math.abs(pfAmt / te - 0.0075) < 0.0015;
+
   const calculation = {
     basicSalary: Number(r.basic_salary) || 0,
     hra: Number(r.hra) || 0,
@@ -191,10 +203,11 @@ export function buildPayslipOptsFromMonthlyRecord(record) {
     esi: Number(r.esi_deduction) || 0,
     healthInsurance,
     overtimeAmount: Number(r.overtime_amount) || 0,
-    totalEarnings: Number(r.total_earnings) || 0,
+    totalEarnings: te,
     totalDeductions: Number(r.total_deductions) || 0,
     netSalary: Number(r.net_salary) || 0,
     processedDeductions,
+    lowGrossPfRule: inferredLowGrossPfRule,
   };
 
   return {
@@ -292,18 +305,67 @@ export const buildTemplatePayslipHTML = (opts) => {
     Number(c.overtimeAmount) || 0,
   ];
 
-  const structureDeds = [
-    { deduction_name: "PF", calculatedAmount: Number(c.pf) || 0 },
-    { deduction_name: "ESI", calculatedAmount: Number(c.esi) || 0 },
-    {
-      deduction_name: "Health Insurance",
-      calculatedAmount: Number(c.healthInsurance) || 0,
-    },
-  ].filter((d) => Number(d.calculatedAmount) > 0);
+  const isPfDeductionRow = (d) => {
+    const code = String(d?.deduction_code || "");
+    const name = String(d?.deduction_name || "");
+    return (
+      code === "PF" ||
+      name === "PF" ||
+      /provident/i.test(name)
+    );
+  };
+  const isEsiDeductionRow = (d) => {
+    const code = String(d?.deduction_code || "");
+    const name = String(d?.deduction_name || "");
+    return code === "ESI" || name === "ESI" || /\besi\b/i.test(name);
+  };
+
+  const lowGrossPfRule = Boolean(c.lowGrossPfRule);
+
+  const pfDisplay =
+    typeof c.pf === "number" && Number.isFinite(c.pf)
+      ? floorInr(c.pf)
+      : 0;
+  const esiFromStruct = Number(c.esi) || 0;
+
+  let structureDeds;
+  if (lowGrossPfRule) {
+    const esiCombined = pfDisplay + floorInr(esiFromStruct);
+    structureDeds = [
+      ...(esiCombined > 0
+        ? [{ deduction_name: "ESI", calculatedAmount: esiCombined }]
+        : []),
+      {
+        deduction_name: "Health Insurance",
+        calculatedAmount: Number(c.healthInsurance) || 0,
+      },
+    ].filter((d) => Number(d.calculatedAmount) > 0);
+  } else {
+    structureDeds = [
+      { deduction_name: "PF", calculatedAmount: pfDisplay },
+      { deduction_name: "ESI", calculatedAmount: esiFromStruct },
+      {
+        deduction_name: "Health Insurance",
+        calculatedAmount: Number(c.healthInsurance) || 0,
+      },
+    ].filter((d) => Number(d.calculatedAmount) > 0);
+  }
+
   const processedPositive = (Array.isArray(c.processedDeductions)
     ? c.processedDeductions
     : []
-  ).filter((d) => Number(d.calculatedAmount) > 0);
+  ).filter((d) => {
+    if (Number(d.calculatedAmount) <= 0) return false;
+    if (isPfDeductionRow(d)) return false;
+    if (lowGrossPfRule && isEsiDeductionRow(d)) return false;
+    if (
+      !(Number(c.healthInsurance) > 0) &&
+      isHealthInsuranceDeductionRow(d)
+    ) {
+      return false;
+    }
+    return true;
+  });
   const dedList = [...structureDeds, ...processedPositive];
   const ROWS = Math.max(EARN_ROW_COUNT, dedList.length);
 
@@ -341,6 +403,15 @@ export const buildTemplatePayslipHTML = (opts) => {
 
   const monthLabel = getMonthYearLabel(monthStr);
   const co = company;
+
+  const displayTotalDeductions = dedList.reduce(
+    (s, d) => s + (Number(d.calculatedAmount) || 0),
+    0,
+  );
+  const displayNetSalary = Math.max(
+    0,
+    floorInr((Number(c.totalEarnings) || 0) - displayTotalDeductions),
+  );
 
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Payslip</title></head>
@@ -411,14 +482,14 @@ export const buildTemplatePayslipHTML = (opts) => {
       <td style="border:1px solid #666;background:#a9c4e3;font-weight:700;padding:7px 7px;font-size:14px;">Salary</td>
       <td style="border:1px solid #666;background:#fff;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">${fmtInr(c.totalEarnings)}</td>
       <td style="border:1px solid #666;background:#a9c4e3;font-weight:700;padding:7px 7px;font-size:14px;">Total Deduction</td>
-      <td style="border:1px solid #666;background:#fff;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">${fmtInr(c.totalDeductions)}</td>
+      <td style="border:1px solid #666;background:#fff;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">${fmtInr(displayTotalDeductions)}</td>
     </tr>
     <tr>
       <td colspan="4" style="border-left:1px solid #666;border-right:1px solid #666;border-bottom:1px solid #666;padding:8px 6px;font-size:0;line-height:0;">&nbsp;</td>
     </tr>
     <tr>
       <td colspan="3" style="border-left:1px solid #666;border-right:none;border-bottom:1px solid #666;padding:8px 9px;font-size:14px;line-height:1.25;font-weight:700;">Net Pay</td>
-      <td style="border-left:none;border-right:1px solid #666;border-bottom:1px solid #666;padding:8px 9px;font-size:14px;line-height:1.25;text-align:right;font-weight:700;">${fmtInr(c.netSalary)}</td>
+      <td style="border-left:none;border-right:1px solid #666;border-bottom:1px solid #666;padding:8px 9px;font-size:14px;line-height:1.25;text-align:right;font-weight:700;">${fmtInr(displayNetSalary)}</td>
     </tr>
   </table>
   <div style="padding:24px 16px 32px;text-align:center;font-size:12px;color:#555;line-height:1.5;font-style:italic;">

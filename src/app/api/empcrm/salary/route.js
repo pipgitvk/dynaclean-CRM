@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-
 const HR_SALARY_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
 
 /** Employees only see payslip rows after approval (paid counts as post-approval). */
@@ -162,6 +161,11 @@ export async function POST(request) {
       return NextResponse.json({ message: "Employee not found." }, { status: 404 });
     }
 
+    const grossSalaryVal =
+      gross_salary === "" || gross_salary === undefined || gross_salary === null
+        ? null
+        : Number(gross_salary);
+
     // Deactivate previous salary structure
     await db.query(
       "UPDATE employee_salary_structure SET is_active = 0, effective_to = ? WHERE username = ? AND is_active = 1",
@@ -175,10 +179,6 @@ export async function POST(request) {
       health_insurance === "" || health_insurance === undefined || health_insurance === null
         ? 0
         : Number(health_insurance);
-    const grossSalaryVal =
-      gross_salary === "" || gross_salary === undefined || gross_salary === null
-        ? null
-        : Number(gross_salary);
 
     await db.query(`
       INSERT INTO employee_salary_structure 
