@@ -159,7 +159,14 @@ const allMenuItems = [
         roles: ["SUPERADMIN", "ACCOUNTANT"],
         icon: "Receipt",
       },
+     
     ],
+  },
+  {
+    path: "/empcrm/admin-dashboard/salary-slips",
+    name: "Salary slips",
+    roles: ["SUPERADMIN", "ACCOUNTANT"],
+    icon: "Receipt",
   },
   {
     name: "Orders",

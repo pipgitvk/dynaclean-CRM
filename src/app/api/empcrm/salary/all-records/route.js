@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
-const HR_SALARY_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
+const HR_SALARY_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"];
 
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
 
 /**
- * GET — all employees' monthly salary rows (payslip list). HR roles only.
+ * GET — all employees' monthly salary rows (payslip list). HR roles and ACCOUNTANT.
  * Query: month=YYYY-MM, search=username/empId fragment, limit, offset
  */
 export async function GET(request) {
