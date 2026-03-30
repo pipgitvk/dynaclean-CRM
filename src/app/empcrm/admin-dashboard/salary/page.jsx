@@ -894,13 +894,16 @@ const SalaryManagementPage = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Overtime Rate (per hour)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Overtime Rate (per hour)
+                  </label>
                   <input
                     type="number"
+                    min="0"
+                    step="0.01"
                     value={salaryForm.overtime_rate}
                     onChange={(e) => setSalaryForm({ ...salaryForm, overtime_rate: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
                   />
                 </div>
               </div>
