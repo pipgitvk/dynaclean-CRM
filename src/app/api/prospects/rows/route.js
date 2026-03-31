@@ -93,7 +93,7 @@ export async function GET(req) {
                NULLIF(TRIM(c.company), '')
              ) AS customer_name
       FROM prospects p
-      LEFT JOIN customers c ON TRIM(c.customer_id) = TRIM(p.customer_id)
+      LEFT JOIN customers c ON BINARY TRIM(c.customer_id) = BINARY TRIM(p.customer_id)
     `;
     query += whereSql;
     query += ` ORDER BY p.commitment_date IS NULL, p.commitment_date ASC, p.updated_at DESC`;

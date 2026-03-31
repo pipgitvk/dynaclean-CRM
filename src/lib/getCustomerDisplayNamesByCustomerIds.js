@@ -13,6 +13,7 @@ export async function getCustomerDisplayNamesByCustomerIds(conn, customerIds) {
   ];
   if (!ids.length) return {};
   const ph = ids.map(() => "?").join(",");
+  /** BINARY avoids ER_CANT_AGGREGATE_2COLLATIONS when column + bound params use different collations. */
   const [rows] = await conn.execute(
     `SELECT TRIM(c.customer_id) AS customer_id,
             COALESCE(
@@ -20,7 +21,7 @@ export async function getCustomerDisplayNamesByCustomerIds(conn, customerIds) {
               NULLIF(TRIM(c.company), '')
             ) AS customer_name
      FROM customers c
-     WHERE TRIM(c.customer_id) IN (${ph})`,
+     WHERE BINARY TRIM(c.customer_id) IN (${ph})`,
     ids,
   );
   /** @type {Record<string, string | null>} */
