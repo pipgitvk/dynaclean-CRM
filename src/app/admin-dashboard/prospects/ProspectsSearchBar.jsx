@@ -31,7 +31,6 @@ export default function ProspectsSearchBar({
   onAddSuggestion,
   onRemoveCustomer,
   onSubmitSearch,
-  onAddProspects,
   /** Plain click / Enter on a suggestion row opens Add Prospect; Ctrl+click still adds to selection only. */
   onSuggestionNavigateToAdd,
 }) {
@@ -153,9 +152,8 @@ export default function ProspectsSearchBar({
       onSubmit={handleFormSubmit}
       className="mb-4 flex flex-col gap-4"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <div ref={rootRef} className="min-w-0 flex-1 space-y-2">
-          <div className="relative">
+      <div ref={rootRef} className="min-w-0 space-y-2">
+        <div className="relative">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 z-[1] h-[18px] w-[18px] -translate-y-1/2 text-slate-400"
               strokeWidth={1.75}
@@ -183,38 +181,38 @@ export default function ProspectsSearchBar({
                 …
               </span>
             ) : null}
-          </div>
-          {open && suggestions.length > 0 ? (
-            <div
-              className="max-h-[min(22rem,50vh)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md ring-1 ring-slate-900/5"
-              role="listbox"
-            >
-              <div className="overflow-x-auto overscroll-x-contain">
-                <table className="w-full min-w-[36rem] text-left text-sm">
-                  <thead className="sticky top-0 z-[1] bg-slate-50 shadow-sm">
-                    <tr>
-                      <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
-                        Quotation ID
-                      </th>
-                      <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
-                        Client
-                      </th>
-                      <th className="hidden px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:table-cell sm:px-3 sm:text-xs">
-                        Email
-                      </th>
-                      <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
-                        Phone
-                      </th>
-                      <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
-                        Date
-                      </th>
-                      <th className="whitespace-nowrap px-2 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {suggestions.map((s, i) => {
+        </div>
+        {open && suggestions.length > 0 ? (
+          <div
+            className="max-h-[min(22rem,50vh)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md ring-1 ring-slate-900/5"
+            role="listbox"
+          >
+            <div className="overflow-x-auto overscroll-x-contain">
+              <table className="w-full min-w-[36rem] text-left text-sm">
+                <thead className="sticky top-0 z-[1] bg-slate-50 shadow-sm">
+                  <tr>
+                    <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                      Quotation ID
+                    </th>
+                    <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                      Client
+                    </th>
+                    <th className="hidden px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:table-cell sm:px-3 sm:text-xs">
+                      Email
+                    </th>
+                    <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                      Phone
+                    </th>
+                    <th className="whitespace-nowrap px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                      Date
+                    </th>
+                    <th className="whitespace-nowrap px-2 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:px-3 sm:text-xs">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {suggestions.map((s, i) => {
                       const key = s.quote_number
                         ? `${s.customer_id}:${s.quote_number}`
                         : s.customer_id;
@@ -272,14 +270,6 @@ export default function ProspectsSearchBar({
               </div>
             </div>
           ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={() => onAddProspects?.()}
-          className="h-11 w-full shrink-0 rounded-[10px] bg-slate-900 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 sm:mt-0 sm:w-auto sm:min-w-[10.5rem]"
-        >
-          Add Prospects
-        </button>
       </div>
 
       {selectedCustomers.length > 0 ? (
