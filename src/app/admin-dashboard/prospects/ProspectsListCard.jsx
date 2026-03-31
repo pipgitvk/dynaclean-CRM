@@ -474,6 +474,28 @@ export default function ProspectsListCard({
     router.push(`/admin-dashboard/prospects/new?customers=${q}${quoteQs}`);
   }, [router]);
 
+  const navigateToAddFromSuggestion = useCallback(
+    (s) => {
+      const qn =
+        s.quote_number ??
+        extractQuoteNumberFromProspectSearch(searchTextRef.current);
+      const q = encodeURIComponent(String(s.customer_id));
+      let quoteQs = "";
+      if (qn) {
+        quoteQs = `&quote_number=${encodeURIComponent(String(qn))}`;
+      } else {
+        const fromSearch = extractQuoteNumberFromProspectSearch(
+          searchTextRef.current,
+        );
+        if (fromSearch) {
+          quoteQs = `&quote_number=${encodeURIComponent(fromSearch)}`;
+        }
+      }
+      router.push(`/admin-dashboard/prospects/new?customers=${q}${quoteQs}`);
+    },
+    [router],
+  );
+
   // Delete disabled for all roles (admin + sales).
   // const handleDelete = useCallback(
   //   (rowId) => {
@@ -507,6 +529,7 @@ export default function ProspectsListCard({
           onRemoveCustomer={() => {}}
           onSubmitSearch={() => {}}
           onAddProspects={() => {}}
+          onSuggestionNavigateToAdd={() => {}}
         />
         <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
           {loadError}
@@ -559,6 +582,7 @@ export default function ProspectsListCard({
         onRemoveCustomer={removeCustomer}
         onSubmitSearch={submitSearch}
         onAddProspects={goAddProspects}
+        onSuggestionNavigateToAdd={navigateToAddFromSuggestion}
       />
 
       {viewerIsAdmin ? (
