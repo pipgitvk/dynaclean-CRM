@@ -34,7 +34,10 @@ export default function EditProspectFormClient({
   const qtySubmit =
     Number.isFinite(qtyParsed) && qtyParsed >= 1 ? qtyParsed : 1;
   const amountNum = Number(row.amount);
-  const safeAmount = Number.isFinite(amountNum) ? amountNum : 0;
+
+  const [amountInput, setAmountInput] = useState(() =>
+    Number.isFinite(amountNum) ? String(amountNum) : "0",
+  );
 
   const [commitmentStr, setCommitmentStr] = useState(() =>
     toDateInputValue(row.commitment_date),
@@ -56,7 +59,6 @@ export default function EditProspectFormClient({
       <input type="hidden" name="prospect_id" value={prospectId} />
       <input type="hidden" name="customer_id" value={row.customer_id} />
       <input type="hidden" name="qty" value={qtySubmit} />
-      <input type="hidden" name="amount" value={safeAmount} />
 
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -106,18 +108,21 @@ export default function EditProspectFormClient({
 
       <div>
         <label
-          htmlFor="amount_display"
+          htmlFor="amount"
           className="mb-1 block text-sm font-medium text-slate-700"
         >
           Total amount
         </label>
         <input
-          id="amount_display"
+          id="amount"
+          name="amount"
           type="text"
-          readOnly
-          tabIndex={-1}
-          value={safeAmount.toFixed(2)}
-          className={`${inputClass} cursor-default bg-slate-50 text-slate-800`}
+          inputMode="decimal"
+          autoComplete="off"
+          required
+          value={amountInput}
+          onChange={(e) => setAmountInput(e.target.value)}
+          className={inputClass}
         />
       </div>
 
