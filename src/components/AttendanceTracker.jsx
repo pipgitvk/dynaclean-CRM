@@ -24,8 +24,10 @@ async function loadFaceDetection() {
 }
 
 // ---------------------------------------------------------------------------
-// CameraCheckinModal
+// CameraCheckinModal (service engineer check-in — min face area vs frame)
 // ---------------------------------------------------------------------------
+const SERVICE_ENGINEER_MIN_FACE_COVERAGE = 0.1; // 10%
+
 function CameraCheckinModal({ onVerified, onCancel }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -128,10 +130,10 @@ function CameraCheckinModal({ onVerified, onCancel }) {
       const imageArea = w * h;
       const coverage = faceArea / imageArea;
 
-      if (coverage < 0.5) {
+      if (coverage < SERVICE_ENGINEER_MIN_FACE_COVERAGE) {
         setStatus("error");
         setMessage(
-          `Your face covers only ${Math.round(coverage * 100)}% of the photo. Please move closer to the camera — at least 50% coverage is required to check in.`
+          `Your face covers only ${Math.round(coverage * 100)}% of the photo. Please move closer to the camera — at least ${Math.round(SERVICE_ENGINEER_MIN_FACE_COVERAGE * 100)}% coverage is required to check in.`
         );
         return;
       }
@@ -168,7 +170,9 @@ function CameraCheckinModal({ onVerified, onCancel }) {
               Face Verification
             </h3>
             <p className="text-xs text-gray-500">
-              Your face must cover 50%+ of the frame
+              Your face must cover{" "}
+              {Math.round(SERVICE_ENGINEER_MIN_FACE_COVERAGE * 100)}%+ of the
+              frame
             </p>
           </div>
           <button
