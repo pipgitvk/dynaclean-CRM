@@ -108,8 +108,9 @@ function getIstCalendarYearMonth() {
 }
 
 /**
- * When commitment_year / commitment_month are absent from the URL, default to current
- * calendar month & year (IST). Use explicit `all` in the URL to mean no filter.
+ * When commitment_year is absent from the URL, default to current calendar year (IST).
+ * When commitment_month is absent or `default`, default to all months (no month filter).
+ * Use explicit `all` in the URL for year to mean no year filter.
  * @param {(key: string) => string} get
  * @param {object|null|undefined} basePartial
  */
@@ -125,7 +126,7 @@ function mergeProspectAdminCalendarDefaultsWithGetter(get, basePartial) {
       };
   const cyRaw = String(get("commitment_year") ?? "").trim();
   const cmRaw = String(get("commitment_month") ?? "").trim();
-  const { year: defY, month: defM } = getIstCalendarYearMonth();
+  const { year: defY } = getIstCalendarYearMonth();
 
   if (cyRaw === "" || cyRaw.toLowerCase() === "default") {
     b.commitmentYear = defY;
@@ -136,7 +137,7 @@ function mergeProspectAdminCalendarDefaultsWithGetter(get, basePartial) {
   }
 
   if (cmRaw === "" || cmRaw.toLowerCase() === "default") {
-    b.commitmentMonth = defM;
+    b.commitmentMonth = null;
   } else if (cmRaw.toLowerCase() === "all") {
     b.commitmentMonth = null;
   } else {

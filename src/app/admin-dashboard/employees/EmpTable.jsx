@@ -15,9 +15,6 @@ const EmployeeCard = ({
   maskEmail,
   maskNumber,
   maskStatus,
-  showEmployeeStatusToggle,
-  handleToggleStatus,
-  togglingUsername,
 }) => (
   <div className="bg-white shadow-md rounded-lg p-4 mb-4 border border-gray-200">
     <div className="mb-2">
@@ -97,28 +94,11 @@ const EmployeeCard = ({
         <span>Manager</span>
       </button>
 
-   
-      {showEmployeeStatusToggle ? (
-        <button
-          type="button"
-          onClick={() => handleToggleStatus(employee)}
-          disabled={togglingUsername === employee.username}
-          className={`font-medium flex items-center space-x-1 text-sm disabled:opacity-50 ${
-            employee.status == 1
-              ? "text-rose-600 hover:text-rose-900"
-              : "text-emerald-600 hover:text-emerald-900"
-          }`}
-          title={employee.status == 1 ? "Deactivate employee" : "Activate employee"}
-        >
-          <span>{togglingUsername === employee.username ? "…" : employee.status == 1 ? "Deactivate" : "Activate"}</span>
-        </button>
-      ) : null}
-  
     </div>
   </div>
 );
 
-const EmpTable = ({ employees, showEmployeeStatusToggle = false }) => {
+const EmpTable = ({ employees }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobile, setIsMobile] = useState(false);
@@ -127,33 +107,7 @@ const EmpTable = ({ employees, showEmployeeStatusToggle = false }) => {
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
   const [savingReportingManager, setSavingReportingManager] = useState(false);
   const [employeeList, setEmployeeList] = useState([]);
-  const [togglingUsername, setTogglingUsername] = useState("");
   const router = useRouter();
-
-  const handleToggleStatus = async (employee) => {
-    const newStatus = employee.status == 1 ? 0 : 1;
-    setTogglingUsername(employee.username);
-    try {
-      const res = await fetch("/api/employees/set-status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: employee.username,
-          status: newStatus,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.error || "Failed to update status");
-        return;
-      }
-      router.refresh();
-    } catch {
-      alert("Failed to update status");
-    } finally {
-      setTogglingUsername("");
-    }
-  };
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -392,9 +346,6 @@ const EmpTable = ({ employees, showEmployeeStatusToggle = false }) => {
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
-                showEmployeeStatusToggle={showEmployeeStatusToggle}
-                handleToggleStatus={handleToggleStatus}
-                togglingUsername={togglingUsername}
               />
             ))
           ) : (
@@ -486,30 +437,6 @@ const EmpTable = ({ employees, showEmployeeStatusToggle = false }) => {
                         >
                           <UserPlus size={20} />
                         </button>
-
-               
-                        {showEmployeeStatusToggle ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(employee)}
-                            disabled={togglingUsername === employee.username}
-                            className={
-                              employee.status == 1
-                                ? "text-rose-600 hover:text-rose-800 disabled:opacity-50"
-                                : "text-emerald-600 hover:text-emerald-800 disabled:opacity-50"
-                            }
-                            title={employee.status == 1 ? "Deactivate" : "Activate"}
-                          >
-                            <span className="text-xs font-medium">
-                              {togglingUsername === employee.username
-                                ? "…"
-                                : employee.status == 1
-                                  ? "Deactivate"
-                                  : "Activate"}
-                            </span>
-                          </button>
-                        ) : null}
-                      
                       </div>
                     </td>
                   </tr>
