@@ -15,6 +15,9 @@ const EmployeeCard = ({
   maskEmail,
   maskNumber,
   maskStatus,
+  showEmployeeStatusToggle,
+  handleToggleStatus,
+  togglingUsername,
 }) => (
   <div className="bg-white shadow-md rounded-lg p-4 mb-4 border border-gray-200">
     <div className="mb-2">
@@ -94,7 +97,7 @@ const EmployeeCard = ({
         <span>Manager</span>
       </button>
 
-      {/*
+   
       {showEmployeeStatusToggle ? (
         <button
           type="button"
@@ -110,12 +113,12 @@ const EmployeeCard = ({
           <span>{togglingUsername === employee.username ? "…" : employee.status == 1 ? "Deactivate" : "Activate"}</span>
         </button>
       ) : null}
-      */}
+  
     </div>
   </div>
 );
 
-const EmpTable = ({ employees }) => {
+const EmpTable = ({ employees, showEmployeeStatusToggle = false }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isMobile, setIsMobile] = useState(false);
@@ -124,10 +127,33 @@ const EmpTable = ({ employees }) => {
   const [selectedReportingManager, setSelectedReportingManager] = useState("");
   const [savingReportingManager, setSavingReportingManager] = useState(false);
   const [employeeList, setEmployeeList] = useState([]);
+  const [togglingUsername, setTogglingUsername] = useState("");
   const router = useRouter();
 
-  // const [togglingUsername, setTogglingUsername] = useState("");
-  // const handleToggleStatus = async (employee) => { ... }; — Activate/Deactivate UI commented out
+  const handleToggleStatus = async (employee) => {
+    const newStatus = employee.status == 1 ? 0 : 1;
+    setTogglingUsername(employee.username);
+    try {
+      const res = await fetch("/api/employees/set-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: employee.username,
+          status: newStatus,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Failed to update status");
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert("Failed to update status");
+    } finally {
+      setTogglingUsername("");
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -366,6 +392,9 @@ const EmpTable = ({ employees }) => {
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
+                showEmployeeStatusToggle={showEmployeeStatusToggle}
+                handleToggleStatus={handleToggleStatus}
+                togglingUsername={togglingUsername}
               />
             ))
           ) : (
@@ -458,7 +487,7 @@ const EmpTable = ({ employees }) => {
                           <UserPlus size={20} />
                         </button>
 
-                        {/*
+               
                         {showEmployeeStatusToggle ? (
                           <button
                             type="button"
@@ -480,7 +509,7 @@ const EmpTable = ({ employees }) => {
                             </span>
                           </button>
                         ) : null}
-                        */}
+                      
                       </div>
                     </td>
                   </tr>
