@@ -12,6 +12,8 @@ import {
   User,
   AlertCircle
 } from "lucide-react";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+import Link from "next/link";
 
 export default function AdminLeaveManagement() {
   const [leaves, setLeaves] = useState([]);
@@ -23,6 +25,12 @@ export default function AdminLeaveManagement() {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Reporting manager assignment (inside View modal)
+  const [canAddReportingManager, setCanAddReportingManager] = useState(false);
+  const [showReportingManagerModal, setShowReportingManagerModal] = useState(false);
+  const [selectedReportingManager, setSelectedReportingManager] = useState("");
+  const [reportingManagerSaving, setReportingManagerSaving] = useState(false);
 
   // Leave policy management
   const [employees, setEmployees] = useState([]);
@@ -37,6 +45,22 @@ export default function AdminLeaveManagement() {
   useEffect(() => {
     fetchLeaves();
     fetchEmployees();
+  }, []);
+
+  // HR-only UI for setting reporting manager
+  useEffect(() => {
+    const fetchMyRole = async () => {
+      try {
+        const res = await fetch("/api/me");
+        const data = await res.json();
+        const role = data?.userRole || data?.role || "";
+        setCanAddReportingManager(["HR", "HR HEAD", "HR Executive"].includes(role));
+      } catch (e) {
+        setCanAddReportingManager(false);
+      }
+    };
+
+    fetchMyRole();
   }, []);
 
   useEffect(() => {
@@ -197,6 +221,40 @@ export default function AdminLeaveManagement() {
     }
   };
 
+  const handleSaveReportingManager = async () => {
+    if (!selectedLeave?.username) return;
+    if (!selectedReportingManager) {
+      alert("Please select a reporting manager");
+      return;
+    }
+
+    try {
+      setReportingManagerSaving(true);
+      const res = await fetch("/api/employees/set-reporting-manager", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeUsername: selectedLeave.username,
+          reportingManagerUsername: selectedReportingManager || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        alert(data?.error || data?.message || "Failed to update reporting manager");
+        return;
+      }
+
+      setShowReportingManagerModal(false);
+      setSelectedReportingManager("");
+      fetchLeaves();
+    } catch (e) {
+      alert("Error updating reporting manager");
+    } finally {
+      setReportingManagerSaving(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const styles = {
       pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
@@ -341,6 +399,18 @@ export default function AdminLeaveManagement() {
           </div>
         </div>
       </div>
+
+      {/* HR: Set Reporting Manager (opens employee selector page) */}
+      {canAddReportingManager && (
+        <div className="flex justify-end mb-4">
+          <Link
+            href="/empcrm/admin-dashboard/leave/reporting-manager"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            Set Reporting Manager
+          </Link>
+        </div>
+      )}
 
       {/* Leave Applications Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -611,17 +681,113 @@ export default function AdminLeaveManagement() {
 
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-end">
+            <div className="p-6 border-t border-gray-200 flex justify-between items-center">
+              {canAddReportingManager && (
+                <button
+                  onClick={() => {
+                    setSelectedReportingManager("");
+                    setShowReportingManagerModal(true);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  disabled={reportingManagerSaving}
+                >
+                  {reportingManagerSaving ? "Saving..." : "Add Reporting Manager"}
+                </button>
+              )}
               <button
                 onClick={() => {
                   setShowApprovalModal(false);
                   setRejectionReason("");
                   setSelectedLeave(null);
+                  setShowReportingManagerModal(false);
+                  setSelectedReportingManager("");
                 }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reporting Manager Modal */}
+      {showReportingManagerModal && selectedLeave && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          {/* overflow-visible so SearchableSelect dropdown isn't clipped */}
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-visible">
+            <div className="p-6 border-b border-gray-200 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800">Set Reporting Manager</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Employee:{" "}
+                  <span className="font-medium text-gray-900">
+                    {selectedLeave.full_name || selectedLeave.username}
+                  </span>
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowReportingManagerModal(false);
+                  setSelectedReportingManager("");
+                }}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reporting Manager
+                </label>
+                <SearchableSelect
+                  options={(() => {
+                    const placeholder = { value: "", label: "-- Select Reporting Manager --" };
+                    const seen = new Set();
+                    const opts = employees
+                      .filter((emp) => emp?.username && emp.username !== selectedLeave.username)
+                      .map((emp) => {
+                        const username = emp.username;
+                        if (seen.has(username)) return null;
+                        seen.add(username);
+                        return {
+                          value: username,
+                          label: `${username}${emp.userRole ? ` (${emp.userRole})` : ""}`,
+                        };
+                      })
+                      .filter(Boolean);
+
+                    return [placeholder, ...opts];
+                  })()}
+                  value={selectedReportingManager}
+                  onChange={(val) => setSelectedReportingManager(val)}
+                  placeholder="-- Select Reporting Manager --"
+                  searchPlaceholder="Search manager..."
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowReportingManagerModal(false);
+                    setSelectedReportingManager("");
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  disabled={reportingManagerSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveReportingManager}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  disabled={reportingManagerSaving}
+                >
+                  {reportingManagerSaving ? "Saving..." : "Save"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

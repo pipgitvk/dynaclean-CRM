@@ -6,6 +6,16 @@ export async function GET() {
   try {
     const conn = await getDbConnection();
 
+    // reporting_manager column may not exist in some DBs yet
+    const [columns] = await conn.execute(
+      `SHOW COLUMNS FROM rep_list LIKE 'reporting_manager'`
+    );
+    const hasReportingManagerColumn = columns.length > 0;
+
+    const reportingManagerSelect = hasReportingManagerColumn
+      ? `, reporting_manager`
+      : ``;
+
     const [employees] = await conn.execute(
       `SELECT 
         username, 
@@ -13,7 +23,8 @@ export async function GET() {
         email, 
         userRole,
         status,
-        userDepartment 
+        userDepartment
+        ${reportingManagerSelect}
       FROM rep_list 
       where status = 1
       ORDER BY username ASC`

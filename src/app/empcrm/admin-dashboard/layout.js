@@ -13,7 +13,8 @@ export default async function EmpCrmLayout({ children }) {
   return (
     <UserLayoutShell
       menuItems={menuItems}
-      showBackButton={true}
+      // HR: only show “Back to user CRM” (hide “Back to CRM” to avoid 2 buttons)
+      showBackButton={!showBackToUserCrm}
       backButtonPath={backButtonPath}
       showBackToUserCrm={showBackToUserCrm}
     >
