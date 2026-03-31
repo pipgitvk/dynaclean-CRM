@@ -18,7 +18,9 @@ const QuickEditPage = () => {
     state: "",
     userRole: "",
     profile_pic: "",
+    status: 0,
   });
+  const [canEditEmployeeStatus, setCanEditEmployeeStatus] = useState(false);
   const [newProfilePic, setNewProfilePic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,7 +40,12 @@ const QuickEditPage = () => {
 
         console.log("Fetched employee data:", data);
 
-        setEmployee(data.employee);
+        const emp = data.employee || {};
+        setEmployee({
+          ...emp,
+          status: emp.status == null ? 0 : Number(emp.status),
+        });
+        setCanEditEmployeeStatus(!!data.canEditEmployeeStatus);
       } catch (err) {
         setError(err.message);
         toast.error("Failed to load employee data.");
@@ -102,6 +109,9 @@ const QuickEditPage = () => {
     formData.append("address", employee.address);
     formData.append("state", employee.state);
     formData.append("userRole", employee.userRole);
+    if (canEditEmployeeStatus) {
+      formData.append("status", String(employee.status === 1 ? 1 : 0));
+    }
     if (newProfilePic) {
       formData.append("profile_pic", newProfilePic);
     } else {
@@ -149,9 +159,20 @@ const QuickEditPage = () => {
 
   return (
     <div className="bg-white shadow-md rounded-lg p-8 max-w-2xl mx-auto my-10">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-        Quick Edit: {employee.username}
-      </h1>
+      <div className="text-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-3">
+          Quick Edit: {employee.username}
+        </h1>
+        <span
+          className={`inline-flex px-4 py-1.5 rounded-full text-sm font-semibold ${
+            employee.status == 1
+              ? "bg-emerald-100 text-emerald-800"
+              : "bg-gray-200 text-gray-700"
+          }`}
+        >
+          {employee.status == 1 ? "Active" : "Inactive"}
+        </span>
+      </div>
       <div className="flex justify-center mb-6">
         {(profileImageSrc && profileImageSrc.startsWith("/employees")) ||
           newProfilePic ? (
@@ -259,6 +280,31 @@ const QuickEditPage = () => {
               onChange={handleInputChange}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Status
+            </label>
+            {canEditEmployeeStatus ? (
+              <select
+                name="status"
+                value={employee.status == 1 ? "1" : "0"}
+                onChange={(e) =>
+                  setEmployee((prev) => ({
+                    ...prev,
+                    status: e.target.value === "1" ? 1 : 0,
+                  }))
+                }
+                className="mt-1 block w-full rounded-md border border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="1">Active</option>
+                <option value="0">Inactive</option>
+              </select>
+            ) : (
+              <p className="mt-1 text-gray-800">
+                {employee.status == 1 ? "Active" : "Inactive"}
+              </p>
+            )}
           </div>
         </div>
         <div className="mt-6 flex justify-end space-x-4">

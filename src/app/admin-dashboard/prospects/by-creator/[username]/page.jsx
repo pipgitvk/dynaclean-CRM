@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getDbConnection } from "@/lib/db";
 import { ensureProspectsTable } from "@/lib/ensureProspectsTable";
 import { getSessionPayload } from "@/lib/auth";
@@ -7,7 +8,7 @@ import {
   canAccessProspectsRole,
   isProspectsAdminRole,
 } from "@/lib/prospectAccess";
-import ProspectsListCard from "./ProspectsListCard";
+import ProspectsListCard from "../../ProspectsListCard";
 import {
   parseCustomerIdsParam,
   parseQuoteNumbersParam,
@@ -22,7 +23,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function ProspectsPage({ searchParams }) {
+export default async function ProspectsByCreatorPage({ params, searchParams }) {
   const payload = await getSessionPayload();
   if (!payload || !canAccessProspectsRole(payload.role)) {
     return (
@@ -30,6 +31,23 @@ export default async function ProspectsPage({ searchParams }) {
         Unauthorized. Prospects is for super admin, admin, or sales roles.
       </div>
     );
+  }
+
+  const viewerIsAdmin = isProspectsAdminRole(payload.role);
+  if (!viewerIsAdmin) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+        This page is only for admin users. Use the main Prospects list.
+      </div>
+    );
+  }
+
+  const routeParams = await params;
+  const creatorName = decodeURIComponent(
+    String(routeParams?.username ?? "").trim(),
+  );
+  if (!creatorName) {
+    notFound();
   }
 
   const resolved = await searchParams;
@@ -42,13 +60,15 @@ export default async function ProspectsPage({ searchParams }) {
   );
   const like = searchRaw ? `%${searchRaw}%` : null;
 
-  const viewerIsAdmin = isProspectsAdminRole(payload.role);
-  const adminFiltersParsed = viewerIsAdmin
-    ? parseProspectsAdminFiltersFromSearchParams(resolved)
-    : null;
-  const adminFilters = viewerIsAdmin
-    ? mergeProspectAdminCalendarDefaults(resolved, adminFiltersParsed)
-    : null;
+  const parsed = parseProspectsAdminFiltersFromSearchParams(resolved);
+  const basePartial = {
+    ...(parsed || {}),
+    createdBy: creatorName,
+  };
+  const adminFilters = mergeProspectAdminCalendarDefaults(
+    resolved,
+    basePartial,
+  );
 
   let rows = [];
   let loadError = null;
@@ -58,35 +78,33 @@ export default async function ProspectsPage({ searchParams }) {
     await ensureProspectsTable();
     const conn = await getDbConnection();
 
-    if (viewerIsAdmin) {
-      try {
-        const [cr] = await conn.execute(
-          `SELECT TRIM(created_by) AS u, COUNT(*) AS cnt,
-                  COALESCE(SUM(amount), 0) AS total_amount,
-                  GROUP_CONCAT(DISTINCT TRIM(CAST(customer_id AS CHAR)) ORDER BY TRIM(CAST(customer_id AS CHAR)) SEPARATOR ', ') AS customer_ids
-           FROM prospects
-           WHERE created_by IS NOT NULL AND TRIM(created_by) <> ''
-           GROUP BY TRIM(created_by)
-           ORDER BY u ASC`,
-        );
-        prospectCreatorSummaries = (cr || [])
-          .map((r) => {
-            const raw = r.customer_ids != null ? String(r.customer_ids) : "";
-            const customerIds = raw
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean);
-            return {
-              name: String(r.u ?? "").trim(),
-              count: Number(r.cnt) || 0,
-              totalAmount: Number(r.total_amount) || 0,
-              customerIds,
-            };
-          })
-          .filter((x) => x.name);
-      } catch {
-        prospectCreatorSummaries = [];
-      }
+    try {
+      const [cr] = await conn.execute(
+        `SELECT TRIM(created_by) AS u, COUNT(*) AS cnt,
+                COALESCE(SUM(amount), 0) AS total_amount,
+                GROUP_CONCAT(DISTINCT TRIM(CAST(customer_id AS CHAR)) ORDER BY TRIM(CAST(customer_id AS CHAR)) SEPARATOR ', ') AS customer_ids
+         FROM prospects
+         WHERE created_by IS NOT NULL AND TRIM(created_by) <> ''
+         GROUP BY TRIM(created_by)
+         ORDER BY u ASC`,
+      );
+      prospectCreatorSummaries = (cr || [])
+        .map((r) => {
+          const raw = r.customer_ids != null ? String(r.customer_ids) : "";
+          const customerIds = raw
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          return {
+            name: String(r.u ?? "").trim(),
+            count: Number(r.cnt) || 0,
+            totalAmount: Number(r.total_amount) || 0,
+            customerIds,
+          };
+        })
+        .filter((x) => x.name);
+    } catch {
+      prospectCreatorSummaries = [];
     }
 
     const { whereSql, params } = buildProspectsListWhereClause({
@@ -161,16 +179,16 @@ export default async function ProspectsPage({ searchParams }) {
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 md:p-8 dark:border-slate-200 dark:bg-white">
-      {!viewerIsAdmin && (
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link
-          href="/user-dashboard"
-          className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:text-blue-900 hover:underline"
+          href="/admin-dashboard/prospects"
+          className="inline-flex items-center gap-1 text-sm font-medium text-blue-700 hover:text-blue-900 hover:underline"
         >
-          ← Back to user dashboard
+          ← All prospects
         </Link>
-      )}
+      </div>
       <h1 className="mb-4 text-xl font-semibold tracking-tight text-slate-900 sm:mb-6 sm:text-2xl">
-        Prospects
+        Prospects — {creatorName}
       </h1>
 
       <Suspense
@@ -190,6 +208,7 @@ export default async function ProspectsPage({ searchParams }) {
           loadError={loadError}
           viewerUsername={viewerUsername}
           viewerIsAdmin={viewerIsAdmin}
+          lockedCreatorName={creatorName}
         />
       </Suspense>
     </div>

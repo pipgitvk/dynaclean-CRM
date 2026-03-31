@@ -5,6 +5,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
+import { getMainSessionPayload } from "@/lib/auth";
 // Login username rename disabled — keep import commented if re-enabled:
 // import { renameRepListUsername } from "@/lib/renameRepListUsername";
 
@@ -39,7 +40,7 @@ export async function GET(request, { params }) {
     const { username } = await params;
     const db = await getDbConnection();
     const [rows] = await db.query(
-      "SELECT username, email, dob, number, address, state, userRole, profile_pic FROM rep_list WHERE username = ?",
+      "SELECT username, email, dob, number, address, state, userRole, profile_pic, status FROM rep_list WHERE username = ?",
       [username],
     );
 
@@ -50,7 +51,13 @@ export async function GET(request, { params }) {
       );
     }
 
-    return NextResponse.json({ employee: rows[0] });
+    const mainPayload = await getMainSessionPayload();
+    const canEditEmployeeStatus = mainPayload?.role === "SUPERADMIN";
+
+    return NextResponse.json({
+      employee: rows[0],
+      canEditEmployeeStatus,
+    });
   } catch (error) {
     console.error("Error fetching employee data:", error);
     return NextResponse.json(
@@ -78,14 +85,50 @@ export async function PUT(request, { params }) {
     const state = formData.get("state");
     const userRole = formData.get("userRole");
     const profilePic = formData.get("profile_pic");
+    const statusRaw = formData.get("status");
+
+    const mainPayload = await getMainSessionPayload();
+    let statusToSet = null;
+    if (statusRaw !== null && statusRaw !== "") {
+      const s = Number(statusRaw);
+      if (s !== 0 && s !== 1) {
+        return NextResponse.json(
+          { message: "status must be 0 or 1." },
+          { status: 400 },
+        );
+      }
+      if (mainPayload?.role !== "SUPERADMIN") {
+        return NextResponse.json(
+          { message: "Forbidden: only SUPERADMIN can change employee status." },
+          { status: 403 },
+        );
+      }
+      const actor = String(mainPayload.username || "").toLowerCase();
+      if (s === 0 && actor === String(effectiveUsername).toLowerCase()) {
+        return NextResponse.json(
+          { message: "You cannot deactivate your own account." },
+          { status: 400 },
+        );
+      }
+      statusToSet = s;
+    }
 
     let profilePicPath = formData.get("current_profile_pic");
-    let query = `
+    let query = statusToSet !== null
+      ? `
+      UPDATE rep_list 
+      SET email = ?, dob = ?, number = ?, address = ?, state = ?, userRole = ?, status = ?
+      WHERE username = ?
+    `
+      : `
       UPDATE rep_list 
       SET email = ?, dob = ?, number = ?, address = ?, state = ?, userRole = ?
       WHERE username = ?
     `;
-    let queryParams = [email, dob, number, address, state, userRole, effectiveUsername];
+    let queryParams =
+      statusToSet !== null
+        ? [email, dob, number, address, state, userRole, statusToSet, effectiveUsername]
+        : [email, dob, number, address, state, userRole, effectiveUsername];
 
     if (profilePic && typeof profilePic !== "string") {
       const bytes = await profilePic.arrayBuffer();
@@ -106,21 +149,41 @@ export async function PUT(request, { params }) {
       await writeFile(filePath, buffer);
 
       profilePicPath = `/employees/${effectiveUsername}/${filename}`;
-      query = `
+      query =
+        statusToSet !== null
+          ? `
+        UPDATE rep_list 
+        SET email = ?, dob = ?, number = ?, address = ?, state = ?, userRole = ?, profile_pic = ?, status = ? 
+        WHERE username = ?
+      `
+          : `
         UPDATE rep_list 
         SET email = ?, dob = ?, number = ?, address = ?, state = ?, userRole = ?, profile_pic = ? 
         WHERE username = ?
       `;
-      queryParams = [
-        email,
-        dob,
-        number,
-        address,
-        state,
-        userRole,
-        profilePicPath,
-        effectiveUsername,
-      ];
+      queryParams =
+        statusToSet !== null
+          ? [
+              email,
+              dob,
+              number,
+              address,
+              state,
+              userRole,
+              profilePicPath,
+              statusToSet,
+              effectiveUsername,
+            ]
+          : [
+              email,
+              dob,
+              number,
+              address,
+              state,
+              userRole,
+              profilePicPath,
+              effectiveUsername,
+            ];
     }
 
     const db = await getDbConnection();

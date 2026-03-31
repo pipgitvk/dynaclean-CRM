@@ -8,8 +8,8 @@ import {
   useMemo,
 } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, Pencil, Search } from "lucide-react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { ChevronRight, Eye, Pencil, Search, User } from "lucide-react";
 import ProspectsSearchBar from "./ProspectsSearchBar";
 // import { deleteProspect } from "./actions";
 import {
@@ -140,15 +140,6 @@ function normalizeAdminFilterState(initial) {
   };
 }
 
-function adminSnapshotToSelectStrings(f) {
-  return {
-    year: f.commitmentYear != null ? String(f.commitmentYear) : "",
-    month: f.commitmentMonth != null ? String(f.commitmentMonth) : "",
-    day: f.commitmentDay != null ? String(f.commitmentDay) : "",
-    createdBy: f.createdBy ?? "",
-  };
-}
-
 function buildCommitmentYearOptions() {
   const y = new Date().getFullYear();
   const out = [];
@@ -171,8 +162,161 @@ const MONTH_LABELS = [
   "December",
 ];
 
-const adminSelectClass =
-  "h-11 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-200/90";
+const adminTableSelectClass =
+  "h-11 min-w-[9rem] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100";
+
+function initialYearSelectFromAdmin(initialFilters) {
+  const n = normalizeAdminFilterState(initialFilters);
+  if (n.commitmentYear != null && Number.isFinite(Number(n.commitmentYear))) {
+    return String(Number(n.commitmentYear));
+  }
+  return "all";
+}
+
+function initialMonthSelectFromAdmin(initialFilters) {
+  const n = normalizeAdminFilterState(initialFilters);
+  if (n.commitmentMonth != null && Number.isFinite(Number(n.commitmentMonth))) {
+    return String(Number(n.commitmentMonth));
+  }
+  return "";
+}
+
+function ProspectCreatorCardsGrid({
+  summaries,
+  selectedCreatorFromPath,
+}) {
+  const [customerIdQuery, setCustomerIdQuery] = useState("");
+
+  const filteredSummaries = useMemo(() => {
+    const q = customerIdQuery.trim();
+    if (!q) return summaries;
+    return summaries.filter((s) => {
+      const ids = Array.isArray(s.customerIds) ? s.customerIds : [];
+      return ids.some((id) => String(id).trim() === q);
+    });
+  }, [summaries, customerIdQuery]);
+
+  if (!summaries.length) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-14 text-center">
+        <p className="text-sm font-medium text-slate-600">
+          No creators yet — add prospects to see them listed here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50/90 to-white p-5 shadow-sm sm:p-6 md:p-8">
+      <div className="mb-5 border-b border-slate-200/80 pb-4">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600">
+              Created by
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Choose a team member to open their prospects
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 w-full max-w-md">
+          <label htmlFor="creator-cards-customer-id-search" className="sr-only">
+            Search by customer ID
+          </label>
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              aria-hidden
+            />
+            <input
+              id="creator-cards-customer-id-search"
+              type="search"
+              autoComplete="off"
+              value={customerIdQuery}
+              onChange={(e) => setCustomerIdQuery(e.target.value)}
+              placeholder="Search by customer ID…"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+        </div>
+      </div>
+      {filteredSummaries.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
+          <p className="text-sm font-medium text-slate-600">
+            No creator matches this customer ID.
+          </p>
+        </div>
+      ) : (
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {filteredSummaries.map(({ name, count, totalAmount = 0, customerIds = [] }) => {
+          const selected = selectedCreatorFromPath === name;
+          const amount = Number(totalAmount ?? 0);
+          const ids = Array.isArray(customerIds) ? customerIds : [];
+          return (
+            <li key={name}>
+              <Link
+                href={`/admin-dashboard/prospects/by-creator/${encodeURIComponent(name)}`}
+                scroll={false}
+                className={[
+                  "group relative flex flex-col gap-3 rounded-2xl border p-5 text-left transition-all duration-200",
+                  "outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+                  selected
+                    ? "border-blue-400 bg-gradient-to-br from-blue-50/50 to-white shadow-md ring-2 ring-blue-500/30"
+                    : "border-slate-200/90 bg-gradient-to-br from-white via-slate-50/40 to-blue-50/50 shadow-sm hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg",
+                ].join(" ")}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={[
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600 transition group-hover:bg-blue-600 group-hover:text-white",
+                      selected ? "bg-blue-600 text-white" : "",
+                    ].join(" ")}
+                  >
+                    <User className="h-5 w-5" strokeWidth={2} aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className="line-clamp-2 text-base font-semibold leading-snug text-slate-900"
+                      title={name}
+                    >
+                      {name}
+                    </span>
+                    <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+                      {count} {count === 1 ? "prospect" : "prospects"}
+                    </p>
+                    <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Customer ID
+                    </p>
+                    <p
+                      className="mt-0.5 text-xs font-mono leading-relaxed text-slate-700 break-words"
+                      title={ids.join(", ")}
+                    >
+                      {ids.length ? ids.join(", ") : "—"}
+                    </p>
+                    <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Total amount
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums text-emerald-700">
+                      {formatAmount(amount)}
+                    </p>
+                  </div>
+                  <ChevronRight
+                    className={[
+                      "h-5 w-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-blue-500",
+                      selected ? "text-blue-500" : "",
+                    ].join(" ")}
+                    aria-hidden
+                  />
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      )}
+    </div>
+  );
+}
 
 export default function ProspectsListCard({
   initialRows = [],
@@ -180,13 +324,29 @@ export default function ProspectsListCard({
   initialCustomerIds = [],
   initialQuoteNumbers = [],
   initialAdminFilters = null,
-  prospectCreatorUsernames = [],
+  prospectCreatorSummaries = [],
   loadError = null,
   viewerUsername = "",
   viewerIsAdmin = false,
+  lockedCreatorName = null,
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const selectedCreatorFromPath = useMemo(() => {
+    const mark = "/admin-dashboard/prospects/by-creator/";
+    if (!pathname.startsWith(mark)) return null;
+    return decodeURIComponent(pathname.slice(mark.length));
+  }, [pathname]);
+
+  const isMainProspectsList =
+    pathname === "/admin-dashboard/prospects" ||
+    pathname === "/admin-dashboard/prospects/";
+
+  /** Admins use creator cards → by-creator page; hide the big table on the main list only. */
+  const hideDataTable =
+    viewerIsAdmin && lockedCreatorName == null && isMainProspectsList;
   const [rows, setRows] = useState(initialRows);
   const [searchText, setSearchText] = useState(initialSearch);
   const [selectedCustomers, setSelectedCustomers] = useState(() =>
@@ -194,38 +354,16 @@ export default function ProspectsListCard({
   );
   const [tableLoading, setTableLoading] = useState(false);
 
-  const emptyAdminSnapshot = useRef({
-    commitmentYear: null,
-    commitmentMonth: null,
-    commitmentDay: null,
-    createdBy: null,
-    adminSearch: null,
-  });
   const adminFiltersRef = useRef(
     normalizeAdminFilterState(initialAdminFilters),
   );
-  const adminSearchDebounceRef = useRef(null);
 
-  const [fYear, setFYear] = useState(() =>
-    adminSnapshotToSelectStrings(normalizeAdminFilterState(initialAdminFilters))
-      .year,
+  const [commitmentYearSelect, setCommitmentYearSelect] = useState(() =>
+    initialYearSelectFromAdmin(initialAdminFilters),
   );
-  const [fMonth, setFMonth] = useState(() =>
-    adminSnapshotToSelectStrings(normalizeAdminFilterState(initialAdminFilters))
-      .month,
+  const [commitmentMonthSelect, setCommitmentMonthSelect] = useState(() =>
+    initialMonthSelectFromAdmin(initialAdminFilters),
   );
-  const [fDay, setFDay] = useState(() =>
-    adminSnapshotToSelectStrings(normalizeAdminFilterState(initialAdminFilters))
-      .day,
-  );
-  const [fCreatedBy, setFCreatedBy] = useState(() =>
-    adminSnapshotToSelectStrings(normalizeAdminFilterState(initialAdminFilters))
-      .createdBy,
-  );
-  const [fAdminSearch, setFAdminSearch] = useState(() => {
-    const n = normalizeAdminFilterState(initialAdminFilters);
-    return n.adminSearch ?? "";
-  });
 
   const searchTextRef = useRef(searchText);
   searchTextRef.current = searchText;
@@ -247,41 +385,24 @@ export default function ProspectsListCard({
 
   useEffect(() => {
     if (!viewerIsAdmin) return;
-    const norm = normalizeAdminFilterState(initialAdminFilters);
-    adminFiltersRef.current = norm;
-    const s = adminSnapshotToSelectStrings(norm);
-    setFYear(s.year);
-    setFMonth(s.month);
-    setFDay(s.day);
-    setFCreatedBy(s.createdBy);
-    setFAdminSearch(norm.adminSearch ?? "");
+    adminFiltersRef.current = normalizeAdminFilterState(initialAdminFilters);
+    setCommitmentYearSelect(initialYearSelectFromAdmin(initialAdminFilters));
+    setCommitmentMonthSelect(initialMonthSelectFromAdmin(initialAdminFilters));
   }, [viewerIsAdmin, adminFilterKey, initialAdminFilters]);
-
-  useEffect(() => {
-    return () => {
-      if (adminSearchDebounceRef.current) {
-        clearTimeout(adminSearchDebounceRef.current);
-      }
-    };
-  }, []);
 
   const syncAdminFiltersToUrl = useCallback(
     (snapshot) => {
       if (!viewerIsAdmin) return;
       const p = new URLSearchParams(searchParams.toString());
-      if (
-        snapshot.commitmentYear != null &&
-        Number.isFinite(Number(snapshot.commitmentYear))
-      ) {
-        p.set("commitment_year", String(Number(snapshot.commitmentYear)));
+      const y = snapshot.commitmentYear;
+      if (y != null && Number.isFinite(Number(y))) {
+        p.set("commitment_year", String(Number(y)));
       } else {
         p.set("commitment_year", "all");
       }
-      if (
-        snapshot.commitmentMonth != null &&
-        Number.isFinite(Number(snapshot.commitmentMonth))
-      ) {
-        p.set("commitment_month", String(Number(snapshot.commitmentMonth)));
+      const m = snapshot.commitmentMonth;
+      if (m != null && Number.isFinite(Number(m))) {
+        p.set("commitment_month", String(Number(m)));
       } else {
         p.set("commitment_month", "all");
       }
@@ -290,7 +411,9 @@ export default function ProspectsListCard({
       } else {
         p.delete("commitment_day");
       }
-      if (snapshot.createdBy) {
+      if (lockedCreatorName) {
+        p.delete("created_by");
+      } else if (snapshot.createdBy) {
         p.set("created_by", snapshot.createdBy);
       } else {
         p.delete("created_by");
@@ -301,12 +424,12 @@ export default function ProspectsListCard({
         p.delete("admin_search");
       }
       const qs = p.toString();
-      router.replace(
-        qs ? `/admin-dashboard/prospects?${qs}` : "/admin-dashboard/prospects",
-        { scroll: false },
-      );
+      const base = lockedCreatorName
+        ? `/admin-dashboard/prospects/by-creator/${encodeURIComponent(lockedCreatorName)}`
+        : "/admin-dashboard/prospects";
+      router.replace(qs ? `${base}?${qs}` : base, { scroll: false });
     },
-    [viewerIsAdmin, searchParams, router],
+    [viewerIsAdmin, searchParams, router, lockedCreatorName],
   );
 
   const refreshRows = useCallback(
@@ -331,9 +454,16 @@ export default function ProspectsListCard({
     [viewerIsAdmin],
   );
 
-  const applyAdminFilterSnapshot = useCallback(
-    (next) => {
+  const onCommitmentYearChange = useCallback(
+    (e) => {
+      const v = e.target.value;
+      setCommitmentYearSelect(v);
+      const next = {
+        ...adminFiltersRef.current,
+        commitmentYear: v === "all" ? null : Number(v),
+      };
       adminFiltersRef.current = next;
+      syncAdminFiltersToUrl(next);
       const sel = selectedRef.current;
       void refreshRows(
         sel.map((c) => c.customer_id),
@@ -341,44 +471,30 @@ export default function ProspectsListCard({
         sel.map((c) => c.quote_number ?? ""),
         next,
       );
-      syncAdminFiltersToUrl(next);
     },
-    [refreshRows, syncAdminFiltersToUrl],
+    [syncAdminFiltersToUrl, refreshRows],
   );
 
-  const flushAdminSearchNow = useCallback(
-    (raw) => {
-      const trimmed = String(raw ?? "").trim().slice(0, 200);
+  const onCommitmentMonthChange = useCallback(
+    (e) => {
+      const v = e.target.value;
+      setCommitmentMonthSelect(v);
       const next = {
         ...adminFiltersRef.current,
-        adminSearch: trimmed || null,
+        commitmentMonth: v === "" ? null : Number(v),
       };
-      applyAdminFilterSnapshot(next);
+      adminFiltersRef.current = next;
+      syncAdminFiltersToUrl(next);
+      const sel = selectedRef.current;
+      void refreshRows(
+        sel.map((c) => c.customer_id),
+        "",
+        sel.map((c) => c.quote_number ?? ""),
+        next,
+      );
     },
-    [applyAdminFilterSnapshot],
+    [syncAdminFiltersToUrl, refreshRows],
   );
-
-  const clearAdminFilters = useCallback(() => {
-    if (adminSearchDebounceRef.current) {
-      clearTimeout(adminSearchDebounceRef.current);
-      adminSearchDebounceRef.current = null;
-    }
-    const next = { ...emptyAdminSnapshot.current };
-    adminFiltersRef.current = next;
-    setFYear("");
-    setFMonth("");
-    setFDay("");
-    setFCreatedBy("");
-    setFAdminSearch("");
-    const sel = selectedRef.current;
-    void refreshRows(
-      sel.map((c) => c.customer_id),
-      "",
-      sel.map((c) => c.quote_number ?? ""),
-      next,
-    );
-    syncAdminFiltersToUrl(next);
-  }, [refreshRows, syncAdminFiltersToUrl]);
 
   const addSuggestion = useCallback((s) => {
     setSelectedCustomers((prev) => {
@@ -490,6 +606,35 @@ export default function ProspectsListCard({
   //   [refreshRows, router],
   // );
 
+  const hasAdminUiFilter = useMemo(() => {
+    if (!viewerIsAdmin) return false;
+    const norm = normalizeAdminFilterState(initialAdminFilters);
+    if (norm.commitmentYear != null) return true;
+    if (norm.commitmentMonth != null) return true;
+    if (norm.commitmentDay != null) return true;
+    if (norm.adminSearch && String(norm.adminSearch).trim() !== "") return true;
+    if (!lockedCreatorName && norm.createdBy) return true;
+    return false;
+  }, [viewerIsAdmin, adminFilterKey, initialAdminFilters, lockedCreatorName]);
+
+  const tableTotalAmount = useMemo(() => {
+    let sum = 0;
+    for (const row of rows) {
+      const n = Number(row.amount);
+      if (Number.isFinite(n)) sum += n;
+    }
+    return sum;
+  }, [rows]);
+
+  const allCreatorsCardsTotalAmount = useMemo(() => {
+    let sum = 0;
+    for (const s of prospectCreatorSummaries) {
+      const n = Number(s.totalAmount);
+      if (Number.isFinite(n)) sum += n;
+    }
+    return sum;
+  }, [prospectCreatorSummaries]);
+
   if (loadError) {
     return (
       <>
@@ -509,13 +654,6 @@ export default function ProspectsListCard({
     );
   }
 
-  const hasAdminUiFilter =
-    viewerIsAdmin &&
-    (fYear !== "" ||
-      fMonth !== "" ||
-      fDay !== "" ||
-      fCreatedBy !== "" ||
-      fAdminSearch.trim() !== "");
   const hasFilter =
     selectedCustomers.length > 0 || hasAdminUiFilter;
 
@@ -534,15 +672,6 @@ export default function ProspectsListCard({
   ];
   const tableColSpan = tableHeaders.length;
 
-  const tableTotalAmount = useMemo(() => {
-    let sum = 0;
-    for (const row of rows) {
-      const n = Number(row.amount);
-      if (Number.isFinite(n)) sum += n;
-    }
-    return sum;
-  }, [rows]);
-
   return (
     <>
       <ProspectsSearchBar
@@ -557,204 +686,79 @@ export default function ProspectsListCard({
 
       {viewerIsAdmin ? (
         <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Admin filters
-              </p>
+          {!hideDataTable ? (
+            <div className="flex flex-wrap items-end gap-3">
               <div
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm"
+                className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
                 title="Sum of Total amount for rows currently shown in the table"
               >
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                  Total amount
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                    Total amount
+                  </p>
+                  <p className="text-sm font-semibold tabular-nums text-slate-900">
+                    {formatAmount(tableTotalAmount)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-end gap-2 sm:ml-auto">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                    Year
+                  </span>
+                  <select
+                    className={adminTableSelectClass}
+                    value={commitmentYearSelect}
+                    onChange={onCommitmentYearChange}
+                    aria-label="Filter by commitment year"
+                  >
+                    <option value="all">All years</option>
+                    {buildCommitmentYearOptions().map((y) => (
+                      <option key={y} value={String(y)}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                    Month
+                  </span>
+                  <select
+                    className={adminTableSelectClass}
+                    value={commitmentMonthSelect}
+                    onChange={onCommitmentMonthChange}
+                    aria-label="Filter by commitment month"
+                  >
+                    <option value="">All months</option>
+                    {MONTH_LABELS.map((label, i) => (
+                      <option key={label} value={String(i + 1)}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="inline-flex rounded-lg border border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/50 px-3 py-2 shadow-sm"
+              title="Sum of total amount across all creator cards below"
+            >
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-700/90">
+                  All creators total
                 </p>
-                <p className="text-sm font-semibold tabular-nums text-slate-900">
-                  {formatAmount(tableTotalAmount)}
+                <p className="text-sm font-semibold tabular-nums text-emerald-800">
+                  {formatAmount(allCreatorsCardsTotalAmount)}
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={clearAdminFilters}
-              className="text-xs font-medium text-slate-600 underline decoration-slate-300 underline-offset-2 hover:text-slate-900"
-            >
-              Clear filters
-            </button>
-          </div>
-          <div className="mb-4 min-w-0">
-            <label
-              htmlFor="prospect-admin-search"
-              className="mb-1 block text-xs font-medium text-slate-600"
-            >
-              Search by customer name, quotation ID, or customer ID
-            </label>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              <input
-                id="prospect-admin-search"
-                type="search"
-                value={fAdminSearch}
-                placeholder="e.g. rahul yadav, QUOTE20260320013, 721091"
-                autoComplete="off"
-                className="h-11 w-full rounded-[10px] border border-slate-200 bg-white py-3 pl-11 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200/90"
-                onChange={(e) => {
-                  const v = e.target.value.slice(0, 200);
-                  setFAdminSearch(v);
-                  if (adminSearchDebounceRef.current) {
-                    clearTimeout(adminSearchDebounceRef.current);
-                  }
-                  adminSearchDebounceRef.current = setTimeout(() => {
-                    adminSearchDebounceRef.current = null;
-                    const trimmed = v.trim().slice(0, 200);
-                    const next = {
-                      ...adminFiltersRef.current,
-                      adminSearch: trimmed || null,
-                    };
-                    applyAdminFilterSnapshot(next);
-                  }, 400);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key !== "Enter") return;
-                  e.preventDefault();
-                  if (adminSearchDebounceRef.current) {
-                    clearTimeout(adminSearchDebounceRef.current);
-                    adminSearchDebounceRef.current = null;
-                  }
-                  flushAdminSearchNow(e.currentTarget.value);
-                }}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-4 lg:flex lg:flex-wrap lg:items-end">
-            <div className="min-w-0 lg:min-w-[7.5rem] lg:flex-1">
-              <label
-                htmlFor="prospect-filter-year"
-                className="mb-1 block text-xs font-medium text-slate-600"
-              >
-                Year
-              </label>
-              <select
-                id="prospect-filter-year"
-                value={fYear}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  const next = {
-                    ...adminFiltersRef.current,
-                    commitmentYear: v === "" ? null : Number(v),
-                  };
-                  adminFiltersRef.current = next;
-                  setFYear(v);
-                  applyAdminFilterSnapshot(next);
-                }}
-                className={adminSelectClass}
-              >
-                <option value="">All years</option>
-                {buildCommitmentYearOptions().map((y) => (
-                  <option key={y} value={String(y)}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="min-w-0 lg:min-w-[8.5rem] lg:flex-1">
-              <label
-                htmlFor="prospect-filter-month"
-                className="mb-1 block text-xs font-medium text-slate-600"
-              >
-                Month
-              </label>
-              <select
-                id="prospect-filter-month"
-                value={fMonth}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  const next = {
-                    ...adminFiltersRef.current,
-                    commitmentMonth: v === "" ? null : Number(v),
-                  };
-                  adminFiltersRef.current = next;
-                  setFMonth(v);
-                  applyAdminFilterSnapshot(next);
-                }}
-                className={adminSelectClass}
-              >
-                <option value="">All months</option>
-                {MONTH_LABELS.map((label, idx) => (
-                  <option key={label} value={String(idx + 1)}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="min-w-0 lg:min-w-[6.5rem] lg:flex-1">
-              <label
-                htmlFor="prospect-filter-day"
-                className="mb-1 block text-xs font-medium text-slate-600"
-              >
-                Day
-              </label>
-              <select
-                id="prospect-filter-day"
-                value={fDay}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  const next = {
-                    ...adminFiltersRef.current,
-                    commitmentDay: v === "" ? null : Number(v),
-                  };
-                  adminFiltersRef.current = next;
-                  setFDay(v);
-                  applyAdminFilterSnapshot(next);
-                }}
-                className={adminSelectClass}
-              >
-                <option value="">All days</option>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={String(d)}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-span-2 min-w-0 md:col-span-2 lg:min-w-[12rem] lg:flex-[1.25]">
-              <label
-                htmlFor="prospect-filter-created-by"
-                className="mb-1 block text-xs font-medium text-slate-600"
-              >
-                Employee (created by)
-              </label>
-              <select
-                id="prospect-filter-created-by"
-                value={fCreatedBy}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  const next = {
-                    ...adminFiltersRef.current,
-                    createdBy: v === "" ? null : v,
-                  };
-                  adminFiltersRef.current = next;
-                  setFCreatedBy(v);
-                  applyAdminFilterSnapshot(next);
-                }}
-                className={adminSelectClass}
-              >
-                <option value="">All employees</option>
-                {prospectCreatorUsernames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
         </div>
       ) : null}
 
+      {!hideDataTable ? (
       <div className="relative overflow-hidden rounded-[10px] border border-slate-200 bg-white shadow-sm">
         {tableLoading ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 text-sm text-slate-500">
@@ -921,6 +925,12 @@ export default function ProspectsListCard({
           </table>
         </div>
       </div>
+      ) : (
+        <ProspectCreatorCardsGrid
+          summaries={prospectCreatorSummaries}
+          selectedCreatorFromPath={selectedCreatorFromPath}
+        />
+      )}
     </>
   );
 }
