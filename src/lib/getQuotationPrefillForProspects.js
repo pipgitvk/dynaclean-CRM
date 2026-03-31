@@ -73,15 +73,23 @@ export async function getQuotationPrefillForProspects(
     return { quoteAmounts, quotationLinesByCustomer };
   }
 
-  const [itemRows] = await conn.execute(
-    `SELECT quote_number, item_name, item_code, specification, quantity,
-            price_per_unit, total_price
-     FROM quotation_items
-     WHERE quote_number = ?
-        OR TRIM(quote_number) = TRIM(?)
-     ORDER BY COALESCE(created_at, '1970-01-01') ASC, item_name, item_code`,
-    [canonicalQuoteNumber, canonicalQuoteNumber],
-  );
+  /** Stable ordering without `created_at` — many DBs have no that column on quotation_items. */
+  let itemRows = [];
+  try {
+    const [rows] = await conn.execute(
+      `SELECT quote_number, item_name, item_code, specification, quantity,
+              price_per_unit, total_price
+       FROM quotation_items
+       WHERE quote_number = ?
+          OR TRIM(quote_number) = TRIM(?)
+       ORDER BY item_name, item_code`,
+      [canonicalQuoteNumber, canonicalQuoteNumber],
+    );
+    itemRows = rows || [];
+  } catch (e) {
+    console.error("getQuotationPrefillForProspects quotation_items:", e);
+    return { quoteAmounts, quotationLinesByCustomer };
+  }
 
   const lines = [];
   for (const it of itemRows || []) {
