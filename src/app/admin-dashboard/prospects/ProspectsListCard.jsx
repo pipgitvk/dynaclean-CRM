@@ -317,10 +317,9 @@ function ProspectCreatorCardsGrid({
         </div>
       ) : (
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filteredSummaries.map(({ name, count, totalAmount = 0, customerIds = [] }) => {
+        {filteredSummaries.map(({ name, count, totalAmount = 0 }) => {
           const selected = selectedCreatorFromPath === name;
           const amount = Number(totalAmount ?? 0);
-          const ids = Array.isArray(customerIds) ? customerIds : [];
           return (
             <li key={name}>
               <Link
@@ -352,15 +351,6 @@ function ProspectCreatorCardsGrid({
                     </span>
                     <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">
                       {count} {count === 1 ? "prospect" : "prospects"}
-                    </p>
-                    <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                      Customer ID
-                    </p>
-                    <p
-                      className="mt-0.5 text-xs font-mono leading-relaxed text-slate-700 break-words"
-                      title={ids.join(", ")}
-                    >
-                      {ids.length ? ids.join(", ") : "—"}
                     </p>
                     <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                       Total amount
