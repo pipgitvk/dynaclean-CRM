@@ -37,6 +37,8 @@ import {
   Ship,
   Receipt,
   Clock,
+  LayoutGrid,
+  Grid3x3,
 } from "lucide-react";
 
 // Icon map
@@ -61,6 +63,8 @@ const iconMap = {
   User,
   UserCircle: User,
   Clock,
+  LayoutGrid,
+  Grid3x3,
   Receipt,
   ShoppingCart,
   FilePlus,

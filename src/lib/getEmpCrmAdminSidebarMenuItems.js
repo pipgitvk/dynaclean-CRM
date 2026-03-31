@@ -9,7 +9,10 @@ const empCrmMenuItems = [
   { path: "/empcrm/admin-dashboard/profile", name: "Profile Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "UserCircle" },
   { path: "/empcrm/admin-dashboard/profile/approvals", name: "Profile Approvals", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "UserCircle" },
   { path: "/empcrm/admin-dashboard/leave", name: "Leave Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Calendar" },
-  { path: "/empcrm/admin-dashboard/attendance", name: "Attendance", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Clock" },
+
+
+  { path: "/empcrm/admin-dashboard/attendance-summary", name: "Attendance Summary", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "LayoutGrid" },
+  { path: "/empcrm/admin-dashboard/attendance", name: "Attendance details", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Clock" },
   { path: "/empcrm/admin-dashboard/documents", name: "Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "FileText" },
   { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "DollarSign" },
   { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"], icon: "Receipt" },

@@ -179,7 +179,7 @@ export default function EmpCrmDashboard() {
               href="/empcrm/admin-dashboard/attendance"
               className="block p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
             >
-              <h3 className="font-semibold text-blue-900">Attendance</h3>
+              <h3 className="font-semibold text-blue-900">Attendance details</h3>
               <p className="text-sm text-blue-700">Monitor employee attendance records</p>
             </a>
             <a
