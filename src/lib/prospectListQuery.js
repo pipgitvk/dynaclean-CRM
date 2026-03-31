@@ -4,6 +4,42 @@
  */
 
 /**
+ * Commitment date filters on `prospects` alias `p` (YEAR/MONTH/DAY).
+ * @param {AdminProspectFilters|null|undefined} adminFilters
+ * @returns {{ parts: string[], params: unknown[] }}
+ */
+export function buildCommitmentCalendarFiltersForProspects(adminFilters) {
+  const parts = [];
+  const params = [];
+  if (!adminFilters) return { parts, params };
+  const y = adminFilters.commitmentYear;
+  if (y != null && Number.isFinite(Number(y))) {
+    const yn = Number(y);
+    if (yn >= 2000 && yn <= 2100) {
+      parts.push(`YEAR(p.commitment_date) = ?`);
+      params.push(yn);
+    }
+  }
+  const mo = adminFilters.commitmentMonth;
+  if (mo != null && Number.isFinite(Number(mo))) {
+    const mn = Number(mo);
+    if (mn >= 1 && mn <= 12) {
+      parts.push(`MONTH(p.commitment_date) = ?`);
+      params.push(mn);
+    }
+  }
+  const d = adminFilters.commitmentDay;
+  if (d != null && Number.isFinite(Number(d))) {
+    const dn = Number(d);
+    if (dn >= 1 && dn <= 31) {
+      parts.push(`DAY(p.commitment_date) = ?`);
+      params.push(dn);
+    }
+  }
+  return { parts, params };
+}
+
+/**
  * Builds WHERE clause + params for listing prospects.
  * Admins see all rows; sales roles only see rows they created (created_by = username).
  * @param {{ customerIds: string[], like: string|null, searchRaw?: string|null, role: string, username: string, adminFilters?: AdminProspectFilters|null }} args
@@ -51,30 +87,12 @@ export function buildProspectsListWhereClause({
       params.push(u);
     }
   } else if (adminFilters && isAdmin) {
-    const y = adminFilters.commitmentYear;
-    if (y != null && Number.isFinite(Number(y))) {
-      const yn = Number(y);
-      if (yn >= 2000 && yn <= 2100) {
-        parts.push(`YEAR(p.commitment_date) = ?`);
-        params.push(yn);
-      }
-    }
-    const mo = adminFilters.commitmentMonth;
-    if (mo != null && Number.isFinite(Number(mo))) {
-      const mn = Number(mo);
-      if (mn >= 1 && mn <= 12) {
-        parts.push(`MONTH(p.commitment_date) = ?`);
-        params.push(mn);
-      }
-    }
-    const d = adminFilters.commitmentDay;
-    if (d != null && Number.isFinite(Number(d))) {
-      const dn = Number(d);
-      if (dn >= 1 && dn <= 31) {
-        parts.push(`DAY(p.commitment_date) = ?`);
-        params.push(dn);
-      }
-    }
+    const {
+      parts: calParts,
+      params: calParams,
+    } = buildCommitmentCalendarFiltersForProspects(adminFilters);
+    parts.push(...calParts);
+    params.push(...calParams);
     const cb = String(adminFilters.createdBy ?? "").trim();
     if (cb) {
       parts.push(`p.created_by = ?`);

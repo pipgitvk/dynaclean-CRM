@@ -14,7 +14,10 @@ import {
   parseProspectsAdminFiltersFromSearchParams,
   mergeProspectAdminCalendarDefaults,
 } from "@/lib/prospectFilterUtils";
-import { buildProspectsListWhereClause } from "@/lib/prospectListQuery";
+import {
+  buildProspectsListWhereClause,
+  buildCommitmentCalendarFiltersForProspects,
+} from "@/lib/prospectListQuery";
 import {
   enrichProspectRowsWithPaymentStatus,
   commitmentValueToYmd,
@@ -60,14 +63,23 @@ export default async function ProspectsPage({ searchParams }) {
 
     if (viewerIsAdmin) {
       try {
+        const {
+          parts: calParts,
+          params: calParams,
+        } = buildCommitmentCalendarFiltersForProspects(adminFilters);
+        const calSql = calParts.length
+          ? ` AND ${calParts.join(" AND ")}`
+          : "";
         const [cr] = await conn.execute(
-          `SELECT TRIM(created_by) AS u, COUNT(*) AS cnt,
-                  COALESCE(SUM(amount), 0) AS total_amount,
-                  GROUP_CONCAT(DISTINCT TRIM(CAST(customer_id AS CHAR)) ORDER BY TRIM(CAST(customer_id AS CHAR)) SEPARATOR ', ') AS customer_ids
-           FROM prospects
-           WHERE created_by IS NOT NULL AND TRIM(created_by) <> ''
-           GROUP BY TRIM(created_by)
+          `SELECT TRIM(p.created_by) AS u, COUNT(*) AS cnt,
+                  COALESCE(SUM(p.amount), 0) AS total_amount,
+                  GROUP_CONCAT(DISTINCT TRIM(CAST(p.customer_id AS CHAR)) ORDER BY TRIM(CAST(p.customer_id AS CHAR)) SEPARATOR ', ') AS customer_ids
+           FROM prospects p
+           WHERE p.created_by IS NOT NULL AND TRIM(p.created_by) <> ''
+           ${calSql}
+           GROUP BY TRIM(p.created_by)
            ORDER BY u ASC`,
+          calParams,
         );
         prospectCreatorSummaries = (cr || [])
           .map((r) => {

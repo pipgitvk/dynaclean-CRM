@@ -181,10 +181,44 @@ function initialMonthSelectFromAdmin(initialFilters) {
   return "";
 }
 
+function buildByCreatorHref(name, sp) {
+  const base = `/admin-dashboard/prospects/by-creator/${encodeURIComponent(name)}`;
+  const q = new URLSearchParams();
+  const cy = sp.get("commitment_year");
+  const cm = sp.get("commitment_month");
+  const cd = sp.get("commitment_day");
+  if (cy) q.set("commitment_year", cy);
+  if (cm) q.set("commitment_month", cm);
+  if (cd) q.set("commitment_day", cd);
+  const qs = q.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
+/** True when the user did a full browser reload (F5 / refresh), not client-side navigation. */
+function isBrowserReload() {
+  if (typeof window === "undefined") return false;
+  const navEntry = performance.getEntriesByType("navigation")[0];
+  if (navEntry && "type" in navEntry && navEntry.type === "reload") {
+    return true;
+  }
+  try {
+    const legacy = performance.navigation;
+    if (legacy && legacy.type === legacy.TYPE_RELOAD) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 function ProspectCreatorCardsGrid({
   summaries,
   selectedCreatorFromPath,
+  commitmentYearSelect,
+  commitmentMonthSelect,
+  onCommitmentYearChange,
+  onCommitmentMonthChange,
 }) {
+  const sp = useSearchParams();
   const [customerIdQuery, setCustomerIdQuery] = useState("");
 
   const filteredSummaries = useMemo(() => {
@@ -195,16 +229,6 @@ function ProspectCreatorCardsGrid({
       return ids.some((id) => String(id).trim() === q);
     });
   }, [summaries, customerIdQuery]);
-
-  if (!summaries.length) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-6 py-14 text-center">
-        <p className="text-sm font-medium text-slate-600">
-          No creators yet — add prospects to see them listed here.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50/90 to-white p-5 shadow-sm sm:p-6 md:p-8">
@@ -219,28 +243,73 @@ function ProspectCreatorCardsGrid({
             </p>
           </div>
         </div>
-        <div className="mt-4 w-full max-w-md">
-          <label htmlFor="creator-cards-customer-id-search" className="sr-only">
-            Search by customer ID
-          </label>
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-              aria-hidden
-            />
-            <input
-              id="creator-cards-customer-id-search"
-              type="search"
-              autoComplete="off"
-              value={customerIdQuery}
-              onChange={(e) => setCustomerIdQuery(e.target.value)}
-              placeholder="Search by customer ID…"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-            />
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1 sm:min-w-[12rem]">
+            <label htmlFor="creator-cards-customer-id-search" className="sr-only">
+              Search by customer ID
+            </label>
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                aria-hidden
+              />
+              <input
+                id="creator-cards-customer-id-search"
+                type="search"
+                autoComplete="off"
+                value={customerIdQuery}
+                onChange={(e) => setCustomerIdQuery(e.target.value)}
+                placeholder="Search by customer ID…"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
           </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+              Year
+            </span>
+            <select
+              className={adminTableSelectClass}
+              value={commitmentYearSelect}
+              onChange={onCommitmentYearChange}
+              aria-label="Filter creator cards by commitment year"
+            >
+              <option value="all">All years</option>
+              {buildCommitmentYearOptions().map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+              Month
+            </span>
+            <select
+              className={adminTableSelectClass}
+              value={commitmentMonthSelect}
+              onChange={onCommitmentMonthChange}
+              aria-label="Filter creator cards by commitment month"
+            >
+              <option value="">All months</option>
+              {MONTH_LABELS.map((label, i) => (
+                <option key={label} value={String(i + 1)}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
-      {filteredSummaries.length === 0 ? (
+      {!summaries.length ? (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
+          <p className="text-sm font-medium text-slate-600">
+            No creator cards for this period. Try another year or month, or add
+            prospects.
+          </p>
+        </div>
+      ) : filteredSummaries.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
           <p className="text-sm font-medium text-slate-600">
             No creator matches this customer ID.
@@ -255,7 +324,7 @@ function ProspectCreatorCardsGrid({
           return (
             <li key={name}>
               <Link
-                href={`/admin-dashboard/prospects/by-creator/${encodeURIComponent(name)}`}
+                href={buildByCreatorHref(name, sp)}
                 scroll={false}
                 className={[
                   "group relative flex flex-col gap-3 rounded-2xl border p-5 text-left transition-all duration-200",
@@ -370,6 +439,9 @@ export default function ProspectsListCard({
   const selectedRef = useRef(selectedCustomers);
   selectedRef.current = selectedCustomers;
 
+  /** On full page refresh, drop admin filter query params so UI resets to server defaults. */
+  const reloadAdminFiltersStripDoneRef = useRef(false);
+
   const syncKey = `${initialCustomerIds.join("|")}__${initialQuoteNumbers.join("|")}__${initialSearch}`;
   const adminFilterKey = viewerIsAdmin
     ? JSON.stringify(initialAdminFilters ?? null)
@@ -389,6 +461,39 @@ export default function ProspectsListCard({
     setCommitmentYearSelect(initialYearSelectFromAdmin(initialAdminFilters));
     setCommitmentMonthSelect(initialMonthSelectFromAdmin(initialAdminFilters));
   }, [viewerIsAdmin, adminFilterKey, initialAdminFilters]);
+
+  useEffect(() => {
+    if (!viewerIsAdmin) return;
+    if (reloadAdminFiltersStripDoneRef.current) return;
+    if (!isBrowserReload()) {
+      reloadAdminFiltersStripDoneRef.current = true;
+      return;
+    }
+
+    const p = new URLSearchParams(searchParams.toString());
+    const stripKeys = [
+      "commitment_year",
+      "commitment_month",
+      "commitment_day",
+      "admin_search",
+      "created_by",
+    ];
+    let changed = false;
+    for (const k of stripKeys) {
+      if (p.has(k)) {
+        p.delete(k);
+        changed = true;
+      }
+    }
+    reloadAdminFiltersStripDoneRef.current = true;
+    if (!changed) return;
+
+    const base = lockedCreatorName
+      ? `/admin-dashboard/prospects/by-creator/${encodeURIComponent(lockedCreatorName)}`
+      : "/admin-dashboard/prospects";
+    const qs = p.toString();
+    router.replace(qs ? `${base}?${qs}` : base, { scroll: false });
+  }, [viewerIsAdmin, searchParams, lockedCreatorName, router]);
 
   const syncAdminFiltersToUrl = useCallback(
     (snapshot) => {
@@ -929,6 +1034,10 @@ export default function ProspectsListCard({
         <ProspectCreatorCardsGrid
           summaries={prospectCreatorSummaries}
           selectedCreatorFromPath={selectedCreatorFromPath}
+          commitmentYearSelect={commitmentYearSelect}
+          commitmentMonthSelect={commitmentMonthSelect}
+          onCommitmentYearChange={onCommitmentYearChange}
+          onCommitmentMonthChange={onCommitmentMonthChange}
         />
       )}
     </>
