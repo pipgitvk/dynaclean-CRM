@@ -96,4 +96,12 @@ export async function ensureProspectsTable() {
   } catch (e) {
     if (e?.errno !== 1060) throw e;
   }
+  try {
+    await conn.execute(
+      `ALTER TABLE prospects ADD UNIQUE INDEX uq_prospects_quote_number (quote_number)`,
+    );
+  } catch (e) {
+    /* 1061 duplicate index name, 1062 duplicate values in column — clean DB then re-run migration */
+    if (e?.errno !== 1061 && e?.errno !== 1062) throw e;
+  }
 }

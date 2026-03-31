@@ -32,6 +32,8 @@ export default function ProspectsSearchBar({
   onRemoveCustomer,
   onSubmitSearch,
   onAddProspects,
+  /** Plain click / Enter on a suggestion row opens Add Prospect; Ctrl+click still adds to selection only. */
+  onSuggestionNavigateToAdd,
 }) {
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
@@ -106,6 +108,17 @@ export default function ProspectsSearchBar({
     setHighlight(-1);
   }
 
+  function handleSuggestionRowClick(e, s) {
+    if (e.ctrlKey || e.metaKey) {
+      const key = s.quote_number
+        ? `${s.customer_id}:${s.quote_number}`
+        : s.customer_id;
+      if (!selectedKeys.has(key)) pickSuggestion(s);
+      return;
+    }
+    onSuggestionNavigateToAdd?.(s);
+  }
+
   function onKeyDown(e) {
     if (!open || suggestions.length === 0) return;
     if (e.key === "ArrowDown") {
@@ -117,10 +130,14 @@ export default function ProspectsSearchBar({
     } else if (e.key === "Enter" && highlight >= 0 && suggestions[highlight]) {
       e.preventDefault();
       const s = suggestions[highlight];
-      const key = s.quote_number
-        ? `${s.customer_id}:${s.quote_number}`
-        : s.customer_id;
-      if (!selectedKeys.has(key)) pickSuggestion(s);
+      if (e.ctrlKey || e.metaKey) {
+        const key = s.quote_number
+          ? `${s.customer_id}:${s.quote_number}`
+          : s.customer_id;
+        if (!selectedKeys.has(key)) pickSuggestion(s);
+      } else {
+        onSuggestionNavigateToAdd?.(s);
+      }
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -155,7 +172,7 @@ export default function ProspectsSearchBar({
                 if (suggestions.length > 0) setOpen(true);
               }}
               onKeyDown={onKeyDown}
-              placeholder="Quotation ID, customer ID (e.g. QUOTE…, 721091) — add multiple"
+              placeholder="Quotation ID, customer ID (e.g. QUOTE…, 721091) — click a result to add prospect; Ctrl+click to add to list only"
               autoComplete="off"
               aria-autocomplete="list"
               aria-expanded={open}
@@ -207,15 +224,16 @@ export default function ProspectsSearchBar({
                           key={key}
                           role="option"
                           aria-selected={i === highlight}
+                          title="Click to open Add Prospect. Ctrl+click to add to list only."
                           className={`cursor-pointer ${
                             taken
                               ? "bg-slate-50 text-slate-400"
                               : i === highlight
                                 ? "bg-slate-100"
                                 : "hover:bg-slate-50"
-                          } ${taken ? "cursor-not-allowed" : ""}`}
+                          }`}
                           onMouseEnter={() => setHighlight(i)}
-                          onClick={() => !taken && pickSuggestion(s)}
+                          onClick={(e) => handleSuggestionRowClick(e, s)}
                         >
                           <td className="max-w-[10rem] px-2 py-2 align-top font-medium text-slate-900 sm:max-w-none sm:px-3 sm:py-2.5">
                             <span className="break-all font-mono text-xs sm:text-sm">

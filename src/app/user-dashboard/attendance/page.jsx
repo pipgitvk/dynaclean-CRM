@@ -11,6 +11,7 @@ import {
   isHalfDayByRules,
   isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
+import AttendanceSummaryGrid from "@/components/AttendanceSummaryGrid";
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -249,7 +250,7 @@ const AttendancePage = () => {
     <>
       <div className="container mx-auto p-4 md:p-8 max-w-7xl">
         <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          My Attendance Logs
+          Attendance details
         </h1>
 
         {/* Summary Statistics Section */}
@@ -649,6 +650,13 @@ const AttendancePage = () => {
             </tbody>
           </table>
         </div>
+
+        <AttendanceSummaryGrid
+          logs={logs}
+          holidays={holidays}
+          leaves={leaves}
+          rules={rules}
+        />
       </div>
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

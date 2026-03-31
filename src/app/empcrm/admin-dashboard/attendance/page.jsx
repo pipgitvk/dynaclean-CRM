@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { Loader2, Search } from "lucide-react";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -20,6 +21,9 @@ const AttendancePage = () => {
   const [toDate, setToDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedUser, setSelectedUser] = useState("all");
+  /** Set only after clicking Search; drives summary + table */
+  const [appliedUserSelection, setAppliedUserSelection] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [uniqueUsers, setUniqueUsers] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
@@ -150,6 +154,15 @@ const AttendancePage = () => {
     setToDate("");
   };
 
+  const handleSearch = () => {
+    setSearchLoading(true);
+    setAppliedUserSelection(null);
+    setTimeout(() => {
+      setAppliedUserSelection(selectedUser);
+      setSearchLoading(false);
+    }, 120);
+  };
+
   const generateAttendanceTimeline = (userLogs, user) => {
     const allDates = [];
 
@@ -241,9 +254,11 @@ const AttendancePage = () => {
     return allDates;
   };
 
-  // Generate the full attendance timeline based on the selected user
+  // Generate the full attendance timeline based on the last Search (applied selection)
   let fullTimeline = [];
-  if (selectedUser === "all") {
+  if (appliedUserSelection == null) {
+    fullTimeline = [];
+  } else if (appliedUserSelection === "all") {
     const allUsersAttendance = uniqueUsers
       .filter((user) => user !== "all")
       .flatMap((user) => {
@@ -254,8 +269,8 @@ const AttendancePage = () => {
       (a, b) => new Date(b.date) - new Date(a.date)
     );
   } else {
-    const userLogs = logs.filter((log) => log.username === selectedUser);
-    fullTimeline = generateAttendanceTimeline(userLogs, selectedUser).reverse();
+    const userLogs = logs.filter((log) => log.username === appliedUserSelection);
+    fullTimeline = generateAttendanceTimeline(userLogs, appliedUserSelection).reverse();
   }
 
   // Apply filters to the complete timeline
@@ -308,6 +323,10 @@ const AttendancePage = () => {
   );
 
   const handleDownload = async () => {
+    if (appliedUserSelection == null) {
+      toast.error("Please click Search to load data first.");
+      return;
+    }
     try {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Attendance Report");
@@ -381,9 +400,59 @@ const AttendancePage = () => {
       <div className="container mx-auto p-4 md:p-8 max-w-7xl">
         <div className="bg-white shadow-md rounded-lg p-6 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-4 text-center">
-            Attendance Dashboard
+            Attendance details
           </h1>
 
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-center sm:gap-4">
+            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 sm:min-w-[200px]">
+              Employee
+              <select
+                value={selectedUser}
+                onChange={(e) => setSelectedUser(e.target.value)}
+                className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {uniqueUsers.map((user) => (
+                  <option key={user} value={user}>
+                    {user === "all" ? "All Users" : user}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={searchLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {searchLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              {searchLoading ? "Loading…" : "Search"}
+            </button>
+            <button
+              type="button"
+              onClick={openHolidayModal}
+              className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Holiday List
+            </button>
+          </div>
+
+          {searchLoading ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50/80 py-16 text-slate-600">
+              <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
+              <p className="mt-4 text-sm font-medium">Loading attendance…</p>
+              <p className="mt-1 text-xs text-slate-500">Preparing summary and records</p>
+            </div>
+          ) : appliedUserSelection === null ? (
+            <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12 text-center text-sm text-slate-600">
+              Default is <span className="font-medium">All Users</span>. Pick an employee if needed, then click{" "}
+              <span className="font-medium">Search</span> to load the summary and table.
+            </p>
+          ) : (
+            <>
           <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-green-600">
@@ -458,17 +527,6 @@ const AttendancePage = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {uniqueUsers.map((user) => (
-                  <option key={user} value={user}>
-                    {user === "all" ? "All Users" : user}
-                  </option>
-                ))}
-              </select>
               <button
                 onClick={handleShowAll}
                 className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all" && !fromDate && !toDate
@@ -525,16 +583,13 @@ const AttendancePage = () => {
               >
                 Download
               </button>
-              <button
-                onClick={openHolidayModal}
-                className="px-4 py-2 rounded-md font-medium text-sm bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                Holiday List
-              </button>
             </div>
           </div>
+            </>
+          )}
         </div>
 
+        {appliedUserSelection !== null && (
         <div className="h-[70vh] overflow-y-auto">
           {/* Card View for Mobile (md and below) */}
           <div className="grid grid-cols-1 gap-4 md:hidden">
@@ -849,6 +904,7 @@ const AttendancePage = () => {
             </table>
           </div>
         </div>
+        )}
       </div>
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

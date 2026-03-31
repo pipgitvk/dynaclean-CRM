@@ -36,7 +36,7 @@ const allMenuItems = [
       },
       {
         path: "/user-dashboard/attendance/",
-        name: "Attendance",
+        name: "Attendance details",
         roles: ["ALL"],
         icon: "ListOrdered",
       },
@@ -196,7 +196,7 @@ const allMenuItems = [
   },
   {
     path: "/user-dashboard/attendance-log/",
-    name: "All Attendance",
+    name: "All Attendance details",
     roles: ["ADMIN", "ACCOUNTANT", "HR", "TEAM LEADER"],
     icon: "ListOrdered",
   },

@@ -247,7 +247,7 @@ const AttendancePage = () => {
     <>
       <div className="container mx-auto p-4 md:p-8 max-w-7xl">
         <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          My Attendance Logs
+          Attendance details
         </h1>
 
         {/* Summary Statistics Section */}

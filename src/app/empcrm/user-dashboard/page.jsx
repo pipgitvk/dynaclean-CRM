@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, FileText, Calendar, Clock, DollarSign, Receipt, Settings, CheckSquare } from "lucide-react";
+import { User, FileText, Calendar, Clock, Grid3x3, DollarSign, Receipt, Settings, CheckSquare } from "lucide-react";
 import AttendanceTracker from "@/components/empcrm/AttendanceTracker";
 
 export default function UserEmpCrmDashboard() {
@@ -79,7 +79,15 @@ export default function UserEmpCrmDashboard() {
         ]
       : []),
     {
-      title: "Attendance",
+      title: "Attendance Summary",
+      description: "Year view of your attendance codes",
+      icon: Grid3x3,
+      color: "bg-violet-600",
+      href: "/empcrm/user-dashboard/attendance-summary",
+      available: true,
+    },
+    {
+      title: "Attendance details",
       description: "View your attendance records",
       icon: Clock,
       color: "bg-purple-500",

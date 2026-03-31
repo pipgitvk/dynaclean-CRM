@@ -38,6 +38,10 @@ const errorMessages = {
   too_many: "Too many prospect lines in one save (max 100). Remove some lines or save in batches.",
   forbidden_customer:
     "You can only add prospects for customers assigned to you (your leads).",
+  duplicate_quote:
+    "This quotation ID already has a prospect. Each quotation can only be added once — open the existing prospect or use a different quotation.",
+  duplicate_quote_batch:
+    "The same quotation ID appears more than once in this form. Remove the duplicate rows and save again.",
 };
 
 const inputClass =

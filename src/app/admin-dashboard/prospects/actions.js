@@ -18,6 +18,32 @@ import { userMayUseCustomerForProspect } from "@/lib/prospectCustomerAccess";
 
 const NOTES_MAX = 4000;
 
+/** Next.js redirect() throws; must rethrow from catch so the response is not replaced with a generic DB error. */
+function isNextRedirectError(e) {
+  return (
+    e != null &&
+    typeof e === "object" &&
+    "digest" in e &&
+    String(e.digest).startsWith("NEXT_REDIRECT")
+  );
+}
+
+/**
+ * Non-null quotation IDs must be unique across prospects (one prospect entry per quotation).
+ * @returns {{ keys: string[], error: null | "batch" }}
+ */
+function prospectQuoteUniquenessCheck(collected) {
+  const seen = new Set();
+  for (const r of collected) {
+    const raw = r.quote_number;
+    if (raw == null || String(raw).trim() === "") continue;
+    const k = String(raw).trim().toLowerCase();
+    if (seen.has(k)) return { keys: [], error: "batch" };
+    seen.add(k);
+  }
+  return { keys: Array.from(seen), error: null };
+}
+
 function normalizeNotes(formData, key = "notes") {
   const raw = String(formData.get(key) ?? "").trim();
   if (!raw) return null;
@@ -347,6 +373,7 @@ export async function createProspectsBulk(formData) {
   await ensureProspectsTable();
   const pool = await getDbConnection();
   const connection = await pool.getConnection();
+  let txStarted = false;
 
   try {
     for (const r of collected) {
@@ -359,7 +386,27 @@ export async function createProspectsBulk(formData) {
         redirectCustomers("error=forbidden_customer");
       }
     }
+
+    const quoteCheck = prospectQuoteUniquenessCheck(collected);
+    if (quoteCheck.error === "batch") {
+      redirectCustomers("error=duplicate_quote_batch");
+    }
+    if (quoteCheck.keys.length > 0) {
+      const ph = quoteCheck.keys.map(() => "?").join(",");
+      const [existing] = await connection.execute(
+        `SELECT id FROM prospects
+         WHERE quote_number IS NOT NULL AND TRIM(quote_number) <> ''
+           AND LOWER(TRIM(quote_number)) IN (${ph})
+         LIMIT 1`,
+        quoteCheck.keys,
+      );
+      if (existing?.length > 0) {
+        redirectCustomers("error=duplicate_quote");
+      }
+    }
+
     await connection.beginTransaction();
+    txStarted = true;
     for (const r of collected) {
       await connection.execute(
         `INSERT INTO prospects (customer_id, order_id, quote_number, model, qty, amount, commitment_date, notes, created_by)
@@ -378,8 +425,18 @@ export async function createProspectsBulk(formData) {
       );
     }
     await connection.commit();
-  } catch {
-    await connection.rollback();
+  } catch (e) {
+    if (txStarted) {
+      try {
+        await connection.rollback();
+      } catch {
+        /* ignore */
+      }
+    }
+    if (isNextRedirectError(e)) throw e;
+    if (e?.errno === 1062) {
+      redirectCustomers("error=duplicate_quote");
+    }
     const ids = collected.map((r) => r.customer_id).join(",");
     const quoteQs = formQuoteNumber
       ? `&quote_number=${encodeURIComponent(formQuoteNumber)}`
