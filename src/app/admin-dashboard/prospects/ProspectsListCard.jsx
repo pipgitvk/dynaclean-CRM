@@ -446,34 +446,6 @@ export default function ProspectsListCard({
     );
   }, [refreshRows]);
 
-  const goAddProspects = useCallback(() => {
-    const sel = selectedRef.current;
-    if (sel.length === 0) {
-      window.alert(
-        "Please add client_id: select a customer from the search bar first.",
-      );
-      return;
-    }
-    const customerIds = sel.map((c) => c.customer_id);
-    const quoteNums = sel
-      .map((c) => c.quote_number)
-      .filter(Boolean)
-      .map(String);
-    const fromSearch = extractQuoteNumberFromProspectSearch(
-      searchTextRef.current,
-    );
-    const q = encodeURIComponent(customerIds.join(","));
-    let quoteQs = "";
-    if (quoteNums.length === customerIds.length) {
-      quoteQs = `&quote_numbers=${encodeURIComponent(quoteNums.join(","))}`;
-    } else if (quoteNums.length === 1) {
-      quoteQs = `&quote_number=${encodeURIComponent(quoteNums[0])}`;
-    } else if (fromSearch) {
-      quoteQs = `&quote_number=${encodeURIComponent(fromSearch)}`;
-    }
-    router.push(`/admin-dashboard/prospects/new?customers=${q}${quoteQs}`);
-  }, [router]);
-
   const navigateToAddFromSuggestion = useCallback(
     (s) => {
       const qn =
@@ -528,7 +500,6 @@ export default function ProspectsListCard({
           onAddSuggestion={() => {}}
           onRemoveCustomer={() => {}}
           onSubmitSearch={() => {}}
-          onAddProspects={() => {}}
           onSuggestionNavigateToAdd={() => {}}
         />
         <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
@@ -581,7 +552,6 @@ export default function ProspectsListCard({
         onAddSuggestion={addSuggestion}
         onRemoveCustomer={removeCustomer}
         onSubmitSearch={submitSearch}
-        onAddProspects={goAddProspects}
         onSuggestionNavigateToAdd={navigateToAddFromSuggestion}
       />
 
