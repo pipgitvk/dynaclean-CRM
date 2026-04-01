@@ -1726,6 +1726,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import Image from "next/image";
 import signImg from "../../../public/s.png"
+import dynacleanLogo from "@/components/logo1.jpg";
 import html2canvas from "html2canvas";
 import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
 import InvoicePDFPreview from "../Preview";
@@ -1953,18 +1954,28 @@ const NewInvoice = ({ invoice }) => {
     },
   };
 
-  const [logoSrc, setLogoSrc] = React.useState("/logo1.jpg");
+  const [logoSrc, setLogoSrc] = React.useState(dynacleanLogo.src);
   const [logoErrorStep, setLogoErrorStep] = React.useState(0);
 
   const handleLogoError = () => {
     if (logoErrorStep === 0) {
-      setLogoSrc("/logo.jpg");
+      setLogoSrc("/logo1.jpg");
       setLogoErrorStep(1);
       return;
     }
     if (logoErrorStep === 1) {
-      setLogoSrc("/logo.png");
+      setLogoSrc("/logo.jpg");
       setLogoErrorStep(2);
+      return;
+    }
+    if (logoErrorStep === 2) {
+      setLogoSrc("/logo.png");
+      setLogoErrorStep(3);
+      return;
+    }
+    if (logoErrorStep === 3) {
+      setLogoSrc("https://dynacleanindustries.com/logo1.jpg");
+      setLogoErrorStep(4);
       return;
     }
     setLogoSrc("");
