@@ -1,11 +1,12 @@
 /**
  * Salary “pay days” from attendance (payroll-oriented).
  * Formula:
- *   present + weekend_off + holiday + paid_leave − LOP − (half_day × 0.5)
- * - weekend_off: Sunday and Saturday with no punch (paid week off; not LOP).
+ *   present + sunday_off + holiday + paid_leave − LOP − (half_day × 0.5)
+ * - Full day = check-in AND check-out both “green” (onTime). Otherwise that punch day is half-day for pay.
+ * - sunday_off: Sundays with no punch only (Saturday is a normal working day for LOP).
  * - Days before date_of_joining are skipped (not LOP, not paid).
  */
-import { isHalfDayByRules } from "@/lib/attendanceRulesEngine";
+import { getCheckinStatus, getCheckoutStatus } from "@/lib/attendanceRulesEngine";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -85,10 +86,17 @@ export function computeSalaryPayDaysForUser(p) {
 
   const leaveDates = buildLeaveDateSetForUser(leavesAll, username);
 
+  /** Full day only when both check-in and check-out are on time (green). */
+  function isFullDayGreen(log) {
+    const cin = getCheckinStatus(log?.checkin_time, rules);
+    const cout = getCheckoutStatus(log?.checkout_time, rules);
+    return cin === "onTime" && cout === "onTime";
+  }
+
   let present = 0;
   let half_day = 0;
   let sunday = 0;
-  /** Saturday + Sunday with no log (paid weekly off; not LOP). */
+  /** Sundays with no log (paid weekly off; not LOP). Saturday is not included. */
   let weekend_off = 0;
   let holiday = 0;
   let lop = 0;
@@ -105,15 +113,14 @@ export function computeSalaryPayDaysForUser(p) {
     const existingLog = dateMap.get(dateString);
     const dow = d.getDay();
     const isSunday = dow === 0;
-    const isSaturday = dow === 6;
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveDates.has(dateString);
 
     if (existingLog) {
-      if (isHalfDayByRules(existingLog, rules)) {
-        half_day++;
-      } else {
+      if (isFullDayGreen(existingLog)) {
         present++;
+      } else {
+        half_day++;
       }
       if (isSunday) {
         sundayWorkedDates.push(dateString);
@@ -126,10 +133,6 @@ export function computeSalaryPayDaysForUser(p) {
     }
     if (isSunday) {
       sunday++;
-      weekend_off++;
-      continue;
-    }
-    if (isSaturday) {
       weekend_off++;
       continue;
     }
