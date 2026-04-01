@@ -311,7 +311,7 @@ const fetchQuotationAndFill = async () => {
       state: quotation.state,
       state_code: quotation.state_code,
       customer_id: quotation.customer_id,
-      quotation_id: quotation.quotation_number, 
+      quotation_id: quotation.quotation_id, 
       due_date: quotation.due_date
   ? quotation.due_date.split("T")[0]
   : "",
