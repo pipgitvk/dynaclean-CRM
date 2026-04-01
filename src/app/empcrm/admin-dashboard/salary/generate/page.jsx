@@ -101,11 +101,17 @@ const GenerateSalaryPage = () => {
                 const attendanceRes = await fetch(`/api/empcrm/salary/attendance-summary?month=${selectedMonth}`);
                 const attendanceData = await attendanceRes.json();
 
-                let payDaysFromAttendance = 0;
+                /** null = employee not returned by attendance API; number = use for Present Days */
+                let payDaysFromAttendance = null;
                 let sundayDates = [];
 
                 if (attendanceData.success) {
-                    const empAtt = attendanceData.employees.find(e => e.username === selectedEmployee);
+                    const empAtt = attendanceData.employees.find(
+                        (e) =>
+                            e.username === selectedEmployee ||
+                            String(e.username ?? "").toLowerCase() ===
+                                String(selectedEmployee ?? "").toLowerCase()
+                    );
                     if (empAtt) {
                         payDaysFromAttendance =
                             typeof empAtt.pay_days === "number"
@@ -129,7 +135,11 @@ const GenerateSalaryPage = () => {
                 if (existingRecord) {
                     setFormData({
                         working_days: existingRecord.working_days,
-                        present_days: existingRecord.present_days,
+                        // Prefer live attendance pay_days (matches Attendance details); do not keep stale saved present_days.
+                        present_days:
+                            payDaysFromAttendance !== null
+                                ? payDaysFromAttendance
+                                : existingRecord.present_days,
                         overtime_hours: existingRecord.overtime_hours,
                         status: existingRecord.status || 'draft'
                     });
@@ -137,7 +147,7 @@ const GenerateSalaryPage = () => {
                 } else {
                     setFormData(prev => ({
                         ...prev,
-                        present_days: payDaysFromAttendance,
+                        present_days: payDaysFromAttendance ?? 0,
                         status: 'draft'
                     }));
                 }
