@@ -1,12 +1,77 @@
 /**
- * Salary “pay days” from attendance (payroll-oriented).
- * Formula:
- *   present + sunday_off + holiday + paid_leave − LOP − (half_day × 0.5)
- * - Full day = check-in AND check-out both “green” (onTime). Otherwise that punch day is half-day for pay.
+ * Salary "pay days" from attendance (payroll-oriented).
+ * Pay days (for salary / UI) = full-day present + Sunday weekly off + holidays − (half_day × 0.5).
+ * - Salary uses a fixed 15 min grace from configured check-in / check-out times (not a wider DB gracePeriodMinutes).
+ * - Check-in: on time = at/before standard; grace = within 15 min after standard; after that = late (half-day).
+ * - Check-out: on time = at/after standard; grace = within 15 min before standard; earlier = late (half-day).
+ * - Clock times use the wall time from DB strings (YYYY-MM-DD HH:mm:ss) when present so server TZ does not shift 10:30 → wrong band.
+ * - Other combinations (e.g. late check-out) are half-day unless covered above.
  * - sunday_off: Sundays with no punch only (Saturday is a normal working day for LOP).
  * - Days before date_of_joining are skipped (not LOP, not paid).
  */
-import { getCheckinStatus, getCheckoutStatus } from "@/lib/attendanceRulesEngine";
+import {
+  parseTimeToMinutes,
+  DEFAULT_ATTENDANCE_RULES,
+} from "@/lib/attendanceRulesEngine";
+
+/** Salary only: grace window is exactly 15 minutes from standard in/out times. */
+const SALARY_GRACE_MINUTES = 15;
+
+/**
+ * Minutes since midnight for a punch time. Prefer MySQL-style "YYYY-MM-DD HH:mm:ss" so
+ * 10:30 stays 10:30 (avoids Node/UTC shifting getHours() vs stored local wall time).
+ * @param {string|Date|null|undefined} logTime
+ * @returns {number|null}
+ */
+function parseLogClockMinutes(logTime) {
+  if (logTime == null) return null;
+  if (logTime instanceof Date) {
+    if (Number.isNaN(logTime.getTime())) return null;
+    return logTime.getHours() * 60 + logTime.getMinutes();
+  }
+  const s = String(logTime).trim();
+  const m = s.match(/\d{4}-\d{2}-\d{2}[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) {
+    const h = parseInt(m[1], 10) || 0;
+    const min = parseInt(m[2], 10) || 0;
+    return h * 60 + min;
+  }
+  const d = new Date(logTime);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+/**
+ * @param {string|null|undefined} logTime
+ * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} rules
+ * @returns {"onTime"|"grace"|"late"|null}
+ */
+function getSalaryCheckinBand(logTime, rules) {
+  const r = rules || DEFAULT_ATTENDANCE_RULES;
+  const logM = parseLogClockMinutes(logTime);
+  if (logM == null) return null;
+  const standardM = parseTimeToMinutes(r.checkin);
+  const graceEndM = standardM + SALARY_GRACE_MINUTES;
+  if (logM <= standardM) return "onTime";
+  if (logM <= graceEndM) return "grace";
+  return "late";
+}
+
+/**
+ * @param {string|null|undefined} logTime
+ * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} rules
+ * @returns {"onTime"|"grace"|"late"|null}
+ */
+function getSalaryCheckoutBand(logTime, rules) {
+  const r = rules || DEFAULT_ATTENDANCE_RULES;
+  const logM = parseLogClockMinutes(logTime);
+  if (logM == null) return null;
+  const standardM = parseTimeToMinutes(r.checkout);
+  const graceStartM = standardM - SALARY_GRACE_MINUTES;
+  if (logM >= standardM) return "onTime";
+  if (logM >= graceStartM) return "grace";
+  return "late";
+}
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -86,11 +151,25 @@ export function computeSalaryPayDaysForUser(p) {
 
   const leaveDates = buildLeaveDateSetForUser(leavesAll, username);
 
-  /** Full day only when both check-in and check-out are on time (green). */
-  function isFullDayGreen(log) {
-    const cin = getCheckinStatus(log?.checkin_time, rules);
-    const cout = getCheckoutStatus(log?.checkout_time, rules);
-    return cin === "onTime" && cout === "onTime";
+  /**
+   * @returns {boolean} true = full day (present), false = half-day
+   */
+  function punchDayIsFullDay(log) {
+    const cin = getSalaryCheckinBand(log?.checkin_time, rules);
+    const cout = getSalaryCheckoutBand(log?.checkout_time, rules);
+    if (cin == null || cout == null) return false;
+
+    if (cin === "onTime" && cout === "onTime") return true;
+
+    if (cin === "grace" && cout === "onTime") return true;
+    if (cin === "onTime" && cout === "grace") return true;
+    if (cin === "grace" && cout === "grace") return true;
+
+    if (cin === "late") return false;
+
+    if (cout === "late") return false;
+
+    return false;
   }
 
   let present = 0;
@@ -117,7 +196,7 @@ export function computeSalaryPayDaysForUser(p) {
     const isOnLeave = leaveDates.has(dateString);
 
     if (existingLog) {
-      if (isFullDayGreen(existingLog)) {
+      if (punchDayIsFullDay(existingLog)) {
         present++;
       } else {
         half_day++;
@@ -143,10 +222,10 @@ export function computeSalaryPayDaysForUser(p) {
     lop++;
   }
 
-  const raw =
-    present + weekend_off + holiday + paid_leave - lop - 0.5 * half_day;
-  /** Never show 0 pay days when employee has punches (LOP-heavy months made raw negative). */
-  const floorFromPunches = present + 0.5 * half_day;
+  const payDays = Math.max(
+    0,
+    present + weekend_off + holiday - 0.5 * half_day
+  );
 
   return {
     present,
@@ -156,9 +235,8 @@ export function computeSalaryPayDaysForUser(p) {
     holiday,
     lop,
     paid_leave,
-    pay_days: Math.max(0, raw, floorFromPunches),
-    pay_days_raw: raw,
-    floor_from_punches: floorFromPunches,
+    pay_days: payDays,
+    pay_days_raw: payDays,
     sunday_worked_dates: sundayWorkedDates,
   };
 }
