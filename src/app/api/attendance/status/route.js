@@ -1,5 +1,6 @@
 // /api/attendance/status/route.js
 import { getDbConnection } from "@/lib/db";
+import { getISTDateString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
@@ -10,8 +11,8 @@ export async function GET() {
   const conn = await getDbConnection();
 
   const [rows] = await conn.execute(
-    "SELECT * FROM attendance_logs WHERE username = ? AND date = CURDATE()",
-    [username]
+    "SELECT * FROM attendance_logs WHERE username = ? AND date = ?",
+    [username, getISTDateString()]
   );
 
   if (!rows.length) {

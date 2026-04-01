@@ -1,7 +1,7 @@
 // app/api/attendance/action.js
 import { getDbConnection } from "@/lib/db";
+import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
-import dayjs from "dayjs";
 
 export async function POST(req) {
   const body = await req.json();
@@ -17,8 +17,8 @@ export async function POST(req) {
   }
 
   const conn = await getDbConnection();
-  const today = dayjs().format("YYYY-MM-DD");
-  const now = dayjs().format("YYYY-MM-DD HH:mm:ss");
+  const today = getISTDateString();
+  const now = getISTDateTimeString();
 
   let [rows] = await conn.execute("SELECT * FROM attendance_logs WHERE username = ? AND date = ?", [username, today]);
 

@@ -1,6 +1,7 @@
 // pages/api/attendance.js or src/app/api/attendance/route.js
 
 import { getDbConnection } from "@/lib/db";
+import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
 
 
@@ -38,7 +39,7 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const username = searchParams.get("username");
   const conn = await getDbConnection();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getISTDateString();
 
   try {
     const [rows] = await conn.execute(
@@ -62,8 +63,8 @@ export async function GET(req) {
 export async function POST(req) {
   const { username, action, latitude, longitude } = await req.json();
   const conn = await getDbConnection();
-  const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = getISTDateString();
+  const now = getISTDateTimeString();
 
   // Variable to store location data if provided
   let locationAddress = null;
