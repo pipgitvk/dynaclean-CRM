@@ -113,7 +113,7 @@ const GenerateSalaryPage = () => {
                 }
             }
 
-            /** null = no attendance row; number = Present Days from payroll formula (+ punch floor) */
+            /** null = no attendance row; number = pay days (present + Sunday off + holidays − half×0.5) */
             let payDaysFromAttendance = null;
             let sundayDates = [];
 
@@ -129,15 +129,7 @@ const GenerateSalaryPage = () => {
                           );
                 if (empAtt) {
                     const pay = empAtt.pay_days != null ? Number(empAtt.pay_days) : NaN;
-                    const floor =
-                        Number(empAtt.present_days || 0) +
-                        0.5 * Number(empAtt.half_day_count || 0);
-                    const primary = Number.isFinite(pay) ? pay : NaN;
-                    payDaysFromAttendance = Number.isFinite(primary)
-                        ? Math.max(primary, floor)
-                        : floor > 0
-                          ? floor
-                          : null;
+                    payDaysFromAttendance = Number.isFinite(pay) ? pay : null;
                     if (empAtt.sunday_worked_dates && Array.isArray(empAtt.sunday_worked_dates)) {
                         sundayDates = empAtt.sunday_worked_dates;
                     } else if (empAtt.dates_worked && Array.isArray(empAtt.dates_worked)) {
@@ -155,8 +147,6 @@ const GenerateSalaryPage = () => {
                         lop: Number(empAtt.lop_count) || 0,
                         paidLeave: Number(empAtt.paid_leave_days) || 0,
                         payDays: Number(empAtt.pay_days) || 0,
-                        payDaysRaw:
-                            empAtt.pay_days_raw != null ? Number(empAtt.pay_days_raw) : null,
                         logRows: Number(empAtt.attendance_log_days) || 0,
                     });
                 } else {
@@ -722,18 +712,6 @@ const GenerateSalaryPage = () => {
                                 </dd>
                             </div>
                         </dl>
-                        <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-                            Formula: full days + Sunday weekly off + holidays + paid leave − LOP − (half days × 0.5).
-                            Full day = check-in and check-out both on time (green). Other punch days count as half days. Saturday counts as a normal workday.
-                            A minimum based on actual punches also applies when the raw total would be too low.
-                            {attendanceBreakdown.payDaysRaw != null &&
-                            attendanceBreakdown.payDaysRaw < 0 ? (
-                                <span className="block mt-1 text-amber-800">
-                                    Raw calculation was negative ({attendanceBreakdown.payDaysRaw.toFixed(1)}); the pay
-                                    days shown above use the capped / floor rules.
-                                </span>
-                            ) : null}
-                        </p>
                     </div>
                 )}
                 </div>
