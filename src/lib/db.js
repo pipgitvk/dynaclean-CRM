@@ -35,9 +35,14 @@ export async function getDbConnection() {
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       waitForConnections: true,
-      connectionLimit: 100,  // max simultaneous
+      connectionLimit: 100, // max simultaneous
       queueLimit: 0,
       connectTimeout: 10000,
+      /**
+       * Return DATE/DATETIME/TIMESTAMP as strings (e.g. "2026-04-01 04:29:03") instead of JS Date.
+       * Otherwise JSON APIs serialize Date as ISO UTC ("...Z") and the frontend adds +5:30 again for IST.
+       */
+      dateStrings: true,
     });
 
     console.log("✅ [DB] Connection pool created");

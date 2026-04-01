@@ -4,6 +4,8 @@
  */
 
 export const IST_TIMEZONE = "Asia/Kolkata";
+const ATTENDANCE_DB_NAIVE_IS_UTC =
+  process.env.NEXT_PUBLIC_ATTENDANCE_DB_NAIVE_IS_UTC === "1";
 
 function pad2(n) {
   const x = typeof n === "string" ? parseInt(n, 10) : n;
@@ -46,9 +48,36 @@ export function getISTDateTimeString(date = new Date()) {
   return `${y}-${mo}-${da} ${h}:${min}:${s}`;
 }
 
+function getISTHourMinuteFromDate(date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const h = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const m = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  return { h, m };
+}
+
+/** Parse MySQL DATETIME-like string as UTC instant (for UTC-stored DB). */
+function parseNaiveDateTimeAsUtcDate(s) {
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const d = parseInt(m[3], 10);
+  const h = parseInt(m[4], 10);
+  const mi = parseInt(m[5], 10);
+  const sec = parseInt(m[6] ?? "0", 10);
+  return new Date(Date.UTC(y, mo - 1, d, h, mi, sec));
+}
+
 /**
- * Minutes from midnight for rule checks. Naive "YYYY-MM-DD HH:mm:ss" is treated as IST wall clock.
- * ISO strings with Z/offset use that instant, then read clock in Asia/Kolkata.
+ * Minutes from midnight for rule checks.
+ * - Naive "YYYY-MM-DD HH:mm:ss" is interpreted as wall-clock by default.
+ * - Set NEXT_PUBLIC_ATTENDANCE_DB_NAIVE_IS_UTC=1 to treat naive values as UTC.
+ * - ISO strings with Z/offset are also converted to IST clock.
  * @param {string|Date|null|undefined} value
  * @returns {number|null}
  */
@@ -56,40 +85,31 @@ export function parseAttendanceClockMinutes(value) {
   if (value == null || value === "") return null;
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: IST_TIMEZONE,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(value);
-    const h = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-    const m = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+    const { h, m } = getISTHourMinuteFromDate(value);
     return h * 60 + m;
   }
   const s = String(value).trim();
-  const naive = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  const naiveUtcDate = parseNaiveDateTimeAsUtcDate(s);
   const hasExplicitTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
-  if (naive && !hasExplicitTz) {
-    const h = parseInt(naive[2], 10);
-    const m = parseInt(naive[3], 10);
+  if (naiveUtcDate && !hasExplicitTz) {
+    if (!ATTENDANCE_DB_NAIVE_IS_UTC) {
+      const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      if (m) return parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+    }
+    const { h, m } = getISTHourMinuteFromDate(naiveUtcDate);
     return h * 60 + m;
   }
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: IST_TIMEZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(d);
-  const h = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
-  const m = parseInt(parts.find((p) => p.type === "minute")?.value ?? "0", 10);
+  const { h, m } = getISTHourMinuteFromDate(d);
   return h * 60 + m;
 }
 
 /**
- * Display attendance DATETIME in UI. Naive MySQL strings are shown as stored wall clock (no UTC→IST double shift).
- * Values with explicit timezone are formatted in Asia/Kolkata.
+ * Display attendance DATETIME in UI.
+ * - Naive MySQL strings are rendered as wall-clock by default.
+ * - Set NEXT_PUBLIC_ATTENDANCE_DB_NAIVE_IS_UTC=1 to treat naive values as UTC.
+ * - Values with explicit timezone are also rendered in IST.
  * @param {string|Date|null|undefined} value
  * @returns {string}
  */
@@ -97,18 +117,22 @@ export function formatAttendanceTimeForDisplay(value) {
   if (value == null || value === "") return "";
   const s = String(value).trim();
   const hasExplicitTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
-  if (!hasExplicitTz) {
+  if (!hasExplicitTz && !ATTENDANCE_DB_NAIVE_IS_UTC) {
     const m = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
     if (m) {
-      let h = parseInt(m[2], 10);
+      const h = parseInt(m[2], 10);
       const min = parseInt(m[3], 10);
       const h12 = h % 12 || 12;
       const period = h >= 12 ? "pm" : "am";
       return `${String(h12).padStart(2, "0")}:${String(min).padStart(2, "0")} ${period}`;
     }
   }
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
+  const d = !hasExplicitTz
+    ? parseNaiveDateTimeAsUtcDate(s)
+    : value instanceof Date
+      ? value
+      : new Date(value);
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "";
   return d.toLocaleTimeString("en-IN", {
     timeZone: IST_TIMEZONE,
     hour: "2-digit",
