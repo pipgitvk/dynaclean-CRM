@@ -58,7 +58,7 @@ async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultS
 
   const structure = structRows[0];
 
-  const logs = salaryContext.logsByUser[emp.username] || [];
+  const logs = salaryContext.logsByUser[normalizeUserKey(emp.username)] || [];
   const rules = mergeGlobalRulesWithEmployeeSchedule(
     salaryContext.globalRules,
     salaryContext.scheduleByUser.get(normalizeUserKey(emp.username)) || null
@@ -296,8 +296,9 @@ export async function GET(request) {
     );
     const logsByUser = {};
     for (const row of attendanceRows) {
-      if (!logsByUser[row.username]) logsByUser[row.username] = [];
-      logsByUser[row.username].push(row);
+      const uk = normalizeUserKey(row.username);
+      if (!logsByUser[uk]) logsByUser[uk] = [];
+      logsByUser[uk].push(row);
     }
 
     const [holidays] = await db.query(

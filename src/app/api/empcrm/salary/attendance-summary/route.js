@@ -69,8 +69,9 @@ export async function GET(request) {
 
     const logsByUser = {};
     for (const row of attendance) {
-      if (!logsByUser[row.username]) logsByUser[row.username] = [];
-      logsByUser[row.username].push(row);
+      const uk = normalizeUserKey(row.username);
+      if (!logsByUser[uk]) logsByUser[uk] = [];
+      logsByUser[uk].push(row);
     }
 
     const employeeSummary = employees.map((emp) => {
@@ -78,7 +79,7 @@ export async function GET(request) {
         globalRules,
         scheduleByUser.get(normalizeUserKey(emp.username)) || null
       );
-      const logs = logsByUser[emp.username] || [];
+      const logs = logsByUser[normalizeUserKey(emp.username)] || [];
       const stats = computeSalaryPayDaysForUser({
         monthStr: month,
         logs,
@@ -97,8 +98,8 @@ export async function GET(request) {
         holiday_count: stats.holiday,
         lop_count: stats.lop,
         paid_leave_days: stats.paid_leave,
-        /** Present + Sunday + Holiday − LOP − 0.5×half_day */
-        pay_days: stats.pay_days,
+        /** present + sunday + holiday + paid_leave − LOP − 0.5×half_day */
+        pay_days: Number(stats.pay_days),
         /** Legacy: total distinct log days (same as present + half_day + sunday worked). */
         attendance_log_days: logs.length,
         dates_worked: logs.map((l) => l.date),
