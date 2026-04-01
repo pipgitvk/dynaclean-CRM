@@ -198,6 +198,27 @@ Thanks for doing business with us!`,
   );
 
   const [notes, setNotes] = useState("");
+  const [formLogoSrc, setFormLogoSrc] = useState("/logo1.jpg");
+  const [formLogoErrorStep, setFormLogoErrorStep] = useState(0);
+
+  const handleFormLogoError = () => {
+    if (formLogoErrorStep === 0) {
+      setFormLogoSrc("/logo.jpg");
+      setFormLogoErrorStep(1);
+      return;
+    }
+    if (formLogoErrorStep === 1) {
+      setFormLogoSrc("/logo.png");
+      setFormLogoErrorStep(2);
+      return;
+    }
+    if (formLogoErrorStep === 2) {
+      setFormLogoSrc("https://dynacleanindustries.com/logo1.jpg");
+      setFormLogoErrorStep(3);
+      return;
+    }
+    setFormLogoSrc("");
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -363,14 +384,20 @@ const fetchQuotationAndFill = async () => {
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border p-4 rounded bg-gray-50 gap-4">
-        <Image
-          src="/logo1.jpg"
-          alt="Dynaclean Logo"
-          width={120}
-          height={80}
-          className="object-contain"
-          unoptimized
-        />
+        {formLogoSrc ? (
+          <img
+            src={formLogoSrc}
+            alt="Dynaclean Logo"
+            width={120}
+            height={80}
+            className="object-contain"
+            onError={handleFormLogoError}
+          />
+        ) : (
+          <div className="w-[120px] h-[80px] border border-gray-200 flex items-center justify-center text-xs font-semibold text-red-600">
+            DYNACLEAN
+          </div>
+        )}
 
         <div className="flex-1 text-sm text-gray-700">
           <h2 className="text-xl font-bold text-red-600 mb-1">
