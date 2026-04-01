@@ -6,6 +6,7 @@ import TaxAndSummary from "./Tax-invoice";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import dynacleanLogo from "@/components/logo1.jpg";
 
 export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
   const router = useRouter();
@@ -198,23 +199,28 @@ Thanks for doing business with us!`,
   );
 
   const [notes, setNotes] = useState("");
-  const [formLogoSrc, setFormLogoSrc] = useState("/logo1.jpg");
+  const [formLogoSrc, setFormLogoSrc] = useState(dynacleanLogo.src);
   const [formLogoErrorStep, setFormLogoErrorStep] = useState(0);
 
   const handleFormLogoError = () => {
     if (formLogoErrorStep === 0) {
-      setFormLogoSrc("/logo.jpg");
+      setFormLogoSrc("/logo1.jpg");
       setFormLogoErrorStep(1);
       return;
     }
     if (formLogoErrorStep === 1) {
-      setFormLogoSrc("/logo.png");
+      setFormLogoSrc("/logo.jpg");
       setFormLogoErrorStep(2);
       return;
     }
     if (formLogoErrorStep === 2) {
-      setFormLogoSrc("https://dynacleanindustries.com/logo1.jpg");
+      setFormLogoSrc("/logo.png");
       setFormLogoErrorStep(3);
+      return;
+    }
+    if (formLogoErrorStep === 3) {
+      setFormLogoSrc("https://dynacleanindustries.com/logo1.jpg");
+      setFormLogoErrorStep(4);
       return;
     }
     setFormLogoSrc("");
