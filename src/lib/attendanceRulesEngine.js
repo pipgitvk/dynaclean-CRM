@@ -1,3 +1,5 @@
+import { parseAttendanceClockMinutes } from "@/lib/istDateTime";
+
 /**
  * Shared attendance rule evaluation (matches previous hardcoded behaviour, driven by API rules).
  * @typedef {Object} AttendanceRulesShape
@@ -82,9 +84,8 @@ export function formatBreakWindowRange(startHHMMSS, durationMin) {
 export function getCheckinStatus(logTime, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
   if (!logTime) return null;
-  const logDate = new Date(logTime);
-  if (Number.isNaN(logDate.getTime())) return null;
-  const logM = logDate.getHours() * 60 + logDate.getMinutes();
+  const logM = parseAttendanceClockMinutes(logTime);
+  if (logM == null) return null;
   const standardM = parseTimeToMinutes(r.checkin);
   const halfDayM = parseTimeToMinutes(r.halfDayCheckin);
   const graceEndM = standardM + r.gracePeriodMinutes;
@@ -99,9 +100,8 @@ export function getCheckinStatus(logTime, rules) {
 export function getCheckoutStatus(logTime, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
   if (!logTime) return null;
-  const logDate = new Date(logTime);
-  if (Number.isNaN(logDate.getTime())) return null;
-  const logM = logDate.getHours() * 60 + logDate.getMinutes();
+  const logM = parseAttendanceClockMinutes(logTime);
+  if (logM == null) return null;
   const standardM = parseTimeToMinutes(r.checkout);
   const graceStartM = standardM - r.gracePeriodMinutes;
   const halfDayM = parseTimeToMinutes(r.halfDayCheckout);
@@ -114,9 +114,10 @@ export function getCheckoutStatus(logTime, rules) {
 export function getBreakStatus(startTime, endTime, breakType, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
   if (!startTime || !endTime) return null;
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-  const durationMinutes = Math.floor((end - start) / (1000 * 60));
+  const startM = parseAttendanceClockMinutes(startTime);
+  const endM = parseAttendanceClockMinutes(endTime);
+  if (startM == null || endM == null) return null;
+  const durationMinutes = Math.max(0, endM - startM);
   const allowedDuration = r.breakDurations[breakType];
   const graceLimit = allowedDuration + r.breakGracePeriodMinutes;
   if (durationMinutes <= allowedDuration) return "green";
@@ -127,10 +128,9 @@ export function getBreakStatus(startTime, endTime, breakType, rules) {
 export function isHalfDayByRules(log, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
   if (!log?.checkin_time || !log?.checkout_time) return false;
-  const logDateIn = new Date(log.checkin_time);
-  const logDateOut = new Date(log.checkout_time);
-  const inM = logDateIn.getHours() * 60 + logDateIn.getMinutes();
-  const outM = logDateOut.getHours() * 60 + logDateOut.getMinutes();
+  const inM = parseAttendanceClockMinutes(log.checkin_time);
+  const outM = parseAttendanceClockMinutes(log.checkout_time);
+  if (inM == null || outM == null) return false;
   const halfInM = parseTimeToMinutes(r.halfDayCheckin);
   const halfOutM = parseTimeToMinutes(r.halfDayCheckout);
   /* Matches former isLate(checkin, halfDayCheckin) || isEarly(checkout, halfDayCheckout) */
@@ -141,12 +141,9 @@ export function isHalfDayByRules(log, rules) {
 export function isLateDaySummary(log, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
   if (!log?.checkin_time || !log?.checkout_time) return false;
-  const inM =
-    new Date(log.checkin_time).getHours() * 60 +
-    new Date(log.checkin_time).getMinutes();
-  const outM =
-    new Date(log.checkout_time).getHours() * 60 +
-    new Date(log.checkout_time).getMinutes();
+  const inM = parseAttendanceClockMinutes(log.checkin_time);
+  const outM = parseAttendanceClockMinutes(log.checkout_time);
+  if (inM == null || outM == null) return false;
   const standardIn = parseTimeToMinutes(r.checkin);
   const standardOut = parseTimeToMinutes(r.checkout);
   return inM > standardIn || outM < standardOut;

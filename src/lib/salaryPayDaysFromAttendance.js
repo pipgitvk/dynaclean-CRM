@@ -13,33 +13,10 @@ import {
   parseTimeToMinutes,
   DEFAULT_ATTENDANCE_RULES,
 } from "@/lib/attendanceRulesEngine";
+import { parseAttendanceClockMinutes } from "@/lib/istDateTime";
 
 /** Salary only: grace window is exactly 15 minutes from standard in/out times. */
 const SALARY_GRACE_MINUTES = 15;
-
-/**
- * Minutes since midnight for a punch time. Prefer MySQL-style "YYYY-MM-DD HH:mm:ss" so
- * 10:30 stays 10:30 (avoids Node/UTC shifting getHours() vs stored local wall time).
- * @param {string|Date|null|undefined} logTime
- * @returns {number|null}
- */
-function parseLogClockMinutes(logTime) {
-  if (logTime == null) return null;
-  if (logTime instanceof Date) {
-    if (Number.isNaN(logTime.getTime())) return null;
-    return logTime.getHours() * 60 + logTime.getMinutes();
-  }
-  const s = String(logTime).trim();
-  const m = s.match(/\d{4}-\d{2}-\d{2}[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
-  if (m) {
-    const h = parseInt(m[1], 10) || 0;
-    const min = parseInt(m[2], 10) || 0;
-    return h * 60 + min;
-  }
-  const d = new Date(logTime);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.getHours() * 60 + d.getMinutes();
-}
 
 /**
  * @param {string|null|undefined} logTime
@@ -48,7 +25,7 @@ function parseLogClockMinutes(logTime) {
  */
 function getSalaryCheckinBand(logTime, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
-  const logM = parseLogClockMinutes(logTime);
+  const logM = parseAttendanceClockMinutes(logTime);
   if (logM == null) return null;
   const standardM = parseTimeToMinutes(r.checkin);
   const graceEndM = standardM + SALARY_GRACE_MINUTES;
@@ -64,7 +41,7 @@ function getSalaryCheckinBand(logTime, rules) {
  */
 function getSalaryCheckoutBand(logTime, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
-  const logM = parseLogClockMinutes(logTime);
+  const logM = parseAttendanceClockMinutes(logTime);
   if (logM == null) return null;
   const standardM = parseTimeToMinutes(r.checkout);
   const graceStartM = standardM - SALARY_GRACE_MINUTES;
