@@ -204,7 +204,7 @@ export default function InvoiceTable() {
                   </td>
                   <td className="px-4 py-2 text-center">
                     <Link
-                      href={`/admin-dashboard/invoices/${i.invoice_number}`}
+                      href={`/admin-dashboard/invoices/${encodeURIComponent(i.invoice_number)}`}
                       className="bg-green-600 text-white px-3 py-1 rounded"
                     >
                       View

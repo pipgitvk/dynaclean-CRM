@@ -147,10 +147,14 @@ export async function POST(req) {
 
     await conn.beginTransaction();
 
-    // Generate a unique invoice number at submit time
+    // Generate invoice number from DB sequence (no hardcoded segment)
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
-    const todayPrefix = `INV${dateStr}`;
+    const getDefaultPrefix = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      return `DYN/${year}-${month}/`;
+    };
+    const defaultPrefix = getDefaultPrefix(now);
     const serverInvoiceDate = invoice_date || now.toISOString().split("T")[0];
 
     let attempt = 0;
@@ -158,26 +162,41 @@ export async function POST(req) {
     let invoiceId = null;
 
     while (attempt < 5) {
-      // Find highest invoice number for today
+      // Find latest DYN invoice from DB and continue that prefix
+      const [latestRows] = await conn.execute(
+        `SELECT invoice_number FROM invoices
+         WHERE invoice_number LIKE 'DYN/%'
+         ORDER BY id DESC
+         LIMIT 1`,
+      );
+
+      const latestInvoiceNumber = latestRows?.[0]?.invoice_number || "";
+      let invoicePrefix = defaultPrefix;
+
+      const prefixMatch = latestInvoiceNumber.match(/^(DYN\/\d{4}-\d{2}\/)\d+$/);
+      if (prefixMatch) {
+        invoicePrefix = prefixMatch[1];
+      }
+
       const [existing] = await conn.execute(
         `SELECT invoice_number FROM invoices 
          WHERE invoice_number LIKE ? 
          ORDER BY invoice_number DESC 
          LIMIT 1`,
-        [`${todayPrefix}%`],
+        [`${invoicePrefix}%`],
       );
 
       let increment = 1;
       if (existing.length > 0) {
         const lastInvoice = existing[0].invoice_number || "";
         const lastIncrement = parseInt(
-          lastInvoice.replace(todayPrefix, ""),
+          lastInvoice.replace(invoicePrefix, ""),
           10,
         );
         if (!Number.isNaN(lastIncrement)) increment = lastIncrement + 1;
       }
 
-      finalInvoiceNumber = `${todayPrefix}${increment.toString().padStart(3, "0")}`;
+      finalInvoiceNumber = `${invoicePrefix}${increment.toString().padStart(3, "0")}`;
 
       try {
         // Insert the invoice header

@@ -1868,7 +1868,7 @@ const NewInvoice = ({ invoice }) => {
     invoice: {
       number: invoice.invoice_number || "",
       eWayBill: "", // Not in your table
-      referenceNo: "123456", // Not in your table
+      referenceNo: invoice.reference_quote_number || invoice.quotation_id || "",
       orderDate: invoice.invoice_date
         ? new Date(invoice.invoice_date)
             .toLocaleDateString("en-GB", {
@@ -1951,6 +1951,23 @@ const NewInvoice = ({ invoice }) => {
           })
         : "0.00",
     },
+  };
+
+  const [logoSrc, setLogoSrc] = React.useState("/logo1.jpg");
+  const [logoErrorStep, setLogoErrorStep] = React.useState(0);
+
+  const handleLogoError = () => {
+    if (logoErrorStep === 0) {
+      setLogoSrc("/logo.jpg");
+      setLogoErrorStep(1);
+      return;
+    }
+    if (logoErrorStep === 1) {
+      setLogoSrc("/logo.png");
+      setLogoErrorStep(2);
+      return;
+    }
+    setLogoSrc("");
   };
 
   const containerRef = React.useRef(null);
@@ -2333,11 +2350,30 @@ const NewInvoice = ({ invoice }) => {
             <tr style={{ height: "110px" }}>
               {/* Left - Logo */}
               <td style={{ width: "25%" }}>
-                <img
-                  src="/logo.png"
-                  style={{ width: 110, height: "auto", display: "block" }}
-                  alt="logo"
-                />
+                {logoSrc ? (
+                  <img
+                    src={logoSrc}
+                    style={{ width: 110, height: "auto", display: "block" }}
+                    alt="logo"
+                    onError={handleLogoError}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 110,
+                      minHeight: 48,
+                      border: "1px solid #ddd",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#c62828",
+                      fontWeight: 700,
+                      fontSize: 10,
+                    }}
+                  >
+                    DYNACLEAN
+                  </div>
+                )}
               </td>
 
               {/* Center - Company Details */}
@@ -2729,7 +2765,7 @@ const NewInvoice = ({ invoice }) => {
                   borderRight: "0px",
                 }}
               >
-                State Code : <span style={{ fontWeight: "normal" }}> {invoice.state_code || "12345"}</span>
+                State Code : <span style={{ fontWeight: "normal" }}> {invoice.gst_number || invoice.state_code || ""}</span>
               </td>
               <td
                 style={{
@@ -2740,7 +2776,7 @@ const NewInvoice = ({ invoice }) => {
                   borderBottom: "0px",
                 }}
               >
-                Amount Paid : <span style={{ fontWeight: "normal" }}> ₹{invoice.amountPaid || "0.00"}</span>
+                Amount Paid : <span style={{ fontWeight: "normal" }}> ₹{data.paymentInfo.amountPaid || "0.00"}</span>
               </td>
             </tr>
             

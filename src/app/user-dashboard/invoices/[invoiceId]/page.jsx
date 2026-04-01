@@ -22,6 +22,41 @@ async function getInvoiceWithItems(invoiceNumber) {
 
   if (!invoice) return null;
 
+  // Resolve quotation number for reference field (supports both quote_number and internal quotation id)
+  let resolvedQuoteNumber = invoice.quotation_id || null;
+  if (invoice.quotation_id) {
+    try {
+      const [[byQuoteNumber]] = await conn.execute(
+        `
+        SELECT quote_number
+        FROM quotations_records
+        WHERE TRIM(quote_number) = TRIM(?)
+        LIMIT 1
+        `,
+        [String(invoice.quotation_id)],
+      );
+
+      if (byQuoteNumber?.quote_number) {
+        resolvedQuoteNumber = byQuoteNumber.quote_number;
+      } else {
+        const [[byLegacyId]] = await conn.execute(
+          `
+          SELECT quote_number
+          FROM quotations_records
+          WHERE TRIM(CAST(\`S.No.\` AS CHAR)) = TRIM(?)
+          LIMIT 1
+          `,
+          [String(invoice.quotation_id)],
+        );
+        if (byLegacyId?.quote_number) {
+          resolvedQuoteNumber = byLegacyId.quote_number;
+        }
+      }
+    } catch {
+      // Keep existing quotation_id as fallback if lookup fails
+    }
+  }
+
   // Invoice items (MULTIPLE)
   const [items] = await conn.execute(
     `
@@ -35,12 +70,14 @@ async function getInvoiceWithItems(invoiceNumber) {
 
   return {
     ...invoice,
+    reference_quote_number: resolvedQuoteNumber,
     items,
   };
 }
 
 export default async function InvoicePage({ params }) {
   const { invoiceId } = await params;
+  const decodedInvoiceId = decodeURIComponent(invoiceId);
 
   //  Auth check
   const cookieStore = await cookies();
@@ -57,7 +94,7 @@ export default async function InvoicePage({ params }) {
   }
 
   //  Fetch invoice + items
-  const invoiceData = await getInvoiceWithItems(invoiceId);
+  const invoiceData = await getInvoiceWithItems(decodedInvoiceId);
 
   if (!invoiceData) {
     return <p className="p-6 text-red-600">Invoice not found</p>;
