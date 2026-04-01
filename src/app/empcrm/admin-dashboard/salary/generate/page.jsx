@@ -113,10 +113,11 @@ const GenerateSalaryPage = () => {
                                 String(selectedEmployee ?? "").toLowerCase()
                     );
                     if (empAtt) {
-                        payDaysFromAttendance =
-                            typeof empAtt.pay_days === "number"
-                                ? empAtt.pay_days
-                                : Number(empAtt.present_days) || 0;
+                        const raw =
+                            empAtt.pay_days != null ? Number(empAtt.pay_days) : NaN;
+                        payDaysFromAttendance = Number.isFinite(raw)
+                            ? raw
+                            : Number(empAtt.present_days) || 0;
                         if (empAtt.sunday_worked_dates && Array.isArray(empAtt.sunday_worked_dates)) {
                             sundayDates = empAtt.sunday_worked_dates;
                         } else if (empAtt.dates_worked && Array.isArray(empAtt.dates_worked)) {
