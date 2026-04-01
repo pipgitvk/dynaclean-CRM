@@ -34,8 +34,6 @@ const GenerateSalaryPage = () => {
 
     /** Dates employee had a log on Sunday (worked on Sunday). */
     const [sundaysWorked, setSundaysWorked] = useState([]);
-    /** Counts from attendance-summary API (pay_days formula). */
-    const [attendanceBreakdown, setAttendanceBreakdown] = useState(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -65,7 +63,6 @@ const GenerateSalaryPage = () => {
             setDeductions([]);
             setCalculation(null);
             setSundaysWorked([]);
-            setAttendanceBreakdown(null);
         }
     }, [selectedEmployee, selectedMonth]);
 
@@ -106,7 +103,6 @@ const GenerateSalaryPage = () => {
 
                 let payDaysFromAttendance = 0;
                 let sundayDates = [];
-                let breakdown = null;
 
                 if (attendanceData.success) {
                     const empAtt = attendanceData.employees.find(e => e.username === selectedEmployee);
@@ -115,15 +111,6 @@ const GenerateSalaryPage = () => {
                             typeof empAtt.pay_days === "number"
                                 ? empAtt.pay_days
                                 : Number(empAtt.present_days) || 0;
-                        breakdown = {
-                            present: empAtt.present_days,
-                            half_day: empAtt.half_day_count,
-                            sunday: empAtt.sunday_count,
-                            holiday: empAtt.holiday_count,
-                            lop: empAtt.lop_count,
-                            paid_leave: empAtt.paid_leave_days,
-                            pay_days: empAtt.pay_days,
-                        };
                         if (empAtt.sunday_worked_dates && Array.isArray(empAtt.sunday_worked_dates)) {
                             sundayDates = empAtt.sunday_worked_dates;
                         } else if (empAtt.dates_worked && Array.isArray(empAtt.dates_worked)) {
@@ -135,7 +122,6 @@ const GenerateSalaryPage = () => {
                     }
                 }
                 setSundaysWorked(sundayDates);
-                setAttendanceBreakdown(breakdown);
 
                 // Check if records already exist for this month to pre-fill
                 const existingRecord = salaryData.salaryRecords?.find(r => r.salary_month === selectedMonth);
@@ -594,29 +580,6 @@ const GenerateSalaryPage = () => {
                                 </select>
                             </div>
 
-                            {attendanceBreakdown && (
-                                <div className="bg-slate-50 p-3 rounded-md border border-slate-200 text-xs text-slate-700 space-y-1">
-                                    <p className="font-semibold text-slate-800">Attendance (selected month)</p>
-                                    <p>
-                                        Present {attendanceBreakdown.present} · Sunday {attendanceBreakdown.sunday} ·
-                                        Holiday {attendanceBreakdown.holiday} · LOP {attendanceBreakdown.lop} · Half-day{" "}
-                                        {attendanceBreakdown.half_day} · Paid leave {attendanceBreakdown.paid_leave}
-                                    </p>
-                                    <p className="text-slate-600">
-                                        Pay days = Present + Sunday + Holiday − LOP − 0.5×Half-day →{" "}
-                                        <span className="font-mono font-semibold text-slate-900">
-                                            {Number(attendanceBreakdown.pay_days).toFixed(1)}
-                                        </span>
-                                        {attendanceBreakdown.paid_leave > 0 ? (
-                                            <span className="block mt-1 text-amber-800">
-                                                Paid leave ({attendanceBreakdown.paid_leave} days) is not in this sum;
-                                                increase Present Days manually if those should be paid.
-                                            </span>
-                                        ) : null}{" "}
-                                        <span className="block mt-1">(Auto-fills <strong>Present Days</strong> below.)</span>
-                                    </p>
-                                </div>
-                            )}
                             {/* Sundays Worked Display */}
                             {sundaysWorked.length > 0 && (
                                 <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
