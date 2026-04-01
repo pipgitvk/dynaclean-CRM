@@ -7,6 +7,13 @@
  */
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { loadGlobalAttendanceRulesRow } from "@/lib/ensureAttendanceRulesTable";
+import { ensureEmployeeAttendanceScheduleTable } from "@/lib/ensureEmployeeAttendanceScheduleTable";
+import {
+  rowToAttendanceRulesShape,
+  mergeGlobalRulesWithEmployeeSchedule,
+} from "@/lib/attendanceRulesDb";
+import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
 import {
   computeSpecialAllowanceFromGross,
   computeBasicHraFromGrossSalary,
@@ -15,6 +22,12 @@ import {
   applyStatutoryDeductionsFromStructure,
   isHealthInsuranceDeductionRow,
 } from "@/lib/salaryGrossSpecialAllowance";
+
+function normalizeUserKey(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase();
+}
 
 /** Working days in a month (exclude Sundays). */
 function calcWorkingDays(year, month) {
@@ -36,7 +49,7 @@ function prevMonth() {
   return { year: y, month: m, label };
 }
 
-async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultStatus }) {
+async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultStatus, salaryContext }) {
   const [structRows] = await db.query(
     `SELECT * FROM employee_salary_structure WHERE username = ? AND is_active = 1 ORDER BY effective_from DESC LIMIT 1`,
     [emp.username]
@@ -45,12 +58,20 @@ async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultS
 
   const structure = structRows[0];
 
-  // Attendance present days for the month
-  const [attRows] = await db.query(
-    `SELECT COUNT(DISTINCT date) as cnt FROM attendance_logs WHERE username = ? AND date LIKE ?`,
-    [emp.username, `${salaryMonth}%`]
+  const logs = salaryContext.logsByUser[emp.username] || [];
+  const rules = mergeGlobalRulesWithEmployeeSchedule(
+    salaryContext.globalRules,
+    salaryContext.scheduleByUser.get(normalizeUserKey(emp.username)) || null
   );
-  const presentDays = Number(attRows[0]?.cnt) || 0;
+  const stats = computeSalaryPayDaysForUser({
+    monthStr: salaryMonth,
+    logs,
+    holidaysAll: salaryContext.holidays,
+    leavesAll: salaryContext.leaves,
+    username: emp.username,
+    rules,
+  });
+  const presentDays = stats.pay_days;
 
   const [deductions] = await db.query(
     `SELECT esd.*, sdt.deduction_name, sdt.deduction_code, sdt.calculation_type, sdt.is_mandatory
@@ -265,12 +286,57 @@ export async function GET(request) {
       "SELECT username FROM rep_list WHERE status = 1 ORDER BY username"
     );
 
+    const [attendanceRows] = await db.query(
+      `SELECT username, date, checkin_time, checkout_time,
+        break_morning_start, break_morning_end,
+        break_lunch_start, break_lunch_end,
+        break_evening_start, break_evening_end
+      FROM attendance_logs WHERE date LIKE ?`,
+      [`${salaryMonth}%`]
+    );
+    const logsByUser = {};
+    for (const row of attendanceRows) {
+      if (!logsByUser[row.username]) logsByUser[row.username] = [];
+      logsByUser[row.username].push(row);
+    }
+
+    const [holidays] = await db.query(
+      `SELECT holiday_date, title, description FROM holidays ORDER BY holiday_date DESC`
+    );
+    const [leaves] = await db.query(
+      `SELECT username, from_date, to_date, leave_type, reason
+       FROM employee_leaves WHERE status = 'approved'`
+    );
+
+    const globalRow = await loadGlobalAttendanceRulesRow(db);
+    const globalRules = rowToAttendanceRulesShape(globalRow);
+    await ensureEmployeeAttendanceScheduleTable();
+    const [schedules] = await db.query(`SELECT * FROM employee_attendance_schedule`);
+    const scheduleByUser = new Map(
+      (schedules || []).map((s) => [normalizeUserKey(s.username), s])
+    );
+
+    const salaryContext = {
+      logsByUser,
+      holidays,
+      leaves,
+      globalRules,
+      scheduleByUser,
+    };
+
     let generated = 0, skipped = 0, failed = 0;
     const errors = [];
 
     for (const emp of employees) {
       try {
-        const result = await generateForEmployee({ db, emp, salaryMonth, workingDays, defaultStatus });
+        const result = await generateForEmployee({
+          db,
+          emp,
+          salaryMonth,
+          workingDays,
+          defaultStatus,
+          salaryContext,
+        });
         if (result.success) generated++;
         else skipped++;
       } catch (err) {
