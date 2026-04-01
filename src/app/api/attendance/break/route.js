@@ -1,5 +1,6 @@
 // /api/attendance/break/route.js
 import { getDbConnection } from "@/lib/db";
+import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
@@ -16,9 +17,10 @@ export async function POST(req) {
 
   const conn = await getDbConnection();
 
+  const today = getISTDateString();
   const [rows] = await conn.execute(
-    "SELECT * FROM attendance_logs WHERE username = ? AND date = CURDATE()",
-    [username]
+    "SELECT * FROM attendance_logs WHERE username = ? AND date = ?",
+    [username, today]
   );
 
   if (!rows.length) {
@@ -31,8 +33,8 @@ export async function POST(req) {
   }
 
   await conn.execute(
-    `UPDATE attendance_logs SET ${column} = NOW() WHERE id = ?`,
-    [row.id]
+    `UPDATE attendance_logs SET ${column} = ? WHERE id = ?`,
+    [getISTDateTimeString(), row.id]
   );
 
   return NextResponse.json({ success: true });
