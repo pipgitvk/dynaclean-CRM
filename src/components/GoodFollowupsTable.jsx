@@ -28,6 +28,9 @@ const SkeletonRows = () => (
         <td className="px-3 py-4">
           <div className="h-4 bg-gray-200 rounded w-20"></div>
         </td>
+        <td className="px-3 py-4">
+          <div className="h-4 bg-gray-200 rounded w-20"></div>
+        </td>
       </tr>
     ))}
   </>
@@ -37,10 +40,12 @@ export default function GoodFollowupsTable({ data, isLoading }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredData, setFilteredData] = useState([]);
   const [stageFilter, setStageFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const stages = Array.from(
     new Set(data?.map((item) => item.stage).filter(Boolean))
   );
+  const statuses = ["NEW", "Very Good", "Average", "Poor", "Denied"];
 
   useEffect(() => {
     if (!data) return;
@@ -55,11 +60,15 @@ export default function GoodFollowupsTable({ data, isLoading }) {
       const matchesStage =
         stageFilter === "" || item.stage?.toLowerCase() === stageFilter.toLowerCase();
 
-      return matchesSearch && matchesStage;
+      const matchesStatus =
+        statusFilter === "" ||
+        item.status?.toLowerCase() === statusFilter.toLowerCase();
+
+      return matchesSearch && matchesStage && matchesStatus;
     });
 
     setFilteredData(result);
-  }, [searchQuery, stageFilter, data]);
+  }, [searchQuery, stageFilter, statusFilter, data]);
 
 
   if (isLoading) {
@@ -73,6 +82,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
               <th className="px-3 py-3 font-semibold text-left">Phone</th>
               <th className="px-3 py-3 font-semibold text-left">Source</th>
               <th className="px-3 py-3 font-semibold text-left">Stage</th>
+              <th className="px-3 py-3 font-semibold text-left">Status</th>
               <th className="px-3 py-3 font-semibold text-left">Notes</th>
               <th className="px-3 py-3 font-semibold text-left">Date</th>
             </tr>
@@ -122,6 +132,22 @@ export default function GoodFollowupsTable({ data, isLoading }) {
             </select>
           </div>
 
+          {/* Status Filter */}
+          <div className="w-full sm:max-w-[200px]">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">All Status</option>
+              {statuses.map((status, idx) => (
+                <option key={idx} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+
 
           {/* Dynamic Row Count */}
           <div className="text-sm font-medium text-gray-600">
@@ -144,6 +170,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
                 <th className="px-3 py-3 font-semibold text-left">Phone</th>
                 <th className="px-3 py-3 font-semibold text-left">Source</th>
                 <th className="px-3 py-3 font-semibold text-left">Stage</th>
+                <th className="px-3 py-3 font-semibold text-left">Status</th>
                 <th className="px-3 py-3 font-semibold text-left">Notes</th>
                 <th className="px-3 py-3 font-semibold text-left">Date</th>
               </tr>
@@ -160,6 +187,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
                     <td className="px-3 py-3">{f.phone}</td>
                     <td className="px-3 py-3">{f.lead_source}</td>
                     <td className="px-3 py-3">{f.stage}</td>
+                    <td className="px-3 py-3">{f.status || "-"}</td>
                     <td className="px-3 py-3">{f.notes}</td>
                     <td className="px-3 py-3">
                       {dayjs(f.followed_date).format("DD-MMM-YYYY")}
@@ -169,7 +197,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
               ) : (
                 <tr>
                   <td
-                    colSpan="7"
+                    colSpan="8"
                     className="px-6 py-4 text-center text-gray-500"
                   >
                     No followups found.
@@ -207,6 +235,10 @@ export default function GoodFollowupsTable({ data, isLoading }) {
                 <div className="flex items-center justify-between text-sm text-gray-600">
                   <span>Stage:</span>
                   <span className="text-right">{f.stage}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>Status:</span>
+                  <span className="text-right">{f.status || "-"}</span>
                 </div>
                 <div className="text-sm text-gray-600">
                   <span className="font-medium">Notes:</span>

@@ -54,6 +54,7 @@ export async function GET(req) {
         c.phone,
         c.lead_source,
         c.stage,
+        c.status,
         cf.notes,
         cf.followed_date
       FROM
