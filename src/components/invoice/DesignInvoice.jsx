@@ -2442,7 +2442,7 @@ const NewInvoice = ({ invoice }) => {
             <tr>
               <td
                 style={{
-                  border: "0.2px solid #000",
+                  border: "1px solid #000",
                   padding: "3px",
                   paddingBottom: "7px",
                   width: "33%",
@@ -2464,7 +2464,6 @@ const NewInvoice = ({ invoice }) => {
                   fontWeight: "bold",
                   borderBottom: "0px",
                   borderRight: "0px",
-                  marginBottom: "20px",
                 }}
               >
                 Invoice Date : <span style={{
@@ -2493,25 +2492,31 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "3px",
                   paddingBottom: "7px",
+                  width: "33%",
                   borderBottom: "0px",
                   borderRight: "0px",
-                 
-                  
+                  verticalAlign: "top",
                 }}
               >
-                <b>Reference No. : <span style={{
-                  fontWeight: "normal",
-                  marginRight:"3px"
-                }}>{data.invoice.referenceNo}</span></b>
-                <b>Dt. : <span style={{
-                  fontWeight: "normal",
-                }}>{data.invoice.orderDate}</span></b>
+                <div style={{ fontWeight: "bold", lineHeight: "1.3" }}>
+                  Reference No. :{" "}
+                  <span style={{ fontWeight: "normal" }}>
+                    {data.invoice.referenceNo || "-"}
+                  </span>
+                </div>
+                <div style={{ fontWeight: "bold", marginTop: "6px", lineHeight: "1.3" }}>
+                  Dt. :{" "}
+                  <span style={{ fontWeight: "normal" }}>
+                    {data.invoice.orderDate || "-"}
+                  </span>
+                </div>
               </td>
               <td
                 style={{
                   border: "1px solid #000",
                   padding: "3px",
                   paddingBottom: "7px",
+                  width: "33%",
                   borderBottom: "0px",
                   borderRight: "0px",
                 }}
@@ -2525,6 +2530,7 @@ const NewInvoice = ({ invoice }) => {
                   border: "1px solid #000",
                   padding: "3px",
                   paddingBottom: "7px",
+                  width: "34%",
                   borderBottom: "0px",
                 }}
               >
@@ -2696,21 +2702,19 @@ const NewInvoice = ({ invoice }) => {
 
   <div
     style={{
-      display: "flex",
+      display: "block",
       width: "100%",
-      gap: "10px",
-      flexWrap: "wrap",           // IMPORTANT
-      alignItems: "flex-start"
+      marginBottom: "3px",
     }}
   >
-    <p style={{ fontWeight: "bold", margin: 0 }}>
+    <p style={{ fontWeight: "bold", margin: 0, marginBottom: "2px" }}>
       Address:{" "}
       <span style={{ fontWeight: "normal" }}>
         {data.consignee.address}
       </span>
     </p>
 
-    <p style={{ fontWeight: "bold", margin: 0 }}>
+    <p style={{ fontWeight: "bold", margin: 0, marginBottom: "2px" }}>
       GSTIN:{" "}
       <span style={{ fontWeight: "normal" }}>
         {data.consignee.gstin || "22AAAAA0000A1Z5"}
