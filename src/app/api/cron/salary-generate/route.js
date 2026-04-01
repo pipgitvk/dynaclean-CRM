@@ -70,6 +70,7 @@ async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultS
     leavesAll: salaryContext.leaves,
     username: emp.username,
     rules,
+    dateOfJoining: salaryContext.dojByUser?.get(normalizeUserKey(emp.username)) ?? null,
   });
   const presentDays = stats.pay_days;
 
@@ -317,12 +318,18 @@ export async function GET(request) {
       (schedules || []).map((s) => [normalizeUserKey(s.username), s])
     );
 
+    const [profileRows] = await db.query(`SELECT username, date_of_joining FROM employee_profiles`);
+    const dojByUser = new Map(
+      (profileRows || []).map((p) => [normalizeUserKey(p.username), p.date_of_joining])
+    );
+
     const salaryContext = {
       logsByUser,
       holidays,
       leaves,
       globalRules,
       scheduleByUser,
+      dojByUser,
     };
 
     let generated = 0, skipped = 0, failed = 0;

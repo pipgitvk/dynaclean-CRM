@@ -1,7 +1,9 @@
 /**
- * Salary “pay days” from attendance, aligned with AttendanceSummaryGrid / cell logic.
+ * Salary “pay days” from attendance (payroll-oriented).
  * Formula:
- *   present + sunday + holiday + paid_leave − LOP − (half_day × 0.5)
+ *   present + weekend_off + holiday + paid_leave − LOP − (half_day × 0.5)
+ * - weekend_off: Sunday and Saturday with no punch (paid week off; not LOP).
+ * - Days before date_of_joining are skipped (not LOP, not paid).
  */
 import { isHalfDayByRules } from "@/lib/attendanceRulesEngine";
 
@@ -50,14 +52,24 @@ function buildLeaveDateSetForUser(leaves, username) {
  * @param {Array<{holiday_date:string|Date}>} p.holidaysAll
  * @param {Array<{username:string, from_date:string, to_date:string}>} p.leavesAll
  * @param {string} p.username
+ * @param {string|Date|null|undefined} p.dateOfJoining — skip calendar days before this (exclusive of LOP/present).
  * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} p.rules
  */
 export function computeSalaryPayDaysForUser(p) {
-  const { monthStr, logs, holidaysAll, leavesAll, username, rules } = p;
+  const { monthStr, logs, holidaysAll, leavesAll, username, rules, dateOfJoining } = p;
   const [y, m] = monthStr.split("-").map(Number);
   const monthIndex = m - 1;
   const daysInMonth = new Date(y, monthIndex + 1, 0).getDate();
   const today = startOfDay(new Date());
+  let dojValid = false;
+  let doj = null;
+  if (dateOfJoining != null && String(dateOfJoining).trim() !== "") {
+    const parsed = startOfDay(new Date(dateOfJoining));
+    if (!Number.isNaN(parsed.getTime())) {
+      doj = parsed;
+      dojValid = true;
+    }
+  }
 
   const holidayMap = new Map();
   for (const h of holidaysAll || []) {
@@ -76,6 +88,8 @@ export function computeSalaryPayDaysForUser(p) {
   let present = 0;
   let half_day = 0;
   let sunday = 0;
+  /** Saturday + Sunday with no log (paid weekly off; not LOP). */
+  let weekend_off = 0;
   let holiday = 0;
   let lop = 0;
   let paid_leave = 0;
@@ -85,10 +99,13 @@ export function computeSalaryPayDaysForUser(p) {
     const d = new Date(y, monthIndex, day);
     const cellDate = startOfDay(d);
     if (cellDate > today) continue;
+    if (dojValid && cellDate < doj) continue;
 
     const dateString = ymdKey(y, m, day);
     const existingLog = dateMap.get(dateString);
-    const isSunday = d.getDay() === 0;
+    const dow = d.getDay();
+    const isSunday = dow === 0;
+    const isSaturday = dow === 6;
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveDates.has(dateString);
 
@@ -103,12 +120,17 @@ export function computeSalaryPayDaysForUser(p) {
       }
       continue;
     }
-    if (isSunday) {
-      sunday++;
-      continue;
-    }
     if (isHoliday) {
       holiday++;
+      continue;
+    }
+    if (isSunday) {
+      sunday++;
+      weekend_off++;
+      continue;
+    }
+    if (isSaturday) {
+      weekend_off++;
       continue;
     }
     if (isOnLeave) {
@@ -118,19 +140,22 @@ export function computeSalaryPayDaysForUser(p) {
     lop++;
   }
 
-  const pay_days = Math.max(
-    0,
-    present + sunday + holiday + paid_leave - lop - 0.5 * half_day
-  );
+  const raw =
+    present + weekend_off + holiday + paid_leave - lop - 0.5 * half_day;
+  /** Never show 0 pay days when employee has punches (LOP-heavy months made raw negative). */
+  const floorFromPunches = present + 0.5 * half_day;
 
   return {
     present,
     half_day,
     sunday,
+    weekend_off,
     holiday,
     lop,
     paid_leave,
-    pay_days,
+    pay_days: Math.max(0, raw, floorFromPunches),
+    pay_days_raw: raw,
+    floor_from_punches: floorFromPunches,
     sunday_worked_dates: sundayWorkedDates,
   };
 }

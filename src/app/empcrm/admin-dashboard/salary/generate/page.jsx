@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Calculator, AlertCircle, Download } from "lucide-react";
+import { ArrowLeft, Save, Calculator, AlertCircle, Download, CalendarDays } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   generateGenerateSalaryPayslipPDF,
@@ -34,6 +34,8 @@ const GenerateSalaryPage = () => {
 
     /** Dates employee had a log on Sunday (worked on Sunday). */
     const [sundaysWorked, setSundaysWorked] = useState([]);
+    /** Breakdown from attendance-summary API for the selected month. */
+    const [attendanceBreakdown, setAttendanceBreakdown] = useState(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -63,6 +65,7 @@ const GenerateSalaryPage = () => {
             setDeductions([]);
             setCalculation(null);
             setSundaysWorked([]);
+            setAttendanceBreakdown(null);
         }
     }, [selectedEmployee, selectedMonth]);
 
@@ -88,70 +91,109 @@ const GenerateSalaryPage = () => {
 
     const fetchEmployeeDetails = async () => {
         setFetchingDetails(true);
+        const apiUser = encodeURIComponent(selectedEmployee);
+        const apiMonth = encodeURIComponent(selectedMonth);
         try {
-            // 1. Fetch Salary Structure & Deductions
-            const salaryRes = await fetch(`/api/empcrm/salary?username=${selectedEmployee}&month=${selectedMonth}`);
-            const salaryData = await salaryRes.json();
+            const [salaryRes, attendanceRes] = await Promise.all([
+                fetch(`/api/empcrm/salary?username=${apiUser}&month=${apiMonth}`),
+                fetch(`/api/empcrm/salary/attendance-summary?month=${apiMonth}&username=${apiUser}`),
+            ]);
 
-            if (salaryData.success) {
-                setSalaryStructure(salaryData.salaryStructure);
+            const salaryData = await salaryRes.json().catch(() => ({}));
+            const attendanceData = await attendanceRes.json().catch(() => ({}));
+
+            if (salaryRes.ok && salaryData.success) {
+                setSalaryStructure(salaryData.salaryStructure ?? null);
                 setDeductions(salaryData.deductions || []);
+            } else {
+                setSalaryStructure(salaryData.salaryStructure ?? null);
+                setDeductions(salaryData.deductions || []);
+                if (!salaryRes.ok && salaryData?.message) {
+                    toast.error(salaryData.message);
+                }
+            }
 
-                // 2. Fetch Attendance
-                const attendanceRes = await fetch(`/api/empcrm/salary/attendance-summary?month=${selectedMonth}`);
-                const attendanceData = await attendanceRes.json();
+            /** null = no attendance row; number = Present Days from payroll formula (+ punch floor) */
+            let payDaysFromAttendance = null;
+            let sundayDates = [];
 
-                /** null = employee not returned by attendance API; number = use for Present Days */
-                let payDaysFromAttendance = null;
-                let sundayDates = [];
-
-                if (attendanceData.success) {
-                    const empAtt = attendanceData.employees.find(
-                        (e) =>
-                            e.username === selectedEmployee ||
-                            String(e.username ?? "").toLowerCase() ===
-                                String(selectedEmployee ?? "").toLowerCase()
-                    );
-                    if (empAtt) {
-                        const raw =
-                            empAtt.pay_days != null ? Number(empAtt.pay_days) : NaN;
-                        payDaysFromAttendance = Number.isFinite(raw)
-                            ? raw
-                            : Number(empAtt.present_days) || 0;
-                        if (empAtt.sunday_worked_dates && Array.isArray(empAtt.sunday_worked_dates)) {
-                            sundayDates = empAtt.sunday_worked_dates;
-                        } else if (empAtt.dates_worked && Array.isArray(empAtt.dates_worked)) {
-                            sundayDates = empAtt.dates_worked.filter((dateStr) => {
-                                const date = new Date(dateStr);
-                                return date.getDay() === 0;
-                            });
-                        }
+            if (attendanceRes.ok && attendanceData.success && Array.isArray(attendanceData.employees)) {
+                const empAtt =
+                    attendanceData.employees.length === 1
+                        ? attendanceData.employees[0]
+                        : attendanceData.employees.find(
+                              (e) =>
+                                  e.username === selectedEmployee ||
+                                  String(e.username ?? "").toLowerCase() ===
+                                      String(selectedEmployee ?? "").toLowerCase()
+                          );
+                if (empAtt) {
+                    const pay = empAtt.pay_days != null ? Number(empAtt.pay_days) : NaN;
+                    const floor =
+                        Number(empAtt.present_days || 0) +
+                        0.5 * Number(empAtt.half_day_count || 0);
+                    const primary = Number.isFinite(pay) ? pay : NaN;
+                    payDaysFromAttendance = Number.isFinite(primary)
+                        ? Math.max(primary, floor)
+                        : floor > 0
+                          ? floor
+                          : null;
+                    if (empAtt.sunday_worked_dates && Array.isArray(empAtt.sunday_worked_dates)) {
+                        sundayDates = empAtt.sunday_worked_dates;
+                    } else if (empAtt.dates_worked && Array.isArray(empAtt.dates_worked)) {
+                        sundayDates = empAtt.dates_worked.filter((dateStr) => {
+                            const date = new Date(dateStr);
+                            return date.getDay() === 0;
+                        });
                     }
-                }
-                setSundaysWorked(sundayDates);
-
-                // Check if records already exist for this month to pre-fill
-                const existingRecord = salaryData.salaryRecords?.find(r => r.salary_month === selectedMonth);
-
-                if (existingRecord) {
-                    setFormData({
-                        working_days: existingRecord.working_days,
-                        // Prefer live attendance pay_days (matches Attendance details); do not keep stale saved present_days.
-                        present_days:
-                            payDaysFromAttendance !== null
-                                ? payDaysFromAttendance
-                                : existingRecord.present_days,
-                        overtime_hours: existingRecord.overtime_hours,
-                        status: existingRecord.status || 'draft'
+                    setAttendanceBreakdown({
+                        month: selectedMonth,
+                        present: Number(empAtt.present_days) || 0,
+                        halfDay: Number(empAtt.half_day_count) || 0,
+                        sundayOff: Number(empAtt.sunday_count) || 0,
+                        weekendOff: Number(empAtt.weekend_off_count) || 0,
+                        holiday: Number(empAtt.holiday_count) || 0,
+                        lop: Number(empAtt.lop_count) || 0,
+                        paidLeave: Number(empAtt.paid_leave_days) || 0,
+                        payDays: Number(empAtt.pay_days) || 0,
+                        payDaysRaw:
+                            empAtt.pay_days_raw != null ? Number(empAtt.pay_days_raw) : null,
+                        logRows: Number(empAtt.attendance_log_days) || 0,
                     });
-                    toast.success("Loaded existing draft/record for this month");
                 } else {
-                    setFormData(prev => ({
-                        ...prev,
-                        present_days: payDaysFromAttendance ?? 0,
-                        status: 'draft'
-                    }));
+                    setAttendanceBreakdown(null);
                 }
+            } else {
+                setAttendanceBreakdown(null);
+                if (!attendanceRes.ok && attendanceData?.message) {
+                    toast.error(attendanceData.message);
+                }
+            }
+
+            setSundaysWorked(sundayDates);
+
+            const existingRecord =
+                salaryRes.ok && salaryData.success
+                    ? salaryData.salaryRecords?.find((r) => r.salary_month === selectedMonth)
+                    : null;
+
+            if (existingRecord) {
+                setFormData({
+                    working_days: existingRecord.working_days,
+                    present_days:
+                        payDaysFromAttendance !== null
+                            ? payDaysFromAttendance
+                            : existingRecord.present_days,
+                    overtime_hours: existingRecord.overtime_hours,
+                    status: existingRecord.status || "draft",
+                });
+                toast.success("Loaded existing draft/record for this month");
+            } else {
+                setFormData((prev) => ({
+                    ...prev,
+                    present_days: payDaysFromAttendance ?? 0,
+                    status: "draft",
+                }));
             }
         } catch (error) {
             console.error("Error fetching details:", error);
@@ -505,6 +547,16 @@ const GenerateSalaryPage = () => {
         return new Date(dateString).toLocaleDateString();
     };
 
+    const formatMonthHeading = (ym) => {
+        if (!ym || String(ym).length < 7) return ym || "";
+        const [y, mo] = String(ym).split("-").map(Number);
+        if (!y || !mo) return ym;
+        return new Date(y, mo - 1, 1).toLocaleDateString("en-GB", {
+            month: "long",
+            year: "numeric",
+        });
+    };
+
     return (
         <div className="container mx-auto p-4 max-w-5xl">
             <div className="flex items-center mb-6">
@@ -518,8 +570,9 @@ const GenerateSalaryPage = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                {/* Controls */}
-                <div className="lg:col-span-1 bg-white rounded-lg shadow-md p-6 h-fit">
+                {/* Controls + attendance card */}
+                <div className="lg:col-span-1 space-y-4 h-fit">
+                <div className="bg-white rounded-lg shadow-md p-6">
                     <h2 className="text-lg font-semibold text-gray-800 mb-4">Configuration</h2>
 
                     <div className="mb-4">
@@ -617,6 +670,76 @@ const GenerateSalaryPage = () => {
                             )}
                         </div>
                     ) : null}
+                </div>
+
+                {attendanceBreakdown && selectedEmployee && (
+                    <div className="bg-gradient-to-br from-slate-50 to-white rounded-lg shadow-md p-5 border border-slate-200">
+                        <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                            <CalendarDays className="w-4 h-4 text-purple-600 shrink-0" />
+                            <span>
+                                Monthly attendance — {formatMonthHeading(attendanceBreakdown.month)}
+                            </span>
+                        </h3>
+                        <p className="text-xs text-slate-500 mb-3">
+                            Breakdown for the selected employee and month (from attendance records).
+                        </p>
+                        <dl className="grid grid-cols-1 gap-2 text-sm">
+                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                <dt className="text-slate-600">Full day present</dt>
+                                <dd className="font-semibold text-emerald-700 tabular-nums">{attendanceBreakdown.present}</dd>
+                            </div>
+                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                <dt className="text-slate-600">Half days</dt>
+                                <dd className="font-semibold text-amber-700 tabular-nums">{attendanceBreakdown.halfDay}</dd>
+                            </div>
+                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                <dt className="text-slate-600">Sundays off (no punch)</dt>
+                                <dd className="font-semibold text-violet-700 tabular-nums">{attendanceBreakdown.sundayOff}</dd>
+                            </div>
+                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                <dt className="text-slate-600">Weekend off (Sat and Sun, no punch)</dt>
+                                <dd className="font-semibold text-indigo-700 tabular-nums">{attendanceBreakdown.weekendOff}</dd>
+                            </div>
+                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                <dt className="text-slate-600">Holidays</dt>
+                                <dd className="font-semibold text-sky-700 tabular-nums">{attendanceBreakdown.holiday}</dd>
+                            </div>
+                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                <dt className="text-slate-600">Paid leave (approved)</dt>
+                                <dd className="font-semibold text-blue-700 tabular-nums">{attendanceBreakdown.paidLeave}</dd>
+                            </div>
+                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                <dt className="text-slate-600">LOP / unpaid absent</dt>
+                                <dd className="font-semibold text-red-700 tabular-nums">{attendanceBreakdown.lop}</dd>
+                            </div>
+                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                <dt className="text-slate-600">Attendance log rows</dt>
+                                <dd className="font-medium text-slate-700 tabular-nums">{attendanceBreakdown.logRows}</dd>
+                            </div>
+                            <div className="flex justify-between gap-2 pt-2 items-baseline">
+                                <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
+                                <dd className="text-lg font-bold text-purple-700 tabular-nums">
+                                    {Number.isFinite(attendanceBreakdown.payDays)
+                                        ? attendanceBreakdown.payDays % 1 === 0
+                                            ? attendanceBreakdown.payDays
+                                            : attendanceBreakdown.payDays.toFixed(1)
+                                        : "—"}
+                                </dd>
+                            </div>
+                        </dl>
+                        <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+                            Formula: full present + weekend off + holidays + paid leave − LOP − (half days × 0.5).
+                            A minimum based on actual punches also applies when the raw total would be too low.
+                            {attendanceBreakdown.payDaysRaw != null &&
+                            attendanceBreakdown.payDaysRaw < 0 ? (
+                                <span className="block mt-1 text-amber-800">
+                                    Raw calculation was negative ({attendanceBreakdown.payDaysRaw.toFixed(1)}); the pay
+                                    days shown above use the capped / floor rules.
+                                </span>
+                            ) : null}
+                        </p>
+                    </div>
+                )}
                 </div>
 
                 {/* Calculation Preview */}
