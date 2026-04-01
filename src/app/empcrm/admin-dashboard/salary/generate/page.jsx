@@ -150,7 +150,6 @@ const GenerateSalaryPage = () => {
                         month: selectedMonth,
                         present: Number(empAtt.present_days) || 0,
                         halfDay: Number(empAtt.half_day_count) || 0,
-                        sundayOff: Number(empAtt.sunday_count) || 0,
                         weekendOff: Number(empAtt.weekend_off_count) || 0,
                         holiday: Number(empAtt.holiday_count) || 0,
                         lop: Number(empAtt.lop_count) || 0,
@@ -693,12 +692,8 @@ const GenerateSalaryPage = () => {
                                 <dd className="font-semibold text-amber-700 tabular-nums">{attendanceBreakdown.halfDay}</dd>
                             </div>
                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">Sundays off (no punch)</dt>
-                                <dd className="font-semibold text-violet-700 tabular-nums">{attendanceBreakdown.sundayOff}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">Weekend off (Sat and Sun, no punch)</dt>
-                                <dd className="font-semibold text-indigo-700 tabular-nums">{attendanceBreakdown.weekendOff}</dd>
+                                <dt className="text-slate-600">Sunday weekly off (no punch; Sat is working)</dt>
+                                <dd className="font-semibold text-violet-700 tabular-nums">{attendanceBreakdown.weekendOff}</dd>
                             </div>
                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                 <dt className="text-slate-600">Holidays</dt>
@@ -728,7 +723,8 @@ const GenerateSalaryPage = () => {
                             </div>
                         </dl>
                         <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-                            Formula: full present + weekend off + holidays + paid leave − LOP − (half days × 0.5).
+                            Formula: full days + Sunday weekly off + holidays + paid leave − LOP − (half days × 0.5).
+                            Full day = check-in and check-out both on time (green). Other punch days count as half days. Saturday counts as a normal workday.
                             A minimum based on actual punches also applies when the raw total would be too low.
                             {attendanceBreakdown.payDaysRaw != null &&
                             attendanceBreakdown.payDaysRaw < 0 ? (
