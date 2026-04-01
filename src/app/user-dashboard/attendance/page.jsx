@@ -12,6 +12,7 @@ import {
   isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
 import AttendanceSummaryGrid from "@/components/AttendanceSummaryGrid";
+import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -77,16 +78,6 @@ const AttendancePage = () => {
     } catch (e) {
       toast.error(e.message);
     }
-  };
-
-  const formatTime = (timeString) => {
-    if (!timeString) return "";
-    const date = new Date(timeString);
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
   };
 
   const getCheckinStatus = (logTime) => checkinStatusFromRules(logTime, rules);
