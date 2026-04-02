@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import Link from "next/link";
 import FallbackLink from "@/components/attachments/FallbackLink";
-import { splitAttachmentList } from "@/lib/attachmentPathUtils";
+import { normalizeAttachmentPathParam, splitAttachmentList } from "@/lib/attachmentPathUtils";
 import dayjs from "dayjs";
 import ApproveModal from "@/components/expenses/ApproveModal";
 
@@ -146,23 +146,11 @@ export default async function ExpenseDetailPage({ params }) {
         ) : (
           <ul className="list-disc ml-6 space-y-2 text-sm text-blue-700">
             {attachments.map((filePath, index) => {
-              // Normalize to path-only, in case DB stored a full URL
-              let pathOnly = filePath || "";
-              try {
-                if (pathOnly.startsWith("http")) {
-                  const u = new URL(pathOnly);
-                  pathOnly = u.pathname.startsWith("/")
-                    ? u.pathname
-                    : `/${u.pathname}`;
-                }
-              } catch {}
-
-              // Ensure path starts with '/'
-              if (pathOnly && !pathOnly.startsWith("/")) {
-                pathOnly = `/${pathOnly}`;
-              }
-
-              const fileName = pathOnly.split("/").pop();
+              const pathOnly = normalizeAttachmentPathParam(filePath || "");
+              const fileName =
+                (pathOnly.startsWith("http") ? new URL(pathOnly).pathname : pathOnly)
+                  .split("/")
+                  .pop() || "attachment";
 
               return (
                 <li key={index}>
