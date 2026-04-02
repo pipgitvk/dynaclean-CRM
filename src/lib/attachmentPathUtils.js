@@ -5,11 +5,22 @@ export const ATTACHMENT_DOMAINS = [
   "https://service.dynacleanindustries.com",
 ];
 
+const OWNED_HOSTS = new Set([
+  "app.dynacleanindustries.com",
+  "service.dynacleanindustries.com",
+  "localhost",
+  "127.0.0.1",
+]);
+
 export function normalizeAttachmentPathParam(path) {
   let p = path || "";
   try {
     if (p.startsWith("http")) {
       const u = new URL(p);
+      // Keep external URLs (e.g. Cloudinary) as full URLs.
+      if (!OWNED_HOSTS.has(u.hostname)) {
+        return u.toString();
+      }
       p = u.pathname.startsWith("/") ? u.pathname : `/${u.pathname}`;
     }
   } catch {}

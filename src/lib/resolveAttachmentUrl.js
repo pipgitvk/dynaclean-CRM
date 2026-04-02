@@ -50,6 +50,10 @@ export async function resolveAttachmentTarget(request, pathInput) {
   if (!path) {
     return { url: null, found: false, cleaned: "" };
   }
+  // External URL (e.g. Cloudinary): open directly.
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return { url: path, found: true, cleaned: path };
+  }
 
   const cleaned = path.replace(/^\/public\//, "/").replace(/^\/+/, "");
   const safeForLocal =
