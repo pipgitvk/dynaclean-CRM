@@ -1,5 +1,9 @@
 import { getDbConnection } from "@/lib/db";
 import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
+import {
+  extractProductFromMetaFieldData,
+  buildProductsInterestLabel,
+} from "@/lib/metaLeadProduct";
 
 // Allow up to 5 min for Meta API (mode=all can be slow)
 export const maxDuration = 300;
@@ -149,9 +153,10 @@ export async function GET(request) {
         leadgen_id,
         created_time,
         ad_id,
+        field_data: fieldData,
         ...parseLeadFromFieldData(fieldData, {
           lead_campaign: "social_media",
-          products_interest: "", // we will resolve via campaign only on insert
+          products_interest: "", // resolved below (campaign + form product)
         }),
       };
     });
@@ -200,10 +205,13 @@ export async function GET(request) {
       (l) => l.phone && !existingPhones.has(l.phone),
     );
 
-    // Resolve products_interest (campaign name) - skip when autoImport (saves 2 API calls per lead)
-    if (!autoImport) {
-      for (const lead of newLeads) {
-        if (!lead.ad_id) continue;
+    // Resolve products_interest: Meta campaign name + optional form "product" question
+    for (const lead of newLeads) {
+      const formProduct = extractProductFromMetaFieldData(
+        lead.field_data || [],
+      );
+      let campaignName = "";
+      if (lead.ad_id) {
         try {
           const adRes = await fetch(
             `https://graph.facebook.com/v18.0/${lead.ad_id}?fields=campaign_id&access_token=${token}`,
@@ -216,14 +224,17 @@ export async function GET(request) {
               `https://graph.facebook.com/v18.0/${campaign_id}?fields=name&access_token=${token}`,
             );
             const campJson = await campRes.json();
-            lead.products_interest = campJson?.name || "";
+            campaignName = campJson?.name || "";
           }
         } catch (err) {
           console.warn("⚠️ Failed to resolve campaign for ad", lead.ad_id, err);
         }
       }
-    } else {
-      for (const lead of newLeads) lead.products_interest = lead.products_interest || "social_media";
+      lead.products_interest =
+        buildProductsInterestLabel({
+          formProduct,
+          campaignName,
+        }) || formProduct || "";
     }
 
     // If requested, automatically import all new leads into DB
@@ -494,9 +505,16 @@ export async function POST(request) {
           }
         }
 
+        const formProduct = extractProductFromMetaFieldData(fieldData);
+        const products_interest =
+          buildProductsInterestLabel({
+            formProduct,
+            campaignName,
+          }) || formProduct || "";
+
         const parsed = parseLeadFromFieldData(fieldData, {
           lead_campaign: "social_media",
-          products_interest: campaignName,
+          products_interest,
         });
 
         if (!parsed.phone && !parsed.email) {

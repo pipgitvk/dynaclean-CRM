@@ -32,5 +32,5 @@ export async function GET(req) {
 
   const [rows] = await conn.execute(query, params);
 
-  return NextResponse.json(rows);
+  return NextResponse.json(rows || []);
 }

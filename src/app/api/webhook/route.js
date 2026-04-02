@@ -1,5 +1,9 @@
 import { getDbConnection } from "@/lib/db";
 import { checkPhoneDuplicate, normalizePhone } from "@/lib/phone-check";
+import {
+  extractProductFromMetaFieldData,
+  buildProductsInterestLabel,
+} from "@/lib/metaLeadProduct";
 
 // Disable caching - fixes 405 Method Not Allowed on production (Vercel, nginx, etc.)
 export const dynamic = "force-dynamic";
@@ -90,7 +94,9 @@ export async function POST(request) {
     }
 
     const fieldData = leadData?.field_data || [];
-    const ad_id = body?.entry?.[0]?.changes?.[0]?.value?.ad_id;
+    // Prefer ad_id from Graph API — webhook payload often omits it
+    const ad_id =
+      leadData?.ad_id || entry?.changes?.[0]?.value?.ad_id || null;
 
     // Step 2: Fetch campaign name from ad_id → campaign_id → name
     let campaignName = "";
@@ -124,7 +130,12 @@ export async function POST(request) {
     const address = getValue("city");
     const language = getValue("preferred_language_to_communicate");
     const lead_campaign = "social_media";
-    const products_interest = campaignName;
+    const productFromForm = extractProductFromMetaFieldData(fieldData);
+    const products_interest =
+      buildProductsInterestLabel({
+        formProduct: productFromForm,
+        campaignName,
+      }) || "";
     const now = new Date();
 
     if (!phone && !email)

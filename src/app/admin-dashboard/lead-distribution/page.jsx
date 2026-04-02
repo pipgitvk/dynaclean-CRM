@@ -25,18 +25,26 @@ export default function LeadDistributionPage() {
   const router = useRouter();
 
   const filteredLeads = latestLeads.filter((lead) => {
+    const q = searchTerm.toLowerCase();
+    const productsInterest = String(lead.products_interest ?? "");
     return (
-      lead.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.products_interest.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.assigned_to.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.sales_representative
+      String(lead.first_name ?? "")
         .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
+        .includes(q) ||
+      String(lead.phone ?? "")
+        .toLowerCase()
+        .includes(q) ||
+      productsInterest.toLowerCase().includes(q) ||
+      String(lead.assigned_to ?? "")
+        .toLowerCase()
+        .includes(q) ||
+      String(lead.sales_representative ?? "")
+        .toLowerCase()
+        .includes(q) ||
       new Date(lead.date_created)
         .toLocaleString()
         .toLowerCase()
-        .includes(searchTerm.toLowerCase())
+        .includes(q)
     );
   });
 
@@ -396,7 +404,12 @@ export default function LeadDistributionPage() {
                 <tr key={lead.customer_id} className="border-t">
                   <td className="p-2 border">{lead.first_name}</td>
                   <td className="p-2 border">{lead.phone}</td>
-                  <td className="p-2 border">{lead.products_interest}</td>
+                  <td className="p-2 border">
+                    {lead.products_interest != null &&
+                    String(lead.products_interest).trim() !== ""
+                      ? lead.products_interest
+                      : "—"}
+                  </td>
                   <td className="p-2 border font-semibold text-blue-600">
                     {lead.assigned_to}
                   </td>
@@ -426,7 +439,11 @@ export default function LeadDistributionPage() {
                 <strong>Phone:</strong> {lead.phone}
               </p>
               <p>
-                <strong>Product:</strong> {lead.products_interest}
+                <strong>Product:</strong>{" "}
+                {lead.products_interest != null &&
+                String(lead.products_interest).trim() !== ""
+                  ? lead.products_interest
+                  : "—"}
               </p>
               <p>
                 <strong>Assigned By:</strong>{" "}

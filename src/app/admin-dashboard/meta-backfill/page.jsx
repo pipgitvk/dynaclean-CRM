@@ -1,11 +1,23 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Eye, X } from "lucide-react";
 
 const CRON_HISTORY_KEY = "meta-backfill-cron-history";
 const AUTO_POLL_KEY = "meta-backfill-auto-poll-enabled";
 const MAX_HISTORY = 50;
+/** Fixed assigner for "assigned_by" View (not editable in UI) */
+const ASSIGNED_BY_FIXED_USERNAME = "harsh_M";
+
+/** Map customers.lead_campaign to summary bucket (Campaign column) */
+function campaignLeadBucket(raw) {
+  if (raw == null || String(raw).trim() === "") return null;
+  const s = String(raw).trim().toLowerCase().replace(/\s+/g, "_");
+  if (s === "social_media" || s === "socialmedia") return "social_media";
+  if (s === "google" || s === "google_ads" || s === "googleads") return "google";
+  if (s === "indiamart" || s === "india_mart" || s === "india-mart") return "indiamart";
+  return null;
+}
 
 function getAutoPollEnabled() {
   if (typeof window === "undefined") return false;
@@ -63,6 +75,21 @@ export default function MetaBackfillPage() {
   const [reportDetailLeads, setReportDetailLeads] = useState([]);
   const [reportDetailLoading, setReportDetailLoading] = useState(false);
   const [reportDetailError, setReportDetailError] = useState("");
+  const [assignedByOpen, setAssignedByOpen] = useState(false);
+  const [assignedByLeads, setAssignedByLeads] = useState([]);
+  const [assignedByLoading, setAssignedByLoading] = useState(false);
+  const [assignedByError, setAssignedByError] = useState("");
+
+  const assignedByCampaignTotals = useMemo(() => {
+    const totals = { social_media: 0, indiamart: 0, google: 0 };
+    for (const lead of assignedByLeads) {
+      const b = campaignLeadBucket(lead.lead_campaign);
+      if (b === "social_media") totals.social_media += 1;
+      else if (b === "indiamart") totals.indiamart += 1;
+      else if (b === "google") totals.google += 1;
+    }
+    return totals;
+  }, [assignedByLeads]);
 
   // Hydrate auto-poll from localStorage (persists across refresh)
   useEffect(() => {
@@ -228,6 +255,35 @@ export default function MetaBackfillPage() {
       setReportDetailError("Error loading leads");
     } finally {
       setReportDetailLoading(false);
+    }
+  };
+
+  /** Leads where this user was the assigner (assigned_to = TL/admin who assigned), same date range as report */
+  const openAssignedByModal = async () => {
+    if (!since || !until) {
+      setMessage("Please select both From and To dates");
+      return;
+    }
+    const by = ASSIGNED_BY_FIXED_USERNAME;
+    setAssignedByLeads([]);
+    setAssignedByError("");
+    setAssignedByOpen(true);
+    setAssignedByLoading(true);
+    setMessage("");
+    try {
+      const q = new URLSearchParams({ from: since, to: until, by });
+      const res = await fetch(`/api/meta-backfill/leads-report/assigned-by?${q.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setAssignedByError(data?.error || "Failed to load leads");
+        return;
+      }
+      setAssignedByLeads(data.leads || []);
+    } catch (err) {
+      console.error(err);
+      setAssignedByError("Error loading leads");
+    } finally {
+      setAssignedByLoading(false);
     }
   };
 
@@ -583,6 +639,27 @@ export default function MetaBackfillPage() {
           <p className="text-sm text-emerald-800 mb-3">
             <strong>Total leads:</strong> {leadsReport.total}
           </p>
+          <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
+            <span className="font-medium text-emerald-900">assigned_by</span>
+            <span
+              className="inline-flex items-center border border-emerald-200 rounded px-2 py-1 bg-emerald-50/80 text-emerald-950 font-medium tabular-nums"
+              aria-label="Assigner (fixed)"
+            >
+              {ASSIGNED_BY_FIXED_USERNAME}
+            </span>
+            <button
+              type="button"
+              onClick={openAssignedByModal}
+              disabled={!since || !until}
+              className="px-3 py-1 rounded bg-teal-700 text-white text-sm hover:bg-teal-800 disabled:opacity-50"
+            >
+              View
+            </button>
+            {/* <span className="text-xs text-emerald-800/90 max-w-md">
+              Shows leads assigned or added by this user (where{" "}
+              <code className="bg-emerald-100/80 px-1 rounded">assigned_to</code> matches).
+            </span> */}
+          </div>
           <div className="overflow-x-auto border rounded bg-white">
             <table className="min-w-full text-sm">
               <thead className="bg-emerald-100">
@@ -593,7 +670,11 @@ export default function MetaBackfillPage() {
                 </tr>
               </thead>
               <tbody>
-                {leadsReport.byEmployee?.map((row, i) => (
+                {leadsReport.byEmployee
+                  ?.filter(
+                    (row) => String(row.employee ?? "").toLowerCase() !== "harsh_m"
+                  )
+                  .map((row, i) => (
                   <tr key={i} className="border-t border-emerald-100">
                     <td className="px-3 py-2">{row.employee}</td>
                     <td className="px-3 py-2 text-right font-medium">{row.leadCount}</td>
@@ -698,6 +779,115 @@ export default function MetaBackfillPage() {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {assignedByOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="assigned-by-title"
+          onClick={() => setAssignedByOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+              <div>
+                <h3 id="assigned-by-title" className="text-lg font-semibold text-gray-900">
+                  Assigned by — {ASSIGNED_BY_FIXED_USERNAME}
+                </h3>
+                {since && until && (
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    Date range: {since} to {until} · Total: {assignedByLeads.length}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssignedByOpen(false)}
+                className="rounded p-1 text-gray-600 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="overflow-auto flex-1 p-4">
+              {assignedByLoading && (
+                <p className="text-sm text-gray-600">Loading...</p>
+              )}
+              {!assignedByLoading && assignedByError && (
+                <p className="text-sm text-red-600">{assignedByError}</p>
+              )}
+              {!assignedByLoading && !assignedByError && assignedByLeads.length === 0 && (
+                <p className="text-sm text-gray-600">
+                  No leads assigned or added by this user in the selected date range.
+                </p>
+              )}
+              {!assignedByLoading && !assignedByError && assignedByLeads.length > 0 && (
+                <>
+                  <div className="mb-3 rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2 text-sm text-gray-800">
+                    {/* <span className="font-medium text-teal-950">Campaign (lead_campaign):</span>{" "} */}
+                    <span className="ml-1">
+                      social_media={assignedByCampaignTotals.social_media}
+                    </span>
+                    <span className="mx-2 text-gray-400">|</span>
+                    <span>indiamart={assignedByCampaignTotals.indiamart}</span>
+                    <span className="mx-2 text-gray-400">|</span>
+                    <span>google={assignedByCampaignTotals.google}</span>
+                  </div>
+                  <div className="overflow-x-auto border rounded">
+                  <table className="min-w-full text-xs sm:text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-2 py-2 text-left border-b">ID</th>
+                        <th className="px-2 py-2 text-left border-b">Name</th>
+                        <th className="px-2 py-2 text-left border-b">Phone</th>
+                        <th className="px-2 py-2 text-left border-b">Email</th>
+                        <th className="px-2 py-2 text-left border-b">lead_source</th>
+                        <th className="px-2 py-2 text-left border-b">sales_representative</th>
+                        <th className="px-2 py-2 text-left border-b">assigned_to</th>
+                        <th className="px-2 py-2 text-left border-b">Status</th>
+                        <th className="px-2 py-2 text-left border-b">Stage</th>
+                        <th className="px-2 py-2 text-left border-b">Campaign</th>
+                        <th className="px-2 py-2 text-left border-b">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assignedByLeads.map((lead) => {
+                        const fullName = [lead.first_name, lead.last_name]
+                          .filter(Boolean)
+                          .join(" ")
+                          .trim() || "—";
+                        const created =
+                          lead.date_created != null
+                            ? String(lead.date_created).slice(0, 19).replace("T", " ")
+                            : "—";
+                        return (
+                          <tr key={lead.customer_id} className="border-b border-gray-100">
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.customer_id}</td>
+                            <td className="px-2 py-2">{fullName}</td>
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.phone || "—"}</td>
+                            <td className="px-2 py-2 break-all max-w-[160px]">{lead.email || "—"}</td>
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.lead_source || "—"}</td>
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.sales_representative || "—"}</td>
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.assigned_to || "—"}</td>
+                            <td className="px-2 py-2">{lead.status || "—"}</td>
+                            <td className="px-2 py-2">{lead.stage || "—"}</td>
+                            <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                </>
               )}
             </div>
           </div>
