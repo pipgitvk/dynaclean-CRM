@@ -166,6 +166,10 @@ export function computeSalaryPayDaysForUser(p) {
   let periodDays = 0;
   /** Non-Sunday, non-holiday days in period (expected attendance slots). */
   let requiredWorkingDays = 0;
+  /** For UI: Sundays in eligible period (incl. Sunday that is also a company holiday). */
+  let sundaysInPeriod = 0;
+  /** Company holidays on Mon–Sat in period (not double-counted with Sundays). */
+  let holidayWeekdaysInPeriod = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, monthIndex, day);
@@ -181,6 +185,8 @@ export function computeSalaryPayDaysForUser(p) {
     const isOnLeave = leaveDates.has(dateString);
 
     periodDays++;
+    if (isSunday) sundaysInPeriod++;
+    if (isHoliday && !isSunday) holidayWeekdaysInPeriod++;
     if (!isSunday && !isHoliday) {
       requiredWorkingDays++;
     }
@@ -227,5 +233,11 @@ export function computeSalaryPayDaysForUser(p) {
     pay_days: payDays,
     pay_days_raw: payDays,
     sunday_worked_dates: sundayWorkedDates,
+    period_days: periodDays,
+    sundays_in_period: sundaysInPeriod,
+    holiday_weekdays_in_period: holidayWeekdaysInPeriod,
+    required_working_days: requiredWorkingDays,
+    total_attendance: totalAttendance,
+    deduction_days: deductionDays,
   };
 }
