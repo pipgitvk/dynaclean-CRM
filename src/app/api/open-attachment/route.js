@@ -22,5 +22,6 @@ export async function GET(request) {
     return NextResponse.json({ error: "Could not resolve path" }, { status: 404 });
   }
 
-  return NextResponse.redirect(url, 302);
+  const redirectUrl = url.startsWith("http") ? url : new URL(url, request.url).toString();
+  return NextResponse.redirect(redirectUrl, 302);
 }

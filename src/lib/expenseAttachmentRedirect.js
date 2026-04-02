@@ -11,9 +11,9 @@ export function redirectExpenseFileToOpenAttachment(_req, fileName) {
     return NextResponse.json({ error: "Missing file name" }, { status: 400 });
   }
 
-  const target = `/api/open-attachment?path=${encodeURIComponent(
+  const target = new URL(`/api/open-attachment?path=${encodeURIComponent(
     `/expense_attachments/${name}`
-  )}`;
+  )}`, _req.url).toString();
 
   return NextResponse.redirect(target, 307);
 }
