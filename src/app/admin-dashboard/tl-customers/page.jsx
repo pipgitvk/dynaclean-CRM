@@ -101,9 +101,9 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     }
   }
 
-  // Filter to show only TL entries (customers with TL followup OR regular followup - includes new automatic leads)
+  // When ON: show only customers that have TL_followups rows
   if (showTLOnly) {
-    query += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
+    query += ` AND tlf.customer_id IS NOT NULL`;
   }
 
   // Filter by follow-up date range (when status/stage was set)
@@ -133,13 +133,25 @@ export default async function AdminTLCustomersPage({ searchParams }) {
 
   // Filter by next follow-up range (TL next_followup if present else latest)
   if (nextFromDate && nextToDate) {
-    query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) BETWEEN ? AND ?`;
+    if (showTLOnly) {
+      query += ` AND tlf.next_followup_date BETWEEN ? AND ?`;
+    } else {
+      query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) BETWEEN ? AND ?`;
+    }
     params.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
   } else if (nextFromDate) {
-    query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) >= ?`;
+    if (showTLOnly) {
+      query += ` AND tlf.next_followup_date >= ?`;
+    } else {
+      query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) >= ?`;
+    }
     params.push(`${nextFromDate} 00:00:00`);
   } else if (nextToDate) {
-    query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) <= ?`;
+    if (showTLOnly) {
+      query += ` AND tlf.next_followup_date <= ?`;
+    } else {
+      query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) <= ?`;
+    }
     params.push(`${nextToDate} 23:59:59`);
   }
 
@@ -224,7 +236,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   if (showTLOnly) {
-    kpiQuery += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
+    kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
   }
 
   // Filter by follow-up date range (same logic as main query)
@@ -252,13 +264,25 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   if (nextFromDate && nextToDate) {
-    kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) BETWEEN ? AND ?`;
+    if (showTLOnly) {
+      kpiQuery += ` AND tlf.next_followup_date BETWEEN ? AND ?`;
+    } else {
+      kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) BETWEEN ? AND ?`;
+    }
     kpiParams.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
   } else if (nextFromDate) {
-    kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) >= ?`;
+    if (showTLOnly) {
+      kpiQuery += ` AND tlf.next_followup_date >= ?`;
+    } else {
+      kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) >= ?`;
+    }
     kpiParams.push(`${nextFromDate} 00:00:00`);
   } else if (nextToDate) {
-    kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) <= ?`;
+    if (showTLOnly) {
+      kpiQuery += ` AND tlf.next_followup_date <= ?`;
+    } else {
+      kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) <= ?`;
+    }
     kpiParams.push(`${nextToDate} 23:59:59`);
   }
 
