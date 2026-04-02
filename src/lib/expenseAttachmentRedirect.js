@@ -11,9 +11,15 @@ export function redirectExpenseFileToOpenAttachment(_req, fileName) {
     return NextResponse.json({ error: "Missing file name" }, { status: 400 });
   }
 
+  const forwardedProto = _req.headers.get("x-forwarded-proto");
+  const forwardedHost = _req.headers.get("x-forwarded-host");
+  const host = forwardedHost || _req.headers.get("host");
+  const publicOrigin =
+    host ? `${forwardedProto || "https"}://${host}` : new URL(_req.url).origin;
+
   const target = new URL(`/api/open-attachment?path=${encodeURIComponent(
     `/expense_attachments/${name}`
-  )}`, _req.url).toString();
+  )}`, publicOrigin).toString();
 
   return NextResponse.redirect(target, 307);
 }
