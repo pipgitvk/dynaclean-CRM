@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import TLFollowupForm from "@/components/TL/TLFollowupForm";
+import FollowupNotesWithDelete from "@/components/TL/FollowupNotesWithDelete";
 import { redirect } from "next/navigation";
 import dayjs from "dayjs";
 
@@ -32,10 +33,11 @@ export default async function AdminTLFollowupPage({ params }) {
       cf.next_followup_date as latest_next_followup,
       cf.followed_date as latest_followed_date,
       cf.notes as latest_notes,
-      cf.followed_by as latest_followed_by
+      cf.followed_by as latest_followed_by,
+      cf.time_stamp as latest_emp_followup_time_stamp
     FROM customers c
     LEFT JOIN (
-      SELECT customer_id, next_followup_date, followed_date, notes, followed_by,
+      SELECT customer_id, next_followup_date, followed_date, notes, followed_by, time_stamp,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY time_stamp DESC) as rn
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
@@ -52,6 +54,15 @@ export default async function AdminTLFollowupPage({ params }) {
   }
 
   const customer = customers[0];
+
+  const latestEmpFollowupTimeStampStr =
+    customer.latest_emp_followup_time_stamp == null
+      ? null
+      : typeof customer.latest_emp_followup_time_stamp === "string"
+        ? customer.latest_emp_followup_time_stamp
+        : dayjs(customer.latest_emp_followup_time_stamp).format(
+            "YYYY-MM-DD HH:mm:ss"
+          );
 
   // Fetch latest TL followup
   const [tlFollowups] = await conn.execute(
@@ -124,9 +135,12 @@ export default async function AdminTLFollowupPage({ params }) {
               <p>
                 <strong>By:</strong> {customer.latest_followed_by}
               </p>
-              <p className="md:col-span-2">
-                <strong>Notes:</strong> {customer.latest_notes || "No notes"}
-              </p>
+              <FollowupNotesWithDelete
+                customerId={customerId}
+                variant="employee"
+                notes={customer.latest_notes}
+                empTimeStamp={latestEmpFollowupTimeStampStr}
+              />
             </div>
           </div>
         )}
@@ -161,10 +175,12 @@ export default async function AdminTLFollowupPage({ params }) {
                   <strong>Model:</strong> {latestTLFollowup.model}
                 </p>
               )}
-              <p className="md:col-span-2">
-                <strong>TL Notes:</strong>{" "}
-                {latestTLFollowup.notes || "No notes"}
-              </p>
+              <FollowupNotesWithDelete
+                customerId={customerId}
+                variant="tl"
+                notes={latestTLFollowup.notes}
+                tlFollowupId={latestTLFollowup.id}
+              />
             </div>
           </div>
         )}
