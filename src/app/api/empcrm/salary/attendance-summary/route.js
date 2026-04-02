@@ -60,6 +60,18 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     paid_leave_days: stats.paid_leave,
     pay_days: Number(stats.pay_days),
     pay_days_raw: stats.pay_days_raw != null ? Number(stats.pay_days_raw) : null,
+    pay_period_days: stats.period_days != null ? Number(stats.period_days) : null,
+    pay_sundays_in_period: stats.sundays_in_period != null ? Number(stats.sundays_in_period) : null,
+    pay_holiday_weekdays_in_period:
+      stats.holiday_weekdays_in_period != null
+        ? Number(stats.holiday_weekdays_in_period)
+        : null,
+    pay_required_working_days:
+      stats.required_working_days != null ? Number(stats.required_working_days) : null,
+    pay_total_attendance:
+      stats.total_attendance != null ? Number(stats.total_attendance) : null,
+    pay_deduction_days:
+      stats.deduction_days != null ? Number(stats.deduction_days) : null,
     attendance_log_days: logs.length,
     dates_worked: logs.map((l) => l.date),
     sunday_worked_dates: stats.sunday_worked_dates,

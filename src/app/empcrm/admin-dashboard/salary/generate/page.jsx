@@ -18,6 +18,12 @@ import {
   isHealthInsuranceDeductionRow,
 } from "@/lib/salaryGrossSpecialAllowance";
 
+function formatPayCalcNumber(n) {
+    if (n == null || !Number.isFinite(Number(n))) return "—";
+    const x = Number(n);
+    return x % 1 === 0 ? String(x) : x.toFixed(1);
+}
+
 /** Payroll-only rows when API has no `attendance_cards` (same shape as older salary summary). */
 function payrollAttendanceFallbackRows(b) {
     return {
@@ -160,6 +166,22 @@ const GenerateSalaryPage = () => {
                         lop: Number(empAtt.lop_count) || 0,
                         paidLeave: Number(empAtt.paid_leave_days) || 0,
                         payDays: Number(empAtt.pay_days) || 0,
+                        payCalc:
+                            empAtt.pay_period_days != null &&
+                            empAtt.pay_period_days !== ""
+                                ? {
+                                      periodDays: Number(empAtt.pay_period_days),
+                                      sundaysInPeriod: Number(empAtt.pay_sundays_in_period) || 0,
+                                      holidayWeekdaysInPeriod:
+                                          Number(empAtt.pay_holiday_weekdays_in_period) || 0,
+                                      requiredWorkingDays:
+                                          Number(empAtt.pay_required_working_days) || 0,
+                                      totalAttendance: Number(empAtt.pay_total_attendance) || 0,
+                                      deductionDays: Number(empAtt.pay_deduction_days) || 0,
+                                      salaryFullDays: Number(empAtt.present_days) || 0,
+                                      salaryHalfDays: Number(empAtt.half_day_count) || 0,
+                                  }
+                                : null,
                     });
                 } else {
                     setAttendanceBreakdown(null);
@@ -686,10 +708,92 @@ const GenerateSalaryPage = () => {
                                 ? "Same metrics as Attendance details (admin) for this month — through today if current month."
                                 : "Breakdown for the selected employee and month (from attendance records)."}
                         </p>
+                        {attendanceBreakdown.payCalc && (
+                            <div className="mb-4 rounded-lg border border-purple-100 bg-purple-50/60 p-3 text-xs text-slate-700">
+                                <p className="font-semibold text-slate-900 mb-2">
+                                    Salary pay days calculation
+                                </p>
+                                <ul className="space-y-1.5 list-none">
+                                    <li>
+                                        Period days (eligible in month) ={" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(attendanceBreakdown.payCalc.periodDays)}
+                                        </span>
+                                    </li>
+                                    <li>
+                                        Sundays (in period) ={" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(attendanceBreakdown.payCalc.sundaysInPeriod)}
+                                        </span>
+                                    </li>
+                                    <li>
+                                        Holidays on weekdays (in period) ={" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceBreakdown.payCalc.holidayWeekdaysInPeriod
+                                            )}
+                                        </span>
+                                    </li>
+                                    <li>
+                                        Required working days = period − Sundays − weekday holidays ={" "}
+                                        {formatPayCalcNumber(attendanceBreakdown.payCalc.periodDays)} −{" "}
+                                        {formatPayCalcNumber(attendanceBreakdown.payCalc.sundaysInPeriod)} −{" "}
+                                        {formatPayCalcNumber(
+                                            attendanceBreakdown.payCalc.holidayWeekdaysInPeriod
+                                        )}{" "}
+                                        ={" "}
+                                        <span className="font-semibold text-purple-800 tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceBreakdown.payCalc.requiredWorkingDays
+                                            )}
+                                        </span>
+                                    </li>
+                                    <li>
+                                        Total attendance (salary rules) = full days + (half days ÷ 2) ={" "}
+                                        {formatPayCalcNumber(attendanceBreakdown.payCalc.salaryFullDays)}{" "}
+                                        + ({formatPayCalcNumber(attendanceBreakdown.payCalc.salaryHalfDays)}{" "}
+                                        ÷ 2) ={" "}
+                                        <span className="font-semibold text-purple-800 tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceBreakdown.payCalc.totalAttendance
+                                            )}
+                                        </span>
+                                    </li>
+                                    <li>
+                                        Deduction days = max(0, required − total attendance) ={" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceBreakdown.payCalc.deductionDays
+                                            )}
+                                        </span>
+                                    </li>
+                                    <li className="pt-1 border-t border-purple-200/80 text-slate-800">
+                                        Pay days (for salary) = period − deduction ={" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(attendanceBreakdown.payCalc.periodDays)}
+                                        </span>{" "}
+                                        −{" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceBreakdown.payCalc.deductionDays
+                                            )}
+                                        </span>{" "}
+                                        ={" "}
+                                        <span className="font-bold text-purple-800 tabular-nums">
+                                            {formatPayCalcNumber(attendanceBreakdown.payDays)}
+                                        </span>
+                                    </li>
+                                </ul>
+                            </div>
+                        )}
                         <dl className="grid grid-cols-1 gap-2 text-sm">
                             {(() => {
                                 const c = attendanceBreakdown.cards;
                                 if (c) {
+                                    const lateDaysAdjusted = Math.max(
+                                        0,
+                                        (Number(c.lateDays) || 0) - (Number(c.halfDays) || 0)
+                                    );
                                     return (
                                         <>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
@@ -718,7 +822,12 @@ const GenerateSalaryPage = () => {
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Late Days</dt>
-                                                <dd className="font-semibold text-red-600 tabular-nums">{c.lateDays}</dd>
+                                                <dd
+                                                    className="font-semibold text-red-600 tabular-nums"
+                                                    title="Late days − half days (from attendance rules)"
+                                                >
+                                                    {lateDaysAdjusted}
+                                                </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 pt-2 items-baseline">
                                                 <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
