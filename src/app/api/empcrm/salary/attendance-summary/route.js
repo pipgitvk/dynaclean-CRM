@@ -8,6 +8,7 @@ import {
   mergeGlobalRulesWithEmployeeSchedule,
 } from "@/lib/attendanceRulesDb";
 import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
+import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
 
 function normalizeUserKey(value) {
   return String(value ?? "")
@@ -37,9 +38,19 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     dateOfJoining: emp.date_of_joining ?? null,
   });
 
+  const attendance_cards = computeAttendanceDetailsCardSummaryForMonth({
+    monthStr: emp._monthStr,
+    username: emp.username,
+    logs,
+    holidaysAll: holidays,
+    leavesAll: leaves,
+    rules,
+  });
+
   return {
     username: emp.username,
     full_name: emp.full_name,
+    attendance_cards,
     present_days: stats.present,
     half_day_count: stats.half_day,
     sunday_count: stats.sunday,
