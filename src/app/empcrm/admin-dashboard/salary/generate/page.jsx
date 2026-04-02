@@ -16,6 +16,7 @@ import {
   getEffectiveGrossSalary,
   applyStatutoryDeductionsFromStructure,
   isHealthInsuranceDeductionRow,
+  isLowGrossPfMonthly,
 } from "@/lib/salaryGrossSpecialAllowance";
 
 function formatPayCalcNumber(n) {
@@ -148,6 +149,17 @@ const GenerateSalaryPage = () => {
                 if (empAtt) {
                     const pay = empAtt.pay_days != null ? Number(empAtt.pay_days) : NaN;
                     payDaysFromAttendance = Number.isFinite(pay) ? pay : null;
+                    const cards = empAtt.attendance_cards;
+                    const presentFromCards =
+                        cards != null ? Number(cards.present) || 0 : null;
+                    const presentFromApi = Number(empAtt.present_days) || 0;
+                    if (
+                        presentFromCards != null
+                            ? presentFromCards === 0
+                            : presentFromApi === 0
+                    ) {
+                        payDaysFromAttendance = 0;
+                    }
                     if (empAtt.sunday_worked_dates && Array.isArray(empAtt.sunday_worked_dates)) {
                         sundayDates = empAtt.sunday_worked_dates;
                     } else if (empAtt.dates_worked && Array.isArray(empAtt.dates_worked)) {
@@ -235,6 +247,36 @@ const GenerateSalaryPage = () => {
         const workingDays = Number(working_days) || 30;
         const presentDays = Number(present_days) || 0;
         const overtimeHours = Number(overtime_hours) || 0;
+
+        const effectiveGrossEarly = getEffectiveGrossSalary(salaryStructure);
+        const lowGrossPfRuleEarly = isLowGrossPfMonthly(effectiveGrossEarly);
+
+        /** No attendance → payslip/preview still work; amounts must all be 0 (not pro‑rated transport/medical). */
+        if (presentDays <= 0) {
+            const processedDeductionsZero = deductions.map((deduction) => ({
+                ...deduction,
+                calculatedAmount: 0,
+            }));
+            setCalculation({
+                basicSalary: 0,
+                hra: 0,
+                transportAllowance: 0,
+                medicalAllowance: 0,
+                specialAllowance: 0,
+                bonus: 0,
+                pf: 0,
+                esi: 0,
+                healthInsurance: 0,
+                overtimeAmount: 0,
+                totalEarnings: 0,
+                structureDeductions: [],
+                processedDeductions: processedDeductionsZero,
+                totalDeductions: 0,
+                netSalary: 0,
+                lowGrossPfRule: lowGrossPfRuleEarly,
+            });
+            return;
+        }
 
         const structBasic = Number(salaryStructure.basic_salary) || 0;
         const structHra = Number(salaryStructure.hra) || 0;
