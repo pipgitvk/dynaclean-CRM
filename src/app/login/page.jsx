@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
 
 const ACCENT_COLOR = "#1F454A";
+const SERVICE_APP_LOGIN_URL = "https://service.dynacleanindustries.com/login";
 
 const LoginPage = () => {
   const router = useRouter();
@@ -40,6 +41,12 @@ const LoginPage = () => {
       }
 
       localStorage.setItem("username", username);
+
+      const roleNorm = String(data.role ?? "").trim().toUpperCase();
+      if (roleNorm === "SERVICE ENGINEER") {
+        window.location.href = SERVICE_APP_LOGIN_URL;
+        return;
+      }
 
       if (data.role === "SUPERADMIN") {
         router.push("/admin-dashboard");
