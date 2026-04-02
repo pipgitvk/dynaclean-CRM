@@ -18,6 +18,18 @@ import {
   isHealthInsuranceDeductionRow,
 } from "@/lib/salaryGrossSpecialAllowance";
 
+/** Payroll-only rows when API has no `attendance_cards` (same shape as older salary summary). */
+function payrollAttendanceFallbackRows(b) {
+    return {
+        fullDayPresent: b.present,
+        halfDays: b.halfDay,
+        sundayOff: b.weekendOff,
+        holidayN: b.holiday,
+        paidLeaveN: b.paidLeave,
+        lopN: b.lop,
+    };
+}
+
 const GenerateSalaryPage = () => {
     const router = useRouter();
 
@@ -140,6 +152,7 @@ const GenerateSalaryPage = () => {
                     }
                     setAttendanceBreakdown({
                         month: selectedMonth,
+                        cards: empAtt.attendance_cards || null,
                         present: Number(empAtt.present_days) || 0,
                         halfDay: Number(empAtt.half_day_count) || 0,
                         weekendOff: Number(empAtt.weekend_off_count) || 0,
@@ -147,7 +160,6 @@ const GenerateSalaryPage = () => {
                         lop: Number(empAtt.lop_count) || 0,
                         paidLeave: Number(empAtt.paid_leave_days) || 0,
                         payDays: Number(empAtt.pay_days) || 0,
-                        logRows: Number(empAtt.attendance_log_days) || 0,
                     });
                 } else {
                     setAttendanceBreakdown(null);
@@ -670,47 +682,99 @@ const GenerateSalaryPage = () => {
                             </span>
                         </h3>
                         <p className="text-xs text-slate-500 mb-3">
-                            Breakdown for the selected employee and month (from attendance records).
+                            {attendanceBreakdown.cards
+                                ? "Same metrics as Attendance details (admin) for this month — through today if current month."
+                                : "Breakdown for the selected employee and month (from attendance records)."}
                         </p>
                         <dl className="grid grid-cols-1 gap-2 text-sm">
-                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">Full day present</dt>
-                                <dd className="font-semibold text-emerald-700 tabular-nums">{attendanceBreakdown.present}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">Half days</dt>
-                                <dd className="font-semibold text-amber-700 tabular-nums">{attendanceBreakdown.halfDay}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">Sunday weekly off (no punch; Sat is working)</dt>
-                                <dd className="font-semibold text-violet-700 tabular-nums">{attendanceBreakdown.weekendOff}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">Holidays</dt>
-                                <dd className="font-semibold text-sky-700 tabular-nums">{attendanceBreakdown.holiday}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">Paid leave (approved)</dt>
-                                <dd className="font-semibold text-blue-700 tabular-nums">{attendanceBreakdown.paidLeave}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">LOP / unpaid absent</dt>
-                                <dd className="font-semibold text-red-700 tabular-nums">{attendanceBreakdown.lop}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                <dt className="text-slate-600">Attendance log rows</dt>
-                                <dd className="font-medium text-slate-700 tabular-nums">{attendanceBreakdown.logRows}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 pt-2 items-baseline">
-                                <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
-                                <dd className="text-lg font-bold text-purple-700 tabular-nums">
-                                    {Number.isFinite(attendanceBreakdown.payDays)
-                                        ? attendanceBreakdown.payDays % 1 === 0
-                                            ? attendanceBreakdown.payDays
-                                            : attendanceBreakdown.payDays.toFixed(1)
-                                        : "—"}
-                                </dd>
-                            </div>
+                            {(() => {
+                                const c = attendanceBreakdown.cards;
+                                if (c) {
+                                    return (
+                                        <>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">Present</dt>
+                                                <dd className="font-semibold text-green-600 tabular-nums">{c.present}</dd>
+                                            </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">Absent</dt>
+                                                <dd className="font-semibold text-orange-600 tabular-nums">{c.absents}</dd>
+                                            </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">Leaves</dt>
+                                                <dd className="font-semibold text-blue-600 tabular-nums">{c.leaves}</dd>
+                                            </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">Sundays</dt>
+                                                <dd className="font-semibold text-purple-600 tabular-nums">{c.sundays}</dd>
+                                            </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">Holidays</dt>
+                                                <dd className="font-semibold text-indigo-600 tabular-nums">{c.holidays}</dd>
+                                            </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">Half-Days</dt>
+                                                <dd className="font-semibold text-yellow-500 tabular-nums">{c.halfDays}</dd>
+                                            </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">Late Days</dt>
+                                                <dd className="font-semibold text-red-600 tabular-nums">{c.lateDays}</dd>
+                                            </div>
+                                            <div className="flex justify-between gap-2 pt-2 items-baseline">
+                                                <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
+                                                <dd className="text-lg font-bold text-purple-700 tabular-nums">
+                                                    {Number.isFinite(attendanceBreakdown.payDays)
+                                                        ? attendanceBreakdown.payDays % 1 === 0
+                                                            ? attendanceBreakdown.payDays
+                                                            : attendanceBreakdown.payDays.toFixed(1)
+                                                        : "—"}
+                                                </dd>
+                                            </div>
+                                        </>
+                                    );
+                                }
+                                const v = payrollAttendanceFallbackRows(attendanceBreakdown);
+                                return (
+                                    <>
+                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                            <dt className="text-slate-600">Full day present</dt>
+                                            <dd className="font-semibold text-emerald-700 tabular-nums">{v.fullDayPresent}</dd>
+                                        </div>
+                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                            <dt className="text-slate-600">Half days</dt>
+                                            <dd className="font-semibold text-amber-700 tabular-nums">{v.halfDays}</dd>
+                                        </div>
+                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                            <dt className="text-slate-600 leading-snug">
+                                                Sunday weekly off (no punch; Sat is working)
+                                            </dt>
+                                            <dd className="font-semibold text-violet-700 tabular-nums shrink-0">{v.sundayOff}</dd>
+                                        </div>
+                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                            <dt className="text-slate-600">Holidays</dt>
+                                            <dd className="font-semibold text-sky-700 tabular-nums">{v.holidayN}</dd>
+                                        </div>
+                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                            <dt className="text-slate-600">Paid leave (approved)</dt>
+                                            <dd className="font-semibold text-blue-700 tabular-nums">{v.paidLeaveN}</dd>
+                                        </div>
+                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                            <dt className="text-slate-600">LOP / unpaid absent</dt>
+                                            <dd className="font-semibold text-red-700 tabular-nums">{v.lopN}</dd>
+                                        </div>
+                                        <div className="flex justify-between gap-2 pt-2 items-baseline">
+                                            <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
+                                            <dd className="text-lg font-bold text-purple-700 tabular-nums">
+                                                {Number.isFinite(attendanceBreakdown.payDays)
+                                                    ? attendanceBreakdown.payDays % 1 === 0
+                                                        ? attendanceBreakdown.payDays
+                                                        : attendanceBreakdown.payDays.toFixed(1)
+                                                    : "—"}
+                                            </dd>
+                                        </div>
+                                    </>
+                                );
+                            })()}
                         </dl>
                     </div>
                 )}
