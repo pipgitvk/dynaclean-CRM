@@ -104,4 +104,18 @@ export async function ensureProspectsTable() {
     /* 1061 duplicate index name, 1062 duplicate values in column — clean DB then re-run migration */
     if (e?.errno !== 1061 && e?.errno !== 1062) throw e;
   }
+  try {
+    await conn.execute(
+      `ALTER TABLE prospects ADD COLUMN image_1 VARCHAR(512) NULL`,
+    );
+  } catch (e) {
+    if (e?.errno !== 1060) throw e;
+  }
+  try {
+    await conn.execute(
+      `ALTER TABLE prospects ADD COLUMN image_2 VARCHAR(512) NULL`,
+    );
+  } catch (e) {
+    if (e?.errno !== 1060) throw e;
+  }
 }

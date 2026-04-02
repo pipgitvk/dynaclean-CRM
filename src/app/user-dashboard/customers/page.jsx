@@ -8,10 +8,23 @@ export const dynamic = "force-dynamic";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
+/** Legacy filter slugs from older dropdown values — DB stores title-case labels */
+const STATUS_QUERY_ALIASES = {
+  verygud: "Very Good",
+  average: "Average",
+  poor: "Poor",
+  denied: "Denied",
+};
+
+function resolveStatusForQuery(raw) {
+  if (!raw) return "";
+  return STATUS_QUERY_ALIASES[raw] ?? raw;
+}
+
 export default async function CustomersPage({ searchParams }) {
   const searchParamsResolved = await searchParams;
   const {
-    status,
+    status: statusParam,
     stage,
     product,
     lead_campaign,
@@ -23,6 +36,8 @@ export default async function CustomersPage({ searchParams }) {
     employee,
     page = '1'
   } = searchParamsResolved;
+
+  const status = resolveStatusForQuery(statusParam);
 
   const currentPage = parseInt(page);
   const pageSize = 50;

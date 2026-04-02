@@ -9,6 +9,14 @@ import {
   formatYmdLongEnIN,
 } from "@/lib/prospectCommitmentRules";
 
+function setQtyStrFromInput(raw, setQtyStr) {
+  if (raw === "") {
+    setQtyStr("");
+    return;
+  }
+  if (/^\d+$/.test(raw)) setQtyStr(raw);
+}
+
 function toDateInputValue(v) {
   if (v == null || v === "") return "";
   const s = String(v);
@@ -30,10 +38,12 @@ export default function EditProspectFormClient({
   row,
   inputClass,
 }) {
-  const qtyParsed = parseInt(String(row.qty ?? "").trim(), 10);
-  const qtySubmit =
-    Number.isFinite(qtyParsed) && qtyParsed >= 1 ? qtyParsed : 1;
   const amountNum = Number(row.amount);
+
+  const [qtyStr, setQtyStr] = useState(() => {
+    const q = parseInt(String(row.qty ?? "").trim(), 10);
+    return Number.isFinite(q) && q >= 1 ? String(q) : "1";
+  });
 
   const [amountInput, setAmountInput] = useState(() =>
     Number.isFinite(amountNum) ? String(amountNum) : "0",
@@ -58,7 +68,6 @@ export default function EditProspectFormClient({
     <form action={updateProspect} className="space-y-4">
       <input type="hidden" name="prospect_id" value={prospectId} />
       <input type="hidden" name="customer_id" value={row.customer_id} />
-      <input type="hidden" name="qty" value={qtySubmit} />
 
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -98,11 +107,14 @@ export default function EditProspectFormClient({
         </label>
         <input
           id="qty"
+          name="qty"
           type="text"
-          readOnly
-          tabIndex={-1}
-          value={row.qty != null && row.qty !== "" ? String(row.qty) : ""}
-          className={`${inputClass} cursor-default bg-slate-50 text-slate-800`}
+          inputMode="numeric"
+          autoComplete="off"
+          required
+          value={qtyStr}
+          onChange={(e) => setQtyStrFromInput(e.target.value, setQtyStr)}
+          className={inputClass}
         />
       </div>
 
