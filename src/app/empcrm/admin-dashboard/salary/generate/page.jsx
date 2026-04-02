@@ -495,6 +495,15 @@ const GenerateSalaryPage = () => {
         return buildTemplatePayslipHTML(payslipPreviewOpts);
     }, [payslipPreviewOpts]);
 
+    /** When card/API present is 0, show all attendance numbers in this block as 0 (no stray half/late). */
+    const attendanceDisplayAllZero = useMemo(() => {
+        if (!attendanceBreakdown) return false;
+        if (attendanceBreakdown.cards) {
+            return (Number(attendanceBreakdown.cards.present) || 0) === 0;
+        }
+        return (Number(attendanceBreakdown.present) || 0) === 0;
+    }, [attendanceBreakdown]);
+
     const handleSave = async () => {
         if (!selectedEmployee || !selectedMonth) return;
 
@@ -717,45 +726,80 @@ const GenerateSalaryPage = () => {
                                     <li>
                                         Period days (eligible in month) ={" "}
                                         <span className="font-semibold tabular-nums">
-                                            {formatPayCalcNumber(attendanceBreakdown.payCalc.periodDays)}
+                                            {formatPayCalcNumber(
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.periodDays
+                                            )}
                                         </span>
                                     </li>
                                     <li>
                                         Sundays (in period) ={" "}
                                         <span className="font-semibold tabular-nums">
-                                            {formatPayCalcNumber(attendanceBreakdown.payCalc.sundaysInPeriod)}
+                                            {formatPayCalcNumber(
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.sundaysInPeriod
+                                            )}
                                         </span>
                                     </li>
                                     <li>
                                         Holidays on weekdays (in period) ={" "}
                                         <span className="font-semibold tabular-nums">
                                             {formatPayCalcNumber(
-                                                attendanceBreakdown.payCalc.holidayWeekdaysInPeriod
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.holidayWeekdaysInPeriod
                                             )}
                                         </span>
                                     </li>
                                     <li>
                                         Required working days = period − Sundays − weekday holidays ={" "}
-                                        {formatPayCalcNumber(attendanceBreakdown.payCalc.periodDays)} −{" "}
-                                        {formatPayCalcNumber(attendanceBreakdown.payCalc.sundaysInPeriod)} −{" "}
                                         {formatPayCalcNumber(
-                                            attendanceBreakdown.payCalc.holidayWeekdaysInPeriod
+                                            attendanceDisplayAllZero
+                                                ? 0
+                                                : attendanceBreakdown.payCalc.periodDays
+                                        )}{" "}
+                                        −{" "}
+                                        {formatPayCalcNumber(
+                                            attendanceDisplayAllZero
+                                                ? 0
+                                                : attendanceBreakdown.payCalc.sundaysInPeriod
+                                        )}{" "}
+                                        −{" "}
+                                        {formatPayCalcNumber(
+                                            attendanceDisplayAllZero
+                                                ? 0
+                                                : attendanceBreakdown.payCalc.holidayWeekdaysInPeriod
                                         )}{" "}
                                         ={" "}
                                         <span className="font-semibold text-purple-800 tabular-nums">
                                             {formatPayCalcNumber(
-                                                attendanceBreakdown.payCalc.requiredWorkingDays
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.requiredWorkingDays
                                             )}
                                         </span>
                                     </li>
                                     <li>
                                         Total attendance (salary rules) = full days + (half days ÷ 2) ={" "}
-                                        {formatPayCalcNumber(attendanceBreakdown.payCalc.salaryFullDays)}{" "}
-                                        + ({formatPayCalcNumber(attendanceBreakdown.payCalc.salaryHalfDays)}{" "}
+                                        {formatPayCalcNumber(
+                                            attendanceDisplayAllZero
+                                                ? 0
+                                                : attendanceBreakdown.payCalc.salaryFullDays
+                                        )}{" "}
+                                        + (
+                                        {formatPayCalcNumber(
+                                            attendanceDisplayAllZero
+                                                ? 0
+                                                : attendanceBreakdown.payCalc.salaryHalfDays
+                                        )}{" "}
                                         ÷ 2) ={" "}
                                         <span className="font-semibold text-purple-800 tabular-nums">
                                             {formatPayCalcNumber(
-                                                attendanceBreakdown.payCalc.totalAttendance
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.totalAttendance
                                             )}
                                         </span>
                                     </li>
@@ -763,24 +807,36 @@ const GenerateSalaryPage = () => {
                                         Deduction days = max(0, required − total attendance) ={" "}
                                         <span className="font-semibold tabular-nums">
                                             {formatPayCalcNumber(
-                                                attendanceBreakdown.payCalc.deductionDays
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.deductionDays
                                             )}
                                         </span>
                                     </li>
                                     <li className="pt-1 border-t border-purple-200/80 text-slate-800">
                                         Pay days (for salary) = period − deduction ={" "}
                                         <span className="font-semibold tabular-nums">
-                                            {formatPayCalcNumber(attendanceBreakdown.payCalc.periodDays)}
+                                            {formatPayCalcNumber(
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.periodDays
+                                            )}
                                         </span>{" "}
                                         −{" "}
                                         <span className="font-semibold tabular-nums">
                                             {formatPayCalcNumber(
-                                                attendanceBreakdown.payCalc.deductionDays
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.deductionDays
                                             )}
                                         </span>{" "}
                                         ={" "}
                                         <span className="font-bold text-purple-800 tabular-nums">
-                                            {formatPayCalcNumber(attendanceBreakdown.payDays)}
+                                            {formatPayCalcNumber(
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payDays
+                                            )}
                                         </span>
                                     </li>
                                 </ul>
@@ -790,21 +846,28 @@ const GenerateSalaryPage = () => {
                             {(() => {
                                 const c = attendanceBreakdown.cards;
                                 if (c) {
-                                    const lateDaysAdjusted = Math.max(
-                                        0,
-                                        (Number(c.lateDays) || 0) - (Number(c.halfDays) || 0)
-                                    );
-                                    const presentRegular = Math.max(
-                                        0,
-                                        (Number(c.present) || 0) - (Number(c.halfDays) || 0)
-                                    );
+                                    const lateDaysAdjusted = attendanceDisplayAllZero
+                                        ? 0
+                                        : Math.max(
+                                              0,
+                                              (Number(c.lateDays) || 0) - (Number(c.halfDays) || 0)
+                                          );
+                                    const presentRegular = attendanceDisplayAllZero
+                                        ? 0
+                                        : Math.max(
+                                              0,
+                                              (Number(c.present) || 0) - (Number(c.halfDays) || 0)
+                                          );
+                                    const z = (n) => (attendanceDisplayAllZero ? 0 : Number(n) || 0);
                                     return (
                                         <>
                                             <div className="border-b border-slate-100 py-1.5">
+                                               
                                                 <div className="flex justify-between gap-2">
+                                                
                                                     <dt className="text-slate-600">Present</dt>
                                                     <dd className="font-semibold text-green-600 tabular-nums">
-                                                        {c.present}
+                                                        {z(c.present)}
                                                     </dd>
                                                 </div>
                                                 <div className="mt-1.5 space-y-1 pl-4 text-xs">
@@ -817,56 +880,68 @@ const GenerateSalaryPage = () => {
                                                     <div className="flex justify-between gap-2 text-slate-500">
                                                         <span>Half day</span>
                                                         <span className="tabular-nums font-medium text-yellow-600">
-                                                            {c.halfDays}
+                                                            {z(c.halfDays)}
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between gap-2 text-slate-500">
-                                                        <span>Late day</span>
-                                                        <span
+                                                        {/* <span>Late day</span> */}
+                                                        {/* <span
                                                             className="tabular-nums font-medium text-red-600"
                                                             title="Late days − half days (from attendance rules)"
                                                         >
                                                             {lateDaysAdjusted}
-                                                        </span>
+                                                        </span> */}
                                                     </div>
                                                 </div>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Absent</dt>
-                                                <dd className="font-semibold text-orange-600 tabular-nums">{c.absents}</dd>
+                                                <dd className="font-semibold text-orange-600 tabular-nums">
+                                                    {z(c.absents)}
+                                                </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Leaves</dt>
-                                                <dd className="font-semibold text-blue-600 tabular-nums">{c.leaves}</dd>
+                                                <dd className="font-semibold text-blue-600 tabular-nums">
+                                                    {z(c.leaves)}
+                                                </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Sundays</dt>
-                                                <dd className="font-semibold text-purple-600 tabular-nums">{c.sundays}</dd>
+                                                <dd className="font-semibold text-purple-600 tabular-nums">
+                                                    {z(c.sundays)}
+                                                </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Holidays</dt>
-                                                <dd className="font-semibold text-indigo-600 tabular-nums">{c.holidays}</dd>
+                                                <dd className="font-semibold text-indigo-600 tabular-nums">
+                                                    {z(c.holidays)}
+                                                </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Half-Days</dt>
-                                                <dd className="font-semibold text-yellow-500 tabular-nums">{c.halfDays}</dd>
+                                                <dd className="font-semibold text-yellow-500 tabular-nums">
+                                                    {z(c.halfDays)}
+                                                </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">Late Days</dt>
+                                                {/* <dt className="text-slate-600">Late Days</dt>
                                                 <dd
                                                     className="font-semibold text-red-600 tabular-nums"
                                                     title="Late days − half days (from attendance rules)"
                                                 >
                                                     {lateDaysAdjusted}
-                                                </dd>
+                                                </dd> */}
                                             </div>
                                             <div className="flex justify-between gap-2 pt-2 items-baseline">
                                                 <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
                                                 <dd className="text-lg font-bold text-purple-700 tabular-nums">
                                                     {Number.isFinite(attendanceBreakdown.payDays)
-                                                        ? attendanceBreakdown.payDays % 1 === 0
-                                                            ? attendanceBreakdown.payDays
-                                                            : attendanceBreakdown.payDays.toFixed(1)
+                                                        ? attendanceDisplayAllZero
+                                                            ? 0
+                                                            : attendanceBreakdown.payDays % 1 === 0
+                                                              ? attendanceBreakdown.payDays
+                                                              : attendanceBreakdown.payDays.toFixed(1)
                                                         : "—"}
                                                 </dd>
                                             </div>
@@ -874,41 +949,56 @@ const GenerateSalaryPage = () => {
                                     );
                                 }
                                 const v = payrollAttendanceFallbackRows(attendanceBreakdown);
+                                const fz = (n) => (attendanceDisplayAllZero ? 0 : Number(n) || 0);
                                 return (
                                     <>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                             <dt className="text-slate-600">Full day present</dt>
-                                            <dd className="font-semibold text-emerald-700 tabular-nums">{v.fullDayPresent}</dd>
+                                            <dd className="font-semibold text-emerald-700 tabular-nums">
+                                                {fz(v.fullDayPresent)}
+                                            </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                             <dt className="text-slate-600">Half days</dt>
-                                            <dd className="font-semibold text-amber-700 tabular-nums">{v.halfDays}</dd>
+                                            <dd className="font-semibold text-amber-700 tabular-nums">
+                                                {fz(v.halfDays)}
+                                            </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                             <dt className="text-slate-600 leading-snug">
                                                 Sunday weekly off (no punch; Sat is working)
                                             </dt>
-                                            <dd className="font-semibold text-violet-700 tabular-nums shrink-0">{v.sundayOff}</dd>
+                                            <dd className="font-semibold text-violet-700 tabular-nums shrink-0">
+                                                {fz(v.sundayOff)}
+                                            </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                             <dt className="text-slate-600">Holidays</dt>
-                                            <dd className="font-semibold text-sky-700 tabular-nums">{v.holidayN}</dd>
+                                            <dd className="font-semibold text-sky-700 tabular-nums">
+                                                {fz(v.holidayN)}
+                                            </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                             <dt className="text-slate-600">Paid leave (approved)</dt>
-                                            <dd className="font-semibold text-blue-700 tabular-nums">{v.paidLeaveN}</dd>
+                                            <dd className="font-semibold text-blue-700 tabular-nums">
+                                                {fz(v.paidLeaveN)}
+                                            </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                             <dt className="text-slate-600">LOP / unpaid absent</dt>
-                                            <dd className="font-semibold text-red-700 tabular-nums">{v.lopN}</dd>
+                                            <dd className="font-semibold text-red-700 tabular-nums">
+                                                {fz(v.lopN)}
+                                            </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 pt-2 items-baseline">
                                             <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
                                             <dd className="text-lg font-bold text-purple-700 tabular-nums">
                                                 {Number.isFinite(attendanceBreakdown.payDays)
-                                                    ? attendanceBreakdown.payDays % 1 === 0
-                                                        ? attendanceBreakdown.payDays
-                                                        : attendanceBreakdown.payDays.toFixed(1)
+                                                    ? attendanceDisplayAllZero
+                                                        ? 0
+                                                        : attendanceBreakdown.payDays % 1 === 0
+                                                          ? attendanceBreakdown.payDays
+                                                          : attendanceBreakdown.payDays.toFixed(1)
                                                     : "—"}
                                             </dd>
                                         </div>
