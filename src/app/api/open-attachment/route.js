@@ -22,6 +22,11 @@ export async function GET(request) {
     return NextResponse.json({ error: "Could not resolve path" }, { status: 404 });
   }
 
-  const redirectUrl = url.startsWith("http") ? url : new URL(url, request.url).toString();
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = forwardedHost || request.headers.get("host");
+  const publicOrigin =
+    host ? `${forwardedProto || "https"}://${host}` : new URL(request.url).origin;
+  const redirectUrl = url.startsWith("http") ? url : new URL(url, publicOrigin).toString();
   return NextResponse.redirect(redirectUrl, 302);
 }
