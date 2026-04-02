@@ -1,5 +1,14 @@
 import { parseAttendanceClockMinutes } from "@/lib/istDateTime";
 
+/** True when there is no usable clock-out time (null, empty, or unparsable). */
+function isMissingCheckoutTime(log) {
+  if (log == null) return true;
+  const t = log.checkout_time;
+  if (t == null) return true;
+  if (String(t).trim() === "") return true;
+  return parseAttendanceClockMinutes(t) == null;
+}
+
 /**
  * Shared attendance rule evaluation (matches previous hardcoded behaviour, driven by API rules).
  * @typedef {Object} AttendanceRulesShape
@@ -99,7 +108,8 @@ export function getCheckinStatus(logTime, rules) {
 /** @param {string|null|undefined} logTime */
 export function getCheckoutStatus(logTime, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
-  if (!logTime) return null;
+  /* No punch-out → same classification as half-day (see isHalfDayByRules). */
+  if (!logTime) return "halfDay";
   const logM = parseAttendanceClockMinutes(logTime);
   if (logM == null) return null;
   const standardM = parseTimeToMinutes(r.checkout);
@@ -127,10 +137,13 @@ export function getBreakStatus(startTime, endTime, breakType, rules) {
 
 export function isHalfDayByRules(log, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
-  if (!log?.checkin_time || !log?.checkout_time) return false;
+  if (!log?.checkin_time) return false;
   const inM = parseAttendanceClockMinutes(log.checkin_time);
+  if (inM == null) return false;
+  /* Check-in but no check-out → half day (salary + cards match admin expectation). */
+  if (isMissingCheckoutTime(log)) return true;
   const outM = parseAttendanceClockMinutes(log.checkout_time);
-  if (inM == null || outM == null) return false;
+  if (outM == null) return true;
   const halfInM = parseTimeToMinutes(r.halfDayCheckin);
   const halfOutM = parseTimeToMinutes(r.halfDayCheckout);
   /* Matches former isLate(checkin, halfDayCheckin) || isEarly(checkout, halfDayCheckout) */

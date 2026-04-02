@@ -6,7 +6,7 @@
  *   requiredWorkingDays = days in period that are not Sunday and not (company) holiday.
  *   totalAttendance = full-day present count + (half_day × 0.5).
  *   Half-day for pay uses `isHalfDayByRules` (same as Attendance details / Monthly card).
- *   Missing check-in or check-out does not count as half-day (matches card Half-Days row).
+ *   Check-in with no check-out counts as half-day; missing check-in does not.
  *   deductionDays = max(0, requiredWorkingDays − totalAttendance)
  *   pay_days = periodDays − deductionDays
  *
