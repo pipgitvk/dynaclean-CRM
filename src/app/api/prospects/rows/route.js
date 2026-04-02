@@ -87,7 +87,7 @@ export async function GET(req) {
 
     let query = `
       SELECT p.id, p.customer_id, p.order_id, p.quote_number, p.status, p.model, p.qty, p.amount,
-             p.commitment_date, p.notes, p.created_by, p.finalized_at,
+             p.commitment_date, p.notes, p.created_by, p.finalized_at, p.image_1, p.image_2,
              COALESCE(
                NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''),
                NULLIF(TRIM(c.company), '')

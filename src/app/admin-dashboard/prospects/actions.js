@@ -104,6 +104,59 @@ export async function createProspect(formData) {
   redirect("/admin-dashboard/prospects");
 }
 
+export async function createProspectManual(formData) {
+  const payload = await getSessionPayload();
+  if (!payload || !canAccessProspectsRole(payload.role)) {
+    redirect("/admin-dashboard/prospects/add-manual?error=unauthorized");
+  }
+
+  const customer_id = String(formData.get("customer_id") ?? "").trim();
+  const model = String(formData.get("model") ?? "").trim();
+  const qtyRaw = formData.get("qty");
+  const amountRaw = formData.get("amount");
+  const commitmentRaw = String(formData.get("commitment_date") ?? "").trim();
+
+  if (!customer_id || !model) {
+    redirect("/admin-dashboard/prospects/add-manual?error=required");
+  }
+
+  const qtyParsed = parseInt(String(qtyRaw ?? "").trim(), 10);
+  if (!Number.isFinite(qtyParsed) || qtyParsed < 1) {
+    redirect("/admin-dashboard/prospects/add-manual?error=qty");
+  }
+  const qty = qtyParsed;
+  const amount = parseFloat(String(amountRaw).replace(/,/g, "")) || 0;
+  const commitment_date = commitmentRaw ? commitmentRaw : null;
+  const notes = normalizeNotes(formData);
+
+  const todayIst = getTodayYmdIST();
+  const createCommitCheck = validateCommitmentDateForCreate(
+    commitmentRaw,
+    todayIst,
+  );
+  if (!createCommitCheck.ok) {
+    redirect("/admin-dashboard/prospects/add-manual?error=commitment_past");
+  }
+
+  const createdBy = String(payload.username ?? "").trim() || null;
+
+  await ensureProspectsTable();
+  const conn = await getDbConnection();
+  const mayUse = await userMayUseCustomerForProspect(conn, customer_id, payload);
+  if (!mayUse) {
+    redirect("/admin-dashboard/prospects/add-manual?error=forbidden_customer");
+  }
+
+  await conn.execute(
+    `INSERT INTO prospects (customer_id, order_id, model, qty, amount, commitment_date, notes, created_by, image_1, image_2)
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+    [customer_id, model, qty, amount, commitment_date, notes, createdBy],
+  );
+
+  revalidatePath("/admin-dashboard/prospects");
+  redirect("/admin-dashboard/prospects");
+}
+
 export async function updateProspect(formData) {
   const payload = await getSessionPayload();
   if (!payload || !canAccessProspectsRole(payload.role)) {

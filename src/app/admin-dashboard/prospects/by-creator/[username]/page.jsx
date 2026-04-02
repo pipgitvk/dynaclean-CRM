@@ -118,7 +118,7 @@ export default async function ProspectsByCreatorPage({ params, searchParams }) {
 
     let query = `
       SELECT p.id, p.customer_id, p.order_id, p.quote_number, p.status, p.model, p.qty, p.amount,
-             p.commitment_date, p.notes, p.created_by, p.finalized_at,
+             p.commitment_date, p.notes, p.created_by, p.finalized_at, p.image_1, p.image_2,
              COALESCE(
                NULLIF(TRIM(CONCAT_WS(' ', c.first_name, c.last_name)), ''),
                NULLIF(TRIM(c.company), '')
@@ -173,6 +173,8 @@ export default async function ProspectsByCreatorPage({ params, searchParams }) {
           ? row.finalized_at.toISOString()
           : String(row.finalized_at),
     order_payment_target: row.order_payment_target ?? null,
+    image_1: row.image_1 != null ? String(row.image_1) : null,
+    image_2: row.image_2 != null ? String(row.image_2) : null,
   }));
 
   const viewerUsername = String(payload.username ?? "").trim();

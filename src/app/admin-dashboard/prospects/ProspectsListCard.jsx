@@ -742,6 +742,14 @@ export default function ProspectsListCard({
           onSubmitSearch={() => {}}
           onSuggestionNavigateToAdd={() => {}}
         />
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Link
+            href="/admin-dashboard/prospects/add-manual"
+            className="inline-flex items-center justify-center rounded-[10px] bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+          >
+            Add prospect (manual)
+          </Link>
+        </div>
         <div className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
           {loadError}
         </div>
@@ -778,6 +786,18 @@ export default function ProspectsListCard({
         onSubmitSearch={submitSearch}
         onSuggestionNavigateToAdd={navigateToAddFromSuggestion}
       />
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Link
+          href="/admin-dashboard/prospects/add-manual"
+          className="inline-flex items-center justify-center rounded-[10px] bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
+        >
+          Add prospect (manual)
+        </Link>
+        <span className="text-xs text-slate-500">
+          No quotation required
+        </span>
+      </div>
 
       {viewerIsAdmin ? (
         <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">

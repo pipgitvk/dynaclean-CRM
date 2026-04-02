@@ -6,6 +6,19 @@ import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { Eye, Pencil, ArrowRightCircle, Loader2 } from "lucide-react";
 
+/** Old option values sent `verygud` etc.; DB stores "Very Good", "Average", … */
+const LEGACY_STATUS_SLUGS = {
+  verygud: "Very Good",
+  average: "Average",
+  poor: "Poor",
+  denied: "Denied",
+};
+
+function normalizeStatusFromParams(raw) {
+  if (!raw) return "";
+  return LEGACY_STATUS_SLUGS[raw] ?? raw;
+}
+
 export default function CustomerTable({ 
   rows, 
   searchParams,
@@ -24,7 +37,7 @@ export default function CustomerTable({
     date_from: searchParams.date_from ?? "",
     date_to: searchParams.date_to ?? "",
     sort: searchParams.sort ?? "", // ✅ empty unless explicitly set
-    status: searchParams.status ?? "",
+    status: normalizeStatusFromParams(searchParams.status ?? ""),
     stage: searchParams.stage ?? "",
     lead_campaign: searchParams.lead_campaign ?? "",
     next_follow_date: searchParams.next_follow_date ?? "",
@@ -36,6 +49,21 @@ export default function CustomerTable({
     console.log("ROWS:", rows);
     console.log("SearchParams:", searchParams);
   }, [rows, searchParams]);
+
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      search: searchParams.search ?? "",
+      date_from: searchParams.date_from ?? "",
+      date_to: searchParams.date_to ?? "",
+      sort: searchParams.sort ?? "",
+      status: normalizeStatusFromParams(searchParams.status ?? ""),
+      stage: searchParams.stage ?? "",
+      lead_campaign: searchParams.lead_campaign ?? "",
+      next_follow_date: searchParams.next_follow_date ?? "",
+      employee: searchParams.employee ?? "",
+    }));
+  }, [searchParams]);
 
   const resetFilters = () => {
     const cleared = {
@@ -138,10 +166,10 @@ export default function CustomerTable({
         >
           <option value="">All Status</option>
           <option value="New">New</option>
-          <option value="verygud">Very Good</option>
-          <option value="average">Average</option>
-          <option value="poor">Poor</option>
-          <option value="denied">Denied</option>
+          <option value="Very Good">Very Good</option>
+          <option value="Average">Average</option>
+          <option value="Poor">Poor</option>
+          <option value="Denied">Denied</option>
         </select>
         <select
           value={filters.stage}
