@@ -2,6 +2,11 @@ import React, { useState, useEffect } from "react";
 import { toast } from "react-hot-toast"; // Import toast
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
+import FallbackLink from "@/components/attachments/FallbackLink";
+import {
+  normalizeAttachmentPathParam,
+  splitAttachmentList,
+} from "@/lib/attachmentPathUtils";
 
 const Modal = ({ isOpen, closeModal, row, role, onPaymentSuccess }) => {
   const [notes, setNotes] = useState("");
@@ -78,6 +83,8 @@ const Modal = ({ isOpen, closeModal, row, role, onPaymentSuccess }) => {
 
   if (!isOpen || !expenseDetails) return null;
 
+  const attachmentPaths = splitAttachmentList(expenseDetails.attachments);
+
   return (
     <div className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50">
       <div className="bg-white p-6 rounded-lg w-96">
@@ -97,13 +104,24 @@ const Modal = ({ isOpen, closeModal, row, role, onPaymentSuccess }) => {
           </div>
           <div>
             <strong>Attachments:</strong>{" "}
-            <a
-              href={expenseDetails.attachments}
-              target="_blank"
-              className="text-blue-600"
-            >
-              View Attachment
-            </a>
+            {attachmentPaths.length === 0 ? (
+              <span className="text-gray-500">—</span>
+            ) : (
+              <ul className="list-disc ml-4 mt-1 text-blue-600 text-sm">
+                {attachmentPaths.map(
+                  (raw, i) => {
+                    const pathOnly = normalizeAttachmentPathParam(raw);
+                    const fileName =
+                      pathOnly.split("/").pop() || "attachment";
+                    return (
+                      <li key={i}>
+                        <FallbackLink pathOnly={pathOnly} fileName={fileName} />
+                      </li>
+                    );
+                  },
+                )}
+              </ul>
+            )}
           </div>
 
           <div>
