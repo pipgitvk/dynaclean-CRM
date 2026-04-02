@@ -91,6 +91,22 @@ export default function MetaBackfillPage() {
     return totals;
   }, [assignedByLeads]);
 
+  /** Total = sum of all employee buckets (table + hidden harsh_M), not raw API total */
+  const leadsReportBreakdown = useMemo(() => {
+    const rows = leadsReport?.byEmployee;
+    if (!rows?.length) {
+      return { grand: leadsReport?.total ?? 0, visible: 0, harsh: 0 };
+    }
+    let harsh = 0;
+    let visible = 0;
+    for (const r of rows) {
+      const n = Number(r.leadCount) || 0;
+      if (String(r.employee ?? "").toLowerCase() === "harsh_m") harsh += n;
+      else visible += n;
+    }
+    return { grand: visible + harsh, visible, harsh };
+  }, [leadsReport]);
+
   // Hydrate auto-poll from localStorage (persists across refresh)
   useEffect(() => {
     setAutoPollEnabledState(getAutoPollEnabled());
@@ -636,8 +652,12 @@ export default function MetaBackfillPage() {
           <h2 className="font-medium mb-2 text-emerald-900">
             Leads Report ({leadsReport.from} to {leadsReport.to})
           </h2>
-          <p className="text-sm text-emerald-800 mb-3">
-            <strong>Total leads:</strong> {leadsReport.total}
+          <p className="text-sm text-emerald-800 mb-1">
+            <strong>Total leads:</strong> {leadsReportBreakdown.grand}
+          </p>
+          <p className="text-xs text-emerald-800/85 mb-3">
+            Employees (in table) + harsh_M: {leadsReportBreakdown.visible} +{" "}
+            {leadsReportBreakdown.harsh} = {leadsReportBreakdown.grand}
           </p>
           <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
             <span className="font-medium text-emerald-900">assigned_by</span>
