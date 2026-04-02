@@ -4,54 +4,15 @@
  * Pay days (for salary):
  *   periodDays = eligible calendar days in month (after DOJ, not after today).
  *   requiredWorkingDays = days in period that are not Sunday and not (company) holiday.
- *   totalAttendance = full-day present count + (half_day × 0.5), using salary 15‑min grace rules.
+ *   totalAttendance = full-day present count + (half_day × 0.5).
+ *   Half-day for pay uses `isHalfDayByRules` (same as Attendance details / Monthly card).
+ *   Missing check-in or check-out does not count as half-day (matches card Half-Days row).
  *   deductionDays = max(0, requiredWorkingDays − totalAttendance)
  *   pay_days = periodDays − deductionDays
- *   (equivalent to: totalAttendance + paid Sundays/holidays in period − shortfall vs required slots.)
  *
- * - Salary uses a fixed 15 min grace from configured check-in / check-out times (not a wider DB gracePeriodMinutes).
  * - Days before date_of_joining are skipped (not LOP, not paid).
  */
-import {
-  parseTimeToMinutes,
-  DEFAULT_ATTENDANCE_RULES,
-} from "@/lib/attendanceRulesEngine";
-import { parseAttendanceClockMinutes } from "@/lib/istDateTime";
-
-/** Salary only: grace window is exactly 15 minutes from standard in/out times. */
-const SALARY_GRACE_MINUTES = 15;
-
-/**
- * @param {string|null|undefined} logTime
- * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} rules
- * @returns {"onTime"|"grace"|"late"|null}
- */
-function getSalaryCheckinBand(logTime, rules) {
-  const r = rules || DEFAULT_ATTENDANCE_RULES;
-  const logM = parseAttendanceClockMinutes(logTime);
-  if (logM == null) return null;
-  const standardM = parseTimeToMinutes(r.checkin);
-  const graceEndM = standardM + SALARY_GRACE_MINUTES;
-  if (logM <= standardM) return "onTime";
-  if (logM <= graceEndM) return "grace";
-  return "late";
-}
-
-/**
- * @param {string|null|undefined} logTime
- * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} rules
- * @returns {"onTime"|"grace"|"late"|null}
- */
-function getSalaryCheckoutBand(logTime, rules) {
-  const r = rules || DEFAULT_ATTENDANCE_RULES;
-  const logM = parseAttendanceClockMinutes(logTime);
-  if (logM == null) return null;
-  const standardM = parseTimeToMinutes(r.checkout);
-  const graceStartM = standardM - SALARY_GRACE_MINUTES;
-  if (logM >= standardM) return "onTime";
-  if (logM >= graceStartM) return "grace";
-  return "late";
-}
+import { isHalfDayByRules } from "@/lib/attendanceRulesEngine";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -131,27 +92,6 @@ export function computeSalaryPayDaysForUser(p) {
 
   const leaveDates = buildLeaveDateSetForUser(leavesAll, username);
 
-  /**
-   * @returns {boolean} true = full day (present), false = half-day
-   */
-  function punchDayIsFullDay(log) {
-    const cin = getSalaryCheckinBand(log?.checkin_time, rules);
-    const cout = getSalaryCheckoutBand(log?.checkout_time, rules);
-    if (cin == null || cout == null) return false;
-
-    if (cin === "onTime" && cout === "onTime") return true;
-
-    if (cin === "grace" && cout === "onTime") return true;
-    if (cin === "onTime" && cout === "grace") return true;
-    if (cin === "grace" && cout === "grace") return true;
-
-    if (cin === "late") return false;
-
-    if (cout === "late") return false;
-
-    return false;
-  }
-
   let present = 0;
   let half_day = 0;
   let sunday = 0;
@@ -192,10 +132,10 @@ export function computeSalaryPayDaysForUser(p) {
     }
 
     if (existingLog) {
-      if (punchDayIsFullDay(existingLog)) {
-        present++;
-      } else {
+      if (isHalfDayByRules(existingLog, rules)) {
         half_day++;
+      } else {
+        present++;
       }
       if (isSunday) {
         sundayWorkedDates.push(dateString);
