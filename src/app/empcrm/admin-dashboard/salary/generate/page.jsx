@@ -125,7 +125,7 @@ const GenerateSalaryPage = () => {
                 }
             }
 
-            /** null = no attendance row; number = pay days (present + Sunday off + holidays − half×0.5) */
+            /** null = no attendance row; number = pay days (period − max(0, required working − (full present + half/2))) */
             let payDaysFromAttendance = null;
             let sundayDates = [];
 

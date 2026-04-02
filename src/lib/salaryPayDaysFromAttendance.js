@@ -1,12 +1,15 @@
 /**
  * Salary "pay days" from attendance (payroll-oriented).
- * Pay days (for salary / UI) = full-day present + Sunday weekly off + holidays − (half_day × 0.5).
+ *
+ * Pay days (for salary):
+ *   periodDays = eligible calendar days in month (after DOJ, not after today).
+ *   requiredWorkingDays = days in period that are not Sunday and not (company) holiday.
+ *   totalAttendance = full-day present count + (half_day × 0.5), using salary 15‑min grace rules.
+ *   deductionDays = max(0, requiredWorkingDays − totalAttendance)
+ *   pay_days = periodDays − deductionDays
+ *   (equivalent to: totalAttendance + paid Sundays/holidays in period − shortfall vs required slots.)
+ *
  * - Salary uses a fixed 15 min grace from configured check-in / check-out times (not a wider DB gracePeriodMinutes).
- * - Check-in: on time = at/before standard; grace = within 15 min after standard; after that = late (half-day).
- * - Check-out: on time = at/after standard; grace = within 15 min before standard; earlier = late (half-day).
- * - Clock times use the wall time from DB strings (YYYY-MM-DD HH:mm:ss) when present so server TZ does not shift 10:30 → wrong band.
- * - Other combinations (e.g. late check-out) are half-day unless covered above.
- * - sunday_off: Sundays with no punch only (Saturday is a normal working day for LOP).
  * - Days before date_of_joining are skipped (not LOP, not paid).
  */
 import {
@@ -159,6 +162,11 @@ export function computeSalaryPayDaysForUser(p) {
   let paid_leave = 0;
   const sundayWorkedDates = [];
 
+  /** Eligible days in month (same loop scope as pay-days formula). */
+  let periodDays = 0;
+  /** Non-Sunday, non-holiday days in period (expected attendance slots). */
+  let requiredWorkingDays = 0;
+
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, monthIndex, day);
     const cellDate = startOfDay(d);
@@ -171,6 +179,11 @@ export function computeSalaryPayDaysForUser(p) {
     const isSunday = dow === 0;
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveDates.has(dateString);
+
+    periodDays++;
+    if (!isSunday && !isHoliday) {
+      requiredWorkingDays++;
+    }
 
     if (existingLog) {
       if (punchDayIsFullDay(existingLog)) {
@@ -199,10 +212,9 @@ export function computeSalaryPayDaysForUser(p) {
     lop++;
   }
 
-  const payDays = Math.max(
-    0,
-    present + weekend_off + holiday - 0.5 * half_day
-  );
+  const totalAttendance = present + 0.5 * half_day;
+  const deductionDays = Math.max(0, requiredWorkingDays - totalAttendance);
+  const payDays = periodDays - deductionDays;
 
   return {
     present,
