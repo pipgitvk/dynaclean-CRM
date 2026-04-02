@@ -5,17 +5,6 @@ import {
   normalizeAttachmentPathParam,
 } from "@/lib/attachmentPathUtils";
 
-function getRequestOrigin(request) {
-  try {
-    return new URL(request.url).origin;
-  } catch {}
-  try {
-    const ref = request.headers.get("referer") || request.headers.get("origin");
-    if (ref) return new URL(ref).origin;
-  } catch {}
-  return ATTACHMENT_DOMAINS[0];
-}
-
 async function tryHead(url) {
   try {
     const controller = new AbortController();
@@ -72,8 +61,8 @@ export async function resolveAttachmentTarget(request, pathInput) {
   if (safeForLocal) {
     const localPath = join(process.cwd(), "public", cleaned);
     if (existsSync(localPath)) {
-      const origin = getRequestOrigin(request);
-      const serveUrl = `${origin}/api/serve-attachment?path=${encodeURIComponent(cleaned)}`;
+      // Relative URL so the browser keeps the current host:port (avoids 3000 vs 3001 mismatches).
+      const serveUrl = `/api/serve-attachment?path=${encodeURIComponent(cleaned)}`;
       return { url: serveUrl, found: true, cleaned };
     }
   }

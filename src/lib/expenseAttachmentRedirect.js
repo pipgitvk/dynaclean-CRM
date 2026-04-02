@@ -5,14 +5,13 @@ import { NextResponse } from "next/server";
  * (`/expense_attachments/<file>`) and `/api/open-attachment`, which probes
  * app + service so both deploys behave the same.
  */
-export function redirectExpenseFileToOpenAttachment(req, fileName) {
+export function redirectExpenseFileToOpenAttachment(_req, fileName) {
   const name = String(fileName || "").trim();
   if (!name) {
     return NextResponse.json({ error: "Missing file name" }, { status: 400 });
   }
 
-  const origin = new URL(req.url).origin;
-  const target = `${origin}/api/open-attachment?path=${encodeURIComponent(
+  const target = `/api/open-attachment?path=${encodeURIComponent(
     `/expense_attachments/${name}`
   )}`;
 
