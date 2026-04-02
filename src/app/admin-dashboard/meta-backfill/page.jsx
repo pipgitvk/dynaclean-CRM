@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { Eye, X } from "lucide-react";
 
 const CRON_HISTORY_KEY = "meta-backfill-cron-history";
 const AUTO_POLL_KEY = "meta-backfill-auto-poll-enabled";
@@ -57,6 +58,11 @@ export default function MetaBackfillPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [cronHistory, setCronHistory] = useState([]);
   const pollCountRef = useRef(0);
+  const [reportDetailOpen, setReportDetailOpen] = useState(false);
+  const [reportDetailEmployee, setReportDetailEmployee] = useState(null);
+  const [reportDetailLeads, setReportDetailLeads] = useState([]);
+  const [reportDetailLoading, setReportDetailLoading] = useState(false);
+  const [reportDetailError, setReportDetailError] = useState("");
 
   // Hydrate auto-poll from localStorage (persists across refresh)
   useEffect(() => {
@@ -194,6 +200,34 @@ export default function MetaBackfillPage() {
       setMessage("Error fetching leads report");
     } finally {
       setLeadsReportLoading(false);
+    }
+  };
+
+  const openEmployeeLeadDetails = async (employeeName) => {
+    if (!since || !until) return;
+    setReportDetailEmployee(employeeName);
+    setReportDetailLeads([]);
+    setReportDetailError("");
+    setReportDetailOpen(true);
+    setReportDetailLoading(true);
+    try {
+      const q = new URLSearchParams({
+        from: since,
+        to: until,
+        employee: employeeName,
+      });
+      const res = await fetch(`/api/meta-backfill/leads-report/details?${q.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setReportDetailError(data?.error || "Failed to load leads");
+        return;
+      }
+      setReportDetailLeads(data.leads || []);
+    } catch (err) {
+      console.error(err);
+      setReportDetailError("Error loading leads");
+    } finally {
+      setReportDetailLoading(false);
     }
   };
 
@@ -555,6 +589,7 @@ export default function MetaBackfillPage() {
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-emerald-900">Employee</th>
                   <th className="px-3 py-2 text-right font-medium text-emerald-900">Leads Count</th>
+                  <th className="px-3 py-2 text-center font-medium text-emerald-900 w-24">View</th>
                 </tr>
               </thead>
               <tbody>
@@ -562,10 +597,109 @@ export default function MetaBackfillPage() {
                   <tr key={i} className="border-t border-emerald-100">
                     <td className="px-3 py-2">{row.employee}</td>
                     <td className="px-3 py-2 text-right font-medium">{row.leadCount}</td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => openEmployeeLeadDetails(row.employee)}
+                        className="inline-flex items-center justify-center rounded p-1.5 text-emerald-800 hover:bg-emerald-100 disabled:opacity-40 disabled:pointer-events-none"
+                        title="View leads for this employee"
+                        aria-label={`View leads for ${row.employee}`}
+                        disabled={row.leadCount === 0}
+                      >
+                        <Eye className="h-5 w-5" />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {reportDetailOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-detail-title"
+          onClick={() => setReportDetailOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+              <h3 id="report-detail-title" className="text-lg font-semibold text-gray-900">
+                Leads — {reportDetailEmployee}
+                {since && until && (
+                  <span className="text-sm font-normal text-gray-600 ml-2">
+                    ({since} to {until})
+                  </span>
+                )}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setReportDetailOpen(false)}
+                className="rounded p-1 text-gray-600 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="overflow-auto flex-1 p-4">
+              {reportDetailLoading && (
+                <p className="text-sm text-gray-600">Loading...</p>
+              )}
+              {!reportDetailLoading && reportDetailError && (
+                <p className="text-sm text-red-600">{reportDetailError}</p>
+              )}
+              {!reportDetailLoading && !reportDetailError && reportDetailLeads.length === 0 && (
+                <p className="text-sm text-gray-600">No leads in this range for this employee.</p>
+              )}
+              {!reportDetailLoading && !reportDetailError && reportDetailLeads.length > 0 && (
+                <div className="overflow-x-auto border rounded">
+                  <table className="min-w-full text-xs sm:text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-2 py-2 text-left border-b">ID</th>
+                        <th className="px-2 py-2 text-left border-b">Name</th>
+                        <th className="px-2 py-2 text-left border-b">Phone</th>
+                        <th className="px-2 py-2 text-left border-b">Email</th>
+                        <th className="px-2 py-2 text-left border-b">Status</th>
+                        <th className="px-2 py-2 text-left border-b">Stage</th>
+                        <th className="px-2 py-2 text-left border-b">Campaign</th>
+                        <th className="px-2 py-2 text-left border-b">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportDetailLeads.map((lead) => {
+                        const fullName = [lead.first_name, lead.last_name]
+                          .filter(Boolean)
+                          .join(" ")
+                          .trim() || "—";
+                        const created =
+                          lead.date_created != null
+                            ? String(lead.date_created).slice(0, 19).replace("T", " ")
+                            : "—";
+                        return (
+                          <tr key={lead.customer_id} className="border-b border-gray-100">
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.customer_id}</td>
+                            <td className="px-2 py-2">{fullName}</td>
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.phone || "—"}</td>
+                            <td className="px-2 py-2 break-all max-w-[180px]">{lead.email || "—"}</td>
+                            <td className="px-2 py-2">{lead.status || "—"}</td>
+                            <td className="px-2 py-2">{lead.stage || "—"}</td>
+                            <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
