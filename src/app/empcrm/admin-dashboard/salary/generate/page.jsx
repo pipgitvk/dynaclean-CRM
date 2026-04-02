@@ -794,11 +794,42 @@ const GenerateSalaryPage = () => {
                                         0,
                                         (Number(c.lateDays) || 0) - (Number(c.halfDays) || 0)
                                     );
+                                    const presentRegular = Math.max(
+                                        0,
+                                        (Number(c.present) || 0) - (Number(c.halfDays) || 0)
+                                    );
                                     return (
                                         <>
-                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">Present</dt>
-                                                <dd className="font-semibold text-green-600 tabular-nums">{c.present}</dd>
+                                            <div className="border-b border-slate-100 py-1.5">
+                                                <div className="flex justify-between gap-2">
+                                                    <dt className="text-slate-600">Present</dt>
+                                                    <dd className="font-semibold text-green-600 tabular-nums">
+                                                        {c.present}
+                                                    </dd>
+                                                </div>
+                                                <div className="mt-1.5 space-y-1 pl-4 text-xs">
+                                                    <div className="flex justify-between gap-2 text-slate-500">
+                                                        <span>Regular </span>
+                                                        <span className="tabular-nums font-medium text-slate-700">
+                                                            {presentRegular}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between gap-2 text-slate-500">
+                                                        <span>Half day</span>
+                                                        <span className="tabular-nums font-medium text-yellow-600">
+                                                            {c.halfDays}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between gap-2 text-slate-500">
+                                                        <span>Late day</span>
+                                                        <span
+                                                            className="tabular-nums font-medium text-red-600"
+                                                            title="Late days − half days (from attendance rules)"
+                                                        >
+                                                            {lateDaysAdjusted}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Absent</dt>
