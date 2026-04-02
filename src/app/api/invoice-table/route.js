@@ -149,35 +149,25 @@ export async function POST(req) {
 
     // Generate invoice number from DB sequence (no hardcoded segment)
     const now = new Date();
+    // Indian FY: Apr–Mar → e.g. DYN/2026-27/001 (not calendar month like 2026-04)
     const getDefaultPrefix = (date) => {
+      const month = date.getMonth() + 1; // 1–12
       const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      return `DYN/${year}-${month}/`;
+      const startYear = month >= 4 ? year : year - 1;
+      const endYear2Digits = String((startYear + 1) % 100).padStart(2, "0");
+      return `DYN/${startYear}-${endYear2Digits}/`;
     };
-    const defaultPrefix = getDefaultPrefix(now);
     const serverInvoiceDate = invoice_date || now.toISOString().split("T")[0];
+    const dateForPrefix = invoice_date
+      ? new Date(`${String(invoice_date).slice(0, 10)}T12:00:00`)
+      : now;
+    const invoicePrefix = getDefaultPrefix(dateForPrefix);
 
     let attempt = 0;
     let finalInvoiceNumber = "";
     let invoiceId = null;
 
     while (attempt < 5) {
-      // Find latest DYN invoice from DB and continue that prefix
-      const [latestRows] = await conn.execute(
-        `SELECT invoice_number FROM invoices
-         WHERE invoice_number LIKE 'DYN/%'
-         ORDER BY id DESC
-         LIMIT 1`,
-      );
-
-      const latestInvoiceNumber = latestRows?.[0]?.invoice_number || "";
-      let invoicePrefix = defaultPrefix;
-
-      const prefixMatch = latestInvoiceNumber.match(/^(DYN\/\d{4}-\d{2}\/)\d+$/);
-      if (prefixMatch) {
-        invoicePrefix = prefixMatch[1];
-      }
-
       const [existing] = await conn.execute(
         `SELECT invoice_number FROM invoices 
          WHERE invoice_number LIKE ? 
