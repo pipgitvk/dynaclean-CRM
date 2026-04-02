@@ -798,21 +798,13 @@ export default function MetaBackfillPage() {
               <code className="bg-emerald-100/80 px-1 rounded">assigned_to</code> matches).
             </span> */}
           </div>
-          
-        </div>
-      )}
-       <h2 className="font-medium mb-2 text-emerald-900">
-          Assigned To ({leadsReport.from} to {leadsReport.to})
-          </h2>
-      <div className="overflow-x-auto border rounded bg-white">
-         
-            <table className="min-w-full text-sm">
-              
-              
-              
 
+          <h2 className="font-medium mb-2 text-emerald-900 mt-4">
+            Assigned To ({leadsReport.from} to {leadsReport.to})
+          </h2>
+          <div className="overflow-x-auto border rounded bg-white">
+            <table className="min-w-full text-sm">
               <thead className="bg-emerald-100">
-                
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-emerald-900">Employee</th>
                   <th className="px-3 py-2 text-right font-medium text-emerald-900">Leads Count</th>
@@ -825,26 +817,28 @@ export default function MetaBackfillPage() {
                     (row) => String(row.employee ?? "").toLowerCase() !== "harsh_m"
                   )
                   .map((row, i) => (
-                  <tr key={i} className="border-t border-emerald-100">
-                    <td className="px-3 py-2">{row.employee}</td>
-                    <td className="px-3 py-2 text-right font-medium">{row.leadCount}</td>
-                    <td className="px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => openEmployeeLeadDetails(row.employee)}
-                        className="inline-flex items-center justify-center rounded p-1.5 text-emerald-800 hover:bg-emerald-100 disabled:opacity-40 disabled:pointer-events-none"
-                        title="View leads for this employee"
-                        aria-label={`View leads for ${row.employee}`}
-                        disabled={row.leadCount === 0}
-                      >
-                        <Eye className="h-5 w-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                    <tr key={i} className="border-t border-emerald-100">
+                      <td className="px-3 py-2">{row.employee}</td>
+                      <td className="px-3 py-2 text-right font-medium">{row.leadCount}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => openEmployeeLeadDetails(row.employee)}
+                          className="inline-flex items-center justify-center rounded p-1.5 text-emerald-800 hover:bg-emerald-100 disabled:opacity-40 disabled:pointer-events-none"
+                          title="View leads for this employee"
+                          aria-label={`View leads for ${row.employee}`}
+                          disabled={row.leadCount === 0}
+                        >
+                          <Eye className="h-5 w-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
+        </div>
+      )}
 
       {assignerDetailOpen && assignerDetailName != null && (
         <div
