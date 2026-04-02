@@ -1,6 +1,7 @@
 /**
  * GET /api/meta-backfill/leads-report?from=YYYY-MM-DD&to=YYYY-MM-DD
- * Returns: leads count per employee (assigned_to) + total leads in date range
+ * Returns: leads count per employee (receiver), total, byAssigner (raw assigned_to:
+ * Automatic vs manual name), byCampaignAndAssigner (lead_campaign bucket × assigner).
  */
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
@@ -75,12 +76,76 @@ export async function GET(request) {
 
     const total = totalResult[0]?.total ?? 0;
 
+    // Raw customers.assigned_to: Automatic vs manual assigner name (same semantics as CRM column)
+    const [byAssignerRows] = await conn.execute(
+      `SELECT assigner_label, COUNT(*) AS lead_count
+       FROM (
+         SELECT
+           CASE
+             WHEN assigned_to IS NULL OR TRIM(assigned_to) = ''
+               OR LOWER(TRIM(assigned_to)) = 'automatic'
+             THEN 'Automatic'
+             ELSE TRIM(assigned_to)
+           END AS assigner_label
+         FROM customers
+         WHERE DATE(date_created) BETWEEN ? AND ?
+       ) t
+       GROUP BY assigner_label
+       ORDER BY
+         CASE WHEN assigner_label = 'Automatic' THEN 0 ELSE 1 END,
+         lead_count DESC,
+         assigner_label ASC`,
+      [from, to]
+    );
+
+    const byAssigner = byAssignerRows.map((r) => ({
+      assigner: r.assigner_label,
+      leadCount: Number(r.lead_count),
+    }));
+
+    // Campaign/source × assigner (lead_campaign bucket × assigned_to label)
+    const [byCampaignAssignerRows] = await conn.execute(
+      `SELECT campaign_bucket, assigner_label, COUNT(*) AS lead_count
+       FROM (
+         SELECT
+           CASE
+             WHEN assigned_to IS NULL OR TRIM(assigned_to) = ''
+               OR LOWER(TRIM(assigned_to)) = 'automatic'
+             THEN 'Automatic'
+             ELSE TRIM(assigned_to)
+           END AS assigner_label,
+           CASE
+             WHEN lead_campaign IS NULL OR TRIM(lead_campaign) = '' THEN 'other'
+             WHEN LOWER(REPLACE(REPLACE(TRIM(lead_campaign), ' ', '_'), '-', '_'))
+               IN ('social_media', 'socialmedia') THEN 'social_media'
+             WHEN LOWER(REPLACE(REPLACE(TRIM(lead_campaign), ' ', '_'), '-', '_'))
+               IN ('google', 'google_ads', 'googleads') THEN 'google'
+             WHEN LOWER(REPLACE(REPLACE(TRIM(lead_campaign), ' ', '_'), '-', '_'))
+               IN ('indiamart', 'india_mart', 'india-mart') THEN 'indiamart'
+             ELSE 'other'
+           END AS campaign_bucket
+         FROM customers
+         WHERE DATE(date_created) BETWEEN ? AND ?
+       ) x
+       GROUP BY campaign_bucket, assigner_label
+       ORDER BY campaign_bucket ASC, assigner_label ASC`,
+      [from, to]
+    );
+
+    const byCampaignAndAssigner = byCampaignAssignerRows.map((r) => ({
+      campaign: r.campaign_bucket,
+      assigner: r.assigner_label,
+      leadCount: Number(r.lead_count),
+    }));
+
     return NextResponse.json({
       success: true,
       from,
       to,
       total,
       byEmployee: byEmployeeFull,
+      byAssigner,
+      byCampaignAndAssigner,
     });
   } catch (err) {
     console.error("/api/meta-backfill/leads-report error:", err);

@@ -79,6 +79,29 @@ export default function MetaBackfillPage() {
   const [assignedByLeads, setAssignedByLeads] = useState([]);
   const [assignedByLoading, setAssignedByLoading] = useState(false);
   const [assignedByError, setAssignedByError] = useState("");
+  const [assignerSourceOpen, setAssignerSourceOpen] = useState(false);
+  const [assignerSourceFor, setAssignerSourceFor] = useState(null);
+
+  /** Per assigned_to row: counts by lead_campaign bucket (from API byCampaignAndAssigner) */
+  const assignerCampaignBreakdown = useMemo(() => {
+    const map = new Map();
+    const rows = leadsReport?.byCampaignAndAssigner;
+    if (!rows?.length) return map;
+    for (const r of rows) {
+      const key = r.assigner;
+      if (!map.has(key)) {
+        map.set(key, { social_media: 0, google: 0, indiamart: 0, other: 0 });
+      }
+      const b = map.get(key);
+      const n = Number(r.leadCount) || 0;
+      const c = r.campaign;
+      if (c === "social_media") b.social_media += n;
+      else if (c === "google") b.google += n;
+      else if (c === "indiamart") b.indiamart += n;
+      else b.other += n;
+    }
+    return map;
+  }, [leadsReport?.byCampaignAndAssigner]);
 
   const assignedByCampaignTotals = useMemo(() => {
     const totals = { social_media: 0, indiamart: 0, google: 0 };
@@ -652,13 +675,92 @@ export default function MetaBackfillPage() {
           <h2 className="font-medium mb-2 text-emerald-900">
             Leads Report ({leadsReport.from} to {leadsReport.to})
           </h2>
-          <p className="text-sm text-emerald-800 mb-1">
-            <strong>Total leads:</strong> {leadsReportBreakdown.grand}
-          </p>
-          <p className="text-xs text-emerald-800/85 mb-3">
-            Employees (in table) + harsh_M: {leadsReportBreakdown.visible} +{" "}
-            {leadsReportBreakdown.harsh} = {leadsReportBreakdown.grand}
-          </p>
+          <div className="flex flex-wrap gap-4 items-start mb-3">
+            <div className="min-w-0">
+              <p className="text-sm text-emerald-800 mb-1">
+                <strong>Total leads:</strong> {leadsReportBreakdown.grand}
+              </p>
+              <p className="text-xs text-emerald-800/85">
+                Employees (in table) + harsh_M: {leadsReportBreakdown.visible} +{" "}
+                {leadsReportBreakdown.harsh} = {leadsReportBreakdown.grand}
+              </p>
+            </div>
+            {Array.isArray(leadsReport.byAssigner) && leadsReport.byAssigner.length > 0 && (
+              <div className="border border-emerald-200 rounded-lg overflow-hidden bg-white text-sm shrink-0">
+                <table className="min-w-[280px]">
+                  <thead className="bg-emerald-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-emerald-900">
+                        assigned_to
+                      </th>
+                      <th className="px-3 py-2 text-right font-medium text-emerald-900 whitespace-nowrap">
+                        Total
+                      </th>
+                      <th className="px-3 py-2 text-center font-medium text-emerald-900 w-14">
+                        View
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leadsReport.byAssigner.map((row, i) => (
+                      <tr key={`${row.assigner}-${i}`} className="border-t border-emerald-100">
+                        <td className="px-3 py-1.5 text-emerald-950">{row.assigner}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums font-medium">
+                          {row.leadCount}
+                        </td>
+                        <td className="px-3 py-1.5 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAssignerSourceFor(row.assigner);
+                              setAssignerSourceOpen(true);
+                            }}
+                            className="inline-flex items-center justify-center rounded p-1.5 text-emerald-800 hover:bg-emerald-100"
+                            title="View by source (social / Google / Indiamart)"
+                            aria-label={`Source breakdown for ${row.assigner}`}
+                          >
+                            <Eye className="h-5 w-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {/* <p className="px-3 py-1.5 text-[11px] text-emerald-800/80 border-t border-emerald-100 bg-emerald-50/50">
+                  Automatic = system-assigned; other rows = who assigned or added the lead (
+                  <code className="bg-emerald-100/80 px-0.5 rounded">assigned_to</code>).
+                </p> */}
+              </div>
+            )}
+          </div>
+          {Array.isArray(leadsReport.byCampaignAndAssigner) &&
+            leadsReport.byCampaignAndAssigner.length > 0 && (
+              <div className="mb-3 overflow-x-auto border border-emerald-200 rounded-lg bg-white">
+                <p className="px-3 py-2 text-xs font-medium text-emerald-900 bg-emerald-50/80 border-b border-emerald-100">
+                  By source (campaign) &amp; assigned_to
+                </p>
+                <table className="min-w-full text-sm">
+                  <thead className="bg-emerald-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-emerald-900">Source</th>
+                      <th className="px-3 py-2 text-left font-medium text-emerald-900">Assigned-By</th>
+                      <th className="px-3 py-2 text-right font-medium text-emerald-900">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leadsReport.byCampaignAndAssigner.map((row, i) => (
+                      <tr key={`${row.campaign}-${row.assigner}-${i}`} className="border-t border-emerald-100">
+                        <td className="px-3 py-1.5">{row.campaign}</td>
+                        <td className="px-3 py-1.5">{row.assigner}</td>
+                        <td className="px-3 py-1.5 text-right tabular-nums font-medium">
+                          {row.leadCount}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
             <span className="font-medium text-emerald-900">assigned_by</span>
             <span
@@ -714,6 +816,79 @@ export default function MetaBackfillPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {assignerSourceOpen && assignerSourceFor != null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="assigner-source-title"
+          onClick={() => setAssignerSourceOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-md w-full flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+              <h3 id="assigner-source-title" className="text-lg font-semibold text-gray-900">
+                By source — {assignerSourceFor}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAssignerSourceOpen(false)}
+                className="rounded p-1 text-gray-600 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              {since && until && (
+                <p className="text-xs text-gray-600 mb-3">
+                  Range: {since} to {until} · From lead_campaign (social / Google / Indiamart)
+                </p>
+              )}
+              {!leadsReport?.byCampaignAndAssigner?.length ? (
+                <p className="text-sm text-gray-600">No source breakdown for this range.</p>
+              ) : (
+                <table className="w-full text-sm border rounded overflow-hidden">
+                  <thead className="bg-emerald-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium text-emerald-900">Source</th>
+                      <th className="px-3 py-2 text-right font-medium text-emerald-900">Leads</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const d =
+                        assignerCampaignBreakdown.get(assignerSourceFor) ?? {
+                          social_media: 0,
+                          google: 0,
+                          indiamart: 0,
+                          other: 0,
+                        };
+                      const rows = [
+                        { label: "Social media", key: "social_media", n: d.social_media },
+                        { label: "Google", key: "google", n: d.google },
+                        { label: "Indiamart", key: "indiamart", n: d.indiamart },
+                      ];
+                      if (d.other > 0) {
+                        rows.push({ label: "Other", key: "other", n: d.other });
+                      }
+                      return rows.map((r) => (
+                        <tr key={r.key} className="border-t border-emerald-100">
+                          <td className="px-3 py-2">{r.label}</td>
+                          <td className="px-3 py-2 text-right tabular-nums font-medium">{r.n}</td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       )}
