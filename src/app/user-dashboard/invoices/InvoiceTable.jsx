@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import InvoiceEditModal from "@/app/admin-dashboard/invoices/InvoiceEditModal";
 
 export default function InvoiceTable() {
   const [invoices, setInvoices] = useState([]);
@@ -24,6 +25,7 @@ export default function InvoiceTable() {
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
   const [fetchError, setFetchError] = useState(null);
+  const [editId, setEditId] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -203,12 +205,21 @@ export default function InvoiceTable() {
                     {new Date(i.created_at).toLocaleDateString("en-IN")}
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <Link
-                      href={`/admin-dashboard/invoices/${encodeURIComponent(i.invoice_number)}`}
-                      className="bg-green-600 text-white px-3 py-1 rounded"
-                    >
-                      View
-                    </Link>
+                    <div className="flex flex-wrap items-center justify-center gap-1.5">
+                      <Link
+                        href={`/user-dashboard/invoices/${encodeURIComponent(i.invoice_number)}`}
+                        className="bg-green-600 text-white px-3 py-1 rounded inline-block"
+                      >
+                        View
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setEditId(i.id)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -236,6 +247,16 @@ export default function InvoiceTable() {
             </button>
           ))}
         </div>
+      )}
+
+      {editId != null && (
+        <InvoiceEditModal
+          open
+          invoiceId={editId}
+          onClose={() => setEditId(null)}
+          onSaved={fetchData}
+          viewHrefBase="/user-dashboard/invoices"
+        />
       )}
     </div>
   );
