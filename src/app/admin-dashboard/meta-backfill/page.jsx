@@ -79,8 +79,11 @@ export default function MetaBackfillPage() {
   const [assignedByLeads, setAssignedByLeads] = useState([]);
   const [assignedByLoading, setAssignedByLoading] = useState(false);
   const [assignedByError, setAssignedByError] = useState("");
-  const [assignerSourceOpen, setAssignerSourceOpen] = useState(false);
-  const [assignerSourceFor, setAssignerSourceFor] = useState(null);
+  const [assignerDetailOpen, setAssignerDetailOpen] = useState(false);
+  const [assignerDetailName, setAssignerDetailName] = useState(null);
+  const [assignerDetailLeads, setAssignerDetailLeads] = useState([]);
+  const [assignerDetailLoading, setAssignerDetailLoading] = useState(false);
+  const [assignerDetailError, setAssignerDetailError] = useState("");
 
   /** Per assigned_to row: counts by lead_campaign bucket (from API byCampaignAndAssigner) */
   const assignerCampaignBreakdown = useMemo(() => {
@@ -266,6 +269,34 @@ export default function MetaBackfillPage() {
       setMessage("Error fetching leads report");
     } finally {
       setLeadsReportLoading(false);
+    }
+  };
+
+  const openAssignerLeadDetails = async (assignerLabel) => {
+    if (!since || !until) return;
+    setAssignerDetailName(assignerLabel);
+    setAssignerDetailLeads([]);
+    setAssignerDetailError("");
+    setAssignerDetailOpen(true);
+    setAssignerDetailLoading(true);
+    try {
+      const q = new URLSearchParams({
+        from: since,
+        to: until,
+        assigner: assignerLabel,
+      });
+      const res = await fetch(`/api/meta-backfill/leads-report/by-assigner?${q.toString()}`);
+      const data = await res.json();
+      if (!res.ok) {
+        setAssignerDetailError(data?.error || "Failed to load leads");
+        return;
+      }
+      setAssignerDetailLeads(data.leads || []);
+    } catch (err) {
+      console.error(err);
+      setAssignerDetailError("Error loading leads");
+    } finally {
+      setAssignerDetailLoading(false);
     }
   };
 
@@ -673,25 +704,19 @@ export default function MetaBackfillPage() {
       {leadsReport && (
         <div className="border rounded-lg p-4 bg-emerald-50/50 border-emerald-200">
           <h2 className="font-medium mb-2 text-emerald-900">
-            Leads Report ({leadsReport.from} to {leadsReport.to})
+        Assigned By ({leadsReport.from} to {leadsReport.to})
           </h2>
-          <div className="flex flex-wrap gap-4 items-start mb-3">
-            <div className="min-w-0">
-              <p className="text-sm text-emerald-800 mb-1">
-                <strong>Total leads:</strong> {leadsReportBreakdown.grand}
-              </p>
-              <p className="text-xs text-emerald-800/85">
-                Employees (in table) + harsh_M: {leadsReportBreakdown.visible} +{" "}
-                {leadsReportBreakdown.harsh} = {leadsReportBreakdown.grand}
-              </p>
-            </div>
+          <p className="text-sm text-emerald-800 mb-3">
+            <strong>Total Leads Added :</strong> {leadsReportBreakdown.grand}
+          </p>
+          <div className="flex flex-col lg:flex-row gap-4 items-stretch mb-3">
             {Array.isArray(leadsReport.byAssigner) && leadsReport.byAssigner.length > 0 && (
-              <div className="border border-emerald-200 rounded-lg overflow-hidden bg-white text-sm shrink-0">
-                <table className="min-w-[280px]">
+              <div className="border border-emerald-200 rounded-lg overflow-hidden bg-white text-sm shrink-0 lg:max-w-md w-full">
+                <table className="min-w-[280px] w-full">
                   <thead className="bg-emerald-100">
                     <tr>
                       <th className="px-3 py-2 text-left font-medium text-emerald-900">
-                        assigned_to
+                        Added By
                       </th>
                       <th className="px-3 py-2 text-right font-medium text-emerald-900 whitespace-nowrap">
                         Total
@@ -711,13 +736,10 @@ export default function MetaBackfillPage() {
                         <td className="px-3 py-1.5 text-center">
                           <button
                             type="button"
-                            onClick={() => {
-                              setAssignerSourceFor(row.assigner);
-                              setAssignerSourceOpen(true);
-                            }}
+                            onClick={() => openAssignerLeadDetails(row.assigner)}
                             className="inline-flex items-center justify-center rounded p-1.5 text-emerald-800 hover:bg-emerald-100"
-                            title="View by source (social / Google / Indiamart)"
-                            aria-label={`Source breakdown for ${row.assigner}`}
+                            title="View all leads for this assigned_to"
+                            aria-label={`View leads for ${row.assigner}`}
                           >
                             <Eye className="h-5 w-5" />
                           </button>
@@ -726,43 +748,37 @@ export default function MetaBackfillPage() {
                     ))}
                   </tbody>
                 </table>
-                {/* <p className="px-3 py-1.5 text-[11px] text-emerald-800/80 border-t border-emerald-100 bg-emerald-50/50">
-                  Automatic = system-assigned; other rows = who assigned or added the lead (
-                  <code className="bg-emerald-100/80 px-0.5 rounded">assigned_to</code>).
-                </p> */}
               </div>
             )}
-          </div>
-          {Array.isArray(leadsReport.byCampaignAndAssigner) &&
-            leadsReport.byCampaignAndAssigner.length > 0 && (
-              <div className="mb-3 overflow-x-auto border border-emerald-200 rounded-lg bg-white">
-                <p className="px-3 py-2 text-xs font-medium text-emerald-900 bg-emerald-50/80 border-b border-emerald-100">
-                  By source (campaign) &amp; assigned_to
-                </p>
-                <table className="min-w-full text-sm">
-                  <thead className="bg-emerald-100">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium text-emerald-900">Source</th>
-                      <th className="px-3 py-2 text-left font-medium text-emerald-900">Assigned-By</th>
-                      <th className="px-3 py-2 text-right font-medium text-emerald-900">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leadsReport.byCampaignAndAssigner.map((row, i) => (
-                      <tr key={`${row.campaign}-${row.assigner}-${i}`} className="border-t border-emerald-100">
-                        <td className="px-3 py-1.5">{row.campaign}</td>
-                        <td className="px-3 py-1.5">{row.assigner}</td>
-                        <td className="px-3 py-1.5 text-right tabular-nums font-medium">
-                          {row.leadCount}
-                        </td>
+            {Array.isArray(leadsReport.byCampaignAndAssigner) &&
+              leadsReport.byCampaignAndAssigner.length > 0 && (
+                <div className="flex-1 min-w-0 overflow-x-auto border border-emerald-200 rounded-lg bg-white">
+                
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-emerald-100">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-emerald-900">Source</th>
+                        <th className="px-3 py-2 text-left font-medium text-emerald-900">Assigned-By</th>
+                        <th className="px-3 py-2 text-right font-medium text-emerald-900">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {leadsReport.byCampaignAndAssigner.map((row, i) => (
+                        <tr key={`${row.campaign}-${row.assigner}-${i}`} className="border-t border-emerald-100">
+                          <td className="px-3 py-1.5">{row.campaign}</td>
+                          <td className="px-3 py-1.5">{row.assigner}</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums font-medium">
+                            {row.leadCount}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+          </div>
           <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
-            <span className="font-medium text-emerald-900">assigned_by</span>
+            {/* <span className="font-medium text-emerald-900">assigned_by</span>
             <span
               className="inline-flex items-center border border-emerald-200 rounded px-2 py-1 bg-emerald-50/80 text-emerald-950 font-medium tabular-nums"
               aria-label="Assigner (fixed)"
@@ -776,15 +792,27 @@ export default function MetaBackfillPage() {
               className="px-3 py-1 rounded bg-teal-700 text-white text-sm hover:bg-teal-800 disabled:opacity-50"
             >
               View
-            </button>
+            </button> */}
             {/* <span className="text-xs text-emerald-800/90 max-w-md">
               Shows leads assigned or added by this user (where{" "}
               <code className="bg-emerald-100/80 px-1 rounded">assigned_to</code> matches).
             </span> */}
           </div>
-          <div className="overflow-x-auto border rounded bg-white">
+          
+        </div>
+      )}
+       <h2 className="font-medium mb-2 text-emerald-900">
+          Assigned To ({leadsReport.from} to {leadsReport.to})
+          </h2>
+      <div className="overflow-x-auto border rounded bg-white">
+         
             <table className="min-w-full text-sm">
+              
+              
+              
+
               <thead className="bg-emerald-100">
+                
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-emerald-900">Employee</th>
                   <th className="px-3 py-2 text-right font-medium text-emerald-900">Leads Count</th>
@@ -817,76 +845,124 @@ export default function MetaBackfillPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
 
-      {assignerSourceOpen && assignerSourceFor != null && (
+      {assignerDetailOpen && assignerDetailName != null && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="assigner-source-title"
-          onClick={() => setAssignerSourceOpen(false)}
+          aria-labelledby="assigner-detail-title"
+          onClick={() => setAssignerDetailOpen(false)}
         >
           <div
-            className="bg-white rounded-lg shadow-xl max-w-md w-full flex flex-col"
+            className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-              <h3 id="assigner-source-title" className="text-lg font-semibold text-gray-900">
-                By source — {assignerSourceFor}
-              </h3>
+              <div>
+                <h3 id="assigner-detail-title" className="text-lg font-semibold text-gray-900">
+                  assigned_to — {assignerDetailName}
+                </h3>
+                {since && until && (
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    {since} to {until} · Loaded: {assignerDetailLeads.length}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
-                onClick={() => setAssignerSourceOpen(false)}
+                onClick={() => setAssignerDetailOpen(false)}
                 className="rounded p-1 text-gray-600 hover:bg-gray-100"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-4">
-              {since && until && (
-                <p className="text-xs text-gray-600 mb-3">
-                  Range: {since} to {until} · From lead_campaign (social / Google / Indiamart)
-                </p>
+            <div className="overflow-auto flex-1 p-4">
+              {leadsReport?.byCampaignAndAssigner?.length > 0 && assignerDetailName && (
+                <div className="mb-4 flex flex-wrap gap-4 text-sm border border-emerald-100 rounded-lg bg-emerald-50/50 p-3">
+                  <span className="font-medium text-emerald-900">By campaign (lead_campaign):</span>
+                  {(() => {
+                    const d =
+                      assignerCampaignBreakdown.get(assignerDetailName) ?? {
+                        social_media: 0,
+                        google: 0,
+                        indiamart: 0,
+                        other: 0,
+                      };
+                    return (
+                      <>
+                        <span>
+                          Social media: <strong className="tabular-nums">{d.social_media}</strong>
+                        </span>
+                        <span>
+                          Google: <strong className="tabular-nums">{d.google}</strong>
+                        </span>
+                        <span>
+                          Indiamart: <strong className="tabular-nums">{d.indiamart}</strong>
+                        </span>
+                        {d.other > 0 && (
+                          <span>
+                            Other: <strong className="tabular-nums">{d.other}</strong>
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
               )}
-              {!leadsReport?.byCampaignAndAssigner?.length ? (
-                <p className="text-sm text-gray-600">No source breakdown for this range.</p>
-              ) : (
-                <table className="w-full text-sm border rounded overflow-hidden">
-                  <thead className="bg-emerald-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium text-emerald-900">Source</th>
-                      <th className="px-3 py-2 text-right font-medium text-emerald-900">Leads</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(() => {
-                      const d =
-                        assignerCampaignBreakdown.get(assignerSourceFor) ?? {
-                          social_media: 0,
-                          google: 0,
-                          indiamart: 0,
-                          other: 0,
-                        };
-                      const rows = [
-                        { label: "Social media", key: "social_media", n: d.social_media },
-                        { label: "Google", key: "google", n: d.google },
-                        { label: "Indiamart", key: "indiamart", n: d.indiamart },
-                      ];
-                      if (d.other > 0) {
-                        rows.push({ label: "Other", key: "other", n: d.other });
-                      }
-                      return rows.map((r) => (
-                        <tr key={r.key} className="border-t border-emerald-100">
-                          <td className="px-3 py-2">{r.label}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-medium">{r.n}</td>
-                        </tr>
-                      ));
-                    })()}
-                  </tbody>
-                </table>
+              {assignerDetailLoading && (
+                <p className="text-sm text-gray-600">Loading...</p>
+              )}
+              {!assignerDetailLoading && assignerDetailError && (
+                <p className="text-sm text-red-600">{assignerDetailError}</p>
+              )}
+              {!assignerDetailLoading && !assignerDetailError && assignerDetailLeads.length === 0 && (
+                <p className="text-sm text-gray-600">No leads in this range for this assigned_to.</p>
+              )}
+              {!assignerDetailLoading && !assignerDetailError && assignerDetailLeads.length > 0 && (
+                <div className="overflow-x-auto border rounded">
+                  <table className="min-w-full text-xs sm:text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-2 py-2 text-left border-b">ID</th>
+                        <th className="px-2 py-2 text-left border-b">Name</th>
+                        <th className="px-2 py-2 text-left border-b">Phone</th>
+                        <th className="px-2 py-2 text-left border-b">Email</th>
+                        <th className="px-2 py-2 text-left border-b">Status</th>
+                        <th className="px-2 py-2 text-left border-b">Stage</th>
+                        <th className="px-2 py-2 text-left border-b">Campaign</th>
+                        <th className="px-2 py-2 text-left border-b">assigned_to</th>
+                        <th className="px-2 py-2 text-left border-b">Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assignerDetailLeads.map((lead) => {
+                        const fullName = [lead.first_name, lead.last_name]
+                          .filter(Boolean)
+                          .join(" ")
+                          .trim() || "—";
+                        const created =
+                          lead.date_created != null
+                            ? String(lead.date_created).slice(0, 19).replace("T", " ")
+                            : "—";
+                        return (
+                          <tr key={lead.customer_id} className="border-b border-gray-100">
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.customer_id}</td>
+                            <td className="px-2 py-2">{fullName}</td>
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.phone || "—"}</td>
+                            <td className="px-2 py-2 break-all max-w-[180px]">{lead.email || "—"}</td>
+                            <td className="px-2 py-2">{lead.status || "—"}</td>
+                            <td className="px-2 py-2">{lead.stage || "—"}</td>
+                            <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.assigned_to || "—"}</td>
+                            <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
@@ -1046,7 +1122,7 @@ export default function MetaBackfillPage() {
                         <th className="px-2 py-2 text-left border-b">Email</th>
                         <th className="px-2 py-2 text-left border-b">lead_source</th>
                         <th className="px-2 py-2 text-left border-b">sales_representative</th>
-                        <th className="px-2 py-2 text-left border-b">assigned_to</th>
+                        {/* <th className="px-2 py-2 text-left border-b">Added By</th> */}
                         <th className="px-2 py-2 text-left border-b">Status</th>
                         <th className="px-2 py-2 text-left border-b">Stage</th>
                         <th className="px-2 py-2 text-left border-b">Campaign</th>
