@@ -178,7 +178,7 @@ export default function InvoiceEditModal({
     return () => {
       cancelled = true;
     };
-  }, [open, invoiceId, onClose]);
+  }, [open, invoiceId]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -305,10 +305,11 @@ export default function InvoiceEditModal({
                 <div>
                   <label className="block text-gray-600 mb-1">Invoice no.</label>
                   <input
-                    className="w-full border rounded px-2 py-1.5"
+                    readOnly
+                    tabIndex={-1}
+                    className="w-full border rounded px-2 py-1.5 bg-gray-100 text-gray-800 cursor-default"
                     value={invoiceNumber}
-                    onChange={(e) => setInvoiceNumber(e.target.value)}
-                    required
+                    title="Invoice number cannot be changed"
                   />
                 </div>
                 <div>
