@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "node --no-deprecation ./node_modules/next/dist/bin/next dev --turbopack",
     "migrate:salary-structure": "node scripts/migrate-salary-structure-columns.js",
+    "migrate:profile-submission-reassign": "node scripts/migrate-profile-submission-reassign-columns.js",
+    "migrate:profile-submission-status": "node scripts/migrate-profile-submission-status-varchar.js",
     "build": "next build",
     "start": "node --no-deprecation ./node_modules/next/dist/bin/next start -p 3001",
     "lint": "next lint"

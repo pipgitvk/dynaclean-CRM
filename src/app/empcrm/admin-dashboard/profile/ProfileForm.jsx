@@ -9,8 +9,29 @@ import EducationSection from "./sections/EducationSection";
 import ExperienceSection from "./sections/ExperienceSection";
 import DocumentsSection from "./sections/DocumentsSection";
 import ReferencesSection from "./sections/ReferencesSection";
+import {
+  isReassignFieldMode,
+  shouldShowPersonalBlock,
+  shouldShowBankingBlock,
+  shouldShowEducationSection,
+  shouldShowExperienceSection,
+  shouldShowReferencesSection,
+  shouldShowDocumentsSection,
+} from "@/lib/reassignFieldVisibility";
+import { labelForReassignKey } from "@/lib/profileReassignFields";
 
-export default function ProfileForm({ username, empId, entryMode, onBack, submitTo, isPrivilegedEditor = true, initialData = null, reviewMode = false }) {
+export default function ProfileForm({
+  username,
+  empId,
+  entryMode,
+  onBack,
+  submitTo,
+  isPrivilegedEditor = true,
+  initialData = null,
+  reviewMode = false,
+  resubmitSubmissionId = null,
+  reassignFieldKeys = null,
+}) {
   const [loading, setLoading] = useState(false);
   const [isExperienced, setIsExperienced] = useState(false);
 
@@ -174,34 +195,13 @@ export default function ProfileForm({ username, empId, entryMode, onBack, submit
     }
   };
 
-  const validateForm = () => {
-    // 1. Check References
-    if (references.length < 3) {
-      toast.error("Please provide at least 3 Reference Verification Details.");
-      return false;
-    }
-    for (const ref of references) {
-      if (!ref.name || !ref.contact || !ref.address || !ref.relationship) {
-        toast.error("Please complete all details for references.");
-        return false;
-      }
-    }
-
-    // 2. Check Mandatory Documents
+  const validateMandatoryDocumentsAndPhotos = () => {
     const MANDATORY_KEYS = [
       "doc_pan_card",
       "doc_aadhaar_card",
       "doc_electricity_bill",
       "doc_10th_certificate",
-      "doc_12th_certificate"
-      // "doc_degree_diploma",
-      // "doc_loi_appointment",
-      // "doc_joining_form",
-      // "doc_emp_verification",
-      // "doc_code_conduct",
-      // "doc_cancelled_cheque",
-      // "doc_nda",
-      // "doc_company_policy"
+      "doc_12th_certificate",
     ];
 
     if (isExperienced) {
@@ -213,25 +213,18 @@ export default function ProfileForm({ username, empId, entryMode, onBack, submit
       );
     }
 
-    const missingDocs = MANDATORY_KEYS.filter(key => !documents[key]);
+    const missingDocs = MANDATORY_KEYS.filter((key) => !documents[key]);
     if (missingDocs.length > 0) {
       toast.error(`Missing mandatory documents: ${missingDocs.length} required documents not selected.`);
-      // Optionally list them: 
-      // toast.error(`Missing: ${missingDocs.join(", ")}`);
       return false;
     }
 
-    // 3. Check Files for Selected Docs (if selected but not uploaded AND not previously existing)
-    // Since we don't track which doc is "previously existing" reliably by key (documents[key] = true/false),
-    // we rely on documents[key] being true.
-    // If documents[key] is TRUE, we assume it's fine. 
-    // Ideally we should check if (documents[key] === true && !files[key] && !serverHasIt).
-    // Taking a lenient approach: if checked, assume valid unless we want to force upload.
-    // But we DO want to force upload for mandatory if they are not already there.
-    // We will assume if it came from DB (fetchExistingProfile), it's verified.
+    const ebType = documents.electricity_bill_proof_type;
+    if (ebType !== "current" && ebType !== "permanent") {
+      toast.error("Select whether the electricity bill is for Current or Permanent address.");
+      return false;
+    }
 
-    // 4. Check Photos/Signature
-    // If no file and no URL from DB, error.
     const hasProtoPhoto = files.profile_photo || formData.profile_photo;
     const hasSignature = files.signature || formData.signature;
 
@@ -242,6 +235,142 @@ export default function ProfileForm({ username, empId, entryMode, onBack, submit
     if (!hasSignature) {
       toast.error("Signature is required.");
       return false;
+    }
+
+    return true;
+  };
+
+  const validateReassignForm = () => {
+    const keys = reassignFieldKeys;
+    if (!keys?.length) return true;
+
+    for (const key of keys) {
+      if (key === "section_references") {
+        if (references.length < 3) {
+          toast.error("Please provide at least 3 Reference Verification Details.");
+          return false;
+        }
+        for (const ref of references) {
+          if (
+            !ref.name?.trim() ||
+            !ref.contact?.trim() ||
+            !ref.address?.trim() ||
+            (ref.relationship !== "neighbours" && ref.relationship !== "relation")
+          ) {
+            toast.error("Please complete all details for references, including Relationship (Neighbours or Relation).");
+            return false;
+          }
+        }
+      } else if (key === "section_documents") {
+        if (!validateMandatoryDocumentsAndPhotos()) return false;
+      } else if (key === "section_education") {
+        if (!education?.length) {
+          toast.error("Add at least one education qualification.");
+          return false;
+        }
+        for (const edu of education) {
+          if (
+            !edu.exam_name?.trim() ||
+            !edu.board_university?.trim() ||
+            !edu.year_of_passing?.trim() ||
+            !edu.grade_percentage?.trim()
+          ) {
+            toast.error("Please complete all fields in each education row.");
+            return false;
+          }
+        }
+      } else if (key === "section_experience") {
+        if (!isExperienced) continue;
+        if (!experience?.length) {
+          toast.error("Add at least one work experience entry.");
+          return false;
+        }
+        for (const exp of experience) {
+          if (
+            !exp.company_name?.trim() ||
+            !exp.designation?.trim() ||
+            !exp.period_from ||
+            !exp.period_to ||
+            !exp.reason_for_leaving?.trim()
+          ) {
+            toast.error("Please complete all fields in each experience row.");
+            return false;
+          }
+        }
+      }
+    }
+
+    const granular = keys.filter((k) => !k.startsWith("section_"));
+    for (const k of granular) {
+      if (k === "is_experienced") continue;
+      const v = formData[k];
+      if (v == null || String(v).trim() === "") {
+        toast.error(`${labelForReassignKey(k)} is required.`);
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const validateForm = () => {
+    if (isReassignFieldMode(reassignFieldKeys)) {
+      return validateReassignForm();
+    }
+
+    if (references.length < 3) {
+      toast.error("Please provide at least 3 Reference Verification Details.");
+      return false;
+    }
+    for (const ref of references) {
+      if (
+        !ref.name?.trim() ||
+        !ref.contact?.trim() ||
+        !ref.address?.trim() ||
+        (ref.relationship !== "neighbours" && ref.relationship !== "relation")
+      ) {
+        toast.error("Please complete all details for references, including Relationship (Neighbours or Relation).");
+        return false;
+      }
+    }
+
+    if (!education?.length) {
+      toast.error("Add at least one education qualification.");
+      return false;
+    }
+    for (const edu of education) {
+      if (
+        !edu.exam_name?.trim() ||
+        !edu.board_university?.trim() ||
+        !edu.year_of_passing?.trim() ||
+        !edu.grade_percentage?.trim()
+      ) {
+        toast.error("Please complete all fields in each education row.");
+        return false;
+      }
+    }
+
+    if (!validateMandatoryDocumentsAndPhotos()) {
+      return false;
+    }
+
+    if (isExperienced) {
+      if (!experience?.length) {
+        toast.error("Add at least one work experience entry.");
+        return false;
+      }
+      for (const exp of experience) {
+        if (
+          !exp.company_name?.trim() ||
+          !exp.designation?.trim() ||
+          !exp.period_from ||
+          !exp.period_to ||
+          !exp.reason_for_leaving?.trim()
+        ) {
+          toast.error("Please complete each work experience row, including Reason for Leaving.");
+          return false;
+        }
+      }
     }
 
     return true;
@@ -305,6 +434,9 @@ export default function ProfileForm({ username, empId, entryMode, onBack, submit
         }
       });
 
+      if (resubmitSubmissionId) {
+        submitData.append("resubmitSubmissionId", String(resubmitSubmissionId));
+      }
 
       // If submitTo is provided (e.g. Submissions API), default to POST unless specified otherwise.
       // If direct profile save (no submitTo), infer PUT/PATCH based on ID.
@@ -339,31 +471,74 @@ export default function ProfileForm({ username, empId, entryMode, onBack, submit
     }
   };
 
+  const handleFormSubmit = (e) => {
+    if (reviewMode) {
+      e.preventDefault();
+      return;
+    }
+    handleSubmit(e);
+  };
+
+  /** HR review always shows the full profile; reassign-only hiding is for the employee edit screen only. */
+  const fieldVisibilityKeys = reviewMode ? null : reassignFieldKeys;
+  const reassignMode = !reviewMode && isReassignFieldMode(reassignFieldKeys);
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
-      <button onClick={onBack} className="text-blue-600 hover:text-blue-800 mb-4">
-        ← Back
-      </button>
+      {!reviewMode && (
+        <button type="button" onClick={onBack} className="text-blue-600 hover:text-blue-800 mb-4">
+          ← Back
+        </button>
+      )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <PersonalInfoSection
-          formData={formData}
-          setFormData={setFormData}
-          isPrivilegedEditor={isPrivilegedEditor}
-          isExperienced={isExperienced}
-          setIsExperienced={setIsExperienced}
-        />
+      {reassignMode && (
+        <p className="text-sm text-gray-600 mb-4">
+          Account: <span className="font-medium">{formData.username || username}</span>
+          {(formData.employee_code || formData.empId || empId) && (
+            <>
+              {" "}
+              · Employee ID:{" "}
+              <span className="font-medium">{formData.employee_code || formData.empId || empId}</span>
+            </>
+          )}
+        </p>
+      )}
 
-        <BankingSection formData={formData} setFormData={setFormData} />
-
-        <EducationSection education={education} setEducation={setEducation} />
-
-        {isExperienced && (
-          <ExperienceSection experience={experience} setExperience={setExperience} />
+      <form onSubmit={handleFormSubmit} className="space-y-6">
+        {shouldShowPersonalBlock(fieldVisibilityKeys) && (
+          <PersonalInfoSection
+            formData={formData}
+            setFormData={setFormData}
+            isPrivilegedEditor={isPrivilegedEditor}
+            isExperienced={isExperienced}
+            setIsExperienced={setIsExperienced}
+            reviewMode={reviewMode}
+            reassignFieldKeys={fieldVisibilityKeys}
+          />
         )}
 
-        <ReferencesSection references={references} setReferences={setReferences} />
+        {shouldShowBankingBlock(fieldVisibilityKeys) && (
+          <BankingSection
+            formData={formData}
+            setFormData={setFormData}
+            reviewMode={reviewMode}
+            reassignFieldKeys={fieldVisibilityKeys}
+          />
+        )}
 
+        {shouldShowEducationSection(fieldVisibilityKeys) && (
+          <EducationSection education={education} setEducation={setEducation} reviewMode={reviewMode} />
+        )}
+
+        {isExperienced && shouldShowExperienceSection(fieldVisibilityKeys) && (
+          <ExperienceSection experience={experience} setExperience={setExperience} reviewMode={reviewMode} />
+        )}
+
+        {shouldShowReferencesSection(fieldVisibilityKeys) && (
+          <ReferencesSection references={references} setReferences={setReferences} reviewMode={reviewMode} />
+        )}
+
+        {shouldShowDocumentsSection(fieldVisibilityKeys) && (
         <DocumentsSection
           documents={documents}
           setDocuments={setDocuments}
@@ -374,7 +549,9 @@ export default function ProfileForm({ username, empId, entryMode, onBack, submit
           existingSignatureUrl={formData.signature || ""}
           isExperienced={isExperienced}
           fileUrls={formData.fileUrls || {}}
+          reviewMode={reviewMode}
         />
+        )}
 
         <div className="flex gap-4 border-t pt-4">
           {!reviewMode && (

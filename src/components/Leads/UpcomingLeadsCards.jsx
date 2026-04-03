@@ -2,7 +2,10 @@
 import { useEffect, useState } from "react";
 import TaskCard from "./TaskCard";
 import { getGradientColor } from "@/utils/getGradientColor";
-import dayjs from "dayjs";
+import {
+  formatCrmDatetimeForISTDisplay,
+  getCrmInstantMs,
+} from "@/lib/timezone";
 
 function SkeletonCard() {
   return (
@@ -62,8 +65,9 @@ export default function UpcomingLeadsCards({ leadSource }) {
       const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
       filtered = filtered.filter((cust) => {
         if (!cust.next_followup_date) return false; // hide if no date when filter applied
-        const d = new Date(cust.next_followup_date);
-        if (Number.isNaN(d.getTime())) return false;
+        const ms = getCrmInstantMs(cust.next_followup_date);
+        if (!ms) return false;
+        const d = new Date(ms);
         if (start && d < start) return false;
         if (end && d > end) return false;
         return true;
@@ -75,8 +79,12 @@ export default function UpcomingLeadsCards({ leadSource }) {
       if (sortOrder === "name") {
         return (a.first_name || "").localeCompare(b.first_name || "");
       }
-      const aTime = a.next_followup_date ? new Date(a.next_followup_date).getTime() : Infinity;
-      const bTime = b.next_followup_date ? new Date(b.next_followup_date).getTime() : Infinity;
+      const aTime = a.next_followup_date
+        ? getCrmInstantMs(a.next_followup_date)
+        : Infinity;
+      const bTime = b.next_followup_date
+        ? getCrmInstantMs(b.next_followup_date)
+        : Infinity;
       if (sortOrder === "latest") return bTime - aTime; // latest first
       return aTime - bTime; // default soonest first
     });
@@ -178,8 +186,7 @@ export default function UpcomingLeadsCards({ leadSource }) {
           ) : processedLeads.length > 0 ? (
             processedLeads.map((cust) => {
               const hours = cust.next_followup_date
-                ? (new Date(cust.next_followup_date).getTime() - Date.now()) /
-                3600000
+                ? (getCrmInstantMs(cust.next_followup_date) - Date.now()) / 3600000
                 : null;
               const bgColor = cust.next_followup_date
                 ? getGradientColor(hours)
@@ -197,9 +204,7 @@ export default function UpcomingLeadsCards({ leadSource }) {
                     stage={cust.stage}
                     dueDate={
                       cust.next_followup_date
-                        ? dayjs(cust.next_followup_date).format(
-                          "DD MMM, YYYY hh:mm A"
-                        )
+                        ? formatCrmDatetimeForISTDisplay(cust.next_followup_date)
                         : "Not set"
                     }
                     notes={cust.notes}
