@@ -263,7 +263,11 @@
 // }
 
 "use client";
-import dayjs from "dayjs";
+import {
+  formatCrmDatetimeForISTDisplay,
+  getCrmDateKeyIST,
+  getCrmInstantMs,
+} from "@/lib/timezone";
 
 export default function FollowUpHistory({
   entries = [],
@@ -271,16 +275,13 @@ export default function FollowUpHistory({
 }) {
   const uploads = cust_analysis_external?.uploads || [];
 
- // Normalize date (remove time for matching)
-const normalizeDate = (date) => dayjs(date).format("YYYY-MM-DD");
-
-// Create grouped map
+// Create grouped map (calendar day in IST matches how users think about follow-ups)
 const mergedMap = {};
 
 // 1️⃣ Add followups (support multiple per date safely)
 entries.forEach((entry) => {
   const dateKey = entry.followed_date
-    ? normalizeDate(entry.followed_date)
+    ? getCrmDateKeyIST(entry.followed_date)
     : "no-date";
 
   if (!mergedMap[dateKey]) {
@@ -302,7 +303,7 @@ entries.forEach((entry) => {
 // 2️⃣ Add uploads
 uploads.forEach((upload) => {
   const dateKey = upload.datetime
-    ? normalizeDate(upload.datetime)
+    ? getCrmDateKeyIST(upload.datetime)
     : "no-date";
 
   if (!mergedMap[dateKey]) {
@@ -322,7 +323,7 @@ uploads.forEach((upload) => {
 
 // 3️⃣ Convert to array & sort by latest date first
 const mergedData = Object.values(mergedMap).sort((a, b) => {
-  return dayjs(b.sortDate).valueOf() - dayjs(a.sortDate).valueOf();
+  return getCrmInstantMs(b.sortDate) - getCrmInstantMs(a.sortDate);
 });
 
   
@@ -361,9 +362,7 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
                     ? row.followups.map((f, i) => (
                         <div key={i} className="mb-3">
                           {f.next_followup_date
-                            ? dayjs(f.next_followup_date).format(
-                                "DD MMM, YYYY hh:mm A"
-                              )
+                            ? formatCrmDatetimeForISTDisplay(f.next_followup_date)
                             : "-"}
                         </div>
                       ))
@@ -385,9 +384,7 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
                     ? row.followups.map((f, i) => (
                         <div key={i} className="mb-3">
                           {f.followed_date
-                            ? dayjs(f.followed_date).format(
-                                "DD MMM, YYYY hh:mm A"
-                              )
+                            ? formatCrmDatetimeForISTDisplay(f.followed_date)
                             : "-"}
                         </div>
                       ))
@@ -420,9 +417,7 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
                     ? row.uploads.map((u, i) => (
                         <div key={i} className="mb-3">
                           {u.datetime
-                            ? dayjs(u.datetime).format(
-                                "DD MMM, YYYY hh:mm A"
-                              )
+                            ? formatCrmDatetimeForISTDisplay(u.datetime)
                             : "-"}
                         </div>
                       ))
