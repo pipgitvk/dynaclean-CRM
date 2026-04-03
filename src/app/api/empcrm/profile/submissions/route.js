@@ -198,22 +198,42 @@ export async function GET(request) {
           { status: 400 }
         );
       }
-      const saUsername = String(session.username || "").trim();
       let sql;
       const params = [];
-      if (status === "approved") {
-        // Only Super Admin can publish (pending_admin → approved), so all approved = admin action.
-        sql = `SELECT * FROM employee_profile_submissions WHERE status = 'approved'`;
-      } else {
-        // rejected: HR can also reject (pending → rejected), filter by reviewed_by = this Super Admin.
-        sql = `SELECT * FROM employee_profile_submissions WHERE status = 'rejected' AND LOWER(TRIM(COALESCE(reviewed_by,''))) = LOWER(?)`;
-        params.push(saUsername);
-      }
+      // approved: only SA can publish (pending_admin→approved), so all approved rows = admin action.
+      // rejected: show ALL (HR may also reject from pending). Front-end distinguishes via reviewed_by.
+      sql = `SELECT * FROM employee_profile_submissions WHERE status = ?`;
+      params.push(status);
       if (username) {
         sql += " AND username = ?";
         params.push(username);
       }
       sql += " ORDER BY submitted_at DESC";
+
+      // For rejected: also fetch reviewer's role so the UI can show "Admin" vs "HR" badge.
+      if (status === "rejected") {
+        const listSql = sql;
+        const [rows] = await conn.execute(listSql, params);
+        // Fetch all distinct reviewer usernames in one query
+        const reviewers = [...new Set(rows.map((r) => r.reviewed_by).filter(Boolean))];
+        let roleMap = {};
+        if (reviewers.length) {
+          const placeholders = reviewers.map(() => "?").join(", ");
+          const [repRows] = await conn.execute(
+            `SELECT username, userRole FROM rep_list WHERE username IN (${placeholders})`,
+            reviewers
+          );
+          for (const r of repRows) {
+            roleMap[String(r.username || "").trim().toLowerCase()] = String(r.userRole || "").trim().toUpperCase();
+          }
+        }
+        const enriched = rows.map((row) => ({
+          ...row,
+          reviewer_role: roleMap[String(row.reviewed_by || "").trim().toLowerCase()] || null,
+        }));
+        return NextResponse.json({ success: true, submissions: enriched });
+      }
+
       const [rows] = await conn.execute(sql, params);
       return NextResponse.json({ success: true, submissions: rows });
     }

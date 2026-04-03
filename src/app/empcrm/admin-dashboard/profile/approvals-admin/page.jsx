@@ -164,10 +164,12 @@ export default function ProfileApprovalsAdminPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  {tab === "pending_admin" ? "HR reviewed" : "Reviewed"}
+                  {tab === "pending_admin" ? "HR reviewed" : "Reviewed at"}
                 </th>
                 {tab !== "pending_admin" && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">By</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {tab === "rejected" ? "Rejected by" : "By"}
+                  </th>
                 )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -189,7 +191,26 @@ export default function ProfileApprovalsAdminPage() {
                     {s.reviewed_at ? new Date(s.reviewed_at).toLocaleString() : "—"}
                   </td>
                   {tab !== "pending_admin" && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{s.reviewed_by || "—"}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {s.reviewed_by ? (
+                        <span className="flex items-center gap-1.5 flex-wrap">
+                          <span>{s.reviewed_by}</span>
+                          {tab === "rejected" && s.reviewer_role != null && (
+                            <span
+                              className={`inline-flex px-1.5 py-0.5 rounded text-xs font-semibold ${
+                                s.reviewer_role === "SUPERADMIN"
+                                  ? "bg-violet-100 text-violet-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {s.reviewer_role === "SUPERADMIN" ? "Admin" : "HR"}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center gap-2 flex-wrap">
