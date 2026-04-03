@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Calculator, AlertCircle, Download, CalendarDays } from "lucide-react";
+import { ArrowLeft, Save, Calculator, AlertCircle, Download, CalendarDays, Lock } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   generateGenerateSalaryPayslipPDF,
@@ -63,6 +63,9 @@ const GenerateSalaryPage = () => {
         overtime_hours: 0,
         status: 'draft'
     });
+
+    /** true when the loaded record is approved/paid — all editing locked */
+    const isLocked = ["approved", "paid"].includes((formData.status || "").toLowerCase());
 
     // Calculated State
     const [calculation, setCalculation] = useState(null);
@@ -677,13 +680,25 @@ const GenerateSalaryPage = () => {
 
                     {salaryStructure ? (
                         <div className="space-y-4 pt-4 border-t border-gray-200">
+
+                            {/* Lock banner for approved/paid records */}
+                            {isLocked && (
+                                <div className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 border border-amber-300 rounded-md text-amber-800 text-sm font-medium">
+                                    <Lock className="w-4 h-4 shrink-0" />
+                                    <span>
+                                        This salary is <span className="font-semibold uppercase">{formData.status}</span> and cannot be edited.
+                                    </span>
+                                </div>
+                            )}
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Working Days</label>
                                 <input
                                     type="number"
                                     value={formData.working_days}
-                                    onChange={(e) => setFormData({ ...formData, working_days: Number(e.target.value) })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500"
+                                    disabled={isLocked}
+                                    onChange={(e) => !isLocked && setFormData({ ...formData, working_days: Number(e.target.value) })}
+                                    className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-purple-500 ${isLocked ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "border-gray-300"}`}
                                 />
                             </div>
                             <div>
@@ -691,8 +706,9 @@ const GenerateSalaryPage = () => {
                                 <input
                                     type="number"
                                     value={formData.present_days}
-                                    onChange={(e) => setFormData({ ...formData, present_days: Number(e.target.value) })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500"
+                                    disabled={isLocked}
+                                    onChange={(e) => !isLocked && setFormData({ ...formData, present_days: Number(e.target.value) })}
+                                    className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-purple-500 ${isLocked ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "border-gray-300"}`}
                                 />
                             </div>
                             <div>
@@ -700,16 +716,18 @@ const GenerateSalaryPage = () => {
                                 <input
                                     type="number"
                                     value={formData.overtime_hours}
-                                    onChange={(e) => setFormData({ ...formData, overtime_hours: Number(e.target.value) })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500"
+                                    disabled={isLocked}
+                                    onChange={(e) => !isLocked && setFormData({ ...formData, overtime_hours: Number(e.target.value) })}
+                                    className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-purple-500 ${isLocked ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "border-gray-300"}`}
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                                 <select
                                     value={formData.status}
-                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-purple-500"
+                                    disabled={isLocked}
+                                    onChange={(e) => !isLocked && setFormData({ ...formData, status: e.target.value })}
+                                    className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-purple-500 ${isLocked ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "border-gray-300"}`}
                                 >
                                     <option value="draft">Draft</option>
                                     <option value="pending">Pending Approval</option>
@@ -1157,20 +1175,27 @@ const GenerateSalaryPage = () => {
                                         </>
                                     )}
                                 </button>
-                                <button
-                                    onClick={handleSave}
-                                    disabled={loading}
-                                    className={`flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 shadow-lg transition-all ${loading ? 'opacity-70 cursor-wait' : ''}`}
-                                >
-                                    {loading ? (
-                                        <>Processing...</>
-                                    ) : (
-                                        <>
-                                            <Save className="w-5 h-5 mr-2" />
-                                            Save Record
-                                        </>
-                                    )}
-                                </button>
+                                {isLocked ? (
+                                    <div className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-500 rounded-lg border border-gray-300 text-sm font-medium cursor-not-allowed select-none">
+                                        <Lock className="w-4 h-4" />
+                                        Record Locked
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={loading}
+                                        className={`flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 shadow-lg transition-all ${loading ? 'opacity-70 cursor-wait' : ''}`}
+                                    >
+                                        {loading ? (
+                                            <>Processing...</>
+                                        ) : (
+                                            <>
+                                                <Save className="w-5 h-5 mr-2" />
+                                                Save Record
+                                            </>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </>
                     ) : (

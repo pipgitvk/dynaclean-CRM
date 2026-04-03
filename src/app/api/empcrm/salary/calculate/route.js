@@ -223,13 +223,21 @@ export async function POST(request) {
 
     // Check if salary record already exists
     const [existingRecord] = await db.query(`
-      SELECT id FROM monthly_salary_records 
+      SELECT id, status FROM monthly_salary_records 
       WHERE username = ? AND salary_month = ?
     `, [username, salary_month]);
 
     let salaryRecordId;
 
     if (existingRecord.length > 0) {
+      const existingStatus = (existingRecord[0].status || "").toLowerCase();
+      if (existingStatus === "approved" || existingStatus === "paid") {
+        return NextResponse.json(
+          { message: `This salary record is already ${existingStatus} and cannot be modified.` },
+          { status: 403 }
+        );
+      }
+
       // Update existing record
       salaryRecordId = existingRecord[0].id;
 
