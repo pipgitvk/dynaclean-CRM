@@ -401,7 +401,9 @@ export default function BulkReassignTable() {
                                         <td className="px-4 py-3 text-sm">{customer.stage}</td>
                                         <td className="px-4 py-3 text-sm">{customer.tags || "—"}</td>
                                         <td className="px-4 py-3 text-sm">
-                                            {format(new Date(customer.date_created), "dd MMM yyyy")}
+                                            {customer.date_created && !isNaN(new Date(customer.date_created))
+                                                ? format(new Date(customer.date_created), "dd MMM yyyy")
+                                                : "—"}
                                         </td>
                                     </tr>
                                 ))}
