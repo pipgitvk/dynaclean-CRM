@@ -36,6 +36,47 @@ function isEmpcrmProfileAdmin(session) {
   return ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].some((a) => a.toLowerCase() === r.toLowerCase());
 }
 
+/** Final profile publish (merge into employee_profiles) — Super Admin only */
+function isSuperAdmin(session) {
+  if (!session?.role) return false;
+  return String(session.role).trim().toUpperCase() === "SUPERADMIN";
+}
+
+function isHrHead(session) {
+  if (!session?.role) return false;
+  return String(session.role).trim().toLowerCase() === "hr head";
+}
+
+/** Super Admin or HR Head sees every pending row (including delegated). */
+function canSeeAllPendingHrQueue(session) {
+  return isSuperAdmin(session) || isHrHead(session);
+}
+
+/** Single submission row visible in admin GET ?id= */
+function submissionVisibleToAdmin(session, sub) {
+  if (!sub) return false;
+  const st = String(sub.status || "");
+  if (st === "pending_admin" && !isSuperAdmin(session)) return false;
+  if (st === "pending") {
+    const a = sub.pending_assignee_username;
+    if (a == null || String(a).trim() === "") return true;
+    if (canSeeAllPendingHrQueue(session)) return true;
+    const su = String(session.username || "").trim().toLowerCase();
+    return su === String(a).trim().toLowerCase();
+  }
+  return true;
+}
+
+/** Approve / reject / reassign on pending — respects HR delegation */
+function canActOnPendingSubmission(session, sub) {
+  if (!sub || sub.status !== "pending") return true;
+  const a = sub.pending_assignee_username;
+  if (a == null || String(a).trim() === "") return true;
+  if (isSuperAdmin(session) || isHrHead(session)) return true;
+  const su = String(session.username || "").trim().toLowerCase();
+  return su === String(a).trim().toLowerCase();
+}
+
 function buildSessionSubmissionOwnerWhere(session) {
   const { username, empId } = sessionAccountIdentity(session);
   const parts = [];
@@ -127,11 +168,55 @@ export async function GET(request) {
         `SELECT * FROM employee_profile_submissions WHERE id = ?`,
         [id]
       );
+      if (rows.length && !submissionVisibleToAdmin(session, rows[0])) {
+        return NextResponse.json({ success: false, error: "Access denied" }, { status: 403 });
+      }
       return NextResponse.json({ success: true, submissions: rows });
     }
 
     const status = (searchParams.get("status") || "pending").trim();
-    const username = searchParams.get('username');
+    if (status === "pending_admin" && !isSuperAdmin(session)) {
+      return NextResponse.json({ success: false, error: "Access denied" }, { status: 403 });
+    }
+    const username = searchParams.get("username");
+    const adminFinalOnly = ["1", "true", "yes"].includes(
+      String(searchParams.get("adminFinalOnly") || "").trim().toLowerCase()
+    );
+
+    /**
+     * adminFinalOnly=1 — approved/rejected actions done by Super Admin only.
+     * approved: ALL status=approved were published by Super Admin (only SA can do pending_admin→approved).
+     * rejected: filter by reviewed_by = logged-in Super Admin's own username (to exclude HR rejects from pending).
+     */
+    if (adminFinalOnly) {
+      if (!isSuperAdmin(session)) {
+        return NextResponse.json({ success: false, error: "Access denied" }, { status: 403 });
+      }
+      if (status !== "approved" && status !== "rejected") {
+        return NextResponse.json(
+          { success: false, error: "adminFinalOnly applies only to approved or rejected" },
+          { status: 400 }
+        );
+      }
+      const saUsername = String(session.username || "").trim();
+      let sql;
+      const params = [];
+      if (status === "approved") {
+        // Only Super Admin can publish (pending_admin → approved), so all approved = admin action.
+        sql = `SELECT * FROM employee_profile_submissions WHERE status = 'approved'`;
+      } else {
+        // rejected: HR can also reject (pending → rejected), filter by reviewed_by = this Super Admin.
+        sql = `SELECT * FROM employee_profile_submissions WHERE status = 'rejected' AND LOWER(TRIM(COALESCE(reviewed_by,''))) = LOWER(?)`;
+        params.push(saUsername);
+      }
+      if (username) {
+        sql += " AND username = ?";
+        params.push(username);
+      }
+      sql += " ORDER BY submitted_at DESC";
+      const [rows] = await conn.execute(sql, params);
+      return NextResponse.json({ success: true, submissions: rows });
+    }
 
     let sql;
     const params = [];
@@ -140,6 +225,11 @@ export async function GET(request) {
     } else {
       sql = `SELECT * FROM employee_profile_submissions WHERE status = ?`;
       params.push(status);
+      if (status === "pending" && !canSeeAllPendingHrQueue(session)) {
+        const u = String(session.username || "").trim();
+        sql += ` AND (pending_assignee_username IS NULL OR TRIM(pending_assignee_username) = '' OR LOWER(TRIM(pending_assignee_username)) = LOWER(?))`;
+        params.push(u);
+      }
     }
     if (username) {
       sql += " AND username = ?";
@@ -334,7 +424,7 @@ export async function POST(request) {
       // Keep reassigned_fields / reassignment_note so HR can see what was sent back until approve/reject.
       await conn.execute(
         `UPDATE employee_profile_submissions SET status = 'pending', payload = ?, uploaded_files = ?, submitted_by = ?, submitted_at = NOW(),
-         reviewed_by = NULL, reviewed_at = NULL, rejection_reason = NULL
+         reviewed_by = NULL, reviewed_at = NULL, rejection_reason = NULL, pending_assignee_username = NULL
          WHERE id = ?`,
         [JSON.stringify({ data: mergedData, references: mergedReferences, education: mergedEducation, experience: mergedExperience }), JSON.stringify(mergedUploadedFiles), session.username, resubmitId]
       );
@@ -366,7 +456,7 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { submissionId, action, rejection_reason, fields, reassignment_note } = body;
+    const { submissionId, action, rejection_reason, fields, reassignment_note, reassign_target, assignee_username } = body;
     if (!submissionId || !action || !['approve', 'reject', 'reassign'].includes(action)) {
       return NextResponse.json({ success: false, error: 'submissionId and valid action are required' }, { status: 400 });
     }
@@ -379,35 +469,115 @@ export async function PATCH(request) {
     const submission = rows[0];
 
     if (action === "reassign") {
-      if (!Array.isArray(fields) || fields.length === 0) {
-        return NextResponse.json({ success: false, error: "Select at least one field to reassign" }, { status: 400 });
-      }
       if (submission.status !== "pending") {
         return NextResponse.json({ success: false, error: "Only pending submissions can be reassigned" }, { status: 400 });
       }
+      if (!canActOnPendingSubmission(session, submission)) {
+        return NextResponse.json(
+          { success: false, error: "This submission is assigned to another HR member." },
+          { status: 403 }
+        );
+      }
+      const toHr = reassign_target === "hr";
+      if (toHr) {
+        const assignee = typeof assignee_username === "string" ? assignee_username.trim() : "";
+        if (!assignee) {
+          return NextResponse.json({ success: false, error: "Select an HR user to assign" }, { status: 400 });
+        }
+        const note = typeof reassignment_note === "string" ? reassignment_note.trim() : "";
+        const fieldArr = Array.isArray(fields) ? fields : [];
+        if (fieldArr.length === 0 && !note) {
+          return NextResponse.json(
+            { success: false, error: "Add a note or select at least one field for the assigned HR" },
+            { status: 400 }
+          );
+        }
+        await conn.execute(
+          `UPDATE employee_profile_submissions SET status = 'pending', pending_assignee_username = ?, reassigned_fields = ?, reassignment_note = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
+          [
+            assignee,
+            fieldArr.length ? JSON.stringify(fieldArr) : null,
+            note || null,
+            session.username,
+            submissionId,
+          ]
+        );
+        return NextResponse.json({
+          success: true,
+          message: `Delegated to ${assignee} for review (still in HR queue).`,
+        });
+      }
+      if (!Array.isArray(fields) || fields.length === 0) {
+        return NextResponse.json({ success: false, error: "Select at least one field to reassign" }, { status: 400 });
+      }
       await conn.execute(
-        `UPDATE employee_profile_submissions SET status = 'reassign', reassigned_fields = ?, reassignment_note = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
+        `UPDATE employee_profile_submissions SET status = 'reassign', reassigned_fields = ?, reassignment_note = ?, reviewed_by = ?, reviewed_at = NOW(), pending_assignee_username = NULL WHERE id = ?`,
         [JSON.stringify(fields), reassignment_note || null, session.username, submissionId]
       );
       return NextResponse.json({ success: true, message: "Selected fields sent to employee for correction" });
     }
 
-    if (action === 'reject') {
+    if (action === "reject") {
+      if (!["pending", "pending_admin"].includes(submission.status)) {
+        return NextResponse.json({ success: false, error: "This submission cannot be rejected." }, { status: 400 });
+      }
+      if (submission.status === "pending" && !canActOnPendingSubmission(session, submission)) {
+        return NextResponse.json(
+          { success: false, error: "This submission is assigned to another HR member." },
+          { status: 403 }
+        );
+      }
+      if (submission.status === "pending_admin" && !isSuperAdmin(session)) {
+        return NextResponse.json(
+          { success: false, error: "Only Super Admin can reject at this stage." },
+          { status: 403 }
+        );
+      }
       await conn.execute(
         `UPDATE employee_profile_submissions SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?, reassigned_fields = NULL, reassignment_note = NULL WHERE id = ?`,
         [session.username, rejection_reason || null, submissionId]
       );
-      return NextResponse.json({ success: true, message: 'Submission rejected' });
+      return NextResponse.json({ success: true, message: "Submission rejected" });
     }
 
-    if (submission.status !== "pending") {
+    if (action !== "approve") {
+      return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
+    }
+
+    // --- HR first approval: pending → pending_admin (no DB merge) ---
+    if (submission.status === "pending") {
+      if (!canActOnPendingSubmission(session, submission)) {
+        return NextResponse.json(
+          { success: false, error: "This submission is assigned to another HR member." },
+          { status: 403 }
+        );
+      }
+      await conn.execute(
+        `UPDATE employee_profile_submissions SET status = 'pending_admin', reviewed_by = ?, reviewed_at = NOW(), pending_assignee_username = NULL WHERE id = ?`,
+        [session.username, submissionId]
+      );
+      return NextResponse.json({
+        success: true,
+        message: "HR approved. Sent to Super Admin for final approval.",
+      });
+    }
+
+    // --- Super Admin final approval: merge into employee_profiles ---
+    if (submission.status !== "pending_admin") {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Only pending submissions can be approved. If the profile was sent back for correction, wait until the employee resubmits.",
+            "Nothing to approve, or wait until HR approves first. Reassign submissions must be resubmitted by the employee.",
         },
         { status: 400 }
+      );
+    }
+
+    if (!isSuperAdmin(session)) {
+      return NextResponse.json(
+        { success: false, error: "Only Super Admin can publish the profile after HR approval." },
+        { status: 403 }
       );
     }
 

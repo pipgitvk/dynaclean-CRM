@@ -77,6 +77,7 @@ export default function UserProfileView() {
 
   const st = latestSubmission?.status;
   const isReassign = st === "reassign" || st === "revision_requested";
+  const isPendingAdmin = st === "pending_admin";
   const reassignedLabels = isReassign && latestSubmission ? parseReassignedLabels(latestSubmission) : [];
 
   if (!profile) {
@@ -133,6 +134,22 @@ export default function UserProfileView() {
       );
     }
 
+    if (latestSubmission && isPendingAdmin) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
+          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-violet-200">
+            <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-violet-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Awaiting final approval</h2>
+            <p className="text-gray-600 mb-6 text-sm">
+              HR has approved your submission. Your profile will appear here after Super Admin publishes it.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     if (latestSubmission && st === "approved") {
       return (
         <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
@@ -142,7 +159,7 @@ export default function UserProfileView() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Profile approved</h2>
             <p className="text-gray-600 mb-2 text-sm">
-              HR has approved your profile submission
+              Your profile was published
               {latestSubmission.reviewed_at ? ` on ${new Date(latestSubmission.reviewed_at).toLocaleString()}` : ""}.
             </p>
             <p className="text-xs text-gray-500">Your details will appear here once they are synced to your profile.</p>
@@ -185,6 +202,22 @@ export default function UserProfileView() {
           <a href={EDIT_PROFILE_HREF} className="inline-block w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all shadow-md hover:shadow-lg">
             Create Profile
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPendingAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
+        <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-violet-200">
+          <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Clock className="w-8 h-8 text-violet-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Awaiting final approval</h2>
+          <p className="text-gray-600 mb-6 text-sm">
+            HR has approved your submission. Your profile will appear here after Super Admin publishes it.
+          </p>
         </div>
       </div>
     );
@@ -240,9 +273,9 @@ export default function UserProfileView() {
           <div className="rounded-xl border border-green-200 bg-green-50 p-4 sm:p-5 text-green-950 shadow-sm flex gap-3 items-start">
             <CheckCircle className="w-6 h-6 shrink-0 text-green-600 mt-0.5" />
             <div>
-              <h2 className="font-bold text-lg">Profile approved by HR</h2>
+              <h2 className="font-bold text-lg">Profile published</h2>
               <p className="text-sm mt-1">
-                Your submission was approved
+                Your submission was approved and merged into your profile
                 {latestSubmission.reviewed_at ? ` on ${new Date(latestSubmission.reviewed_at).toLocaleString()}` : ""}.
               </p>
             </div>

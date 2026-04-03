@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ProfileForm from "@/app/empcrm/admin-dashboard/profile/ProfileForm";
 import ReassignFieldsModal from "@/app/empcrm/admin-dashboard/profile/approvals/ReassignFieldsModal";
 import { Check, X, ListChecks } from "lucide-react";
@@ -12,13 +12,32 @@ import { parseReassignKeys } from "@/lib/reassignFieldVisibility";
 
 export default function SubmissionDetailsPage({ params }) {
     const { id } = use(params);
+    const searchParams = useSearchParams();
+    const fromAdminQueue = searchParams.get("from") === "admin";
 
     const router = useRouter();
+    const [sessionRole, setSessionRole] = useState("");
+    const [sessionUsername, setSessionUsername] = useState("");
     const [submission, setSubmission] = useState(null);
     const [reviewInitialData, setReviewInitialData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [reassignOpen, setReassignOpen] = useState(false);
     const [reassignSubmitting, setReassignSubmitting] = useState(false);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const me = await fetch("/api/me", { credentials: "include", cache: "no-store" });
+                const meJson = await me.json();
+                const r = meJson?.user?.role ?? meJson?.role ?? "";
+                setSessionRole(typeof r === "string" ? r : "");
+                const u = meJson?.user?.username ?? meJson?.username;
+                setSessionUsername(typeof u === "string" ? u : "");
+            } catch {
+                setSessionRole("");
+            }
+        })();
+    }, []);
 
     useEffect(() => {
         if (!id) {
@@ -37,6 +56,12 @@ export default function SubmissionDetailsPage({ params }) {
                 });
                 if (cancelled) return;
                 const data = await res.json();
+                if (res.status === 403) {
+                    toast.error(data.error || "Access denied");
+                    setSubmission(null);
+                    setReviewInitialData(null);
+                    return;
+                }
                 if (!data.success || !data.submissions?.length) {
                     toast.error("Submission not found");
                     setSubmission(null);
@@ -90,8 +115,12 @@ export default function SubmissionDetailsPage({ params }) {
             });
             const data = await res.json();
             if (data.success) {
-                toast.success(`Profile ${action}ed successfully`);
-                router.push("/empcrm/admin-dashboard/profile/approvals");
+                toast.success(data.message || `Profile ${action}ed successfully`);
+                const back =
+                    fromAdminQueue || submission?.status === "pending_admin"
+                        ? "/empcrm/admin-dashboard/profile/approvals-admin"
+                        : "/empcrm/admin-dashboard/profile/approvals";
+                router.push(back);
             } else {
                 toast.error(data.error || `Failed to ${action}`);
             }
@@ -100,7 +129,7 @@ export default function SubmissionDetailsPage({ params }) {
         }
     };
 
-    const handleReassignConfirm = async ({ fields, reassignment_note }) => {
+    const handleReassignConfirm = async (payload) => {
         setReassignSubmitting(true);
         try {
             const res = await fetch("/api/empcrm/profile/submissions", {
@@ -109,15 +138,21 @@ export default function SubmissionDetailsPage({ params }) {
                 body: JSON.stringify({
                     submissionId: id,
                     action: "reassign",
-                    fields,
-                    reassignment_note,
+                    fields: payload.fields,
+                    reassignment_note: payload.reassignment_note,
+                    reassign_target: payload.reassign_target,
+                    assignee_username: payload.assignee_username,
                 }),
             });
             const data = await res.json();
             if (data.success) {
-                toast.success(data.message || "Sent to employee");
+                toast.success(data.message || "Updated");
                 setReassignOpen(false);
-                router.push("/empcrm/admin-dashboard/profile/approvals");
+                router.push(
+                    fromAdminQueue
+                        ? "/empcrm/admin-dashboard/profile/approvals-admin"
+                        : "/empcrm/admin-dashboard/profile/approvals"
+                );
             } else {
                 toast.error(data.error || "Failed to reassign");
             }
@@ -129,7 +164,13 @@ export default function SubmissionDetailsPage({ params }) {
     };
 
     if (loading) return <div className="p-8 text-center text-gray-500">Loading submission details...</div>;
-    if (!submission) return <div className="p-8 text-center text-red-500">Submission not found</div>;
+    if (!submission) {
+        return (
+            <div className="p-8 text-center text-red-500">
+                Submission not found, or you do not have access to this request.
+            </div>
+        );
+    }
 
     if (!reviewInitialData) {
         return <div className="p-8 text-center text-red-500">Invalid submission data</div>;
@@ -139,7 +180,20 @@ export default function SubmissionDetailsPage({ params }) {
 
     const st = submission.status || "";
     const isPending = st === "pending";
+    const isPendingAdmin = st === "pending_admin";
     const isReassign = st === "reassign" || st === "revision_requested";
+    const isSuperAdmin = String(sessionRole || "").trim().toUpperCase() === "SUPERADMIN";
+    const assignedTo =
+        typeof submission.pending_assignee_username === "string" ? submission.pending_assignee_username.trim() : "";
+    const roleLower = String(sessionRole || "").trim().toLowerCase();
+    const isHrHeadOrSuper = roleLower === "superadmin" || roleLower === "hr head";
+    const canActPending =
+        !isPending ||
+        !assignedTo ||
+        isHrHeadOrSuper ||
+        (sessionUsername && assignedTo.toLowerCase() === sessionUsername.trim().toLowerCase());
+    const showHrActions = isPending && canActPending;
+    const showAdminActions = isPendingAdmin && isSuperAdmin;
 
     const reassignKeys = parseReassignKeys(submission.reassigned_fields);
     const reassignNote =
@@ -156,7 +210,17 @@ export default function SubmissionDetailsPage({ params }) {
             />
             <div className="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 py-4 border-b">
                 <div>
-                    <button onClick={() => router.push("/empcrm/admin-dashboard/profile/approvals")} className="text-gray-500 hover:text-gray-700 text-sm mb-1">
+                    <button
+                        type="button"
+                        onClick={() =>
+                            router.push(
+                                fromAdminQueue
+                                    ? "/empcrm/admin-dashboard/profile/approvals-admin"
+                                    : "/empcrm/admin-dashboard/profile/approvals"
+                            )
+                        }
+                        className="text-gray-500 hover:text-gray-700 text-sm mb-1"
+                    >
                         &larr; Back to List
                     </button>
                     <h1 className="text-2xl font-bold text-gray-800">Review Request: {submission.username}</h1>
@@ -168,16 +232,31 @@ export default function SubmissionDetailsPage({ params }) {
                                     ? "bg-green-100 text-green-800"
                                     : st === "rejected"
                                       ? "bg-red-100 text-red-800"
-                                      : isReassign
-                                        ? "bg-amber-100 text-amber-900"
-                                        : "bg-blue-100 text-blue-800"
+                                      : isPendingAdmin
+                                        ? "bg-violet-100 text-violet-900"
+                                        : isReassign
+                                          ? "bg-amber-100 text-amber-900"
+                                          : "bg-blue-100 text-blue-800"
                             }`}
                         >
-                            {st === "revision_requested" ? "reassign" : st || "—"}
+                            {st === "revision_requested"
+                                ? "reassign"
+                                : st === "pending_admin"
+                                  ? "awaiting super admin"
+                                  : st || "—"}
                         </span>
                     </p>
+                    {isPending && assignedTo ? (
+                        <p className="text-sm text-amber-800 mt-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
+                            {canActPending
+                                ? isHrHeadOrSuper
+                                    ? `Delegated to HR: @${assignedTo} — you can act as HR Head / Super Admin.`
+                                    : `Assigned to you (@${assignedTo}) for review.`
+                                : `Assigned to @${assignedTo}. You can view only.`}
+                        </p>
+                    ) : null}
                 </div>
-                {isPending && (
+                {showHrActions && (
                     <div className="flex flex-wrap gap-2 justify-end">
                         <button
                             type="button"
@@ -198,7 +277,25 @@ export default function SubmissionDetailsPage({ params }) {
                             onClick={() => handleAction("approve")}
                             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 font-medium"
                         >
-                            <Check className="w-4 h-4" /> Approve
+                            <Check className="w-4 h-4" /> Approve (send to Super Admin)
+                        </button>
+                    </div>
+                )}
+                {showAdminActions && (
+                    <div className="flex flex-wrap gap-2 justify-end">
+                        <button
+                            type="button"
+                            onClick={() => handleAction("reject", prompt("Rejection Reason:") || "")}
+                            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center gap-2 font-medium"
+                        >
+                            <X className="w-4 h-4" /> Reject
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleAction("approve")}
+                            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 font-medium"
+                        >
+                            <Check className="w-4 h-4" /> Publish profile
                         </button>
                     </div>
                 )}
@@ -232,7 +329,9 @@ export default function SubmissionDetailsPage({ params }) {
                         ? "bg-green-50 border-green-500"
                         : st === "rejected"
                           ? "bg-red-50 border-red-400"
-                          : "bg-blue-50 border-blue-400"
+                          : isPendingAdmin
+                            ? "bg-violet-50 border-violet-400"
+                            : "bg-blue-50 border-blue-400"
                 }`}
             >
                 {st === "approved" && (
@@ -254,7 +353,17 @@ export default function SubmissionDetailsPage({ params }) {
                         )}
                     </>
                 )}
-                {(isPending || isReassign) && (
+                {isPendingAdmin && !isSuperAdmin && (
+                    <p className="text-sm text-violet-900 font-medium">
+                        HR has approved this submission. Final publish is pending Super Admin.
+                    </p>
+                )}
+                {isPendingAdmin && isSuperAdmin && (
+                    <p className="text-sm text-violet-900">
+                        <strong>Super Admin:</strong> Verify details and documents below, then publish to merge into the employee profile.
+                    </p>
+                )}
+                {(isPending || isReassign) && !isPendingAdmin && (
                     <p className="text-sm text-blue-700">
                         <strong>Review Note:</strong> Please verify all details and documents below. You can view uploaded documents by clicking the &quot;View&quot; buttons in the Documents section.
                     </p>
