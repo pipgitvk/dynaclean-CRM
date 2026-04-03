@@ -225,12 +225,12 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "Target",
         children: [
-          {
-            path: "/admin-dashboard/assign-targets",
-            name: "Assign",
-            roles: ["SUPERADMIN"],
-            icon: "FileText",
-          },
+          // {
+          //   path: "/admin-dashboard/assign-targets",
+          //   name: "Assign",
+          //   roles: ["SUPERADMIN"],
+          //   icon: "FileText",
+          // },
           {
             path: "/admin-dashboard/monitor-targets",
             name: "Monitor",
