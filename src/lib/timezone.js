@@ -1,8 +1,68 @@
 // Timezone conversion utilities
 // Handles conversion between IST and UTC based on server timezone
 
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
+
 // Check if server is running in UTC (production) or IST (local dev)
 const isServerUTC = process.env.SERVER_TIMEZONE === 'UTC' || process.env.NODE_ENV === 'production';
+
+/** IST offset (+05:30) in minutes — used for display only (India has no DST). */
+const IST_OFFSET_MINUTES = 330;
+
+/**
+ * True when `customers_followup` / TL follow-up MySQL datetimes are stored as UTC
+ * (matches `convertISTtoUTC` in this file). Client bundles only see NODE_ENV unless
+ * NEXT_PUBLIC_* is set, so this mirrors production behaviour for deployed users.
+ */
+export function isCrmDbStoredUtc() {
+  if (typeof process === 'undefined' || !process.env) return true;
+  return process.env.SERVER_TIMEZONE === 'UTC' || process.env.NODE_ENV === 'production';
+}
+
+/**
+ * Parse a CRM datetime for display/sort: naive strings are UTC wall-clock when DB
+ * stores UTC; otherwise treated as local wall-clock (typical local dev).
+ */
+function parseCrmDatetimeToDayjs(value) {
+  if (value == null || value === '') return null;
+  const s = String(value).trim();
+  if (!s) return null;
+  const hasExplicitTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
+  if (hasExplicitTz) {
+    return dayjs(s);
+  }
+  const normalized = s.includes('T') ? s : s.replace(' ', 'T');
+  if (isCrmDbStoredUtc()) {
+    return dayjs.utc(normalized);
+  }
+  return dayjs(normalized);
+}
+
+/**
+ * Format follow-up / next-follow-up / external ISO datetimes for the UI in IST.
+ * Use for fields saved via `convertISTtoUTC` in production.
+ */
+export function formatCrmDatetimeForISTDisplay(value, format = 'DD MMM, YYYY hh:mm A') {
+  const d = parseCrmDatetimeToDayjs(value);
+  if (!d || !d.isValid()) return '';
+  return d.utcOffset(IST_OFFSET_MINUTES).format(format);
+}
+
+/** Calendar day key (YYYY-MM-DD) in IST — for grouping rows. */
+export function getCrmDateKeyIST(value) {
+  const d = parseCrmDatetimeToDayjs(value);
+  if (!d || !d.isValid()) return 'no-date';
+  return d.utcOffset(IST_OFFSET_MINUTES).format('YYYY-MM-DD');
+}
+
+/** Epoch ms for sorting (latest first). */
+export function getCrmInstantMs(value) {
+  const d = parseCrmDatetimeToDayjs(value);
+  return d && d.isValid() ? d.valueOf() : 0;
+}
 
 function toMysqlDateTime(date) {
   return date.toISOString().slice(0, 19).replace('T', ' ');
