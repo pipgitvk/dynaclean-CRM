@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, Trash2, CheckSquare, Square } from "lucide-react";
+import { Search, Trash2, CheckSquare, Square, BadgeCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   generatePayslipPDF,
@@ -41,8 +41,12 @@ export default function AdminSalarySlipsPage() {
   // Bulk select state
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [approving, setApproving] = useState(false);
+  // Per-row approve loading
+  const [approvingId, setApprovingId] = useState(null);
 
   const canDelete = userRole === "SUPERADMIN" || userRole === "ADMIN";
+  const canApprove = userRole === "SUPERADMIN" || userRole === "ADMIN";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -134,6 +138,68 @@ export default function AdminSalarySlipsPage() {
     }
   };
 
+  // Approve a single record
+  const handleApproveOne = async (id) => {
+    setApprovingId(id);
+    const toastId = toast.loading("Approving…");
+    try {
+      const res = await fetch("/api/empcrm/salary/all-records", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [id], status: "approved" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Salary slip approved", { id: toastId });
+        load();
+      } else {
+        toast.error(data.message || "Approval failed", { id: toastId });
+      }
+    } catch {
+      toast.error("Error approving record", { id: toastId });
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  // Bulk approve selected records
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) return;
+    // Only approve those that are draft / pending
+    const draftIds = records
+      .filter((r) => selectedIds.has(r.id) && ["draft", "pending"].includes((r.status || "").toLowerCase()))
+      .map((r) => r.id);
+
+    if (draftIds.length === 0) {
+      toast.error("No draft/pending records selected to approve.");
+      return;
+    }
+
+    if (!confirm(`Approve ${draftIds.length} salary slip${draftIds.length > 1 ? "s" : ""}?`)) return;
+
+    setApproving(true);
+    const toastId = toast.loading(`Approving ${draftIds.length} record${draftIds.length > 1 ? "s" : ""}…`);
+    try {
+      const res = await fetch("/api/empcrm/salary/all-records", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: draftIds, status: "approved" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Approved ${data.updated} record${data.updated !== 1 ? "s" : ""}`, { id: toastId });
+        setSelectedIds(new Set());
+        load();
+      } else {
+        toast.error(data.message || "Approval failed", { id: toastId });
+      }
+    } catch {
+      toast.error("Error approving records", { id: toastId });
+    } finally {
+      setApproving(false);
+    }
+  };
+
   const handleDownload = async (record) => {
     const toastId = toast.loading("Generating payslip…");
     try {
@@ -193,25 +259,43 @@ export default function AdminSalarySlipsPage() {
         <PayslipRefreshButton onClick={load} loading={loading} />
       </div>
 
-      {/* Bulk action bar — visible only to SUPERADMIN when rows are selected */}
-      {canDelete && selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-          <span className="text-sm font-medium text-red-800">
+      {/* Bulk action bar — visible when rows are selected */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+          <span className="text-sm font-medium text-slate-700">
             {selectedIds.size} record{selectedIds.size > 1 ? "s" : ""} selected
           </span>
-          <button
-            type="button"
-            onClick={handleBulkDelete}
-            disabled={deleting}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-            {deleting ? "Deleting…" : "Delete Selected"}
-          </button>
+
+          {/* Approve button — HR roles */}
+          {canApprove && (
+            <button
+              type="button"
+              onClick={handleBulkApprove}
+              disabled={approving || deleting}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              <BadgeCheck className="w-4 h-4" />
+              {approving ? "Approving…" : "Approve Selected"}
+            </button>
+          )}
+
+          {/* Delete button — SUPERADMIN only */}
+          {canDelete && (
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={deleting || approving}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              {deleting ? "Deleting…" : "Delete Selected"}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setSelectedIds(new Set())}
-            className="text-sm text-red-600 hover:text-red-800 underline"
+            className="text-sm text-slate-500 hover:text-slate-800 underline"
           >
             Clear
           </button>
@@ -253,8 +337,8 @@ export default function AdminSalarySlipsPage() {
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className={PAYSLIP_UI.navy}>
-            {/* Select-all checkbox — SUPERADMIN only */}
-            {canDelete && (
+            {/* Select-all checkbox — HR + SUPERADMIN */}
+            {(canApprove || canDelete) && (
               <th className="px-3 py-3 w-10">
                 <button
                   type="button"
@@ -288,13 +372,13 @@ export default function AdminSalarySlipsPage() {
                 key={row.id}
                 className={`hover:bg-slate-50/90 ${isSelected ? "bg-red-50" : "bg-white"}`}
               >
-                {/* Row checkbox — SUPERADMIN only */}
-                {canDelete && (
+                {/* Row checkbox — HR + SUPERADMIN */}
+                {(canApprove || canDelete) && (
                   <td className="px-3 py-3 w-10">
                     <button
                       type="button"
                       onClick={() => toggleOne(row.id)}
-                      className={`flex items-center justify-center ${isSelected ? "text-red-600" : "text-gray-400 hover:text-gray-600"}`}
+                      className={`flex items-center justify-center ${isSelected ? "text-green-600" : "text-gray-400 hover:text-gray-600"}`}
                     >
                       {isSelected ? (
                         <CheckSquare className="w-4 h-4" />
@@ -315,6 +399,19 @@ export default function AdminSalarySlipsPage() {
                 <td className={payslipTdRightClass}>{formatPayslipCurrency(row.net_salary)}</td>
                 <td className={`${payslipTdRightClass} align-middle`}>
                   <div className="flex justify-end flex-wrap gap-2">
+                    {/* Approve button — only for draft/pending slips */}
+                    {canApprove && ["draft", "pending"].includes((row.status || "").toLowerCase()) && (
+                      <button
+                        type="button"
+                        onClick={() => handleApproveOne(row.id)}
+                        disabled={approvingId === row.id}
+                        title="Approve this salary slip"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      >
+                        <BadgeCheck className="w-3.5 h-3.5" />
+                        {approvingId === row.id ? "…" : "Approve"}
+                      </button>
+                    )}
                     <PayslipViewButton onClick={() => handleView(row)} />
                     <PayslipDownloadButton onClick={() => handleDownload(row)} />
                   </div>
