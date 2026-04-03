@@ -102,6 +102,56 @@ export async function GET(request) {
   }
 }
 
+const APPROVE_ALLOWED_ROLES = ["SUPERADMIN", "ADMIN"];
+const VALID_STATUS_TRANSITIONS = ["approved", "paid", "pending", "draft"];
+
+/**
+ * PATCH — bulk update status of salary records.
+ * Body: { ids: number[], status: string }
+ * HR roles allowed.
+ */
+export async function PATCH(request) {
+  try {
+    const payload = await getSessionPayload();
+    if (!payload || !APPROVE_ALLOWED_ROLES.includes(payload.role)) {
+      return NextResponse.json({ message: "Unauthorized. Only HR / SUPERADMIN can update records." }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { ids, status } = body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ message: "No record IDs provided." }, { status: 400 });
+    }
+
+    if (!VALID_STATUS_TRANSITIONS.includes(status)) {
+      return NextResponse.json({ message: `Invalid status. Allowed: ${VALID_STATUS_TRANSITIONS.join(", ")}` }, { status: 400 });
+    }
+
+    const validIds = ids.map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    if (validIds.length === 0) {
+      return NextResponse.json({ message: "Invalid IDs." }, { status: 400 });
+    }
+
+    const placeholders = validIds.map(() => "?").join(",");
+    const db = await getDbConnection();
+
+    const [result] = await db.query(
+      `UPDATE monthly_salary_records SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`,
+      [status, ...validIds]
+    );
+
+    return NextResponse.json({
+      success: true,
+      updated: result.affectedRows,
+      status,
+    });
+  } catch (error) {
+    console.error("Error updating salary records status:", error);
+    return NextResponse.json({ message: "Internal server error." }, { status: 500 });
+  }
+}
+
 /**
  * DELETE — bulk delete salary records by IDs.
  * Body: { ids: number[] }
