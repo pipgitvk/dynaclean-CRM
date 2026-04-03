@@ -1,21 +1,53 @@
 // src/app/components/targets/TargetTable.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation"; // Import useRouter
-import { Search, Eye, Edit } from "lucide-react";
+import { Search, Eye, Edit, Plus } from "lucide-react";
 import TargetCompletionModal from "./TargetCompletionModal";
 import EditTargetModal from "./EditTargetModal";
+import AssignTargetModal from "./AssignTargetModal";
+import TargetMonitorChart from "./TargetMonitorChart";
 import { useUser } from "@/context/UserContext";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** Target assignment overlaps the selected calendar month (inclusive). */
+function targetOverlapsMonth(startStr, endStr, year, month) {
+  if (!startStr || !endStr) return false;
+  const start = String(startStr).slice(0, 10);
+  const end = String(endStr).slice(0, 10);
+  const pad = (n) => String(n).padStart(2, "0");
+  const lastDay = new Date(year, month, 0).getDate();
+  const monthStart = `${year}-${pad(month)}-01`;
+  const monthEnd = `${year}-${pad(month)}-${pad(lastDay)}`;
+  return start <= monthEnd && end >= monthStart;
+}
 
 const TargetTable = () => {
   const [targets, setTargets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterMonth, setFilterMonth] = useState(() => new Date().getMonth() + 1);
+  const [filterYear, setFilterYear] = useState(() => new Date().getFullYear());
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
   const router = useRouter(); // Initialize the router
   const { user } = useUser();
@@ -57,29 +89,54 @@ const TargetTable = () => {
   };
 
   const handleEditSuccess = () => {
-    // Refresh targets after successful edit
-    fetchTargets();
+    fetchTargets(true);
   };
 
-  const fetchTargets = async () => {
+  const handleAssignSuccess = () => {
+    fetchTargets(true);
+  };
+
+  const fetchTargets = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await fetch("/api/monitor-target");
       if (!response.ok) {
         throw new Error("Failed to fetch targets");
       }
       const data = await response.json();
       setTargets(data);
+      setError(null);
     } catch (err) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  const filteredTargets = targets.filter((target) =>
-    target.username.toLowerCase().includes(searchTerm.toLowerCase()),
+  const monthFilteredTargets = useMemo(
+    () =>
+      targets.filter((t) =>
+        targetOverlapsMonth(t.target_start_date, t.target_end_date, filterYear, filterMonth)
+      ),
+    [targets, filterYear, filterMonth]
   );
+
+  const filteredTargets = useMemo(
+    () =>
+      monthFilteredTargets.filter((target) =>
+        target.username.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [monthFilteredTargets, searchTerm]
+  );
+
+  const periodLabel = `${MONTH_NAMES[filterMonth - 1]} ${filterYear}`;
+
+  const yearOptions = useMemo(() => {
+    const y = new Date().getFullYear();
+    const list = [];
+    for (let i = y - 5; i <= y + 2; i++) list.push(i);
+    return list;
+  }, []);
 
   if (loading) {
     return <div className="text-center py-10">Loading targets...</div>;
@@ -91,16 +148,68 @@ const TargetTable = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-4">
-      <div className="flex justify-between items-center mb-4">
-        {/* Back Button */}
-        <button
-          onClick={() => router.back()} // Use router.back() for navigation
-          className="bg-gray-200 text-gray-800 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors duration-200"
-        >
-          &larr; Back
-        </button>
+      <div className="mb-4 flex flex-wrap items-end gap-4 border-b border-gray-100 pb-4">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="monitor-month" className="text-xs font-medium text-gray-600">
+            Month
+          </label>
+          <select
+            id="monitor-month"
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(Number(e.target.value))}
+            className="min-w-[140px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600"
+          >
+            {MONTH_NAMES.map((name, idx) => (
+              <option key={name} value={idx + 1}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="monitor-year" className="text-xs font-medium text-gray-600">
+            Year
+          </label>
+          <select
+            id="monitor-year"
+            value={filterYear}
+            onChange={(e) => setFilterYear(Number(e.target.value))}
+            className="min-w-[100px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600"
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="ml-auto text-xs text-gray-500 sm:ml-0 sm:pt-5">
+          Showing targets active in {periodLabel}
+        </p>
+      </div>
 
-        <div className="relative w-full max-w-sm ml-auto">
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="bg-gray-200 text-gray-800 py-2 px-4 rounded-lg font-semibold hover:bg-gray-300 transition-colors duration-200 w-fit"
+          >
+            &larr; Back
+          </button>
+          {user?.userRole === "SUPERADMIN" && (
+            <button
+              type="button"
+              onClick={() => setIsAssignModalOpen(true)}
+              className="inline-flex items-center gap-2 bg-gray-700 text-white py-2 px-4 rounded-lg font-semibold hover:bg-gray-800 transition-colors duration-200"
+            >
+              <Plus size={18} />
+              Add Targets
+            </button>
+          )}
+        </div>
+
+        <div className="relative w-full max-w-sm sm:ml-auto">
           <input
             type="text"
             placeholder="Search by username..."
@@ -111,6 +220,13 @@ const TargetTable = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
         </div>
       </div>
+
+      <TargetMonitorChart
+        rows={filteredTargets}
+        periodLabel={periodLabel}
+        filterMonth={filterMonth}
+        filterYear={filterYear}
+      />
 
       {/* Desktop Table View */}
       <div className="hidden lg:block overflow-x-auto">
@@ -129,7 +245,7 @@ const TargetTable = () => {
             {filteredTargets.length > 0 ? (
               filteredTargets.map((target, index) => (
                 <tr
-                  key={index}
+                  key={target.id ?? index}
                   className="border-b border-gray-200 hover:bg-gray-50"
                 >
                   <td className="py-3 px-6 text-center">{target.username}</td>
@@ -181,7 +297,7 @@ const TargetTable = () => {
         {filteredTargets.length > 0 ? (
           filteredTargets.map((target, index) => (
             <div
-              key={index}
+              key={target.id ?? index}
               className="bg-gray-50 border border-gray-200 rounded-lg p-4 shadow-sm"
             >
               <div className="font-bold text-lg mb-2">{target.username}</div>
@@ -249,6 +365,12 @@ const TargetTable = () => {
         onClose={closeEditModal}
         targetData={selectedTarget}
         onSuccess={handleEditSuccess}
+      />
+
+      <AssignTargetModal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        onSuccess={handleAssignSuccess}
       />
     </div>
   );

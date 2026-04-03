@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+
+const TRIPLE_CLICK_WINDOW_MS = 500;
 
 /**
- * Click the notes text to reveal a delete action (admin follow-up page).
+ * Triple-click the notes text to show/hide delete (admin follow-up page).
  * variant "employee" uses customers_followup (time_stamp); "tl" uses TL_followups (id).
  */
 export default function FollowupNotesWithDelete({
@@ -17,6 +19,31 @@ export default function FollowupNotesWithDelete({
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
+  const clickCountRef = useRef(0);
+  const clickResetTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (clickResetTimerRef.current) {
+        clearTimeout(clickResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  function handleNotesClick() {
+    if (clickResetTimerRef.current) {
+      clearTimeout(clickResetTimerRef.current);
+    }
+    clickCountRef.current += 1;
+    if (clickCountRef.current === 3) {
+      setOpen((o) => !o);
+      clickCountRef.current = 0;
+      return;
+    }
+    clickResetTimerRef.current = setTimeout(() => {
+      clickCountRef.current = 0;
+    }, TRIPLE_CLICK_WINDOW_MS);
+  }
 
   const canDelete =
     variant === "tl"
@@ -72,8 +99,9 @@ export default function FollowupNotesWithDelete({
         {canDelete ? (
           <button
             type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="text-left align-baseline cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1 transition-colors text-gray-700"
+            title="Triple-click to show or hide delete"
+            onClick={handleNotesClick}
+            className="text-left align-baseline cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1 transition-colors text-gray-700 select-none"
           >
             {display}
           </button>
