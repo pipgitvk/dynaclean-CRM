@@ -3,6 +3,54 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import {
+  mergePayloadDataPreferNonEmpty,
+  referencesPayloadHasContent,
+  educationPayloadHasContent,
+  experiencePayloadHasContent,
+  mapDbReferencesToPayload,
+  mapDbEducationToPayload,
+  mapDbExperienceToPayload,
+} from "@/lib/submissionPayloadMerge";
+
+/** JWT may carry username and/or id (empId). Submission rows use username + empId — match both. */
+function sessionAccountIdentity(session) {
+  if (!session) return { username: "", empId: null };
+  const username = typeof session.username === "string" ? session.username.trim() : "";
+  const empId = session.empId ?? session.id ?? null;
+  return { username, empId };
+}
+
+function submissionBelongsToSessionRow(sub, session) {
+  const { username, empId } = sessionAccountIdentity(session);
+  if (username && String(sub.username || "").trim().toLowerCase() === username.toLowerCase()) return true;
+  if (empId != null && empId !== "" && String(sub.empId) === String(empId)) return true;
+  return false;
+}
+
+/** (username match OR empId match) for this session — own submissions only */
+/** HR roles that can list/approve profile submissions (case-insensitive) */
+function isEmpcrmProfileAdmin(session) {
+  if (!session?.role) return false;
+  const r = String(session.role).trim();
+  return ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].some((a) => a.toLowerCase() === r.toLowerCase());
+}
+
+function buildSessionSubmissionOwnerWhere(session) {
+  const { username, empId } = sessionAccountIdentity(session);
+  const parts = [];
+  const params = [];
+  if (username) {
+    parts.push(`LOWER(TRIM(username)) = LOWER(?)`);
+    params.push(username);
+  }
+  if (empId != null && empId !== "") {
+    parts.push(`CAST(empId AS CHAR) = CAST(? AS CHAR)`);
+    params.push(String(empId));
+  }
+  if (parts.length === 0) return null;
+  return { clause: `(${parts.join(" OR ")})`, params };
+}
 
 // Utility helpers
 const toBoolean = (val) => {
@@ -37,29 +85,67 @@ const toYyyyMmDd = (val) => {
   return s;
 };
 
-// GET: List submissions (admin/HR only); optional filters: status, username
+// GET: List submissions (admin/HR); ?mine=1 = logged-in employee's active revision request
 export async function GET(request) {
   try {
     const session = await getSessionPayload();
-    if (!session?.username) {
+    if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    }
-    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR"].includes(session.role);
-    if (!isAdmin) {
-      return NextResponse.json({ success: false, error: "Access denied" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') || 'pending';
-    const username = searchParams.get('username');
-    const id = searchParams.get('id');
-
+    const mine = searchParams.get("mine");
     const conn = await getDbConnection();
-    let sql = `SELECT * FROM employee_profile_submissions WHERE status = ?`;
-    const params = [status];
-    if (username) { sql += ' AND username = ?'; params.push(username); }
-    if (id) { sql += ' AND id = ?'; params.push(id); }
-    sql += ' ORDER BY submitted_at DESC';
+
+    if (mine === "1") {
+      const owner = buildSessionSubmissionOwnerWhere(session);
+      if (!owner) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      }
+      const sql = `SELECT * FROM employee_profile_submissions WHERE status IN ('reassign', 'revision_requested') AND ${owner.clause} ORDER BY submitted_at DESC LIMIT 1`;
+      const [rows] = await conn.execute(sql, owner.params);
+      return NextResponse.json({ success: true, submissions: rows });
+    }
+
+    if (mine === "latest") {
+      const owner = buildSessionSubmissionOwnerWhere(session);
+      if (!owner) {
+        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      }
+      const sql = `SELECT * FROM employee_profile_submissions WHERE ${owner.clause} ORDER BY submitted_at DESC LIMIT 1`;
+      const [rows] = await conn.execute(sql, owner.params);
+      return NextResponse.json({ success: true, submissions: rows });
+    }
+
+    if (!isEmpcrmProfileAdmin(session)) {
+      return NextResponse.json({ success: false, error: "Access denied" }, { status: 403 });
+    }
+
+    const id = searchParams.get("id");
+    if (id) {
+      const [rows] = await conn.execute(
+        `SELECT * FROM employee_profile_submissions WHERE id = ?`,
+        [id]
+      );
+      return NextResponse.json({ success: true, submissions: rows });
+    }
+
+    const status = (searchParams.get("status") || "pending").trim();
+    const username = searchParams.get('username');
+
+    let sql;
+    const params = [];
+    if (status === "reassign") {
+      sql = `SELECT * FROM employee_profile_submissions WHERE status IN ('reassign', 'revision_requested')`;
+    } else {
+      sql = `SELECT * FROM employee_profile_submissions WHERE status = ?`;
+      params.push(status);
+    }
+    if (username) {
+      sql += " AND username = ?";
+      params.push(username);
+    }
+    sql += " ORDER BY submitted_at DESC";
 
     const [rows] = await conn.execute(sql, params);
     return NextResponse.json({ success: true, submissions: rows });
@@ -73,7 +159,11 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const session = await getSessionPayload();
-    if (!session?.username) {
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const sessIdent = sessionAccountIdentity(session);
+    if (!sessIdent.username && (sessIdent.empId == null || sessIdent.empId === "")) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -90,13 +180,14 @@ export async function POST(request) {
         key.startsWith('experience[') ||
         key.startsWith('reference[') ||
         key.startsWith('document_') ||
-        key === 'references' || key === 'education' || key === 'experience'
+        key === 'references' || key === 'education' || key === 'experience' ||
+        key === 'resubmitSubmissionId'
       ) continue;
       data[key] = value;
     }
 
-    const username = data.username || session.username;
-    const empId = data.empId || session.empId;
+    const username = data.username || session.username || sessIdent.username;
+    const empId = data.empId || session.empId || sessIdent.empId;
     if (!username || !empId) {
       return NextResponse.json({ success: false, error: "Username and empId are required" }, { status: 400 });
     }
@@ -175,8 +266,81 @@ export async function POST(request) {
     let experience = parseMaybeJson(formData.get('experience'), []);
     if (!Array.isArray(experience) && experience && typeof experience === 'object') experience = [experience];
 
-    // Save submission
+    delete data.resubmitSubmissionId;
+
     const conn = await getDbConnection();
+    const resubmitIdRaw = formData.get("resubmitSubmissionId");
+    const resubmitId = resubmitIdRaw != null && String(resubmitIdRaw).trim() !== ""
+      ? Number(resubmitIdRaw)
+      : null;
+
+    if (!resubmitId) {
+      const whereSession = buildSessionSubmissionOwnerWhere(session);
+      let revPendingRows = [];
+      if (whereSession) {
+        const sqlRev = `SELECT id FROM employee_profile_submissions WHERE status IN ('reassign', 'revision_requested') AND ${whereSession.clause} LIMIT 1`;
+        [revPendingRows] = await conn.execute(sqlRev, whereSession.params);
+      }
+      if (revPendingRows.length > 0) {
+        return NextResponse.json(
+          { success: false, error: "You have pending corrections from HR. Please update your profile and resubmit from the same screen." },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (resubmitId) {
+      const [subRows] = await conn.execute(`SELECT * FROM employee_profile_submissions WHERE id = ?`, [resubmitId]);
+      if (subRows.length === 0) {
+        return NextResponse.json({ success: false, error: "Submission not found" }, { status: 404 });
+      }
+      const sub = subRows[0];
+      if (!submissionBelongsToSessionRow(sub, session)) {
+        return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      }
+      if (sub.status !== "reassign" && sub.status !== "revision_requested") {
+        return NextResponse.json({ success: false, error: "This submission is not awaiting revision" }, { status: 400 });
+      }
+
+      // Merge with previous payload so HR always sees a full record (partial FormData keys don't drop untouched fields).
+      const oldPayload = parseMaybeJson(sub.payload, {});
+      const oldData = oldPayload.data && typeof oldPayload.data === "object" ? oldPayload.data : {};
+      const mergedData = mergePayloadDataPreferNonEmpty(oldData, data);
+
+      const mergedReferences =
+        Array.isArray(references) && references.length > 0 ? references : (Array.isArray(oldPayload.references) ? oldPayload.references : []);
+      const mergedEducation =
+        Array.isArray(education) && education.length > 0 ? education : (Array.isArray(oldPayload.education) ? oldPayload.education : []);
+
+      const isExp = toBoolean(data.is_experienced ?? mergedData.is_experienced ?? oldData.is_experienced);
+      let mergedExperience;
+      if (!isExp) {
+        mergedExperience = [];
+      } else if (Array.isArray(experience) && experience.length > 0) {
+        mergedExperience = experience;
+      } else {
+        mergedExperience = Array.isArray(oldPayload.experience) ? oldPayload.experience : [];
+      }
+
+      let oldUploadedFiles = [];
+      try {
+        oldUploadedFiles = sub.uploaded_files ? JSON.parse(sub.uploaded_files) : [];
+      } catch {
+        oldUploadedFiles = [];
+      }
+      if (!Array.isArray(oldUploadedFiles)) oldUploadedFiles = [];
+      const mergedUploadedFiles = [...new Set([...oldUploadedFiles, ...uploadedFiles])];
+
+      // Keep reassigned_fields / reassignment_note so HR can see what was sent back until approve/reject.
+      await conn.execute(
+        `UPDATE employee_profile_submissions SET status = 'pending', payload = ?, uploaded_files = ?, submitted_by = ?, submitted_at = NOW(),
+         reviewed_by = NULL, reviewed_at = NULL, rejection_reason = NULL
+         WHERE id = ?`,
+        [JSON.stringify({ data: mergedData, references: mergedReferences, education: mergedEducation, experience: mergedExperience }), JSON.stringify(mergedUploadedFiles), session.username, resubmitId]
+      );
+      return NextResponse.json({ success: true, message: "Profile resubmitted for HR approval", submissionId: resubmitId });
+    }
+
     const [result] = await conn.execute(
       `INSERT INTO employee_profile_submissions (username, empId, status, payload, uploaded_files, submitted_by) VALUES (?, ?, 'pending', ?, ?, ?)`,
       [username, empId, JSON.stringify({ data, references, education, experience }), JSON.stringify(uploadedFiles), session.username]
@@ -194,17 +358,16 @@ export async function PATCH(request) {
   let conn;
   try {
     const session = await getSessionPayload();
-    if (!session?.username) {
+    if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
-    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR"].includes(session.role);
-    if (!isAdmin) {
+    if (!isEmpcrmProfileAdmin(session)) {
       return NextResponse.json({ success: false, error: "Access denied" }, { status: 403 });
     }
 
     const body = await request.json();
-    const { submissionId, action, rejection_reason } = body;
-    if (!submissionId || !action || !['approve', 'reject'].includes(action)) {
+    const { submissionId, action, rejection_reason, fields, reassignment_note } = body;
+    if (!submissionId || !action || !['approve', 'reject', 'reassign'].includes(action)) {
       return NextResponse.json({ success: false, error: 'submissionId and valid action are required' }, { status: 400 });
     }
 
@@ -215,12 +378,37 @@ export async function PATCH(request) {
     }
     const submission = rows[0];
 
+    if (action === "reassign") {
+      if (!Array.isArray(fields) || fields.length === 0) {
+        return NextResponse.json({ success: false, error: "Select at least one field to reassign" }, { status: 400 });
+      }
+      if (submission.status !== "pending") {
+        return NextResponse.json({ success: false, error: "Only pending submissions can be reassigned" }, { status: 400 });
+      }
+      await conn.execute(
+        `UPDATE employee_profile_submissions SET status = 'reassign', reassigned_fields = ?, reassignment_note = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?`,
+        [JSON.stringify(fields), reassignment_note || null, session.username, submissionId]
+      );
+      return NextResponse.json({ success: true, message: "Selected fields sent to employee for correction" });
+    }
+
     if (action === 'reject') {
       await conn.execute(
-        `UPDATE employee_profile_submissions SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ? WHERE id = ?`,
+        `UPDATE employee_profile_submissions SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?, reassigned_fields = NULL, reassignment_note = NULL WHERE id = ?`,
         [session.username, rejection_reason || null, submissionId]
       );
       return NextResponse.json({ success: true, message: 'Submission rejected' });
+    }
+
+    if (submission.status !== "pending") {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Only pending submissions can be approved. If the profile was sent back for correction, wait until the employee resubmits.",
+        },
+        { status: 400 }
+      );
     }
 
     // Approve: merge into employee_profiles and child tables
@@ -232,38 +420,56 @@ export async function PATCH(request) {
     const { data, references = [], education = [], experience = [] } = payload;
     const username = submission.username;
 
-    // Fetch existing profile id and existing docs
-    const [existing] = await conn.execute(`SELECT id, joining_form_documents FROM employee_profiles WHERE username = ?`, [username]);
+    const [existing] = await conn.execute(`SELECT * FROM employee_profiles WHERE username = ?`, [username]);
+    const existingRow = existing[0] || {};
 
-    let profileId;
+    let profileId = existingRow.id;
     let previousDocs = [];
-    if (existing.length > 0) {
-      profileId = existing[0].id;
-      try { previousDocs = existing[0].joining_form_documents ? JSON.parse(existing[0].joining_form_documents) : []; } catch { previousDocs = []; }
+    if (existingRow.joining_form_documents) {
+      try {
+        previousDocs = JSON.parse(existingRow.joining_form_documents);
+      } catch {
+        previousDocs = [];
+      }
     }
-    let uploadedFiles = [];
-    try { uploadedFiles = submission.uploaded_files ? JSON.parse(submission.uploaded_files) : []; } catch { uploadedFiles = []; }
+    if (!Array.isArray(previousDocs)) previousDocs = [];
 
-    // Deduplicate documents: If uploadedFiles (from submission) contains URLs, it likely represents the full intended list (including preserved ones).
-    // However, to ensure we don't duplicate existing ones if they are merged, we use a Set.
-    // If the submission system is working correctly (POST includes existing), then uploadedFiles IS the final list.
-    // But to be safe if POST only had new files (old logic), we might want to merge. 
-    // Given checks in POST, uploadedFiles should have everything.
-    // Let's use a unique set of all non-empty strings.
+    let uploadedFiles = [];
+    try {
+      uploadedFiles = submission.uploaded_files ? JSON.parse(submission.uploaded_files) : [];
+    } catch {
+      uploadedFiles = [];
+    }
 
     const allDocs = [...(Array.isArray(previousDocs) ? previousDocs : []), ...uploadedFiles];
     const uniqueDocs = [...new Set(allDocs)];
 
-    // Wait, if user wanted to DELETE a doc, merging previousDocs will bring it back.
-    // The user requirement says "edit... previous data should not be change". It implies adding.
-    // But if editing, usually implies ability to remove.
-    // If I switched POST to include "Preserved URLs", then `uploadedFiles` has the user's intent.
-    // If I merge `previousDocs`, I prevent deletion.
-    // But users mostly "add".
-    // I will stick to the safer "Merge Unique". Why? Because if there's a bug in frontend not sending old docs, merge saves them. 
-    // And users didn't explicitly ask for delete.
+    let refsToInsert = references;
+    let eduToInsert = education;
+    let expToInsert = experience;
+    if (profileId) {
+      if (!referencesPayloadHasContent(refsToInsert)) {
+        const [rrows] = await conn.execute(`SELECT * FROM employee_references WHERE profile_id = ?`, [profileId]);
+        if (rrows.length) refsToInsert = mapDbReferencesToPayload(rrows);
+      }
+      if (!educationPayloadHasContent(eduToInsert)) {
+        const [erows] = await conn.execute(
+          `SELECT * FROM employee_education WHERE profile_id = ? ORDER BY display_order, year_of_passing DESC`,
+          [profileId]
+        );
+        if (erows.length) eduToInsert = mapDbEducationToPayload(erows);
+      }
+      if (!experiencePayloadHasContent(expToInsert)) {
+        const [xrows] = await conn.execute(
+          `SELECT * FROM employee_experience WHERE profile_id = ? ORDER BY display_order, period_from DESC`,
+          [profileId]
+        );
+        if (xrows.length) expToInsert = mapDbExperienceToPayload(xrows);
+      }
+    }
 
-    const upsertData = { ...data, joining_form_documents: JSON.stringify(uniqueDocs) };
+    const mergedFlat = mergePayloadDataPreferNonEmpty(existingRow, data);
+    const upsertData = { ...mergedFlat, joining_form_documents: JSON.stringify(uniqueDocs) };
 
     if (existing.length > 0) {
       // Update
@@ -295,8 +501,8 @@ export async function PATCH(request) {
     }
 
     await conn.execute(`DELETE FROM employee_references WHERE profile_id = ?`, [profileId]);
-    console.log('[DEBUG][PATCH] Inserting references for profileId:', profileId, 'Count:', references.length, 'Data:', JSON.stringify(references));
-    for (const ref of references) {
+    console.log('[DEBUG][PATCH] Inserting references for profileId:', profileId, 'Count:', refsToInsert.length, 'Data:', JSON.stringify(refsToInsert));
+    for (const ref of refsToInsert) {
       if (ref.reference_name || ref.name) {
         await conn.execute(
           `INSERT INTO employee_references (profile_id, reference_name, reference_mobile, reference_type, reference_address, relationship) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -306,8 +512,8 @@ export async function PATCH(request) {
     }
 
     await conn.execute(`DELETE FROM employee_education WHERE profile_id = ?`, [profileId]);
-    for (let i = 0; i < (education?.length || 0); i++) {
-      const edu = education[i];
+    for (let i = 0; i < (eduToInsert?.length || 0); i++) {
+      const edu = eduToInsert[i];
       if (edu.exam_name) {
         await conn.execute(
           `INSERT INTO employee_education (profile_id, exam_name, board_university, year_of_passing, grade_percentage, display_order) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -317,8 +523,8 @@ export async function PATCH(request) {
     }
 
     await conn.execute(`DELETE FROM employee_experience WHERE profile_id = ?`, [profileId]);
-    for (let i = 0; i < (experience?.length || 0); i++) {
-      const exp = experience[i];
+    for (let i = 0; i < (expToInsert?.length || 0); i++) {
+      const exp = expToInsert[i];
       if (exp.company_name) {
         const pf = toYyyyMmDd(exp.period_from) || null;
         const pt = toYyyyMmDd(exp.period_to) || null;
@@ -331,7 +537,7 @@ export async function PATCH(request) {
 
     // Mark submission as approved
     await conn.execute(
-      `UPDATE employee_profile_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = NOW(), rejection_reason = NULL WHERE id = ?`,
+      `UPDATE employee_profile_submissions SET status = 'approved', reviewed_by = ?, reviewed_at = NOW(), rejection_reason = NULL, reassigned_fields = NULL, reassignment_note = NULL WHERE id = ?`,
       [session.username, submissionId]
     );
 

@@ -1,13 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Phone, Calendar, MapPin, Briefcase, GraduationCap, Building, Loader2, Download, ExternalLink, FileText, CheckCircle } from "lucide-react";
+import { User, Mail, Phone, Calendar, MapPin, Briefcase, GraduationCap, Building, Loader2, Download, ExternalLink, FileText, AlertCircle, CheckCircle, Clock, XCircle } from "lucide-react";
 import toast from "react-hot-toast";
+import { labelForReassignKey } from "@/lib/profileReassignFields";
+
+const EDIT_PROFILE_HREF = "/empcrm/user-dashboard/profile/edit";
+
+function parseReassignedLabels(submission) {
+  if (!submission?.reassigned_fields) return [];
+  try {
+    const keys =
+      typeof submission.reassigned_fields === "string"
+        ? JSON.parse(submission.reassigned_fields)
+        : submission.reassigned_fields;
+    return Array.isArray(keys) ? keys.map((k) => labelForReassignKey(k)) : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function UserProfileView() {
   const [profile, setProfile] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [latestSubmission, setLatestSubmission] = useState(null);
 
   useEffect(() => {
     fetchUserAndProfile();
@@ -15,16 +32,28 @@ export default function UserProfileView() {
 
   const fetchUserAndProfile = async () => {
     try {
-      const userResponse = await fetch("/api/me");
-      const userData = await userResponse.json();
-      if (userData?.success) setUserData(userData.user);
+      const userResponse = await fetch("/api/me", { credentials: "include", cache: "no-store" });
+      const userJson = await userResponse.json();
+      if (userJson?.username) setUserData(userJson);
 
-      const requestUrl = userData?.success && userData?.user?.username
-        ? `/api/empcrm/profile?username=${encodeURIComponent(userData.user.username)}`
+      const requestUrl = userJson?.username
+        ? `/api/empcrm/profile?username=${encodeURIComponent(userJson.username)}`
         : `/api/empcrm/profile`;
 
-      const profileResponse = await fetch(requestUrl);
+      const fetchOpts = { credentials: "include", cache: "no-store" };
+      const [profileResponse, submissionResponse] = await Promise.all([
+        fetch(requestUrl, fetchOpts),
+        fetch("/api/empcrm/profile/submissions?mine=latest", fetchOpts),
+      ]);
+
       const profileData = await profileResponse.json();
+      const submissionData = await submissionResponse.json();
+
+      if (submissionData.success && submissionData.submissions?.length > 0) {
+        setLatestSubmission(submissionData.submissions[0]);
+      } else {
+        setLatestSubmission(null);
+      }
 
       if (profileData.success && profileData.profile) {
         setProfile(profileData.profile);
@@ -46,7 +75,103 @@ export default function UserProfileView() {
     );
   }
 
+  const st = latestSubmission?.status;
+  const isReassign = st === "reassign" || st === "revision_requested";
+  const reassignedLabels = isReassign && latestSubmission ? parseReassignedLabels(latestSubmission) : [];
+
   if (!profile) {
+    if (latestSubmission && isReassign) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
+          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-left border border-amber-200">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-8 h-8 text-amber-600" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">HR requested corrections</h2>
+            <p className="text-gray-600 mb-4 text-center text-sm">
+              Please update the items below and submit again. Your profile will go back to HR for approval.
+            </p>
+            {reassignedLabels.length > 0 && (
+              <ul className="mb-4 list-disc pl-5 text-sm text-gray-800 space-y-1 bg-amber-50 rounded-lg p-4 border border-amber-100">
+                {reassignedLabels.map((label, idx) => (
+                  <li key={`${label}-${idx}`}>{label}</li>
+                ))}
+              </ul>
+            )}
+            {latestSubmission.reassignment_note && (
+              <p className="text-sm text-gray-700 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <span className="font-semibold">Note from HR: </span>
+                {latestSubmission.reassignment_note}
+              </p>
+            )}
+            <a
+              href={EDIT_PROFILE_HREF}
+              className="inline-block w-full text-center py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 font-medium transition-all shadow-md"
+            >
+              Update &amp; submit to HR
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    if (latestSubmission && st === "pending") {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
+          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-blue-200">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-blue-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Awaiting HR approval</h2>
+            <p className="text-gray-600 mb-6 text-sm">
+              Your profile has been submitted and is waiting for HR to review.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (latestSubmission && st === "approved") {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
+          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-green-200">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Profile approved</h2>
+            <p className="text-gray-600 mb-2 text-sm">
+              HR has approved your profile submission
+              {latestSubmission.reviewed_at ? ` on ${new Date(latestSubmission.reviewed_at).toLocaleString()}` : ""}.
+            </p>
+            <p className="text-xs text-gray-500">Your details will appear here once they are synced to your profile.</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (latestSubmission && st === "rejected") {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
+          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-left border border-red-200">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                <XCircle className="w-8 h-8 text-red-600" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">Submission rejected</h2>
+            {latestSubmission.rejection_reason && (
+              <p className="text-sm text-gray-700 mb-4 p-3 bg-gray-50 rounded-lg">{latestSubmission.rejection_reason}</p>
+            )}
+            <a href={EDIT_PROFILE_HREF} className="inline-block w-full text-center py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+              Edit &amp; resubmit
+            </a>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -57,7 +182,7 @@ export default function UserProfileView() {
           <p className="text-gray-600 mb-6">
             Your profile details are missing. Please complete your profile to proceed.
           </p>
-          <a href="/empcrm/user-dashboard/profile/edit" className="inline-block w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all shadow-md hover:shadow-lg">
+          <a href={EDIT_PROFILE_HREF} className="inline-block w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all shadow-md hover:shadow-lg">
             Create Profile
           </a>
         </div>
@@ -68,11 +193,80 @@ export default function UserProfileView() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
-        <div className="flex justify-end">
-          <a href="/empcrm/user-dashboard/profile/edit" className="py-3 px-4 bg-blue-600 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all shadow-md hover:shadow-lg text-right">
+        {(latestSubmission?.status === "reassign" || latestSubmission?.status === "revision_requested") && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5 text-amber-950 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div className="flex gap-3">
+                <AlertCircle className="w-6 h-6 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-gray-900">HR requested corrections on your submission</h2>
+                  <p className="text-sm text-gray-700 mt-1">
+                    Update the fields below, then submit again. It will return to HR for approval.
+                  </p>
+                  {reassignedLabels.length > 0 && (
+                    <ul className="mt-3 list-disc pl-5 text-sm text-gray-800 space-y-0.5">
+                      {reassignedLabels.map((label, idx) => (
+                        <li key={`${label}-${idx}`}>{label}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {latestSubmission.reassignment_note && (
+                    <p className="mt-3 text-sm border-t border-amber-200 pt-3">
+                      <span className="font-semibold">Note from HR: </span>
+                      {latestSubmission.reassignment_note}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <a
+                href={EDIT_PROFILE_HREF}
+                className="shrink-0 inline-flex justify-center items-center py-2.5 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium text-sm whitespace-nowrap"
+              >
+                Update &amp; submit to HR
+              </a>
+            </div>
+          </div>
+        )}
+        {latestSubmission?.status === "pending" && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 sm:p-5 text-blue-950 shadow-sm flex gap-3 items-start">
+            <Clock className="w-6 h-6 shrink-0 text-blue-600 mt-0.5" />
+            <div>
+              <h2 className="font-bold text-lg">Awaiting HR approval</h2>
+              <p className="text-sm mt-1">Your latest profile submission is under review.</p>
+            </div>
+          </div>
+        )}
+        {latestSubmission?.status === "approved" && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4 sm:p-5 text-green-950 shadow-sm flex gap-3 items-start">
+            <CheckCircle className="w-6 h-6 shrink-0 text-green-600 mt-0.5" />
+            <div>
+              <h2 className="font-bold text-lg">Profile approved by HR</h2>
+              <p className="text-sm mt-1">
+                Your submission was approved
+                {latestSubmission.reviewed_at ? ` on ${new Date(latestSubmission.reviewed_at).toLocaleString()}` : ""}.
+              </p>
+            </div>
+          </div>
+        )}
+        {latestSubmission?.status === "rejected" && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 sm:p-5 text-red-950 shadow-sm flex gap-3 items-start">
+            <XCircle className="w-6 h-6 shrink-0 text-red-600 mt-0.5" />
+            <div className="flex-1">
+              <h2 className="font-bold text-lg">Submission rejected</h2>
+              {latestSubmission.rejection_reason && (
+                <p className="text-sm mt-1">{latestSubmission.rejection_reason}</p>
+              )}
+              <a href={EDIT_PROFILE_HREF} className="inline-block mt-3 text-sm font-medium text-red-800 underline">
+                Edit &amp; resubmit
+              </a>
+            </div>
+          </div>
+        )}
+        {/* <div className="flex justify-end">
+          <a href={EDIT_PROFILE_HREF} className="py-3 px-4 bg-blue-600 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all shadow-md hover:shadow-lg text-right">
             Edit Profile
           </a>
-        </div>
+        </div> */}
         {/* Header Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
           <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-700"></div>

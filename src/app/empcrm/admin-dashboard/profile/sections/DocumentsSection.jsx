@@ -9,14 +9,18 @@ export default function DocumentsSection({
   existingPhotoUrl = "",
   existingSignatureUrl = "",
   isExperienced = false,
-  fileUrls = {} // Map of key -> url for existing documents
+  fileUrls = {}, // Map of key -> url for existing documents
+  reviewMode = false,
 }) {
+  const ro = reviewMode;
 
   const handleDocumentCheckbox = (key) => {
+    if (ro) return;
     setDocuments(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleFileChange = (e, fieldName) => {
+    if (ro) return;
     const file = e.target.files?.[0];
     if (file) {
       setFiles(prev => ({ ...prev, [fieldName]: file }));
@@ -43,7 +47,7 @@ export default function DocumentsSection({
       title: "Address Proof (Mandatory)",
       items: [
         { key: "doc_aadhaar_card", label: "Aadhaar Card", required: true },
-        { key: "doc_electricity_bill", label: "Electricity Bill (Permanent & Current)", required: true },
+        { key: "doc_electricity_bill", label: "Electricity Bill", required: true },
         { key: "doc_rent_agreement", label: "Rent Agreement (If Applicable)", required: false },
       ]
     },
@@ -108,7 +112,8 @@ export default function DocumentsSection({
               type="file"
               accept="image/*"
               onChange={(e) => handleFileChange(e, "profile_photo")}
-              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              disabled={ro}
+              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {existingPhotoUrl && !files.profile_photo && (
               <a
@@ -139,7 +144,8 @@ export default function DocumentsSection({
               type="file"
               accept="image/*"
               onChange={(e) => handleFileChange(e, "signature")}
-              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              disabled={ro}
+              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {existingSignatureUrl && !files.signature && (
               <a
@@ -176,70 +182,97 @@ export default function DocumentsSection({
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {category.items.map((doc) => (
-                  <div key={doc.key} className="flex items-center justify-between gap-3 p-3 bg-white border rounded-md hover:shadow-sm transition-shadow">
-                    <div className="flex-1 min-w-0">
-                      <label className="flex items-start gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={documents[doc.key] || false}
-                          onChange={() => handleDocumentCheckbox(doc.key)}
-                          className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-gray-700 block truncate" title={doc.label}>
-                            {doc.label} {doc.required && <span className="text-red-500">*</span>}
-                          </span>
-                          {(documents[doc.key] || files[doc.key]) && (
-                            <span className="text-xs text-green-600 flex items-center gap-1 mt-0.5">
-                              <CheckCircle className="w-3 h-3" /> Selected
+                  <div key={doc.key} className="p-3 bg-white border rounded-md hover:shadow-sm transition-shadow">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <label className={`flex items-start gap-2 ${ro ? "cursor-default" : "cursor-pointer"}`}>
+                          <input
+                            type="checkbox"
+                            checked={documents[doc.key] || false}
+                            onChange={() => handleDocumentCheckbox(doc.key)}
+                            disabled={ro}
+                            className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 disabled:opacity-60"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-700 block truncate" title={doc.label}>
+                              {doc.label} {doc.required && <span className="text-red-500">*</span>}
                             </span>
-                          )}
-                        </div>
-                      </label>
-                    </div>
+                            {(documents[doc.key] || files[doc.key]) && (
+                              <span className="text-xs text-green-600 flex items-center gap-1 mt-0.5">
+                                <CheckCircle className="w-3 h-3" /> Selected
+                              </span>
+                            )}
+                          </div>
+                        </label>
+                      </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <input
-                        id={`file_${doc.key}`}
-                        type="file"
-                        onChange={(e) => handleFileChange(e, doc.key)}
-                        className="hidden"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => document.getElementById(`file_${doc.key}`)?.click()}
-                        className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
-                        title="Upload File"
-                      >
-                        <Upload className="w-4 h-4" />
-                      </button>
-
-                      {/* View New Button */}
-                      {files[doc.key] && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          id={`file_${doc.key}`}
+                          type="file"
+                          onChange={(e) => handleFileChange(e, doc.key)}
+                          disabled={ro}
+                          className="hidden"
+                        />
                         <button
                           type="button"
-                          onClick={() => {
-                            try { window.open(URL.createObjectURL(files[doc.key]), "_blank"); } catch { }
-                          }}
-                          className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
-                          title="View New Upload"
+                          onClick={() => !ro && document.getElementById(`file_${doc.key}`)?.click()}
+                          disabled={ro}
+                          className="p-2 rounded-full hover:bg-gray-100 text-gray-600 disabled:opacity-40 disabled:pointer-events-none"
+                          title="Upload File"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Upload className="w-4 h-4" />
                         </button>
-                      )}
 
-                      {/* View Existing Button (from URL map) */}
-                      {!files[doc.key] && fileUrls[doc.key] && (
-                        <button
-                          type="button"
-                          onClick={() => window.open(fileUrls[doc.key], "_blank")}
-                          className="p-2 rounded-full hover:bg-blue-50 text-blue-600"
-                          title="View Existing Document"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      )}
+                        {files[doc.key] && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              try { window.open(URL.createObjectURL(files[doc.key]), "_blank"); } catch { }
+                            }}
+                            className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+                            title="View New Upload"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {!files[doc.key] && fileUrls[doc.key] && (
+                          <button
+                            type="button"
+                            onClick={() => window.open(fileUrls[doc.key], "_blank")}
+                            className="p-2 rounded-full hover:bg-blue-50 text-blue-600"
+                            title="View Existing Document"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {doc.key === "doc_electricity_bill" && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          This bill is for <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={documents.electricity_bill_proof_type || ""}
+                          onChange={(e) =>
+                            setDocuments((prev) => ({
+                              ...prev,
+                              electricity_bill_proof_type: e.target.value,
+                            }))
+                          }
+                          disabled={ro}
+                          required={!ro}
+                          className="w-full max-w-sm px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        >
+                          <option value="">Select Current or Permanent</option>
+                          <option value="current">Current address</option>
+                          <option value="permanent">Permanent address</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
