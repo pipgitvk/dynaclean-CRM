@@ -16,6 +16,7 @@ const TABS = [
 function displayStatus(status) {
   if (!status) return "—";
   if (status === "revision_requested") return "reassign";
+  if (status === "pending_admin") return "with super admin";
   return status;
 }
 
@@ -30,6 +31,8 @@ function statusBadgeClass(status) {
       return "bg-amber-100 text-amber-900";
     case "pending":
       return "bg-blue-100 text-blue-800";
+    case "pending_admin":
+      return "bg-violet-100 text-violet-900";
     default:
       return "bg-gray-100 text-gray-800";
   }
@@ -70,7 +73,7 @@ export default function ProfileApprovalsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast.success("Approved");
+        toast.success(data.message || "Approved");
         load();
       } else toast.error(data.error || "Failed to approve");
     } catch (e) {
@@ -147,6 +150,11 @@ export default function ProfileApprovalsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EmpID</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                {tab === "pending" && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Assigned HR
+                  </th>
+                )}
                 {tab !== "pending" && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reviewed</th>
                 )}
@@ -166,6 +174,15 @@ export default function ProfileApprovalsPage() {
                       {displayStatus(s.status)}
                     </span>
                   </td>
+                  {tab === "pending" && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {s.pending_assignee_username?.trim() ? (
+                        <span className="text-violet-800 font-medium">@{s.pending_assignee_username.trim()}</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  )}
                   {tab !== "pending" && (
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {s.reviewed_at ? new Date(s.reviewed_at).toLocaleString() : "—"}
