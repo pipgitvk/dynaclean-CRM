@@ -271,10 +271,10 @@ async function saveProfile(request, methodType) {
       }
     }
 
-    // Strategy B: Per-document fields
+    // Strategy B: Per-document fields (accept both document_* and doc_* prefix keys)
     for (const [key, val] of formData.entries()) {
       if (key === 'profile_photo' || key === 'signature' || key === 'joining_form_documents') continue;
-      if (!key.startsWith('document_')) continue;
+      if (!(key.startsWith('document_') || key.startsWith('doc_'))) continue;
       if (val && typeof val === 'object' && 'arrayBuffer' in val && val.size > 0) {
         const safeKey = sanitizeToken(key);
         const url = await processFile(val, safeKey);
