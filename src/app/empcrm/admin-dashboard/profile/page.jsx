@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, FileText } from "lucide-react";
 import ProfileForm from "./ProfileForm";
 
 export default function ProfileManagement() {
+  const searchParams = useSearchParams();
+  const presetUsername = searchParams.get("username") || "";
+
   const [employees, setEmployees] = useState([]);
   const [selectedUsername, setSelectedUsername] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -47,6 +51,19 @@ export default function ProfileManagement() {
       console.error("Error fetching profile:", error);
     }
   };
+
+  // Auto-select employee when coming from Edit button with ?username= in URL
+  useEffect(() => {
+    if (presetUsername && employees.length > 0 && !selectedUsername) {
+      const emp = employees.find(
+        (e) => e.username.toLowerCase() === presetUsername.toLowerCase()
+      );
+      if (emp) {
+        setSelectedUsername(emp.username);
+        setSelectedEmployee(emp);
+      }
+    }
+  }, [presetUsername, employees]);
 
   const filteredEmployees = employees.filter((emp) =>
     emp.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
