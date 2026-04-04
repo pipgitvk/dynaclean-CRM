@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { User, Mail, Phone, Calendar, MapPin, Briefcase, GraduationCap, Building, Loader2, Download, ExternalLink, FileText, AlertCircle, CheckCircle, Clock, XCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { labelForReassignKey } from "@/lib/profileReassignFields";
+import { profileAssetViewUrl } from "@/lib/profileMediaUrl";
 
 const EDIT_PROFILE_HREF = "/empcrm/user-dashboard/profile/edit";
 
@@ -308,7 +309,7 @@ export default function UserProfileView() {
               <div className="w-32 h-32 bg-white rounded-full p-2 shadow-lg mb-4 md:mb-0">
                 <div className="w-full h-full rounded-full overflow-hidden bg-gray-100">
                   {profile.profile_photo ? (
-                    <img src={profile.profile_photo} alt="Profile" className="w-full h-full object-cover" />
+                    <img src={profileAssetViewUrl(profile.profile_photo)} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
                       <User className="w-12 h-12" />

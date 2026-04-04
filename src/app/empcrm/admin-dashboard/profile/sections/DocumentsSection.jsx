@@ -1,4 +1,5 @@
 import { Upload, Eye, Paperclip, CheckCircle } from "lucide-react";
+import { profileAssetViewUrl } from "@/lib/profileMediaUrl";
 
 export default function DocumentsSection({
   documents,
@@ -117,7 +118,7 @@ export default function DocumentsSection({
             />
             {existingPhotoUrl && !files.profile_photo && (
               <a
-                href={existingPhotoUrl}
+                href={profileAssetViewUrl(existingPhotoUrl)}
                 target="_blank"
                 rel="noreferrer"
                 className="text-blue-600 text-sm underline shrink-0"
@@ -149,7 +150,7 @@ export default function DocumentsSection({
             />
             {existingSignatureUrl && !files.signature && (
               <a
-                href={existingSignatureUrl}
+                href={profileAssetViewUrl(existingSignatureUrl)}
                 target="_blank"
                 rel="noreferrer"
                 className="text-blue-600 text-sm underline shrink-0"
@@ -240,7 +241,7 @@ export default function DocumentsSection({
                         {!files[doc.key] && fileUrls[doc.key] && (
                           <button
                             type="button"
-                            onClick={() => window.open(fileUrls[doc.key], "_blank")}
+                            onClick={() => window.open(profileAssetViewUrl(fileUrls[doc.key]), "_blank")}
                             className="p-2 rounded-full hover:bg-blue-50 text-blue-600"
                             title="View Existing Document"
                           >
