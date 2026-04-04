@@ -11,6 +11,7 @@ import {
   Eye,
   Plus
 } from "lucide-react";
+import { profileAssetViewUrl } from "@/lib/profileMediaUrl";
 
 export default function AdminDocuments() {
   const [employees, setEmployees] = useState([]);
@@ -192,8 +193,10 @@ export default function AdminDocuments() {
   };
 
   const getFileUrl = (doc) => {
-    return typeof doc === 'string' ? doc : doc.url;
+    return typeof doc === "string" ? doc : doc.url;
   };
+
+  const getFileUrlForView = (doc) => profileAssetViewUrl(getFileUrl(doc));
 
   const getDocumentTypes = (doc) => {
     if (typeof doc === 'object' && doc.documentTypes) {
@@ -308,7 +311,7 @@ export default function AdminDocuments() {
                     <div>
                       <p className="text-sm font-medium text-gray-600 mb-2">Profile Photo</p>
                       <img 
-                        src={documents.profile_photo} 
+                        src={profileAssetViewUrl(documents.profile_photo)} 
                         alt="Profile" 
                         className="w-32 h-32 object-cover rounded-lg border border-gray-200"
                       />
@@ -318,7 +321,7 @@ export default function AdminDocuments() {
                     <div>
                       <p className="text-sm font-medium text-gray-600 mb-2">Signature</p>
                       <img 
-                        src={documents.signature} 
+                        src={profileAssetViewUrl(documents.signature)} 
                         alt="Signature" 
                         className="w-32 h-32 object-contain rounded-lg border border-gray-200 bg-white"
                       />
@@ -362,7 +365,7 @@ export default function AdminDocuments() {
                           </div>
                           <div className="flex items-center gap-2">
                             <a
-                              href={getFileUrl(doc)}
+                              href={getFileUrlForView(doc)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
@@ -371,7 +374,7 @@ export default function AdminDocuments() {
                               <Eye className="w-4 h-4" />
                             </a>
                             <a
-                              href={getFileUrl(doc)}
+                              href={getFileUrlForView(doc)}
                               download
                               className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
                               title="Download"

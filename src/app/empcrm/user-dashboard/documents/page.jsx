@@ -8,6 +8,7 @@ import {
   Image,
   FileCheck
 } from "lucide-react";
+import { profileAssetViewUrl } from "@/lib/profileMediaUrl";
 
 export default function UserDocuments() {
   const [documents, setDocuments] = useState(null);
@@ -43,7 +44,8 @@ export default function UserDocuments() {
   };
 
   const getFileUrl = (doc) => {
-    return typeof doc === 'string' ? doc : doc.url;
+    const u = typeof doc === "string" ? doc : doc.url;
+    return profileAssetViewUrl(u);
   };
 
   const getDocumentTypes = (doc) => {
@@ -97,7 +99,7 @@ export default function UserDocuments() {
         <div className="flex items-center gap-4">
           {documents.profile_photo && (
             <img 
-              src={documents.profile_photo} 
+              src={profileAssetViewUrl(documents.profile_photo)} 
               alt="Profile" 
               className="w-20 h-20 rounded-full object-cover border-2 border-blue-500"
             />
@@ -124,13 +126,13 @@ export default function UserDocuments() {
                 <p className="text-sm font-medium text-gray-600 mb-2">Profile Photo</p>
                 <div className="flex items-center justify-between">
                   <img 
-                    src={documents.profile_photo} 
+                    src={profileAssetViewUrl(documents.profile_photo)} 
                     alt="Profile" 
                     className="w-24 h-24 object-cover rounded-lg border border-gray-200"
                   />
                   <div className="flex gap-2">
                     <a
-                      href={documents.profile_photo}
+                      href={profileAssetViewUrl(documents.profile_photo)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
@@ -139,7 +141,7 @@ export default function UserDocuments() {
                       <Eye className="w-5 h-5" />
                     </a>
                     <a
-                      href={documents.profile_photo}
+                      href={profileAssetViewUrl(documents.profile_photo)}
                       download
                       className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
                       title="Download"
@@ -156,13 +158,13 @@ export default function UserDocuments() {
                 <p className="text-sm font-medium text-gray-600 mb-2">Signature</p>
                 <div className="flex items-center justify-between">
                   <img 
-                    src={documents.signature} 
+                    src={profileAssetViewUrl(documents.signature)} 
                     alt="Signature" 
                     className="w-24 h-24 object-contain rounded-lg border border-gray-200 bg-white"
                   />
                   <div className="flex gap-2">
                     <a
-                      href={documents.signature}
+                      href={profileAssetViewUrl(documents.signature)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
@@ -171,7 +173,7 @@ export default function UserDocuments() {
                       <Eye className="w-5 h-5" />
                     </a>
                     <a
-                      href={documents.signature}
+                      href={profileAssetViewUrl(documents.signature)}
                       download
                       className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
                       title="Download"
