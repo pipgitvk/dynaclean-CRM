@@ -1,5 +1,9 @@
-export default function ReferencesSection({ references, setReferences, reviewMode = false }) {
+import { shouldShowReferenceColumn } from "@/lib/reassignFieldVisibility";
+
+export default function ReferencesSection({ references, setReferences, reviewMode = false, reassignFieldKeys = null }) {
     const ro = reviewMode;
+    const rf = reassignFieldKeys;
+    const col = (k) => shouldShowReferenceColumn(rf, k);
     const addReference = () => {
         if (ro) return;
         setReferences([...references, { name: "", contact: "", address: "", relationship: "" }]);
@@ -40,6 +44,7 @@ export default function ReferencesSection({ references, setReferences, reviewMod
 
             {references.map((ref, index) => (
                 <div key={index} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 mb-4 bg-gray-50 rounded-lg border">
+                    {col("reference_name") && (
                     <div>
                         <label className={labelClass}>Reference Name *</label>
                         <input
@@ -51,6 +56,8 @@ export default function ReferencesSection({ references, setReferences, reviewMod
                             className={inactive(inputClass)}
                         />
                     </div>
+                    )}
+                    {col("reference_contact") && (
                     <div>
                         <label className={labelClass}>Contact Number *</label>
                         <input
@@ -62,6 +69,8 @@ export default function ReferencesSection({ references, setReferences, reviewMod
                             className={inactive(inputClass)}
                         />
                     </div>
+                    )}
+                    {col("reference_address") && (
                     <div>
                         <label className={labelClass}>Address *</label>
                         <input
@@ -73,6 +82,8 @@ export default function ReferencesSection({ references, setReferences, reviewMod
                             className={inactive(inputClass)}
                         />
                     </div>
+                    )}
+                    {col("reference_relationship") && (
                     <div>
                         <label className={labelClass}>Relationship w/ Applicant *</label>
                         <select
@@ -87,6 +98,7 @@ export default function ReferencesSection({ references, setReferences, reviewMod
                             <option value="relation">Relation</option>
                         </select>
                     </div>
+                    )}
 
                     {!ro && (
                         <div className="col-span-1 md:col-span-2 lg:col-span-4 text-right">

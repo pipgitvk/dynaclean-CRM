@@ -41,6 +41,12 @@ const allMenuItems = [
         icon: "ListOrdered",
       },
       {
+        path: "/user-dashboard/attendance-regularization-approvals",
+        name: "Regularization approvals",
+        roles: ["ALL"],
+        icon: "CheckSquare",
+      },
+      {
         path: "/user-dashboard/task-manager",
         name: "Task Manager",
         roles: ["ALL"],

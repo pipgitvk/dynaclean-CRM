@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, Info } from "lucide-react";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -688,12 +688,44 @@ const AttendancePage = () => {
                           {formatTime(log.checkout_time)}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-gray-900">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-gray-900 shrink-0">
                           Check-out Address:
                         </span>
-                        <span className="text-sm text-gray-700">
-                          {log.checkout_address}
+                        <span className="text-sm text-gray-700 flex items-center gap-1.5 justify-end text-right min-w-0">
+                          <span className="truncate">
+                            {log.checkout_address || "—"}
+                          </span>
+                          {log.regularization ? (
+                            <span className="relative inline-flex shrink-0 group/regm">
+                              <Info
+                                className="w-4 h-4 text-teal-600 cursor-help"
+                                aria-label="Regularization details"
+                              />
+                              <span className="absolute right-0 bottom-full mb-2 z-30 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-md shadow-lg opacity-0 invisible group-hover/regm:opacity-100 group-hover/regm:visible transition-all pointer-events-none">
+                                <div className="space-y-1.5 text-left whitespace-normal">
+                                  <p>
+                                    <span className="text-gray-400">
+                                      Username (created request):{" "}
+                                    </span>
+                                    {log.regularization.createdBy}
+                                  </p>
+                                  <p>
+                                    <span className="text-gray-400">
+                                      Reviewed by:{" "}
+                                    </span>
+                                    {log.regularization.approvedBy}
+                                  </p>
+                                  <p>
+                                    <span className="text-gray-400">
+                                      Reason:{" "}
+                                    </span>
+                                    {log.regularization.reason}
+                                  </p>
+                                </div>
+                              </span>
+                            </span>
+                          ) : null}
                         </span>
                       </div>
                     </>
@@ -841,13 +873,47 @@ const AttendancePage = () => {
                           >
                             {formatTime(log.checkout_time)}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 relative group">
-                            <span className="underline cursor-help">
-                              View Address
-                            </span>
-                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                              {log.checkout_address}
-                            </span>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="relative group/coaddr inline-block">
+                                <span className="underline cursor-help">
+                                  View Address
+                                </span>
+                                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md max-w-sm whitespace-normal opacity-0 group-hover/coaddr:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                  {log.checkout_address || "—"}
+                                </span>
+                              </span>
+                              {log.regularization ? (
+                                <span className="relative inline-flex group/coreg">
+                                  <Info
+                                    className="w-4 h-4 text-teal-600 cursor-help shrink-0"
+                                    aria-label="Regularization details"
+                                  />
+                                  <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-20 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-md shadow-lg opacity-0 invisible group-hover/coreg:opacity-100 group-hover/coreg:visible transition-all pointer-events-none">
+                                    <div className="space-y-1.5 text-left whitespace-normal">
+                                      <p>
+                                        <span className="text-gray-400">
+                                          Username (created request):{" "}
+                                        </span>
+                                        {log.regularization.createdBy}
+                                      </p>
+                                      <p>
+                                        <span className="text-gray-400">
+                                          Reviewed by:{" "}
+                                        </span>
+                                        {log.regularization.approvedBy}
+                                      </p>
+                                      <p>
+                                        <span className="text-gray-400">
+                                          Reason:{" "}
+                                        </span>
+                                        {log.regularization.reason}
+                                      </p>
+                                    </div>
+                                  </span>
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
                         </>
                       ) : (

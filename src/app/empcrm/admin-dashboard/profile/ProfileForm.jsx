@@ -17,7 +17,14 @@ import {
   shouldShowReferencesSection,
   shouldShowDocumentsSection,
 } from "@/lib/reassignFieldVisibility";
-import { labelForReassignKey } from "@/lib/profileReassignFields";
+import {
+  EMPLOYEE_MANDATORY_DOCS_REASSIGN_KEYS,
+  EXPERIENCE_COLUMN_KEYS,
+  FORM_TOP_LEVEL_REASSIGN_KEYS,
+  labelForReassignKey,
+  QUALIFICATION_COLUMN_KEYS,
+  REFERENCE_COLUMN_KEYS,
+} from "@/lib/profileReassignFields";
 import { deriveIsExperiencedForForm } from "@/lib/profileExperiencedUi";
 
 function normalizeSubmissionStatus(status) {
@@ -74,6 +81,7 @@ export default function ProfileForm({
     department: "",
     correspondence_address: "",
     permanent_address: "",
+    near_police_station: "",
     pan_number: "",
     aadhar_number: "",
     pf_uan: "",
@@ -253,64 +261,160 @@ export default function ProfileForm({
     const keys = reassignFieldKeys;
     if (!keys?.length) return true;
 
-    for (const key of keys) {
-      if (key === "section_references") {
-        if (references.length < 3) {
-          toast.error("Please provide at least 3 Reference Verification Details.");
+    const needFullRefs = keys.includes("section_references");
+    const needAnyRefCol = keys.some((k) => REFERENCE_COLUMN_KEYS.has(k));
+
+    if (needFullRefs) {
+      if (references.length < 3) {
+        toast.error("Please provide at least 3 Reference Verification Details.");
+        return false;
+      }
+      for (const ref of references) {
+        if (
+          !ref.name?.trim() ||
+          !ref.contact?.trim() ||
+          !ref.address?.trim() ||
+          (ref.relationship !== "neighbours" && ref.relationship !== "relation")
+        ) {
+          toast.error("Please complete all details for references, including Relationship (Neighbours or Relation).");
           return false;
         }
-        for (const ref of references) {
-          if (
-            !ref.name?.trim() ||
-            !ref.contact?.trim() ||
-            !ref.address?.trim() ||
-            (ref.relationship !== "neighbours" && ref.relationship !== "relation")
-          ) {
-            toast.error("Please complete all details for references, including Relationship (Neighbours or Relation).");
+      }
+    } else if (needAnyRefCol) {
+      if (references.length < 3) {
+        toast.error("Please provide at least 3 Reference Verification Details.");
+        return false;
+      }
+      for (const ref of references) {
+        if (keys.includes("reference_name") && !ref.name?.trim()) {
+          toast.error("Reference Name is required.");
+          return false;
+        }
+        if (keys.includes("reference_contact") && !ref.contact?.trim()) {
+          toast.error("Contact Number is required for each reference.");
+          return false;
+        }
+        if (keys.includes("reference_address") && !ref.address?.trim()) {
+          toast.error("Address is required for each reference.");
+          return false;
+        }
+        if (
+          keys.includes("reference_relationship") &&
+          ref.relationship !== "neighbours" &&
+          ref.relationship !== "relation"
+        ) {
+          toast.error("Select Relationship (Neighbours or Relation) for each reference.");
+          return false;
+        }
+      }
+    }
+
+    if (keys.includes("section_documents")) {
+      if (!validateMandatoryDocumentsAndPhotos()) return false;
+    } else {
+      const docKeys = keys.filter((k) => EMPLOYEE_MANDATORY_DOCS_REASSIGN_KEYS.has(k));
+      for (const dk of docKeys) {
+        if (dk === "profile_photo") {
+          if (!(files.profile_photo || formData.profile_photo)) {
+            toast.error("Passport size photograph is required.");
             return false;
           }
+          continue;
         }
-      } else if (key === "section_documents") {
-        if (!validateMandatoryDocumentsAndPhotos()) return false;
-      } else if (key === "section_education") {
-        if (!education?.length) {
-          toast.error("Add at least one education qualification.");
-          return false;
-        }
-        for (const edu of education) {
-          if (
-            !edu.exam_name?.trim() ||
-            !edu.board_university?.trim() ||
-            !edu.year_of_passing?.trim() ||
-            !edu.grade_percentage?.trim()
-          ) {
-            toast.error("Please complete all fields in each education row.");
+        if (dk === "signature") {
+          if (!(files.signature || formData.signature)) {
+            toast.error("Signature is required.");
             return false;
           }
+          continue;
         }
-      } else if (key === "section_experience") {
-        if (!isExperienced) continue;
-        if (!experience?.length) {
-          toast.error("Add at least one work experience entry.");
+        const hasDoc = documents[dk] || files[dk] || formData.fileUrls?.[dk];
+        if (!hasDoc) {
+          toast.error(`${labelForReassignKey(dk)} is required.`);
           return false;
         }
-        for (const exp of experience) {
-          if (
-            !exp.company_name?.trim() ||
-            !exp.designation?.trim() ||
-            !exp.period_from ||
-            !exp.period_to ||
-            !exp.reason_for_leaving?.trim()
-          ) {
-            toast.error("Please complete all fields in each experience row.");
+        if (dk === "doc_electricity_bill") {
+          const ebType = documents.electricity_bill_proof_type;
+          if (ebType !== "current" && ebType !== "permanent") {
+            toast.error("Select whether the electricity bill is for Current or Permanent address.");
             return false;
           }
         }
       }
     }
 
-    const granular = keys.filter((k) => !k.startsWith("section_"));
-    for (const k of granular) {
+    const needEducationRows = keys.includes("section_education") || keys.some((k) => QUALIFICATION_COLUMN_KEYS.has(k));
+    const needQualValidation = needEducationRows;
+    if (needQualValidation) {
+      if (!education?.length) {
+        toast.error("Add at least one education qualification.");
+        return false;
+      }
+      const want = (col) => keys.includes("section_education") || keys.includes(col);
+      for (const edu of education) {
+        if (want("qualification_exam_name") && !edu.exam_name?.trim()) {
+          toast.error("Exam/Degree is required in each education row.");
+          return false;
+        }
+        if (want("qualification_board_university") && !edu.board_university?.trim()) {
+          toast.error("Board/University is required in each education row.");
+          return false;
+        }
+        if (want("qualification_year_of_passing") && !edu.year_of_passing?.trim()) {
+          toast.error("Year of Passing is required in each education row.");
+          return false;
+        }
+        if (want("qualification_grade_percentage") && !edu.grade_percentage?.trim()) {
+          toast.error("Grade/Percentage is required in each education row.");
+          return false;
+        }
+      }
+    }
+
+    const needExperienceRows =
+      isExperienced && (keys.includes("section_experience") || keys.some((k) => EXPERIENCE_COLUMN_KEYS.has(k)));
+    if (needExperienceRows) {
+      if (!experience?.length) {
+        toast.error("Add at least one work experience entry.");
+        return false;
+      }
+      const expColRequired = (col) => {
+        if (keys.includes(col)) return true;
+        if (keys.includes("section_experience")) {
+          return col !== "experience_gross_salary_ctc";
+        }
+        return false;
+      };
+      for (const exp of experience) {
+        if (expColRequired("experience_company_name") && !exp.company_name?.trim()) {
+          toast.error("Company Name is required in each experience row.");
+          return false;
+        }
+        if (expColRequired("experience_designation") && !exp.designation?.trim()) {
+          toast.error("Designation is required in each experience row.");
+          return false;
+        }
+        if (expColRequired("experience_gross_salary_ctc") && (exp.gross_salary_ctc == null || String(exp.gross_salary_ctc).trim() === "")) {
+          toast.error("Gross Salary (CTC) is required in each experience row.");
+          return false;
+        }
+        if (expColRequired("experience_period_from") && !exp.period_from) {
+          toast.error("Period From is required in each experience row.");
+          return false;
+        }
+        if (expColRequired("experience_period_to") && !exp.period_to) {
+          toast.error("Period To is required in each experience row.");
+          return false;
+        }
+        if (expColRequired("experience_reason_for_leaving") && !exp.reason_for_leaving?.trim()) {
+          toast.error("Reason for Leaving is required in each experience row.");
+          return false;
+        }
+      }
+    }
+
+    const granularFlat = keys.filter((k) => FORM_TOP_LEVEL_REASSIGN_KEYS.has(k));
+    for (const k of granularFlat) {
       if (k === "is_experienced") continue;
       const v = formData[k];
       if (v == null || String(v).trim() === "") {
@@ -360,6 +464,15 @@ export default function ProfileForm({
     }
 
     if (!validateMandatoryDocumentsAndPhotos()) {
+      return false;
+    }
+
+    if (!formData.permanent_address?.trim()) {
+      toast.error("Permanent address is required.");
+      return false;
+    }
+    if (!formData.near_police_station?.trim()) {
+      toast.error("Near police station is required.");
       return false;
     }
 
@@ -567,6 +680,7 @@ export default function ProfileForm({
     isExperienced,
     fileUrls: formData.fileUrls || {},
     reviewMode,
+    reassignFieldKeys: fieldVisibilityKeys,
   };
 
   const hrDocumentsSectionProps = {
@@ -653,6 +767,7 @@ export default function ProfileForm({
             education={education}
             setEducation={setEducation}
             reviewMode={reviewMode}
+            reassignFieldKeys={fieldVisibilityKeys}
             qualificationDocumentsSlot={qualificationDocumentsSlot}
           />
         )}
@@ -671,7 +786,12 @@ export default function ProfileForm({
         )}
 
         {shouldShowReferencesSection(fieldVisibilityKeys) && (
-          <ReferencesSection references={references} setReferences={setReferences} reviewMode={reviewMode} />
+          <ReferencesSection
+            references={references}
+            setReferences={setReferences}
+            reviewMode={reviewMode}
+            reassignFieldKeys={fieldVisibilityKeys}
+          />
         )}
 
         {showHrDetailsCard && (

@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
+import { shouldShowExperienceColumn } from "@/lib/reassignFieldVisibility";
 
 export default function ExperienceSection({
   experience,
@@ -6,8 +7,11 @@ export default function ExperienceSection({
   reviewMode = false,
   /** Nested under Banking Details: compact title and panel styling. */
   embedded = false,
+  reassignFieldKeys = null,
 }) {
   const ro = reviewMode;
+  const rf = reassignFieldKeys;
+  const col = (k) => shouldShowExperienceColumn(rf, k);
   const addExperience = () => {
     if (ro) return;
     setExperience([...experience, { company_name: "", designation: "", gross_salary_ctc: "", period_from: "", period_to: "", reason_for_leaving: "" }]);
@@ -71,37 +75,79 @@ export default function ExperienceSection({
               <Trash2 className="w-4 h-4" />
             </button>
           )}
-          <div>
-            <label className={labelClass}>Company Name</label>
-            <input type="text" value={exp.company_name} onChange={(e) => updateExperience(index, "company_name", e.target.value)} readOnly={ro} className={inactive(inputClass)} />
-          </div>
-          <div>
-            <label className={labelClass}>Designation</label>
-            <input type="text" value={exp.designation} onChange={(e) => updateExperience(index, "designation", e.target.value)} readOnly={ro} className={inactive(inputClass)} />
-          </div>
-          <div>
-            <label className={labelClass}>Gross Salary (CTC)</label>
-            <input type="number" value={exp.gross_salary_ctc} onChange={(e) => updateExperience(index, "gross_salary_ctc", e.target.value)} readOnly={ro} className={inactive(inputClass)} />
-          </div>
-          <div>
-            <label className={labelClass}>Period From</label>
-            <input type="date" value={exp.period_from} onChange={(e) => updateExperience(index, "period_from", e.target.value)} disabled={ro} className={inactive(inputClass)} />
-          </div>
-          <div>
-            <label className={labelClass}>Period To</label>
-            <input type="date" value={exp.period_to} onChange={(e) => updateExperience(index, "period_to", e.target.value)} disabled={ro} className={inactive(inputClass)} />
-          </div>
-          <div className="md:col-span-3">
-            <label className={labelClass}>Reason for Leaving *</label>
-            <textarea
-              value={exp.reason_for_leaving}
-              onChange={(e) => updateExperience(index, "reason_for_leaving", e.target.value)}
-              rows="2"
-              readOnly={ro}
-              required={!ro}
-              className={inactive(inputClass)}
-            />
-          </div>
+          {col("experience_company_name") && (
+            <div>
+              <label className={labelClass}>Company Name</label>
+              <input
+                type="text"
+                value={exp.company_name}
+                onChange={(e) => updateExperience(index, "company_name", e.target.value)}
+                readOnly={ro}
+                className={inactive(inputClass)}
+              />
+            </div>
+          )}
+          {col("experience_designation") && (
+            <div>
+              <label className={labelClass}>Designation</label>
+              <input
+                type="text"
+                value={exp.designation}
+                onChange={(e) => updateExperience(index, "designation", e.target.value)}
+                readOnly={ro}
+                className={inactive(inputClass)}
+              />
+            </div>
+          )}
+          {col("experience_gross_salary_ctc") && (
+            <div>
+              <label className={labelClass}>Gross Salary (CTC)</label>
+              <input
+                type="number"
+                value={exp.gross_salary_ctc}
+                onChange={(e) => updateExperience(index, "gross_salary_ctc", e.target.value)}
+                readOnly={ro}
+                className={inactive(inputClass)}
+              />
+            </div>
+          )}
+          {col("experience_period_from") && (
+            <div>
+              <label className={labelClass}>Period From</label>
+              <input
+                type="date"
+                value={exp.period_from}
+                onChange={(e) => updateExperience(index, "period_from", e.target.value)}
+                disabled={ro}
+                className={inactive(inputClass)}
+              />
+            </div>
+          )}
+          {col("experience_period_to") && (
+            <div>
+              <label className={labelClass}>Period To</label>
+              <input
+                type="date"
+                value={exp.period_to}
+                onChange={(e) => updateExperience(index, "period_to", e.target.value)}
+                disabled={ro}
+                className={inactive(inputClass)}
+              />
+            </div>
+          )}
+          {col("experience_reason_for_leaving") && (
+            <div className="md:col-span-3">
+              <label className={labelClass}>Reason for Leaving *</label>
+              <textarea
+                value={exp.reason_for_leaving}
+                onChange={(e) => updateExperience(index, "reason_for_leaving", e.target.value)}
+                rows="2"
+                readOnly={ro}
+                required={!ro}
+                className={inactive(inputClass)}
+              />
+            </div>
+          )}
         </div>
       ))}
     </div>

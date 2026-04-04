@@ -14,6 +14,23 @@ function normalizeUserKey(value) {
     .toLowerCase();
 }
 
+/** Match attendance row `date` with regularization `log_date` (MySQL DATE / string / Date). */
+function attendanceDateKey(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "string") {
+    const s = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  const s = String(value);
+  return s.length >= 10 ? s.slice(0, 10) : s;
+}
+
 export async function GET(request) {
   try {
 
@@ -83,6 +100,41 @@ export async function GET(request) {
         globalRules,
         schedule
       );
+    }
+
+    const regMap = new Map();
+    try {
+      const [regRows] = await db.query(
+        `SELECT ar.username, ar.log_date, ar.reason, ar.reviewed_by
+         FROM attendance_regularization_requests ar
+         INNER JOIN (
+           SELECT username, log_date, MAX(id) AS mid
+           FROM attendance_regularization_requests
+           WHERE status = 'approved'
+           GROUP BY username, log_date
+         ) t
+           ON ar.username COLLATE utf8mb4_unicode_ci = t.username COLLATE utf8mb4_unicode_ci
+           AND ar.log_date = t.log_date
+           AND ar.id = t.mid
+         WHERE ar.status = 'approved'`
+      );
+      for (const r of regRows || []) {
+        const dk = attendanceDateKey(r.log_date);
+        const key = `${r.username}|${dk}`;
+        regMap.set(key, {
+          createdBy: r.username,
+          approvedBy: r.reviewed_by || "—",
+          reason: r.reason && String(r.reason).trim() ? r.reason : "—",
+        });
+      }
+    } catch (e) {
+      console.warn("attendance regularization metadata skipped:", e.message);
+    }
+
+    for (const row of rows) {
+      const dk = attendanceDateKey(row.date);
+      const meta = regMap.get(`${row.username}|${dk}`);
+      row.regularization = meta || null;
     }
 
     return NextResponse.json({ attendance: rows, holidays, leaves, rulesByUsername });

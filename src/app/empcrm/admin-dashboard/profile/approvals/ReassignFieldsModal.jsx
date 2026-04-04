@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
-import { PROFILE_REASSIGN_FIELD_GROUPS } from "@/lib/profileReassignFields";
+import {
+  PROFILE_REASSIGN_FIELD_GROUPS,
+  allReassignFieldKeys,
+  getReassignCardVariant,
+} from "@/lib/profileReassignFields";
 
 const HR_LIKE_ROLES = new Set(["superadmin", "hr head", "hr", "hr executive"]);
 
@@ -11,11 +15,24 @@ function isHRLikeRole(userRole) {
   return HR_LIKE_ROLES.has(String(userRole).trim().toLowerCase());
 }
 
-export default function ReassignFieldsModal({ open, onClose, onConfirm, submitting }) {
-  const allKeys = useMemo(
-    () => PROFILE_REASSIGN_FIELD_GROUPS.flatMap((g) => g.fields.map((f) => f.key)),
-    []
+function ReassignFieldRow({ field, selected, onToggle, rowBorder }) {
+  return (
+    <label
+      className={`flex items-start gap-3 w-full p-3.5 bg-white/90 rounded-lg border ${rowBorder} cursor-pointer hover:bg-white transition-colors shadow-sm`}
+    >
+      <input
+        type="checkbox"
+        checked={selected.has(field.key)}
+        onChange={() => onToggle(field.key)}
+        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+      />
+      <span className="text-sm font-medium text-gray-800 leading-snug pt-0.5">{field.label}</span>
+    </label>
   );
+}
+
+export default function ReassignFieldsModal({ open, onClose, onConfirm, submitting }) {
+  const allKeys = useMemo(() => allReassignFieldKeys(), []);
   const [target, setTarget] = useState("employee");
   const [selected, setSelected] = useState(() => new Set());
   const [note, setNote] = useState("");
@@ -87,7 +104,7 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Reassign submission</h2>
           <button
@@ -125,12 +142,13 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
 
         {target === "employee" ? (
           <p className="px-4 pt-3 text-sm text-gray-600">
-            Select fields that need correction. The employee will update and resubmit for HR approval.
+            {/* Select fields that need correction. The employee will update and resubmit for HR approval. Fields are listed
+            in the same order and grouping as the profile form — one row per field. */}
           </p>
         ) : (
           <p className="px-4 pt-3 text-sm text-gray-600">
-            Choose an HR user to review this submission. It stays in the pending queue for that person (or HR Head /
-            Super Admin can act on all).
+            {/* Choose an HR user to review this submission. It stays in the pending queue for that person (or HR Head /
+            Super Admin can act on all). */}
           </p>
         )}
 
@@ -162,28 +180,47 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
             Clear fields
           </button>
         </div>
-        <div className="px-4 flex-1 overflow-y-auto border-t border-gray-100 py-3 space-y-4">
-          {PROFILE_REASSIGN_FIELD_GROUPS.map((group) => (
-            <div key={group.title}>
-              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{group.title}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {group.fields.map(({ key, label }) => (
-                  <label
-                    key={key}
-                    className="flex items-start gap-2 text-sm text-gray-800 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(key)}
-                      onChange={() => toggle(key)}
-                      className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
+        <div className="px-4 flex-1 overflow-y-auto border-t border-gray-100 py-4 space-y-5">
+          {PROFILE_REASSIGN_FIELD_GROUPS.map((group) => {
+            const v = getReassignCardVariant(group.variant);
+            return (
+              <div key={group.title} className={v.shell}>
+                <h3 className={v.heading}>{group.title}</h3>
+                {group.blocks ? (
+                  <div className="space-y-5">
+                    {group.blocks.map((block) => (
+                      <div key={block.subtitle} className="space-y-2">
+                        <h4 className="text-sm font-semibold text-gray-800 px-0.5">{block.subtitle}</h4>
+                        <div className="flex flex-col gap-2">
+                          {block.fields.map((field) => (
+                            <ReassignFieldRow
+                              key={field.key}
+                              field={field}
+                              selected={selected}
+                              onToggle={toggle}
+                              rowBorder={v.rowBorder}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {(group.fields || []).map((field) => (
+                      <ReassignFieldRow
+                        key={field.key}
+                        field={field}
+                        selected={selected}
+                        onToggle={toggle}
+                        rowBorder={v.rowBorder}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="px-4 py-3 border-t border-gray-200">
           <label className="block text-xs font-medium text-gray-700 mb-1">

@@ -31,3 +31,27 @@ export async function isReportingManagerOf(managerUsername, employeeUsername) {
   const reportees = await getReportees(managerUsername);
   return reportees.includes(employeeUsername);
 }
+
+/**
+ * Reporting manager username from rep_list (HR-assigned).
+ * @param {string} employeeUsername
+ * @returns {Promise<string|null>}
+ */
+export async function getReportingManagerForEmployee(employeeUsername) {
+  if (!employeeUsername) return null;
+  try {
+    const conn = await getDbConnection();
+    const [columns] = await conn.execute(
+      `SHOW COLUMNS FROM rep_list LIKE 'reporting_manager'`
+    );
+    if (columns.length === 0) return null;
+    const [rows] = await conn.execute(
+      `SELECT reporting_manager FROM rep_list WHERE username = ? LIMIT 1`,
+      [employeeUsername]
+    );
+    const rm = rows[0]?.reporting_manager;
+    return rm && String(rm).trim() ? String(rm).trim() : null;
+  } catch {
+    return null;
+  }
+}
