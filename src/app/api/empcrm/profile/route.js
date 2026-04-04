@@ -248,7 +248,7 @@ async function saveProfile(request, methodType) {
       const p = path.join(uploadDir, name);
       const buffer = Buffer.from(await file.arrayBuffer());
       await writeFile(p, buffer);
-      return `/employee_profiles/${username}/${name}`;
+      return `/employee_profiles/${encodeURIComponent(username)}/${encodeURIComponent(name)}`;
     };
 
     const profilePhoto = formData.get("profile_photo");
