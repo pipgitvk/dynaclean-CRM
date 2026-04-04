@@ -8,7 +8,6 @@ const empCrmMenuItems = [
   { path: "/empcrm/admin-dashboard", name: "EMPCRM Dashboard", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Home" },
   { path: "/empcrm/admin-dashboard/profile", name: "Profile Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "UserCircle" },
   { path: "/empcrm/admin-dashboard/profile/approvals", name: "Profile Approvals", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "UserCircle" },
-  { path: "/empcrm/admin-dashboard/profile/approvals-admin", name: "Final profile approval", roles: ["SUPERADMIN"], icon: "UserCircle" },
   { path: "/empcrm/admin-dashboard/leave", name: "Leave Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Calendar" },
 
 

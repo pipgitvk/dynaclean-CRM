@@ -726,6 +726,12 @@ const allMenuItems = [
     roles: [...ATTENDANCE_RULES_ALLOWED_ROLES],
     icon: "Clock",
   },
+  {
+    path: "/empcrm/admin-dashboard/profile/approvals-admin",
+    name: "Final profile approval",
+    roles: ["SUPERADMIN"],
+    icon: "UserCircle",
+  },
 ];
 
 function filterMenuItemsByRole(items, roleKeyNormalized) {
