@@ -105,6 +105,32 @@ export default function SubmissionDetailsPage({ params }) {
         return () => { cancelled = true; controller.abort(); };
     }, [id]);
 
+    const refreshSubmissionFromServer = async () => {
+        const res = await fetch(`/api/empcrm/profile/submissions?id=${encodeURIComponent(id)}`, {
+            credentials: "include",
+            cache: "no-store",
+        });
+        const data = await res.json();
+        if (!data.success || !data.submissions?.length) return false;
+        const sub = data.submissions[0];
+        const built = buildProfileSubmissionInitialData(sub);
+        if (!built.initialData) return false;
+        let liveJson = null;
+        try {
+            const pr = await fetch(
+                `/api/empcrm/profile?username=${encodeURIComponent(sub.username)}`,
+                { credentials: "include", cache: "no-store" }
+            );
+            liveJson = await pr.json();
+        } catch {
+            liveJson = null;
+        }
+        const merged = mergeSubmissionInitialWithLiveProfile(built.initialData, liveJson);
+        setSubmission(sub);
+        setReviewInitialData(merged);
+        return true;
+    };
+
     const handleAction = async (action, reason = "") => {
         if (!confirm(`Are you sure you want to ${action} this profile?`)) return;
         try {
@@ -116,6 +142,17 @@ export default function SubmissionDetailsPage({ params }) {
             const data = await res.json();
             if (data.success) {
                 toast.success(data.message || `Profile ${action}ed successfully`);
+                if (action === "approve") {
+                    const st = String(submission?.status ?? "").trim().toLowerCase();
+                    const stayOnPageForHrDocs =
+                        st === "pending" ||
+                        (st === "" && submission?.reviewed_at);
+                    if (stayOnPageForHrDocs) {
+                        const ok = await refreshSubmissionFromServer();
+                        if (!ok) toast.error("Could not refresh; reload the page to continue with HR documents.");
+                        return;
+                    }
+                }
                 const back =
                     fromAdminQueue || submission?.status === "pending_admin"
                         ? "/empcrm/admin-dashboard/profile/approvals-admin"
@@ -178,10 +215,18 @@ export default function SubmissionDetailsPage({ params }) {
 
     const initialData = reviewInitialData;
 
-    const st = submission.status || "";
-    const isPending = st === "pending";
-    const isPendingAdmin = st === "pending_admin";
-    const isReassign = st === "reassign" || st === "revision_requested";
+    let stNorm = String(submission.status ?? "").trim().toLowerCase();
+    const statusWasCorruptBlank =
+        !stNorm &&
+        submission.reviewed_at &&
+        (submission.rejection_reason == null || String(submission.rejection_reason).trim() === "");
+    if (statusWasCorruptBlank) {
+        stNorm = "pending_hr_docs";
+    }
+    const isPending = stNorm === "pending";
+    const isPendingHrDocs = stNorm === "pending_hr_docs";
+    const isPendingAdmin = stNorm === "pending_admin";
+    const isReassign = stNorm === "reassign" || stNorm === "revision_requested";
     const isSuperAdmin = String(sessionRole || "").trim().toUpperCase() === "SUPERADMIN";
     const assignedTo =
         typeof submission.pending_assignee_username === "string" ? submission.pending_assignee_username.trim() : "";
@@ -193,6 +238,7 @@ export default function SubmissionDetailsPage({ params }) {
         isHrHeadOrSuper ||
         (sessionUsername && assignedTo.toLowerCase() === sessionUsername.trim().toLowerCase());
     const showHrActions = isPending && canActPending;
+    const showHrRejectOnly = isPendingHrDocs && canActPending;
     const showAdminActions = isPendingAdmin && isSuperAdmin;
 
     const reassignKeys = parseReassignKeys(submission.reassigned_fields);
@@ -228,22 +274,28 @@ export default function SubmissionDetailsPage({ params }) {
                         <span className="font-medium text-gray-600">Status: </span>
                         <span
                             className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
-                                st === "approved"
+                                stNorm === "approved"
                                     ? "bg-green-100 text-green-800"
-                                    : st === "rejected"
+                                    : stNorm === "rejected"
                                       ? "bg-red-100 text-red-800"
-                                      : isPendingAdmin
+                                        : isPendingAdmin
                                         ? "bg-violet-100 text-violet-900"
+                                        : isPendingHrDocs
+                                          ? "bg-indigo-100 text-indigo-900"
                                         : isReassign
                                           ? "bg-amber-100 text-amber-900"
                                           : "bg-blue-100 text-blue-800"
                             }`}
                         >
-                            {st === "revision_requested"
+                            {stNorm === "revision_requested"
                                 ? "reassign"
-                                : st === "pending_admin"
+                                : stNorm === "pending_admin"
                                   ? "awaiting super admin"
-                                  : st || "—"}
+                                  : stNorm === "pending_hr_docs"
+                                    ? "HR documents"
+                                    : stNorm === "pending"
+                                      ? "pending"
+                                      : stNorm || "—"}
                         </span>
                     </p>
                     {isPending && assignedTo ? (
@@ -277,7 +329,18 @@ export default function SubmissionDetailsPage({ params }) {
                             onClick={() => handleAction("approve")}
                             className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2 font-medium"
                         >
-                            <Check className="w-4 h-4" /> Approve (send to Super Admin)
+                            <Check className="w-4 h-4" /> Approve employee sections
+                        </button>
+                    </div>
+                )}
+                {showHrRejectOnly && (
+                    <div className="flex flex-wrap gap-2 justify-end">
+                        <button
+                            type="button"
+                            onClick={() => handleAction("reject", prompt("Rejection Reason:") || "")}
+                            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center gap-2 font-medium"
+                        >
+                            <X className="w-4 h-4" /> Reject
                         </button>
                     </div>
                 )}
@@ -300,6 +363,24 @@ export default function SubmissionDetailsPage({ params }) {
                     </div>
                 )}
             </div>
+
+            {statusWasCorruptBlank && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-950 text-sm shadow-sm">
+                    <p className="font-semibold">Database status was empty</p>
+                    <p className="mt-1">
+                        The UI is treating this request as the <strong>HR documents</strong> step. If uploads or Send to
+                        Super Admin fail, run{" "}
+                        <code className="text-xs bg-red-100 px-1 rounded">
+                            migration_submissions_status_varchar.sql
+                        </code>{" "}
+                        then{" "}
+                        <code className="text-xs bg-red-100 px-1 rounded">
+                            migration_repair_blank_submission_status.sql
+                        </code>{" "}
+                        (or reload this page after the API auto-repair runs).
+                    </p>
+                </div>
+            )}
 
             {showReassignSummary && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950 shadow-sm">
@@ -325,16 +406,18 @@ export default function SubmissionDetailsPage({ params }) {
 
             <div
                 className={`border-l-4 p-4 mb-6 rounded-r ${
-                    st === "approved"
+                    stNorm === "approved"
                         ? "bg-green-50 border-green-500"
-                        : st === "rejected"
+                        : stNorm === "rejected"
                           ? "bg-red-50 border-red-400"
                           : isPendingAdmin
                             ? "bg-violet-50 border-violet-400"
+                            : isPendingHrDocs
+                              ? "bg-indigo-50 border-indigo-400"
                             : "bg-blue-50 border-blue-400"
                 }`}
             >
-                {st === "approved" && (
+                {stNorm === "approved" && (
                     <>
                         <p className="text-sm text-green-900 font-medium">This profile submission was approved.</p>
                         {submission.reviewed_at && (
@@ -345,7 +428,7 @@ export default function SubmissionDetailsPage({ params }) {
                         )}
                     </>
                 )}
-                {st === "rejected" && (
+                {stNorm === "rejected" && (
                     <>
                         <p className="text-sm text-red-900 font-medium">This submission was rejected.</p>
                         {submission.rejection_reason && (
@@ -363,9 +446,16 @@ export default function SubmissionDetailsPage({ params }) {
                         <strong>Super Admin:</strong> Verify details and documents below, then publish to merge into the employee profile.
                     </p>
                 )}
-                {(isPending || isReassign) && !isPendingAdmin && (
+                {isPendingHrDocs && (
+                    <p className="text-sm text-indigo-900 font-medium">
+                        <strong>HR step:</strong> Employee sections are approved. Complete <strong>HR Details</strong> below,
+                        then click <strong>Send to Super Admin</strong>.
+                    </p>
+                )}
+                {(isPending || isReassign) && !isPendingAdmin && !isPendingHrDocs && (
                     <p className="text-sm text-blue-700">
-                        <strong>Review Note:</strong> Please verify all details and documents below. You can view uploaded documents by clicking the &quot;View&quot; buttons in the Documents section.
+                        <strong>Review Note:</strong> Please verify all details and documents below. HR-only documents
+                        appear after you approve employee sections.
                     </p>
                 )}
                 <p className="text-xs text-gray-600 mt-1">Submitted: {new Date(submission.submitted_at).toLocaleString()}</p>
@@ -373,13 +463,20 @@ export default function SubmissionDetailsPage({ params }) {
 
             <div className="opacity-100 mb-8">
                 <ProfileForm
-                    key={`review-${submission.id}`}
+                    key={`review-${submission.id}-${stNorm}`}
                     username={submission.username}
                     empId={submission.empId}
                     onBack={() => { }}
                     isPrivilegedEditor={true}
                     initialData={initialData}
                     reviewMode={true}
+                    submissionReviewContext={{ id: submission.id, status: stNorm }}
+                    onAfterHrForwardToAdmin={() => {
+                        const back = fromAdminQueue
+                            ? "/empcrm/admin-dashboard/profile/approvals-admin"
+                            : "/empcrm/admin-dashboard/profile/approvals";
+                        router.push(back);
+                    }}
                 />
             </div>
 

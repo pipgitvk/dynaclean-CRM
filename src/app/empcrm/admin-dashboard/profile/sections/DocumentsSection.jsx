@@ -1,5 +1,51 @@
-import { Upload, Eye, Paperclip, CheckCircle } from "lucide-react";
+import { Upload, Eye, CheckCircle } from "lucide-react";
 import { profileAssetViewUrl } from "@/lib/profileMediaUrl";
+
+const EDUCATION_CATEGORY_TITLE = "Educational Documents";
+const BANK_PAYROLL_CATEGORY_TITLE = "Bank & Payroll Details";
+const EXPERIENCE_DOCS_CATEGORY_TITLE = "Experience Documents (If Experienced)";
+const EMPLOYMENT_HR_CATEGORY_TITLE = "Employment & HR Documents";
+const CONFIDENTIALITY_POLICY_CATEGORY_TITLE = "Confidentiality & Company Policy";
+
+const HR_ONLY_CATEGORY_TITLES = new Set([
+  EMPLOYMENT_HR_CATEGORY_TITLE,
+  CONFIDENTIALITY_POLICY_CATEGORY_TITLE,
+]);
+
+function filterDocumentCategories(categories, mode) {
+  let list = categories.filter((c) => c.condition !== false);
+
+  if (mode === "hr_details_only") {
+    return list.filter((c) => HR_ONLY_CATEGORY_TITLES.has(c.title));
+  }
+
+  if (mode === "education_only") {
+    list = list.filter((c) => c.title === EDUCATION_CATEGORY_TITLE);
+  } else if (mode === "excluding_education") {
+    list = list.filter((c) => c.title !== EDUCATION_CATEGORY_TITLE);
+  } else if (mode === "excluding_banking_experience") {
+    list = list.filter(
+      (c) =>
+        c.title !== BANK_PAYROLL_CATEGORY_TITLE &&
+        c.title !== EXPERIENCE_DOCS_CATEGORY_TITLE
+    );
+  } else if (mode === "excluding_education_banking_experience") {
+    list = list.filter(
+      (c) =>
+        c.title !== EDUCATION_CATEGORY_TITLE &&
+        c.title !== BANK_PAYROLL_CATEGORY_TITLE &&
+        c.title !== EXPERIENCE_DOCS_CATEGORY_TITLE
+    );
+  } else if (mode === "banking_and_experience_docs_only") {
+    list = list.filter(
+      (c) =>
+        c.title === BANK_PAYROLL_CATEGORY_TITLE ||
+        c.title === EXPERIENCE_DOCS_CATEGORY_TITLE
+    );
+  }
+
+  return list.filter((c) => !HR_ONLY_CATEGORY_TITLES.has(c.title));
+}
 
 export default function DocumentsSection({
   documents,
@@ -12,6 +58,22 @@ export default function DocumentsSection({
   isExperienced = false,
   fileUrls = {}, // Map of key -> url for existing documents
   reviewMode = false,
+  /** When true, section is shown inside Employee Personal Details (lighter chrome). */
+  embedded = false,
+  /**
+   * all — default.
+   * education_only — only “Educational Documents” (no photo/signature header).
+   * excluding_education — all categories except educational (for split layout with Qualification Details).
+   * excluding_banking_experience — drop bank payroll + experience doc categories (shown under Banking Details).
+   * excluding_education_banking_experience — combination of the above.
+   * banking_and_experience_docs_only — cancelled cheque + experience letters only.
+   * hr_details_only — Employment & HR + Confidentiality & policy (HR-only form card).
+   */
+  categoryMode = "all",
+  /** Prefix for file input ids when multiple DocumentSections exist on one page. */
+  htmlIdPrefix = "",
+  /** Border tint when embedded: violet (personal), amber (banking), or indigo (HR). */
+  embeddedAccent = "violet",
 }) {
   const ro = reviewMode;
 
@@ -101,11 +163,56 @@ export default function DocumentsSection({
     }
   ];
 
+  const filteredCategories = filterDocumentCategories(documentCategories, categoryMode);
+  const showPhotoSignature =
+    categoryMode !== "education_only" &&
+    categoryMode !== "banking_and_experience_docs_only" &&
+    categoryMode !== "hr_details_only";
+  const embeddedBorder =
+    embeddedAccent === "amber"
+      ? "border-amber-200/90"
+      : embeddedAccent === "indigo"
+        ? "border-indigo-200/90"
+        : "border-violet-200/90";
+  const embeddedPanelBorder =
+    embeddedAccent === "amber"
+      ? "border-amber-200/80"
+      : embeddedAccent === "indigo"
+        ? "border-indigo-200/80"
+        : "border-violet-200/80";
+  const topDividerClass =
+    categoryMode === "education_only"
+      ? "border-emerald-200/90"
+      : categoryMode === "banking_and_experience_docs_only"
+        ? embeddedBorder
+        : embedded
+          ? embeddedBorder
+          : "border-gray-200";
+
   return (
     <div>
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">Mandatory Documents Upload</h3>
+      {categoryMode === "hr_details_only" ? null : categoryMode === "education_only" ? (
+        <h4 className={`text-sm font-semibold text-gray-700 mb-3 mt-4 pt-4 border-t ${topDividerClass}`}>
+          Certificates & marksheets
+        </h4>
+      ) : categoryMode === "banking_and_experience_docs_only" ? (
+        <h4 className={`text-sm font-semibold text-gray-800 mb-3 mt-4 pt-4 border-t ${topDividerClass}`}>
+          Bank & payroll / experience documents
+        </h4>
+      ) : embedded ? (
+        <h4 className={`text-base font-semibold text-gray-800 mb-3 pt-4 border-t ${topDividerClass}`}>
+          Mandatory documents upload
+        </h4>
+      ) : (
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Mandatory Documents Upload</h3>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+      {showPhotoSignature && (
+      <div
+        className={`grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 p-4 rounded-lg border ${
+          embedded ? `bg-white/80 ${embeddedPanelBorder}` : "bg-gray-50 border-gray-200"
+        }`}
+      >
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Passport Size Photograph *</label>
           <div className="flex items-center gap-4">
@@ -171,16 +278,36 @@ export default function DocumentsSection({
           </div>
         </div>
       </div>
+      )}
 
-      <div className="space-y-6">
-        {documentCategories.map((category, catIdx) => {
-          if (category.condition === false) return null;
-
+      <div
+        className={`space-y-6 ${
+          categoryMode === "education_only" ||
+          categoryMode === "banking_and_experience_docs_only" ||
+          categoryMode === "hr_details_only"
+            ? "mt-0"
+            : ""
+        }`}
+      >
+        {filteredCategories.map((category, catIdx) => {
           return (
-            <div key={catIdx} className="border rounded-lg p-4">
-              <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                {category.title}
-              </h4>
+            <div
+              key={`${htmlIdPrefix}${catIdx}`}
+              className={
+                categoryMode === "education_only"
+                  ? ""
+                  : categoryMode === "banking_and_experience_docs_only"
+                    ? "border border-amber-100 rounded-lg p-4 bg-white/80"
+                    : categoryMode === "hr_details_only"
+                      ? "border border-indigo-100 rounded-lg p-4 bg-white/80"
+                      : "border rounded-lg p-4"
+              }
+            >
+              {categoryMode !== "education_only" && (
+                <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                  {category.title}
+                </h4>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {category.items.map((doc) => (
                   <div key={doc.key} className="p-3 bg-white border rounded-md hover:shadow-sm transition-shadow">
@@ -209,7 +336,7 @@ export default function DocumentsSection({
 
                       <div className="flex items-center gap-2 shrink-0">
                         <input
-                          id={`file_${doc.key}`}
+                          id={`${htmlIdPrefix}file_${doc.key}`}
                           type="file"
                           onChange={(e) => handleFileChange(e, doc.key)}
                           disabled={ro}
@@ -217,7 +344,9 @@ export default function DocumentsSection({
                         />
                         <button
                           type="button"
-                          onClick={() => !ro && document.getElementById(`file_${doc.key}`)?.click()}
+                          onClick={() =>
+                            !ro && document.getElementById(`${htmlIdPrefix}file_${doc.key}`)?.click()
+                          }
                           disabled={ro}
                           className="p-2 rounded-full hover:bg-gray-100 text-gray-600 disabled:opacity-40 disabled:pointer-events-none"
                           title="Upload File"

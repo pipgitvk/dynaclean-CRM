@@ -2,24 +2,38 @@
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Upload, Loader2, Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import PersonalInfoSection from "./sections/PersonalInfoSection";
-import BankingSection from "./sections/BankingSection";
+import BankingDetailsSection from "./sections/BankingDetailsSection";
 import EducationSection from "./sections/EducationSection";
-import ExperienceSection from "./sections/ExperienceSection";
 import DocumentsSection from "./sections/DocumentsSection";
+import HrDetailsSection from "./sections/HrDetailsSection";
 import ReferencesSection from "./sections/ReferencesSection";
 import {
   isReassignFieldMode,
   shouldShowPersonalBlock,
-  shouldShowBankingBlock,
+  shouldShowBankingDetailsCard,
   shouldShowEducationSection,
-  shouldShowExperienceSection,
   shouldShowReferencesSection,
   shouldShowDocumentsSection,
 } from "@/lib/reassignFieldVisibility";
 import { labelForReassignKey } from "@/lib/profileReassignFields";
 import { deriveIsExperiencedForForm } from "@/lib/profileExperiencedUi";
+
+function normalizeSubmissionStatus(status) {
+  if (status == null || status === undefined) return "";
+  return String(status).trim().toLowerCase();
+}
+
+/** File field keys in HR Details (Employment & HR + Confidentiality) — used when sending to Super Admin. */
+const HR_DETAILS_DOC_KEYS = [
+  "doc_loi_appointment",
+  "doc_joining_form",
+  "doc_emp_verification",
+  "doc_code_conduct",
+  "doc_nda",
+  "doc_company_policy",
+];
 
 export default function ProfileForm({
   username,
@@ -32,6 +46,9 @@ export default function ProfileForm({
   reviewMode = false,
   resubmitSubmissionId = null,
   reassignFieldKeys = null,
+  /** When reviewing a submission: `{ id, status }` drives HR-only document workflow. */
+  submissionReviewContext = null,
+  onAfterHrForwardToAdmin = null,
 }) {
   const [loading, setLoading] = useState(false);
   const [isExperienced, setIsExperienced] = useState(false);
@@ -471,9 +488,128 @@ export default function ProfileForm({
     handleSubmit(e);
   };
 
+  const handleHrForwardToAdmin = async () => {
+    const subId = submissionReviewContext?.id;
+    if (subId == null || String(subId).trim() === "") {
+      toast.error("Missing submission");
+      return;
+    }
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("submissionId", String(subId));
+      fd.append("documents_submitted", JSON.stringify(documents));
+      for (const k of HR_DETAILS_DOC_KEYS) {
+        if (files[k]) fd.append(k, files[k]);
+      }
+      const res = await fetch("/api/empcrm/profile/submissions/hr-supplement", {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!data.success) {
+        toast.error(data.error || "Failed to save HR documents");
+        return;
+      }
+      const res2 = await fetch("/api/empcrm/profile/submissions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ submissionId: subId, action: "forward_to_admin" }),
+      });
+      const data2 = await res2.json();
+      if (!data2.success) {
+        toast.error(data2.error || "Failed to send to Super Admin");
+        return;
+      }
+      toast.success(data2.message || "Sent to Super Admin for final approval.");
+      onAfterHrForwardToAdmin?.();
+    } catch (err) {
+      console.error(err);
+      toast.error("Error sending to Super Admin");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   /** HR review always shows the full profile; reassign-only hiding is for the employee edit screen only. */
   const fieldVisibilityKeys = reviewMode ? null : reassignFieldKeys;
   const reassignMode = !reviewMode && isReassignFieldMode(reassignFieldKeys);
+
+  const educationVisible = shouldShowEducationSection(fieldVisibilityKeys);
+  const documentsVisible = shouldShowDocumentsSection(fieldVisibilityKeys);
+  const bankingCardVisible = shouldShowBankingDetailsCard(fieldVisibilityKeys, isExperienced);
+
+  let mainDocumentsCategoryMode = "all";
+  if (educationVisible && bankingCardVisible) {
+    mainDocumentsCategoryMode = "excluding_education_banking_experience";
+  } else if (educationVisible) {
+    mainDocumentsCategoryMode = "excluding_education";
+  } else if (bankingCardVisible) {
+    mainDocumentsCategoryMode = "excluding_banking_experience";
+  }
+
+  const submissionStatus = normalizeSubmissionStatus(submissionReviewContext?.status);
+  const hrDetailsEditable =
+    reviewMode && submissionStatus === "pending_hr_docs" && isPrivilegedEditor;
+  const hrDocumentsReadOnly = reviewMode && !hrDetailsEditable;
+  const hrSectionAwaitingEmployeeApprove = reviewMode && submissionStatus === "pending";
+
+  const documentsSectionProps = {
+    documents,
+    setDocuments,
+    files,
+    setFiles,
+    existingDocs: Array.isArray(formData.joining_form_documents) ? formData.joining_form_documents : [],
+    existingPhotoUrl: formData.profile_photo || "",
+    existingSignatureUrl: formData.signature || "",
+    isExperienced,
+    fileUrls: formData.fileUrls || {},
+    reviewMode,
+  };
+
+  const hrDocumentsSectionProps = {
+    ...documentsSectionProps,
+    reviewMode: hrDocumentsReadOnly,
+  };
+
+  // In submission review, always show HR card when we have workflow context (status may vary by DB casing).
+  const showHrDetailsCard =
+    isPrivilegedEditor &&
+    documentsVisible &&
+    (!reviewMode || submissionReviewContext != null);
+
+  const documentsSectionEl =
+    documentsVisible ? (
+      <DocumentsSection
+        {...documentsSectionProps}
+        categoryMode={mainDocumentsCategoryMode}
+        embedded={shouldShowPersonalBlock(fieldVisibilityKeys)}
+        htmlIdPrefix=""
+      />
+    ) : null;
+
+  const bankingDocumentsSlot =
+    documentsVisible && bankingCardVisible ? (
+      <DocumentsSection
+        {...documentsSectionProps}
+        categoryMode="banking_and_experience_docs_only"
+        embedded
+        embeddedAccent="amber"
+        htmlIdPrefix="bank_"
+      />
+    ) : null;
+
+  const qualificationDocumentsSlot =
+    documentsVisible && educationVisible ? (
+      <DocumentsSection
+        {...documentsSectionProps}
+        categoryMode="education_only"
+        embedded
+        htmlIdPrefix="qual_"
+      />
+    ) : null;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -506,43 +642,63 @@ export default function ProfileForm({
             setIsExperienced={setIsExperienced}
             reviewMode={reviewMode}
             reassignFieldKeys={fieldVisibilityKeys}
+            documentsSlot={documentsSectionEl}
           />
         )}
 
-        {shouldShowBankingBlock(fieldVisibilityKeys) && (
-          <BankingSection
-            formData={formData}
-            setFormData={setFormData}
-            reviewMode={reviewMode}
-            reassignFieldKeys={fieldVisibilityKeys}
-          />
-        )}
+        {!shouldShowPersonalBlock(fieldVisibilityKeys) && documentsSectionEl}
 
         {shouldShowEducationSection(fieldVisibilityKeys) && (
-          <EducationSection education={education} setEducation={setEducation} reviewMode={reviewMode} />
+          <EducationSection
+            education={education}
+            setEducation={setEducation}
+            reviewMode={reviewMode}
+            qualificationDocumentsSlot={qualificationDocumentsSlot}
+          />
         )}
 
-        {isExperienced && shouldShowExperienceSection(fieldVisibilityKeys) && (
-          <ExperienceSection experience={experience} setExperience={setExperience} reviewMode={reviewMode} />
+        {shouldShowBankingDetailsCard(fieldVisibilityKeys, isExperienced) && (
+          <BankingDetailsSection
+            formData={formData}
+            setFormData={setFormData}
+            experience={experience}
+            setExperience={setExperience}
+            isExperienced={isExperienced}
+            reviewMode={reviewMode}
+            reassignFieldKeys={fieldVisibilityKeys}
+            bankingDocumentsSlot={bankingDocumentsSlot}
+          />
         )}
 
         {shouldShowReferencesSection(fieldVisibilityKeys) && (
           <ReferencesSection references={references} setReferences={setReferences} reviewMode={reviewMode} />
         )}
 
-        {shouldShowDocumentsSection(fieldVisibilityKeys) && (
-        <DocumentsSection
-          documents={documents}
-          setDocuments={setDocuments}
-          files={files}
-          setFiles={setFiles}
-          existingDocs={Array.isArray(formData.joining_form_documents) ? formData.joining_form_documents : []}
-          existingPhotoUrl={formData.profile_photo || ""}
-          existingSignatureUrl={formData.signature || ""}
-          isExperienced={isExperienced}
-          fileUrls={formData.fileUrls || {}}
-          reviewMode={reviewMode}
-        />
+        {showHrDetailsCard && (
+          <HrDetailsSection
+            reviewMode={hrDocumentsReadOnly}
+            pendingEmployeeSectionsApproved={hrDetailsEditable}
+            awaitingEmployeeSectionApprove={hrSectionAwaitingEmployeeApprove}
+            documentsSectionProps={hrDocumentsSectionProps}
+          />
+        )}
+
+        {hrDetailsEditable && (
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50/90 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="text-sm text-indigo-950">
+              After uploading Employment & HR and policy documents above, send this request to Super Admin for final
+              approval.
+            </p>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleHrForwardToAdmin}
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-semibold shadow-sm"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+              {loading ? "Sending…" : "Send to Super Admin"}
+            </button>
+          </div>
         )}
 
         <div className="flex gap-4 border-t pt-4">

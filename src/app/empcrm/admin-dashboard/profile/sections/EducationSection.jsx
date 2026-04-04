@@ -1,6 +1,12 @@
 import { Plus, Trash2 } from "lucide-react";
 
-export default function EducationSection({ education, setEducation, reviewMode = false }) {
+export default function EducationSection({
+  education,
+  setEducation,
+  reviewMode = false,
+  /** Renders inside the same “Qualification Details” card (e.g. educational document uploads). */
+  qualificationDocumentsSlot = null,
+}) {
   const ro = reviewMode;
   const addEducation = () => {
     if (ro) return;
@@ -24,13 +30,13 @@ export default function EducationSection({ education, setEducation, reviewMode =
   const inactive = (cls) => (ro ? `${cls} bg-gray-50 cursor-not-allowed` : cls);
 
   return (
-    <div className="border-b pb-6">
-      <div className="flex justify-between items-center mb-4">
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/85 p-5 md:p-6 space-y-5 shadow-sm">
+      <div className="flex justify-between items-center gap-3 flex-wrap pb-2 border-b border-emerald-200/80">
         <h3 className="text-lg font-semibold text-gray-800">
-          Education Qualifications <span className="text-red-500">*</span>
+          Qualification Details <span className="text-red-500">*</span>
         </h3>
         {!ro && (
-          <button type="button" onClick={addEducation} className="flex items-center gap-2 text-blue-600 hover:text-blue-800">
+          <button type="button" onClick={addEducation} className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium">
             <Plus className="w-4 h-4" /> Add Education
           </button>
         )}
@@ -41,7 +47,7 @@ export default function EducationSection({ education, setEducation, reviewMode =
         </p>
       )}
       {education.map((edu, index) => (
-        <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 rounded-lg relative">
+        <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-white/90 border border-emerald-100 rounded-lg relative">
           {education.length > 1 && !ro && (
             <button type="button" onClick={() => removeEducation(index)} className="absolute top-2 right-2 text-red-600">
               <Trash2 className="w-4 h-4" />
@@ -65,6 +71,8 @@ export default function EducationSection({ education, setEducation, reviewMode =
           </div>
         </div>
       ))}
+
+      {qualificationDocumentsSlot}
     </div>
   );
 }
