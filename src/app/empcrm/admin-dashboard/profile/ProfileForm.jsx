@@ -19,6 +19,7 @@ import {
   shouldShowDocumentsSection,
 } from "@/lib/reassignFieldVisibility";
 import { labelForReassignKey } from "@/lib/profileReassignFields";
+import { deriveIsExperiencedForForm } from "@/lib/profileExperiencedUi";
 
 export default function ProfileForm({
   username,
@@ -81,9 +82,7 @@ export default function ProfileForm({
     // And we already initialized state with it.
     // Just ensure isExperienced is set.
     if (initialData) {
-      if ((initialData.experience && initialData.experience.length > 0) || initialData.is_experienced) {
-        setIsExperienced(true);
-      }
+      setIsExperienced(deriveIsExperiencedForForm(initialData));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -181,14 +180,7 @@ export default function ProfileForm({
         setExperience(data.profile.experience || []);
         setDocuments(docsSubmitted || {});
 
-        // Infer experience level if not explicitly saved (naive check: has experience entries?)
-        // Or if we save 'isExperienced' in formData/profile, use that.
-        // For now, if experience array has items, set true.
-        if (data.profile.is_experienced) {
-          setIsExperienced(!!data.profile.is_experienced);
-        } else if (data.profile.experience && data.profile.experience.length > 0) {
-          setIsExperienced(true);
-        }
+        setIsExperienced(deriveIsExperiencedForForm(data.profile));
       }
     } catch (error) {
       console.error("Error fetching profile:", error);

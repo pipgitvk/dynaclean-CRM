@@ -1,3 +1,5 @@
+import { isExplicitlyFresherSubmission } from "@/lib/profileExperiencedUi";
+
 /**
  * Maps a employee_profile_submissions row to ProfileForm initialData + fileUrls (same logic as admin review page).
  */
@@ -153,10 +155,16 @@ export function mergeSubmissionInitialWithLiveProfile(submissionInitial, liveApi
       ? submissionInitial.education
       : liveEdu;
 
-  merged.experience =
-    Array.isArray(submissionInitial.experience) && submissionInitial.experience.length > 0
+  if (isExplicitlyFresherSubmission(submissionInitial)) {
+    merged.experience = Array.isArray(submissionInitial.experience)
       ? submissionInitial.experience
-      : liveExp;
+      : [];
+  } else {
+    merged.experience =
+      Array.isArray(submissionInitial.experience) && submissionInitial.experience.length > 0
+        ? submissionInitial.experience
+        : liveExp;
+  }
 
   merged.documents_submitted = mergedDocs;
 
