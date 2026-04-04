@@ -1,5 +1,10 @@
 import { Upload, Eye, CheckCircle } from "lucide-react";
 import { profileAssetViewUrl } from "@/lib/profileMediaUrl";
+import {
+  shouldShowDocumentReassignItem,
+  shouldShowProfilePhotoReassign,
+  shouldShowSignatureReassign,
+} from "@/lib/reassignFieldVisibility";
 
 const EDUCATION_CATEGORY_TITLE = "Educational Documents";
 const BANK_PAYROLL_CATEGORY_TITLE = "Bank & Payroll Details";
@@ -74,8 +79,13 @@ export default function DocumentsSection({
   htmlIdPrefix = "",
   /** Border tint when embedded: violet (personal), amber (banking), or indigo (HR). */
   embeddedAccent = "violet",
+  /** Employee resubmit: filter upload rows to keys HR sent back. */
+  reassignFieldKeys = null,
 }) {
   const ro = reviewMode;
+  const rf = reassignFieldKeys;
+
+  const itemVisible = (docKey) => shouldShowDocumentReassignItem(rf, docKey);
 
   const handleDocumentCheckbox = (key) => {
     if (ro) return;
@@ -163,11 +173,23 @@ export default function DocumentsSection({
     }
   ];
 
-  const filteredCategories = filterDocumentCategories(documentCategories, categoryMode);
-  const showPhotoSignature =
+  const filteredCategories = filterDocumentCategories(documentCategories, categoryMode)
+    .map((category) => ({
+      ...category,
+      items: (category.items || []).filter((doc) => itemVisible(doc.key)),
+    }))
+    .filter((category) => (category.items || []).length > 0);
+  const showPhotoSlot =
     categoryMode !== "education_only" &&
     categoryMode !== "banking_and_experience_docs_only" &&
-    categoryMode !== "hr_details_only";
+    categoryMode !== "hr_details_only" &&
+    shouldShowProfilePhotoReassign(rf);
+  const showSignatureSlot =
+    categoryMode !== "education_only" &&
+    categoryMode !== "banking_and_experience_docs_only" &&
+    categoryMode !== "hr_details_only" &&
+    shouldShowSignatureReassign(rf);
+  const showPhotoSignature = showPhotoSlot || showSignatureSlot;
   const embeddedBorder =
     embeddedAccent === "amber"
       ? "border-amber-200/90"
@@ -213,6 +235,7 @@ export default function DocumentsSection({
           embedded ? `bg-white/80 ${embeddedPanelBorder}` : "bg-gray-50 border-gray-200"
         }`}
       >
+        {showPhotoSlot && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Passport Size Photograph *</label>
           <div className="flex items-center gap-4">
@@ -245,6 +268,8 @@ export default function DocumentsSection({
             )}
           </div>
         </div>
+        )}
+        {showSignatureSlot && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Signature *</label>
           <div className="flex items-center gap-4">
@@ -277,6 +302,7 @@ export default function DocumentsSection({
             )}
           </div>
         </div>
+        )}
       </div>
       )}
 

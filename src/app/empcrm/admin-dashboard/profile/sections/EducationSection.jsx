@@ -1,4 +1,8 @@
 import { Plus, Trash2 } from "lucide-react";
+import {
+  shouldShowEducationDataRows,
+  shouldShowQualificationColumn,
+} from "@/lib/reassignFieldVisibility";
 
 export default function EducationSection({
   education,
@@ -6,8 +10,12 @@ export default function EducationSection({
   reviewMode = false,
   /** Renders inside the same “Qualification Details” card (e.g. educational document uploads). */
   qualificationDocumentsSlot = null,
+  reassignFieldKeys = null,
 }) {
   const ro = reviewMode;
+  const rf = reassignFieldKeys;
+  const showRows = shouldShowEducationDataRows(rf);
+  const col = (k) => shouldShowQualificationColumn(rf, k);
   const addEducation = () => {
     if (ro) return;
     setEducation([...education, { exam_name: "", board_university: "", year_of_passing: "", grade_percentage: "" }]);
@@ -41,36 +49,72 @@ export default function EducationSection({
           </button>
         )}
       </div>
-      {education.length === 0 && (
+      {showRows && education.length === 0 && (
         <p className="text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-center">
           At least one education entry is required. Click &quot;Add Education&quot; to add a row.
         </p>
       )}
-      {education.map((edu, index) => (
-        <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-white/90 border border-emerald-100 rounded-lg relative">
-          {education.length > 1 && !ro && (
-            <button type="button" onClick={() => removeEducation(index)} className="absolute top-2 right-2 text-red-600">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-          <div>
-            <label className={labelClass}>Exam/Degree</label>
-            <input type="text" value={edu.exam_name} onChange={(e) => updateEducation(index, "exam_name", e.target.value)} placeholder="e.g., B.Com" readOnly={ro} className={inactive(inputClass)} />
+      {showRows &&
+        education.map((edu, index) => (
+          <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-white/90 border border-emerald-100 rounded-lg relative">
+            {education.length > 1 && !ro && (
+              <button type="button" onClick={() => removeEducation(index)} className="absolute top-2 right-2 text-red-600">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            {col("qualification_exam_name") && (
+              <div>
+                <label className={labelClass}>Exam/Degree</label>
+                <input
+                  type="text"
+                  value={edu.exam_name}
+                  onChange={(e) => updateEducation(index, "exam_name", e.target.value)}
+                  placeholder="e.g., B.Com"
+                  readOnly={ro}
+                  className={inactive(inputClass)}
+                />
+              </div>
+            )}
+            {col("qualification_board_university") && (
+              <div>
+                <label className={labelClass}>Board/University</label>
+                <input
+                  type="text"
+                  value={edu.board_university}
+                  onChange={(e) => updateEducation(index, "board_university", e.target.value)}
+                  readOnly={ro}
+                  className={inactive(inputClass)}
+                />
+              </div>
+            )}
+            {col("qualification_year_of_passing") && (
+              <div>
+                <label className={labelClass}>Year of Passing</label>
+                <input
+                  type="text"
+                  value={edu.year_of_passing}
+                  onChange={(e) => updateEducation(index, "year_of_passing", e.target.value)}
+                  placeholder="2020"
+                  readOnly={ro}
+                  className={inactive(inputClass)}
+                />
+              </div>
+            )}
+            {col("qualification_grade_percentage") && (
+              <div>
+                <label className={labelClass}>Grade/Percentage</label>
+                <input
+                  type="text"
+                  value={edu.grade_percentage}
+                  onChange={(e) => updateEducation(index, "grade_percentage", e.target.value)}
+                  placeholder="75%"
+                  readOnly={ro}
+                  className={inactive(inputClass)}
+                />
+              </div>
+            )}
           </div>
-          <div>
-            <label className={labelClass}>Board/University</label>
-            <input type="text" value={edu.board_university} onChange={(e) => updateEducation(index, "board_university", e.target.value)} readOnly={ro} className={inactive(inputClass)} />
-          </div>
-          <div>
-            <label className={labelClass}>Year of Passing</label>
-            <input type="text" value={edu.year_of_passing} onChange={(e) => updateEducation(index, "year_of_passing", e.target.value)} placeholder="2020" readOnly={ro} className={inactive(inputClass)} />
-          </div>
-          <div>
-            <label className={labelClass}>Grade/Percentage</label>
-            <input type="text" value={edu.grade_percentage} onChange={(e) => updateEducation(index, "grade_percentage", e.target.value)} placeholder="75%" readOnly={ro} className={inactive(inputClass)} />
-          </div>
-        </div>
-      ))}
+        ))}
 
       {qualificationDocumentsSlot}
     </div>

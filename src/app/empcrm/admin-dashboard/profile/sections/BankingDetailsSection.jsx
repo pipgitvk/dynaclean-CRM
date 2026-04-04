@@ -182,6 +182,7 @@ export default function BankingDetailsSection({
             setExperience={setExperience}
             reviewMode={reviewMode}
             embedded
+            reassignFieldKeys={reassignFieldKeys}
           />
         </div>
       )}

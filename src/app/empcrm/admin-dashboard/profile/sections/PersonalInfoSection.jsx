@@ -40,7 +40,8 @@ export default function PersonalInfoSection({
     show("emergency_contact_name") ||
     show("emergency_contact_number") ||
     show("correspondence_address") ||
-    show("permanent_address");
+    show("permanent_address") ||
+    show("near_police_station");
 
   return (
     <div className="space-y-8">
@@ -408,13 +409,13 @@ export default function PersonalInfoSection({
 
         {show("correspondence_address") && (
         <div className="md:col-span-2">
-          <label className={labelClass}>Current Address *</label>
+          <label className={labelClass}>Current Address</label>
           <textarea
             name="correspondence_address"
             value={formData.correspondence_address || ""}
             onChange={handleChange}
             rows="2"
-            required={!rf || show("correspondence_address")}
+            required={Boolean(rf && show("correspondence_address"))}
             readOnly={ro}
             className={inactive(inputClass)}
           />
@@ -431,6 +432,21 @@ export default function PersonalInfoSection({
             required={!rf || show("permanent_address")}
             readOnly={ro}
             className={inactive(inputClass)}
+          />
+        </div>
+        )}
+        {show("near_police_station") && (
+        <div className="md:col-span-2">
+          <label className={labelClass}>Near police station *</label>
+          <input
+            type="text"
+            name="near_police_station"
+            value={formData.near_police_station || ""}
+            onChange={handleChange}
+            required={!rf || show("near_police_station")}
+            readOnly={ro}
+            className={inactive(inputClass)}
+            placeholder="e.g. Dwarka Sector 21 Police Station"
           />
         </div>
         )}

@@ -402,6 +402,10 @@ export default function UserProfileView() {
                   <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">Permanent Address</span>
                   <p className="text-gray-800">{profile.permanent_address || "N/A"}</p>
                 </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">Near police station</span>
+                  <p className="text-gray-800">{profile.near_police_station || "N/A"}</p>
+                </div>
               </div>
             </Section>
 

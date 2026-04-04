@@ -1,7 +1,8 @@
 // app/user-dashboard/attendance/page.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/attendanceRulesEngine";
 import AttendanceSummaryGrid from "@/components/AttendanceSummaryGrid";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import AttendanceRegularizeModal from "./AttendanceRegularizeModal";
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -24,6 +26,30 @@ const AttendancePage = () => {
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
   const [rules, setRules] = useState(DEFAULT_ATTENDANCE_RULES);
+  const [regSummary, setRegSummary] = useState(null);
+  const [myRegRequests, setMyRegRequests] = useState([]);
+  const [regModalOpen, setRegModalOpen] = useState(false);
+  const [regModalLog, setRegModalLog] = useState(null);
+  const [regModalDateKey, setRegModalDateKey] = useState("");
+
+  const refreshRegularization = useCallback(async () => {
+    try {
+      const [sRes, mRes] = await Promise.all([
+        fetch("/api/attendance/regularization?scope=summary"),
+        fetch("/api/attendance/regularization?scope=mine"),
+      ]);
+      if (sRes.ok) {
+        const d = await sRes.json().catch(() => ({}));
+        if (d.success) setRegSummary(d);
+      }
+      if (mRes.ok) {
+        const d = await mRes.json().catch(() => ({}));
+        if (d.success) setMyRegRequests(d.requests || []);
+      }
+    } catch {
+      /* optional feature */
+    }
+  }, []);
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -65,6 +91,12 @@ const AttendancePage = () => {
     fetchAttendance();
   }, []);
 
+  useEffect(() => {
+    if (!loading) {
+      refreshRegularization();
+    }
+  }, [loading, refreshRegularization]);
+
   const openHolidayModal = async () => {
     try {
       const res = await fetch("/api/holidays");
@@ -88,6 +120,43 @@ const AttendancePage = () => {
     breakStatusFromRules(startTime, endTime, breakType, rules);
 
   const isHalfDay = (log) => isHalfDayByRules(log, rules);
+
+  const logDateKeyForReg = (log) =>
+    log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
+
+  const rowNeedsRegularization = (log) => {
+    if (log.type !== "present") return false;
+    const checkinOk = getCheckinStatus(log.checkin_time) === "onTime";
+    const checkoutOk = getCheckoutStatus(log.checkout_time) === "onTime";
+    return !checkinOk || !checkoutOk;
+  };
+
+  const pendingRegByDate = useMemo(() => {
+    const m = new Map();
+    for (const r of myRegRequests) {
+      if (r.status !== "pending") continue;
+      let k = r.log_date;
+      if (k == null) continue;
+      if (typeof k === "string") {
+        k = k.includes("T") ? k.slice(0, 10) : k.slice(0, 10);
+      } else if (k instanceof Date) {
+        k = k.toISOString().slice(0, 10);
+      } else {
+        k = String(k).slice(0, 10);
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) m.set(k, r);
+    }
+    return m;
+  }, [myRegRequests]);
+
+  const openRegularizeModal = (log) => {
+    setRegModalLog(log);
+    setRegModalDateKey(logDateKeyForReg(log));
+    setRegModalOpen(true);
+  };
+
+  const showRegActionCol = filterStatus === "regularize";
+  const tableColSpanEmpty = showRegActionCol ? 7 : 6;
 
   const handleShowAll = () => {
     setFilterStatus("all");
@@ -224,6 +293,11 @@ const AttendancePage = () => {
       );
     } else if (filterStatus === "halfDay") {
       return log.type === "present" && isHalfDay(log);
+    } else if (filterStatus === "regularize") {
+      if (log.type !== "present") return false;
+      const checkinOk = getCheckinStatus(log.checkin_time) === "onTime";
+      const checkoutOk = getCheckoutStatus(log.checkout_time) === "onTime";
+      return !checkinOk || !checkoutOk;
     }
 
     return true;
@@ -365,6 +439,15 @@ const AttendancePage = () => {
               Show On Time
             </button>
             <button
+              onClick={() => setFilterStatus("regularize")}
+              className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "regularize"
+                ? "bg-teal-600 text-white shadow-md"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+            >
+              Regularize attendance
+            </button>
+            <button
               onClick={openHolidayModal}
               className="px-4 py-2 rounded-md font-medium text-sm bg-indigo-600 text-white hover:bg-indigo-700"
             >
@@ -372,6 +455,19 @@ const AttendancePage = () => {
             </button>
           </div>
         </div>
+
+        {regSummary?.isReportingManager &&
+          regSummary.managerPendingCount > 0 && (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <Link
+                href="/user-dashboard/attendance-regularization-approvals"
+                className="font-semibold text-amber-800 underline hover:text-amber-950"
+              >
+                Approve team attendance regularizations (
+                {regSummary.managerPendingCount} pending)
+              </Link>
+            </div>
+          )}
 
         {/* Card View for Mobile (md and below) */}
         <div className="grid grid-cols-1 gap-4 md:hidden">
@@ -465,6 +561,23 @@ const AttendancePage = () => {
                         {formatTime(log.checkout_time)}
                       </span>
                     </div>
+                    {showRegActionCol && rowNeedsRegularization(log) && (
+                      <div className="pt-3 mt-2 border-t border-gray-200">
+                        {pendingRegByDate.get(logDateKeyForReg(log)) ? (
+                          <span className="text-sm font-medium text-amber-700">
+                            Pending manager approval
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openRegularizeModal(log)}
+                            className="w-full py-2 rounded-md text-sm font-medium bg-teal-600 text-white hover:bg-teal-700"
+                          >
+                            Regularize
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="text-center py-4">
@@ -517,6 +630,11 @@ const AttendancePage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Check-out
                 </th>
+                {showRegActionCol && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -599,10 +717,29 @@ const AttendancePage = () => {
                         >
                           {formatTime(log.checkout_time)}
                         </td>
+                        {showRegActionCol && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {rowNeedsRegularization(log) ? (
+                              pendingRegByDate.get(logDateKeyForReg(log)) ? (
+                                <span className="text-amber-700 font-medium">
+                                  Pending
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openRegularizeModal(log)}
+                                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                                >
+                                  Regularize
+                                </button>
+                              )
+                            ) : null}
+                          </td>
+                        )}
                       </>
                     ) : (
                       <td
-                        colSpan="5"
+                        colSpan={showRegActionCol ? 6 : 5}
                         className={`px-6 py-4 text-center ${log.type === "absent"
                           ? "bg-orange-50 text-orange-700"
                           : log.type === "leave"
@@ -633,7 +770,10 @@ const AttendancePage = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                  <td
+                    colSpan={tableColSpanEmpty}
+                    className="px-6 py-4 text-center text-gray-500"
+                  >
                     No attendance logs found for the selected filter.
                   </td>
                 </tr>
@@ -649,6 +789,21 @@ const AttendancePage = () => {
           rules={rules}
         />
       </div>
+
+      <AttendanceRegularizeModal
+        open={regModalOpen}
+        log={regModalLog}
+        logDateKey={regModalDateKey}
+        onClose={() => {
+          setRegModalOpen(false);
+          setRegModalLog(null);
+          setRegModalDateKey("");
+        }}
+        onSubmitted={() => {
+          refreshRegularization();
+        }}
+      />
+
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-4">

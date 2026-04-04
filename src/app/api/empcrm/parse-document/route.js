@@ -79,6 +79,7 @@ Return ONLY valid JSON without any markdown formatting or additional text.
   "correspondence_address": "",
   "correspondence_telephone": "",
   "permanent_address": "",
+  "near_police_station": "",
   "permanent_telephone": "",
   "emergency_contact_name": "",
   "emergency_contact_number": "",
