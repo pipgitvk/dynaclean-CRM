@@ -8,6 +8,7 @@ export default function PersonalInfoSection({
   setIsExperienced,
   reviewMode = false,
   reassignFieldKeys = null,
+  documentsSlot = null,
 }) {
   const ro = reviewMode;
   const rf = reassignFieldKeys;
@@ -25,17 +26,31 @@ export default function PersonalInfoSection({
   const labelClass = "block text-sm font-medium text-gray-700 mb-1";
   const inactive = (cls) => (ro ? `${cls} bg-gray-50 cursor-not-allowed` : cls);
 
-  const showTaxBlock =
-    show("pan_number") || show("aadhar_number") || show("pf_uan") || show("esic_number");
+  const hasPersonalDetailsContent =
+    Boolean(documentsSlot) ||
+    show("date_of_birth") ||
+    show("contact_mobile") ||
+    show("email") ||
+    show("blood_group") ||
+    show("marital_status") ||
+    show("father_name") ||
+    show("father_phone") ||
+    show("mother_name") ||
+    show("mother_phone") ||
+    show("emergency_contact_name") ||
+    show("emergency_contact_number") ||
+    show("correspondence_address") ||
+    show("permanent_address");
 
   return (
-    <div className="border-b pb-6">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">
+    <div className="space-y-8">
+      <div className="rounded-xl border border-sky-200 bg-sky-50/90 p-5 md:p-6 shadow-sm space-y-4">
+      <h3 className="text-lg font-semibold text-gray-800 mb-1 pb-2 border-b border-sky-200/80">
         Employee Basic Details
       </h3>
 
       {show("is_experienced") && (
-      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+      <div className="p-4 bg-white/80 rounded-lg border border-sky-100">
         <label className="block text-sm font-bold text-gray-700 mb-3">Employment Type (Select before filling details) *</label>
         <div className="flex gap-6">
           <label className={`flex items-center gap-2 p-2 bg-white rounded border border-gray-200 ${ro ? "cursor-default opacity-90" : "cursor-pointer hover:border-blue-400"}`}>
@@ -217,7 +232,15 @@ export default function PersonalInfoSection({
           </select>
         </div>
         )}
+      </div>
+      </div>
 
+      {hasPersonalDetailsContent && (
+      <div className="rounded-xl border border-violet-200 bg-violet-50/85 p-5 md:p-6 space-y-4 shadow-sm">
+        <h3 className="text-lg font-semibold text-gray-800 pb-2 border-b border-violet-200/80">
+          Employee Personal Details
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {show("date_of_birth") && (
         <div>
           <label className={labelClass}>Date of Birth *</label>
@@ -383,70 +406,6 @@ export default function PersonalInfoSection({
         </div>
         )}
 
-        {showTaxBlock && (
-        <div className="md:col-span-3 mt-4 border-t pt-4 bg-gray-50 p-4 rounded-lg">
-          <h4 className="text-sm font-semibold text-gray-800 mb-3">Tax & Compliance Info</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {show("pan_number") && (
-            <div>
-              <label className={labelClass}>PAN Number *</label>
-              <input
-                type="text"
-                name="pan_number"
-                value={formData.pan_number || ""}
-                onChange={handleChange}
-                className={inactive(inputClass)}
-                required={!rf || show("pan_number")}
-                readOnly={ro}
-              />
-            </div>
-            )}
-            {show("aadhar_number") && (
-            <div>
-              <label className={labelClass}>Aadhaar Number *</label>
-              <input
-                type="text"
-                name="aadhar_number"
-                value={formData.aadhar_number || ""}
-                onChange={handleChange}
-                className={inactive(inputClass)}
-                required={!rf || show("aadhar_number")}
-                readOnly={ro}
-              />
-            </div>
-            )}
-            {show("pf_uan") && (
-            <div>
-              <label className={labelClass}>PF UAN Number</label>
-              <input
-                type="text"
-                name="pf_uan"
-                value={formData.pf_uan || ""}
-                onChange={handleChange}
-                readOnly={ro}
-                className={inactive(inputClass)}
-                required={Boolean(rf && show("pf_uan"))}
-              />
-            </div>
-            )}
-            {show("esic_number") && (
-            <div>
-              <label className={labelClass}>ESIC Number (If Available)</label>
-              <input
-                type="text"
-                name="esic_number"
-                value={formData.esic_number || ""}
-                onChange={handleChange}
-                readOnly={ro}
-                className={inactive(inputClass)}
-                required={Boolean(rf && show("esic_number"))}
-              />
-            </div>
-            )}
-          </div>
-        </div>
-        )}
-
         {show("correspondence_address") && (
         <div className="md:col-span-2">
           <label className={labelClass}>Current Address *</label>
@@ -475,10 +434,14 @@ export default function PersonalInfoSection({
           />
         </div>
         )}
+        </div>
 
-        {isPrivilegedEditor && !ro && (
-          <>
-            <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4 mt-2 p-4 border rounded-lg bg-gray-50">
+        {documentsSlot}
+      </div>
+      )}
+
+      {isPrivilegedEditor && !ro && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
               <div>
                 <label className={labelClass}>Sick Leave Enabled</label>
                 <select
@@ -550,9 +513,7 @@ export default function PersonalInfoSection({
                 />
               </div>
             </div>
-          </>
-        )}
-      </div>
+      )}
     </div>
   );
 }

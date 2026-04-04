@@ -13,6 +13,33 @@ import {
   mapDbExperienceToPayload,
 } from "@/lib/submissionPayloadMerge";
 
+/** Lowercase trimmed status; empty string if missing (e.g. ENUM rejected an UPDATE). */
+function normalizeSubStatus(s) {
+  return String(s ?? "").trim().toLowerCase();
+}
+
+/**
+ * Blank status after "Approve employee sections" usually means the DB column rejected `pending_hr_docs`
+ * (ENUM / VARCHAR too short). Heal to pending_hr_docs when the row clearly completed first HR review.
+ */
+async function maybeRepairBlankSubmissionStatus(conn, row) {
+  if (!row?.id) return row;
+  if (normalizeSubStatus(row.status) !== "") return row;
+  if (!row.reviewed_at) return row;
+  if (row.rejection_reason != null && String(row.rejection_reason).trim() !== "") return row;
+  try {
+    await conn.execute(
+      `UPDATE employee_profile_submissions SET status = 'pending_hr_docs' WHERE id = ? AND (status IS NULL OR TRIM(status) = '')`,
+      [row.id]
+    );
+    const [again] = await conn.execute(`SELECT * FROM employee_profile_submissions WHERE id = ?`, [row.id]);
+    if (again.length) return again[0];
+  } catch (e) {
+    console.error("[PROFILE][SUBMISSIONS] status repair failed (run VARCHAR migration):", e?.message || e);
+  }
+  return row;
+}
+
 /** JWT may carry username and/or id (empId). Submission rows use username + empId — match both. */
 function sessionAccountIdentity(session) {
   if (!session) return { username: "", empId: null };
@@ -55,9 +82,12 @@ function canSeeAllPendingHrQueue(session) {
 /** Single submission row visible in admin GET ?id= */
 function submissionVisibleToAdmin(session, sub) {
   if (!sub) return false;
-  const st = String(sub.status || "");
+  let st = normalizeSubStatus(sub.status);
+  if (!st && sub.reviewed_at && (sub.rejection_reason == null || String(sub.rejection_reason).trim() === "")) {
+    st = "pending_hr_docs";
+  }
   if (st === "pending_admin" && !isSuperAdmin(session)) return false;
-  if (st === "pending") {
+  if (st === "pending" || st === "pending_hr_docs") {
     const a = sub.pending_assignee_username;
     if (a == null || String(a).trim() === "") return true;
     if (canSeeAllPendingHrQueue(session)) return true;
@@ -69,7 +99,12 @@ function submissionVisibleToAdmin(session, sub) {
 
 /** Approve / reject / reassign on pending — respects HR delegation */
 function canActOnPendingSubmission(session, sub) {
-  if (!sub || sub.status !== "pending") return true;
+  if (!sub) return true;
+  let st = normalizeSubStatus(sub.status);
+  if (!st && sub.reviewed_at && (sub.rejection_reason == null || String(sub.rejection_reason).trim() === "")) {
+    st = "pending_hr_docs";
+  }
+  if (st !== "pending" && st !== "pending_hr_docs") return true;
   const a = sub.pending_assignee_username;
   if (a == null || String(a).trim() === "") return true;
   if (isSuperAdmin(session) || isHrHead(session)) return true;
@@ -164,12 +199,15 @@ export async function GET(request) {
 
     const id = searchParams.get("id");
     if (id) {
-      const [rows] = await conn.execute(
+      let [rows] = await conn.execute(
         `SELECT * FROM employee_profile_submissions WHERE id = ?`,
         [id]
       );
       if (rows.length && !submissionVisibleToAdmin(session, rows[0])) {
         return NextResponse.json({ success: false, error: "Access denied" }, { status: 403 });
+      }
+      if (rows.length && isEmpcrmProfileAdmin(session)) {
+        rows = [await maybeRepairBlankSubmissionStatus(conn, rows[0])];
       }
       return NextResponse.json({ success: true, submissions: rows });
     }
@@ -242,14 +280,23 @@ export async function GET(request) {
     const params = [];
     if (status === "reassign") {
       sql = `SELECT * FROM employee_profile_submissions WHERE status IN ('reassign', 'revision_requested')`;
-    } else {
-      sql = `SELECT * FROM employee_profile_submissions WHERE status = ?`;
-      params.push(status);
-      if (status === "pending" && !canSeeAllPendingHrQueue(session)) {
+    } else if (status === "pending") {
+      sql = `SELECT * FROM employee_profile_submissions WHERE (
+        status IN ('pending', 'pending_hr_docs')
+        OR (
+          (status IS NULL OR TRIM(status) = '')
+          AND reviewed_at IS NOT NULL
+          AND (rejection_reason IS NULL OR TRIM(rejection_reason) = '')
+        )
+      )`;
+      if (!canSeeAllPendingHrQueue(session)) {
         const u = String(session.username || "").trim();
         sql += ` AND (pending_assignee_username IS NULL OR TRIM(pending_assignee_username) = '' OR LOWER(TRIM(pending_assignee_username)) = LOWER(?))`;
         params.push(u);
       }
+    } else {
+      sql = `SELECT * FROM employee_profile_submissions WHERE status = ?`;
+      params.push(status);
     }
     if (username) {
       sql += " AND username = ?";
@@ -477,7 +524,7 @@ export async function PATCH(request) {
 
     const body = await request.json();
     const { submissionId, action, rejection_reason, fields, reassignment_note, reassign_target, assignee_username } = body;
-    if (!submissionId || !action || !['approve', 'reject', 'reassign'].includes(action)) {
+    if (!submissionId || !action || !['approve', 'reject', 'reassign', 'forward_to_admin'].includes(action)) {
       return NextResponse.json({ success: false, error: 'submissionId and valid action are required' }, { status: 400 });
     }
 
@@ -489,7 +536,7 @@ export async function PATCH(request) {
     const submission = rows[0];
 
     if (action === "reassign") {
-      if (submission.status !== "pending") {
+      if (normalizeSubStatus(submission.status) !== "pending") {
         return NextResponse.json({ success: false, error: "Only pending submissions can be reassigned" }, { status: 400 });
       }
       if (!canActOnPendingSubmission(session, submission)) {
@@ -537,17 +584,48 @@ export async function PATCH(request) {
       return NextResponse.json({ success: true, message: "Selected fields sent to employee for correction" });
     }
 
-    if (action === "reject") {
-      if (!["pending", "pending_admin"].includes(submission.status)) {
-        return NextResponse.json({ success: false, error: "This submission cannot be rejected." }, { status: 400 });
+    if (action === "forward_to_admin") {
+      if (normalizeSubStatus(submission.status) !== "pending_hr_docs") {
+        return NextResponse.json(
+          { success: false, error: "Send to Super Admin is only available after HR approves employee sections." },
+          { status: 400 }
+        );
       }
-      if (submission.status === "pending" && !canActOnPendingSubmission(session, submission)) {
+      if (!canActOnPendingSubmission(session, submission)) {
         return NextResponse.json(
           { success: false, error: "This submission is assigned to another HR member." },
           { status: 403 }
         );
       }
-      if (submission.status === "pending_admin" && !isSuperAdmin(session)) {
+      await conn.execute(
+        `UPDATE employee_profile_submissions SET status = 'pending_admin', reviewed_by = ?, reviewed_at = NOW(), pending_assignee_username = NULL WHERE id = ?`,
+        [session.username, submissionId]
+      );
+      return NextResponse.json({
+        success: true,
+        message: "Sent to Super Admin for final approval.",
+      });
+    }
+
+    if (action === "reject") {
+      const stReject = normalizeSubStatus(submission.status);
+      const rejectableStuckBlank =
+        !stReject &&
+        submission.reviewed_at &&
+        (submission.rejection_reason == null || String(submission.rejection_reason).trim() === "");
+      if (!["pending", "pending_admin", "pending_hr_docs"].includes(stReject) && !rejectableStuckBlank) {
+        return NextResponse.json({ success: false, error: "This submission cannot be rejected." }, { status: 400 });
+      }
+      if (
+        (stReject === "pending" || stReject === "pending_hr_docs" || rejectableStuckBlank) &&
+        !canActOnPendingSubmission(session, submission)
+      ) {
+        return NextResponse.json(
+          { success: false, error: "This submission is assigned to another HR member." },
+          { status: 403 }
+        );
+      }
+      if (stReject === "pending_admin" && !isSuperAdmin(session)) {
         return NextResponse.json(
           { success: false, error: "Only Super Admin can reject at this stage." },
           { status: 403 }
@@ -564,8 +642,9 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, error: "Invalid action" }, { status: 400 });
     }
 
-    // --- HR first approval: pending → pending_admin (no DB merge) ---
-    if (submission.status === "pending") {
+    // --- HR first approval: pending → pending_hr_docs (HR completes HR-only docs, then forward_to_admin) ---
+    const stApprove = normalizeSubStatus(submission.status);
+    if (stApprove === "pending") {
       if (!canActOnPendingSubmission(session, submission)) {
         return NextResponse.json(
           { success: false, error: "This submission is assigned to another HR member." },
@@ -573,17 +652,44 @@ export async function PATCH(request) {
         );
       }
       await conn.execute(
-        `UPDATE employee_profile_submissions SET status = 'pending_admin', reviewed_by = ?, reviewed_at = NOW(), pending_assignee_username = NULL WHERE id = ?`,
+        `UPDATE employee_profile_submissions SET status = 'pending_hr_docs', reviewed_by = ?, reviewed_at = NOW(), pending_assignee_username = NULL WHERE id = ?`,
         [session.username, submissionId]
       );
+      const [verifyRows] = await conn.execute(`SELECT status FROM employee_profile_submissions WHERE id = ?`, [
+        submissionId,
+      ]);
+      const after = normalizeSubStatus(verifyRows[0]?.status);
+      if (after !== "pending_hr_docs") {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Database did not save status pending_hr_docs (column may be ENUM or too short). Run: ALTER TABLE employee_profile_submissions MODIFY COLUMN status VARCHAR(32) NOT NULL DEFAULT 'pending';",
+            dbStatus: verifyRows[0]?.status ?? null,
+          },
+          { status: 500 }
+        );
+      }
       return NextResponse.json({
         success: true,
-        message: "HR approved. Sent to Super Admin for final approval.",
+        message:
+          "Employee sections approved. Complete HR Details (Employment & HR / policy documents), then use Send to Super Admin.",
       });
     }
 
+    if (stApprove === "pending_hr_docs") {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Use Send to Super Admin on the form after uploading HR documents — or reject this submission.",
+        },
+        { status: 400 }
+      );
+    }
+
     // --- Super Admin final approval: merge into employee_profiles ---
-    if (submission.status !== "pending_admin") {
+    if (normalizeSubStatus(submission.status) !== "pending_admin") {
       return NextResponse.json(
         {
           success: false,

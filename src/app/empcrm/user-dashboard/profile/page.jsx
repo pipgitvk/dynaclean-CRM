@@ -135,6 +135,23 @@ export default function UserProfileView() {
       );
     }
 
+    if (latestSubmission && st === "pending_hr_docs") {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
+          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-indigo-200">
+            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-indigo-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">With HR — final paperwork</h2>
+            <p className="text-gray-600 mb-6 text-sm">
+              HR has approved your details and is completing internal employment and policy documents. Your request will
+              go to Super Admin next.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     if (latestSubmission && isPendingAdmin) {
       return (
         <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
@@ -144,7 +161,7 @@ export default function UserProfileView() {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Awaiting final approval</h2>
             <p className="text-gray-600 mb-6 text-sm">
-              HR has approved your submission. Your profile will appear here after Super Admin publishes it.
+              HR has sent your submission for final review. Your profile will appear here after Super Admin publishes it.
             </p>
           </div>
         </div>
@@ -267,6 +284,17 @@ export default function UserProfileView() {
             <div>
               <h2 className="font-bold text-lg">Awaiting HR approval</h2>
               <p className="text-sm mt-1">Your latest profile submission is under review.</p>
+            </div>
+          </div>
+        )}
+        {latestSubmission?.status === "pending_hr_docs" && (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 sm:p-5 text-indigo-950 shadow-sm flex gap-3 items-start">
+            <Clock className="w-6 h-6 shrink-0 text-indigo-600 mt-0.5" />
+            <div>
+              <h2 className="font-bold text-lg">HR completing documents</h2>
+              <p className="text-sm mt-1">
+                Your details are approved. HR is adding employment / policy documents before Super Admin reviews.
+              </p>
             </div>
           </div>
         )}

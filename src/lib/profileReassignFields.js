@@ -56,7 +56,7 @@ export const PROFILE_REASSIGN_FIELD_GROUPS = [
   {
     title: "Sections (whole block)",
     fields: [
-      { key: "section_education", label: "Education qualifications (all rows)" },
+      { key: "section_education", label: "Qualification Details (all rows)" },
       { key: "section_experience", label: "Work experience (all rows)" },
       { key: "section_references", label: "Reference verification (all references)" },
       { key: "section_documents", label: "Documents, photo & signature (all uploads)" },

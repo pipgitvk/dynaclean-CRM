@@ -1,6 +1,12 @@
 import { Plus, Trash2 } from "lucide-react";
 
-export default function ExperienceSection({ experience, setExperience, reviewMode = false }) {
+export default function ExperienceSection({
+  experience,
+  setExperience,
+  reviewMode = false,
+  /** Nested under Banking Details: compact title and panel styling. */
+  embedded = false,
+}) {
   const ro = reviewMode;
   const addExperience = () => {
     if (ro) return;
@@ -23,21 +29,43 @@ export default function ExperienceSection({ experience, setExperience, reviewMod
   const labelClass = "block text-sm font-medium text-gray-700 mb-1";
   const inactive = (cls) => (ro ? `${cls} bg-gray-50 cursor-not-allowed` : cls);
 
+  const rowPanel = embedded
+    ? "bg-white/90 border border-amber-100 rounded-lg"
+    : "bg-gray-50 rounded-lg";
+
   return (
-    <div className="border-b pb-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-gray-800">Work Experience</h3>
+    <div className={embedded ? "space-y-3" : "border-b pb-6"}>
+      <div className="flex justify-between items-center gap-3 flex-wrap mb-1">
+        {embedded ? (
+          <h4 className="text-sm font-semibold text-gray-800">Work experience</h4>
+        ) : (
+          <h3 className="text-lg font-semibold text-gray-800">Work Experience</h3>
+        )}
         {!ro && (
-          <button type="button" onClick={addExperience} className="flex items-center gap-2 text-blue-600 hover:text-blue-800">
+          <button
+            type="button"
+            onClick={addExperience}
+            className={`flex items-center gap-2 text-blue-600 hover:text-blue-800 ${
+              embedded ? "text-sm font-medium" : ""
+            }`}
+          >
             <Plus className="w-4 h-4" /> Add Experience
           </button>
         )}
       </div>
       {experience.length === 0 && (
-        <p className="text-gray-500 text-center py-4">No experience added. Click "Add Experience" to start.</p>
+        <p
+          className={
+            embedded
+              ? "text-amber-900/80 bg-amber-50/80 border border-amber-100 rounded-lg px-4 py-3 text-sm text-center"
+              : "text-gray-500 text-center py-4"
+          }
+        >
+          No experience added. Click &quot;Add Experience&quot; to start.
+        </p>
       )}
       {experience.map((exp, index) => (
-        <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg relative">
+        <div key={index} className={`grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 relative ${rowPanel}`}>
           {experience.length > 1 && !ro && (
             <button type="button" onClick={() => removeExperience(index)} className="absolute top-2 right-2 text-red-600">
               <Trash2 className="w-4 h-4" />

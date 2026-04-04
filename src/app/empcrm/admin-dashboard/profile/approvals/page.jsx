@@ -17,6 +17,7 @@ function displayStatus(status) {
   if (!status) return "—";
   if (status === "revision_requested") return "reassign";
   if (status === "pending_admin") return "with super admin";
+  if (status === "pending_hr_docs") return "HR documents";
   return status;
 }
 
@@ -33,6 +34,8 @@ function statusBadgeClass(status) {
       return "bg-blue-100 text-blue-800";
     case "pending_admin":
       return "bg-violet-100 text-violet-900";
+    case "pending_hr_docs":
+      return "bg-indigo-100 text-indigo-900";
     default:
       return "bg-gray-100 text-gray-800";
   }
