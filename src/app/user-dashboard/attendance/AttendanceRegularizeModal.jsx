@@ -7,17 +7,6 @@ import {
   datetimeLocalToMysql,
 } from "./regularizationUtils";
 
-const TIME_FIELDS = [
-  { key: "checkin_time", label: "Check-in" },
-  { key: "checkout_time", label: "Check-out" },
-  { key: "break_morning_start", label: "Morning break start" },
-  { key: "break_morning_end", label: "Morning break end" },
-  { key: "break_lunch_start", label: "Lunch start" },
-  { key: "break_lunch_end", label: "Lunch end" },
-  { key: "break_evening_start", label: "Evening break start" },
-  { key: "break_evening_end", label: "Evening break end" },
-];
-
 export default function AttendanceRegularizeModal({
   open,
   log,
@@ -26,41 +15,51 @@ export default function AttendanceRegularizeModal({
   onSubmitted,
 }) {
   const [reason, setReason] = useState("");
-  const [values, setValues] = useState({});
+  const [checkin, setCheckin] = useState("");
+  const [checkout, setCheckout] = useState("");
+  const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   useEffect(() => {
     if (!open || !log) return;
-    const next = {};
-    for (const { key } of TIME_FIELDS) {
-      next[key] = mysqlDatetimeToDatetimeLocalValue(log[key]);
-    }
-    setValues(next);
+    setCheckin(mysqlDatetimeToDatetimeLocalValue(log.checkin_time));
+    setCheckout(mysqlDatetimeToDatetimeLocalValue(log.checkout_time));
     setReason("");
+    setFile(null);
+    setFileInputKey((k) => k + 1);
   }, [open, log]);
 
   if (!open || !log) return null;
 
-  const handleChange = (key, v) => {
-    setValues((prev) => ({ ...prev, [key]: v }));
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const r = reason.trim();
+    if (!r) {
+      toast.error("Reason is required.");
+      return;
+    }
+
     setSaving(true);
     try {
-      const proposed = {};
-      for (const { key } of TIME_FIELDS) {
-        proposed[key] = datetimeLocalToMysql(values[key]);
+      const fd = new FormData();
+      fd.append("log_date", logDateKey);
+      fd.append("reason", r);
+      fd.append(
+        "checkin_time",
+        datetimeLocalToMysql(checkin) ?? ""
+      );
+      fd.append(
+        "checkout_time",
+        datetimeLocalToMysql(checkout) ?? ""
+      );
+      if (file) {
+        fd.append("attachment", file);
       }
+
       const res = await fetch("/api/attendance/regularization", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          log_date: logDateKey,
-          reason,
-          proposed,
-        }),
+        body: fd,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -98,33 +97,58 @@ export default function AttendanceRegularizeModal({
             <span className="font-medium text-gray-900">
               {new Date(log.date).toLocaleDateString()}
             </span>
-            . Correct the times below. Your reporting manager must approve before
-            the attendance log is updated.
+            . Set check-in and check-out. Your reporting manager must approve
+            before the attendance log is updated.
           </p>
-          {TIME_FIELDS.map(({ key, label }) => (
-            <div key={key}>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                {label}
-              </label>
-              <input
-                type="datetime-local"
-                value={values[key] ?? ""}
-                onChange={(e) => handleChange(key, e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              />
-            </div>
-          ))}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              Reason (optional)
+              Check-in
+            </label>
+            <input
+              type="datetime-local"
+              value={checkin}
+              onChange={(e) => setCheckin(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Check-out
+            </label>
+            <input
+              type="datetime-local"
+              value={checkout}
+              onChange={(e) => setCheckout(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Reason <span className="text-red-600">*</span>
             </label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={3}
+              required
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
               placeholder="Why are you correcting this day?"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Attachment (optional)
+            </label>
+            <input
+              key={fileInputKey}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-teal-50 file:text-teal-800"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              PDF, JPG, PNG, or WebP — max 5 MB (optional)
+            </p>
           </div>
           <div className="flex gap-2 justify-end pt-2">
             <button

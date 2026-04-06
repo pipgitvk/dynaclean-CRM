@@ -1,3 +1,5 @@
+import path from "path";
+import { mkdir, writeFile } from "fs/promises";
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
@@ -6,6 +8,14 @@ import {
   isReportingManagerOf,
   getReportingManagerForEmployee,
 } from "@/lib/reportingManager";
+
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_MIME = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 const COLS = [
   "checkin_time",
@@ -114,14 +124,69 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { log_date, reason, proposed } = body;
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.includes("multipart/form-data")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Submit using the form (multipart) with check-in, check-out, and reason.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const formData = await request.formData();
+    const log_date = formData.get("log_date");
+    const reasonRaw = formData.get("reason");
+    const checkinRaw = formData.get("checkin_time");
+    const checkoutRaw = formData.get("checkout_time");
+    const file = formData.get("attachment");
 
     if (!log_date || typeof log_date !== "string") {
       return NextResponse.json(
         { success: false, error: "log_date is required (YYYY-MM-DD)" },
         { status: 400 }
       );
+    }
+
+    const reason = String(reasonRaw ?? "").trim();
+    if (!reason) {
+      return NextResponse.json(
+        { success: false, error: "Reason is required." },
+        { status: 400 }
+      );
+    }
+
+    const hasFile =
+      file &&
+      typeof file !== "string" &&
+      typeof file.size === "number" &&
+      file.size > 0;
+
+    if (hasFile) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        return NextResponse.json(
+          { success: false, error: "Attachment must be 5 MB or smaller." },
+          { status: 400 }
+        );
+      }
+
+      const mime = typeof file.type === "string" ? file.type : "";
+      const nameExt = path
+        .extname(typeof file.name === "string" ? file.name : "")
+        .toLowerCase();
+      const extOk = [".pdf", ".jpg", ".jpeg", ".png", ".webp"].includes(nameExt);
+      const mimeOk = ALLOWED_ATTACHMENT_MIME.has(mime);
+      if (!mimeOk && !extOk) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Attachment must be PDF, JPG, PNG, or WebP.",
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const manager = await getReportingManagerForEmployee(session.username);
@@ -132,13 +197,6 @@ export async function POST(request) {
           error:
             "No reporting manager is set for your account. Ask HR to assign a reporting manager in Employees.",
         },
-        { status: 400 }
-      );
-    }
-
-    if (!proposed || typeof proposed !== "object") {
-      return NextResponse.json(
-        { success: false, error: "proposed times object is required" },
         { status: 400 }
       );
     }
@@ -171,9 +229,50 @@ export async function POST(request) {
     const logRow = logs[0];
     const orig = mapRowToProposed(logRow);
 
-    const prop = {};
-    for (const c of COLS) {
-      prop[c] = normalizeMysqlDatetime(proposed[c] ?? null);
+    const prop = { ...orig };
+    prop.checkin_time = normalizeMysqlDatetime(
+      checkinRaw != null ? String(checkinRaw) : null
+    );
+    prop.checkout_time = normalizeMysqlDatetime(
+      checkoutRaw != null ? String(checkoutRaw) : null
+    );
+
+    let publicUrl = null;
+    if (hasFile) {
+      const mime = typeof file.type === "string" ? file.type : "";
+      const nameExt = path
+        .extname(typeof file.name === "string" ? file.name : "")
+        .toLowerCase();
+      const extFromMime =
+        mime === "application/pdf"
+          ? ".pdf"
+          : mime === "image/jpeg"
+            ? ".jpg"
+            : mime === "image/png"
+              ? ".png"
+              : mime === "image/webp"
+                ? ".webp"
+                : "";
+      const safeExt = [".pdf", ".jpg", ".jpeg", ".png", ".webp"].includes(nameExt)
+        ? nameExt === ".jpeg"
+          ? ".jpg"
+          : nameExt
+        : extFromMime || (nameExt || ".bin");
+
+      const userFolder = String(session.username).replace(/[^a-zA-Z0-9._-]/g, "_");
+      const uploadDir = path.join(
+        process.cwd(),
+        "public",
+        "attendance_regularization",
+        userFolder
+      );
+      await mkdir(uploadDir, { recursive: true });
+      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}${safeExt}`;
+      const fullPath = path.join(uploadDir, fileName);
+      const buf = Buffer.from(await file.arrayBuffer());
+      await writeFile(fullPath, buf);
+
+      publicUrl = `/attendance_regularization/${encodeURIComponent(userFolder)}/${encodeURIComponent(fileName)}`;
     }
 
     await conn.execute(
@@ -186,14 +285,16 @@ export async function POST(request) {
         proposed_checkin_time, proposed_checkout_time,
         proposed_break_morning_start, proposed_break_morning_end,
         proposed_break_lunch_start, proposed_break_lunch_end,
-        proposed_break_evening_start, proposed_break_evening_end
+        proposed_break_evening_start, proposed_break_evening_end,
+        attachment_url
       ) VALUES (?, ?, 'pending', ?,
         ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?)`,
       [
         session.username,
         log_date,
-        reason && String(reason).trim() ? String(reason).trim() : null,
+        reason,
         orig.checkin_time,
         orig.checkout_time,
         orig.break_morning_start,
@@ -210,6 +311,7 @@ export async function POST(request) {
         prop.break_lunch_end,
         prop.break_evening_start,
         prop.break_evening_end,
+        publicUrl ?? null,
       ]
     );
 
