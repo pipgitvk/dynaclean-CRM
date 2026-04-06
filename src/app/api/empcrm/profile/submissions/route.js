@@ -536,16 +536,34 @@ export async function PATCH(request) {
     const submission = rows[0];
 
     if (action === "reassign") {
-      if (normalizeSubStatus(submission.status) !== "pending") {
-        return NextResponse.json({ success: false, error: "Only pending submissions can be reassigned" }, { status: 400 });
+      const stReassign = normalizeSubStatus(submission.status);
+      const fromPending = stReassign === "pending";
+      const fromPendingAdmin = stReassign === "pending_admin";
+      if (!fromPending && !fromPendingAdmin) {
+        return NextResponse.json(
+          { success: false, error: "Only pending or pending_admin submissions can be reassigned" },
+          { status: 400 }
+        );
       }
-      if (!canActOnPendingSubmission(session, submission)) {
+      if (fromPending && !canActOnPendingSubmission(session, submission)) {
         return NextResponse.json(
           { success: false, error: "This submission is assigned to another HR member." },
           { status: 403 }
         );
       }
+      if (fromPendingAdmin && !isSuperAdmin(session)) {
+        return NextResponse.json(
+          { success: false, error: "Only Super Admin can reassign after HR approval." },
+          { status: 403 }
+        );
+      }
       const toHr = reassign_target === "hr";
+      if (fromPendingAdmin && toHr) {
+        return NextResponse.json(
+          { success: false, error: "At pending_admin stage, reassign can only be sent to employee." },
+          { status: 400 }
+        );
+      }
       if (toHr) {
         const assignee = typeof assignee_username === "string" ? assignee_username.trim() : "";
         if (!assignee) {
@@ -581,7 +599,12 @@ export async function PATCH(request) {
         `UPDATE employee_profile_submissions SET status = 'reassign', reassigned_fields = ?, reassignment_note = ?, reviewed_by = ?, reviewed_at = NOW(), pending_assignee_username = NULL WHERE id = ?`,
         [JSON.stringify(fields), reassignment_note || null, session.username, submissionId]
       );
-      return NextResponse.json({ success: true, message: "Selected fields sent to employee for correction" });
+      return NextResponse.json({
+        success: true,
+        message: fromPendingAdmin
+          ? "Super Admin sent selected fields to employee for correction"
+          : "Selected fields sent to employee for correction",
+      });
     }
 
     if (action === "forward_to_admin") {
