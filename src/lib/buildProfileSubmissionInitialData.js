@@ -1,6 +1,131 @@
 import { isExplicitlyFresherSubmission } from "@/lib/profileExperiencedUi";
 
 /**
+ * Best-effort key from a stored upload filename (local or CDN).
+ * Supports: doc_pan_card_123.jpg, doc_pan_card_123_extra.jpg, Cloudinary .../doc_pan_card_169..._x.jpg
+ */
+export function extractKeyFromUploadFilename(filename) {
+  if (!filename || typeof filename !== "string") return null;
+  const base = filename.split("?")[0].split("#")[0];
+  const name = base.includes("/") ? base.split("/").pop() : base;
+  if (!name) return null;
+  let decoded = name;
+  try {
+    decoded = decodeURIComponent(name);
+  } catch {
+    decoded = name;
+  }
+
+  const docPrefix = /^(doc_[a-z0-9_]+)/i;
+  const mDoc = decoded.match(docPrefix);
+  if (mDoc) {
+    const rest = decoded.slice(mDoc[1].length);
+    if (/^_\d/.test(rest) || rest === "") {
+      return mDoc[1];
+    }
+  }
+
+  const mLegacy = decoded.match(/^(.*)_\d+(?:\.[^.]+)?$/);
+  if (mLegacy?.[1]) {
+    const g = mLegacy[1];
+    if (/^doc_/i.test(g)) return g;
+    if (!/_/.test(g)) return g;
+  }
+
+  const mCloudy = decoded.match(/^(.+)_\d{10,}_[a-z0-9_-]+\.(?:jpg|jpeg|png|webp|gif|pdf)$/i);
+  if (mCloudy?.[1] && /^doc_/i.test(mCloudy[1])) return mCloudy[1];
+
+  return null;
+}
+
+function parseMaybeJsonObject(val) {
+  if (val == null) return {};
+  if (typeof val === "string") {
+    try {
+      const o = JSON.parse(val);
+      return typeof o === "object" && o !== null && !Array.isArray(o) ? o : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof val === "object" && !Array.isArray(val)) return val;
+  return {};
+}
+
+/** URLs keyed by doc_* field from documents_submitted.doc_paths */
+export function fileUrlsFromDocumentsSubmittedObject(documentsSubmitted) {
+  const out = {};
+  const o = parseMaybeJsonObject(documentsSubmitted);
+  const paths = o.doc_paths;
+  if (paths && typeof paths === "object") {
+    for (const [k, v] of Object.entries(paths)) {
+      if (typeof v === "string" && v.trim()) {
+        out[k.trim()] = v.trim();
+      }
+    }
+  }
+  return out;
+}
+
+/** joining_form_documents: array of strings OR [{ docKey, url }, ...] */
+export function fileUrlsFromJoiningFormDocuments(joining) {
+  const out = {};
+  let arr = joining;
+  if (typeof arr === "string") {
+    try {
+      arr = JSON.parse(arr);
+    } catch {
+      arr = [];
+    }
+  }
+  if (!Array.isArray(arr)) return out;
+  for (const item of arr) {
+    if (item && typeof item === "object" && item.docKey != null && item.url != null) {
+      const k = String(item.docKey).trim();
+      const u = String(item.url).trim();
+      if (k && u) out[k] = u;
+    }
+  }
+  return out;
+}
+
+/** Legacy: derive keys from uploaded_files URL paths (partial; prefer doc_paths + joining_form). */
+export function fileUrlsFromUploadedFilesArray(uploadedFiles) {
+  const out = {};
+  if (!Array.isArray(uploadedFiles)) return out;
+  for (const raw of uploadedFiles) {
+    if (typeof raw !== "string" || !raw.trim()) continue;
+    const url = raw.trim();
+    const filename = url.split("/").pop() || "";
+    const key = extractKeyFromUploadFilename(filename);
+    if (key) out[key] = url;
+  }
+  return out;
+}
+
+/**
+ * Merge file URL maps; later arguments win (submission over live profile handled by caller).
+ */
+export function mergeFileUrlMaps(...maps) {
+  return Object.assign({}, ...maps.filter(Boolean));
+}
+
+/** Flatten doc_paths URLs into checklist booleans so DocumentsSection checkboxes show "Selected". */
+export function normalizeDocumentsSubmittedForForm(documentsSubmitted) {
+  const o = parseMaybeJsonObject(documentsSubmitted);
+  const next = { ...o };
+  const paths = next.doc_paths;
+  if (paths && typeof paths === "object") {
+    for (const [k, v] of Object.entries(paths)) {
+      if (typeof v === "string" && v.trim()) {
+        next[k] = true;
+      }
+    }
+  }
+  return next;
+}
+
+/**
  * Maps a employee_profile_submissions row to ProfileForm initialData + fileUrls (same logic as admin review page).
  */
 export function buildProfileSubmissionInitialData(submission) {
@@ -17,21 +142,11 @@ export function buildProfileSubmissionInitialData(submission) {
     return { initialData: null, fileUrls: {} };
   }
 
-  const fileUrls = {};
   let uploadedFiles = [];
   try {
     uploadedFiles = submission.uploaded_files ? JSON.parse(submission.uploaded_files) : [];
   } catch {
     uploadedFiles = [];
-  }
-  if (Array.isArray(uploadedFiles)) {
-    uploadedFiles.forEach((url) => {
-      const filename = url.split("/").pop();
-      const match = filename.match(/^(.*)_\d+(?:\.[^.]+)?$/);
-      if (match) {
-        fileUrls[match[1]] = url;
-      }
-    });
   }
 
   let documents_submitted = {};
@@ -44,9 +159,17 @@ export function buildProfileSubmissionInitialData(submission) {
         documents_submitted = {};
       }
     } else if (typeof rawDocs === "object") {
-      documents_submitted = rawDocs;
+      documents_submitted = { ...rawDocs };
     }
   }
+
+  const fileUrls = mergeFileUrlMaps(
+    fileUrlsFromUploadedFilesArray(uploadedFiles),
+    fileUrlsFromDocumentsSubmittedObject(documents_submitted),
+    fileUrlsFromJoiningFormDocuments(payload.data?.joining_form_documents)
+  );
+
+  documents_submitted = normalizeDocumentsSubmittedForForm(documents_submitted);
 
   const initialData = {
     ...payload.data,
@@ -166,7 +289,7 @@ export function mergeSubmissionInitialWithLiveProfile(submissionInitial, liveApi
         : liveExp;
   }
 
-  merged.documents_submitted = mergedDocs;
+  merged.documents_submitted = normalizeDocumentsSubmittedForForm(mergedDocs);
 
   const subJoin = submissionInitial.joining_form_documents;
   const pJoin = p.joining_form_documents;
@@ -174,22 +297,19 @@ export function mergeSubmissionInitialWithLiveProfile(submissionInitial, liveApi
     merged.joining_form_documents = pJoin;
   }
 
-  merged.fileUrls = { ...(submissionInitial.fileUrls || {}) };
+  merged.fileUrls = mergeFileUrlMaps(
+    submissionInitial.fileUrls,
+    fileUrlsFromDocumentsSubmittedObject(mergedDocs),
+    fileUrlsFromJoiningFormDocuments(p.joining_form_documents),
+    fileUrlsFromJoiningFormDocuments(merged.joining_form_documents)
+  );
+  const liveUploadList = [];
   if (Array.isArray(p.joining_form_documents)) {
-    p.joining_form_documents.forEach((url) => {
-      if (typeof url !== "string" || !url) return;
-      try {
-        const filename = url.split("/").pop();
-        const decoded = decodeURIComponent(filename);
-        const match = decoded.match(/^(.*)_\d+(?:\.[^.]+)?$/);
-        if (match?.[1] && !merged.fileUrls[match[1]]) {
-          merged.fileUrls[match[1]] = url;
-        }
-      } catch {
-        /* ignore */
-      }
-    });
+    for (const item of p.joining_form_documents) {
+      if (typeof item === "string" && item.trim()) liveUploadList.push(item.trim());
+    }
   }
+  merged.fileUrls = mergeFileUrlMaps(merged.fileUrls, fileUrlsFromUploadedFilesArray(liveUploadList));
 
   if (isEmptyScalar(submissionInitial.is_experienced) && p.is_experienced != null) {
     merged.is_experienced = p.is_experienced;

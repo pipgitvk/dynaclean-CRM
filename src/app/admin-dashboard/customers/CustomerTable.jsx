@@ -136,6 +136,7 @@ export default function CustomerTable({
             <option value="average">Average</option>
             <option value="poor">Poor</option>
             <option value="denied">Denied</option>
+            <option value="old_reassign">Old Reassign</option>
           </select>
 
           <select

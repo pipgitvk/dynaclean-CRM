@@ -219,7 +219,15 @@ export default function TLCustomersTable({
 
   // Get counts for statuses
   const getStatusCounts = () => {
-    const statuses = ["New", "Good", "Very Good", "Average", "Poor", "Denied"];
+    const statuses = [
+      "New",
+      "Good",
+      "Very Good",
+      "Average",
+      "Poor",
+      "Denied",
+      "old_reassign",
+    ];
     const statusCounts = {};
     statuses.forEach((status) => {
       statusCounts[status] = customersForKPI.filter(
@@ -553,6 +561,7 @@ export default function TLCustomersTable({
                       "Average",
                       "Poor",
                       "Denied",
+                      "old_reassign",
                     ].map((s) => {
                       const statusCounts = getStatusCounts();
                       return (
