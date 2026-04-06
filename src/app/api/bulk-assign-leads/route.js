@@ -51,7 +51,16 @@ export async function POST(request) {
                 try {
                     // Update the customer's lead_source to the new employee
                     await connection.execute(
-                        `UPDATE customers SET lead_source = ?, assigned_to = ?, sales_representative = ? WHERE customer_id = ?`,
+                        `UPDATE customers
+                         SET
+                           lead_source = ?,
+                           assigned_to = ?,
+                           sales_representative = ?,
+                           status = CASE
+                             WHEN LOWER(COALESCE(status, '')) = 'denied' THEN 'old_reassign'
+                             ELSE status
+                           END
+                         WHERE customer_id = ?`,
                         [employee_username, payload.username, employee_username, customer_id]
                     );
 

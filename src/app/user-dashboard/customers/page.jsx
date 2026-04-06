@@ -14,6 +14,7 @@ const STATUS_QUERY_ALIASES = {
   average: "Average",
   poor: "Poor",
   denied: "Denied",
+  old_reassign: "old_reassign",
 };
 
 function resolveStatusForQuery(raw) {

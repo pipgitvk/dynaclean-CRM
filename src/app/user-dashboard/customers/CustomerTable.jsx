@@ -170,6 +170,7 @@ export default function CustomerTable({
           <option value="Average">Average</option>
           <option value="Poor">Poor</option>
           <option value="Denied">Denied</option>
+          <option value="old_reassign">Old Reassign</option>
         </select>
         <select
           value={filters.stage}

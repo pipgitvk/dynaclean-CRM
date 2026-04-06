@@ -11,6 +11,7 @@ function statusValuesForFilter(statusParam) {
         average: ["average", "Average"],
         poor: ["poor", "Poor"],
         denied: ["denied", "Denied"],
+        old_reassign: ["old_reassign", "Old Reassign"],
         New: ["New"],
     };
     if (map[key]) return map[key];
