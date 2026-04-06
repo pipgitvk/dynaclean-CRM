@@ -29,7 +29,12 @@ export default function SubmissionDetailsPage({ params }) {
             try {
                 const me = await fetch("/api/me", { credentials: "include", cache: "no-store" });
                 const meJson = await me.json();
-                const r = meJson?.user?.role ?? meJson?.role ?? "";
+                /** /api/me returns rep_list/emplist row: userRole at top level (not nested user.role). */
+                const r =
+                    meJson?.user?.role ??
+                    meJson?.role ??
+                    meJson?.userRole ??
+                    "";
                 setSessionRole(typeof r === "string" ? r : "");
                 const u = meJson?.user?.username ?? meJson?.username;
                 setSessionUsername(typeof u === "string" ? u : "");
@@ -169,16 +174,27 @@ export default function SubmissionDetailsPage({ params }) {
     const handleReassignConfirm = async (payload) => {
         setReassignSubmitting(true);
         try {
+            const currentStatus = String(submission?.status ?? "").trim().toLowerCase();
+            const forceEmployeeReassign =
+                currentStatus === "pending_admin" &&
+                String(sessionRole || "").trim().toUpperCase() === "SUPERADMIN";
+            const payloadToSend = forceEmployeeReassign
+                ? {
+                      ...payload,
+                      reassign_target: "employee",
+                      assignee_username: undefined,
+                  }
+                : payload;
             const res = await fetch("/api/empcrm/profile/submissions", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     submissionId: id,
                     action: "reassign",
-                    fields: payload.fields,
-                    reassignment_note: payload.reassignment_note,
-                    reassign_target: payload.reassign_target,
-                    assignee_username: payload.assignee_username,
+                    fields: payloadToSend.fields,
+                    reassignment_note: payloadToSend.reassignment_note,
+                    reassign_target: payloadToSend.reassign_target,
+                    assignee_username: payloadToSend.assignee_username,
                 }),
             });
             const data = await res.json();
@@ -253,6 +269,7 @@ export default function SubmissionDetailsPage({ params }) {
                 onClose={() => !reassignSubmitting && setReassignOpen(false)}
                 onConfirm={handleReassignConfirm}
                 submitting={reassignSubmitting}
+                allowHrTarget={showHrActions}
             />
             <div className="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 py-4 border-b">
                 <div>
@@ -346,6 +363,13 @@ export default function SubmissionDetailsPage({ params }) {
                 )}
                 {showAdminActions && (
                     <div className="flex flex-wrap gap-2 justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setReassignOpen(true)}
+                            className="px-4 py-2 bg-amber-500 text-white rounded-md hover:bg-amber-600 flex items-center gap-2 font-medium"
+                        >
+                            Reassign fields
+                        </button>
                         <button
                             type="button"
                             onClick={() => handleAction("reject", prompt("Rejection Reason:") || "")}

@@ -31,7 +31,13 @@ function ReassignFieldRow({ field, selected, onToggle, rowBorder }) {
   );
 }
 
-export default function ReassignFieldsModal({ open, onClose, onConfirm, submitting }) {
+export default function ReassignFieldsModal({
+  open,
+  onClose,
+  onConfirm,
+  submitting,
+  allowHrTarget = true,
+}) {
   const allKeys = useMemo(() => allReassignFieldKeys(), []);
   const [target, setTarget] = useState("employee");
   const [selected, setSelected] = useState(() => new Set());
@@ -45,6 +51,10 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
     setSelected(new Set());
     setNote("");
     setAssignee("");
+    if (!allowHrTarget) {
+      setHrOptions([]);
+      return;
+    }
     (async () => {
       try {
         const res = await fetch("/api/empcrm/employees", { credentials: "include", cache: "no-store" });
@@ -56,7 +66,7 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
         setHrOptions([]);
       }
     })();
-  }, [open]);
+  }, [open, allowHrTarget]);
 
   if (!open) return null;
 
@@ -87,7 +97,7 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
       });
       return;
     }
-    if (!assignee.trim()) return;
+    if (!allowHrTarget || !assignee.trim()) return;
     const fieldArr = [...selected];
     const n = note.trim();
     if (fieldArr.length === 0 && !n) return;
@@ -100,7 +110,7 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
   };
 
   const employeeValid = selected.size > 0;
-  const hrValid = assignee.trim() && (selected.size > 0 || note.trim());
+  const hrValid = allowHrTarget && assignee.trim() && (selected.size > 0 || note.trim());
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true">
@@ -128,16 +138,18 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
             />
             Send to employee (corrections)
           </label>
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="radio"
-              name="reassignTarget"
-              checked={target === "hr"}
-              onChange={() => setTarget("hr")}
-              className="text-blue-600"
-            />
-            Assign to another HR
-          </label>
+          {allowHrTarget && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="reassignTarget"
+                checked={target === "hr"}
+                onChange={() => setTarget("hr")}
+                className="text-blue-600"
+              />
+              Assign to another HR
+            </label>
+          )}
         </div>
 
         {target === "employee" ? (
@@ -152,7 +164,7 @@ export default function ReassignFieldsModal({ open, onClose, onConfirm, submitti
           </p>
         )}
 
-        {target === "hr" && (
+        {allowHrTarget && target === "hr" && (
           <div className="px-4 pt-3">
             <label className="block text-xs font-medium text-gray-700 mb-1">HR user</label>
             <select
