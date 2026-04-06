@@ -247,6 +247,21 @@ export default async function UserDashboardPage() {
     const pendingSpecialCount =
       Number(pendingSpecialRows[0]?.total_pending ?? 0);
 
+    let regTotal = 0;
+    let regPending = 0;
+    try {
+      const [regTotalRows] = await connection.execute(
+        `SELECT COUNT(*) AS c FROM attendance_regularization_requests`,
+      );
+      const [regPendingRows] = await connection.execute(
+        `SELECT COUNT(*) AS c FROM attendance_regularization_requests WHERE status = 'pending'`,
+      );
+      regTotal = Number(regTotalRows[0]?.c ?? 0);
+      regPending = Number(regPendingRows[0]?.c ?? 0);
+    } catch (e) {
+      console.warn("attendance regularization counts:", e.message);
+    }
+
     if (!user) {
       return <p className="text-red-600">User not found</p>;
     }
@@ -355,28 +370,56 @@ export default async function UserDashboardPage() {
           </div>
         </div>
 
-        {/* Special Price Approvals Card */}
-        <div className="mt-6 w-full max-w-xs sm:max-w-sm bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl p-6 flex flex-col items-start justify-between gap-4 text-white aspect-square">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold mb-1">
-              Special Price Approvals
-            </h2>
-            <p className="text-sm sm:text-base text-white/90">
-              Approve or reject customer-wise special prices set by your team.
-            </p>
-            <p className="mt-2 text-sm">
-              Pending approvals:{" "}
-              <span className="font-semibold">
-                {pendingSpecialCount}
-              </span>
-            </p>
+        <div className="mt-6 flex flex-wrap gap-6 items-stretch">
+          {/* Special Price Approvals Card */}
+          <div className="w-full max-w-xs sm:max-w-sm bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl p-6 flex flex-col items-start justify-between gap-4 text-white aspect-square">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold mb-1">
+                Special Price Approvals
+              </h2>
+              <p className="text-sm sm:text-base text-white/90">
+                Approve or reject customer-wise special prices set by your team.
+              </p>
+              <p className="mt-2 text-sm">
+                Pending approvals:{" "}
+                <span className="font-semibold">
+                  {pendingSpecialCount}
+                </span>
+              </p>
+            </div>
+            <a
+              href="/admin-dashboard/special-pricing"
+              className="px-6 py-3 bg-white text-purple-700 rounded-lg font-semibold text-sm sm:text-base hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200 whitespace-nowrap"
+            >
+              Review Special Prices →
+            </a>
           </div>
-          <a
-            href="/admin-dashboard/special-pricing"
-            className="px-6 py-3 bg-white text-purple-700 rounded-lg font-semibold text-sm sm:text-base hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200 whitespace-nowrap"
-          >
-            Review Special Prices →
-          </a>
+
+          {/* Attendance regularization — all requests */}
+          <div className="w-full max-w-xs sm:max-w-sm bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600 rounded-2xl shadow-xl p-6 flex flex-col items-start justify-between gap-4 text-white min-h-[280px] sm:min-h-[320px]">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold mb-1">
+                Attendance regularization
+              </h2>
+              <p className="text-sm sm:text-base text-white/90">
+                All employee requests to correct check-in / check-out (pending,
+                approved, rejected).
+              </p>
+              <p className="mt-2 text-sm">
+                Total:{" "}
+                <span className="font-semibold">{regTotal}</span>
+                <span className="mx-2 opacity-80">·</span>
+                Pending:{" "}
+                <span className="font-semibold">{regPending}</span>
+              </p>
+            </div>
+            <a
+              href="/admin-dashboard/attendance-regularization"
+              className="px-6 py-3 bg-white text-orange-800 rounded-lg font-semibold text-sm sm:text-base hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200 whitespace-nowrap"
+            >
+              View all requests →
+            </a>
+          </div>
         </div>
 
         {/* System Performance Dashboard - Featured Card */}

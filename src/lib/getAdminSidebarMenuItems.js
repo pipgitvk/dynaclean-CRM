@@ -170,6 +170,12 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Home",
       },
+      // {
+      //   path: "/admin-dashboard/attendance-regularization",
+      //   name: "Attendance regularization",
+      //   roles: ["SUPERADMIN", "ADMIN", "HR"],
+      //   icon: "Clock",
+      // },
       {
         path: "/admin-dashboard/today-reports",
         name: "Daily Report",

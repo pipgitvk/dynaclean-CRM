@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS attendance_regularization_requests (
   reviewed_by VARCHAR(255) NULL,
   reviewed_at DATETIME NULL,
   reviewer_comment TEXT NULL,
+  attachment_url VARCHAR(1024) NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_ar_user_date (username, log_date),

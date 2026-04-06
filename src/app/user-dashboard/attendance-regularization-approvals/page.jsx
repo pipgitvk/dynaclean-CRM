@@ -8,12 +8,6 @@ import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime"
 const FIELDS = [
   { key: "checkin_time", label: "Check-in" },
   { key: "checkout_time", label: "Check-out" },
-  { key: "break_morning_start", label: "Morning break start" },
-  { key: "break_morning_end", label: "Morning break end" },
-  { key: "break_lunch_start", label: "Lunch start" },
-  { key: "break_lunch_end", label: "Lunch end" },
-  { key: "break_evening_start", label: "Evening break start" },
-  { key: "break_evening_end", label: "Evening break end" },
 ];
 
 function formatLogDate(v) {
@@ -136,9 +130,19 @@ export default function AttendanceRegularizationApprovalsPage() {
                   Pending
                 </span>
               </div>
-              {req.reason ? (
-                <p className="text-sm text-gray-700 mb-4">
-                  <span className="font-medium">Reason:</span> {req.reason}
+              <p className="text-sm text-gray-700 mb-4">
+                <span className="font-medium">Reason:</span> {req.reason || "—"}
+              </p>
+              {req.attachment_url ? (
+                <p className="text-sm mb-4">
+                  <a
+                    href={req.attachment_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-teal-700 underline hover:text-teal-900"
+                  >
+                    View attachment
+                  </a>
                 </p>
               ) : null}
               <div className="overflow-x-auto">
