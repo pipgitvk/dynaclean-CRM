@@ -558,7 +558,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/dd-management",
     name: "DD Management",
-    roles: ["ALL"],
+    roles: ["ADMIN", "ACCOUNTANT"],
     icon: "DollarSign",
   },
   {
