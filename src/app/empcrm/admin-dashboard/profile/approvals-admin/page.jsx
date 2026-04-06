@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, X, RefreshCcw, Eye, Shield, Pencil } from "lucide-react";
+import { Check, X, RefreshCcw, Eye, Shield } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 
@@ -219,12 +219,6 @@ export default function ProfileApprovalsAdminPage() {
                         className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1 w-fit"
                       >
                         <Eye className="w-4 h-4" /> View
-                      </Link>
-                      <Link
-                        href={`/empcrm/admin-dashboard/profile?username=${encodeURIComponent(s.username)}`}
-                        className="px-3 py-1 bg-amber-500 text-white rounded-md hover:bg-amber-600 flex items-center gap-1 w-fit"
-                      >
-                        <Pencil className="w-4 h-4" /> Edit
                       </Link>
                       {tab === "pending_admin" && (
                         <>
