@@ -14,7 +14,8 @@ export async function GET(req) {
 
     const role = (payload.role || payload.userRole || "").toUpperCase().trim();
     const username = payload.username || null;
-    const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "HR", "SERVICE HEAD"];
+    /** Navbar search + customers-data: only these roles see all customers; everyone else is scoped to their assignments. */
+    const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER"];
     const isPrivileged = privilegedRoles.includes(role);
 
     const { searchParams } = new URL(req.url);
