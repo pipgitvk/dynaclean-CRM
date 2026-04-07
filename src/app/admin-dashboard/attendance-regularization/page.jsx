@@ -34,6 +34,7 @@ function statusBadge(status) {
 export default function AdminAttendanceRegularizationPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,6 +52,30 @@ export default function AdminAttendanceRegularizationPage() {
       setLoading(false);
     }
   }, []);
+
+  const handleAction = useCallback(
+    async (id, action) => {
+      const label = action === "approve" ? "Approve" : "Reject";
+      if (!confirm(`${label} request #${id}?`)) return;
+      setActionLoading(`${id}-${action}`);
+      try {
+        const res = await fetch("/api/admin/attendance-regularization", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, action }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || "Action failed");
+        toast.success(data.message || `${label}d successfully`);
+        await load();
+      } catch (e) {
+        toast.error(e.message);
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [load]
+  );
 
   useEffect(() => {
     load();
@@ -109,6 +134,9 @@ export default function AdminAttendanceRegularizationPage() {
                   <th className="px-3 py-2 font-medium whitespace-nowrap">
                     Attachment
                   </th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -157,6 +185,28 @@ export default function AdminAttendanceRegularizationPage() {
                         </a>
                       ) : (
                         "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {req.status === "pending" ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleAction(req.id, "approve")}
+                            disabled={actionLoading !== null}
+                            className="px-2 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {actionLoading === `${req.id}-approve` ? "…" : "Approve"}
+                          </button>
+                          <button
+                            onClick={() => handleAction(req.id, "reject")}
+                            disabled={actionLoading !== null}
+                            className="px-2 py-1 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {actionLoading === `${req.id}-reject` ? "…" : "Reject"}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
                       )}
                     </td>
                   </tr>
