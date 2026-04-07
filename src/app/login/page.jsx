@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ShieldAlert } from "lucide-react";
 
 const ACCENT_COLOR = "#1F454A";
 const SERVICE_APP_LOGIN_URL = "https://service.dynacleanindustries.com/login";
@@ -14,10 +14,15 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [ipBlocked, setIpBlocked] = useState(false);
 
   useEffect(() => {
     setUsername("");
     setPassword("");
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("reason") === "ip_blocked") {
+      setIpBlocked(true);
+    }
   }, []);
 
   const handleLogin = async (e) => {
@@ -76,6 +81,15 @@ const LoginPage = () => {
           <p className="text-gray-600 mb-8">
             Sign in to access your dashboard and continue managing your CRM efficiently.
           </p>
+
+          {ipBlocked && (
+            <div className="flex items-start gap-3 mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <ShieldAlert className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
+              <p className="text-orange-700 text-sm font-medium">
+                Aapko automatically logout kar diya gaya hai kyunki aapka current IP address allowed nahi hai. Kripya allowed network se login karein.
+              </p>
+            </div>
+          )}
 
           {error && (
             <p className="text-red-500 text-sm mb-4 p-3 bg-red-50 rounded-lg">{error}</p>
