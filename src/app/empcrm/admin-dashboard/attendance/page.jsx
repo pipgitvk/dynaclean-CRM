@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Search, Info } from "lucide-react";
+import { Loader2, Search, Info, Pencil } from "lucide-react";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -14,6 +14,38 @@ import {
   isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+
+function attendanceDateYmd(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "string") {
+    const s = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-CA");
+}
+
+/** HH:mm for <input type="time"> from a DB datetime string. */
+function timeInputFromDbValue(value) {
+  if (value == null || value === "") return "";
+  const s = String(value).trim();
+  const m = s.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return "";
+  const h = String(parseInt(m[1], 10)).padStart(2, "0");
+  const min = String(parseInt(m[2], 10)).padStart(2, "0");
+  return `${h}:${min}`;
+}
+
+function combineDateAndTimeForDb(dateYmd, timeHHmm) {
+  if (!dateYmd || !timeHHmm || String(timeHHmm).trim() === "") return null;
+  const t = String(timeHHmm).trim();
+  if (!/^\d{1,2}:\d{2}$/.test(t)) return null;
+  const [h, m] = t.split(":");
+  const hh = String(parseInt(h, 10)).padStart(2, "0");
+  const mm = String(parseInt(m, 10)).padStart(2, "0");
+  return `${dateYmd} ${hh}:${mm}:00`;
+}
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -29,6 +61,16 @@ const AttendancePage = () => {
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [breakEditLog, setBreakEditLog] = useState(null);
+  const [breakEditForm, setBreakEditForm] = useState({
+    break_morning_start: "",
+    break_morning_end: "",
+    break_lunch_start: "",
+    break_lunch_end: "",
+    break_evening_start: "",
+    break_evening_end: "",
+  });
+  const [breakEditSaving, setBreakEditSaving] = useState(false);
   const [rules, setRules] = useState(DEFAULT_ATTENDANCE_RULES);
   /** Merged company + per-employee rules from fetch-all (keyed by username) */
   const [rulesByUsername, setRulesByUsername] = useState({});
@@ -152,6 +194,79 @@ const AttendancePage = () => {
       setAppliedUserSelection(selectedUser);
       setSearchLoading(false);
     }, 120);
+  };
+
+  const openBreakEditModal = (log) => {
+    setBreakEditLog(log);
+    setBreakEditForm({
+      break_morning_start: timeInputFromDbValue(log.break_morning_start),
+      break_morning_end: timeInputFromDbValue(log.break_morning_end),
+      break_lunch_start: timeInputFromDbValue(log.break_lunch_start),
+      break_lunch_end: timeInputFromDbValue(log.break_lunch_end),
+      break_evening_start: timeInputFromDbValue(log.break_evening_start),
+      break_evening_end: timeInputFromDbValue(log.break_evening_end),
+    });
+  };
+
+  const closeBreakEditModal = () => {
+    setBreakEditLog(null);
+    setBreakEditSaving(false);
+  };
+
+  const saveBreakEdits = async () => {
+    if (!breakEditLog) return;
+    const dateYmd = attendanceDateYmd(breakEditLog.date);
+    if (!dateYmd || !breakEditLog.username) {
+      toast.error("Invalid row.");
+      return;
+    }
+    setBreakEditSaving(true);
+    try {
+      const payload = {
+        username: breakEditLog.username,
+        date: dateYmd,
+        break_morning_start: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_morning_start
+        ),
+        break_morning_end: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_morning_end
+        ),
+        break_lunch_start: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_lunch_start
+        ),
+        break_lunch_end: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_lunch_end
+        ),
+        break_evening_start: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_evening_start
+        ),
+        break_evening_end: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_evening_end
+        ),
+      };
+      const res = await fetch("/api/empcrm/attendance/admin-edit-breaks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to save");
+      }
+      toast.success("Break times updated.");
+      closeBreakEditModal();
+      await fetchAttendance();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBreakEditSaving(false);
+    }
   };
 
   const generateAttendanceTimeline = (userLogs, user) => {
@@ -728,6 +843,16 @@ const AttendancePage = () => {
                           ) : null}
                         </span>
                       </div>
+                      <div className="pt-2 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => openBreakEditModal(log)}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden />
+                          Edit break times
+                        </button>
+                      </div>
                     </>
                   ) : (
                     <div className="text-center py-4">
@@ -788,6 +913,9 @@ const AttendancePage = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check-out Address
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Edit breaks
                   </th>
                 </tr>
               </thead>
@@ -915,10 +1043,21 @@ const AttendancePage = () => {
                               ) : null}
                             </div>
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <button
+                              type="button"
+                              onClick={() => openBreakEditModal(log)}
+                              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                              title="Edit morning, lunch, evening break times"
+                            >
+                              <Pencil className="h-3.5 w-3.5" aria-hidden />
+                              Edit
+                            </button>
+                          </td>
                         </>
                       ) : (
                         <td
-                          colSpan="7"
+                          colSpan="8"
                           className={`px-6 py-4 text-center ${log.type === "absent"
                             ? "bg-orange-50 text-orange-700"
                             : log.type === "leave"
@@ -950,7 +1089,7 @@ const AttendancePage = () => {
                 ) : (
                   <tr>
                     <td
-                      colSpan="9"
+                      colSpan="10"
                       className="px-6 py-4 text-center text-gray-500"
                     >
                       No attendance logs found for the selected filter.
@@ -963,6 +1102,87 @@ const AttendancePage = () => {
         </div>
         )}
       </div>
+      {breakEditLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-4"
+            role="dialog"
+            aria-labelledby="break-edit-title"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 id="break-edit-title" className="text-lg font-semibold">
+                Edit break times
+              </h3>
+              <button
+                type="button"
+                onClick={closeBreakEditModal}
+                className="text-gray-500 hover:text-gray-800 text-xl leading-none"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              {breakEditLog.username} ·{" "}
+              {new Date(breakEditLog.date).toLocaleDateString()}
+            </p>
+            <p className="text-xs text-gray-500 mb-3">
+              Leave a field empty to clear that time. Times use the attendance
+              date (IST).
+            </p>
+            <div className="space-y-3">
+              {[
+                ["Morning break — start", "break_morning_start"],
+                ["Morning break — end", "break_morning_end"],
+                ["Lunch break — start", "break_lunch_start"],
+                ["Lunch break — end", "break_lunch_end"],
+                ["Evening break — start", "break_evening_start"],
+                ["Evening break — end", "break_evening_end"],
+              ].map(([label, key]) => (
+                <label
+                  key={key}
+                  className="flex flex-col gap-1 text-sm font-medium text-gray-700"
+                >
+                  {label}
+                  <input
+                    type="time"
+                    step={60}
+                    value={breakEditForm[key]}
+                    onChange={(e) =>
+                      setBreakEditForm((f) => ({
+                        ...f,
+                        [key]: e.target.value,
+                      }))
+                    }
+                    className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeBreakEditModal}
+                disabled={breakEditSaving}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveBreakEdits}
+                disabled={breakEditSaving}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-70"
+              >
+                {breakEditSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-4">
