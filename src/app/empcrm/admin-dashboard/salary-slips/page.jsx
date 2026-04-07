@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, Trash2, CheckSquare, Square, BadgeCheck } from "lucide-react";
+import { Search, Trash2, CheckSquare, Square, BadgeCheck, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   generatePayslipPDF,
   downloadPayslip,
+  downloadPdfUint8,
+  generateMergedPayslipsPdfBytes,
   buildTemplatePayslipHTML,
   buildPayslipOptsFromMonthlyRecord,
 } from "@/utils/payslipGenerator";
@@ -44,6 +46,7 @@ export default function AdminSalarySlipsPage() {
   const [approving, setApproving] = useState(false);
   // Per-row approve loading
   const [approvingId, setApprovingId] = useState(null);
+  const [downloadingAll, setDownloadingAll] = useState(false);
 
   const canDelete = userRole === "SUPERADMIN" || userRole === "ADMIN";
   const canApprove = userRole === "SUPERADMIN" || userRole === "ADMIN";
@@ -221,6 +224,35 @@ export default function AdminSalarySlipsPage() {
     setPreviewOpen(true);
   };
 
+  const handleDownloadAll = async () => {
+    if (records.length === 0) return;
+    setDownloadingAll(true);
+    const n = records.length;
+    const toastId = toast.loading(
+      n === 1 ? "Generating payslip…" : `Generating payslips (0 / ${n})…`,
+    );
+    try {
+      const bytes = await generateMergedPayslipsPdfBytes(records, {
+        onProgress: (done, total) => {
+          if (total > 1) {
+            toast.loading(`Generating payslips (${done} / ${total})…`, { id: toastId });
+          }
+        },
+      });
+      const monthLabel = month || "all_months";
+      downloadPdfUint8(
+        bytes,
+        `Salary_slips_${monthLabel}_${new Date().toISOString().slice(0, 10)}.pdf`,
+      );
+      toast.success(n === 1 ? "Downloaded" : `Downloaded ${n} payslips in one PDF`, { id: toastId });
+    } catch (e) {
+      console.error(e);
+      toast.error("Could not build combined PDF", { id: toastId });
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
+
   const toolbar = (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
@@ -256,7 +288,19 @@ export default function AdminSalarySlipsPage() {
             </div>
           </label>
         </div>
-        <PayslipRefreshButton onClick={load} loading={loading} />
+        <div className="flex flex-wrap items-end gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleDownloadAll}
+            disabled={loading || records.length === 0 || downloadingAll}
+            title="Merge all salary slips currently visible in the table into one PDF"
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-sm text-sm font-semibold text-white border border-black disabled:opacity-50 disabled:pointer-events-none ${PAYSLIP_UI.navy} ${PAYSLIP_UI.navyHover}`}
+          >
+            <Download className="w-4 h-4" />
+            {downloadingAll ? "Preparing…" : "Download all"}
+          </button>
+          <PayslipRefreshButton onClick={load} loading={loading} />
+        </div>
       </div>
 
       {/* Bulk action bar — visible when rows are selected */}
