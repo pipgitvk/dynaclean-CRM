@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { PDFDocument } from "pdf-lib";
 import logo1 from "@/components/logo1.jpg";
 import { floorInr } from "@/lib/salaryGrossSpecialAllowance";
 
@@ -237,6 +238,43 @@ export function buildPayslipOptsFromMonthlyRecord(record) {
 export const downloadPayslip = (pdf, filename) => {
   pdf.save(filename || "payslip.pdf");
 };
+
+/** Trigger download of a PDF from Uint8Array (e.g. merged payslips). */
+export function downloadPdfUint8(bytes, filename) {
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || "document.pdf";
+    a.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * Build one PDF with one page per record (same rendering as single Download).
+ * @param {Array<Record<string, unknown>>} records — monthly salary rows
+ * @param {{ onProgress?: (done: number, total: number) => void }} [opts]
+ */
+export async function generateMergedPayslipsPdfBytes(records, opts = {}) {
+  const list = Array.isArray(records) ? records : [];
+  const { onProgress } = opts;
+  const mergedPdf = await PDFDocument.create();
+  const total = list.length;
+  for (let i = 0; i < total; i++) {
+    const row = list[i];
+    const single = await generatePayslipPDF(row, row);
+    const raw = single.output("arraybuffer");
+    const loaded = await PDFDocument.load(raw);
+    const copiedPages = await mergedPdf.copyPages(loaded, loaded.getPageIndices());
+    copiedPages.forEach((page) => mergedPdf.addPage(page));
+    onProgress?.(i + 1, total);
+    await new Promise((r) => requestAnimationFrame(r));
+  }
+  return mergedPdf.save();
+}
 
 const fmtInr = (n) =>
   new Intl.NumberFormat("en-IN", {

@@ -696,9 +696,8 @@ const GenerateSalaryPage = () => {
                                 <input
                                     type="number"
                                     value={formData.working_days}
-                                    disabled={isLocked}
-                                    onChange={(e) => !isLocked && setFormData({ ...formData, working_days: Number(e.target.value) })}
-                                    className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-purple-500 ${isLocked ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "border-gray-300"}`}
+                                    disabled
+                                    className="w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
                                 />
                             </div>
                             <div>
@@ -706,9 +705,8 @@ const GenerateSalaryPage = () => {
                                 <input
                                     type="number"
                                     value={formData.present_days}
-                                    disabled={isLocked}
-                                    onChange={(e) => !isLocked && setFormData({ ...formData, present_days: Number(e.target.value) })}
-                                    className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-purple-500 ${isLocked ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "border-gray-300"}`}
+                                    disabled
+                                    className="w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
                                 />
                             </div>
                             <div>
@@ -716,18 +714,16 @@ const GenerateSalaryPage = () => {
                                 <input
                                     type="number"
                                     value={formData.overtime_hours}
-                                    disabled={isLocked}
-                                    onChange={(e) => !isLocked && setFormData({ ...formData, overtime_hours: Number(e.target.value) })}
-                                    className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-purple-500 ${isLocked ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "border-gray-300"}`}
+                                    disabled
+                                    className="w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                                 <select
                                     value={formData.status}
-                                    disabled={isLocked}
-                                    onChange={(e) => !isLocked && setFormData({ ...formData, status: e.target.value })}
-                                    className={`w-full px-3 py-2 border rounded-md focus:ring-1 focus:ring-purple-500 ${isLocked ? "bg-gray-100 border-gray-200 text-gray-500 cursor-not-allowed" : "border-gray-300"}`}
+                                    disabled
+                                    className="w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
                                 >
                                     <option value="draft">Draft</option>
                                     <option value="pending">Pending Approval</option>

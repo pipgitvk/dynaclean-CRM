@@ -284,6 +284,12 @@ const allMenuItems = [
         icon: "Upload",
       },
       {
+        path: "/user-dashboard/digital-marketer-leads",
+        name: "24h Fresh Leads (DM)",
+        roles: ["SUPERADMIN", "DIGITAL MARKETER", "ADMIN"],
+        icon: "Clock",
+      },
+      {
         path: "/admin-dashboard/task-manager",
         name: "Task Manager",
         roles: ["SUPERADMIN"],

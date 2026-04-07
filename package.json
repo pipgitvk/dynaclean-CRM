@@ -6,6 +6,7 @@
     "dev": "node --no-deprecation ./node_modules/next/dist/bin/next dev --turbopack",
     "migrate:salary-structure": "node scripts/migrate-salary-structure-columns.js",
     "migrate:profile-submission-reassign": "node scripts/migrate-profile-submission-reassign-columns.js",
+    "migrate:dm-reassign-exhausted": "node scripts/migrate-dm-reassign-exhausted.js",
     "migrate:profile-submission-status": "node scripts/migrate-profile-submission-status-varchar.js",
     "migrate:profile-submission-pending-assignee": "node scripts/migrate-profile-submission-pending-assignee.js",
     "build": "next build",
