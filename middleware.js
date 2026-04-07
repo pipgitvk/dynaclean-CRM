@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -57,7 +58,16 @@ export async function middleware(request) {
       }
 
       if (pathname.startsWith("/empcrm/admin-dashboard")) {
-        if (!["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].includes(role)) {
+        const roleKey = normalizeRoleKey(role || "");
+        const hrEmpCrmRoles = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
+        const isHrEmpCrm = hrEmpCrmRoles.some(
+          (r) => normalizeRoleKey(r) === roleKey,
+        );
+        // Accountant: Salary slips only (see getEmpCrmAdminSidebarMenuItems)
+        const isAccountantSalarySlips =
+          roleKey === "ACCOUNTANT" &&
+          pathname.startsWith("/empcrm/admin-dashboard/salary-slips");
+        if (!isHrEmpCrm && !isAccountantSalarySlips) {
           return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
         }
       }
