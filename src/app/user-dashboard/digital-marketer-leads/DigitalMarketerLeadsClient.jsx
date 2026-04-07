@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { parseDmBulkCustomerCsv } from "@/lib/dmBulkUploadCsv";
+import { DM_MODULE_ONLY_ASSIGNEE } from "@/lib/digitalMarketerLeadsAuth";
 
 function formatLeadDate(value) {
   if (!value) return "—";
@@ -30,12 +31,6 @@ function getRowStatus(row) {
   return { ok: true };
 }
 
-function rowAssignee(row, defaultEmployee) {
-  const fromCsv = row.employee_username?.toString().trim();
-  const global = defaultEmployee?.toString().trim();
-  return fromCsv || global || "";
-}
-
 export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
   const isDm = viewerRole === "DIGITAL MARKETER";
 
@@ -51,7 +46,6 @@ export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
   const [bulkRows, setBulkRows] = useState([]);
   const [bulkIsMeta, setBulkIsMeta] = useState(false);
   const [bulkFileName, setBulkFileName] = useState("");
-  const [bulkDefaultEmployee, setBulkDefaultEmployee] = useState("");
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
 
@@ -79,8 +73,21 @@ export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
     load();
   }, [load]);
 
+  const kavyaUsername = useMemo(() => {
+    const u = employees.find(
+      (e) =>
+        String(e).toUpperCase() === DM_MODULE_ONLY_ASSIGNEE.toUpperCase(),
+    );
+    return u ? String(u) : "";
+  }, [employees]);
+
+  const reassignEmployees = useMemo(
+    () => (kavyaUsername ? [kavyaUsername] : []),
+    [kavyaUsername],
+  );
+
   const handleReassign = async (customerId) => {
-    const employee_username = selection[customerId];
+    const employee_username = selection[customerId] || kavyaUsername;
     if (!employee_username) {
       return;
     }
@@ -138,13 +145,17 @@ export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
 
   const bulkValidRows = bulkRows.filter((r) => {
     if (!getRowStatus(r).ok) return false;
-    return !!rowAssignee(r, bulkDefaultEmployee);
+    return !!kavyaUsername;
   });
 
   const handleBulkUpload = async () => {
+    if (!kavyaUsername) {
+      toast.error("KAVYA is not in the sales rep list.");
+      return;
+    }
     if (bulkValidRows.length === 0) {
       toast.error(
-        "No valid rows: check first_name, phone, and assignee (dropdown or employee_username column)",
+        "No valid rows: check first_name and phone (10 digits).",
       );
       return;
     }
@@ -156,7 +167,7 @@ export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rows: bulkValidRows,
-          employee_username: bulkDefaultEmployee.trim(),
+          employee_username: kavyaUsername,
         }),
       });
       const data = await res.json();
@@ -276,28 +287,29 @@ export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Default assignee (sales rep)
+                Assignee (fixed)
               </label>
-              <select
-                value={bulkDefaultEmployee}
-                onChange={(e) => setBulkDefaultEmployee(e.target.value)}
-                className="w-full max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="">
-                  — Optional if every row has employee_username —
-                </option>
-                {employees.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
+              {kavyaUsername ? (
+                <p className="text-sm font-medium text-blue-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 max-w-md">
+                  All rows → {kavyaUsername}
+                </p>
+              ) : (
+                <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 max-w-md">
+                  User &quot;KAVYA&quot; not found in sales reps. Add KAVYA in
+                  rep_list.
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1 max-w-md">
+                CSV column employee_username is ignored; leads go to KAVYA only.
+              </p>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
-              disabled={bulkUploading || bulkValidRows.length === 0}
+              disabled={
+                bulkUploading || bulkValidRows.length === 0 || !kavyaUsername
+              }
               onClick={handleBulkUpload}
               className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -433,7 +445,7 @@ export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
                         ) : (
                           <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
                             <select
-                              value={selection[row.customer_id] || ""}
+                              value={selection[row.customer_id] || kavyaUsername}
                               onChange={(e) =>
                                 setSelection((prev) => ({
                                   ...prev,
@@ -441,18 +453,22 @@ export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
                                 }))
                               }
                               className="border border-gray-300 rounded-md px-2 py-1.5 text-sm min-w-[10rem] bg-white"
+                              disabled={!kavyaUsername}
                             >
-                              <option value="">Select employee…</option>
-                              {employees.map((u) => (
-                                <option key={u} value={u}>
-                                  {u}
-                                </option>
-                              ))}
+                              {!kavyaUsername ? (
+                                <option value="">KAVYA not in list</option>
+                              ) : (
+                                reassignEmployees.map((u) => (
+                                  <option key={u} value={u}>
+                                    {u}
+                                  </option>
+                                ))
+                              )}
                             </select>
                             <button
                               type="button"
                               disabled={
-                                !selection[row.customer_id] ||
+                                !kavyaUsername ||
                                 assigningId === row.customer_id
                               }
                               onClick={() => handleReassign(row.customer_id)}

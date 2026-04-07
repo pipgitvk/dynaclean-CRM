@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { canAccessDigitalMarketerLeadsModule } from "@/lib/digitalMarketerLeadsAuth";
+import {
+  canAccessDigitalMarketerLeadsModule,
+  isDmModuleOnlyAssigneeUsername,
+} from "@/lib/digitalMarketerLeadsAuth";
 import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
 
 const MAX_ROWS = 500;
@@ -32,6 +35,15 @@ export async function POST(request) {
 
     const body = await request.json();
     const { rows, employee_username: defaultEmployee } = body;
+
+    if (!isDmModuleOnlyAssigneeUsername(defaultEmployee)) {
+      return NextResponse.json(
+        { error: "Bulk upload in this module only assigns leads to KAVYA." },
+        { status: 400 },
+      );
+    }
+
+    const assignedTo = String(defaultEmployee).trim();
 
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
       return NextResponse.json({ error: "No rows provided" }, { status: 400 });
@@ -90,20 +102,6 @@ export async function POST(request) {
             row: rowNum,
             phone,
             reason: "Duplicate phone — skipped",
-          });
-          continue;
-        }
-
-        const fromRow = row.employee_username?.toString().trim();
-        const fromDefault = defaultEmployee?.toString().trim();
-        const assignedTo = fromRow || fromDefault;
-
-        if (!assignedTo) {
-          results.errors.push({
-            row: rowNum,
-            phone,
-            reason:
-              "Missing assignee: pick “Assign to” or set employee_username in CSV",
           });
           continue;
         }

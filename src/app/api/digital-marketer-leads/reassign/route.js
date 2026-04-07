@@ -5,6 +5,7 @@ import {
   canAccessDigitalMarketerLeadsModule,
   canReassignLeadAsAdmin,
   isDigitalMarketerRole,
+  isDmModuleOnlyAssigneeUsername,
 } from "@/lib/digitalMarketerLeadsAuth";
 export async function POST(request) {
   let connection;
@@ -26,6 +27,13 @@ export async function POST(request) {
     if (!customer_id || !employee_username) {
       return NextResponse.json(
         { error: "customer_id and employee_username are required" },
+        { status: 400 },
+      );
+    }
+
+    if (!isDmModuleOnlyAssigneeUsername(employee_username)) {
+      return NextResponse.json(
+        { error: "This module only allows re-assign to KAVYA." },
         { status: 400 },
       );
     }
