@@ -77,6 +77,10 @@ export async function middleware(request) {
         role === "SUPERADMIN" &&
         !isImpersonated
       ) {
+        // Allow 24h DM leads (admin sidebar links here; module is SUPERADMIN + Digital Marketer only)
+        if (pathname.startsWith("/user-dashboard/digital-marketer-leads")) {
+          return NextResponse.next();
+        }
         return NextResponse.redirect(new URL("/admin-dashboard", request.url));
       }
 

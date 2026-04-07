@@ -286,7 +286,7 @@ const allMenuItems = [
       {
         path: "/user-dashboard/digital-marketer-leads",
         name: "24h Fresh Leads (DM)",
-        roles: ["SUPERADMIN", "DIGITAL MARKETER", "ADMIN"],
+        roles: ["SUPERADMIN", "DIGITAL MARKETER"],
         icon: "Clock",
       },
       {
