@@ -4,6 +4,7 @@ import getEmpCrmAdminSidebarMenuItems, {
   getEmpCrmAdminBackButtonPath,
 } from "@/lib/getEmpCrmAdminSidebarMenuItems";
 import UserLayoutShell from "@/components/layouts/UserAdminLayoutShell";
+import IpGuard from "@/components/IpGuard";
 
 export default async function EmpCrmLayout({ children }) {
   const menuItems = await getEmpCrmAdminSidebarMenuItems();
@@ -18,6 +19,7 @@ export default async function EmpCrmLayout({ children }) {
       backButtonPath={backButtonPath}
       showBackToUserCrm={showBackToUserCrm}
     >
+      <IpGuard />
       {children}
     </UserLayoutShell>
   );
