@@ -65,7 +65,7 @@ export async function POST(request) {
       return NextResponse.json(
         {
           error:
-            "You already re-assigned this lead once. Only an administrator can re-assign it now.",
+            "You already re-assigned this lead once. Only Super Admin can re-assign it now.",
         },
         { status: 403 },
       );

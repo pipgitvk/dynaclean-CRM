@@ -228,7 +228,7 @@ export default function DigitalMarketerLeadsClient({ viewerRole = "" }) {
               {isDm ? (
                 <span className="block mt-2 text-gray-700">
                   Each lead can be re-assigned once by you; after that, only
-                  Super Admin or Admin can re-assign it.
+                  Super Admin can re-assign it.
                 </span>
               ) : null}
             </p>

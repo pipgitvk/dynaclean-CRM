@@ -25,8 +25,8 @@ export default async function DigitalMarketerLeadsPage() {
         <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-8">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Access denied</h1>
           <p className="text-gray-700">
-            This module is only available to Super Admin, Admin, and Digital
-            Marketer roles.
+            This module is only available to Super Admin and Digital Marketer
+            roles.
           </p>
         </div>
       </div>
