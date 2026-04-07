@@ -86,7 +86,7 @@ const LoginPage = () => {
             <div className="flex items-start gap-3 mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <ShieldAlert className="w-5 h-5 text-orange-500 mt-0.5 shrink-0" />
               <p className="text-orange-700 text-sm font-medium">
-                Aapko automatically logout kar diya gaya hai kyunki aapka current IP address allowed nahi hai. Kripya allowed network se login karein.
+                You have been automatically logged out because your current IP address is not allowed. Please connect to an authorized network and try again.
               </p>
             </div>
           )}
