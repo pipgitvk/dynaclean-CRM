@@ -2,7 +2,7 @@
 
 // lib/db.js
 import mysql from "mysql2/promise";
-import dns from "dns/promises";
+import { promises as dns } from "dns";
 
 let resolvedIp = null;
 let pool = null; // single global pool

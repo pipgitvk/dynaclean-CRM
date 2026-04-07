@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, Trash2, CheckSquare, Square, BadgeCheck, Download } from "lucide-react";
+import {
+  Search,
+  Trash2,
+  CheckSquare,
+  Square,
+  BadgeCheck,
+  Download,
+  FileSpreadsheet,
+} from "lucide-react";
+import ExcelJS from "exceljs";
 import toast from "react-hot-toast";
 import {
   generatePayslipPDF,
@@ -47,6 +56,7 @@ export default function AdminSalarySlipsPage() {
   // Per-row approve loading
   const [approvingId, setApprovingId] = useState(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const canDelete = userRole === "SUPERADMIN" || userRole === "ADMIN";
   const canApprove = userRole === "SUPERADMIN" || userRole === "ADMIN";
@@ -224,6 +234,156 @@ export default function AdminSalarySlipsPage() {
     setPreviewOpen(true);
   };
 
+  const formatDeductionDetailsText = (record) => {
+    const d = record?.deduction_details;
+    if (!Array.isArray(d) || d.length === 0) return "";
+    return d
+      .map((x) => {
+        const name = (x.deduction_name || x.deduction_code || "").trim();
+        const amt = Number(x.amount);
+        if (!name && !Number.isFinite(amt)) return "";
+        return `${name || "?"}: ${Number.isFinite(amt) ? amt : x.amount}`;
+      })
+      .filter(Boolean)
+      .join("; ");
+  };
+
+  const formatDoj = (raw) => {
+    if (raw == null || raw === "") return "";
+    const d = raw instanceof Date ? raw : new Date(raw);
+    if (Number.isNaN(d.getTime())) return String(raw);
+    return d.toLocaleDateString("en-IN");
+  };
+
+  const handleExportExcel = async () => {
+    if (records.length === 0) {
+      toast.error("No rows to export.");
+      return;
+    }
+    setExportingExcel(true);
+    const toastId = toast.loading("Building Excel…");
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Salary slips", {
+        views: [{ state: "frozen", ySplit: 1 }],
+      });
+
+      const headers = [
+        "Username",
+        "Employee name",
+        "Emp ID",
+        "Email",
+        "Designation",
+        "Department",
+        "Salary month",
+        "Month (label)",
+        "Status",
+        "Date of joining",
+        "Bank name",
+        "Bank account",
+        "PAN",
+        "Working days",
+        "Present days",
+        "Overtime hours",
+        "Basic salary",
+        "HRA",
+        "Transport allowance",
+        "Medical allowance",
+        "Special allowance",
+        "Bonus",
+        "Overtime amount",
+        "Total earnings",
+        "PF",
+        "ESI",
+        "Income tax (TDS)",
+        "Professional tax",
+        "Other deductions",
+        "Total deductions",
+        "Gross salary",
+        "Net salary",
+        "Deduction details (line items)",
+      ];
+
+      sheet.addRow(headers);
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.alignment = { vertical: "middle", wrapText: true };
+
+      for (const row of records) {
+        const num = (v) => {
+          const n = Number(v);
+          return Number.isFinite(n) ? n : null;
+        };
+        sheet.addRow([
+          row.username ?? "",
+          row.full_name ?? "",
+          row.empId ?? "",
+          row.email ?? "",
+          row.userRole || row.userDepartment || row.department || "",
+          row.department || row.userDepartment || "",
+          row.salary_month ?? "",
+          formatPayslipMonth(row.salary_month),
+          row.status ?? "",
+          formatDoj(row.date_of_joining),
+          row.bank_name ?? "",
+          row.bank_account_number ?? "",
+          row.pan_number ?? "",
+          row.working_days ?? "",
+          row.present_days ?? "",
+          num(row.overtime_hours),
+          num(row.basic_salary),
+          num(row.hra),
+          num(row.transport_allowance),
+          num(row.medical_allowance),
+          num(row.special_allowance),
+          num(row.bonus),
+          num(row.overtime_amount),
+          num(row.total_earnings),
+          num(row.pf_deduction),
+          num(row.esi_deduction),
+          num(row.income_tax),
+          num(row.professional_tax),
+          num(row.other_deductions),
+          num(row.total_deductions),
+          num(row.gross_salary),
+          num(row.net_salary),
+          formatDeductionDetailsText(row),
+        ]);
+      }
+
+      sheet.columns = headers.map((h, i) => {
+        const w =
+          i === headers.length - 1
+            ? 42
+            : [5, 6, 7, 8, 9, 10, 11, 12, 13].includes(i)
+              ? 14
+              : 12;
+        return { width: w };
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      try {
+        const a = document.createElement("a");
+        a.href = url;
+        const m = month || "all_months";
+        a.download = `Salary_slips_${m}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        a.click();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      toast.success(`Exported ${records.length} row${records.length === 1 ? "" : "s"}`, { id: toastId });
+    } catch (e) {
+      console.error(e);
+      toast.error("Could not export Excel", { id: toastId });
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   const handleDownloadAll = async () => {
     if (records.length === 0) return;
     setDownloadingAll(true);
@@ -289,6 +449,16 @@ export default function AdminSalarySlipsPage() {
           </label>
         </div>
         <div className="flex flex-wrap items-end gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={loading || records.length === 0 || exportingExcel}
+            title="Download current table as Excel (same payroll fields as payslip)"
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-sm text-sm font-semibold text-white border border-black disabled:opacity-50 disabled:pointer-events-none bg-emerald-800 hover:bg-emerald-900`}
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            {exportingExcel ? "Exporting…" : "Excel"}
+          </button>
           <button
             type="button"
             onClick={handleDownloadAll}

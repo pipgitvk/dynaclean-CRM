@@ -1,4 +1,6 @@
-import { getDbConnection } from "@/lib/db";
+import { normalizeRoleKey } from "./roleKeyUtils";
+
+export { normalizeRoleKey };
 
 /**
  * Attendance rules (admin) — only these roles (JWT / rep_list.userRole).
@@ -10,12 +12,6 @@ export const ATTENDANCE_RULES_ALLOWED_ROLES = [
   "ADMIN",
   "HR",
 ];
-
-/** Exported for admin sidebar menu filtering (same rules as API checks). */
-export function normalizeRoleKey(role) {
-  if (role == null || role === "") return "";
-  return String(role).trim().replace(/\s+/g, " ").toUpperCase();
-}
 
 const MANAGE_ATTENDANCE_RULES_ROLES = new Set(
   ATTENDANCE_RULES_ALLOWED_ROLES.map((r) => normalizeRoleKey(r))
@@ -35,6 +31,7 @@ export async function resolveRoleForAttendanceAdmin(payload) {
   if (!payload?.username) return null;
   if (canManageAttendanceRules(payload.role)) return payload.role;
   try {
+    const { getDbConnection } = await import("@/lib/db");
     const conn = await getDbConnection();
     const [repRows] = await conn.query(
       "SELECT userRole FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",

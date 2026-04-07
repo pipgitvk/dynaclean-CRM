@@ -1,5 +1,5 @@
 import { getSessionPayload } from "@/lib/auth";
-import { normalizeRoleKey } from "@/lib/adminAttendanceRulesAuth";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { canAccessDigitalMarketerLeadsModule } from "@/lib/digitalMarketerLeadsAuth";
 import DigitalMarketerLeadsClient from "./DigitalMarketerLeadsClient";
 
