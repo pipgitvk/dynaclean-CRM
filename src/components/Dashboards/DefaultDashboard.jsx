@@ -3,8 +3,12 @@ import ProfilePicUploader from "@/app/user-dashboard/ProfilePicUploader";
 import AttendanceTracker from "@/components/AttendanceTracker";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
+import HrTargetVsCompletedChart from "@/components/empcrm/HrTargetVsCompletedChart";
+import { isHrTargetDashboardRole } from "@/lib/hrTargetEligibleRoles";
 
 export default function DefaultDashboard({ user }) {
+  const showHrTargetChart = isHrTargetDashboardRole(user?.userRole);
+
   return (
     <div className="space-y-4 md:space-y-6">
 
@@ -28,6 +32,12 @@ export default function DefaultDashboard({ user }) {
         </div>
 
       </div>
+
+      {showHrTargetChart && (
+        <div className="max-w-lg">
+          <HrTargetVsCompletedChart />
+        </div>
+      )}
 
       {/* Tasks + Leads */}
       <div className="grid grid-cols-1 gap-4 md:gap-6">
