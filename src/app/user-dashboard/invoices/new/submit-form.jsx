@@ -284,7 +284,7 @@ const balanceAmount = taxSummary.grandTotal - amountPaid;
       const data = await res.json();
       if (data.success) {
         toast.success("Invoice created successfully");
-        router.push("/admin-dashboard/invoices");
+        router.push("/user-dashboard/invoices");
       } else {
         alert("Error: " + data.error);
       }

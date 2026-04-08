@@ -238,6 +238,12 @@ const allMenuItems = [
           //   icon: "FileText",
           // },
           {
+            path: "/admin-dashboard/hr-designation-targets",
+            name: "HR designation targets",
+            roles: ["SUPERADMIN"],
+            icon: "FileText",
+          },
+          {
             path: "/admin-dashboard/monitor-targets",
             name: "Monitor",
             roles: ["SUPERADMIN", "ACCOUNTANT"],
