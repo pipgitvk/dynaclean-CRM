@@ -207,7 +207,7 @@ export default function HrTargetVsCompletedChart() {
                 className="rounded-lg border border-gray-100 bg-gray-50/50 p-4 sm:p-5"
               >
                 <p className="text-sm font-semibold text-gray-900 mb-1">{g.hr_username}</p>
-                <p className="text-xs text-gray-500 mb-4">Per-designation target and completed (orders + their hiring)</p>
+                <p className="text-xs text-gray-500 mb-4">Per-designation target and completed for the selected month.</p>
                 <ItemsChartBlock items={g.items || []} />
               </div>
             ))}
