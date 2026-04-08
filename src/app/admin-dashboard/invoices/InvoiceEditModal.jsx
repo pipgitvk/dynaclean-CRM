@@ -82,6 +82,7 @@ export default function InvoiceEditModal({
     buyers_order_no: "",
     eway_bill_no: "",
     delivery_challan_no: "",
+    order_date: "",
   });
   const [notes, setNotes] = useState("");
   const [editableTerms, setEditableTerms] = useState("");
@@ -123,7 +124,9 @@ export default function InvoiceEditModal({
 
         const inv = data.invoice;
         setInvoiceNumber(inv.invoice_number || "");
-        setInvoiceDate(dateInputValue(inv.invoice_date) || "");
+        // Invoice date should reflect when the invoice record was created.
+        // Order date is the editable business date.
+        setInvoiceDate(dateInputValue(inv.created_at || inv.invoice_date) || "");
         setCreatedAtLocal(toDatetimeLocalValue(inv.created_at) || "");
         setForm({
           customer_name: inv.customer_name || "",
@@ -146,6 +149,7 @@ export default function InvoiceEditModal({
           buyers_order_no: inv.buyers_order_no ?? "",
           eway_bill_no: inv.eway_bill_no ?? "",
           delivery_challan_no: inv.delivery_challan_no ?? "",
+          order_date: dateInputValue(inv.order_date) || "",
         });
         setNotes(inv.notes || "");
         setEditableTerms(inv.terms_conditions || "");
@@ -227,6 +231,7 @@ export default function InvoiceEditModal({
           qRef !== "" && Number.isFinite(qNum) ? qNum : null,
         invoice_number: invoiceNumber.trim(),
         invoice_date: invoiceDate,
+        order_date: form.order_date || null,
         due_date: form.due_date || null,
         customer_name: form.customer_name,
         customer_email: form.customer_email || null,
@@ -322,13 +327,25 @@ export default function InvoiceEditModal({
                   />
                 </div>
                 <div>
+                  <label className="block text-gray-600 mb-1">Invoice date</label>
+                  <input
+                    type="date"
+                    className="w-full border rounded px-2 py-1.5 bg-gray-100 cursor-not-allowed"
+                    value={invoiceDate}
+                    readOnly
+                    tabIndex={-1}
+                    title="Invoice date is the creation date"
+                  />
+                </div>
+                <div>
                   <label className="block text-gray-600 mb-1">Order date</label>
                   <input
                     type="date"
                     className="w-full border rounded px-2 py-1.5"
-                    value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
-                    required
+                    value={form.order_date}
+                    onChange={(e) =>
+                      setForm({ ...form, order_date: e.target.value })
+                    }
                   />
                 </div>
                 <div>
@@ -340,17 +357,6 @@ export default function InvoiceEditModal({
                     onChange={(e) =>
                       setForm({ ...form, due_date: e.target.value })
                     }
-                  />
-                </div>
-                <div>
-                  <label className="block text-gray-600 mb-1">
-                    Created (record time)
-                  </label>
-                  <input
-                    type="datetime-local"
-                    className="w-full border rounded px-2 py-1.5"
-                    value={createdAtLocal}
-                    onChange={(e) => setCreatedAtLocal(e.target.value)}
                   />
                 </div>
               </div>

@@ -68,6 +68,7 @@ export async function PATCH(req, context) {
       quotation_id = null,
       invoice_number,
       invoice_date,
+      order_date = null,
       due_date = null,
       customer_name,
       customer_email = null,
@@ -148,6 +149,11 @@ export async function PATCH(req, context) {
         ? String(due_date).slice(0, 10)
         : null;
 
+    const serverOrderDate =
+      order_date != null && String(order_date).trim() !== ""
+        ? String(order_date).slice(0, 10)
+        : null;
+
     await conn.beginTransaction();
 
     const toMysqlDatetime = (v) => {
@@ -164,7 +170,7 @@ export async function PATCH(req, context) {
     if (createdAtSql) {
       await conn.execute(
         `UPDATE invoices SET
-          quotation_id = ?, invoice_number = ?, invoice_date = ?, due_date = ?,
+          quotation_id = ?, invoice_number = ?, invoice_date = ?, order_date = ?, due_date = ?,
           customer_name = ?, customer_email = ?, customer_phone = ?,
           billing_address = ?, shipping_address = ?, Consignee = ?, Consignee_Contact = ?,
           gst_number = ?, state = ?, state_code = ?,
@@ -177,6 +183,7 @@ export async function PATCH(req, context) {
           quotation_id,
           invoice_number,
           serverInvoiceDate,
+          serverOrderDate,
           serverDueDate,
           customer_name,
           customer_email,
@@ -209,7 +216,7 @@ export async function PATCH(req, context) {
     } else {
       await conn.execute(
         `UPDATE invoices SET
-          quotation_id = ?, invoice_number = ?, invoice_date = ?, due_date = ?,
+          quotation_id = ?, invoice_number = ?, invoice_date = ?, order_date = ?, due_date = ?,
           customer_name = ?, customer_email = ?, customer_phone = ?,
           billing_address = ?, shipping_address = ?, Consignee = ?, Consignee_Contact = ?,
           gst_number = ?, state = ?, state_code = ?,
@@ -221,6 +228,7 @@ export async function PATCH(req, context) {
           quotation_id,
           invoice_number,
           serverInvoiceDate,
+          serverOrderDate,
           serverDueDate,
           customer_name,
           customer_email,

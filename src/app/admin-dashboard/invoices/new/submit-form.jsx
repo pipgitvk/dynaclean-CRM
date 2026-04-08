@@ -52,6 +52,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
     buyers_order_no: "",
     eway_bill_no: "",
     delivery_challan_no: "",
+    order_date: "",
   });
 
   const [cgstRate, setCgstRate] = useState(9);
@@ -435,7 +436,7 @@ const fetchQuotationAndFill = async () => {
       </div>
 
       {/* Invoice Info */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 p-4 rounded">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-gray-50 p-4 rounded">
         <div>
           <label className="text-sm text-gray-600">Invoice No.</label>
           <input
@@ -452,6 +453,15 @@ const fetchQuotationAndFill = async () => {
             value={invoiceDate}
             readOnly
             className="input w-full bg-gray-100"
+          />
+        </div>
+        <div>
+          <label className="text-sm text-gray-600">Order Date</label>
+          <input
+            type="date"
+            value={form.order_date}
+            className="input w-full"
+            onChange={(e) => setForm({ ...form, order_date: e.target.value })}
           />
         </div>
         <div>
