@@ -750,6 +750,12 @@ const allMenuItems = [
     roles: ["SUPERADMIN"],
     icon: "UserCircle",
   },
+  {
+    path: "/admin-dashboard/hiring-process",
+    name: "Hiring Process",
+    roles: ["SUPERADMIN"],
+    icon: "Briefcase",
+  },
 ];
 
 function filterMenuItemsByRole(items, roleKeyNormalized) {

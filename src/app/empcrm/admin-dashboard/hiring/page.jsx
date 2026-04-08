@@ -6,7 +6,6 @@ import { Filter, Pencil, UserPlus, X } from "lucide-react";
 /** Shared field styles */
 const fieldClass =
   "rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-400";
-const filterInputClass = `w-full max-w-[11rem] sm:max-w-none ${fieldClass}`;
 const filterSelectClass = `w-full ${fieldClass} min-h-[44px]`;
 const formFieldClass = `w-full ${fieldClass}`;
 const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900`;
@@ -36,6 +35,12 @@ const MONTH_FILTER_OPTIONS = Array.from({ length: 12 }, (_, i) => {
   const label = new Date(2024, i, 1).toLocaleString("en-IN", { month: "long" });
   return { value: String(m), label };
 });
+
+/** Newest first: next calendar year down through 12 prior years */
+const YEAR_FILTER_OPTIONS = (() => {
+  const y = new Date().getFullYear();
+  return Array.from({ length: 14 }, (_, i) => y + 1 - i);
+})();
 
 function formatInterviewAt(v) {
   if (!v) return "—";
@@ -99,6 +104,7 @@ export default function HiringPage() {
   const [marital_status, setMaritalStatus] = useState("");
   const [experience_type, setExperienceType] = useState("");
   const [interview_at, setInterviewAt] = useState("");
+  const [rescheduled_at, setRescheduledAt] = useState("");
   const [interview_mode, setInterviewMode] = useState("");
   const [status, setStatus] = useState("Shortlisted for interview");
   const [tag, setTag] = useState("");
@@ -109,6 +115,7 @@ export default function HiringPage() {
 
   const [filterYear, setFilterYear] = useState(now.getFullYear());
   const [filterMonth, setFilterMonth] = useState("");
+  const [filterMode, setFilterMode] = useState("");
   const [filterDesignation, setFilterDesignation] = useState("");
   const [designationOptions, setDesignationOptions] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -126,6 +133,7 @@ export default function HiringPage() {
     try {
       let url = `/api/empcrm/hiring?year=${filterYear}`;
       if (filterMonth) url += `&month=${filterMonth}`;
+      if (filterMode) url += `&interview_mode=${encodeURIComponent(filterMode)}`;
       if (filterDesignation) url += `&designation=${encodeURIComponent(filterDesignation)}`;
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
@@ -141,7 +149,7 @@ export default function HiringPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterYear, filterMonth, filterDesignation]);
+  }, [filterYear, filterMonth, filterMode, filterDesignation]);
 
   useEffect(() => {
     load();
@@ -161,6 +169,7 @@ export default function HiringPage() {
     setMaritalStatus("");
     setExperienceType("");
     setInterviewAt("");
+    setRescheduledAt("");
     setInterviewMode("");
     setStatus("Shortlisted for interview");
     setTag("");
@@ -176,6 +185,7 @@ export default function HiringPage() {
     setMessage(null);
     try {
       const hired = status === "Hired";
+      const rescheduled = status === "Rescheduled";
       const res = await fetch("/api/empcrm/hiring", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -186,6 +196,7 @@ export default function HiringPage() {
           marital_status: marital_status || null,
           experience_type: experience_type || null,
           interview_at: interview_at || null,
+          rescheduled_at: rescheduled ? rescheduled_at || null : null,
           interview_mode: interview_mode || null,
           status,
           tag: hired ? tag || null : null,
@@ -225,6 +236,7 @@ export default function HiringPage() {
       marital_status: row.marital_status ?? "",
       experience_type: row.experience_type ?? "",
       interview_at: toDatetimeLocalValue(row.interview_at),
+      rescheduled_at: toDatetimeLocalValue(row.rescheduled_at),
       interview_mode: row.interview_mode ?? "",
       status: row.status || "Shortlisted for interview",
       tag: row.tag ?? "",
@@ -251,6 +263,7 @@ export default function HiringPage() {
     setMessage(null);
     try {
       const hired = editing.status === "Hired";
+      const rescheduled = editing.status === "Rescheduled";
       const res = await fetch("/api/empcrm/hiring", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -262,6 +275,7 @@ export default function HiringPage() {
           marital_status: editing.marital_status || null,
           experience_type: editing.experience_type || null,
           interview_at: editing.interview_at || null,
+          rescheduled_at: rescheduled ? editing.rescheduled_at || null : null,
           interview_mode: editing.interview_mode || null,
           status: editing.status,
           tag: hired ? editing.tag || null : null,
@@ -296,21 +310,6 @@ export default function HiringPage() {
     setAddOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("Remove this record?")) return;
-    try {
-      const res = await fetch(`/api/empcrm/hiring?id=${id}`, { method: "DELETE" });
-      const json = await res.json();
-      if (!res.ok) {
-        setMessage({ type: "error", text: json.error || "Delete failed" });
-        return;
-      }
-      load();
-    } catch (e) {
-      setMessage({ type: "error", text: e.message || "Network error" });
-    }
-  };
-
   return (
     <div className="w-full min-w-0 max-w-screen-2xl mx-auto space-y-5 sm:space-y-6 px-3 sm:px-4 lg:px-6 pb-8 sm:pb-10">
       {message && (
@@ -333,10 +332,6 @@ export default function HiringPage() {
               <span className="h-8 w-1 rounded-full bg-indigo-600" aria-hidden />
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Hiring</h1>
             </div>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-600">
-              Filter by year, month, or designation, then use <strong className="font-semibold text-slate-800">Add employee</strong>{" "}
-              to log candidates and hires.
-            </p>
           </div>
           <button
             type="button"
@@ -359,15 +354,19 @@ export default function HiringPage() {
         <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-12">
           <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-2">
             <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Year</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              className={filterInputClass}
-              value={filterYear}
-              onChange={(e) => setFilterYear(Number(e.target.value) || now.getFullYear())}
-            />
+            <select
+              className={filterSelectClass}
+              value={String(filterYear)}
+              onChange={(e) => setFilterYear(Number(e.target.value))}
+            >
+              {YEAR_FILTER_OPTIONS.map((y) => (
+                <option key={y} value={String(y)}>
+                  {y}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-4">
+          <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-3">
             <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Month</label>
             <select className={filterSelectClass} value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
               <option value="">All months</option>
@@ -378,7 +377,18 @@ export default function HiringPage() {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-2 lg:col-span-6">
+          <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-3">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Mode</label>
+            <select className={filterSelectClass} value={filterMode} onChange={(e) => setFilterMode(e.target.value)}>
+              <option value="">All modes</option>
+              {INTERVIEW_MODE_OPTIONS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-2 lg:col-span-4">
             <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Designation</label>
             <select
               className={filterSelectClass}
@@ -471,7 +481,12 @@ export default function HiringPage() {
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.emp_contact || "—"}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
-                        {formatInterviewAt(row.interview_at)}
+                        <span className="block">{formatInterviewAt(row.interview_at)}</span>
+                        {row.status === "Rescheduled" && row.rescheduled_at ? (
+                          <span className="mt-0.5 block text-xs font-medium text-amber-800" title="Rescheduled slot">
+                            → {formatInterviewAt(row.rescheduled_at)}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.interview_mode || "—"}</td>
                       <td className="px-3 py-2.5 align-top sm:px-4">
@@ -485,7 +500,7 @@ export default function HiringPage() {
                         {row.package || "—"}
                       </td>
                       <td className="px-3 py-2.5 text-right sm:px-4">
-                        <div className="inline-flex flex-col items-end gap-1.5 sm:inline-flex sm:flex-row sm:items-center sm:justify-end sm:gap-2">
+                        <div className="inline-flex justify-end">
                           <button
                             type="button"
                             onClick={() => openEdit(row)}
@@ -493,13 +508,6 @@ export default function HiringPage() {
                           >
                             <Pencil className="h-3.5 w-3.5 shrink-0" />
                             Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(row.id)}
-                            className="rounded-lg border border-red-200/80 bg-red-50/50 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
-                          >
-                            Delete
                           </button>
                         </div>
                       </td>
@@ -658,6 +666,7 @@ export default function HiringPage() {
                           setOfferPackage("");
                           setProbationMonths("");
                         }
+                        if (v !== "Rescheduled") setRescheduledAt("");
                       }}
                       className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                     >
@@ -668,6 +677,21 @@ export default function HiringPage() {
                       ))}
                     </select>
                   </div>
+
+                  {status === "Rescheduled" && (
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-slate-700">
+                        Rescheduled date &amp; time *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        required={status === "Rescheduled"}
+                        value={rescheduled_at}
+                        onChange={(e) => setRescheduledAt(e.target.value)}
+                        className={formFieldClass}
+                      />
+                    </div>
+                  )}
 
                   {status === "Hired" && (
                     <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
@@ -891,6 +915,7 @@ export default function HiringPage() {
                           next.offerPackage = "";
                           next.probationMonths = "";
                         }
+                        if (v !== "Rescheduled") next.rescheduled_at = "";
                         return next;
                       });
                     }}
@@ -903,6 +928,21 @@ export default function HiringPage() {
                     ))}
                   </select>
                 </div>
+
+                {editing.status === "Rescheduled" && (
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Rescheduled date &amp; time *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required={editing.status === "Rescheduled"}
+                      value={editing.rescheduled_at}
+                      onChange={(e) => updateEdit("rescheduled_at", e.target.value)}
+                      className={formFieldClass}
+                    />
+                  </div>
+                )}
 
                 {editing.status === "Hired" && (
                   <div className="sm:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-4">
