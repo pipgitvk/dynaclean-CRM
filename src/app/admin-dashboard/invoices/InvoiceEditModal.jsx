@@ -28,6 +28,14 @@ function dateInputValue(v) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function normalizeStateCode(v, gstin) {
+  const raw = v != null ? String(v).trim() : "";
+  if (/^\d{2}$/.test(raw)) return raw;
+  const g = gstin != null ? String(gstin).trim() : "";
+  const code = g.slice(0, 2);
+  return /^\d{2}$/.test(code) ? code : raw;
+}
+
 function toDatetimeLocalValue(v) {
   if (!v) return "";
   const dt = new Date(v);
@@ -138,7 +146,7 @@ export default function InvoiceEditModal({
           Consignee_Contact: inv.Consignee_Contact || "",
           gst_number: inv.gst_number || "",
           state: inv.state || "",
-          state_code: inv.state_code != null ? String(inv.state_code) : "",
+          state_code: normalizeStateCode(inv.state_code, inv.gst_number),
           due_date: dateInputValue(inv.due_date) || "",
           amount_paid: Number(inv.amount_paid) || 0,
           payment_status: inv.payment_status || "UNPAID",
