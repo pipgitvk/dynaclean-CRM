@@ -36,12 +36,23 @@ const SkeletonRows = () => (
   </>
 );
 
+/** DB stores old_reassign when super-admin reassigns; also accept old_reassigned / spaced variants. */
+function normalizeFollowupStatus(s) {
+  if (s == null || s === "") return "";
+  return String(s).trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+function isOldReassignedFollowupStatus(status) {
+  const n = normalizeFollowupStatus(status);
+  return n === "old_reassign" || n === "old_reassigned";
+}
+
 export default function GoodFollowupsTable({ data, isLoading }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredData, setFilteredData] = useState([]);
   const [stageFilter, setStageFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-
+    
   const stages = Array.from(
     new Set(data?.map((item) => item.stage).filter(Boolean))
   );
@@ -62,7 +73,9 @@ export default function GoodFollowupsTable({ data, isLoading }) {
 
       const matchesStatus =
         statusFilter === "" ||
-        item.status?.toLowerCase() === statusFilter.toLowerCase();
+        (statusFilter === "old_reassigned"
+          ? isOldReassignedFollowupStatus(item.status)
+          : item.status?.toLowerCase() === statusFilter.toLowerCase());
 
       return matchesSearch && matchesStage && matchesStatus;
     });
@@ -140,6 +153,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Status</option>
+              <option value="old_reassigned">Old Reassigned</option>
               {statuses.map((status, idx) => (
                 <option key={idx} value={status}>
                   {status}

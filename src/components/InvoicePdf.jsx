@@ -394,7 +394,7 @@ const InvoicePDFDocument = ({ data }) => {
                   {data.invoice.referenceNo}
                 </Text>
                 <Text style={[styles.tableCell, { width: "33%" }]}>
-                  {data.invoice.quotationId || ""}
+                  {data.invoice.buyersOrderNo || ""}
                 </Text>
                 <Text style={[styles.tableCell, { width: "34%" }]}>
                   {data.invoice.orderDate}
@@ -422,6 +422,17 @@ const InvoicePDFDocument = ({ data }) => {
                 </Text>
                 <Text style={[styles.tableCell, { width: "34%" }]}>
                   ₹{data.paymentInfo.balanceAmount}
+                </Text>
+              </View>
+
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.bold, { width: "100%" }]}>
+                  Delivery Challan No.
+                </Text>
+              </View>
+              <View style={styles.tableRow}>
+                <Text style={[styles.tableCell, { width: "100%" }]}>
+                  {data.invoice.deliveryChallanNo || "-"}
                 </Text>
               </View>
             </View>
