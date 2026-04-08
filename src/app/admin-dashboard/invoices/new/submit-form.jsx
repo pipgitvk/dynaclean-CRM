@@ -159,6 +159,19 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
 
+  // Auto-set state + state_code from GSTIN when valid.
+  useEffect(() => {
+    const st = getStateFromGSTIN(form.gst_number?.trim());
+    if (!st) return;
+    setForm((prev) => ({
+      ...prev,
+      state: st.display,
+      state_code: st.code,
+    }));
+    setStateSearch(st.display);
+    setShowStateSuggestions(false);
+  }, [form.gst_number]);
+
 
   useEffect(() => {
     const code = form.state_code || parseCodeFromDisplay(form.state);

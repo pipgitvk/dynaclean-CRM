@@ -1872,6 +1872,10 @@ const NewInvoice = ({ invoice }) => {
       eWayBill: invoice.eway_bill_no || "",
       deliveryChallanNo: invoice.delivery_challan_no || "",
       referenceNo: invoice.reference_quote_number || invoice.quotation_id || "",
+      stateCode:
+        (invoice.state_code != null && String(invoice.state_code).trim() !== ""
+          ? String(invoice.state_code).trim()
+          : (invoice.gst_number || "").slice(0, 2)) || "",
       referenceDate: invoice.reference_quote_created_at
         ? new Date(invoice.reference_quote_created_at)
             .toLocaleDateString("en-GB", {
@@ -2832,7 +2836,7 @@ const NewInvoice = ({ invoice }) => {
                   borderRight: "0px",
                 }}
               >
-                State Code : <span style={{ fontWeight: "normal" }}> {invoice.gst_number || invoice.state_code || ""}</span>
+                State Code : <span style={{ fontWeight: "normal" }}> {data.invoice.stateCode || ""}</span>
               </td>
               <td
                 style={{
