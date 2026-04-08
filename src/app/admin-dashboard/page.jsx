@@ -268,56 +268,23 @@ export default async function UserDashboardPage() {
 
     return (
       <div className="space-y-3 sm:space-y-4 md:space-y-6 max-w-full">
-        {/* Welcome Section - Enhanced Responsive Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-5 md:gap-7">
-          {/* Welcome Card - Takes 2 columns on large screens */}
-          {/* <div className="lg:col-span-2 bg-white rounded-lg sm:rounded-xl shadow-md p-3 sm:p-4 md:p-6 lg:p-8">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg sm:text-xl md:text-2xl shadow-lg flex-shrink-0">
-                {user.username.charAt(0).toUpperCase()}
-              </div>
-              <div className="space-y-0.5 sm:space-y-1 flex-1 min-w-0">
-                <h1 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-semibold text-gray-900 tracking-tight break-words">
-                  Welcome,{" "}
-                  <span className="text-blue-600 break-all">
-                    {user.username}
-                  </span>
-                </h1>
-                <p className="text-xs sm:text-sm font-medium text-gray-500 truncate">
-                  Role:{" "}
-                  <span className="text-gray-700 font-semibold">
-                    {user.userRole}
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div> */}
+        {/* Dashboard Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-7">
 
-          {/* Admin Stats Card - 1 column on large screens */}
-          {/* <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[100px]">
-              <div>
-                <p className="text-xs sm:text-sm opacity-90 mb-1 sm:mb-2">
-                  Control Panel
-                </p>
-                <p className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                  Admin
-                </p>
-              </div>
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-                <p className="text-xs opacity-75">Full System Access</p>
-              </div>
-            </div>
-          </div> */}
-
-          {/* Admin Stats Card - 2 column on large screens */}
+          {/* Pending Orders */}
           <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[100px]">
+            <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div>
-                <p className="text-xs sm:text-sm opacity-90 mb-1 sm:mb-2">
-                  Pending Orders
-                </p>
-                <p className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
+                    📋
+                  </span>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                    <span className="block">Pending Orders</span>
+                    <span className="block"></span>
+                  </h2>
+                </div>
+                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
                   {pendingOrdersCount}
                 </p>
               </div>
@@ -332,11 +299,16 @@ export default async function UserDashboardPage() {
             </div>
           </div>
 
+          {/* System Performance Dashboard */}
           <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[100px]">
-              <div className="text-white">
-                <h2 className="text-xl md:text-xl font-bold mb-2">
-                  📊 System Performance Dashboard
+            <div className="flex flex-col h-full justify-between min-h-[160px]">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
+                  📊
+                </span>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                  <span className="block">System Performance</span>
+                  <span className="block">Dashboard</span>
                 </h2>
               </div>
               <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
@@ -350,13 +322,22 @@ export default async function UserDashboardPage() {
             </div>
           </div>
 
+          {/* Bulk Upload Customers */}
           <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[100px]">
-              <div className="text-white">
-                <h2 className="text-xl font-bold mb-2">
-                  📤 Bulk Upload Customers
-                </h2>
-                <p className="text-xs opacity-80">Upload CSV & auto-distribute leads to sales reps</p>
+            <div className="flex flex-col h-full justify-between min-h-[160px]">
+              <div>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
+                    📤
+                  </span>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                    <span className="block">Bulk Upload</span>
+                    <span className="block">Customers</span>
+                  </h2>
+                </div>
+                <p className="mt-2 text-sm sm:text-base font-semibold text-white/90">
+                  CSV · Auto-distribute to reps
+                </p>
               </div>
               <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
                 <a
@@ -368,58 +349,69 @@ export default async function UserDashboardPage() {
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-6 flex flex-wrap gap-6 items-stretch">
-          {/* Special Price Approvals Card */}
-          <div className="w-full max-w-xs sm:max-w-sm bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl p-6 flex flex-col items-start justify-between gap-4 text-white aspect-square">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold mb-1">
-                Special Price Approvals
-              </h2>
-              <p className="text-sm sm:text-base text-white/90">
-                Approve or reject customer-wise special prices set by your team.
-              </p>
-              <p className="mt-2 text-sm">
-                Pending approvals:{" "}
-                <span className="font-semibold">
+          {/* Special Price Approvals */}
+          <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
+            <div className="flex flex-col h-full justify-between min-h-[160px]">
+              <div>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
+                    💰
+                  </span>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                    <span className="block">Special Price</span>
+                    <span className="block">Approvals</span>
+                  </h2>
+                </div>
+                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
                   {pendingSpecialCount}
-                </span>
-              </p>
+                </p>
+                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
+                  Pending approvals
+                </p>
+              </div>
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
+                <a
+                  href="/admin-dashboard/special-pricing"
+                  className="px-4 py-2 bg-white text-purple-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
+                >
+                  Review Special Prices →
+                </a>
+              </div>
             </div>
-            <a
-              href="/admin-dashboard/special-pricing"
-              className="px-6 py-3 bg-white text-purple-700 rounded-lg font-semibold text-sm sm:text-base hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200 whitespace-nowrap"
-            >
-              Review Special Prices →
-            </a>
           </div>
 
-          {/* Attendance regularization — all requests */}
-          <div className="w-full max-w-xs sm:max-w-sm bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600 rounded-2xl shadow-xl p-6 flex flex-col items-start justify-between gap-4 text-white min-h-[280px] sm:min-h-[320px]">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold mb-1">
-                Attendance regularization
-              </h2>
-              <p className="text-sm sm:text-base text-white/90">
-                All employee requests to correct check-in / check-out (pending,
-                approved, rejected).
-              </p>
-              <p className="mt-2 text-sm">
-                Total:{" "}
-                <span className="font-semibold">{regTotal}</span>
-                <span className="mx-2 opacity-80">·</span>
-                Pending:{" "}
-                <span className="font-semibold">{regPending}</span>
-              </p>
+          {/* Attendance Regularization */}
+          <div className="bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
+            <div className="flex flex-col h-full justify-between min-h-[160px]">
+              <div>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
+                    📅
+                  </span>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                    <span className="block">Attendance</span>
+                    <span className="block">Regularization Requests</span>
+                  </h2>
+                </div>
+                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+                  {regPending}
+                </p>
+                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
+                  Pending · Total: {regTotal}
+                </p>
+              </div>
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
+                <a
+                  href="/admin-dashboard/attendance-regularization"
+                  className="px-4 py-2 bg-white text-orange-700 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
+                >
+                  View all requests →
+                </a>
+              </div>
             </div>
-            <a
-              href="/admin-dashboard/attendance-regularization"
-              className="px-6 py-3 bg-white text-orange-800 rounded-lg font-semibold text-sm sm:text-base hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200 whitespace-nowrap"
-            >
-              View all requests →
-            </a>
           </div>
+
         </div>
 
         {/* System Performance Dashboard - Featured Card */}
