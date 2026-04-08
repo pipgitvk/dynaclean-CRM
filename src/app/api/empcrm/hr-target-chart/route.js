@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { isHrTargetDashboardRole } from "@/lib/hrTargetEligibleRoles";
+import { canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { resolveHrUserDesignation } from "@/lib/resolveHrUserDesignation";
+import {
+  buildItemsForHrUsername,
+  computeCompletedForDesignation,
+} from "@/lib/hrTargetMonthlyCompleted";
 
 async function hasHrUsernameColumn(conn) {
   const [rows] = await conn.execute(`SHOW COLUMNS FROM hr_designation_monthly_targets LIKE 'hr_username'`);
@@ -11,9 +16,8 @@ async function hasHrUsernameColumn(conn) {
 
 /**
  * GET: Target vs completed for HR (month/year).
- * Target row match order:
- * 1) Row with hr_username = logged-in user (if column exists)
- * 2) Row with hr_username empty and designation = profile designation or rep_list.userDepartment
+ * Returns `items`: one entry per designation. If Superadmin set multiple targets for this HR (same month/year),
+ * all rows with matching hr_username are included.
  */
 export async function GET(req) {
   try {
@@ -22,7 +26,8 @@ export async function GET(req) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!isHrTargetDashboardRole(payload.role ?? payload.userRole)) {
+    const sessionRole = payload.role ?? payload.userRole;
+    if (!canViewHrTargetChart(sessionRole)) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
@@ -34,99 +39,106 @@ export async function GET(req) {
     if (Number.isNaN(year) || year < 2000 || year > 2100) year = now.getFullYear();
 
     const conn = await getDbConnection();
-    const username = payload.username;
     const withUser = await hasHrUsernameColumn(conn);
+    const isSuperadmin = normalizeRoleKey(sessionRole) === "SUPERADMIN";
 
-    let target = 0;
-    let labelDesignation = "";
-    let matchedByUsername = false;
-
-    if (withUser) {
-      const [userRows] = await conn.execute(
-        `SELECT target_amount, designation FROM hr_designation_monthly_targets
-         WHERE year = ? AND month = ? AND TRIM(hr_username) <> ''
-           AND LOWER(TRIM(hr_username)) COLLATE utf8mb4_unicode_ci = LOWER(TRIM(?)) COLLATE utf8mb4_unicode_ci
-         LIMIT 1`,
-        [year, month, username]
-      );
-      if (userRows.length > 0) {
-        target = userRows[0]?.target_amount != null ? Number(userRows[0].target_amount) : 0;
-        labelDesignation = String(userRows[0]?.designation || "").trim();
-        matchedByUsername = true;
-      }
-    }
-
-    if (!matchedByUsername) {
-      const designation = await resolveHrUserDesignation(conn, username);
-
-      if (!designation) {
+    if (isSuperadmin) {
+      if (!withUser) {
         return NextResponse.json({
           success: true,
-          designation: null,
-          target: 0,
-          completed: 0,
+          view: "all_hr",
+          groups: [],
           month,
           year,
           message:
-            "No designation found. Add Designation in Employee CRM profile, set User department in employee master, or ask Superadmin to assign a target for your username.",
+            "Per-HR targets need column hr_username on hr_designation_monthly_targets. Run the migration add-hr-username script.",
         });
       }
+      const [distinctHrs] = await conn.execute(
+        `SELECT MIN(hr_username) AS hr_username
+         FROM hr_designation_monthly_targets
+         WHERE year = ? AND month = ? AND TRIM(hr_username) <> ''
+         GROUP BY LOWER(TRIM(hr_username))
+         ORDER BY MIN(hr_username) ASC`,
+        [year, month]
+      );
+      const groups = [];
+      for (const r of distinctHrs || []) {
+        const un = String(r.hr_username || "").trim();
+        if (!un) continue;
+        const items = await buildItemsForHrUsername(conn, un, year, month);
+        if (items.length > 0) groups.push({ hr_username: un, items });
+      }
+      return NextResponse.json({
+        success: true,
+        view: "all_hr",
+        groups,
+        month,
+        year,
+      });
+    }
 
-      labelDesignation = designation;
+    const username = payload.username;
 
-      if (withUser) {
-        const [targetRows] = await conn.execute(
-          `SELECT target_amount FROM hr_designation_monthly_targets
-           WHERE year = ? AND month = ? AND (hr_username IS NULL OR TRIM(hr_username) = '')
-             AND LOWER(TRIM(designation)) COLLATE utf8mb4_unicode_ci = LOWER(TRIM(?)) COLLATE utf8mb4_unicode_ci
-           LIMIT 1`,
-          [year, month, designation]
-        );
-        target = targetRows[0]?.target_amount != null ? Number(targetRows[0].target_amount) : 0;
-      } else {
-        const [targetRows] = await conn.execute(
-          `SELECT target_amount FROM hr_designation_monthly_targets
-           WHERE year = ? AND month = ? AND LOWER(TRIM(designation)) COLLATE utf8mb4_unicode_ci = LOWER(TRIM(?)) COLLATE utf8mb4_unicode_ci
-           LIMIT 1`,
-          [year, month, designation]
-        );
-        target = targetRows[0]?.target_amount != null ? Number(targetRows[0].target_amount) : 0;
+    /** @type {{ designation: string, target: number, completed: number }[]} */
+    const items = [];
+
+    if (withUser) {
+      const fromUser = await buildItemsForHrUsername(conn, username, year, month);
+      if (fromUser.length > 0) {
+        return NextResponse.json({
+          success: true,
+          items: fromUser,
+          month,
+          year,
+        });
       }
     }
 
-    const forCompletedDesignation = (labelDesignation || "").trim();
-    let completed = 0;
-    if (forCompletedDesignation) {
-      try {
-        // Avoid JOIN neworder ↔ employee_profiles (mixed utf8mb4 collations cause ER_CANT_AGGREGATE_2COLLATIONS).
-        const [nameRows] = await conn.execute(
-          `SELECT username FROM employee_profiles
-           WHERE LOWER(TRIM(COALESCE(designation, ''))) = LOWER(TRIM(?))`,
-          [forCompletedDesignation]
-        );
-        const names = (nameRows || []).map((r) => String(r.username || "").trim()).filter(Boolean);
-        if (names.length > 0) {
-          const ph = names.map(() => "?").join(", ");
-          const [sumRows] = await conn.execute(
-            `SELECT COALESCE(SUM(COALESCE(totalamt, 0)), 0) AS completed
-             FROM neworder
-             WHERE YEAR(created_at) = ? AND MONTH(created_at) = ?
-               AND LOWER(TRIM(COALESCE(created_by, ''))) IN (${ph})`,
-            [year, month, ...names.map((n) => n.toLowerCase())]
-          );
-          completed = sumRows[0]?.completed != null ? Number(sumRows[0].completed) : 0;
-        }
-      } catch (sumErr) {
-        console.error("[hr-target-chart] completed sum skipped:", sumErr?.message || sumErr);
-        completed = 0;
-      }
+    const designation = await resolveHrUserDesignation(conn, username);
+
+    if (!designation) {
+      return NextResponse.json({
+        success: true,
+        items: [],
+        month,
+        year,
+        message:
+          "No designation found. Add Designation in Employee CRM profile, set User department in employee master, or ask Superadmin to assign a target for your username.",
+      });
     }
+
+    let target = 0;
+    if (withUser) {
+      const [targetRows] = await conn.execute(
+        `SELECT target_amount FROM hr_designation_monthly_targets
+         WHERE year = ? AND month = ? AND (hr_username IS NULL OR TRIM(hr_username) = '')
+           AND LOWER(TRIM(designation)) = LOWER(TRIM(?))
+         LIMIT 1`,
+        [year, month, designation]
+      );
+      target = targetRows[0]?.target_amount != null ? Number(targetRows[0].target_amount) : 0;
+    } else {
+      const [targetRows] = await conn.execute(
+        `SELECT target_amount FROM hr_designation_monthly_targets
+         WHERE year = ? AND month = ? AND LOWER(TRIM(designation)) = LOWER(TRIM(?))
+         LIMIT 1`,
+        [year, month, designation]
+      );
+      target = targetRows[0]?.target_amount != null ? Number(targetRows[0].target_amount) : 0;
+    }
+
+    const completed = await computeCompletedForDesignation(conn, username, year, month, designation);
+
+    items.push({
+      designation,
+      target,
+      completed,
+    });
 
     return NextResponse.json({
       success: true,
-      designation: labelDesignation || null,
-      target,
-      completed,
+      items,
       month,
       year,
     });

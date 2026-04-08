@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Users, UserCheck, UserX, TrendingUp } from "lucide-react";
 import { Settings } from "lucide-react";
 import HrTargetVsCompletedChart from "@/components/empcrm/HrTargetVsCompletedChart";
-import { isHrTargetDashboardRole } from "@/lib/hrTargetEligibleRoles";
+import { canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
 
 export default function EmpCrmDashboard() {
   const [stats, setStats] = useState({
@@ -40,7 +40,7 @@ export default function EmpCrmDashboard() {
   };
 
   const hasAdminAccess = userData && (userData.userRole === "HR" || userData.userRole === "HR HEAD" || userData.userRole === "HR Executive");
-  const showHrTargetChart = isHrTargetDashboardRole(userData?.userRole);
+  const showHrTargetChart = canViewHrTargetChart(userData?.userRole);
 
   const fetchStats = async () => {
     try {
@@ -127,7 +127,7 @@ export default function EmpCrmDashboard() {
           ))}
         </div>
         {showHrTargetChart && (
-          <div className="max-w-lg">
+          <div className="w-full max-w-6xl">
             <HrTargetVsCompletedChart />
           </div>
         )}
