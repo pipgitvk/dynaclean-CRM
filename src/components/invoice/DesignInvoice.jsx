@@ -1872,8 +1872,8 @@ const NewInvoice = ({ invoice }) => {
       eWayBill: invoice.eway_bill_no || "",
       deliveryChallanNo: invoice.delivery_challan_no || "",
       referenceNo: invoice.reference_quote_number || invoice.quotation_id || "",
-      orderDate: invoice.invoice_date
-        ? new Date(invoice.invoice_date)
+      referenceDate: invoice.reference_quote_created_at
+        ? new Date(invoice.reference_quote_created_at)
             .toLocaleDateString("en-GB", {
               day: "2-digit",
               month: "short",
@@ -1881,6 +1881,40 @@ const NewInvoice = ({ invoice }) => {
             })
             .replace(/ /g, "-")
         : "",
+      invoiceDate: invoice.created_at
+        ? new Date(invoice.created_at)
+            .toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "2-digit",
+            })
+            .replace(/ /g, "-")
+        : invoice.invoice_date
+          ? new Date(invoice.invoice_date)
+              .toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "2-digit",
+              })
+              .replace(/ /g, "-")
+          : "",
+      orderDate: invoice.order_date
+        ? new Date(invoice.order_date)
+            .toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "2-digit",
+            })
+            .replace(/ /g, "-")
+        : invoice.invoice_date
+          ? new Date(invoice.invoice_date)
+              .toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "2-digit",
+              })
+              .replace(/ /g, "-")
+          : "",
       dueDate: invoice.due_date
         ? new Date(invoice.due_date)
             .toLocaleDateString("en-GB", {
@@ -2470,7 +2504,7 @@ const NewInvoice = ({ invoice }) => {
               >
                 Invoice Date : <span style={{
                   fontWeight: "normal",
-                }}>{data.invoice.orderDate}</span>
+                }}>{data.invoice.invoiceDate}</span>
               </td>
               <td
                 style={{
@@ -2507,9 +2541,9 @@ const NewInvoice = ({ invoice }) => {
                   </span>
                 </div>
                 <div style={{ fontWeight: "bold", marginTop: "6px", lineHeight: "1.3" }}>
-                  Dt. :{" "}
+                  Date :{" "}
                   <span style={{ fontWeight: "normal" }}>
-                    {data.invoice.orderDate || "-"}
+                    {data.invoice.referenceDate || "-"}
                   </span>
                 </div>
               </td>

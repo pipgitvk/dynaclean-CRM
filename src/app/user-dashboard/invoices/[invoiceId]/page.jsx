@@ -24,11 +24,12 @@ async function getInvoiceWithItems(invoiceNumber) {
 
   // Resolve quotation number for reference field (supports both quote_number and internal quotation id)
   let resolvedQuoteNumber = invoice.quotation_id || null;
+  let resolvedQuoteCreatedAt = null;
   if (invoice.quotation_id) {
     try {
       const [[byQuoteNumber]] = await conn.execute(
         `
-        SELECT quote_number
+        SELECT quote_number, created_at
         FROM quotations_records
         WHERE TRIM(quote_number) = TRIM(?)
         LIMIT 1
@@ -38,10 +39,11 @@ async function getInvoiceWithItems(invoiceNumber) {
 
       if (byQuoteNumber?.quote_number) {
         resolvedQuoteNumber = byQuoteNumber.quote_number;
+        resolvedQuoteCreatedAt = byQuoteNumber.created_at || null;
       } else {
         const [[byLegacyId]] = await conn.execute(
           `
-          SELECT quote_number
+          SELECT quote_number, created_at
           FROM quotations_records
           WHERE TRIM(CAST(\`S.No.\` AS CHAR)) = TRIM(?)
           LIMIT 1
@@ -50,10 +52,29 @@ async function getInvoiceWithItems(invoiceNumber) {
         );
         if (byLegacyId?.quote_number) {
           resolvedQuoteNumber = byLegacyId.quote_number;
+          resolvedQuoteCreatedAt = byLegacyId.created_at || null;
         }
       }
     } catch {
       // Keep existing quotation_id as fallback if lookup fails
+    }
+  }
+
+  // If we found the quote number but not the created date, try to resolve it once more.
+  if (resolvedQuoteNumber && !resolvedQuoteCreatedAt) {
+    try {
+      const [[q]] = await conn.execute(
+        `
+        SELECT created_at
+        FROM quotations_records
+        WHERE TRIM(quote_number) = TRIM(?)
+        LIMIT 1
+        `,
+        [String(resolvedQuoteNumber)],
+      );
+      resolvedQuoteCreatedAt = q?.created_at || null;
+    } catch {
+      // ignore
     }
   }
 
@@ -71,6 +92,7 @@ async function getInvoiceWithItems(invoiceNumber) {
   return {
     ...invoice,
     reference_quote_number: resolvedQuoteNumber,
+    reference_quote_created_at: resolvedQuoteCreatedAt,
     items,
   };
 }

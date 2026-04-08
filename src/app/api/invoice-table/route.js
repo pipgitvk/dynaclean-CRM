@@ -66,7 +66,7 @@ export async function GET(req) {
         id,
         invoice_number,
         customer_name AS buyer_name,
-        invoice_date AS order_date,
+        COALESCE(order_date, invoice_date) AS order_date,
         (cgst + sgst + igst) AS tax_amount,
         grand_total,
         created_at
@@ -117,6 +117,7 @@ export async function POST(req) {
     const {
       quotation_id = null,
       invoice_date,
+      order_date = null,
       due_date,
       customer_name,
       customer_email = null,
@@ -161,6 +162,10 @@ export async function POST(req) {
       return `DYN/${startYear}-${endYear2Digits}/`;
     };
     const serverInvoiceDate = invoice_date || now.toISOString().split("T")[0];
+    const serverOrderDate =
+      order_date != null && String(order_date).trim() !== ""
+        ? String(order_date).slice(0, 10)
+        : null;
     const dateForPrefix = invoice_date
       ? new Date(`${String(invoice_date).slice(0, 10)}T12:00:00`)
       : now;
@@ -195,15 +200,16 @@ export async function POST(req) {
         // Insert the invoice header
         const [result] = await conn.execute(
           `INSERT INTO invoices 
-           (quotation_id, invoice_number, invoice_date, due_date, customer_name, customer_email, 
+           (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
             subtotal, cgst, sgst, igst, total_tax, grand_total, amount_paid, balance_amount, 
             payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             quotation_id,
             finalInvoiceNumber,
             serverInvoiceDate,
+            serverOrderDate,
             due_date,
             customer_name,
             customer_email,

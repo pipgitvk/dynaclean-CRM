@@ -370,7 +370,7 @@ const InvoicePDFDocument = ({ data }) => {
                   {data.invoice.number}
                 </Text>
                 <Text style={[styles.tableCell, { width: "33%" }]}>
-                  {data.invoice.orderDate}
+                  {data.invoice.invoiceDate}
                 </Text>
                 <Text style={[styles.tableCell, { width: "34%" }]}>
                   {data.invoice.dueDate}
@@ -397,7 +397,7 @@ const InvoicePDFDocument = ({ data }) => {
                   {data.invoice.buyersOrderNo || ""}
                 </Text>
                 <Text style={[styles.tableCell, { width: "34%" }]}>
-                  {data.invoice.orderDate}
+                  {data.invoice.referenceDate}
                 </Text>
               </View>
 
