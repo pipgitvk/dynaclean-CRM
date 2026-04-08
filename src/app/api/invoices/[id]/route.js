@@ -91,6 +91,9 @@ export async function PATCH(req, context) {
       payment_status = "UNPAID",
       notes = null,
       terms_conditions = null,
+      buyers_order_no = null,
+      eway_bill_no = null,
+      delivery_challan_no = null,
       created_at = null,
     } = body;
 
@@ -167,6 +170,7 @@ export async function PATCH(req, context) {
           gst_number = ?, state = ?, state_code = ?,
           subtotal = ?, cgst = ?, sgst = ?, igst = ?, total_tax = ?, grand_total = ?,
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
+          buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
           created_at = ?
         WHERE id = ?`,
         [
@@ -195,6 +199,9 @@ export async function PATCH(req, context) {
           payment_status,
           notes,
           terms_conditions,
+          buyers_order_no,
+          eway_bill_no,
+          delivery_challan_no,
           createdAtSql,
           invoiceId,
         ],
@@ -207,7 +214,8 @@ export async function PATCH(req, context) {
           billing_address = ?, shipping_address = ?, Consignee = ?, Consignee_Contact = ?,
           gst_number = ?, state = ?, state_code = ?,
           subtotal = ?, cgst = ?, sgst = ?, igst = ?, total_tax = ?, grand_total = ?,
-          amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?
+          amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
+          buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?
         WHERE id = ?`,
         [
           quotation_id,
@@ -235,6 +243,9 @@ export async function PATCH(req, context) {
           payment_status,
           notes,
           terms_conditions,
+          buyers_order_no,
+          eway_bill_no,
+          delivery_challan_no,
           invoiceId,
         ],
       );

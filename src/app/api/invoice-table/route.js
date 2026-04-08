@@ -140,6 +140,9 @@ export async function POST(req) {
       payment_status = "UNPAID",
       notes = null,
       terms_conditions = null,
+      buyers_order_no = null,
+      eway_bill_no = null,
+      delivery_challan_no = null,
     } = body;
 
     const pool = await getDbConnection();
@@ -195,8 +198,8 @@ export async function POST(req) {
            (quotation_id, invoice_number, invoice_date, due_date, customer_name, customer_email, 
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
             subtotal, cgst, sgst, igst, total_tax, grand_total, amount_paid, balance_amount, 
-            payment_status, notes, terms_conditions, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             quotation_id,
             finalInvoiceNumber,
@@ -227,6 +230,9 @@ export async function POST(req) {
             payment_status,
             notes,
             terms_conditions,
+            buyers_order_no,
+            eway_bill_no,
+            delivery_challan_no,
           ],
         );
 

@@ -1868,7 +1868,9 @@ const NewInvoice = ({ invoice }) => {
     },
     invoice: {
       number: invoice.invoice_number || "",
-      eWayBill: "", // Not in your table
+      buyersOrderNo: invoice.buyers_order_no || "",
+      eWayBill: invoice.eway_bill_no || "",
+      deliveryChallanNo: invoice.delivery_challan_no || "",
       referenceNo: invoice.reference_quote_number || invoice.quotation_id || "",
       orderDate: invoice.invoice_date
         ? new Date(invoice.invoice_date)
@@ -2578,6 +2580,22 @@ const NewInvoice = ({ invoice }) => {
                 <b>Balance Amount : <span style={{
                   fontWeight: "normal",
                 }}>{data.paymentInfo.balanceAmount}</span></b>
+              </td>
+            </tr>
+            <tr>
+              <td
+                colSpan={3}
+                style={{
+                  border: "1px solid #000",
+                  padding: "3px",
+                  paddingBottom: "7px",
+                  borderBottom: "0px",
+                }}
+              >
+                <b>Delivery Challan No. :{" "}
+                <span style={{ fontWeight: "normal" }}>
+                  {data.invoice.deliveryChallanNo || "-"}
+                </span></b>
               </td>
             </tr>
           </tbody>

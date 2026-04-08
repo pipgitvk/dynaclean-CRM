@@ -79,6 +79,9 @@ export default function InvoiceEditModal({
     amount_paid: 0,
     payment_status: "UNPAID",
     quotation_id: "",
+    buyers_order_no: "",
+    eway_bill_no: "",
+    delivery_challan_no: "",
   });
   const [notes, setNotes] = useState("");
   const [editableTerms, setEditableTerms] = useState("");
@@ -140,6 +143,9 @@ export default function InvoiceEditModal({
             inv.quotation_id != null && inv.quotation_id !== ""
               ? String(inv.quotation_id)
               : "",
+          buyers_order_no: inv.buyers_order_no ?? "",
+          eway_bill_no: inv.eway_bill_no ?? "",
+          delivery_challan_no: inv.delivery_challan_no ?? "",
         });
         setNotes(inv.notes || "");
         setEditableTerms(inv.terms_conditions || "");
@@ -244,6 +250,9 @@ export default function InvoiceEditModal({
         payment_status: form.payment_status,
         notes: notes || null,
         terms_conditions: editableTerms || null,
+        buyers_order_no: form.buyers_order_no?.trim() || null,
+        eway_bill_no: form.eway_bill_no?.trim() || null,
+        delivery_challan_no: form.delivery_challan_no?.trim() || null,
         created_at: createdAtLocal || null,
       };
 
@@ -386,6 +395,42 @@ export default function InvoiceEditModal({
                     value={form.quotation_id}
                     onChange={(e) =>
                       setForm({ ...form, quotation_id: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600 mb-1">
+                    Buyer&apos;s order
+                  </label>
+                  <input
+                    className="w-full border rounded px-2 py-1.5"
+                    value={form.buyers_order_no}
+                    onChange={(e) =>
+                      setForm({ ...form, buyers_order_no: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600 mb-1">
+                    E-way bill no.
+                  </label>
+                  <input
+                    className="w-full border rounded px-2 py-1.5"
+                    value={form.eway_bill_no}
+                    onChange={(e) =>
+                      setForm({ ...form, eway_bill_no: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600 mb-1">
+                    Delivery challan no.
+                  </label>
+                  <input
+                    className="w-full border rounded px-2 py-1.5"
+                    value={form.delivery_challan_no}
+                    onChange={(e) =>
+                      setForm({ ...form, delivery_challan_no: e.target.value })
                     }
                   />
                 </div>

@@ -49,6 +49,9 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
     payment_status: "UNPAID",
     due_date: "",
     amount_paid: 0,
+    buyers_order_no: "",
+    eway_bill_no: "",
+    delivery_challan_no: "",
   });
 
   const [cgstRate, setCgstRate] = useState(9);
@@ -466,6 +469,45 @@ const fetchQuotationAndFill = async () => {
   required
 />
 
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-gray-50 p-4 rounded">
+        <div>
+          <label className="text-sm text-gray-600">Buyer&apos;s order</label>
+          <input
+            type="text"
+            className="input w-full"
+            value={form.buyers_order_no}
+            onChange={(e) =>
+              setForm({ ...form, buyers_order_no: e.target.value })
+            }
+            placeholder="Buyer&apos;s order no."
+          />
+        </div>
+        <div>
+          <label className="text-sm text-gray-600">E-way bill no.</label>
+          <input
+            type="text"
+            className="input w-full"
+            value={form.eway_bill_no}
+            onChange={(e) =>
+              setForm({ ...form, eway_bill_no: e.target.value })
+            }
+            placeholder="E-way bill no."
+          />
+        </div>
+        <div>
+          <label className="text-sm text-gray-600">Delivery challan no.</label>
+          <input
+            type="text"
+            className="input w-full"
+            value={form.delivery_challan_no}
+            onChange={(e) =>
+              setForm({ ...form, delivery_challan_no: e.target.value })
+            }
+            placeholder="Delivery challan no."
+          />
         </div>
       </div>
 
