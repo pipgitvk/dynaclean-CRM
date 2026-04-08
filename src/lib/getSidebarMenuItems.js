@@ -562,6 +562,12 @@ const allMenuItems = [
     icon: "UserPlus",
   },
   {
+    path: "/empcrm/admin-dashboard/hiring",
+    name: "Hiring",
+    roles: ["HR", "HR HEAD", "HR Executive"],
+    icon: "Users",
+  },
+  {
     path: "/user-dashboard/dd-management",
     name: "DD Management",
     roles: ["ADMIN", "ACCOUNTANT"],

@@ -118,6 +118,73 @@ export async function POST(request) {
   }
 }
 
+/** PATCH: update row by id (Superadmin). */
+export async function PATCH(request) {
+  try {
+    const payload = await getSessionPayload();
+    const denied = assertSuperadmin(payload);
+    if (denied) return denied;
+
+    const body = await request.json();
+    const id = parseInt(body.id, 10);
+    const designation = String(body.designation ?? "").trim();
+    const hr_username = String(body.hr_username ?? "").trim();
+    const target_amount = Number(body.target_amount ?? body.target ?? NaN);
+    const month = parseInt(body.month, 10);
+    const year = parseInt(body.year, 10);
+
+    if (!Number.isFinite(id) || id < 1) {
+      return NextResponse.json({ success: false, error: "Valid id is required" }, { status: 400 });
+    }
+    if (!designation) {
+      return NextResponse.json({ success: false, error: "Designation is required" }, { status: 400 });
+    }
+    if (!Number.isFinite(target_amount) || target_amount < 0) {
+      return NextResponse.json({ success: false, error: "Valid target amount is required" }, { status: 400 });
+    }
+    if (Number.isNaN(month) || month < 1 || month > 12) {
+      return NextResponse.json({ success: false, error: "Month must be 1–12" }, { status: 400 });
+    }
+    if (Number.isNaN(year) || year < 2000 || year > 2100) {
+      return NextResponse.json({ success: false, error: "Valid year is required" }, { status: 400 });
+    }
+
+    const conn = await getDbConnection();
+    const withUser = await hasHrUsernameColumn(conn);
+
+    if (withUser) {
+      if (!hr_username) {
+        return NextResponse.json({ success: false, error: "HR username is required" }, { status: 400 });
+      }
+      await conn.execute(
+        `UPDATE hr_designation_monthly_targets
+         SET designation = ?, hr_username = ?, target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [designation, hr_username, target_amount, month, year, id]
+      );
+    } else {
+      await conn.execute(
+        `UPDATE hr_designation_monthly_targets
+         SET designation = ?, target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [designation, target_amount, month, year, id]
+      );
+    }
+
+    return NextResponse.json({ success: true, message: "Target updated" });
+  } catch (error) {
+    console.error("[admin/hr-designation-targets PATCH]", error);
+    const msg = String(error?.message || "");
+    if (msg.includes("Duplicate") || msg.includes("duplicate")) {
+      return NextResponse.json(
+        { success: false, error: "A row already exists for this HR, designation, month and year." },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ success: false, error: error.message || "Server error" }, { status: 500 });
+  }
+}
+
 /** DELETE ?id= */
 export async function DELETE(req) {
   try {

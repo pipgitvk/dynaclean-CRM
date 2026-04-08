@@ -193,6 +193,8 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { TextEncoder as NodeTextEncoder } from "util";
 import { getDbConnection } from "@/lib/db";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+import HrTargetVsCompletedChart from "@/components/empcrm/HrTargetVsCompletedChart";
 import UpcomingTasks from "@/components/task/UpcomingTasksAdmin";
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -265,6 +267,8 @@ export default async function UserDashboardPage() {
     if (!user) {
       return <p className="text-red-600">User not found</p>;
     }
+
+    const showSuperadminHrChart = normalizeRoleKey(user.userRole) === "SUPERADMIN";
 
     return (
       <div className="space-y-3 sm:space-y-4 md:space-y-6 max-w-full">
@@ -413,6 +417,12 @@ export default async function UserDashboardPage() {
           </div>
 
         </div>
+
+        {showSuperadminHrChart && (
+          <div className="w-full max-w-6xl">
+            <HrTargetVsCompletedChart />
+          </div>
+        )}
 
         {/* System Performance Dashboard - Featured Card */}
         {/* <div className="bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 rounded-xl shadow-xl p-6 hover:shadow-2xl transition-all duration-300">
