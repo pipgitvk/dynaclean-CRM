@@ -39,6 +39,7 @@ import {
   Clock,
   LayoutGrid,
   Grid3x3,
+  Briefcase,
 } from "lucide-react";
 
 // Icon map
@@ -76,6 +77,7 @@ const iconMap = {
   Import,
   Ship,
   ArrowLeft,
+  Briefcase,
 };
 
 export default function Sidebar({
