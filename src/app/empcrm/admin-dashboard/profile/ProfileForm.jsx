@@ -11,6 +11,7 @@ import HrDetailsSection from "./sections/HrDetailsSection";
 import ReferencesSection from "./sections/ReferencesSection";
 import {
   isReassignFieldMode,
+  reassignKeysRequireExperienceUi,
   shouldShowPersonalBlock,
   shouldShowBankingDetailsCard,
   shouldShowEducationSection,
@@ -107,7 +108,11 @@ export default function ProfileForm({
     // And we already initialized state with it.
     // Just ensure isExperienced is set.
     if (initialData) {
-      setIsExperienced(deriveIsExperiencedForForm(initialData));
+      let experienced = deriveIsExperiencedForForm(initialData);
+      if (isReassignFieldMode(reassignFieldKeys) && reassignKeysRequireExperienceUi(reassignFieldKeys)) {
+        experienced = true;
+      }
+      setIsExperienced(experienced);
     } else {
       setFormData(prev => ({
         ...prev,
@@ -117,7 +122,7 @@ export default function ProfileForm({
       }));
       fetchExistingProfile();
     }
-  }, [username, empId, initialData]);
+  }, [username, empId, initialData, reassignFieldKeys]);
 
   const fetchExistingProfile = async () => {
     // Only fetch if no initial data
