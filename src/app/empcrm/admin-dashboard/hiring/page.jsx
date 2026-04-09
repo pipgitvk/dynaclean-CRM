@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Filter, Pencil, UserPlus, X } from "lucide-react";
 
 /** Shared field styles */
@@ -118,6 +118,8 @@ export default function HiringPage() {
   const [filterMode, setFilterMode] = useState("");
   const [filterDesignation, setFilterDesignation] = useState("");
   const [designationOptions, setDesignationOptions] = useState([]);
+  /** Designations from `hr_designation_monthly_targets` for this HR (admin-assigned). */
+  const [adminDesignations, setAdminDesignations] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -156,11 +158,41 @@ export default function HiringPage() {
   }, [load]);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/empcrm/hiring-admin-designations", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && json.success && Array.isArray(json.designations)) {
+          setAdminDesignations(json.designations);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const mergedFilterDesignations = useMemo(() => {
+    const set = new Set([...adminDesignations, ...designationOptions]);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [adminDesignations, designationOptions]);
+
+  const editDesignationOptions = useMemo(() => {
+    const set = new Set(adminDesignations);
+    const cur = editing?.designation != null ? String(editing.designation).trim() : "";
+    if (cur) set.add(cur);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [adminDesignations, editing?.designation]);
+
+  useEffect(() => {
     if (!filterDesignation || loading) return;
-    if (!designationOptions.includes(filterDesignation)) {
+    if (!mergedFilterDesignations.includes(filterDesignation)) {
       setFilterDesignation("");
     }
-  }, [designationOptions, filterDesignation, loading]);
+  }, [mergedFilterDesignations, filterDesignation, loading]);
 
   const resetForm = () => {
     setCandidateName("");
@@ -396,7 +428,7 @@ export default function HiringPage() {
               onChange={(e) => setFilterDesignation(e.target.value)}
             >
               <option value="">All designations</option>
-              {designationOptions.map((d) => (
+              {mergedFilterDesignations.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
@@ -567,7 +599,7 @@ export default function HiringPage() {
                     />
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <label className="mb-1 block text-sm font-medium text-slate-700">Emp contact *</label>
                     <input
                       required
@@ -579,15 +611,32 @@ export default function HiringPage() {
                     />
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <label className="mb-1 block text-sm font-medium text-slate-700">Designation *</label>
-                    <input
-                      required
-                      value={designation}
-                      onChange={(e) => setDesignation(e.target.value)}
-                      placeholder="Same as target row if applicable"
-                      className={formFieldClass}
-                    />
+                    {adminDesignations.length > 0 ? (
+                      <select
+                        required
+                        value={designation}
+                        onChange={(e) => setDesignation(e.target.value)}
+                        className={formSelectClass}
+                      >
+                        <option value="">— Select designation —</option>
+                        {adminDesignations.map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        required
+                        value={designation}
+                        onChange={(e) => setDesignation(e.target.value)}
+                        placeholder="Ask admin to assign HR targets first, or type designation"
+                        className={formFieldClass}
+                      />
+                    )}
+                   
                   </div>
 
                   <div>
@@ -822,7 +871,7 @@ export default function HiringPage() {
                     className={formFieldClass}
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Emp contact *</label>
                   <input
                     required
@@ -832,14 +881,30 @@ export default function HiringPage() {
                     className={formFieldClass}
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="block text-sm font-medium text-slate-700 mb-1">Designation *</label>
-                  <input
-                    required
-                    value={editing.designation}
-                    onChange={(e) => updateEdit("designation", e.target.value)}
-                    className={formFieldClass}
-                  />
+                  {editDesignationOptions.length > 0 ? (
+                    <select
+                      required
+                      value={editing.designation}
+                      onChange={(e) => updateEdit("designation", e.target.value)}
+                      className={formSelectClass}
+                    >
+                      <option value="">— Select designation —</option>
+                      {editDesignationOptions.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      required
+                      value={editing.designation}
+                      onChange={(e) => updateEdit("designation", e.target.value)}
+                      className={formFieldClass}
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Marital status *</label>

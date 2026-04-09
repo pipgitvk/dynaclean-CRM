@@ -611,16 +611,12 @@ export default function AdminHiringProcessPage() {
                       <p className="mt-1 text-sm text-slate-800">
                         {h.status_before == null || h.status_before === "" ? (
                           <>
-                            <span className="font-semibold text-emerald-700">Created</span>
+                            <span className="font-semibold text-emerald-600">Created</span>
                             {" · Status: "}
-                            <span className="font-medium">{h.status_after}</span>
+                            <span className="font-semibold text-slate-900">{h.status_after}</span>
                           </>
                         ) : (
-                          <>
-                            Status: <span className="text-slate-500 line-through">{h.status_before}</span>
-                            {" → "}
-                            <span className="font-semibold text-indigo-800">{h.status_after}</span>
-                          </>
+                          <span className="font-semibold text-indigo-900">{h.status_after}</span>
                         )}
                       </p>
                       <p className="mt-0.5 text-xs text-slate-500">By {h.actor_username}</p>
