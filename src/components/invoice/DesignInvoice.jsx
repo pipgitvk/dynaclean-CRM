@@ -1885,23 +1885,17 @@ const NewInvoice = ({ invoice }) => {
             })
             .replace(/ /g, "-")
         : "",
-      invoiceDate: invoice.created_at
-        ? new Date(invoice.created_at)
-            .toLocaleDateString("en-GB", {
-              day: "2-digit",
-              month: "short",
-              year: "2-digit",
-            })
-            .replace(/ /g, "-")
-        : invoice.invoice_date
-          ? new Date(invoice.invoice_date)
-              .toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "2-digit",
-              })
-              .replace(/ /g, "-")
-          : "",
+      invoiceDate: (() => {
+        const raw = invoice.invoice_date || invoice.created_at;
+        if (!raw) return "";
+        return new Date(raw)
+          .toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "2-digit",
+          })
+          .replace(/ /g, "-");
+      })(),
       orderDate: invoice.order_date
         ? new Date(invoice.order_date)
             .toLocaleDateString("en-GB", {
