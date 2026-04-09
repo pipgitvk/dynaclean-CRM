@@ -2,6 +2,7 @@ import {
   shouldShowField,
   shouldShowBankingBlock,
   shouldShowExperienceSection,
+  reassignKeysRequireExperienceUi,
 } from "@/lib/reassignFieldVisibility";
 import ExperienceSection from "./ExperienceSection";
 
@@ -37,7 +38,8 @@ export default function BankingDetailsSection({
     show("esic_number");
   const showBankFields = shouldShowBankingBlock(rf);
   const showExperienceBlock =
-    isExperienced && shouldShowExperienceSection(rf);
+    (isExperienced || reassignKeysRequireExperienceUi(rf)) &&
+    shouldShowExperienceSection(rf);
 
   if (!showTax && !showBankFields && !showExperienceBlock && !bankingDocumentsSlot) {
     return null;
