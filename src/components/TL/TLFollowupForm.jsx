@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Save, X } from "lucide-react";
+import { getTlTagOptions } from "@/utils/tlFollowupTagOptions";
 
 export default function TLFollowupForm({
   customerId,
@@ -10,6 +11,8 @@ export default function TLFollowupForm({
   latestfollowup,
   isAdmin = false,
   currentStage = "New",
+  /** Admin TL management: extra tags only for superadmin */
+  showSuperAdminTlTags = false,
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -39,18 +42,7 @@ export default function TLFollowupForm({
   });
 
   const statusOptions = ["Good", "Very Good", "Average", "Poor", "Denied"];
-  const tagOptions = [
-    "Demo",
-    "Prime",
-    "Repeat order",
-    "Mail",
-    "Truck FollowUp",
-    "Payment Collection",
-    "Strong FollowUp",
-    "Service Issue",
-    "Running Orders",
-    "Clear",
-  ];
+  const tagOptions = getTlTagOptions(showSuperAdminTlTags);
   const stageOptions = [
     "New",
     "Contacted",
@@ -96,6 +88,15 @@ export default function TLFollowupForm({
   useEffect(() => {
     if (!latestfollowup) return;
 
+    const allowed = new Set(getTlTagOptions(showSuperAdminTlTags));
+    const parsedTags = latestfollowup.multi_tag
+      ? latestfollowup.multi_tag
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+    const multi_tag = parsedTags.filter((t) => allowed.has(t));
+
     setFormData((prev) => ({
       ...prev,
       // estimated_order_date: latestfollowup.estimated_order_date || "",
@@ -107,13 +108,11 @@ export default function TLFollowupForm({
         ? latestfollowup.next_followup_date
         : "",
       stage: latestfollowup.stage || prev.stage,
-      multi_tag: latestfollowup.multi_tag
-        ? latestfollowup.multi_tag.split(",").map((t) => t.trim())
-        : [],
+      multi_tag,
       assigned_employee:
         latestfollowup.assigned_employee || prev.assigned_employee,
     }));
-  }, [latestfollowup]);
+  }, [latestfollowup, showSuperAdminTlTags]);
 
   // Filter stages based on customer's current stage from database
   const getAvailableStages = (currentStage) => {
