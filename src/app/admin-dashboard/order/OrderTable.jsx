@@ -322,7 +322,7 @@ export default function OrderTable({ orders, userRole }) {
     <div className="space-y-6">
       <div className="w-full max-w-sm rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm p-3 sm:p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
+          {/* <div>
             <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
               GST total
             </p>
@@ -333,7 +333,7 @@ export default function OrderTable({ orders, userRole }) {
                 maximumFractionDigits: 2,
               })}
             </p>
-          </div>
+          </div> */}
           <div>
             <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
               Taxable
