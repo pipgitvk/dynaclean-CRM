@@ -11,8 +11,6 @@ export default function TLFollowupForm({
   latestfollowup,
   isAdmin = false,
   currentStage = "New",
-  /** Admin TL management: extra tags only for superadmin */
-  showSuperAdminTlTags = false,
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -42,7 +40,7 @@ export default function TLFollowupForm({
   });
 
   const statusOptions = ["Good", "Very Good", "Average", "Poor", "Denied"];
-  const tagOptions = getTlTagOptions(showSuperAdminTlTags);
+  const tagOptions = getTlTagOptions();
   const stageOptions = [
     "New",
     "Contacted",
@@ -88,7 +86,7 @@ export default function TLFollowupForm({
   useEffect(() => {
     if (!latestfollowup) return;
 
-    const allowed = new Set(getTlTagOptions(showSuperAdminTlTags));
+    const allowed = new Set(getTlTagOptions());
     const parsedTags = latestfollowup.multi_tag
       ? latestfollowup.multi_tag
           .split(",")
@@ -112,7 +110,7 @@ export default function TLFollowupForm({
       assigned_employee:
         latestfollowup.assigned_employee || prev.assigned_employee,
     }));
-  }, [latestfollowup, showSuperAdminTlTags]);
+  }, [latestfollowup]);
 
   // Filter stages based on customer's current stage from database
   const getAvailableStages = (currentStage) => {
