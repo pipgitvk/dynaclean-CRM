@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Filter, Pencil, UserPlus, X } from "lucide-react";
+import { HiringStatusChip, formatInterviewAt } from "@/components/empcrm/hiring/HiringEntryCard";
 
 /** Shared field styles */
 const fieldClass =
@@ -14,6 +15,7 @@ const STATUS_OPTIONS = [
   "Shortlisted for interview",
   "Rescheduled",
   "Waiting List",
+  "next-follow-up",
   "Hired",
   "Reject",
 ];
@@ -42,31 +44,6 @@ const YEAR_FILTER_OPTIONS = (() => {
   return Array.from({ length: 14 }, (_, i) => y + 1 - i);
 })();
 
-function formatInterviewAt(v) {
-  if (!v) return "—";
-  try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return String(v).slice(0, 16);
-    return d.toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "—";
-  }
-}
-
-const STATUS_CHIP_STYLES = {
-  "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
-  Rescheduled: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
-  "Waiting List": "bg-violet-50 text-violet-900 border-violet-200 ring-1 ring-violet-500/15",
-  Hired: "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
-  Reject: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
-};
-
 /** MySQL / ISO datetime → datetime-local input value */
 function toDatetimeLocalValue(v) {
   if (v == null || v === "") return "";
@@ -80,22 +57,6 @@ function toDatetimeLocalValue(v) {
   return "";
 }
 
-function StatusChip({ status }) {
-  const s = String(status || "").trim();
-  if (!s) {
-    return <span className="text-gray-400 text-xs">—</span>;
-  }
-  const style = STATUS_CHIP_STYLES[s] || "bg-gray-50 text-gray-800 border-gray-200 ring-1 ring-gray-400/10";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 sm:px-2.5 py-1 text-[10px] sm:text-xs font-semibold whitespace-normal text-left leading-snug max-w-[9rem] sm:max-w-[11rem] ${style}`}
-      title={s}
-    >
-      {s}
-    </span>
-  );
-}
-
 export default function HiringPage() {
   const now = new Date();
   const [candidate_name, setCandidateName] = useState("");
@@ -105,6 +66,7 @@ export default function HiringPage() {
   const [experience_type, setExperienceType] = useState("");
   const [interview_at, setInterviewAt] = useState("");
   const [rescheduled_at, setRescheduledAt] = useState("");
+  const [next_followup_at, setNextFollowupAt] = useState("");
   const [interview_mode, setInterviewMode] = useState("");
   const [status, setStatus] = useState("Shortlisted for interview");
   const [tag, setTag] = useState("");
@@ -202,6 +164,7 @@ export default function HiringPage() {
     setExperienceType("");
     setInterviewAt("");
     setRescheduledAt("");
+    setNextFollowupAt("");
     setInterviewMode("");
     setStatus("Shortlisted for interview");
     setTag("");
@@ -218,6 +181,7 @@ export default function HiringPage() {
     try {
       const hired = status === "Hired";
       const rescheduled = status === "Rescheduled";
+      const nextFollow = status === "next-follow-up";
       const res = await fetch("/api/empcrm/hiring", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -229,6 +193,7 @@ export default function HiringPage() {
           experience_type: experience_type || null,
           interview_at: interview_at || null,
           rescheduled_at: rescheduled ? rescheduled_at || null : null,
+          next_followup_at: nextFollow ? next_followup_at || null : null,
           interview_mode: interview_mode || null,
           status,
           tag: hired ? tag || null : null,
@@ -269,6 +234,7 @@ export default function HiringPage() {
       experience_type: row.experience_type ?? "",
       interview_at: toDatetimeLocalValue(row.interview_at),
       rescheduled_at: toDatetimeLocalValue(row.rescheduled_at),
+      next_followup_at: toDatetimeLocalValue(row.next_followup_at),
       interview_mode: row.interview_mode ?? "",
       status: row.status || "Shortlisted for interview",
       tag: row.tag ?? "",
@@ -296,6 +262,7 @@ export default function HiringPage() {
     try {
       const hired = editing.status === "Hired";
       const rescheduled = editing.status === "Rescheduled";
+      const nextFollow = editing.status === "next-follow-up";
       const res = await fetch("/api/empcrm/hiring", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -308,6 +275,7 @@ export default function HiringPage() {
           experience_type: editing.experience_type || null,
           interview_at: editing.interview_at || null,
           rescheduled_at: rescheduled ? editing.rescheduled_at || null : null,
+          next_followup_at: nextFollow ? editing.next_followup_at || null : null,
           interview_mode: editing.interview_mode || null,
           status: editing.status,
           tag: hired ? editing.tag || null : null,
@@ -519,10 +487,15 @@ export default function HiringPage() {
                             → {formatInterviewAt(row.rescheduled_at)}
                           </span>
                         ) : null}
+                        {row.status === "next-follow-up" && row.next_followup_at ? (
+                          <span className="mt-0.5 block text-xs font-medium text-cyan-800" title="Next follow-up">
+                            Next: {formatInterviewAt(row.next_followup_at)}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.interview_mode || "—"}</td>
                       <td className="px-3 py-2.5 align-top sm:px-4">
-                        <StatusChip status={row.status} />
+                        <HiringStatusChip status={row.status} />
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.tag || "—"}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
@@ -716,6 +689,7 @@ export default function HiringPage() {
                           setProbationMonths("");
                         }
                         if (v !== "Rescheduled") setRescheduledAt("");
+                        if (v !== "next-follow-up") setNextFollowupAt("");
                       }}
                       className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                     >
@@ -737,6 +711,21 @@ export default function HiringPage() {
                         required={status === "Rescheduled"}
                         value={rescheduled_at}
                         onChange={(e) => setRescheduledAt(e.target.value)}
+                        className={formFieldClass}
+                      />
+                    </div>
+                  )}
+
+                  {status === "next-follow-up" && (
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-slate-700">
+                        Next follow-up date &amp; time *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        required={status === "next-follow-up"}
+                        value={next_followup_at}
+                        onChange={(e) => setNextFollowupAt(e.target.value)}
                         className={formFieldClass}
                       />
                     </div>
@@ -981,6 +970,7 @@ export default function HiringPage() {
                           next.probationMonths = "";
                         }
                         if (v !== "Rescheduled") next.rescheduled_at = "";
+                        if (v !== "next-follow-up") next.next_followup_at = "";
                         return next;
                       });
                     }}
@@ -1004,6 +994,21 @@ export default function HiringPage() {
                       required={editing.status === "Rescheduled"}
                       value={editing.rescheduled_at}
                       onChange={(e) => updateEdit("rescheduled_at", e.target.value)}
+                      className={formFieldClass}
+                    />
+                  </div>
+                )}
+
+                {editing.status === "next-follow-up" && (
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Next follow-up date &amp; time *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required={editing.status === "next-follow-up"}
+                      value={editing.next_followup_at}
+                      onChange={(e) => updateEdit("next_followup_at", e.target.value)}
                       className={formFieldClass}
                     />
                   </div>
