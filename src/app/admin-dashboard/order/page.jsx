@@ -49,6 +49,7 @@ export default async function OrdersPage() {
                 no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
+                no.baseAmount, no.taxamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
                 qr.company_name, qr.emp_name, qr.state,

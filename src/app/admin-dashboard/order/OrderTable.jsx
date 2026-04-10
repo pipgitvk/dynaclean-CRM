@@ -13,7 +13,7 @@ import {
   Truck,
   Trash2,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import dayjs from "dayjs";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
@@ -51,6 +51,45 @@ const SkeletonLoader = () => (
   </div>
 );
 
+/** Matches the row when UI status is "Dispatch Done" (same rules as getStatusText). */
+function isDisplayedDispatchDone(order) {
+  if (order.approval_status === "pending") return false;
+  if (order.approval_status === "rejected") return false;
+  if (order.is_returned === 1) return false;
+  if (order.is_returned === 2) return false;
+  if (order.is_cancelled || order.approval_status === "rejected") return false;
+  if (order.installation_status) return false;
+  if (order.delivery_status) return false;
+  return Boolean(order.dispatch_status);
+}
+
+function amountWithoutGst(order) {
+  const rawBase = order.baseAmount;
+  if (rawBase != null && rawBase !== "") {
+    const base = Number(rawBase);
+    if (Number.isFinite(base)) return base;
+  }
+  const total = Number(order.totalamt) || 0;
+  const tax = Number(order.taxamt) || 0;
+  return Math.max(0, total - tax);
+}
+
+/** Same rules as table filter: `created_at` within optional From/To (order date). */
+function orderCreatedInDateRange(order, dateFrom, dateTo) {
+  if (!dateFrom && !dateTo) return true;
+  const created = order.created_at ? new Date(order.created_at) : null;
+  if (!created || isNaN(created.getTime())) return false;
+  if (dateFrom) {
+    const from = new Date(dateFrom + "T00:00:00");
+    if (created < from) return false;
+  }
+  if (dateTo) {
+    const to = new Date(dateTo + "T23:59:59");
+    if (created > to) return false;
+  }
+  return true;
+}
+
 export default function OrderTable({ orders, userRole }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredOrders, setFilteredOrders] = useState([]);
@@ -81,18 +120,7 @@ export default function OrderTable({ orders, userRole }) {
       }
 
       // Step 2: Date range filter (created_at)
-      if (dateFrom || dateTo) {
-        const created = order.created_at ? new Date(order.created_at) : null;
-        if (!created || isNaN(created)) return false;
-        if (dateFrom) {
-          const from = new Date(dateFrom + "T00:00:00");
-          if (created < from) return false;
-        }
-        if (dateTo) {
-          const to = new Date(dateTo + "T23:59:59");
-          if (created > to) return false;
-        }
-      }
+      if (!orderCreatedInDateRange(order, dateFrom, dateTo)) return false;
 
       // Step 2.5: Filter by created_by
       if (createdByFilter && order.created_by !== createdByFilter) {
@@ -125,6 +153,20 @@ export default function OrderTable({ orders, userRole }) {
     createdByFilter,
     approvalStatusFilter,
   ]);
+
+  const dispatchDoneTotals = useMemo(() => {
+    if (!orders?.length) return { exGst: 0, taxAmt: 0 };
+    return orders.reduce(
+      (acc, o) => {
+        if (!orderCreatedInDateRange(o, dateFrom, dateTo)) return acc;
+        if (!isDisplayedDispatchDone(o)) return acc;
+        acc.exGst += amountWithoutGst(o);
+        acc.taxAmt += Number(o.taxamt) || 0;
+        return acc;
+      },
+      { exGst: 0, taxAmt: 0 }
+    );
+  }, [orders, dateFrom, dateTo]);
 
   const getStatusText = (order) => {
     if (order.approval_status === "pending") {
@@ -268,6 +310,33 @@ export default function OrderTable({ orders, userRole }) {
 
   return (
     <div className="space-y-6">
+      <div className="w-full max-w-sm rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm p-3 sm:p-4">
+       
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* <div>
+            <p className="text-xs text-violet-700 mb-0.5"> GST-TOTAL</p>
+            <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
+              ₹
+              {dispatchDoneTotals.exGst.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          </div> */}
+          <div>
+            <p className="text-xs text-violet-700 mb-0.5"> TOTAL AMOUNT WITHOUT GST</p>
+            <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
+              ₹
+              {dispatchDoneTotals.taxAmt.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </p>
+          </div>
+        </div>
+       
+      </div>
+
       {/* 🔍 Search and Quick Status Filter */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="relative w-full sm:w-2/3">
