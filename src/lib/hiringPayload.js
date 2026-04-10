@@ -1,6 +1,8 @@
 const HIRING_STATUS_OPTIONS = [
   "Shortlisted for interview",
   "Rescheduled",
+  "next-follow-up",
+  "follow-up",
   "Waiting List",
   "Hired",
   "Reject",
@@ -49,9 +51,13 @@ export function parseHiringPayload(body) {
   const status = normalizeStatus(body.status);
   const isHired = status === "Hired";
   const isRescheduled = status === "Rescheduled";
+  const isNextFollowUp = status === "next-follow-up";
   const rescheduled_at_raw = String(body.rescheduled_at ?? "").trim();
+  const next_followup_at_raw = String(body.next_followup_at ?? "").trim();
+  const tagForHired = isHired ? normalizeTag(body.tag) : null;
+  const isHiredFollowUpTag = isHired && tagForHired === "Follow-Up";
   const hire_date = isHired ? String(body.hire_date ?? "").trim() || null : null;
-  const tag = isHired ? normalizeTag(body.tag) : null;
+  const tag = tagForHired;
   const packageStr = isHired ? String(body.package ?? "").trim() || null : null;
 
   let probation_months = null;
@@ -94,6 +100,16 @@ export function parseHiringPayload(body) {
   if (isRescheduled && !rescheduled_at_raw) {
     return { error: "Rescheduled date and time is required when status is Rescheduled." };
   }
+  if (isNextFollowUp && !next_followup_at_raw) {
+    return { error: "Next follow-up date and time is required when status is next-follow-up." };
+  }
+
+  let resolved_next_followup_at = null;
+  if (isNextFollowUp) {
+    resolved_next_followup_at = next_followup_at_raw;
+  } else if (isHiredFollowUpTag && next_followup_at_raw) {
+    resolved_next_followup_at = next_followup_at_raw;
+  }
 
   return {
     data: {
@@ -104,6 +120,7 @@ export function parseHiringPayload(body) {
       experience_type: experience_raw,
       interview_at: interview_at_raw,
       rescheduled_at: isRescheduled ? rescheduled_at_raw : null,
+      next_followup_at: resolved_next_followup_at,
       interview_mode: interview_mode_raw,
       status,
       tag,

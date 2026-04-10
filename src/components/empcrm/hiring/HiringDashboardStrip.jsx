@@ -4,27 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Users } from "lucide-react";
 import HiringEntryCard from "./HiringEntryCard";
+import { HIRING_URGENCY_LEGEND } from "@/utils/hiringFollowUpUrgency";
 
 const HIRING_PAGE = "/empcrm/admin-dashboard/hiring";
 
-/** Dashboard strip: only these pipeline rows (not Hired / Reject / Waiting List, etc.) */
+/** Dashboard strip: pipeline rows (excludes Hired / Reject, etc.) */
 const DASHBOARD_PIPELINE_STATUSES = new Set([
   "Rescheduled",
   "next-follow-up",
+  "follow-up",
+  "Waiting List",
   "Shortlisted for interview",
 ]);
-
-function LegendItem({ dotClass, label }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 sm:text-sm">
-      <span
-        className={`h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ring-2 ring-white ${dotClass}`}
-        aria-hidden
-      />
-      {label}
-    </span>
-  );
-}
 
 export default function HiringDashboardStrip() {
   const year = new Date().getFullYear();
@@ -53,7 +44,11 @@ export default function HiringDashboardStrip() {
   }, [load]);
 
   const pipelineEntries = useMemo(() => {
-    return entries.filter((row) => DASHBOARD_PIPELINE_STATUSES.has(String(row.status || "").trim()));
+    return entries.filter((row) => {
+      const st = String(row.status || "").trim();
+      if (DASHBOARD_PIPELINE_STATUSES.has(st)) return true;
+      return st === "Hired" && String(row.tag || "").trim() === "Follow-Up";
+    });
   }, [entries]);
 
   return (
@@ -72,20 +67,20 @@ export default function HiringDashboardStrip() {
               <div
                 className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-l-2 border-slate-200 pl-3"
                 role="list"
-                aria-label="Card colour code"
+                aria-label="Card colours by next date"
               >
-                <LegendItem
-                  dotClass="bg-gradient-to-br from-rose-700 via-rose-500 to-orange-300"
-                  label="Soon"
-                />
-                <LegendItem
-                  dotClass="bg-gradient-to-br from-amber-600 to-amber-300"
-                  label="Medium"
-                />
-                <LegendItem
-                  dotClass="bg-gradient-to-br from-teal-700 via-emerald-500 to-teal-200"
-                  label="Later"
-                />
+                {HIRING_URGENCY_LEGEND.map((item) => (
+                  <span
+                    key={item.key}
+                    className="inline-flex max-w-[14rem] items-center gap-2 text-[11px] font-medium leading-snug text-slate-600 sm:max-w-none sm:text-xs"
+                  >
+                    <span
+                      className={`h-2.5 w-8 shrink-0 rounded-full shadow-sm ring-1 ring-black/5 ${item.dotClass}`}
+                      aria-hidden
+                    />
+                    <span className="font-semibold text-slate-800">{item.label}</span>
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -123,9 +118,9 @@ export default function HiringDashboardStrip() {
           </div>
         ) : pipelineEntries.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-amber-200/80 bg-amber-50/40 px-6 py-10 text-center">
-            <p className="text-sm font-semibold text-slate-800">No rescheduled, next follow-up, or follow-up candidates</p>
+            <p className="text-sm font-semibold text-slate-800">No pipeline candidates for this year</p>
             <p className="mx-auto mt-2 max-w-md text-xs text-slate-600 sm:text-sm">
-              Other statuses (e.g. Hired, Waiting list) stay on the Hiring page.
+              Other statuses (e.g. Hired, Reject) stay on the Hiring page.
             </p>
             <Link
               href={HIRING_PAGE}
@@ -139,7 +134,7 @@ export default function HiringDashboardStrip() {
           <div className="w-full overflow-x-auto pb-2 pt-1 hide-scrollbar [mask-image:linear-gradient(to_right,black_96%,transparent)] sm:[mask-image:none]">
             <div className="flex min-w-max flex-row flex-nowrap gap-5 px-0.5">
               {pipelineEntries.map((row) => (
-                <HiringEntryCard key={row.id} row={row} showEditButton={false} />
+                <HiringEntryCard key={row.id} row={row} showEditButton={false} colorScheme="traffic" />
               ))}
             </div>
           </div>

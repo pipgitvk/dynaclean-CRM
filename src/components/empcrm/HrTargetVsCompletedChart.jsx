@@ -17,6 +17,15 @@ const MONTHS = [
   { value: 12, label: "December" },
 ];
 
+/** Year dropdown range (matches hiring-style dashboards). */
+const YEAR_OPTIONS = (() => {
+  const y = new Date().getFullYear();
+  return Array.from({ length: 14 }, (_, i) => y + 1 - i);
+})();
+
+const filterControlClass =
+  "h-10 w-full min-w-0 cursor-pointer rounded-lg border border-slate-800/25 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm outline-none transition focus:border-slate-800/50 focus:ring-2 focus:ring-slate-900/10";
+
 function formatAmount(n) {
   if (n == null || Number.isNaN(n)) return "0";
   return Math.round(Number(n)).toString();
@@ -63,7 +72,7 @@ function DesignationBarGroup({ designation, target, completed, globalMax }) {
   );
 }
 
-/** Summary + bar row for one set of designation rows (one HR or single-HR view). */
+/** Bar row per designation (one HR or single-HR view). */
 function ItemsChartBlock({ items }) {
   const globalMax = useMemo(() => {
     if (!items.length) return 1;
@@ -73,46 +82,19 @@ function ItemsChartBlock({ items }) {
   if (!items.length) return null;
 
   return (
-    <>
-      <div className="rounded-xl border border-gray-200 bg-slate-50/90 px-4 py-3 mb-4 space-y-2.5">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">By designation</p>
+    <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
+      <div className="flex overflow-x-auto pb-3 pt-1 justify-start">
         {items.map((row, idx) => (
-          <div
-            key={`${row.designation}-${idx}`}
-            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm border-b border-gray-200/80 pb-2 last:border-0 last:pb-0"
-          >
-            <span className="font-semibold text-gray-900 min-w-[6.5rem] sm:min-w-[8rem]">
-              {row.designation || "—"}
-            </span>
-            <span className="text-gray-600">
-              Target{" "}
-              <span className="tabular-nums font-semibold text-[#5a5eef]">{formatAmount(row.target)}</span>
-            </span>
-            <span className="text-gray-300 hidden sm:inline">|</span>
-            <span className="text-gray-600">
-              Completed{" "}
-              <span className="tabular-nums font-semibold text-emerald-700">
-                {formatAmount(row.completed)}
-              </span>
-            </span>
-          </div>
+          <DesignationBarGroup
+            key={`${row.designation}-bar-${idx}`}
+            designation={row.designation}
+            target={row.target ?? 0}
+            completed={row.completed ?? 0}
+            globalMax={globalMax}
+          />
         ))}
       </div>
-
-      <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
-        <div className="flex overflow-x-auto pb-3 pt-1 justify-start">
-          {items.map((row, idx) => (
-            <DesignationBarGroup
-              key={`${row.designation}-bar-${idx}`}
-              designation={row.designation}
-              target={row.target ?? 0}
-              completed={row.completed ?? 0}
-              globalMax={globalMax}
-            />
-          ))}
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -123,6 +105,11 @@ export default function HrTargetVsCompletedChart() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const yearOptions = useMemo(() => {
+    if (YEAR_OPTIONS.includes(year)) return YEAR_OPTIONS;
+    return [...YEAR_OPTIONS, year].sort((a, b) => b - a);
+  }, [year]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,13 +145,16 @@ export default function HrTargetVsCompletedChart() {
         {isAllHrView ? "All HR — target vs completed" : "Target vs completed"}
       </h2>
 
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+      <div className="mb-4 flex flex-wrap items-end gap-4 sm:gap-6">
+        <div className="min-w-[10.5rem] flex-1 sm:flex-initial sm:min-w-[11rem]">
+          <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="hr-target-month">
+            Month
+          </label>
           <select
+            id="hr-target-month"
             value={month}
             onChange={(e) => setMonth(Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white"
+            className={filterControlClass}
           >
             {MONTHS.map((m) => (
               <option key={m.value} value={m.value}>
@@ -173,16 +163,22 @@ export default function HrTargetVsCompletedChart() {
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-          <input
-            type="number"
-            min={2000}
-            max={2100}
+        <div className="min-w-[8rem] flex-1 sm:flex-initial sm:min-w-[9rem]">
+          <label className="mb-1 block text-xs font-medium text-slate-600" htmlFor="hr-target-year">
+            Year
+          </label>
+          <select
+            id="hr-target-year"
             value={year}
-            onChange={(e) => setYear(Number(e.target.value) || now.getFullYear())}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
-          />
+            onChange={(e) => setYear(Number(e.target.value))}
+            className={filterControlClass}
+          >
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -206,8 +202,7 @@ export default function HrTargetVsCompletedChart() {
                 key={g.hr_username}
                 className="rounded-lg border border-gray-100 bg-gray-50/50 p-4 sm:p-5"
               >
-                <p className="text-sm font-semibold text-gray-900 mb-1">{g.hr_username}</p>
-                <p className="text-xs text-gray-500 mb-4">Per-designation target and completed for the selected month.</p>
+                <p className="text-sm font-semibold text-gray-900 mb-4">{g.hr_username}</p>
                 <ItemsChartBlock items={g.items || []} />
               </div>
             ))}

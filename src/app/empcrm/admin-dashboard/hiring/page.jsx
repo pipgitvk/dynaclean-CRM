@@ -10,13 +10,30 @@ const filterSelectClass = `w-full ${fieldClass} min-h-[44px]`;
 const formFieldClass = `w-full ${fieldClass}`;
 const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900`;
 
+/** Status dropdown: no standalone "follow-up" — use Hired → tag Follow-Up. Legacy rows may still be "follow-up". */
 const STATUS_OPTIONS = [
   "Shortlisted for interview",
   "Rescheduled",
+  "next-follow-up",
   "Waiting List",
   "Hired",
   "Reject",
 ];
+const STATUS_OPTIONS_WITH_LEGACY_STATUS_FOLLOWUP = [
+  "Shortlisted for interview",
+  "Rescheduled",
+  "next-follow-up",
+  "follow-up",
+  "Waiting List",
+  "Hired",
+  "Reject",
+];
+
+function hiringStatusSelectOptions(rowStatus) {
+  return String(rowStatus || "").trim() === "follow-up"
+    ? STATUS_OPTIONS_WITH_LEGACY_STATUS_FOLLOWUP
+    : STATUS_OPTIONS;
+}
 
 const TAG_OPTIONS = ["Probation", "Permanent", "Terminate", "Follow-Up"];
 
@@ -62,6 +79,8 @@ function formatInterviewAt(v) {
 const STATUS_CHIP_STYLES = {
   "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
   Rescheduled: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
+  "next-follow-up": "bg-cyan-50 text-cyan-900 border-cyan-200 ring-1 ring-cyan-500/15",
+  "follow-up": "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/15",
   "Waiting List": "bg-violet-50 text-violet-900 border-violet-200 ring-1 ring-violet-500/15",
   Hired: "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
   Reject: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
@@ -105,6 +124,7 @@ export default function HiringPage() {
   const [experience_type, setExperienceType] = useState("");
   const [interview_at, setInterviewAt] = useState("");
   const [rescheduled_at, setRescheduledAt] = useState("");
+  const [next_followup_at, setNextFollowupAt] = useState("");
   const [interview_mode, setInterviewMode] = useState("");
   const [status, setStatus] = useState("Shortlisted for interview");
   const [tag, setTag] = useState("");
@@ -170,6 +190,7 @@ export default function HiringPage() {
     setExperienceType("");
     setInterviewAt("");
     setRescheduledAt("");
+    setNextFollowupAt("");
     setInterviewMode("");
     setStatus("Shortlisted for interview");
     setTag("");
@@ -186,6 +207,8 @@ export default function HiringPage() {
     try {
       const hired = status === "Hired";
       const rescheduled = status === "Rescheduled";
+      const nextFollowUp = status === "next-follow-up";
+      const hiredFollowUpTag = hired && tag === "Follow-Up";
       const res = await fetch("/api/empcrm/hiring", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -197,6 +220,11 @@ export default function HiringPage() {
           experience_type: experience_type || null,
           interview_at: interview_at || null,
           rescheduled_at: rescheduled ? rescheduled_at || null : null,
+          next_followup_at: nextFollowUp
+            ? next_followup_at || null
+            : hiredFollowUpTag
+              ? next_followup_at || null
+              : null,
           interview_mode: interview_mode || null,
           status,
           tag: hired ? tag || null : null,
@@ -237,6 +265,7 @@ export default function HiringPage() {
       experience_type: row.experience_type ?? "",
       interview_at: toDatetimeLocalValue(row.interview_at),
       rescheduled_at: toDatetimeLocalValue(row.rescheduled_at),
+      next_followup_at: toDatetimeLocalValue(row.next_followup_at),
       interview_mode: row.interview_mode ?? "",
       status: row.status || "Shortlisted for interview",
       tag: row.tag ?? "",
@@ -264,6 +293,8 @@ export default function HiringPage() {
     try {
       const hired = editing.status === "Hired";
       const rescheduled = editing.status === "Rescheduled";
+      const nextFollowUp = editing.status === "next-follow-up";
+      const hiredFollowUpTag = hired && editing.tag === "Follow-Up";
       const res = await fetch("/api/empcrm/hiring", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -276,6 +307,11 @@ export default function HiringPage() {
           experience_type: editing.experience_type || null,
           interview_at: editing.interview_at || null,
           rescheduled_at: rescheduled ? editing.rescheduled_at || null : null,
+          next_followup_at: nextFollowUp
+            ? editing.next_followup_at || null
+            : hiredFollowUpTag
+              ? editing.next_followup_at || null
+              : null,
           interview_mode: editing.interview_mode || null,
           status: editing.status,
           tag: hired ? editing.tag || null : null,
@@ -487,6 +523,11 @@ export default function HiringPage() {
                             → {formatInterviewAt(row.rescheduled_at)}
                           </span>
                         ) : null}
+                        {row.status === "next-follow-up" && row.next_followup_at ? (
+                          <span className="mt-0.5 block text-xs font-medium text-cyan-800" title="Next follow-up">
+                            Next → {formatInterviewAt(row.next_followup_at)}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.interview_mode || "—"}</td>
                       <td className="px-3 py-2.5 align-top sm:px-4">
@@ -667,10 +708,11 @@ export default function HiringPage() {
                           setProbationMonths("");
                         }
                         if (v !== "Rescheduled") setRescheduledAt("");
+                        if (v !== "next-follow-up" && v !== "Hired") setNextFollowupAt("");
                       }}
                       className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                     >
-                      {STATUS_OPTIONS.map((s) => (
+                      {hiringStatusSelectOptions(null).map((s) => (
                         <option key={s} value={s}>
                           {s}
                         </option>
@@ -688,6 +730,21 @@ export default function HiringPage() {
                         required={status === "Rescheduled"}
                         value={rescheduled_at}
                         onChange={(e) => setRescheduledAt(e.target.value)}
+                        className={formFieldClass}
+                      />
+                    </div>
+                  )}
+
+                  {status === "next-follow-up" && (
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-slate-700">
+                        Next follow-up date &amp; time *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        required={status === "next-follow-up"}
+                        value={next_followup_at}
+                        onChange={(e) => setNextFollowupAt(e.target.value)}
                         className={formFieldClass}
                       />
                     </div>
@@ -728,6 +785,7 @@ export default function HiringPage() {
                               const v = e.target.value;
                               setTag(v);
                               if (v !== "Probation") setProbationMonths("");
+                              if (v !== "Follow-Up") setNextFollowupAt("");
                             }}
                             className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                           >
@@ -739,6 +797,19 @@ export default function HiringPage() {
                             ))}
                           </select>
                         </div>
+                        {status === "Hired" && tag === "Follow-Up" && (
+                          <div className="sm:col-span-2">
+                            <label className="mb-1 block text-sm font-medium text-slate-700">
+                              Follow-up date &amp; time (optional)
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={next_followup_at}
+                              onChange={(e) => setNextFollowupAt(e.target.value)}
+                              className={formFieldClass}
+                            />
+                          </div>
+                        )}
                         {tag === "Probation" && (
                           <div className="sm:col-span-2">
                             <label className="mb-1 block text-sm font-medium text-slate-700">Probation (months) *</label>
@@ -916,12 +987,13 @@ export default function HiringPage() {
                           next.probationMonths = "";
                         }
                         if (v !== "Rescheduled") next.rescheduled_at = "";
+                        if (v !== "next-follow-up" && v !== "Hired") next.next_followup_at = "";
                         return next;
                       });
                     }}
                     className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                   >
-                    {STATUS_OPTIONS.map((s) => (
+                    {hiringStatusSelectOptions(editing?.status).map((s) => (
                       <option key={s} value={s}>
                         {s}
                       </option>
@@ -939,6 +1011,21 @@ export default function HiringPage() {
                       required={editing.status === "Rescheduled"}
                       value={editing.rescheduled_at}
                       onChange={(e) => updateEdit("rescheduled_at", e.target.value)}
+                      className={formFieldClass}
+                    />
+                  </div>
+                )}
+
+                {editing.status === "next-follow-up" && (
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Next follow-up date &amp; time *
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required={editing.status === "next-follow-up"}
+                      value={editing.next_followup_at ?? ""}
+                      onChange={(e) => updateEdit("next_followup_at", e.target.value)}
                       className={formFieldClass}
                     />
                   </div>
@@ -982,6 +1069,7 @@ export default function HiringPage() {
                                     ...prev,
                                     tag: t,
                                     probationMonths: t !== "Probation" ? "" : prev.probationMonths,
+                                    next_followup_at: t !== "Follow-Up" ? "" : prev.next_followup_at,
                                   }
                                 : prev
                             );
@@ -996,6 +1084,19 @@ export default function HiringPage() {
                           ))}
                         </select>
                       </div>
+                      {editing.status === "Hired" && editing.tag === "Follow-Up" && (
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-slate-700 mb-1">
+                            Follow-up date &amp; time (optional)
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={editing.next_followup_at ?? ""}
+                            onChange={(e) => updateEdit("next_followup_at", e.target.value)}
+                            className={formFieldClass}
+                          />
+                        </div>
+                      )}
                       {editing.tag === "Probation" && (
                         <div className="sm:col-span-2">
                           <label className="block text-sm font-medium text-slate-700 mb-1">Probation (months) *</label>
