@@ -73,6 +73,9 @@ export default async function AdminTLFollowupPage({ params }) {
   const latestTLFollowup = tlFollowups[0] || null;
   // console.log("Latest TL Followup:", latestTLFollowup);
 
+  const roleStr = String(payload.role ?? "").trim().toLowerCase();
+  const showSuperAdminTlTags = roleStr === "superadmin";
+
   return (
     <div className="max-w-4xl mx-auto mt-10 px-4">
       <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
@@ -193,6 +196,7 @@ export default async function AdminTLFollowupPage({ params }) {
         isAdmin={true}
         latestfollowup={latestTLFollowup}
         currentStage={latestTLFollowup?.stage || "New"}
+        showSuperAdminTlTags={showSuperAdminTlTags}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dayjs from "dayjs";
+import { getTlCustomersTableTagOptions } from "@/utils/tlFollowupTagOptions";
 
 export default function TLCustomersTable({
   customers,
@@ -26,6 +27,8 @@ export default function TLCustomersTable({
   pageSize = 50,
   isAdmin = false,
   tlOnly = true,
+  /** Admin TL management: extra tag filters for superadmin only */
+  showSuperAdminTlTags = false,
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -51,18 +54,10 @@ export default function TLCustomersTable({
   const [showQuotePopup, setShowQuotePopup] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const TAGS = [
-    "Demo",
-    "Payment Collection",
-    "Truck FollowUp",
-    "Strong FollowUp",
-    "Service Issue",
-    "Prime",
-    "Repeat order",
-    "Mail",
-    "Running Orders",
-    "Clear",
-  ];
+  const filterTagOptions = useMemo(
+    () => getTlCustomersTableTagOptions(showSuperAdminTlTags),
+    [showSuperAdminTlTags],
+  );
 
   console.log("customer data ", customers);
 
@@ -194,7 +189,7 @@ export default function TLCustomersTable({
   // Get counts for tags
   const getTagCounts = () => {
     const tagCounts = {};
-    TAGS.forEach((tag) => {
+    filterTagOptions.forEach((tag) => {
       tagCounts[tag] = customersForKPI.filter((customer) => {
         if (!customer.multi_tag) return tag === "Clear";
         return customer.multi_tag
@@ -659,7 +654,7 @@ export default function TLCustomersTable({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Tags</option>
-                    {TAGS.map((tag) => {
+                    {filterTagOptions.map((tag) => {
                       const tagCounts = getTagCounts();
                       return (
                         <option key={tag} value={tag}>
