@@ -51,7 +51,7 @@ const SkeletonLoader = () => (
   </div>
 );
 
-/** Matches the row when UI status is "Dispatch Done" (same rules as getStatusText). */
+/** Matches UI status "Dispatch Done" (same rules as getStatusText). */
 function isDisplayedDispatchDone(order) {
   if (order.approval_status === "pending") return false;
   if (order.approval_status === "rejected") return false;
@@ -311,7 +311,6 @@ export default function OrderTable({ orders, userRole }) {
   return (
     <div className="space-y-6">
       <div className="w-full max-w-sm rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm p-3 sm:p-4">
-       
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-violet-700 mb-0.5"> GST-TOTAL</p>
