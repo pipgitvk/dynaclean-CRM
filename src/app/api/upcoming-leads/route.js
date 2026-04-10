@@ -1,73 +1,50 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 
+/**
+ * Latest follow-up per customer for anyone this user "owns":
+ * lead_source, sales_representative, or assigned_to (same as customers list / CRM).
+ */
 export async function GET(request) {
-  // 1. Log incoming URL and parameters
   const { searchParams } = new URL(request.url);
   const leadSource = searchParams.get("leadSource");
-  console.log("Fetching data for leadSource:", leadSource);
-
-  // sixHoursAhead needs to be defined
-  // For example, you can calculate it here
-  function getISTTime() {
-    // Get current time in UTC
-    const now = new Date();
-    // Get the IST offset in minutes (5 hours and 30 minutes)
-    const istOffset = 5.5 * 60;
-    // Apply the offset to the current UTC time
-    const istTime = new Date(now.getTime() + istOffset * 60 * 1000);
-    return istTime;
+  if (!leadSource) {
+    return NextResponse.json({ error: "leadSource required", leads: [] }, { status: 400 });
   }
-
-  const istNow = getISTTime();
-  const sixHoursAhead = new Date(istNow.getTime() + 6 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 19)
-    .replace("T", " ");
 
   try {
     const connection = await getDbConnection();
-    console.log("Database connection established.");
 
-    // 2. Log the final SQL query and its parameters
     const sqlQuery = `
       SELECT *
-FROM (
-  SELECT
-    cf.*,
-    c.status,
-    c.stage,
-    c.first_name,
-    c.phone,
-    c.products_interest,
-    ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
-  FROM customers_followup cf
-  INNER JOIN customers c ON cf.customer_id = c.customer_id
-  WHERE c.lead_source = ? AND c.status != 'DENIED'
-) AS T
-WHERE T.rn = 1
-  AND (T.next_followup_date <= ? OR T.next_followup_date IS NULL);
+      FROM (
+        SELECT
+          cf.*,
+          c.status,
+          c.stage,
+          c.first_name,
+          c.phone,
+          c.products_interest,
+          ROW_NUMBER() OVER (PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
+        FROM customers_followup cf
+        INNER JOIN customers c ON cf.customer_id = c.customer_id
+        WHERE (c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)
+          AND c.status != 'DENIED'
+      ) AS T
+      WHERE T.rn = 1
+      ORDER BY T.next_followup_date ASC
     `;
-    const queryParams = [leadSource, sixHoursAhead];
-    console.log("Executing SQL query:", sqlQuery);
-    console.log("With parameters:", queryParams);
+    const queryParams = [leadSource, leadSource, leadSource];
 
     const [rows] = await connection.execute(sqlQuery, queryParams);
-
-    // 3. Log the number of rows fetched
-    console.log("Query executed successfully. Fetched rows:", rows.length);
-
-
-    console.log("Database connection closed.");
 
     return NextResponse.json({
       leads: rows,
     });
   } catch (error) {
-    // 4. Log any errors that occur
-    console.error("An error occurred during API call:", error);
+    console.error("An error occurred during upcoming-leads API call:", error);
     return NextResponse.json(
-      { error: "Failed to fetch leads" },
+      { error: "Failed to fetch leads", leads: [] },
       { status: 500 }
     );
   }

@@ -44,7 +44,7 @@ export default async function UpcomingTasks({ leadSource }) {
 
             const bgColor = nextDate
               ? getGradientColor(hours)
-              : "rgb(255, 165, 0)"; // orange if no deadline
+              : "linear-gradient(145deg, rgb(180, 83, 9) 0%, rgb(245, 158, 11) 48%, rgb(253, 224, 171) 100%)";
 
             const formattedDueDate = nextDate
               ? dayjs(nextDate).format("DD MMM, YYYY hh:mm A")

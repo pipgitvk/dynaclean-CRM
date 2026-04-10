@@ -13,7 +13,7 @@ const TaskCard = ({
   return (
     <div
       className="flex flex-col justify-between rounded-2xl shadow-md min-w-[280px] max-w-[320px] p-5 text-gray-800 border border-gray-200 hover:shadow-lg transition duration-300 bg-white"
-      style={{ backgroundColor: bgColor }}
+      style={{ background: bgColor }}
     >
       <div>
         {/* Task Name */}

@@ -15,6 +15,7 @@ function SkeletonCard() {
 
 export default function UpcomingLeadsCards({ leadSource }) {
   const [leads, setLeads] = useState([]);
+  const [fetchError, setFetchError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState("soonest"); // soonest | latest | name
   const [startDate, setStartDate] = useState("");
@@ -25,13 +26,22 @@ export default function UpcomingLeadsCards({ leadSource }) {
   useEffect(() => {
     async function fetchLeads() {
       setLoading(true);
+      setFetchError(null);
       try {
-        const res = await fetch(`/api/upcoming-leads?leadSource=${leadSource}`);
+        const res = await fetch(
+          `/api/upcoming-leads?leadSource=${encodeURIComponent(leadSource)}`
+        );
         const data = await res.json();
+        if (!res.ok) {
+          setLeads([]);
+          setFetchError(data.error || "Could not load leads");
+          return;
+        }
         setLeads(data.leads || []);
-        console.log("Fetched leads:", data.leads);
       } catch (err) {
         console.error("Failed to fetch leads", err);
+        setLeads([]);
+        setFetchError(err.message || "Network error");
       } finally {
         setLoading(false);
       }
@@ -98,6 +108,9 @@ export default function UpcomingLeadsCards({ leadSource }) {
       <div className="flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
         <p className="text-sm text-gray-500">
           Showing {processedLeads.length} of {leads.length} leads
+          {fetchError ? (
+            <span className="ml-2 text-red-600">({fetchError})</span>
+          ) : null}
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col">
@@ -190,7 +203,7 @@ export default function UpcomingLeadsCards({ leadSource }) {
                 : null;
               const bgColor = cust.next_followup_date
                 ? getGradientColor(hours)
-                : "rgb(255, 165, 0)";
+                : "linear-gradient(145deg, rgb(180, 83, 9) 0%, rgb(245, 158, 11) 48%, rgb(253, 224, 171) 100%)";
               return (
                 <div
                   key={cust.customer_id}
@@ -215,8 +228,13 @@ export default function UpcomingLeadsCards({ leadSource }) {
               );
             })
           ) : (
-            <div className="text-center w-full text-gray-500">
-              No upcoming leads found.
+            <div className="text-center w-full max-w-md mx-auto px-4 py-6 text-gray-500 text-sm space-y-2">
+              <p className="font-medium text-gray-700">No leads to show here yet.</p>
+              <p className="text-gray-500">
+                Leads appear when you are set as <strong>lead source</strong>,{" "}
+                <strong>sales representative</strong>, or <strong>assigned to</strong> on a customer,
+                and that customer has at least one follow-up row.
+              </p>
             </div>
           )}
         </div>
