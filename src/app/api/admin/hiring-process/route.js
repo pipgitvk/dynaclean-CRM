@@ -36,7 +36,7 @@ export async function GET(req) {
       const conn = await getDbConnection();
       const [rows] = await conn.execute(
         `SELECT id, created_by_username, candidate_name, emp_contact, designation, marital_status,
-         experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\` AS package,
+         experience_type, interview_at, rescheduled_at, interview_mode, status, tag, hire_date, \`package\` AS package,
          probation_months, note, created_at
          FROM hr_hiring_entries WHERE id = ?`,
         [id]
@@ -100,7 +100,7 @@ export async function GET(req) {
     const hr_users = hrRows.map((r) => r.u).filter((x) => x != null && String(x).trim() !== "");
 
     let sql = `SELECT e.id, e.created_by_username, e.candidate_name, e.emp_contact, e.designation,
-         e.interview_at, e.rescheduled_at, e.next_followup_at, e.interview_mode, e.status, e.tag, e.hire_date, e.\`package\` AS package,
+         e.interview_at, e.rescheduled_at, e.interview_mode, e.status, e.tag, e.hire_date, e.\`package\` AS package,
          e.created_at,
          (SELECT COUNT(*) FROM hr_hiring_entry_status_history h WHERE h.entry_id = e.id) AS history_count
        FROM hr_hiring_entries e
@@ -188,7 +188,7 @@ export async function PATCH(request) {
       const [upd] = await conn.execute(
         `UPDATE hr_hiring_entries SET
           candidate_name = ?, emp_contact = ?, designation = ?, marital_status = ?,
-          experience_type = ?, interview_at = ?, rescheduled_at = ?, next_followup_at = ?, interview_mode = ?, status = ?, tag = ?,
+          experience_type = ?, interview_at = ?, rescheduled_at = ?, interview_mode = ?, status = ?, tag = ?,
           hire_date = ?, \`package\` = ?, probation_months = ?, note = ?
         WHERE id = ?`,
         [
@@ -199,7 +199,6 @@ export async function PATCH(request) {
           d.experience_type,
           toMysqlDatetime(d.interview_at),
           d.rescheduled_at != null ? toMysqlDatetime(d.rescheduled_at) : null,
-          d.next_followup_at != null ? toMysqlDatetime(d.next_followup_at) : null,
           d.interview_mode,
           d.status,
           d.tag,

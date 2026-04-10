@@ -14,7 +14,6 @@ const STATUS_CHIP_STYLES = {
   "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
   Rescheduled: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Waiting List": "bg-violet-50 text-violet-900 border-violet-200 ring-1 ring-violet-500/15",
-  "next-follow-up": "bg-cyan-50 text-cyan-900 border-cyan-200 ring-1 ring-cyan-500/15",
   Hired: "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
   Reject: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
 };
@@ -35,7 +34,6 @@ const STATUS_OPTIONS = [
   "Shortlisted for interview",
   "Rescheduled",
   "Waiting List",
-  "next-follow-up",
   "Hired",
   "Reject",
 ];
@@ -243,7 +241,6 @@ export default function AdminHiringProcessPage() {
         experience_type: row.experience_type ?? "",
         interview_at: toDatetimeLocalValue(row.interview_at),
         rescheduled_at: toDatetimeLocalValue(row.rescheduled_at),
-        next_followup_at: toDatetimeLocalValue(row.next_followup_at),
         interview_mode: row.interview_mode ?? "",
         status: row.status || "Shortlisted for interview",
         tag: row.tag ?? "",
@@ -274,7 +271,6 @@ export default function AdminHiringProcessPage() {
     try {
       const hired = editing.status === "Hired";
       const rescheduled = editing.status === "Rescheduled";
-      const nextFollow = editing.status === "next-follow-up";
       const res = await fetch("/api/admin/hiring-process", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -287,7 +283,6 @@ export default function AdminHiringProcessPage() {
           experience_type: editing.experience_type,
           interview_at: editing.interview_at,
           rescheduled_at: rescheduled ? editing.rescheduled_at : "",
-          next_followup_at: nextFollow ? editing.next_followup_at : "",
           interview_mode: editing.interview_mode,
           status: editing.status,
           tag: hired ? editing.tag : "",
@@ -499,11 +494,6 @@ export default function AdminHiringProcessPage() {
                         {row.status === "Rescheduled" && row.rescheduled_at ? (
                           <span className="mt-0.5 block text-xs font-medium text-amber-800" title="Rescheduled slot">
                             → {formatInterviewAt(row.rescheduled_at)}
-                          </span>
-                        ) : null}
-                        {row.status === "next-follow-up" && row.next_followup_at ? (
-                          <span className="mt-0.5 block text-xs font-medium text-cyan-800" title="Next follow-up">
-                            Next: {formatInterviewAt(row.next_followup_at)}
                           </span>
                         ) : null}
                       </td>
@@ -764,7 +754,6 @@ export default function AdminHiringProcessPage() {
                           next.probationMonths = "";
                         }
                         if (v !== "Rescheduled") next.rescheduled_at = "";
-                        if (v !== "next-follow-up") next.next_followup_at = "";
                         return next;
                       });
                     }}
@@ -788,21 +777,6 @@ export default function AdminHiringProcessPage() {
                       required={editing.status === "Rescheduled"}
                       value={editing.rescheduled_at}
                       onChange={(e) => updateEdit("rescheduled_at", e.target.value)}
-                      className={formFieldClass}
-                    />
-                  </div>
-                )}
-
-                {editing.status === "next-follow-up" && (
-                  <div className="sm:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Next follow-up date &amp; time *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required={editing.status === "next-follow-up"}
-                      value={editing.next_followup_at}
-                      onChange={(e) => updateEdit("next_followup_at", e.target.value)}
                       className={formFieldClass}
                     />
                   </div>

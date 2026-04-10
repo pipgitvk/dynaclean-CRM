@@ -6,6 +6,24 @@ import { Suspense } from "react";
 
 export default async function UpcomingLeads({ leadSource }) {
   const connection = await getDbConnection();
+  function getISTTime() {
+    // Get current time in UTC
+    const now = new Date();
+    // Get the IST offset in minutes (5 hours and 30 minutes)
+    const istOffset = 5.5 * 60;
+    // Apply the offset to the current UTC time
+    const istTime = new Date(now.getTime() + istOffset * 60 * 1000);
+    return istTime;
+  }
+
+  const istNow = getISTTime();
+  const sixHoursAhead = new Date(istNow.getTime() + 6 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+
+  console.log("Fetching table rows for leadSource:", leadSource);
+  console.log("Calculated 'sixHoursAhead':", sixHoursAhead);
 
   const [Tablerows] = await connection.execute(
     `
@@ -18,11 +36,11 @@ export default async function UpcomingLeads({ leadSource }) {
                   FROM customers_followup 
                   WHERE customer_id = c.customer_id
               )
-          WHERE (c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)
+          WHERE c.lead_source = ?
             AND c.status != 'DENIED'
           ORDER BY cf.next_followup_date ASC
     `,
-    [leadSource, leadSource, leadSource]
+    [leadSource]
   );
 
   return (
