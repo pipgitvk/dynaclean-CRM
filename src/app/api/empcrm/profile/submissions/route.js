@@ -5,7 +5,6 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import {
   mergePayloadDataPreferNonEmpty,
-  mergeSubmissionRowArrays,
   referencesPayloadHasContent,
   educationPayloadHasContent,
   experiencePayloadHasContent,
@@ -465,21 +464,19 @@ export async function POST(request) {
       const oldData = oldPayload.data && typeof oldPayload.data === "object" ? oldPayload.data : {};
       const mergedData = mergePayloadDataPreferNonEmpty(oldData, data);
 
-      const oldRefs = Array.isArray(oldPayload.references) ? oldPayload.references : [];
-      const oldEdu = Array.isArray(oldPayload.education) ? oldPayload.education : [];
-      const oldExp = Array.isArray(oldPayload.experience) ? oldPayload.experience : [];
-
-      const mergedReferences = mergeSubmissionRowArrays(oldRefs, Array.isArray(references) ? references : []);
-      const mergedEducation = mergeSubmissionRowArrays(oldEdu, Array.isArray(education) ? education : []);
+      const mergedReferences =
+        Array.isArray(references) && references.length > 0 ? references : (Array.isArray(oldPayload.references) ? oldPayload.references : []);
+      const mergedEducation =
+        Array.isArray(education) && education.length > 0 ? education : (Array.isArray(oldPayload.education) ? oldPayload.education : []);
 
       const isExp = toBoolean(data.is_experienced ?? mergedData.is_experienced ?? oldData.is_experienced);
       let mergedExperience;
       if (!isExp) {
         mergedExperience = [];
-      } else if (!Array.isArray(experience) || experience.length === 0) {
-        mergedExperience = oldExp;
+      } else if (Array.isArray(experience) && experience.length > 0) {
+        mergedExperience = experience;
       } else {
-        mergedExperience = mergeSubmissionRowArrays(oldExp, experience);
+        mergedExperience = Array.isArray(oldPayload.experience) ? oldPayload.experience : [];
       }
 
       let oldUploadedFiles = [];

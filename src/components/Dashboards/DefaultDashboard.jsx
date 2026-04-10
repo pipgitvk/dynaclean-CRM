@@ -4,19 +4,21 @@ import AttendanceTracker from "@/components/AttendanceTracker";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import HrTargetVsCompletedChart from "@/components/empcrm/HrTargetVsCompletedChart";
-import HiringDashboardStrip from "@/components/empcrm/hiring/HiringDashboardStrip";
-import { canAccessHiringModule, canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
+import { canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
 
 export default function DefaultDashboard({ user }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
-  const showHiringCards = canAccessHiringModule(user?.userRole);
 
   return (
     <div className="space-y-4 md:space-y-6">
 
-      {/* Welcome + Attendance */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6 lg:grid-cols-3">
-        <div className="bg-white rounded-xl shadow-md p-4 md:p-6 min-w-0 lg:col-span-2">
+      {/* Welcome + Attendance + Target chart (HR: chart to the right of attendance) */}
+      <div
+        className={`grid grid-cols-1 gap-4 md:gap-6 ${showHrTargetChart ? "lg:grid-cols-12" : "lg:grid-cols-3"}`}
+      >
+        <div
+          className={`bg-white rounded-xl shadow-md p-4 md:p-6 min-w-0 ${showHrTargetChart ? "lg:col-span-5" : "lg:col-span-2"}`}
+        >
           <div className="flex flex-col sm:flex-row gap-4">
             <ProfilePicUploader user={user} />
             <div>
@@ -28,14 +30,18 @@ export default function DefaultDashboard({ user }) {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-4 md:p-6 min-w-0 lg:col-span-1">
+        <div
+          className={`bg-white rounded-xl shadow-md p-4 md:p-6 min-w-0 ${showHrTargetChart ? "lg:col-span-3" : "lg:col-span-1"}`}
+        >
           <AttendanceTracker username={user.username} role={user.userRole} />
         </div>
+
+        {showHrTargetChart && (
+          <div className="lg:col-span-4 min-w-0">
+            <HrTargetVsCompletedChart />
+          </div>
+        )}
       </div>
-
-      {showHrTargetChart && <HrTargetVsCompletedChart />}
-
-      {showHiringCards && <HiringDashboardStrip />}
 
       {/* Tasks + Leads */}
       <div className="grid grid-cols-1 gap-4 md:gap-6">

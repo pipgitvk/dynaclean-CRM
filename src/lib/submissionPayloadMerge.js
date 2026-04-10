@@ -29,28 +29,6 @@ export function mergePayloadDataPreferNonEmpty(base, incoming) {
   return out;
 }
 
-/**
- * Resubmit merge for references / education / experience rows.
- * Incoming FormData often contains "" for hidden inputs — do not wipe prior row values.
- * Row count follows max(old, incoming); missing indices keep old rows.
- */
-export function mergeSubmissionRowArrays(baseRows, incomingRows) {
-  if (!Array.isArray(baseRows)) baseRows = [];
-  if (!Array.isArray(incomingRows) || incomingRows.length === 0) return baseRows;
-  const max = Math.max(baseRows.length, incomingRows.length);
-  const out = [];
-  for (let i = 0; i < max; i++) {
-    const baseRow = baseRows[i] && typeof baseRows[i] === "object" ? { ...baseRows[i] } : {};
-    const inc = incomingRows[i];
-    if (!inc || typeof inc !== "object") {
-      out.push(baseRows[i] != null ? baseRows[i] : baseRow);
-      continue;
-    }
-    out.push(mergePayloadDataPreferNonEmpty(baseRow, inc));
-  }
-  return out;
-}
-
 export function referencesPayloadHasContent(refs) {
   if (!Array.isArray(refs) || refs.length === 0) return false;
   return refs.some((r) => {

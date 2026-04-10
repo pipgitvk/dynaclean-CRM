@@ -63,7 +63,7 @@ function DesignationBarGroup({ designation, target, completed, globalMax }) {
   );
 }
 
-/** Bar row for one set of designation rows (one HR or single-HR view). */
+/** Summary + bar row for one set of designation rows (one HR or single-HR view). */
 function ItemsChartBlock({ items }) {
   const globalMax = useMemo(() => {
     if (!items.length) return 1;
@@ -73,19 +73,46 @@ function ItemsChartBlock({ items }) {
   if (!items.length) return null;
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
-      <div className="flex overflow-x-auto pb-3 pt-1 justify-start">
+    <>
+      <div className="rounded-xl border border-gray-200 bg-slate-50/90 px-4 py-3 mb-4 space-y-2.5">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">By designation</p>
         {items.map((row, idx) => (
-          <DesignationBarGroup
-            key={`${row.designation}-bar-${idx}`}
-            designation={row.designation}
-            target={row.target ?? 0}
-            completed={row.completed ?? 0}
-            globalMax={globalMax}
-          />
+          <div
+            key={`${row.designation}-${idx}`}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm border-b border-gray-200/80 pb-2 last:border-0 last:pb-0"
+          >
+            <span className="font-semibold text-gray-900 min-w-[6.5rem] sm:min-w-[8rem]">
+              {row.designation || "—"}
+            </span>
+            <span className="text-gray-600">
+              Target{" "}
+              <span className="tabular-nums font-semibold text-[#5a5eef]">{formatAmount(row.target)}</span>
+            </span>
+            <span className="text-gray-300 hidden sm:inline">|</span>
+            <span className="text-gray-600">
+              Completed{" "}
+              <span className="tabular-nums font-semibold text-emerald-700">
+                {formatAmount(row.completed)}
+              </span>
+            </span>
+          </div>
         ))}
       </div>
-    </div>
+
+      <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
+        <div className="flex overflow-x-auto pb-3 pt-1 justify-start">
+          {items.map((row, idx) => (
+            <DesignationBarGroup
+              key={`${row.designation}-bar-${idx}`}
+              designation={row.designation}
+              target={row.target ?? 0}
+              completed={row.completed ?? 0}
+              globalMax={globalMax}
+            />
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -127,36 +154,35 @@ export default function HrTargetVsCompletedChart() {
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-5 w-full min-w-0 h-full">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 shrink-0">
-          {isAllHrView ? "All HR — target vs completed" : "Target vs completed"}
-        </h2>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col min-w-[10rem] max-w-[13rem]">
-            <label className="text-xs text-gray-600 mb-1">Month</label>
-            <select
-              value={month}
-              onChange={(e) => setMonth(Number(e.target.value))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 bg-white"
-            >
-              {MONTHS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col w-[5.75rem] shrink-0">
-            <label className="text-xs text-gray-600 mb-1">Year</label>
-            <input
-              type="number"
-              min={2000}
-              max={2100}
-              value={year}
-              onChange={(e) => setYear(Number(e.target.value) || now.getFullYear())}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 tabular-nums"
-            />
-          </div>
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">
+        {isAllHrView ? "All HR — target vs completed" : "Target vs completed"}
+      </h2>
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+          <select
+            value={month}
+            onChange={(e) => setMonth(Number(e.target.value))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900 bg-white"
+          >
+            {MONTHS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+          <input
+            type="number"
+            min={2000}
+            max={2100}
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value) || now.getFullYear())}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+          />
         </div>
       </div>
 
