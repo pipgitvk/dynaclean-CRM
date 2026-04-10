@@ -74,6 +74,16 @@ function amountWithoutGst(order) {
   return Math.max(0, total - tax);
 }
 
+/** Sum of quotation line taxable (same as invoice “Taxable” column); fallback base/total−tax. */
+function orderTaxableTotal(order) {
+  const t = order.order_taxable_total;
+  if (t != null && t !== "") {
+    const n = Number(t);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return amountWithoutGst(order);
+}
+
 /** Same rules as table filter: `created_at` within optional From/To (order date). */
 function orderCreatedInDateRange(order, dateFrom, dateTo) {
   if (!dateFrom && !dateTo) return true;
@@ -155,16 +165,16 @@ export default function OrderTable({ orders, userRole }) {
   ]);
 
   const dispatchDoneTotals = useMemo(() => {
-    if (!orders?.length) return { exGst: 0, taxAmt: 0 };
+    if (!orders?.length) return { gstTotal: 0, taxableTotal: 0 };
     return orders.reduce(
       (acc, o) => {
         if (!orderCreatedInDateRange(o, dateFrom, dateTo)) return acc;
         if (!isDisplayedDispatchDone(o)) return acc;
-        acc.exGst += amountWithoutGst(o);
-        acc.taxAmt += Number(o.taxamt) || 0;
+        acc.gstTotal += Number(o.taxamt) || 0;
+        acc.taxableTotal += orderTaxableTotal(o);
         return acc;
       },
-      { exGst: 0, taxAmt: 0 }
+      { gstTotal: 0, taxableTotal: 0 }
     );
   }, [orders, dateFrom, dateTo]);
 
@@ -313,20 +323,27 @@ export default function OrderTable({ orders, userRole }) {
       <div className="w-full max-w-sm rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm p-3 sm:p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-violet-700 mb-0.5"> GST-TOTAL</p>
+            <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
+              GST total
+            </p>
             <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
               ₹
-              {dispatchDoneTotals.exGst.toLocaleString("en-IN", {
+              {dispatchDoneTotals.gstTotal.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
             </p>
           </div>
           <div>
-            <p className="text-xs text-violet-700 mb-0.5"> TOTAL AMOUNT WITHOUT GST</p>
+            <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
+              Taxable
+            </p>
+            <p className="text-[10px] text-violet-600/90 mb-1 leading-tight">
+              Total amount without GST
+            </p>
             <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
               ₹
-              {dispatchDoneTotals.taxAmt.toLocaleString("en-IN", {
+              {dispatchDoneTotals.taxableTotal.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
