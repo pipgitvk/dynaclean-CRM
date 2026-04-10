@@ -54,7 +54,8 @@ export default async function OrdersPage() {
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
                 qr.company_name, qr.emp_name, qr.state,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
-                GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code
+                GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code,
+                COALESCE(SUM(COALESCE(qi.total_taxable_amt, qi.taxable_price, 0)), 0) AS order_taxable_total
             FROM 
                 neworder no
             LEFT JOIN 
