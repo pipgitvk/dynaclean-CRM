@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { convertISTtoUTC } from "@/lib/timezone";
-import { sanitizeMultiTagForRole } from "@/utils/tlFollowupTagOptions";
 
 // GET - Fetch TL follow-ups
 export async function GET(request) {
@@ -138,11 +137,6 @@ export async function POST(request) {
     const finalLeadQualityScore = lastLeadQualityScore ?? lead_quality_score ?? null;
     const finalModel = (model && String(model).trim()) ? model : (lastModel || null);
 
-    const multiTagSanitized = sanitizeMultiTagForRole(
-      multi_tag,
-      payload.role
-    );
-
     // Start transaction to update both tables
     await connection.beginTransaction();
 
@@ -157,7 +151,7 @@ export async function POST(request) {
           finalEstimatedOrderDate,
           finalLeadQualityScore,
           finalModel,
-          multiTagSanitized,
+          multi_tag || null,
           notes || null,
           followedDateUTC,
           nextFollowupDateUTC || null,
@@ -232,11 +226,6 @@ export async function PUT(request) {
     const nextFollowupDateUTC = convertISTtoUTC(next_followup_date);
     const estimatedOrderDateUTC = convertISTtoUTC(estimated_order_date);
 
-    const multiTagSanitized = sanitizeMultiTagForRole(
-      multi_tag,
-      payload.role
-    );
-
     try {
       await connection.execute(
         `UPDATE TL_followups
@@ -246,7 +235,7 @@ export async function PUT(request) {
           estimatedOrderDateUTC || null,
           lead_quality_score || null,
           model || null,
-          multiTagSanitized,
+          multi_tag || null,
           notes || null,
           followedDateUTC || null,
           nextFollowupDateUTC || null,

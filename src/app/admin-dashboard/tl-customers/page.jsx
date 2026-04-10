@@ -298,9 +298,6 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     `SELECT DISTINCT username, username as name FROM rep_list WHERE userRole IN ('SALES') AND status = 1 ORDER BY username`,
   );
 
-  const showSuperAdminTlTags =
-    String(payload.role ?? "").trim().toLowerCase() === "superadmin";
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -326,7 +323,6 @@ export default async function AdminTLCustomersPage({ searchParams }) {
         pageSize={pageSize}
         isAdmin={true}
         tlOnly={showTLOnly}
-        showSuperAdminTlTags={showSuperAdminTlTags}
       />
     </div>
   );

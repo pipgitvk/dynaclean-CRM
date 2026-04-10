@@ -1,6 +1,31 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
+import { getDbConnection } from "@/lib/db";
 import { normalizeRoleKey } from "@/lib/adminAttendanceRulesAuth";
+
+const PROFILE_APPROVALS_PATH = "/empcrm/admin-dashboard/profile/approvals";
+
+async function countPendingHrProfileApprovals() {
+  try {
+    const conn = await getDbConnection();
+    const [rows] = await conn.execute(
+      `SELECT COUNT(*) AS c FROM employee_profile_submissions WHERE status = 'pending'`,
+    );
+    return Number(rows[0]?.c ?? 0);
+  } catch (e) {
+    console.error("countPendingHrProfileApprovals:", e);
+    return 0;
+  }
+}
+
+function attachProfileApprovalsBadge(items, pendingCount) {
+  return items.map((item) => {
+    if (item.path === PROFILE_APPROVALS_PATH) {
+      return { ...item, badgeCount: pendingCount };
+    }
+    return item;
+  });
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -36,11 +61,21 @@ export default async function getEmpCrmAdminSidebarMenuItems() {
 
   const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
 
-  return empCrmMenuItems.filter(
+  let items = empCrmMenuItems.filter(
     (item) =>
       item.roles.includes("ALL") ||
-      item.roles.some((r) => normalizeRoleKey(r) === roleKey)
+      item.roles.some((r) => normalizeRoleKey(r) === roleKey),
   );
+
+  const seesProfileApprovals = items.some(
+    (item) => item.path === PROFILE_APPROVALS_PATH,
+  );
+  if (seesProfileApprovals) {
+    const pending = await countPendingHrProfileApprovals();
+    items = attachProfileApprovalsBadge(items, pending);
+  }
+
+  return items;
 }
 
 /** EMPCRM “Back to CRM”: accountants usually work from user dashboard. */

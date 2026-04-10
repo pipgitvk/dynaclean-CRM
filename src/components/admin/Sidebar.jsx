@@ -142,15 +142,28 @@ export default function Sidebar({
         ? "flex items-center gap-2 rounded-md border border-red-300/90 bg-red-100 p-2 text-sm font-medium text-red-950 shadow-sm transition-colors hover:bg-red-200 dark:border-red-500/50 dark:bg-red-950/55 dark:text-red-50 dark:hover:bg-red-900/60"
         : `flex items-center gap-2 ${theme.sidebar.hover} rounded-md transition-colors p-2`;
 
+      const showBadge =
+        typeof item.badgeCount === "number" && item.badgeCount > 0;
+
       return (
         <li key={itemKey} className="m-2">
           <Link
             href={item.path}
-            className={leafLinkClass}
+            className={`${leafLinkClass} justify-between gap-2`}
             onClick={handleLinkClick}
           >
-            {Icon && <Icon size={20} />}
-            <span>{item.name}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              {Icon && <Icon size={20} className="shrink-0" />}
+              <span className="truncate">{item.name}</span>
+            </span>
+            {showBadge && (
+              <span
+                className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold tabular-nums text-white"
+                title={`${item.badgeCount} pending`}
+              >
+                {item.badgeCount}
+              </span>
+            )}
           </Link>
         </li>
       );

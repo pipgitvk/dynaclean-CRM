@@ -146,10 +146,42 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { TextEncoder as NodeTextEncoder } from "util";
+import { getDbConnection } from "@/lib/db";
 import {
   ATTENDANCE_RULES_ALLOWED_ROLES,
   normalizeRoleKey,
 } from "@/lib/adminAttendanceRulesAuth";
+
+const FINAL_PROFILE_APPROVAL_PATH =
+  "/empcrm/admin-dashboard/profile/approvals-admin";
+
+async function countPendingFinalProfileApprovals() {
+  try {
+    const conn = await getDbConnection();
+    const [rows] = await conn.execute(
+      `SELECT COUNT(*) AS c FROM employee_profile_submissions WHERE status = 'pending_admin'`,
+    );
+    return Number(rows[0]?.c ?? 0);
+  } catch (e) {
+    console.error("countPendingFinalProfileApprovals:", e);
+    return 0;
+  }
+}
+
+function attachFinalProfileApprovalBadge(items, pendingCount) {
+  return items.map((item) => {
+    if (item.path === FINAL_PROFILE_APPROVAL_PATH) {
+      return { ...item, badgeCount: pendingCount };
+    }
+    if (item.children?.length) {
+      return {
+        ...item,
+        children: attachFinalProfileApprovalBadge(item.children, pendingCount),
+      };
+    }
+    return item;
+  });
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -803,7 +835,12 @@ async function getAdminRoleKeyNormalized() {
 
 export default async function getSidebarMenuItems() {
   const roleKeyNormalized = await getAdminRoleKeyNormalized();
-  return filterMenuItemsByRole(allMenuItems, roleKeyNormalized);
+  let items = filterMenuItemsByRole(allMenuItems, roleKeyNormalized);
+  if (roleKeyNormalized === "SUPERADMIN") {
+    const pending = await countPendingFinalProfileApprovals();
+    items = attachFinalProfileApprovalBadge(items, pending);
+  }
+  return items;
 }
 
 /** User CRM is the default home for non–SUPERADMIN logins; hide “Back to user CRM” for SUPERADMIN. */

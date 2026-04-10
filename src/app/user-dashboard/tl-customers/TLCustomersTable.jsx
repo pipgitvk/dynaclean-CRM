@@ -27,8 +27,6 @@ export default function TLCustomersTable({
   pageSize = 50,
   isAdmin = false,
   tlOnly = true,
-  /** Admin TL management: extra tag filters for superadmin only */
-  showSuperAdminTlTags = false,
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -54,10 +52,7 @@ export default function TLCustomersTable({
   const [showQuotePopup, setShowQuotePopup] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const filterTagOptions = useMemo(
-    () => getTlCustomersTableTagOptions(showSuperAdminTlTags),
-    [showSuperAdminTlTags],
-  );
+  const filterTagOptions = useMemo(() => getTlCustomersTableTagOptions(), []);
 
   console.log("customer data ", customers);
 
