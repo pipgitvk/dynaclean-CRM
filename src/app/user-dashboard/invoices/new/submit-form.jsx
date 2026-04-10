@@ -11,8 +11,6 @@ import dynacleanLogo from "@/components/logo1.jpg";
 export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
   const router = useRouter();
 
-  const [editableInvoiceDate, setEditableInvoiceDate] = useState(invoiceDate);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ showQuotationModal, setShowQuotationModal]= useState(false)
   const [quotationNumber, setQuotationNumber] = useState("")
@@ -277,7 +275,7 @@ const balanceAmount = taxSummary.grandTotal - amountPaid;
       const dataToSend = {
         ...form,
         invoice_number: invoiceNumber,
-        invoice_date: editableInvoiceDate,
+        invoice_date: invoiceDate,
         items: itemsWithTotals,
         subtotal: taxSummary.subtotal,
         cgst: taxSummary.cgst,
@@ -464,9 +462,9 @@ const fetchQuotationAndFill = async () => {
           <label className="text-sm text-gray-600">Invoice Date</label>
           <input
             type="date"
-            value={editableInvoiceDate}
-            onChange={(e) => setEditableInvoiceDate(e.target.value)}
-            className="input w-full"
+            value={invoiceDate}
+            readOnly
+            className="input w-full bg-gray-100"
           />
         </div>
         <div>

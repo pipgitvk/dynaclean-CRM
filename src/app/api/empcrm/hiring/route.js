@@ -59,7 +59,7 @@ export async function GET(req) {
     const designations = distRows.map((r) => r.d).filter((x) => x != null && String(x).trim() !== "");
 
     let sql = `SELECT id, created_by_username, candidate_name, emp_contact, designation, marital_status,
-         experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\` AS package,
+         experience_type, interview_at, rescheduled_at, interview_mode, status, tag, hire_date, \`package\` AS package,
          probation_months, note, created_at
          FROM hr_hiring_entries WHERE LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))`;
     const params = [payload.username];
@@ -139,8 +139,8 @@ export async function POST(request) {
       const [result] = await conn.execute(
         `INSERT INTO hr_hiring_entries (
         created_by_username, candidate_name, emp_contact, designation, marital_status,
-        experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\`, probation_months, note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        experience_type, interview_at, rescheduled_at, interview_mode, status, tag, hire_date, \`package\`, probation_months, note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           payload.username,
           d.candidate_name,
@@ -150,7 +150,6 @@ export async function POST(request) {
           d.experience_type,
           toMysqlDatetime(d.interview_at),
           d.rescheduled_at != null ? toMysqlDatetime(d.rescheduled_at) : null,
-          d.next_followup_at != null ? toMysqlDatetime(d.next_followup_at) : null,
           d.interview_mode,
           d.status,
           d.tag,
@@ -247,7 +246,7 @@ export async function PATCH(request) {
       const [upd] = await conn.execute(
         `UPDATE hr_hiring_entries SET
         candidate_name = ?, emp_contact = ?, designation = ?, marital_status = ?,
-        experience_type = ?, interview_at = ?, rescheduled_at = ?, next_followup_at = ?, interview_mode = ?, status = ?, tag = ?,
+        experience_type = ?, interview_at = ?, rescheduled_at = ?, interview_mode = ?, status = ?, tag = ?,
         hire_date = ?, \`package\` = ?, probation_months = ?, note = ?
       WHERE id = ? AND LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))`,
         [
@@ -258,7 +257,6 @@ export async function PATCH(request) {
           d.experience_type,
           toMysqlDatetime(d.interview_at),
           d.rescheduled_at != null ? toMysqlDatetime(d.rescheduled_at) : null,
-          d.next_followup_at != null ? toMysqlDatetime(d.next_followup_at) : null,
           d.interview_mode,
           d.status,
           d.tag,

@@ -56,20 +56,13 @@ export function shouldShowBankingBlock(keys) {
 }
 
 /** Banking account + tax IDs + work experience (and related document uploads) in one card. */
-/**
- * HR reassigned work-experience fields — show experience UI even when payload still has is_experienced=0.
- */
-export function reassignKeysRequireExperienceUi(keys) {
-  if (!isReassignFieldMode(keys)) return false;
-  if (keys.includes("section_experience")) return true;
-  return hasAnyKey(keys, EXPERIENCE_COLUMN_KEYS) || hasAnyKey(keys, EXPERIENCE_DOCUMENT_REASSIGN_KEYS);
-}
-
-export function shouldShowBankingDetailsCard(keys, _isExperienced) {
+export function shouldShowBankingDetailsCard(keys, isExperienced) {
   if (!isReassignFieldMode(keys)) return true;
   if (shouldShowBankingBlock(keys)) return true;
   if (keys.some((k) => TAX_STATUTORY_KEYS_IN_BANKING_CARD.has(k))) return true;
-  if (reassignKeysRequireExperienceUi(keys)) return true;
+  if (isExperienced && keys.includes("section_experience")) return true;
+  if (isExperienced && hasAnyKey(keys, EXPERIENCE_COLUMN_KEYS)) return true;
+  if (isExperienced && hasAnyKey(keys, EXPERIENCE_DOCUMENT_REASSIGN_KEYS)) return true;
   return false;
 }
 

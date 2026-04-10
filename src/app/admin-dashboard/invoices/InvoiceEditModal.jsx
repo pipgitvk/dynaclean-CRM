@@ -132,7 +132,9 @@ export default function InvoiceEditModal({
 
         const inv = data.invoice;
         setInvoiceNumber(inv.invoice_number || "");
-        setInvoiceDate(dateInputValue(inv.invoice_date || inv.created_at) || "");
+        // Invoice date should reflect when the invoice record was created.
+        // Order date is the editable business date.
+        setInvoiceDate(dateInputValue(inv.created_at || inv.invoice_date) || "");
         setCreatedAtLocal(toDatetimeLocalValue(inv.created_at) || "");
         setForm({
           customer_name: inv.customer_name || "",
@@ -336,9 +338,11 @@ export default function InvoiceEditModal({
                   <label className="block text-gray-600 mb-1">Invoice date</label>
                   <input
                     type="date"
-                    className="w-full border rounded px-2 py-1.5"
+                    className="w-full border rounded px-2 py-1.5 bg-gray-100 cursor-not-allowed"
                     value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    readOnly
+                    tabIndex={-1}
+                    title="Invoice date is the creation date"
                   />
                 </div>
                 <div>

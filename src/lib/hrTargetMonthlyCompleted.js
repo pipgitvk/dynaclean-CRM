@@ -1,74 +1,7 @@
 /**
  * Shared logic for HR monthly targets: order revenue + hiring count per designation bucket.
  * Used by /api/empcrm/hr-target-chart and Superadmin dashboard.
- *
- * Hiring “completed” counts rows where status is Hired, hire_date is set, and hire_date falls
- * in the selected month — so a target of 1 shows completed after one hire in that month.
  */
-
-/**
- * @param {import("mysql2/promise").Connection} conn
- * @param {string} username HR who created the hiring row
- * @param {number} year
- * @param {number} month 1–12
- * @param {string} designation Row designation (must match target row)
- */
-async function countMonthlyHiresForHr(conn, username, year, month, designation) {
-  const d = (designation || "").trim();
-  if (!d) return 0;
-  const params = [username, year, month, d];
-  const sqlLegacy = `
-    SELECT COUNT(*) AS c FROM hr_hiring_entries
-    WHERE LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))
-      AND hire_date IS NOT NULL
-      AND YEAR(hire_date) = ? AND MONTH(hire_date) = ?
-      AND LOWER(TRIM(designation)) = LOWER(TRIM(?))
-      AND TRIM(COALESCE(status, '')) = 'Hired'`;
-  try {
-    const [hireRows] = await conn.execute(sqlLegacy, params);
-    return Number(hireRows[0]?.c ?? 0) || 0;
-  } catch (hireErr) {
-    const msg = String(hireErr?.message || "");
-    if (!msg.includes("hr_hiring_entries") && !msg.includes("doesn't exist") && !msg.includes("Unknown table")) {
-      console.error("[hrTargetMonthlyCompleted] hire count (hr_hiring_entries):", hireErr?.message || hireErr);
-      return 0;
-    }
-  }
-
-  const sqlCandidates = `
-    SELECT COUNT(*) AS c FROM candidates
-    WHERE LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))
-      AND hire_date IS NOT NULL
-      AND YEAR(hire_date) = ? AND MONTH(hire_date) = ?
-      AND LOWER(TRIM(designation)) = LOWER(TRIM(?))
-      AND TRIM(COALESCE(hiring_status, '')) = 'Hired'`;
-  try {
-    const [hireRows] = await conn.execute(sqlCandidates, params);
-    return Number(hireRows[0]?.c ?? 0) || 0;
-  } catch (hireErr2) {
-    const msg2 = String(hireErr2?.message || "");
-    if (msg2.includes("hiring_status") && msg2.includes("Unknown column")) {
-      try {
-        const sqlFallback = `
-          SELECT COUNT(*) AS c FROM candidates
-          WHERE LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))
-            AND hire_date IS NOT NULL
-            AND YEAR(hire_date) = ? AND MONTH(hire_date) = ?
-            AND LOWER(TRIM(designation)) = LOWER(TRIM(?))
-            AND TRIM(COALESCE(status, '')) = 'Hired'`;
-        const [hireRowsFb] = await conn.execute(sqlFallback, params);
-        return Number(hireRowsFb[0]?.c ?? 0) || 0;
-      } catch (e3) {
-        console.error("[hrTargetMonthlyCompleted] hire count (candidates status):", e3?.message || e3);
-        return 0;
-      }
-    }
-    if (!msg2.includes("candidates") && !msg2.includes("doesn't exist") && !msg2.includes("Unknown table")) {
-      console.error("[hrTargetMonthlyCompleted] hire count (candidates):", hireErr2?.message || hireErr2);
-    }
-    return 0;
-  }
-}
 
 /** @param {import("mysql2/promise").Connection} conn */
 export async function computeCompletedForDesignation(conn, username, year, month, forCompletedDesignation) {
@@ -99,7 +32,22 @@ export async function computeCompletedForDesignation(conn, username, year, month
     orderCompleted = 0;
   }
 
-  const hireCompleted = await countMonthlyHiresForHr(conn, username, year, month, d);
+  let hireCompleted = 0;
+  try {
+    const [hireRows] = await conn.execute(
+      `SELECT COUNT(*) AS c FROM hr_hiring_entries
+       WHERE LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))
+         AND YEAR(hire_date) = ? AND MONTH(hire_date) = ?
+         AND LOWER(TRIM(designation)) = LOWER(TRIM(?))`,
+      [username, year, month, d]
+    );
+    hireCompleted = Number(hireRows[0]?.c ?? 0) || 0;
+  } catch (hireErr) {
+    if (!String(hireErr?.message || "").includes("hr_hiring_entries")) {
+      console.error("[hrTargetMonthlyCompleted] hire count skipped:", hireErr?.message || hireErr);
+    }
+    hireCompleted = 0;
+  }
 
   return orderCompleted + hireCompleted;
 }
