@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Pencil, Phone, Briefcase } from "lucide-react";
+import { CalendarDays, Pencil, Phone, Briefcase, Sparkles } from "lucide-react";
 import { getGradientColor } from "@/utils/getGradientColor";
 
 export const STATUS_CHIP_STYLES = {
@@ -62,8 +62,12 @@ export function HiringStatusChip({ status, variant = "light" }) {
 
 function cardBackground(row) {
   const st = String(row.status || "").trim();
-  if (st === "Hired") return "linear-gradient(160deg, rgb(5 120 85) 0%, rgb(16 185 129) 100%)";
-  if (st === "Reject") return "linear-gradient(160deg, rgb(71 85 105) 0%, rgb(100 116 139) 100%)";
+  if (st === "Hired") {
+    return "linear-gradient(145deg, rgb(4, 84, 72) 0%, rgb(5, 150, 105) 42%, rgb(45, 212, 191) 100%)";
+  }
+  if (st === "Reject") {
+    return "linear-gradient(145deg, rgb(51, 47, 74) 0%, rgb(91, 78, 120) 45%, rgb(120, 113, 150) 100%)";
+  }
 
   let ms = null;
   if (st === "Rescheduled" && row.rescheduled_at) {
@@ -73,99 +77,137 @@ function cardBackground(row) {
   } else if (row.interview_at) {
     ms = new Date(row.interview_at).getTime();
   }
-  if (ms == null || Number.isNaN(ms)) return "rgb(100 116 139)";
+  if (ms == null || Number.isNaN(ms)) {
+    return "linear-gradient(145deg, rgb(71, 85, 105) 0%, rgb(100, 116, 139) 50%, rgb(148, 163, 184) 100%)";
+  }
   const hours = (ms - Date.now()) / 3600000;
   return getGradientColor(hours);
+}
+
+function DetailRow({ icon: Icon, label, children }) {
+  return (
+    <div className="flex gap-3 px-3 py-2.5 sm:px-3.5 sm:py-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 shadow-inner shadow-black/10">
+        <Icon className="h-4 w-4 text-white/95" strokeWidth={2} />
+      </div>
+      <div className="min-w-0 flex-1 pt-0.5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">{label}</p>
+        <div className="mt-0.5 text-sm font-medium leading-snug text-white">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 export default function HiringEntryCard({ row, onEdit, showEditButton = true }) {
   const bg = cardBackground(row);
   return (
     <div
-      className="flex h-full min-w-[272px] max-w-[300px] flex-shrink-0 flex-col justify-between rounded-2xl border border-white/20 p-5 text-white shadow-lg shadow-slate-900/15 transition hover:shadow-xl hover:shadow-slate-900/20"
+      className="group relative flex h-full min-w-[288px] max-w-[308px] flex-shrink-0 flex-col justify-between overflow-hidden rounded-3xl p-0 text-white shadow-[0_22px_50px_-12px_rgba(15,23,42,0.45)] ring-1 ring-white/25 transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_28px_60px_-12px_rgba(15,23,42,0.55)]"
       style={{ background: bg }}
     >
-      <div className="min-w-0 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-lg font-semibold leading-tight line-clamp-2 text-white">{row.candidate_name || "—"}</h3>
-          <span className="shrink-0 rounded-md bg-black/15 px-2 py-0.5 text-[10px] font-medium tabular-nums text-white/90">
+      {/* sheen + depth */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/25 via-transparent to-black/20"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10 blur-2xl"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-black/10 blur-xl"
+        aria-hidden
+      />
+
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col p-6">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">
+              <Sparkles className="h-3 w-3 opacity-90" />
+              Candidate
+            </p>
+            <h3 className="text-xl font-bold leading-tight tracking-tight text-white drop-shadow-sm line-clamp-2">
+              {row.candidate_name || "—"}
+            </h3>
+          </div>
+          <span className="shrink-0 rounded-full border border-white/20 bg-black/20 px-2.5 py-1 text-[11px] font-bold tabular-nums text-white shadow-inner backdrop-blur-sm">
             #{row.id}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-white/90">
-          <Phone size={14} className="shrink-0 opacity-80" />
-          <span className="truncate">{row.emp_contact || "—"}</span>
-        </div>
-
-        <div className="flex items-start gap-2 text-xs text-white/90">
-          <Briefcase size={14} className="mt-0.5 shrink-0 opacity-80" />
-          <span className="line-clamp-2">{row.designation || "—"}</span>
-        </div>
-
-        <div className="space-y-1 text-xs">
-          <div className="flex items-start gap-2 text-white/95">
-            <CalendarDays size={14} className="mt-0.5 shrink-0 opacity-80" />
-            <div>
-              <span className="font-medium">Interview:</span>{" "}
-              <span className="text-white/95">{formatInterviewAt(row.interview_at)}</span>
+        <div className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/15 bg-black/15 shadow-inner backdrop-blur-[2px]">
+          <DetailRow icon={Phone} label="Contact">
+            <span className="truncate">{row.emp_contact || "—"}</span>
+          </DetailRow>
+          <DetailRow icon={Briefcase} label="Role">
+            <span className="line-clamp-2">{row.designation || "—"}</span>
+          </DetailRow>
+          <div className="flex gap-3 px-3 py-2.5 sm:px-3.5 sm:py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 shadow-inner shadow-black/10">
+              <CalendarDays className="h-4 w-4 text-white/95" strokeWidth={2} />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1.5 pt-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/55">Schedule</p>
+              <p className="text-sm font-medium text-white">
+                <span className="text-white/80">Interview · </span>
+                {formatInterviewAt(row.interview_at)}
+              </p>
               {row.status === "Rescheduled" && row.rescheduled_at ? (
-                <span className="mt-1 block text-amber-100">
+                <p className="text-xs font-medium text-amber-100">
                   Rescheduled → {formatInterviewAt(row.rescheduled_at)}
-                </span>
+                </p>
               ) : null}
               {row.status === "next-follow-up" && row.next_followup_at ? (
-                <span className="mt-1 block text-cyan-100">
-                  Next follow-up: {formatInterviewAt(row.next_followup_at)}
-                </span>
+                <p className="text-xs font-medium text-cyan-100">
+                  Next follow-up · {formatInterviewAt(row.next_followup_at)}
+                </p>
               ) : null}
+              <p className="pt-0.5 text-xs text-white/85">
+                <span className="text-white/60">Mode · </span>
+                {row.interview_mode || "—"}
+              </p>
             </div>
           </div>
-          <p>
-            <span className="text-white/80">Mode:</span> {row.interview_mode || "—"}
-          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-1">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <HiringStatusChip status={row.status} variant="onCard" />
           {row.tag ? (
-            <span className="rounded-full border border-white/25 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/95">
+            <span className="rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/95 backdrop-blur-sm">
               {row.tag}
             </span>
           ) : null}
         </div>
 
         {(row.hire_date || row.package) && (
-          <div className="rounded-lg border border-white/20 bg-black/10 px-2.5 py-2 text-[11px] leading-snug text-white/90">
+          <div className="mt-3 rounded-xl border border-white/15 bg-black/15 px-3 py-2.5 text-[12px] leading-snug text-white/95 backdrop-blur-sm">
             {row.hire_date ? (
               <p>
-                <span className="text-white/75">Joining:</span> {String(row.hire_date).slice(0, 10)}
+                <span className="text-white/65">Joining · </span>
+                {String(row.hire_date).slice(0, 10)}
               </p>
             ) : null}
             {row.package ? (
-              <p className={row.hire_date ? "mt-0.5" : ""}>
-                <span className="text-white/75">Package:</span> {row.package}
+              <p className={row.hire_date ? "mt-1" : ""}>
+                <span className="text-white/65">Package · </span>
+                {row.package}
               </p>
             ) : null}
           </div>
         )}
-
-        {row.note ? (
-          <p className="line-clamp-2 text-[11px] leading-relaxed text-white/85" title={row.note}>
-            {row.note}
-          </p>
-        ) : null}
       </div>
 
       {showEditButton ? (
-        <button
-          type="button"
-          onClick={onEdit}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/20"
-        >
-          <Pencil className="h-4 w-4 shrink-0" />
-          Edit
-        </button>
+        <div className="relative z-10 border-t border-white/15 bg-black/10 px-5 py-3 backdrop-blur-md">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/30 bg-white/15 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/10 transition hover:bg-white/25"
+          >
+            <Pencil className="h-4 w-4 shrink-0" />
+            Edit
+          </button>
+        </div>
       ) : null}
     </div>
   );

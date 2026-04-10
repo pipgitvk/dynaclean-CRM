@@ -183,7 +183,7 @@ export default function UpcomingTeamLeaderFollowupsCards({ teamLeader }) {
                 : null;
               const bgColor = followup.next_followup_date
                 ? getGradientColor(hours)
-                : "rgb(255, 165, 0)";
+                : "linear-gradient(145deg, rgb(180, 83, 9) 0%, rgb(245, 158, 11) 48%, rgb(253, 224, 171) 100%)";
               return (
                 <div
                   key={followup.customer_id}
