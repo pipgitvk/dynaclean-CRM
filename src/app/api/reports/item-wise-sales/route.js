@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import dayjs from "dayjs";
 
 export async function POST(req) {
     try {
-        const { from, to } = await req.json();
+        const { from, to, employee } = await req.json();
 
         let dateFilter = "";
         const params = [];
@@ -17,21 +16,32 @@ export async function POST(req) {
             params.push(from);
         }
 
+        let employeeFilter = "";
+        const emp = employee != null ? String(employee).trim() : "";
+        if (emp) {
+            employeeFilter = "AND n.created_by = ?";
+            params.push(emp);
+        }
+
         const sql = `
-      SELECT DISTINCT
-        n.invoice_date as date,
-        n.created_by as employee_name,
-        c.first_name as customer_name,
-        c.company as company_name,
-        c.gstin as reg_no,
-        c.address as customer_address,
-        qi.item_name as product_name,
-        qi.specification as model,
-        qi.quantity as qty,
-        qi.price_per_unit as sale_price_unit,
-        qi.gst as tax_percent,
-        qi.total_price as total_sale_amount,
-        n.ship_to as delivery_address,
+      SELECT
+        c.customer_id AS customer_id,
+        c.lead_source AS lead_source,
+        n.invoice_date AS order_date,
+        c.first_name AS customer_name,
+        c.company AS company_name,
+        n.created_by AS employee_name,
+        qi.item_name AS model,
+        qi.quantity AS qty,
+        qi.price_per_unit AS sale_price_unit,
+        qi.gst AS tax_percent,
+        qi.total_price AS total_sale_amount,
+        COALESCE(
+          qi.total_taxable_amt,
+          qi.taxable_price,
+          qi.price_per_unit * qi.quantity
+        ) AS amount_without_gst_raw,
+        n.payment_status AS payment_status,
         COALESCE(
           (
             SELECT psr.amount_per_unit
@@ -48,37 +58,46 @@ export async function POST(req) {
             LIMIT 1
           ),
           0
-        ) as purchase_price_unit
+        ) AS purchase_price_unit
       FROM neworder n
       LEFT JOIN quotations_records qr ON n.quote_number COLLATE utf8mb4_unicode_ci = qr.quote_number COLLATE utf8mb4_unicode_ci
       LEFT JOIN customers c ON qr.customer_id = c.customer_id
       LEFT JOIN quotation_items qi ON n.quote_number COLLATE utf8mb4_unicode_ci = qi.quote_number COLLATE utf8mb4_unicode_ci
       WHERE n.invoice_number IS NOT NULL AND n.invoice_number != ''
       ${dateFilter}
+      ${employeeFilter}
       ORDER BY n.invoice_date DESC
     `;
 
         const conn = await getDbConnection();
         const [rows] = await conn.execute(sql, params);
 
-        // Process rows to calculate profit/loss and format data
         const processedRows = rows.map((row) => {
             const salePrice = parseFloat(row.sale_price_unit) || 0;
             const purchasePrice = parseFloat(row.purchase_price_unit) || 0;
-            const qty = parseInt(row.qty) || 0;
+            const qty = parseInt(row.qty, 10) || 0;
             const taxPercent = parseFloat(row.tax_percent) || 0;
-
             const totalSale = salePrice * qty;
-
-            // Assuming Profit = (Unit Sale Price - Unit Purchase Price) * Qty
             const profitLoss = (salePrice - purchasePrice) * qty;
+            const tax = (totalSale * taxPercent) / 100;
+            const amountWithoutGst = parseFloat(row.amount_without_gst_raw) || 0;
 
             return {
-                ...row,
-                purchase_price: purchasePrice,
+                customer_id: row.customer_id ?? null,
+                lead_source: row.lead_source ?? "",
+                order_date: row.order_date,
+                customer_name: row.customer_name ?? "",
+                company_name: row.company_name ?? "",
+                employee_name: row.employee_name ?? "",
+                model: row.model ?? "",
+                qty,
                 sale_price: salePrice,
+                purchase_price: purchasePrice,
+                tax,
                 profit_loss: profitLoss,
-                tax: (totalSale * taxPercent) / 100, // Approximate tax amount
+                total_sale_amount: parseFloat(row.total_sale_amount) || totalSale,
+                amount_without_gst: amountWithoutGst,
+                payment_status: row.payment_status ?? "",
             };
         });
 
