@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/meta-backfill",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/meta-backfill-tamil",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

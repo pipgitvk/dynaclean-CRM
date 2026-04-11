@@ -2,9 +2,16 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Eye, X } from "lucide-react";
+import {
+  TAMIL_META_FORM_ID,
+  TAMIL_META_ASSIGNEE_USERNAME,
+  getTamilCronDateRange,
+} from "@/lib/metaTamilLeadForm";
 
 const CRON_HISTORY_KEY = "meta-backfill-cron-history";
 const AUTO_POLL_KEY = "meta-backfill-auto-poll-enabled";
+const CRON_HISTORY_KEY_TAMIL = "meta-backfill-tamil-cron-history";
+const AUTO_POLL_KEY_TAMIL = "meta-backfill-tamil-auto-poll-enabled";
 const MAX_HISTORY = 50;
 /** Fixed assigner for "assigned_by" View (not editable in UI) */
 const ASSIGNED_BY_FIXED_USERNAME = "harsh_M";
@@ -53,6 +60,40 @@ function addCronHistory(entry) {
   localStorage.setItem(CRON_HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)));
 }
 
+function getTamilAutoPollEnabled() {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(AUTO_POLL_KEY_TAMIL) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setTamilAutoPollEnabledStorage(value) {
+  try {
+    localStorage.setItem(AUTO_POLL_KEY_TAMIL, value ? "1" : "0");
+  } catch {}
+}
+
+function getTamilCronHistory() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CRON_HISTORY_KEY_TAMIL);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function addTamilCronHistory(entry) {
+  const list = getTamilCronHistory();
+  list.unshift({
+    ...entry,
+    timestamp: new Date().toISOString(),
+  });
+  localStorage.setItem(CRON_HISTORY_KEY_TAMIL, JSON.stringify(list.slice(0, MAX_HISTORY)));
+}
+
 export default function MetaBackfillPage() {
   const [since, setSince] = useState("");
   const [until, setUntil] = useState("");
@@ -84,6 +125,20 @@ export default function MetaBackfillPage() {
   const [assignerDetailLeads, setAssignerDetailLeads] = useState([]);
   const [assignerDetailLoading, setAssignerDetailLoading] = useState(false);
   const [assignerDetailError, setAssignerDetailError] = useState("");
+  const [tamilModalOpen, setTamilModalOpen] = useState(false);
+  /** Date range used for Tamil modal list + import (set when opening modal) */
+  const [tamilModalRange, setTamilModalRange] = useState({ since: "", until: "" });
+  const [tamilLeads, setTamilLeads] = useState([]);
+  const [tamilLoading, setTamilLoading] = useState(false);
+  const [tamilError, setTamilError] = useState("");
+  const [tamilImportLoading, setTamilImportLoading] = useState(false);
+  const [tamilImportMessage, setTamilImportMessage] = useState("");
+  const [tamilCronTestLoading, setTamilCronTestLoading] = useState(false);
+  const [tamilCronTestResult, setTamilCronTestResult] = useState(null);
+  const [tamilAutoPollEnabled, setTamilAutoPollEnabledState] = useState(false);
+  const [tamilShowHistory, setTamilShowHistory] = useState(false);
+  const [tamilCronHistory, setTamilCronHistory] = useState([]);
+  const pollCountRefTamil = useRef(0);
 
   /** Per assigned_to row: counts by lead_campaign bucket (from API byCampaignAndAssigner) */
   const assignerCampaignBreakdown = useMemo(() => {
@@ -136,6 +191,7 @@ export default function MetaBackfillPage() {
   // Hydrate auto-poll from localStorage (persists across refresh)
   useEffect(() => {
     setAutoPollEnabledState(getAutoPollEnabled());
+    setTamilAutoPollEnabledState(getTamilAutoPollEnabled());
   }, []);
 
   // API call every 10 min when auto-poll is on (direct meta-backfill - fast response)
@@ -182,6 +238,72 @@ export default function MetaBackfillPage() {
       callNum: cronTestResult.count,
     });
   }, [cronTestResult?.ok, cronTestResult?.data?.loading, cronTestResult?.data?.imported, cronTestResult?.data?.skipped, cronTestResult?.data?.error, cronTestResult?.count, autoPollEnabled]);
+
+  // Tamil form (KAVYA): auto-poll via authenticated POST — last 7 days window
+  useEffect(() => {
+    if (!tamilAutoPollEnabled) return;
+    const run = async () => {
+      pollCountRefTamil.current += 1;
+      setTamilCronTestResult({
+        ok: null,
+        data: { loading: true },
+        count: pollCountRefTamil.current,
+      });
+      try {
+        const ctrl = new AbortController();
+        const timeout = setTimeout(() => ctrl.abort(), 120000);
+        // Same as main Meta cron: server cron route (no admin session / impersonation issues)
+        const res = await fetch("/api/cron/meta-backfill-tamil", { signal: ctrl.signal });
+        clearTimeout(timeout);
+        const data = await res.json();
+        setTamilCronTestResult({
+          ok: res.ok,
+          data: res.ok
+            ? {
+                imported: data?.imported ?? 0,
+                skipped: data?.skipped ?? 0,
+              }
+            : { error: data?.error || data?.message || "Failed" },
+          count: pollCountRefTamil.current,
+        });
+      } catch (err) {
+        setTamilCronTestResult({
+          ok: false,
+          data: { error: err.name === "AbortError" ? "Timeout (2 min)" : err.message },
+          count: pollCountRefTamil.current,
+        });
+      }
+    };
+    run();
+    const id = setInterval(run, 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [tamilAutoPollEnabled]);
+
+  useEffect(() => {
+    if (
+      tamilCronTestResult?.data?.loading ||
+      tamilCronTestResult?.ok === undefined ||
+      tamilCronTestResult?.ok === null
+    ) {
+      return;
+    }
+    addTamilCronHistory({
+      status: tamilCronTestResult.ok ? "success" : "failed",
+      imported: tamilCronTestResult.data?.imported ?? 0,
+      skipped: tamilCronTestResult.data?.skipped ?? 0,
+      error: tamilCronTestResult.data?.error,
+      source: tamilAutoPollEnabled ? "auto-poll" : "test-cron",
+      callNum: tamilCronTestResult.count,
+    });
+  }, [
+    tamilCronTestResult?.ok,
+    tamilCronTestResult?.data?.loading,
+    tamilCronTestResult?.data?.imported,
+    tamilCronTestResult?.data?.skipped,
+    tamilCronTestResult?.data?.error,
+    tamilCronTestResult?.count,
+    tamilAutoPollEnabled,
+  ]);
 
   const handleFetch = async (e) => {
     e.preventDefault();
@@ -368,6 +490,103 @@ export default function MetaBackfillPage() {
       setCronTestResult({ ok: false, data: { error: err.message } });
     } finally {
       setCronTestLoading(false);
+    }
+  };
+
+  const handleTamilCronTest = async () => {
+    setTamilCronTestResult(null);
+    setTamilCronTestLoading(true);
+    try {
+      const res = await fetch("/api/cron/meta-backfill-tamil");
+      const data = await res.json();
+      setTamilCronTestResult({
+        ok: res.ok,
+        data: res.ok
+          ? {
+              imported: data.imported ?? 0,
+              skipped: data.skipped ?? 0,
+            }
+          : { error: data?.error || data?.message || JSON.stringify(data) },
+        count: 1,
+      });
+    } catch (err) {
+      setTamilCronTestResult({ ok: false, data: { error: err.message }, count: 1 });
+    } finally {
+      setTamilCronTestLoading(false);
+    }
+  };
+
+  const openTamilLeadsModal = async () => {
+    const range =
+      since && until ? { since, until } : getTamilCronDateRange(7);
+    setTamilModalRange(range);
+    if (!since || !until) {
+      setMessage(
+        "No From/To selected — showing last 7 days for Tamil form. Pick dates above to filter.",
+      );
+    }
+    setTamilModalOpen(true);
+    setTamilLeads([]);
+    setTamilError("");
+    setTamilImportMessage("");
+    setTamilLoading(true);
+    try {
+      const res = await fetch(
+        `/api/meta-backfill/tamil-form-leads?since=${encodeURIComponent(range.since)}&until=${encodeURIComponent(range.until)}`,
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        const metaMsg =
+          data?.metaError?.message || data?.metaError?.error?.message || data?.message;
+        setTamilError(
+          metaMsg ? `Meta: ${metaMsg}` : data?.error || "Failed to load Tamil form leads",
+        );
+        return;
+      }
+      setTamilLeads(data.leads || []);
+    } catch (err) {
+      console.error(err);
+      setTamilError("Error loading Tamil form leads");
+    } finally {
+      setTamilLoading(false);
+    }
+  };
+
+  const handleTamilFormImport = async () => {
+    const s = tamilModalRange.since;
+    const u = tamilModalRange.until;
+    if (!s || !u) return;
+    setTamilImportMessage("");
+    setTamilImportLoading(true);
+    try {
+      const res = await fetch("/api/meta-backfill/tamil-form-leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ since: s, until: u, autoImport: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const metaMsg =
+          data?.metaError?.message || data?.metaError?.error?.message || data?.message;
+        setTamilImportMessage(
+          metaMsg ? `Meta: ${metaMsg}` : data?.error || "Import failed",
+        );
+        return;
+      }
+      const summary = data.importSummary;
+      setTamilImportMessage(
+        `Imported: ${summary?.imported ?? 0}, Skipped: ${summary?.skipped ?? 0}, Errors: ${summary?.errors ?? 0}.`,
+      );
+      const resList = await fetch(
+        `/api/meta-backfill/tamil-form-leads?since=${encodeURIComponent(s)}&until=${encodeURIComponent(u)}`,
+      );
+      const listData = await resList.json();
+      if (resList.ok) setTamilLeads(listData.leads || []);
+    } catch (err) {
+      console.error(err);
+      setTamilImportMessage("Import request failed");
+    } finally {
+      setTamilImportLoading(false);
     }
   };
 
@@ -616,6 +835,144 @@ export default function MetaBackfillPage() {
         )}
       </div>
 
+      {/* Tamil form cron — same rhythm as main cron; imports Form {TAMIL_META_FORM_ID} → KAVYA */}
+      <div className="border rounded-lg p-4 bg-cyan-50/50 border-cyan-200">
+        <h2 className="font-medium mb-3 text-cyan-950">
+          Tamil leads — Automatic Cron (every 10 min)
+        </h2>
+        <p className="text-xs text-cyan-900 mb-3">
+          Form ID {TAMIL_META_FORM_ID} · New leads import to {TAMIL_META_ASSIGNEE_USERNAME}
+        </p>
+        <div className="flex flex-wrap gap-2 items-center">
+          <button
+            type="button"
+            onClick={handleTamilCronTest}
+            disabled={tamilCronTestLoading || tamilAutoPollEnabled}
+            className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium disabled:opacity-50"
+          >
+            {tamilCronTestLoading ? "Testing..." : "Test Cron Now"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTamilAutoPollEnabledState((p) => {
+                const next = !p;
+                setTamilAutoPollEnabledStorage(next);
+                if (next) pollCountRefTamil.current = 0;
+                return next;
+              });
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              tamilAutoPollEnabled
+                ? "bg-amber-600 hover:bg-amber-700 text-white"
+                : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+            }`}
+          >
+            {tamilAutoPollEnabled ? "Stop (every 10 min)" : "Auto-poll every 10 min"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setTamilShowHistory((h) => !h);
+              if (!tamilShowHistory) setTamilCronHistory(getTamilCronHistory());
+            }}
+            className="px-4 py-2 rounded-lg bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium"
+          >
+            History
+          </button>
+        </div>
+        {tamilCronTestResult && (
+          <div
+            className={`mt-3 p-3 rounded text-sm ${
+              tamilCronTestResult.data?.loading
+                ? "bg-cyan-100 text-cyan-900"
+                : tamilCronTestResult.ok
+                  ? "bg-green-100 text-green-800"
+                  : "bg-red-100 text-red-800"
+            }`}
+          >
+            {tamilCronTestResult.data?.loading ? (
+              <>⏳ Tamil form — fetching / importing... (call #{tamilCronTestResult.count})</>
+            ) : tamilCronTestResult.ok ? (
+              <>
+                ✓ Tamil cron — Imported: {tamilCronTestResult.data?.imported ?? 0}, Skipped:{" "}
+                {tamilCronTestResult.data?.skipped ?? 0}
+                {tamilAutoPollEnabled && (
+                  <span className="ml-2 opacity-80">(call #{tamilCronTestResult.count})</span>
+                )}
+              </>
+            ) : (
+              <>
+                ✗ Failed — {tamilCronTestResult.data?.error || JSON.stringify(tamilCronTestResult.data)}
+                {tamilAutoPollEnabled && (
+                  <span className="ml-2 opacity-80">(call #{tamilCronTestResult.count})</span>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {tamilShowHistory && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            onClick={() => setTamilShowHistory(false)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center p-4 border-b">
+                <strong className="text-lg text-cyan-900">Tamil form — Cron / Auto-poll History</strong>
+                <button
+                  type="button"
+                  onClick={() => setTamilShowHistory(false)}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 text-sm font-medium"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto flex-1">
+                {tamilCronHistory.length === 0 ? (
+                  <p className="text-sm text-gray-500">No history yet</p>
+                ) : (
+                  <table className="text-sm w-full">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="py-2 pr-3">Time</th>
+                        <th className="py-2 pr-3">Status</th>
+                        <th className="py-2 pr-3">Source</th>
+                        <th className="py-2 pr-3">Imported</th>
+                        <th className="py-2 pr-3">Skipped</th>
+                        <th className="py-2 pr-3">Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tamilCronHistory.map((h, i) => (
+                        <tr key={i} className="border-b border-gray-100">
+                          <td className="py-2 pr-3">{new Date(h.timestamp).toLocaleString()}</td>
+                          <td
+                            className={`py-2 pr-3 font-medium ${
+                              h.status === "success" ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            {h.status === "success" ? "✓ Success" : "✗ Failed"}
+                          </td>
+                          <td className="py-2 pr-3">{h.source}</td>
+                          <td className="py-2 pr-3">{h.imported ?? 0}</td>
+                          <td className="py-2 pr-3">{h.skipped ?? 0}</td>
+                          <td className="py-2 pr-3 text-red-600 max-w-[150px] truncate" title={h.error}>
+                            {h.error || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="border rounded-lg p-3 bg-gray-50">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -687,6 +1044,13 @@ export default function MetaBackfillPage() {
             className="px-3 py-1 rounded bg-purple-600 text-white text-sm disabled:opacity-50"
           >
             {loading ? "Fetching..." : "Fetch ALL Leads (form history)"}
+          </button>
+          <button
+            type="button"
+            onClick={openTamilLeadsModal}
+            className="px-3 py-1 rounded bg-teal-700 text-white text-sm hover:bg-teal-800"
+          >
+            Tamil leads
           </button>
           <button
             type="button"
@@ -954,6 +1318,119 @@ export default function MetaBackfillPage() {
                           </tr>
                         );
                       })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tamilModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="tamil-leads-title"
+          onClick={() => setTamilModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+              <div>
+                <h3 id="tamil-leads-title" className="text-lg font-semibold text-gray-900">
+                  Tamil leads (Meta form)
+                </h3>
+                <p className="text-sm text-gray-600 mt-0.5">
+                  Form ID:{" "}
+                  <span className="font-mono text-teal-800">{TAMIL_META_FORM_ID}</span>
+                  {" · "}
+                  New imports go to{" "}
+                  <strong className="text-teal-900">{TAMIL_META_ASSIGNEE_USERNAME}</strong> only
+                </p>
+                {tamilModalRange.since && tamilModalRange.until && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Date range: {tamilModalRange.since} to {tamilModalRange.until}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setTamilModalOpen(false)}
+                className="rounded p-1 text-gray-600 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-4 py-2 border-b bg-teal-50/80 flex flex-wrap items-center gap-2">
+              {autoImportEnabled && (
+                <button
+                  type="button"
+                  onClick={handleTamilFormImport}
+                  disabled={tamilImportLoading || !tamilModalRange.since}
+                  className="px-3 py-1.5 rounded bg-teal-700 text-white text-sm hover:bg-teal-800 disabled:opacity-50"
+                >
+                  {tamilImportLoading ? "Importing..." : "Import new leads to DB (→ Kavya)"}
+                </button>
+              )}
+              {!autoImportEnabled && (
+                <span className="text-xs text-gray-600">
+                  Turn &quot;Automatic import&quot; to Yes above to import this form&apos;s new leads
+                  assigned to {TAMIL_META_ASSIGNEE_USERNAME}.
+                </span>
+              )}
+              {tamilImportMessage && (
+                <span className="text-sm text-teal-900">{tamilImportMessage}</span>
+              )}
+            </div>
+            <div className="overflow-auto flex-1 p-4">
+              {tamilLoading && (
+                <p className="text-sm text-gray-600">Loading leads from Meta...</p>
+              )}
+              {!tamilLoading && tamilError && (
+                <p className="text-sm text-red-600">{tamilError}</p>
+              )}
+              {!tamilLoading && !tamilError && tamilLeads.length === 0 && (
+                <p className="text-sm text-gray-600">No leads in this date range for this form.</p>
+              )}
+              {!tamilLoading && !tamilError && tamilLeads.length > 0 && (
+                <div className="overflow-x-auto border rounded">
+                  <table className="min-w-full text-xs sm:text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-2 py-2 text-left border-b">Lead ID</th>
+                        <th className="px-2 py-2 text-left border-b">Created</th>
+                        <th className="px-2 py-2 text-left border-b">Name</th>
+                        <th className="px-2 py-2 text-left border-b">Phone</th>
+                        <th className="px-2 py-2 text-left border-b">Email</th>
+                        <th className="px-2 py-2 text-left border-b">City</th>
+                        <th className="px-2 py-2 text-left border-b">Product / Campaign</th>
+                        <th className="px-2 py-2 text-left border-b">In DB</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tamilLeads.map((lead) => (
+                        <tr key={lead.leadgen_id} className="border-b border-gray-100">
+                          <td className="px-2 py-2 border break-all">{lead.leadgen_id}</td>
+                          <td className="px-2 py-2 border">{lead.created_time || "—"}</td>
+                          <td className="px-2 py-2 border">{lead.first_name || "—"}</td>
+                          <td className="px-2 py-2 border">{lead.phone || "—"}</td>
+                          <td className="px-2 py-2 border break-all">{lead.email || "—"}</td>
+                          <td className="px-2 py-2 border">{lead.address || "—"}</td>
+                          <td className="px-2 py-2 border">{lead.products_interest || "—"}</td>
+                          <td className="px-2 py-2 border">
+                            {lead.already_in_db ? (
+                              <span className="text-green-700">Yes</span>
+                            ) : (
+                              <span className="text-amber-700">No</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

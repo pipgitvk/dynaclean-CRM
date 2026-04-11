@@ -4,6 +4,7 @@ import {
   extractProductFromMetaFieldData,
   buildProductsInterestLabel,
 } from "@/lib/metaLeadProduct";
+import { TAMIL_META_FORM_ID, TAMIL_META_ASSIGNEE_USERNAME } from "@/lib/metaTamilLeadForm";
 
 // Disable caching - fixes 405 Method Not Allowed on production (Vercel, nginx, etc.)
 export const dynamic = "force-dynamic";
@@ -82,7 +83,7 @@ export async function POST(request) {
     // Step 1: Fetch lead details using leadgen_id
     // Explicitly request field_data + ad_id, otherwise Meta may not include them
     const leadRes = await fetch(
-      `https://graph.facebook.com/v18.0/${leadgen_id}?fields=field_data,ad_id,created_time&access_token=${token}`,
+      `https://graph.facebook.com/v18.0/${leadgen_id}?fields=field_data,ad_id,created_time,form_id&access_token=${token}`,
     );
     const leadData = await leadRes.json();
     console.log("📥 Lead data:", JSON.stringify(leadData, null, 2));
@@ -94,6 +95,8 @@ export async function POST(request) {
     }
 
     const fieldData = leadData?.field_data || [];
+    const formIdFromLead =
+      leadData?.form_id != null ? String(leadData.form_id) : null;
     // Prefer ad_id from Graph API — webhook payload often omits it
     const ad_id =
       leadData?.ad_id || entry?.changes?.[0]?.value?.ad_id || null;
@@ -151,14 +154,23 @@ export async function POST(request) {
     if (!repRows.length)
       return new Response("No reps available", { status: 503 });
 
-    // --- Assign rep based on language ---
+    // --- Assign rep: fixed form (Tamil pipeline) → KAVYA; else language Tamil → KAVYA; else round-robin ---
     let assignedRep = null;
 
-    // normalize once
+    if (formIdFromLead === TAMIL_META_FORM_ID) {
+      assignedRep = repRows.find((r) => r.username === TAMIL_META_ASSIGNEE_USERNAME) || null;
+      if (!assignedRep) {
+        console.error(
+          `❌ ${TAMIL_META_ASSIGNEE_USERNAME} not found in lead_distribution (Tamil form)`,
+        );
+        return new Response("KAVYA not configured", { status: 500 });
+      }
+    }
+
     const normalizedLanguage = language?.toUpperCase()?.trim();
 
-    if (normalizedLanguage === "TAMIL") {
-      assignedRep = repRows.find((r) => r.username === "KAVYA") || null;
+    if (!assignedRep && normalizedLanguage === "TAMIL") {
+      assignedRep = repRows.find((r) => r.username === TAMIL_META_ASSIGNEE_USERNAME) || null;
 
       if (!assignedRep) {
         console.error("❌ KAVYA not found in lead_distribution table");

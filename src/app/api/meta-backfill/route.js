@@ -51,7 +51,7 @@ export const maxDuration = 300;
 //   };
 // }
 
-function parseLeadFromFieldData(fieldData, extra = {}) {
+export function parseLeadFromFieldData(fieldData, extra = {}) {
   const getValue = (name) =>
     fieldData.find((f) => f.name === name)?.values?.[0] || null;
 
@@ -284,45 +284,54 @@ export async function GET(request) {
 }
 
 // Helper: insert ONE lead into DB (reusing your webhook logic)
-async function insertLeadIntoDb(lead) {
+/** @param {{ forceAssignTo?: string }} [options] If set (e.g. KAVYA), assign only to that rep (Tamil form backfill). */
+export async function insertLeadIntoDb(lead, options = {}) {
   const conn = await getDbConnection();
+  const forceAssignTo = options.forceAssignTo;
 
+  let repRows = [];
 
-  // STEP 1: check state from pincode (runtime)
-
- let repRows = [];
-const normalizedLanguage = lead.language?.toUpperCase();
-
-// 🟢 STEP 1: Tamil → Kavya
-if (normalizedLanguage === "TAMIL") {
-  const [rows] = await conn.execute(
-    `SELECT *
-     FROM lead_distribution
-     WHERE is_active = 1
-       AND username = 'KAVYA'
-       AND assigned_count < max_leads
-     LIMIT 1`,
-  );
-
-  if (rows.length) {
+  if (forceAssignTo) {
+    const [rows] = await conn.execute(
+      `SELECT * FROM lead_distribution WHERE is_active = 1 AND username = ?`,
+      [forceAssignTo],
+    );
     repRows = rows;
+    if (!repRows.length) {
+      throw new Error(`Rep ${forceAssignTo} not found in lead_distribution`);
+    }
+  } else {
+    const normalizedLanguage = lead.language?.toUpperCase();
+
+    if (normalizedLanguage === "TAMIL") {
+      const [rows] = await conn.execute(
+        `SELECT *
+         FROM lead_distribution
+         WHERE is_active = 1
+           AND username = 'KAVYA'
+           AND assigned_count < max_leads
+         LIMIT 1`,
+      );
+
+      if (rows.length) {
+        repRows = rows;
+      }
+    }
+
+    if (!repRows.length) {
+      const [rows] = await conn.execute(
+        `SELECT *
+         FROM lead_distribution
+         WHERE is_active = 1
+         ORDER BY priority ASC, last_assigned_at ASC`,
+      );
+      repRows = rows;
+    }
   }
-}
 
-// 🟡 STEP 2: fallback round-robin
-if (!repRows.length) {
-  const [rows] = await conn.execute(
-    `SELECT *
-     FROM lead_distribution
-     WHERE is_active = 1
-     ORDER BY priority ASC, last_assigned_at ASC`,
-  );
-  repRows = rows;
-}
-
-if (repRows.length === 0) {
-  throw new Error("No reps available");
-}
+  if (repRows.length === 0) {
+    throw new Error("No reps available");
+  }
 
 
   // Round-robin
