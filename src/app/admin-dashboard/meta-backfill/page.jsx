@@ -840,9 +840,6 @@ export default function MetaBackfillPage() {
         <h2 className="font-medium mb-3 text-cyan-950">
           Tamil leads — Automatic Cron (every 10 min)
         </h2>
-        <p className="text-xs text-cyan-900 mb-3">
-          Form ID {TAMIL_META_FORM_ID} · New leads import to {TAMIL_META_ASSIGNEE_USERNAME}
-        </p>
         <div className="flex flex-wrap gap-2 items-center">
           <button
             type="button"
