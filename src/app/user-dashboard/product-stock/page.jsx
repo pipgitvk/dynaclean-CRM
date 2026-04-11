@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import { Eye, Search, Pencil } from "lucide-react";
 import Link from "next/link";
+import { pickProductImageUrl } from "@/lib/productImageUrl";
 
 function ProductAndSpareLists({ type }) {
   const [rows, setRows] = useState([]);
@@ -81,7 +82,7 @@ function ProductAndSpareLists({ type }) {
                 "_" +
                 idx;
               const imageUrl =
-                type === "product" ? r.image_path || r.product_image : r.image;
+                type === "product" ? pickProductImageUrl(r.image_path, r.product_image) : r.image;
 
               return (
                 <tr key={key} className="border-t">
@@ -146,7 +147,7 @@ function ProductAndSpareLists({ type }) {
           const key =
             (r.item_code || r.spare_number || r.item_name) + "_" + idx;
           const imageUrl =
-            type === "product" ? r.image_path || r.product_image : r.image;
+            type === "product" ? pickProductImageUrl(r.image_path, r.product_image) : r.image;
 
           return (
             <div key={key} className="border rounded-lg p-3 shadow-sm bg-white">
