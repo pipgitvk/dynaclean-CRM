@@ -2,19 +2,14 @@
  * GET /api/cron/meta-backfill
  * Cron endpoint - call every 10 min to auto-fetch leads from Meta and save to DB
  * Optional: ?secret=YOUR_CRON_SECRET (if CRON_SECRET is set in .env)
+ * Dashboard "Test Cron" uses admin session when secret is not sent (see cronAuth).
  */
 import { NextResponse } from "next/server";
+import { isCronRequestAuthorized } from "@/lib/cronAuth";
 
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const secret = searchParams.get("secret");
-    const authHeader = request.headers.get("authorization");
-    const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    const cronSecret = process.env.CRON_SECRET;
-
-    // Accept: ?secret=xxx (cron-job.org, Hostinger) OR Authorization: Bearer xxx (Vercel Cron)
-    if (cronSecret && secret !== cronSecret && bearerToken !== cronSecret) {
+    if (!(await isCronRequestAuthorized(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
