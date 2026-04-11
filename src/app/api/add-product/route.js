@@ -68,27 +68,83 @@ import { getSessionPayload } from "@/lib/auth";
 import fs from 'fs/promises';
 import path from 'path';
 import heicConvert from 'heic-convert';
+import { v2 as cloudinary } from 'cloudinary';
 
-async function saveImageFile(file, productDir, item_name, item_code) {
+/**
+ * Cloudinary when creds exist and either:
+ * - NODE_ENV=production (real production deploy), or
+ * - PRODUCT_IMAGES_USE_CLOUDINARY=true — use when you run `npm run dev` locally but DB points to production (otherwise NODE_ENV is development and paths would stay /product_images/... on your PC only).
+ * Force disk: PRODUCT_IMAGES_FORCE_LOCAL=true
+ */
+function useCloudinaryForProductImages() {
+    if (process.env.PRODUCT_IMAGES_FORCE_LOCAL === '1' || process.env.PRODUCT_IMAGES_FORCE_LOCAL === 'true') {
+        return false;
+    }
+    const hasCreds = Boolean(
+        process.env.CLOUDINARY_CLOUD_NAME &&
+        process.env.CLOUDINARY_API_KEY &&
+        process.env.CLOUDINARY_API_SECRET
+    );
+    if (!hasCreds) return false;
+    const optIn =
+        process.env.PRODUCT_IMAGES_USE_CLOUDINARY === '1' ||
+        process.env.PRODUCT_IMAGES_USE_CLOUDINARY === 'true';
+    if (optIn) return true;
+    return process.env.NODE_ENV === 'production';
+}
+
+function safePathSegment(seg) {
+    return String(seg ?? 'x').replace(/[^\w.-]+/g, '_').slice(0, 120) || 'x';
+}
+
+async function prepareProductImageBuffer(file) {
     const originalName = file.name.replace(/ /g, '_');
     const ext = path.extname(originalName).toLowerCase();
     const isHeic = ext === '.heic' || ext === '.heif';
-
-    const baseName = path.basename(originalName, ext);
-    const outputExt = isHeic ? '.jpg' : ext;
-    const fileName = `${Date.now()}-${baseName}${outputExt}`;
-    const filePath = path.join(productDir, fileName);
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-
+    let buffer = Buffer.from(await file.arrayBuffer());
+    let outExt = ext;
     if (isHeic) {
-        const jpegBuffer = await heicConvert({ buffer, format: 'JPEG', quality: 0.9 });
-        await fs.writeFile(filePath, Buffer.from(jpegBuffer));
-    } else {
-        await fs.writeFile(filePath, buffer);
+        buffer = Buffer.from(await heicConvert({ buffer, format: 'JPEG', quality: 0.9 }));
+        outExt = '.jpg';
+    }
+    const baseStem = path.basename(originalName, path.extname(originalName));
+    const fileName = `${Date.now()}-${baseStem}${outExt}`;
+    return { buffer, fileName };
+}
+
+async function uploadBufferToCloudinary(buffer, folder) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder, resource_type: 'image' },
+            (error, result) => {
+                if (error) reject(error);
+                else resolve(result?.secure_url || '');
+            }
+        );
+        stream.end(buffer);
+    });
+}
+
+async function saveProductImage(file, item_name, item_code) {
+    const { buffer, fileName } = await prepareProductImageBuffer(file);
+    const relPath = `/product_images/products/${item_name}/${item_code}/${fileName}`;
+
+    if (useCloudinaryForProductImages()) {
+        const folder = `product_images/products/${safePathSegment(item_name)}/${safePathSegment(item_code)}`;
+        const url = await uploadBufferToCloudinary(buffer, folder);
+        if (!url) throw new Error('Cloudinary upload returned no URL');
+        return url;
     }
 
-    return `/product_images/products/${item_name}/${item_code}/${fileName}`;
+    const productDir = path.join(process.cwd(), 'public/product_images/products', item_name, item_code);
+    await fs.mkdir(productDir, { recursive: true });
+    await fs.writeFile(path.join(productDir, fileName), buffer);
+    return relPath;
 }
 
 // Check if a product code exists (case-insensitive)
@@ -131,9 +187,6 @@ export async function POST(request) {
     }
 
     try {
-        const productDir = path.join(process.cwd(), 'public/product_images/products', item_name, item_code);
-        await fs.mkdir(productDir, { recursive: true });
-
         const imagePaths = {};
         const imageFiles = [];
         const imageKeys = ['product_image', 'img_1', 'img_2', 'img_3', 'img_4', 'img_5'];
@@ -141,9 +194,9 @@ export async function POST(request) {
         for (const key of imageKeys) {
             const file = formData.get(key);
             if (file instanceof File) {
-                const relativePath = await saveImageFile(file, productDir, item_name, item_code);
-                imagePaths[key] = relativePath;
-                imageFiles.push(relativePath);
+                const storedPath = await saveProductImage(file, item_name, item_code);
+                imagePaths[key] = storedPath;
+                imageFiles.push(storedPath);
             } else {
                 imagePaths[key] = '';
             }
