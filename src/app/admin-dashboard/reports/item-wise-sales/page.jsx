@@ -12,23 +12,31 @@ export default function ItemWiseSalesPage() {
   const [from, setFrom] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [to, setTo] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
   const [employee, setEmployee] = useState("");
-  const [employees, setEmployees] = useState([]);
+  const [employeeOptions, setEmployeeOptions] = useState([]);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/empcrm/employees");
-        const json = await res.json();
-        if (json.success && Array.isArray(json.employees)) {
-          setEmployees(json.employees);
+        const q = new URLSearchParams({ from, to });
+        const res = await fetch(`/api/reports/item-wise-sales/employees?${q}`);
+        if (!res.ok) {
+          setEmployeeOptions([]);
+          return;
         }
+        const list = await res.json();
+        setEmployeeOptions(Array.isArray(list) ? list : []);
       } catch (e) {
         console.error(e);
+        setEmployeeOptions([]);
       }
     })();
-  }, []);
+  }, [from, to]);
+
+  useEffect(() => {
+    setEmployee((prev) => (prev && !employeeOptions.includes(prev) ? "" : prev));
+  }, [employeeOptions]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -139,9 +147,9 @@ export default function ItemWiseSalesPage() {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors bg-white"
           >
             <option value="">All employees</option>
-            {employees.map((empRow) => (
-              <option key={empRow.username} value={empRow.username}>
-                {empRow.username}
+            {employeeOptions.map((username) => (
+              <option key={username} value={username}>
+                {username}
               </option>
             ))}
           </select>
