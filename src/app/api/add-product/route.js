@@ -70,17 +70,27 @@ import path from 'path';
 import heicConvert from 'heic-convert';
 import { v2 as cloudinary } from 'cloudinary';
 
-/** Local dev: save under public/… — works on localhost. Production: upload to Cloudinary so app.dynacleanindustries.com can serve images (server disk is not writable / not deployed with uploads). */
+/**
+ * Cloudinary when creds exist and either:
+ * - NODE_ENV=production (real production deploy), or
+ * - PRODUCT_IMAGES_USE_CLOUDINARY=true — use when you run `npm run dev` locally but DB points to production (otherwise NODE_ENV is development and paths would stay /product_images/... on your PC only).
+ * Force disk: PRODUCT_IMAGES_FORCE_LOCAL=true
+ */
 function useCloudinaryForProductImages() {
     if (process.env.PRODUCT_IMAGES_FORCE_LOCAL === '1' || process.env.PRODUCT_IMAGES_FORCE_LOCAL === 'true') {
         return false;
     }
-    if (process.env.NODE_ENV !== 'production') return false;
-    return Boolean(
+    const hasCreds = Boolean(
         process.env.CLOUDINARY_CLOUD_NAME &&
         process.env.CLOUDINARY_API_KEY &&
         process.env.CLOUDINARY_API_SECRET
     );
+    if (!hasCreds) return false;
+    const optIn =
+        process.env.PRODUCT_IMAGES_USE_CLOUDINARY === '1' ||
+        process.env.PRODUCT_IMAGES_USE_CLOUDINARY === 'true';
+    if (optIn) return true;
+    return process.env.NODE_ENV === 'production';
 }
 
 function safePathSegment(seg) {
