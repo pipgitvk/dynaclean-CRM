@@ -67,6 +67,29 @@ import { getDbConnection } from '@/lib/db';
 import { getSessionPayload } from "@/lib/auth";
 import fs from 'fs/promises';
 import path from 'path';
+import heicConvert from 'heic-convert';
+
+async function saveImageFile(file, productDir, item_name, item_code) {
+    const originalName = file.name.replace(/ /g, '_');
+    const ext = path.extname(originalName).toLowerCase();
+    const isHeic = ext === '.heic' || ext === '.heif';
+
+    const baseName = path.basename(originalName, ext);
+    const outputExt = isHeic ? '.jpg' : ext;
+    const fileName = `${Date.now()}-${baseName}${outputExt}`;
+    const filePath = path.join(productDir, fileName);
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (isHeic) {
+        const jpegBuffer = await heicConvert({ buffer, format: 'JPEG', quality: 0.9 });
+        await fs.writeFile(filePath, Buffer.from(jpegBuffer));
+    } else {
+        await fs.writeFile(filePath, buffer);
+    }
+
+    return `/product_images/products/${item_name}/${item_code}/${fileName}`;
+}
 
 // Check if a product code exists (case-insensitive)
 export async function GET(request) {
@@ -118,11 +141,7 @@ export async function POST(request) {
         for (const key of imageKeys) {
             const file = formData.get(key);
             if (file instanceof File) {
-                const fileName = `${Date.now()}-${file.name.replace(/ /g, '_')}`;
-                const filePath = path.join(productDir, fileName);
-                await fs.writeFile(filePath, Buffer.from(await file.arrayBuffer()));
-
-                const relativePath = `/product_images/products/${item_name}/${item_code}/${fileName}`;
+                const relativePath = await saveImageFile(file, productDir, item_name, item_code);
                 imagePaths[key] = relativePath;
                 imageFiles.push(relativePath);
             } else {
@@ -168,15 +187,15 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Failed to add product.' }, { status: 500 });
         }
 
-        // 2. Insert each image path into the product_images table
+        // 2. Insert the primary image path into the product_images table
         try {
-            const productImageQuery = `
-                INSERT INTO product_images (item_code, image_path)
-                VALUES (?, ?)
-            `;
-
-            const insertImagePromises = imageFiles.map(image_path => db.execute(productImageQuery, [item_code, image_path]));
-            await Promise.all(insertImagePromises);
+            const primaryImage = imageFiles[0];
+            if (primaryImage) {
+                await db.execute(
+                    `INSERT IGNORE INTO product_images (item_code, image_path) VALUES (?, ?)`,
+                    [item_code, primaryImage]
+                );
+            }
         } catch (error) {
             console.error('Image insert failed:', error);
             return NextResponse.json({ error: 'Failed to add product images.' }, { status: 500 });
