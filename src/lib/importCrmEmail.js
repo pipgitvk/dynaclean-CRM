@@ -17,10 +17,10 @@ export function getImportCrmPublicBaseUrl() {
  * - Optional: SMTP_FROM=full@address — use if "from" must differ; many hosts need SMTP_USER = full mailbox email.
  */
 function createImportCrmTransporter() {
-  const host = process.env.SMTP_HOST?.trim();
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS?.trim();
+  const host = (process.env.IMPORT_CRM_SMTP_HOST || process.env.SMTP_HOST)?.trim();
+  const port = Number(process.env.IMPORT_CRM_SMTP_PORT || process.env.SMTP_PORT || 587);
+  const user = (process.env.IMPORT_CRM_SMTP_USER || process.env.SMTP_USER)?.trim();
+  const pass = (process.env.IMPORT_CRM_SMTP_PASS || process.env.SMTP_PASS)?.trim();
   if (!host || !user) {
     throw new Error("SMTP not configured (SMTP_HOST / SMTP_USER)");
   }
@@ -53,8 +53,8 @@ function createImportCrmTransporter() {
 }
 
 export async function sendImportCrmSmtpEmail({ to, subject, html, text }) {
-  const user = process.env.SMTP_USER?.trim();
-  const fromOverride = process.env.SMTP_FROM?.trim();
+  const user = (process.env.IMPORT_CRM_SMTP_USER || process.env.SMTP_USER)?.trim();
+  const fromOverride = (process.env.IMPORT_CRM_SMTP_FROM || process.env.SMTP_FROM)?.trim();
   const from = fromOverride
     ? `"Dynaclean Industries" <${fromOverride}>`
     : `"Dynaclean Industries" <${user}>`;
