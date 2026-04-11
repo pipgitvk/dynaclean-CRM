@@ -7,18 +7,13 @@
 import { NextResponse } from "next/server";
 import { importNewTamilFormLeads } from "@/lib/tamilFormMetaLeads";
 import { getTamilCronDateRange } from "@/lib/metaTamilLeadForm";
+import { isCronRequestAuthorized } from "@/lib/cronAuth";
 
 export const maxDuration = 300;
 
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const secret = searchParams.get("secret");
-    const authHeader = request.headers.get("authorization");
-    const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    const cronSecret = process.env.CRON_SECRET;
-
-    if (cronSecret && secret !== cronSecret && bearerToken !== cronSecret) {
+    if (!(await isCronRequestAuthorized(request))) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
