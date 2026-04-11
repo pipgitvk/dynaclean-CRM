@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import { Eye, Search, Pencil } from "lucide-react";
 import Link from "next/link";
+import { pickProductImageUrl } from "@/lib/productImageUrl";
 
 
 function ProductAndSpareLists({ type }) {
@@ -117,7 +118,7 @@ function ProductAndSpareLists({ type }) {
           <tbody>
             {view.map((r, idx) => {
               const key = (r.item_code || r.spare_number || r.item_name || "row") + "_" + idx;
-              const imageUrl = type === "product" ? (r.image_path || r.product_image) : r.image;
+              const imageUrl = type === "product" ? pickProductImageUrl(r.image_path, r.product_image) : r.image;
 
               return (
                 <tr key={key} className="border-t">
@@ -247,7 +248,7 @@ function ProductAndSpareLists({ type }) {
         {view.map((r, idx) => {
           const key = (r.item_code || r.spare_number || r.item_name) + "_" + idx;
           const imageUrl = type === "product"
-            ? (r.image_path || r.product_image)
+            ? pickProductImageUrl(r.image_path, r.product_image)
             : r.image;
 
           return (
