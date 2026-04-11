@@ -126,7 +126,7 @@ export default function OrderTable({ orders, userRole }) {
         const orderStatus = getStatusText(order)
           .text.toLowerCase()
           .replace(/\s+/g, "");
-        if (orderStatus !== statusFilter.toLowerCase()) return false;
+        if (orderStatus !== statusFilter.toLowerCase()) return false; 
       }
 
       // Step 2: Date range filter (created_at)
