@@ -70,7 +70,11 @@ export async function POST(request) {
   console.log("🔔 Webhook received:", JSON.stringify(body, null, 2));
 
   const entry = body?.entry?.[0];
-  const leadgen_id = entry?.changes?.[0]?.value?.leadgen_id;
+  const changeValue = entry?.changes?.[0]?.value ?? {};
+  const leadgen_id = changeValue.leadgen_id;
+  /** Meta often sends form_id here; Graph /{leadgen_id} sometimes omits it — use both for Tamil routing */
+  const formIdFromWebhook =
+    changeValue.form_id != null ? String(changeValue.form_id) : null;
 
   if (!leadgen_id) {
     return new Response("Missing leadgen_id", { status: 400 });
@@ -95,8 +99,9 @@ export async function POST(request) {
     }
 
     const fieldData = leadData?.field_data || [];
-    const formIdFromLead =
+    const formIdFromGraph =
       leadData?.form_id != null ? String(leadData.form_id) : null;
+    const formIdForRouting = formIdFromGraph || formIdFromWebhook;
     // Prefer ad_id from Graph API — webhook payload often omits it
     const ad_id =
       leadData?.ad_id || entry?.changes?.[0]?.value?.ad_id || null;
@@ -157,7 +162,7 @@ export async function POST(request) {
     // --- Assign rep: fixed form (Tamil pipeline) → KAVYA; else language Tamil → KAVYA; else round-robin ---
     let assignedRep = null;
 
-    if (formIdFromLead === TAMIL_META_FORM_ID) {
+    if (formIdForRouting === TAMIL_META_FORM_ID) {
       assignedRep = repRows.find((r) => r.username === TAMIL_META_ASSIGNEE_USERNAME) || null;
       if (!assignedRep) {
         console.error(
