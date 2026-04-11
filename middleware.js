@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
+/** Must match `ATTENDANCE_RULES_ALLOWED_ROLES` in `@/lib/adminAttendanceRulesAuth`. */
+const ATTENDANCE_RULES_MIDDLEWARE_ROLES = ["SUPERADMIN", "ADMIN", "HR"];
+
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
 export async function middleware(request) {
@@ -46,6 +49,18 @@ export async function middleware(request) {
       const { payload } = await jwtVerify(token, secret);
       const role = payload.role;
       const isImpersonated = payload.impersonated;
+      const roleKey = normalizeRoleKey(role || "");
+
+      // Same roles as getAdminSidebarMenuItems "Attendance rules" — must not block here,
+      // otherwise ADMIN/HR see the link but middleware sends them to /user-dashboard.
+      if (pathname.startsWith("/admin-dashboard/attendance-rules")) {
+        const canAttendanceRules = ATTENDANCE_RULES_MIDDLEWARE_ROLES.some(
+          (r) => normalizeRoleKey(r) === roleKey,
+        );
+        if (canAttendanceRules) {
+          return NextResponse.next();
+        }
+      }
 
       if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN") {
         return NextResponse.redirect(new URL("/user-dashboard", request.url));
