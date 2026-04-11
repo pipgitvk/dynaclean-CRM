@@ -38,20 +38,35 @@ export function getHoursUntilSchedule(row) {
 
 /** Flat mid-tones — no near-white stops (avoids washed-out cards). */
 const SLATE_FALLBACK =
-  "linear-gradient(165deg, rgb(100, 116, 138) 0%, rgb(118, 132, 152) 100%)";
+  "linear-gradient(165deg, rgb(108, 122, 144) 0%, rgb(126, 138, 158) 100%)";
+
+/** Darker slate — card outer when schedule is missing (pairs with SLATE_FALLBACK on inner panel). */
+const SLATE_OUTER =
+  "linear-gradient(165deg, rgb(96, 112, 132) 0%, rgb(112, 128, 144) 100%)";
 
 const TRAFFIC_RED =
-  "linear-gradient(165deg, rgb(198, 105, 105) 0%, rgb(175, 88, 88) 100%)";
+  "linear-gradient(165deg, rgb(228, 138, 138) 0%, rgb(212, 122, 122) 100%)";
 
-const TRAFFIC_YELLOW =
-  "linear-gradient(165deg, rgb(200, 155, 70) 0%, rgb(185, 140, 58) 100%)";
+const TRAFFIC_RED_OUTER =
+  "linear-gradient(165deg, rgb(210, 128, 128) 0%, rgb(192, 112, 112) 100%)";
+
+/** Medium-urgency band (24–72h): light blue instead of amber/yellow for clearer contrast with red/green. */
+const TRAFFIC_LIGHT_BLUE =
+  "linear-gradient(165deg, rgb(138, 192, 235) 0%, rgb(110, 170, 225) 100%)";
+
+const TRAFFIC_LIGHT_BLUE_OUTER =
+  "linear-gradient(165deg, rgb(126, 172, 220) 0%, rgb(116, 164, 212) 100%)";
 
 const TRAFFIC_GREEN =
-  "linear-gradient(165deg, rgb(72, 145, 108) 0%, rgb(58, 128, 95) 100%)";
+  "linear-gradient(165deg, rgb(102, 178, 138) 0%, rgb(88, 162, 128) 100%)";
+
+const TRAFFIC_GREEN_OUTER =
+  "linear-gradient(165deg, rgb(90, 168, 130) 0%, rgb(78, 152, 118) 100%)";
 
 /**
- * Discrete dashboard colours: red (soon/overdue), yellow (medium), green (later).
- * Thresholds: ≤24h or overdue → red; 24–72h → yellow; &gt;72h → green.
+ * Discrete traffic colours for the **hiring card background** (red / light blue / green by due window).
+ * Thresholds: ≤24h or overdue → red; 24–72h → light blue; &gt;72h → green.
+ * The Contact/Role/Schedule block uses a white panel on top of this (see HiringEntryCard).
  */
 export function getTrafficGradientForHours(hours) {
   if (hours == null || Number.isNaN(hours)) {
@@ -61,25 +76,64 @@ export function getTrafficGradientForHours(hours) {
     return TRAFFIC_RED;
   }
   if (hours <= 72) {
-    return TRAFFIC_YELLOW;
+    return TRAFFIC_LIGHT_BLUE;
   }
   return TRAFFIC_GREEN;
+}
+
+/**
+ * Darker traffic variants (optional); not used by the current hiring card layout.
+ */
+export function getTrafficOuterGradientForHours(hours) {
+  if (hours == null || Number.isNaN(hours)) {
+    return SLATE_OUTER;
+  }
+  if (hours < 0 || hours <= 24) {
+    return TRAFFIC_RED_OUTER;
+  }
+  if (hours <= 72) {
+    return TRAFFIC_LIGHT_BLUE_OUTER;
+  }
+  return TRAFFIC_GREEN_OUTER;
+}
+
+/**
+ * Hours used for traffic red / light blue / green (or slate when `null`).
+ * Returns `undefined` when this row uses a non-traffic card background (e.g. plain Hired, Reject).
+ */
+export function getHoursForTrafficCard(row, colorScheme) {
+  if (colorScheme !== "traffic") return undefined;
+  const st = String(row?.status || "").trim();
+  const hiredFollowUpTag = st === "Hired" && String(row?.tag || "").trim() === "Follow-Up";
+  if (hiredFollowUpTag) {
+    const ms = getScheduleMsForFollowUpCard(row);
+    if (ms != null && !Number.isNaN(ms)) {
+      return (ms - Date.now()) / 3600000;
+    }
+    return undefined;
+  }
+  if (st === "Hired" || st === "Reject") return undefined;
+  const ms = getScheduleMsForFollowUpCard(row);
+  if (ms == null || Number.isNaN(ms)) {
+    return null;
+  }
+  return (ms - Date.now()) / 3600000;
 }
 
 export const HIRING_URGENCY_LEGEND = [
   {
     key: "red",
     label: "Red",
-    dotClass: "bg-gradient-to-r from-rose-400 to-rose-200",
+    dotClass: "bg-gradient-to-r from-rose-200 to-rose-50",
   },
   {
-    key: "yellow",
-    label: "Yellow",
-    dotClass: "bg-gradient-to-r from-amber-400 to-amber-200",
+    key: "lightBlue",
+    label: "Light blue",
+    dotClass: "bg-gradient-to-r from-sky-300 to-sky-100",
   },
   {
     key: "green",
     label: "Green",
-    dotClass: "bg-gradient-to-r from-emerald-400 to-emerald-200",
+    dotClass: "bg-gradient-to-r from-emerald-200 to-emerald-50",
   },
 ];
