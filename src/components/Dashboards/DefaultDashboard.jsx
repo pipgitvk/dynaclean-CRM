@@ -10,6 +10,8 @@ import { canAccessHiringModule, canViewHrTargetChart } from "@/lib/hrTargetEligi
 export default function DefaultDashboard({ user }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
   const showHrCandidatesFollowUp = canAccessHiringModule(user?.userRole);
+  const isHrRole = String(user?.userRole || "").trim() === "HR";
+  const welcomeNameClass = isHrRole ? "text-sky-600" : "text-green-700";
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -25,7 +27,7 @@ export default function DefaultDashboard({ user }) {
             <ProfilePicUploader user={user} />
             <div>
               <h1 className="text-3xl font-semibold">
-                Welcome, <span className="text-green-700">{user.username}</span>
+                Welcome, <span className={welcomeNameClass}>{user.username}</span>
               </h1>
               <p className="text-sm text-gray-500">Role: {user.userRole}</p>
             </div>
