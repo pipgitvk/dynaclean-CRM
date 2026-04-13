@@ -28,6 +28,7 @@ export const MODULE_TREE = [
       { key: "orders-delay",                 label: "Delay Delivery" },
       { key: "bulk-reassign",                label: "Bulk Reassign Leads" },
       { key: "my-leads",                     label: "My Leads" },
+      { key: "leads-upload",                label: "Leads Upload" },
       { key: "dm-fresh-leads",               label: "24h Fresh Leads (DM)" },
       { key: "task-manager",                 label: "Task Manager" },
       { key: "demo-details",                 label: "Demo Details" },
@@ -84,6 +85,7 @@ export const MODULE_TREE = [
     children: [
       { key: "employee-list",  label: "Employee List" },
       { key: "employee-crm",   label: "Employee CRM" },
+      { key: "attendance-log", label: "All Attendance details" },
     ],
   },
   {
@@ -185,11 +187,6 @@ export function parseModuleAccess(raw) {
  * even under backward-compat "grant all when module_access is NULL".
  */
 export const SUPERADMIN_ONLY_MODULE_KEYS = new Set([
-  // Products
-  "spare-parts",
-  // Documents
-  "documents",
-  "company-documents",
   // Admin-only features
   "attendance-rules",
   "import-crm",

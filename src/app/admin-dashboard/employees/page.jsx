@@ -3,24 +3,32 @@ import EmpTable from "./EmpTable";
 import { getDbConnection } from "@/lib/db";
 
 async function getEmployees() {
-  const connection = await getDbConnection();
+  let connection;
+  try {
+    connection = await getDbConnection();
+  } catch (e) {
+    // DB not configured/running → show empty table instead of crashing page.
+    return [];
+  }
   try {
     const [rows] = await connection.execute(
       "SELECT username, email, gender, password, number, empId, userRole, reporting_manager, status FROM rep_list"
     );
     return rows;
   } catch (e) {
-    // Dev/preview resilience: if DB is down, render page with empty data instead of 500.
-    if (e?.code === "ECONNREFUSED" || String(e?.message || "").includes("ECONNREFUSED")) {
-      return [];
+    // Dev/preview resilience: never crash the page due to DB/network/schema issues.
+    const msg = String(e?.message || "");
+    if (msg.includes("reporting_manager")) {
+      try {
+        const [rows] = await connection.execute(
+          "SELECT username, email, gender, password, number, empId, userRole, status FROM rep_list"
+        );
+        return rows.map((r) => ({ ...r, reporting_manager: null }));
+      } catch {
+        return [];
+      }
     }
-    if (e.message?.includes("reporting_manager")) {
-      const [rows] = await connection.execute(
-        "SELECT username, email, gender, password, number, empId, userRole, status FROM rep_list"
-      );
-      return rows.map((r) => ({ ...r, reporting_manager: null }));
-    }
-    throw e;
+    return [];
   }
 }
 

@@ -235,7 +235,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/attendance-log/",
     name: "All Attendance details",
-    moduleKey: "dashboard",
+    moduleKey: "attendance-log",
     roles: ["ADMIN", "ACCOUNTANT", "HR", "TEAM LEADER"],
     icon: "ListOrdered",
   },
@@ -679,6 +679,176 @@ export default async function getSidebarMenuItems() {
 
   // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
   items = stripSuperadminOnlyMenuItems(items, roleKey);
+
+  // Accountant should only see a very small allowlist of screens.
+  if (roleKey === "ACCOUNTANT") {
+    const allowedExactPaths = new Set([
+      "/user-dashboard",
+      "/user-dashboard/",
+    ]);
+    const allowedPrefixes = [
+      "/user-dashboard/manual-payments",
+      "/user-dashboard/dd-management",
+      "/user-dashboard/company-documents",
+      "/admin-dashboard/client-expenses",
+      "/admin-dashboard/statements",
+      "/user-dashboard/monitor-targets",
+      "/user-dashboard/invoices",
+      "/user-dashboard/reports/payment-pending",
+      "/user-dashboard/reports/customer-payment-behavior",
+      "/user-dashboard/attendance-log",
+      "/user-dashboard/quotations",
+      "/user-dashboard/all-expenses",
+      "/user-dashboard/view_service_reports",
+      "/user-dashboard/assets-management",
+      "/user-dashboard/product-stock",
+      "/user-dashboard/product-accessories",
+      "/user-dashboard/purchase",
+      "/user-dashboard/spare",
+      "/user-dashboard/spare/purchase",
+      "/user-dashboard/productions",
+      "/empcrm/user-dashboard",
+    ];
+
+    const isAllowedPath = (p) => {
+      const path = String(p || "");
+      if (allowedExactPaths.has(path)) return true;
+      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
+    };
+
+    const filterByPathAllowlist = (list) =>
+      (list || [])
+        .map((item) => {
+          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
+          if (
+            item?.moduleKey === "dashboard" &&
+            item?.path === "/user-dashboard" &&
+            Array.isArray(item?.children) &&
+            item.children.length > 0
+          ) {
+            return item;
+          }
+          const children = item?.children?.length
+            ? filterByPathAllowlist(item.children)
+            : [];
+          const pathOk = item?.path ? isAllowedPath(item.path) : false;
+          if (children.length > 0) return { ...item, children };
+          if (pathOk) return item;
+          // Keep the top-level dashboard container if it has /user-dashboard path
+          return null;
+        })
+        .filter(Boolean);
+
+    items = filterByPathAllowlist(items);
+  }
+
+  // Team Leader should only see a small allowlist of screens.
+  if (roleKey === "TEAM LEADER") {
+    const allowedExactPaths = new Set([
+      "/user-dashboard",
+      "/user-dashboard/",
+    ]);
+    const allowedPrefixes = [
+      "/user-dashboard/tl-customers",
+      "/user-dashboard/customers",
+      "/user-dashboard/add-customer",
+      "/user-dashboard/reports/customer-payment-behavior",
+      "/user-dashboard/reports/payment-pending",
+      "/user-dashboard/reports/item-wise-sales",
+      "/user-dashboard/lead-reports",
+      "/user-dashboard/quot-report",
+      "/user-dashboard/order-followups",
+      "/user-dashboard/demo-registrations",
+      "/user-dashboard/new_upload",
+      "/user-dashboard/my-leads",
+      "/empcrm/user-dashboard",
+      "/empcrm/user-dashboard/profile",
+    ];
+
+    const isAllowedPath = (p) => {
+      const path = String(p || "");
+      if (allowedExactPaths.has(path)) return true;
+      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
+    };
+
+    const filterByPathAllowlist = (list) =>
+      (list || [])
+        .map((item) => {
+          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
+          if (
+            item?.moduleKey === "dashboard" &&
+            item?.path === "/user-dashboard" &&
+            Array.isArray(item?.children) &&
+            item.children.length > 0
+          ) {
+            return item;
+          }
+          const children = item?.children?.length
+            ? filterByPathAllowlist(item.children)
+            : [];
+          const pathOk = item?.path ? isAllowedPath(item.path) : false;
+          if (children.length > 0) return { ...item, children };
+          if (pathOk) return item;
+          return null;
+        })
+        .filter(Boolean);
+
+    items = filterByPathAllowlist(items);
+  }
+
+  // Sales roles should only see a small allowlist of screens.
+  if (roleKey === "SALES" || roleKey === "SALES HEAD") {
+    const allowedExactPaths = new Set([
+      "/user-dashboard",
+      "/user-dashboard/",
+    ]);
+    const allowedPrefixes = [
+      "/user-dashboard/today-reports",
+      "/user-dashboard/lead-reports",
+      "/admin-dashboard/prospects",
+      "/user-dashboard/customers",
+      "/user-dashboard/add-customer",
+      "/user-dashboard/reports/customer-payment-behavior",
+      "/user-dashboard/reports/payment-pending",
+      "/user-dashboard/quotations",
+      "/user-dashboard/order",
+      "/user-dashboard/order/delivery-status",
+      "/user-dashboard/view_service_reports/upcoming-installation",
+      "/user-dashboard/installation-videos",
+      "/user-dashboard/product-stock",
+      "/empcrm/user-dashboard",
+    ];
+
+    const isAllowedPath = (p) => {
+      const path = String(p || "");
+      if (allowedExactPaths.has(path)) return true;
+      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
+    };
+
+    const filterByPathAllowlist = (list) =>
+      (list || [])
+        .map((item) => {
+          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
+          if (
+            item?.moduleKey === "dashboard" &&
+            item?.path === "/user-dashboard" &&
+            Array.isArray(item?.children) &&
+            item.children.length > 0
+          ) {
+            return item;
+          }
+          const children = item?.children?.length
+            ? filterByPathAllowlist(item.children)
+            : [];
+          const pathOk = item?.path ? isAllowedPath(item.path) : false;
+          if (children.length > 0) return { ...item, children };
+          if (pathOk) return item;
+          return null;
+        })
+        .filter(Boolean);
+
+    items = filterByPathAllowlist(items);
+  }
 
   // Step 2: filter by module_access (SUPERADMIN bypasses this — sees everything)
   if (roleKey !== "SUPERADMIN") {
