@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Filter, Pencil, UserPlus, X } from "lucide-react";
+import { CalendarClock, Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
 
 /** Shared field styles */
 const fieldClass =
@@ -64,6 +64,23 @@ function formatInterviewAt(v) {
   try {
     const d = new Date(v);
     if (Number.isNaN(d.getTime())) return String(v).slice(0, 16);
+    return d.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function formatDt(v) {
+  if (v == null || v === "") return "—";
+  try {
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v).slice(0, 19);
     return d.toLocaleString("en-IN", {
       day: "2-digit",
       month: "short",
@@ -147,6 +164,16 @@ export default function HiringPage() {
   const [addOpen, setAddOpen] = useState(false);
   /** Next auto-increment preview from API (global table max + 1). */
   const [nextId, setNextId] = useState(null);
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyEntry, setHistoryEntry] = useState(null);
+  const [historyRows, setHistoryRows] = useState([]);
+  const [historyError, setHistoryError] = useState(null);
+
+  /** Quick status change: same status list as Edit; other fields kept from row snapshot. */
+  /** @type {null | Record<string, any>} */
+  const [followUp, setFollowUp] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -253,8 +280,104 @@ export default function HiringPage() {
     }
   };
 
+  const closeFollowUp = () => setFollowUp(null);
+
+  const openFollowUp = (row) => {
+    setAddOpen(false);
+    setEditing(null);
+    setHistoryOpen(false);
+    setHistoryEntry(null);
+    setHistoryRows([]);
+    setHistoryError(null);
+    setMessage(null);
+    setFollowUp({
+      id: row.id,
+      candidate_name: row.candidate_name ?? "",
+      emp_contact: row.emp_contact ?? "",
+      designation: row.designation ?? "",
+      marital_status: row.marital_status ?? "",
+      experience_type: row.experience_type ?? "",
+      interview_at: toDatetimeLocalValue(row.interview_at),
+      rescheduled_at: toDatetimeLocalValue(row.rescheduled_at),
+      next_followup_at: toDatetimeLocalValue(row.next_followup_at),
+      interview_mode: row.interview_mode ?? "",
+      status: row.status || "Shortlisted for interview",
+      tag: row.tag ?? "",
+      hire_date: row.hire_date ? String(row.hire_date).slice(0, 10) : "",
+      offerPackage: row.package ?? "",
+      probationMonths:
+        row.probation_months != null && row.probation_months !== ""
+          ? String(row.probation_months)
+          : "",
+      note: row.note ?? "",
+    });
+  };
+
+  const updateFollowUp = (key, value) => {
+    setFollowUp((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const handleFollowUpSubmit = async (e) => {
+    e.preventDefault();
+    if (!followUp) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const hired = followUp.status === "Hired";
+      const rescheduled = followUp.status === "Rescheduled";
+      const nextFollowUp = followUp.status === "next-follow-up";
+      const hiredFollowUpTag = hired && followUp.tag === "Follow-Up";
+      const res = await fetch("/api/empcrm/hiring", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: followUp.id,
+          candidate_name: followUp.candidate_name,
+          emp_contact: followUp.emp_contact,
+          designation: followUp.designation,
+          marital_status: followUp.marital_status || null,
+          experience_type: followUp.experience_type || null,
+          interview_at: followUp.interview_at || null,
+          rescheduled_at: rescheduled ? followUp.rescheduled_at || null : null,
+          next_followup_at: nextFollowUp
+            ? followUp.next_followup_at || null
+            : hiredFollowUpTag
+              ? followUp.next_followup_at || null
+              : null,
+          interview_mode: followUp.interview_mode || null,
+          status: followUp.status,
+          tag: hired ? followUp.tag || null : null,
+          hire_date: hired ? followUp.hire_date || null : null,
+          package: hired ? String(followUp.offerPackage || "").trim() || null : null,
+          probation_months:
+            hired && followUp.tag === "Probation" && followUp.probationMonths !== ""
+              ? Number(followUp.probationMonths)
+              : null,
+          note: followUp.note,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setMessage({ type: "error", text: json.error || "Update failed" });
+        return;
+      }
+      setMessage({ type: "ok", text: json.message || "Status updated" });
+      closeFollowUp();
+      load();
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Network error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openEdit = (row) => {
     setAddOpen(false);
+    setFollowUp(null);
+    setHistoryOpen(false);
+    setHistoryEntry(null);
+    setHistoryRows([]);
+    setHistoryError(null);
     setMessage(null);
     setEditing({
       id: row.id,
@@ -341,9 +464,45 @@ export default function HiringPage() {
 
   const openAdd = () => {
     setEditing(null);
+    setFollowUp(null);
+    setHistoryOpen(false);
+    setHistoryEntry(null);
+    setHistoryRows([]);
+    setHistoryError(null);
     setMessage(null);
     resetForm();
     setAddOpen(true);
+  };
+
+  const closeHistory = () => {
+    setHistoryOpen(false);
+    setHistoryEntry(null);
+    setHistoryRows([]);
+    setHistoryError(null);
+  };
+
+  const openHistory = async (entryId) => {
+    setFollowUp(null);
+    setEditing(null);
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryEntry(null);
+    setHistoryRows([]);
+    setHistoryError(null);
+    try {
+      const res = await fetch(`/api/empcrm/hiring/history?entryId=${entryId}`, { cache: "no-store" });
+      const json = await res.json();
+      if (!json.success) {
+        setHistoryError(json.error || "Failed to load history");
+        return;
+      }
+      setHistoryEntry(json.entry || null);
+      setHistoryRows(Array.isArray(json.history) ? json.history : []);
+    } catch (e) {
+      setHistoryError(e.message || "Network error");
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   return (
@@ -541,7 +700,23 @@ export default function HiringPage() {
                         {row.package || "—"}
                       </td>
                       <td className="px-3 py-2.5 text-right sm:px-4">
-                        <div className="inline-flex justify-end">
+                        <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openHistory(row.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-indigo-200/90 bg-indigo-50/90 px-2 py-1 text-xs font-medium text-indigo-800 transition hover:bg-indigo-100"
+                          >
+                            <Eye className="h-3.5 w-3.5 shrink-0" />
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openFollowUp(row)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-amber-200/90 bg-amber-50/90 px-2 py-1 text-xs font-medium text-amber-900 transition hover:bg-amber-100"
+                          >
+                            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                            Follow-up
+                          </button>
                           <button
                             type="button"
                             onClick={() => openEdit(row)}
@@ -560,6 +735,340 @@ export default function HiringPage() {
           </div>
         )}
       </div>
+
+      {historyOpen && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
+          <div className="absolute inset-0" onClick={closeHistory} aria-hidden />
+          <div className="relative z-10 flex max-h-[min(90dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40 px-4 py-4">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-slate-900">Status &amp; notes history</h2>
+                {historyEntry && (
+                  <p className="mt-1 text-sm text-slate-600">
+                    <span className="font-medium text-slate-800">{historyEntry.candidate_name}</span>
+                    {" · "}
+                    <span className="text-slate-500">#{historyEntry.id}</span>
+                    {historyEntry.designation ? (
+                      <>
+                        {" · "}
+                        <span className="text-slate-600">{historyEntry.designation}</span>
+                      </>
+                    ) : null}
+                  </p>
+                )}
+                {historyEntry && (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                    <span>
+                      Record created {formatDt(historyEntry.created_at)}
+                    </span>
+                    <span className="text-slate-300" aria-hidden>
+                      ·
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="font-medium text-slate-600">Current status:</span>
+                      <StatusChip status={historyEntry.status} />
+                    </span>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={closeHistory}
+                className="rounded-xl p-2 text-slate-500 hover:bg-white hover:text-slate-800"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              {historyLoading ? (
+                <div className="flex items-center justify-center gap-2 py-10 text-slate-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Loading…
+                </div>
+              ) : historyError ? (
+                <p className="py-6 text-center text-sm text-red-700">{historyError}</p>
+              ) : (
+                <>
+                  {historyEntry ? (
+                    <div className="mb-5 rounded-xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/90 to-white px-3.5 py-3 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/90">Note * (latest saved)</p>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">
+                        {historyEntry.note != null && String(historyEntry.note).trim() !== ""
+                          ? String(historyEntry.note)
+                          : "—"}
+                      </p>
+                    </div>
+                  ) : null}
+                  {historyRows.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-slate-500">
+                      No history yet. Save status changes or notes to build a timeline.
+                    </p>
+                  ) : (
+                <ol className="relative space-y-0 border-l-[3px] border-indigo-200 pl-4">
+                  {historyRows.map((h) => {
+                    const sb = h.status_before != null ? String(h.status_before) : "";
+                    const sa = h.status_after != null ? String(h.status_after) : "";
+                    const noteOnly = sb !== "" && sa !== "" && sb === sa;
+                    const noteText =
+                      h.note != null && String(h.note).trim() !== "" ? String(h.note).trim() : null;
+                    return (
+                      <li key={h.id} className="relative pb-7 last:pb-0">
+                        <span className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-indigo-600 shadow-sm ring-2 ring-indigo-200/60" />
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                          {formatDt(h.logged_at)}
+                        </p>
+                        <p className="mt-1.5 text-sm leading-snug text-slate-800">
+                          {sb === "" ? (
+                            <>
+                              <span className="font-semibold text-emerald-800">Created</span>
+                              <span className="text-slate-600"> – Status: </span>
+                              <span className="font-medium text-slate-900">{sa}</span>
+                            </>
+                          ) : noteOnly ? (
+                            <>
+                              <span className="font-semibold text-slate-800">Note updated</span>
+                              <span className="text-slate-600"> – Status: </span>
+                              <span className="font-medium text-slate-900">{sa}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-slate-700">Status: </span>
+                              <span className="text-slate-400 line-through decoration-slate-400">{sb}</span>
+                              <span className="text-slate-600"> → </span>
+                              <span className="font-semibold text-indigo-900">{sa}</span>
+                            </>
+                          )}
+                        </p>
+                        <div className="mt-2 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-2">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Note *</p>
+                          <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap break-words">
+                            {noteText ?? "—"}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">
+                          By <span className="font-medium text-slate-600">{h.actor_username}</span>
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ol>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {followUp && (
+        <div
+          className="fixed inset-0 z-[96] flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="follow-up-title"
+        >
+          <div
+            className="absolute inset-0"
+            onClick={() => !saving && closeFollowUp()}
+            aria-hidden
+          />
+          <div className="relative z-10 mx-0 max-h-[min(92dvh,100%)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-slate-200/90 bg-white shadow-2xl sm:mx-auto sm:max-h-[90vh] sm:rounded-2xl">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-amber-50/80 to-indigo-50/30 px-4 py-3.5 sm:px-5 sm:py-4">
+              <div className="min-w-0">
+                <h2 id="follow-up-title" className="text-base font-semibold text-slate-900 sm:text-lg">
+                  Follow-up <span className="font-normal text-slate-500">#{followUp.id}</span>
+                </h2>
+                <p className="mt-0.5 text-sm font-medium text-slate-800">{followUp.candidate_name}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Update status, note, and any fields required for the new status. Name and interview details stay in
+                  Edit.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => !saving && closeFollowUp()}
+                className="rounded-xl p-2 text-slate-500 transition hover:bg-white/80 hover:text-slate-800"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleFollowUpSubmit} className="space-y-4 px-4 py-4 sm:px-5 sm:py-5 pb-6">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Status *</label>
+                <select
+                  required
+                  value={followUp.status}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setFollowUp((prev) => {
+                      if (!prev) return prev;
+                      const next = { ...prev, status: v };
+                      if (v !== "Hired") {
+                        next.tag = "";
+                        next.hire_date = "";
+                        next.offerPackage = "";
+                        next.probationMonths = "";
+                      }
+                      if (v !== "Rescheduled") next.rescheduled_at = "";
+                      if (v !== "next-follow-up" && v !== "Hired") next.next_followup_at = "";
+                      return next;
+                    });
+                  }}
+                  className={`w-full ${fieldClass} min-h-[44px]`}
+                >
+                  {hiringStatusSelectOptions(followUp?.status).map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {followUp.status === "Rescheduled" && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Rescheduled date &amp; time *</label>
+                  <input
+                    type="datetime-local"
+                    required={followUp.status === "Rescheduled"}
+                    value={followUp.rescheduled_at}
+                    onChange={(e) => updateFollowUp("rescheduled_at", e.target.value)}
+                    className={formFieldClass}
+                  />
+                </div>
+              )}
+
+              {followUp.status === "next-follow-up" && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Next follow-up date &amp; time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required={followUp.status === "next-follow-up"}
+                    value={followUp.next_followup_at ?? ""}
+                    onChange={(e) => updateFollowUp("next_followup_at", e.target.value)}
+                    className={formFieldClass}
+                  />
+                </div>
+              )}
+
+              {followUp.status === "Hired" && (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-4">
+                  <p className="text-sm font-semibold text-indigo-900">Hired — joining &amp; package</p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Joining date *</label>
+                      <input
+                        type="date"
+                        required={followUp.status === "Hired"}
+                        value={followUp.hire_date}
+                        onChange={(e) => updateFollowUp("hire_date", e.target.value)}
+                        className={formFieldClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Package *</label>
+                      <input
+                        type="text"
+                        required={followUp.status === "Hired"}
+                        value={followUp.offerPackage}
+                        onChange={(e) => updateFollowUp("offerPackage", e.target.value)}
+                        className={formFieldClass}
+                        placeholder="e.g. CTC, LPA"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Tags *</label>
+                      <select
+                        required={followUp.status === "Hired"}
+                        value={followUp.tag}
+                        onChange={(e) => {
+                          const t = e.target.value;
+                          setFollowUp((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  tag: t,
+                                  probationMonths: t !== "Probation" ? "" : prev.probationMonths,
+                                  next_followup_at: t !== "Follow-Up" ? "" : prev.next_followup_at,
+                                }
+                              : prev
+                          );
+                        }}
+                        className={`w-full ${formSelectClass}`}
+                      >
+                        <option value="">— Select —</option>
+                        {TAG_OPTIONS.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {followUp.status === "Hired" && followUp.tag === "Follow-Up" && (
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">
+                          Follow-up date &amp; time (optional)
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={followUp.next_followup_at ?? ""}
+                          onChange={(e) => updateFollowUp("next_followup_at", e.target.value)}
+                          className={formFieldClass}
+                        />
+                      </div>
+                    )}
+                    {followUp.tag === "Probation" && (
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Probation (months) *</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={120}
+                          required
+                          value={followUp.probationMonths}
+                          onChange={(e) => updateFollowUp("probationMonths", e.target.value)}
+                          className={`max-w-[200px] ${formFieldClass}`}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Note *</label>
+                <input
+                  required
+                  value={followUp.note}
+                  onChange={(e) => updateFollowUp("note", e.target.value)}
+                  className={formFieldClass}
+                  placeholder="Enter note"
+                />
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() => !saving && closeFollowUp()}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 sm:w-auto"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="w-full rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/25 transition hover:bg-indigo-700 disabled:opacity-50 sm:w-auto"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {addOpen && (
         <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="add-employee-title">
@@ -970,160 +1479,24 @@ export default function HiringPage() {
                     ))}
                   </select>
                 </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Status *</label>
-                  <select
-                    required
-                    value={editing.status}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setEditing((prev) => {
-                        if (!prev) return prev;
-                        const next = { ...prev, status: v };
-                        if (v !== "Hired") {
-                          next.tag = "";
-                          next.hire_date = "";
-                          next.offerPackage = "";
-                          next.probationMonths = "";
-                        }
-                        if (v !== "Rescheduled") next.rescheduled_at = "";
-                        if (v !== "next-follow-up" && v !== "Hired") next.next_followup_at = "";
-                        return next;
-                      });
-                    }}
-                    className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
-                  >
-                    {hiringStatusSelectOptions(editing?.status).map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {editing.status === "Rescheduled" && (
-                  <div className="sm:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Rescheduled date &amp; time *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required={editing.status === "Rescheduled"}
-                      value={editing.rescheduled_at}
-                      onChange={(e) => updateEdit("rescheduled_at", e.target.value)}
-                      className={formFieldClass}
-                    />
+                <div className="sm:col-span-2 rounded-xl border border-slate-200/90 bg-slate-50/90 px-3 py-3">
+                  <p className="text-xs font-medium text-slate-600">Current status &amp; note</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Status and <span className="font-medium text-slate-600">Note *</span> are updated in{" "}
+                    <span className="font-semibold text-amber-800">Follow-up</span>. Here you can change name,
+                    interview, contact, and other details.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <StatusChip status={editing.status} />
                   </div>
-                )}
-
-                {editing.status === "next-follow-up" && (
-                  <div className="sm:col-span-2">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Next follow-up date &amp; time *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required={editing.status === "next-follow-up"}
-                      value={editing.next_followup_at ?? ""}
-                      onChange={(e) => updateEdit("next_followup_at", e.target.value)}
-                      className={formFieldClass}
-                    />
-                  </div>
-                )}
-
-                {editing.status === "Hired" && (
-                  <div className="sm:col-span-2 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-4">
-                    <p className="text-sm font-semibold text-indigo-900">Hired — joining &amp; package</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Joining date *</label>
-                        <input
-                          type="date"
-                          required={editing.status === "Hired"}
-                          value={editing.hire_date}
-                          onChange={(e) => updateEdit("hire_date", e.target.value)}
-                          className={formFieldClass}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Package *</label>
-                        <input
-                          type="text"
-                          required={editing.status === "Hired"}
-                          value={editing.offerPackage}
-                          onChange={(e) => updateEdit("offerPackage", e.target.value)}
-                          className={formFieldClass}
-                          placeholder="e.g. CTC, LPA"
-                        />
-                      </div>
-                      <div className="sm:col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Tags *</label>
-                        <select
-                          required={editing.status === "Hired"}
-                          value={editing.tag}
-                          onChange={(e) => {
-                            const t = e.target.value;
-                            setEditing((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    tag: t,
-                                    probationMonths: t !== "Probation" ? "" : prev.probationMonths,
-                                    next_followup_at: t !== "Follow-Up" ? "" : prev.next_followup_at,
-                                  }
-                                : prev
-                            );
-                          }}
-                          className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
-                        >
-                          <option value="">— Select —</option>
-                          {TAG_OPTIONS.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      {editing.status === "Hired" && editing.tag === "Follow-Up" && (
-                        <div className="sm:col-span-2">
-                          <label className="block text-sm font-medium text-slate-700 mb-1">
-                            Follow-up date &amp; time (optional)
-                          </label>
-                          <input
-                            type="datetime-local"
-                            value={editing.next_followup_at ?? ""}
-                            onChange={(e) => updateEdit("next_followup_at", e.target.value)}
-                            className={formFieldClass}
-                          />
-                        </div>
-                      )}
-                      {editing.tag === "Probation" && (
-                        <div className="sm:col-span-2">
-                          <label className="block text-sm font-medium text-slate-700 mb-1">Probation (months) *</label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={120}
-                            required
-                            value={editing.probationMonths}
-                            onChange={(e) => updateEdit("probationMonths", e.target.value)}
-                            className={`max-w-[200px] ${formFieldClass}`}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Note *</label>
-                  <input
-                    required
-                    value={editing.note}
-                    onChange={(e) => updateEdit("note", e.target.value)}
-                    className={formFieldClass}
-                    placeholder="Enter note"
-                  />
+                  {editing.note != null && String(editing.note).trim() !== "" ? (
+                    <p className="mt-2 rounded-lg border border-slate-100 bg-white/80 px-2.5 py-2 text-xs text-slate-600 leading-snug">
+                      <span className="font-medium text-slate-500">Saved note: </span>
+                      {String(editing.note)}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-slate-400">No note saved yet — add in Follow-up.</p>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50/50 pt-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:gap-3 sm:pb-0">

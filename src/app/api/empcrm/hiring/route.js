@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canAccessHiringModule } from "@/lib/hrTargetEligibleRoles";
-import { logHiringCreated, logHiringStatusChange } from "@/lib/hiringStatusHistory";
+import { logHiringCreated, logHiringNoteUpdate, logHiringStatusChange } from "@/lib/hiringStatusHistory";
 import { parseHiringPayload, toMysqlDatetime } from "@/lib/hiringPayload";
 
 function assertHrRole(payload) {
@@ -162,7 +162,7 @@ export async function POST(request) {
       );
       const insertId = result.insertId;
       if (insertId) {
-        await logHiringCreated(conn, insertId, d.status, payload.username);
+        await logHiringCreated(conn, insertId, d.status, payload.username, d.note);
       }
       await conn.commit();
     } catch (e) {
@@ -187,6 +187,16 @@ export async function POST(request) {
       );
     }
     if (msg.includes("Unknown column")) {
+      if (msg.includes("note") && msg.includes("hr_hiring_entry_status_history")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "History note column missing. Run admin-dashboard/hiring-process/migration_hr_hiring_status_history_note.sql",
+          },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
         {
           success: false,
@@ -235,7 +245,7 @@ export async function PATCH(request) {
     try {
       await conn.beginTransaction();
       const [rows] = await conn.execute(
-        `SELECT status FROM hr_hiring_entries WHERE id = ? AND LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))`,
+        `SELECT status, note FROM hr_hiring_entries WHERE id = ? AND LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))`,
         [id, payload.username]
       );
       if (!rows.length) {
@@ -243,6 +253,7 @@ export async function PATCH(request) {
         return NextResponse.json({ success: false, error: "Record not found." }, { status: 404 });
       }
       const prevStatus = rows[0].status != null ? String(rows[0].status) : "";
+      const prevNote = rows[0].note != null ? String(rows[0].note) : "";
 
       const [upd] = await conn.execute(
         `UPDATE hr_hiring_entries SET
@@ -271,8 +282,13 @@ export async function PATCH(request) {
         ]
       );
       result = upd;
-      if (upd.affectedRows && prevStatus !== d.status) {
-        await logHiringStatusChange(conn, id, prevStatus, d.status, payload.username);
+      const newNote = d.note != null ? String(d.note) : "";
+      if (upd.affectedRows) {
+        if (prevStatus !== d.status) {
+          await logHiringStatusChange(conn, id, prevStatus, d.status, payload.username, newNote);
+        } else if (prevNote !== newNote) {
+          await logHiringNoteUpdate(conn, id, d.status, payload.username, newNote);
+        }
       }
       await conn.commit();
     } catch (e) {
@@ -291,6 +307,16 @@ export async function PATCH(request) {
     console.error("[empcrm/hiring PATCH]", error);
     const msg = error?.message || "";
     if (msg.includes("Unknown column")) {
+      if (msg.includes("note") && msg.includes("hr_hiring_entry_status_history")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "History note column missing. Run admin-dashboard/hiring-process/migration_hr_hiring_status_history_note.sql",
+          },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
         {
           success: false,

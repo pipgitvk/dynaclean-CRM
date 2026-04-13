@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS hr_hiring_entry_status_history (
   status_before VARCHAR(80) NULL COMMENT 'NULL = row created with status_after',
   status_after VARCHAR(80) NOT NULL,
   actor_username VARCHAR(128) NOT NULL,
+  note TEXT NULL COMMENT 'Note saved with this event',
   logged_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_hiring_hist_entry (entry_id),
   KEY idx_hiring_hist_logged (logged_at),
