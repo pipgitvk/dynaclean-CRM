@@ -6,6 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 const empCrmUserMenuItems = [
   { path: "/empcrm/user-dashboard", name: "EMPCRM Dashboard", roles: ["ALL"], icon: "Home" },
+  { path: "/empcrm/admin-dashboard", name: "Go to Admin Panel", roles: ["HR", "SUPERADMIN"], icon: "LayoutGrid" },
   { path: "/empcrm/user-dashboard/profile", name: "My Profile", roles: ["ALL"], icon: "UserCircle" },
   { path: "/empcrm/user-dashboard/leave", name: "Leave", roles: ["ALL"], icon: "Calendar" },
   { path: "/empcrm/user-dashboard/leave-approvals", name: "Leave Approvals", roles: ["REPORTING_MANAGER"], icon: "CheckSquare" },

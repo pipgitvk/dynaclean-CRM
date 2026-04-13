@@ -35,7 +35,8 @@ export async function getDbConnection() {
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
       waitForConnections: true,
-      connectionLimit: 100, // max simultaneous
+      // Keep this conservative in dev; large values can overwhelm MySQL `max_connections`.
+      connectionLimit: 10,
       queueLimit: 0,
       connectTimeout: 10000,
       /**

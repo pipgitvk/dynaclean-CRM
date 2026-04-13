@@ -145,9 +145,17 @@ export async function GET(req) {
     });
   } catch (error) {
     console.error("Database query error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch data" },
-      { status: 500 }
-    );
+    const msg = String(error?.message || "");
+    if (msg.toLowerCase().includes("too many connections")) {
+      return NextResponse.json({
+        employees: username ? [username] : [],
+        followups: [],
+        quotations: [],
+        newOrders: [],
+        demos: [],
+        warning: "DB overloaded (too many connections)",
+      });
+    }
+    return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 });
   }
 }

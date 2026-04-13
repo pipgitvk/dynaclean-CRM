@@ -211,6 +211,31 @@ export function applySuperadminOnlyModuleRestrictions(allowedKeys, role) {
 }
 
 /**
+ * Role-specific deny lists (even if module_access contains the key).
+ * Use for "this role must never see this module".
+ */
+const HR_DENY_MODULE_KEYS = new Set([
+  // Reports / Orders should not be shown to HR
+  "lead-reports",
+  "quotations-report",
+  "order-report",
+  "demo-followups",
+  "item-wise-sales",
+  "customer-payment-behavior",
+  "payment-pending",
+  "orders-process",
+  "orders-delay",
+]);
+
+export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
+  if (!allowedKeys) return allowedKeys ?? null;
+  const r = String(role ?? "").trim().toUpperCase();
+  const isHr = r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE";
+  if (!isHr) return allowedKeys;
+  return allowedKeys.filter((k) => !HR_DENY_MODULE_KEYS.has(k));
+}
+
+/**
  * Check whether a sidebar section should be visible given the allowed keys array.
  * A section is accessible if:
  *   - allowedKeys is null (= all allowed), OR
