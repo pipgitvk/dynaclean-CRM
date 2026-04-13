@@ -338,6 +338,65 @@ const QuickEditPage = () => {
     setSelectedModules(Array.isArray(effective) ? effective : []);
   };
 
+  const setDigitalMarketerDefaults = () => {
+    const defaults = [
+      "leads-upload",
+      "blog",
+      "my-leads",
+      "quotations",
+      "email-templates",
+      "product-stock",
+      "spare-parts",
+      "employee-crm",
+    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
+  const setAdminDefaults = () => {
+    const defaults = [
+      // Prospects
+      "prospects-view",
+      "prospects-add",
+      "prospects-new",
+      // Reports
+      "customer-payment-behavior",
+      "payment-pending",
+      // Payments / docs
+      "manual-payments",
+      "company-documents",
+      "dd-management",
+      // Admin tools
+      "attendance-rules",
+      // TL management
+      "quotations",
+      "service-records",
+      // Products & ops
+      "warranty-console",
+      "registered-products",
+      "warranty-map",
+      "product-stock",
+      "product-accessories",
+      "purchase-direct-in",
+      "purchase-request",
+      "purchase-warehouse-in",
+      "purchases",
+      "spare-parts",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "production-status",
+      "bom-list",
+      // Employee CRM
+      "employee-crm",
+    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -644,6 +703,27 @@ const QuickEditPage = () => {
                     title="Set recommended defaults for Sales"
                   >
                     Set Sales Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() ===
+                  "DIGITAL MARKETER" && (
+                  <button
+                    type="button"
+                    onClick={setDigitalMarketerDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100 transition-colors"
+                    title="Set recommended defaults for Digital Marketer"
+                  >
+                    Set DM Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "ADMIN" && (
+                  <button
+                    type="button"
+                    onClick={setAdminDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors"
+                    title="Set recommended defaults for Admin"
+                  >
+                    Set Admin Defaults
                   </button>
                 )}
                 <button

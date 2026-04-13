@@ -29,6 +29,7 @@ export const MODULE_TREE = [
       { key: "bulk-reassign",                label: "Bulk Reassign Leads" },
       { key: "my-leads",                     label: "My Leads" },
       { key: "leads-upload",                label: "Leads Upload" },
+      { key: "blog",                       label: "Blog" },
       { key: "dm-fresh-leads",               label: "24h Fresh Leads (DM)" },
       { key: "task-manager",                 label: "Task Manager" },
       { key: "demo-details",                 label: "Demo Details" },
