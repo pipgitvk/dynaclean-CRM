@@ -293,12 +293,14 @@ export async function insertLeadIntoDb(lead, options = {}) {
 
   if (forceAssignTo) {
     const [rows] = await conn.execute(
-      `SELECT * FROM lead_distribution WHERE is_active = 1 AND username = ?`,
+      `SELECT * FROM lead_distribution WHERE is_active = 1 AND UPPER(TRIM(username)) = UPPER(TRIM(?)) LIMIT 1`,
       [forceAssignTo],
     );
     repRows = rows;
     if (!repRows.length) {
-      throw new Error(`Rep ${forceAssignTo} not found in lead_distribution`);
+      throw new Error(
+        `Rep "${forceAssignTo}" not found in lead_distribution (check username spelling / active flag)`,
+      );
     }
   } else {
     const normalizedLanguage = lead.language?.toUpperCase();
