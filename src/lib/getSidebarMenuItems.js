@@ -6,7 +6,11 @@ import {
   ATTENDANCE_RULES_ALLOWED_ROLES,
   normalizeRoleKey,
 } from "@/lib/adminAttendanceRulesAuth";
-import { parseModuleAccess, isSectionAllowed } from "@/lib/moduleAccess";
+import {
+  parseModuleAccess,
+  isSectionAllowed,
+  applySuperadminOnlyModuleRestrictions,
+} from "@/lib/moduleAccess";
 import { getDbConnection } from "@/lib/db";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
@@ -659,7 +663,11 @@ export default async function getSidebarMenuItems() {
 
   // Step 2: filter by module_access (SUPERADMIN bypasses this — sees everything)
   if (roleKey !== "SUPERADMIN") {
-    const allowedModules = await getUserModuleAccess(username);
+    const allowedModulesRaw = await getUserModuleAccess(username);
+    const allowedModules = applySuperadminOnlyModuleRestrictions(
+      allowedModulesRaw,
+      roleKey,
+    );
     // allowedModules === null means column not set yet → show all (backward compat)
     if (allowedModules !== null) {
       items = items.filter((item) => {
