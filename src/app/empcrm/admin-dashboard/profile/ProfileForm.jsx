@@ -10,7 +10,9 @@ import DocumentsSection from "./sections/DocumentsSection";
 import HrDetailsSection from "./sections/HrDetailsSection";
 import ReferencesSection from "./sections/ReferencesSection";
 import {
+  effectiveExperiencedForEmployeeReassignUi,
   isReassignFieldMode,
+  reassignKeysImplyExperience,
   shouldShowPersonalBlock,
   shouldShowBankingDetailsCard,
   shouldShowEducationSection,
@@ -58,7 +60,9 @@ export default function ProfileForm({
   onAfterHrForwardToAdmin = null,
 }) {
   const [loading, setLoading] = useState(false);
-  const [isExperienced, setIsExperienced] = useState(false);
+  const [isExperienced, setIsExperienced] = useState(() =>
+    initialData ? deriveIsExperiencedForForm(initialData) : false
+  );
 
   const [formData, setFormData] = useState({
     username,
@@ -103,11 +107,12 @@ export default function ProfileForm({
   const [files, setFiles] = useState({});
 
   useEffect(() => {
-    // If initialData provided, we don't need to fetch. 
-    // And we already initialized state with it.
-    // Just ensure isExperienced is set.
+    // If initialData provided, we don't need to fetch.
+    // Sync experienced flag; HR may have reassigned work experience while payload still has is_experienced false.
     if (initialData) {
-      setIsExperienced(deriveIsExperiencedForForm(initialData));
+      const derived = deriveIsExperiencedForForm(initialData);
+      const impliedByHr = reassignFieldKeys?.length && reassignKeysImplyExperience(reassignFieldKeys);
+      setIsExperienced(Boolean(derived || impliedByHr));
     } else {
       setFormData(prev => ({
         ...prev,
@@ -117,7 +122,7 @@ export default function ProfileForm({
       }));
       fetchExistingProfile();
     }
-  }, [username, empId, initialData]);
+  }, [username, empId, initialData, reassignFieldKeys]);
 
   const fetchExistingProfile = async () => {
     // Only fetch if no initial data
@@ -221,7 +226,7 @@ export default function ProfileForm({
       "doc_12th_certificate",
     ];
 
-    if (isExperienced) {
+    if (effectiveExperiencedForEmployeeReassignUi(isExperienced, reassignFieldKeys)) {
       MANDATORY_KEYS.push(
         "doc_appt_letter_prev",
         "doc_exp_letter",
@@ -372,7 +377,8 @@ export default function ProfileForm({
     }
 
     const needExperienceRows =
-      isExperienced && (keys.includes("section_experience") || keys.some((k) => EXPERIENCE_COLUMN_KEYS.has(k)));
+      effectiveExperiencedForEmployeeReassignUi(isExperienced, keys) &&
+      (keys.includes("section_experience") || keys.some((k) => EXPERIENCE_COLUMN_KEYS.has(k)));
     if (needExperienceRows) {
       if (!experience?.length) {
         toast.error("Add at least one work experience entry.");
@@ -538,8 +544,10 @@ export default function ProfileForm({
         });
       }
 
-      // Append experienced flag?
-      submitData.append("is_experienced", isExperienced);
+      submitData.append(
+        "is_experienced",
+        effectiveExperiencedForEmployeeReassignUi(isExperienced, reviewMode ? null : reassignFieldKeys)
+      );
 
       submitData.append("references", JSON.stringify(references));
       submitData.append("education", JSON.stringify(education));
@@ -650,6 +658,9 @@ export default function ProfileForm({
   const fieldVisibilityKeys = reviewMode ? null : reassignFieldKeys;
   const reassignMode = !reviewMode && isReassignFieldMode(reassignFieldKeys);
 
+  /** Work experience block must show when HR reassigned experience fields even if is_experienced was stored false. */
+  const effectiveIsExperienced = effectiveExperiencedForEmployeeReassignUi(isExperienced, fieldVisibilityKeys);
+
   const educationVisible = shouldShowEducationSection(fieldVisibilityKeys);
   const documentsVisible = shouldShowDocumentsSection(fieldVisibilityKeys);
   const bankingCardVisible = shouldShowBankingDetailsCard(fieldVisibilityKeys, isExperienced);
@@ -677,7 +688,7 @@ export default function ProfileForm({
     existingDocs: Array.isArray(formData.joining_form_documents) ? formData.joining_form_documents : [],
     existingPhotoUrl: formData.profile_photo || "",
     existingSignatureUrl: formData.signature || "",
-    isExperienced,
+    isExperienced: effectiveIsExperienced,
     fileUrls: formData.fileUrls || {},
     reviewMode,
     reassignFieldKeys: fieldVisibilityKeys,
@@ -778,7 +789,7 @@ export default function ProfileForm({
             setFormData={setFormData}
             experience={experience}
             setExperience={setExperience}
-            isExperienced={isExperienced}
+            isExperienced={effectiveIsExperienced}
             reviewMode={reviewMode}
             reassignFieldKeys={fieldVisibilityKeys}
             bankingDocumentsSlot={bankingDocumentsSlot}
