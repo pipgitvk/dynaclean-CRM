@@ -10,6 +10,10 @@ async function getEmployees() {
     );
     return rows;
   } catch (e) {
+    // Dev/preview resilience: if DB is down, render page with empty data instead of 500.
+    if (e?.code === "ECONNREFUSED" || String(e?.message || "").includes("ECONNREFUSED")) {
+      return [];
+    }
     if (e.message?.includes("reporting_manager")) {
       const [rows] = await connection.execute(
         "SELECT username, email, gender, password, number, empId, userRole, status FROM rep_list"

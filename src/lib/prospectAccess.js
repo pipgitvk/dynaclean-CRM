@@ -6,7 +6,7 @@ export function canAccessProspectsRole(role) {
 
 export function isProspectsAdminRole(role) {
   const r = String(role ?? "").toUpperCase().trim();
-  return r === "SUPERADMIN" || r === "ADMIN";
+  return r === "SUPERADMIN";
 }
 
 /** Sales / sales head — amount on add forms is driven by quotation × qty only (not manually edited). */

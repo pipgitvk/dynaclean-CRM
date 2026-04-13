@@ -164,7 +164,6 @@ async function countPendingFinalProfileApprovals() {
     );
     return Number(rows[0]?.c ?? 0);
   } catch (e) {
-    console.error("countPendingFinalProfileApprovals:", e);
     return 0;
   }
 }
