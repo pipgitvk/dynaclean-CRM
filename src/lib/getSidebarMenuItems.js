@@ -688,10 +688,16 @@ async function getUserModuleAccess(username) {
       "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
-    if (!rows.length) return null;
+    if (!rows.length) return []; // unknown user → show nothing (fail closed)
     return parseModuleAccess(rows[0].module_access ?? null);
-  } catch {
-    return null; // column doesn't exist yet → allow all
+  } catch (err) {
+    const msg = String(err?.message || "").toLowerCase();
+    // Backward-compat: if column isn't present yet, allow all.
+    if (msg.includes("unknown column") && msg.includes("module_access")) {
+      return null;
+    }
+    // Any other DB error: do NOT leak modules.
+    return [];
   }
 }
 
