@@ -80,6 +80,7 @@ function SectionBlock({ section, selected, disabled, onToggleParent, onToggleChi
 
   return (
     <div
+      id={`bulk-section-${section.key}`}
       className={`border rounded-lg overflow-hidden transition-all ${
         allChecked
           ? "border-blue-300 bg-blue-50/40"
@@ -123,6 +124,7 @@ function SectionBlock({ section, selected, disabled, onToggleParent, onToggleChi
             return (
               <label
                 key={child.key}
+                id={`bulk-module-${child.key}`}
                 className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border cursor-pointer transition-colors text-xs ${
                   isChecked
                     ? "bg-blue-50 border-blue-200 text-blue-800"
@@ -252,6 +254,7 @@ const EmpTable = ({ employees }) => {
   const [bulkRoleSelections, setBulkRoleSelections] = useState({});
   const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkModuleSearch, setBulkModuleSearch] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -374,6 +377,45 @@ const EmpTable = ({ employees }) => {
     "WELDER HELPER",
     "WAREHOUSE INCHARGE",
   ];
+
+  const bulkModuleIndex = useMemo(() => {
+    const out = [];
+    for (const section of MODULE_TREE || []) {
+      const sectionLabel = String(section?.label || "");
+      const sectionKey = String(section?.key || "");
+      for (const child of section?.children || []) {
+        out.push({
+          key: String(child?.key || ""),
+          label: String(child?.label || ""),
+          sectionKey,
+          sectionLabel,
+        });
+      }
+    }
+    return out.filter((x) => x.key && x.label);
+  }, []);
+
+  const bulkModuleSuggestions = useMemo(() => {
+    const q = String(bulkModuleSearch || "").trim().toLowerCase();
+    if (!q) return [];
+    const hits = bulkModuleIndex.filter(
+      (m) =>
+        m.label.toLowerCase().includes(q) ||
+        m.key.toLowerCase().includes(q) ||
+        m.sectionLabel.toLowerCase().includes(q),
+    );
+    return hits.slice(0, 8);
+  }, [bulkModuleSearch, bulkModuleIndex]);
+
+  const scrollToBulkModule = (moduleKey, sectionKey) => {
+    const el =
+      document.getElementById(`bulk-module-${moduleKey}`) ||
+      document.getElementById(`bulk-section-${sectionKey}`) ||
+      document.getElementById(`bulk-section-dashboard`);
+    if (el?.scrollIntoView) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
   const defaultModulesForSelectedRole = useMemo(() => {
     const cap = getRoleMaxAllowedModuleKeys(bulkRole) || [];
@@ -589,6 +631,33 @@ const EmpTable = ({ employees }) => {
               <div className="lg:col-span-2">
                 <div className="text-sm font-semibold text-gray-800 mb-2">
                   Modules
+                </div>
+                <div className="relative mb-3">
+                  <input
+                    value={bulkModuleSearch}
+                    onChange={(e) => setBulkModuleSearch(e.target.value)}
+                    placeholder="Search modules..."
+                    className="w-full border rounded-md px-3 py-2 text-sm"
+                    disabled={bulkSaving}
+                  />
+                  {bulkModuleSuggestions.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-lg overflow-hidden">
+                      {bulkModuleSuggestions.map((m) => (
+                        <button
+                          key={m.key}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                          onClick={() => {
+                            setBulkModuleSearch("");
+                            scrollToBulkModule(m.key, m.sectionKey);
+                          }}
+                        >
+                          <div className="font-medium text-gray-800">{m.label}</div>
+                          <div className="text-xs text-gray-500">{m.sectionLabel}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-3">
                   {MODULE_TREE.map((section) => (
