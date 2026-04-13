@@ -249,6 +249,7 @@ const EmpTable = ({ employees }) => {
   const [bulkRole, setBulkRole] = useState("ACCOUNTANT");
   const [bulkOperation, setBulkOperation] = useState("REPLACE");
   const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
+  const [bulkRoleSelections, setBulkRoleSelections] = useState({});
   const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const router = useRouter();
@@ -381,18 +382,32 @@ const EmpTable = ({ employees }) => {
     return cap.filter((k) => known.has(k));
   }, [bulkRole]);
 
-  useEffect(() => {
-    // Auto-load defaults when opening modal or changing role,
-    // but don't override manual checkbox changes.
-    if (!showGlobalModulesModal) return;
-    if (bulkTouched) return;
-    setBulkSelectedModules(defaultModulesForSelectedRole);
-  }, [showGlobalModulesModal, bulkRole, bulkTouched, defaultModulesForSelectedRole]);
+  const getDefaultsForRole = (role) => {
+    const cap = getRoleMaxAllowedModuleKeys(role) || [];
+    const known = new Set(ALL_MODULE_KEYS);
+    return cap.filter((k) => known.has(k));
+  };
+
+  const getSavedOrDefaultModulesForRole = (role) => {
+    const key = String(role || "").trim();
+    const saved = bulkRoleSelections?.[key];
+    if (Array.isArray(saved)) return saved;
+    return getDefaultsForRole(role);
+  };
 
   const setRoleAndResetSelection = (role) => {
     setBulkRole(role);
     setBulkTouched(false);
+    setBulkSelectedModules(getSavedOrDefaultModulesForRole(role));
   };
+
+  useEffect(() => {
+    if (!showGlobalModulesModal) return;
+    setBulkRoleSelections((prev) => ({
+      ...(prev || {}),
+      [String(bulkRole || "").trim()]: bulkSelectedModules,
+    }));
+  }, [showGlobalModulesModal, bulkRole, bulkSelectedModules]);
 
   const toggleBulkChild = (key) => {
     setBulkTouched(true);
@@ -491,7 +506,11 @@ const EmpTable = ({ employees }) => {
         </Link>
         <button
           type="button"
-          onClick={() => setShowGlobalModulesModal(true)}
+          onClick={() => {
+            setBulkTouched(false);
+            setBulkSelectedModules(getSavedOrDefaultModulesForRole(bulkRole));
+            setShowGlobalModulesModal(true);
+          }}
           className="text-white bg-emerald-600 hover:bg-emerald-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
         >
           <span>Global Module Access</span>
