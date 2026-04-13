@@ -63,19 +63,25 @@ const TRAFFIC_GREEN =
 const TRAFFIC_GREEN_OUTER =
   "linear-gradient(165deg, rgb(90, 168, 130) 0%, rgb(78, 152, 118) 100%)";
 
+/** Hours until event: red band = overdue or within this many hours (next ~24h). */
+export const FOLLOWUP_TRAFFIC_RED_MAX_HOURS = 24;
+/** Upper bound for light blue: “1–3 days” from now = after 24h through 72h. */
+export const FOLLOWUP_TRAFFIC_BLUE_MAX_HOURS = 72;
+
 /**
- * Discrete traffic colours for the **hiring card background** (red / light blue / green by due window).
- * Thresholds: ≤24h or overdue → red; 24–72h → light blue; &gt;72h → green.
- * The Contact/Role/Schedule block uses a white panel on top of this (see HiringEntryCard).
+ * Discrete traffic colours for the **hiring / TL card background** (red / light blue / green by due window).
+ * Thresholds: overdue or within {@link FOLLOWUP_TRAFFIC_RED_MAX_HOURS}h → red;
+ * after that through {@link FOLLOWUP_TRAFFIC_BLUE_MAX_HOURS}h (1–3 days) → light blue;
+ * later than that → green.
  */
 export function getTrafficGradientForHours(hours) {
   if (hours == null || Number.isNaN(hours)) {
     return SLATE_FALLBACK;
   }
-  if (hours < 0 || hours <= 24) {
+  if (hours < 0 || hours <= FOLLOWUP_TRAFFIC_RED_MAX_HOURS) {
     return TRAFFIC_RED;
   }
-  if (hours <= 72) {
+  if (hours <= FOLLOWUP_TRAFFIC_BLUE_MAX_HOURS) {
     return TRAFFIC_LIGHT_BLUE;
   }
   return TRAFFIC_GREEN;
@@ -88,10 +94,10 @@ export function getTrafficOuterGradientForHours(hours) {
   if (hours == null || Number.isNaN(hours)) {
     return SLATE_OUTER;
   }
-  if (hours < 0 || hours <= 24) {
+  if (hours < 0 || hours <= FOLLOWUP_TRAFFIC_RED_MAX_HOURS) {
     return TRAFFIC_RED_OUTER;
   }
-  if (hours <= 72) {
+  if (hours <= FOLLOWUP_TRAFFIC_BLUE_MAX_HOURS) {
     return TRAFFIC_LIGHT_BLUE_OUTER;
   }
   return TRAFFIC_GREEN_OUTER;
@@ -134,6 +140,31 @@ export const HIRING_URGENCY_LEGEND = [
   {
     key: "green",
     label: "Green",
+    dotClass: "bg-gradient-to-r from-emerald-200 to-emerald-50",
+  },
+];
+
+/**
+ * Legend for dashboards that colour cards by **next follow-up date** (from current time) using
+ * {@link getTrafficGradientForHours}.
+ */
+export const NEXT_FOLLOWUP_DATE_TRAFFIC_LEGEND = [
+  {
+    key: "red",
+    title: "Red",
+    caption: "Overdue or within 24 hours from now",
+    dotClass: "bg-gradient-to-r from-rose-200 to-rose-50",
+  },
+  {
+    key: "lightBlue",
+    title: "Light blue",
+    caption: "Between 1 and 3 days from now (after 24h, up to 72h)",
+    dotClass: "bg-gradient-to-r from-sky-300 to-sky-100",
+  },
+  {
+    key: "green",
+    title: "Green",
+    caption: "More than 3 days from now (after 72h)",
     dotClass: "bg-gradient-to-r from-emerald-200 to-emerald-50",
   },
 ];

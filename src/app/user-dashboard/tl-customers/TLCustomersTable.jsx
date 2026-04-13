@@ -14,7 +14,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import dayjs from "dayjs";
-import { getTlCustomersTableTagOptions } from "@/utils/tlFollowupTagOptions";
+import {
+  getTlCustomersTableTagOptions,
+  getTlMultiTagChipClass,
+} from "@/utils/tlFollowupTagOptions";
+import { pickEffectiveNextFollowup } from "@/utils/tlNextFollowupResolve";
+import TLCustomerFollowUpCards from "@/components/TL/TLCustomerFollowUpCards";
 
 export default function TLCustomersTable({
   customers,
@@ -27,6 +32,7 @@ export default function TLCustomersTable({
   pageSize = 50,
   isAdmin = false,
   tlOnly = true,
+  isSuperAdmin = false,
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -88,11 +94,9 @@ export default function TLCustomersTable({
           ];
           if (excludedStages.includes(customer.stage)) return false;
 
-          const nextFollowup =
-            customer.tl_next_followup || customer.latest_next_followup;
-          if (!nextFollowup) return false;
+          const followupTime = pickEffectiveNextFollowup(customer);
+          if (!followupTime) return false;
 
-          const followupTime = dayjs(nextFollowup);
           return followupTime.isBefore(now); // Overdue
         });
 
@@ -137,10 +141,8 @@ export default function TLCustomersTable({
       ];
       if (excludedStages.includes(customer.stage)) return false;
 
-      const nextFollowup =
-        customer.tl_next_followup || customer.latest_next_followup;
-      if (!nextFollowup) return false;
-      const followupTime = dayjs(nextFollowup);
+      const followupTime = pickEffectiveNextFollowup(customer);
+      if (!followupTime) return false;
       return followupTime.isBefore(now);
     }).length;
     const prime = customersForKPI.filter(
@@ -388,7 +390,6 @@ export default function TLCustomersTable({
     return "bg-red-500 text-white";
   };
 
-  // Stage configuration for progress bar
   const stageConfig = {
     New: { progress: 0, color: "bg-blue-500", label: "New" },
     Contacted: { progress: 10, color: "bg-blue-500", label: "Contacted" },
@@ -437,15 +438,12 @@ export default function TLCustomersTable({
     },
   };
 
-  const getStageInfo = (stage) => {
-    return (
-      stageConfig[stage] || {
-        progress: 0,
-        color: "bg-gray-400",
-        label: stage || "New",
-      }
-    );
-  };
+  const getStageInfo = (stage) =>
+    stageConfig[stage] || {
+      progress: 0,
+      color: "bg-gray-400",
+      label: stage || "New",
+    };
 
   const renderStageProgress = (stage) => {
     const stageInfo = getStageInfo(stage);
@@ -461,7 +459,7 @@ export default function TLCustomersTable({
           <div
             className={`h-2 rounded-full ${stageInfo.color}`}
             style={{ width: `${stageInfo.progress}%` }}
-          ></div>
+          />
         </div>
       </div>
     );
@@ -910,6 +908,14 @@ export default function TLCustomersTable({
         </div>
       </div>
 
+      {isAdmin && tlOnly && isSuperAdmin ? (
+        <TLCustomerFollowUpCards
+          customers={getFilteredCustomers()}
+          basePath={basePath}
+          queryString={queryString}
+        />
+      ) : null}
+
       {/* Table */}
       <div className="overflow-x-auto relative">
         {isPending && (
@@ -932,12 +938,20 @@ export default function TLCustomersTable({
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Assigned To
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                Stage
-              </th>
+              {tlOnly ? (
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Follow-up start date
+                </th>
+              ) : (
+                <>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                    Stage
+                  </th>
+                </>
+              )}
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 TL Score
               </th>
@@ -963,7 +977,7 @@ export default function TLCustomersTable({
             {getFilteredCustomers().length === 0 ? (
               <tr>
                 <td
-                  colSpan="10"
+                  colSpan={tlOnly ? 10 : 11}
                   className="px-4 py-4 text-center text-gray-500"
                 >
                   {activeFilter === "all"
@@ -991,16 +1005,28 @@ export default function TLCustomersTable({
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.lead_source || "Unassigned"}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                      {customer.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="w-24">
-                      {renderStageProgress(customer.stage)}
-                    </div>
-                  </td>
+                  {tlOnly ? (
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {customer.followup_start_at
+                        ? dayjs(customer.followup_start_at).format(
+                            "DD MMM, YYYY HH:mm",
+                          )
+                        : "N/A"}
+                    </td>
+                  ) : (
+                    <>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {customer.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="w-24">
+                          {renderStageProgress(customer.stage)}
+                        </div>
+                      </td>
+                    </>
+                  )}
                   <td className="px-4 py-4 whitespace-nowrap">
                     {customer.lead_quality_score ? (
                       <span
@@ -1021,7 +1047,7 @@ export default function TLCustomersTable({
                         customer.multi_tag.split(", ").map((tag, index) => (
                           <span
                             key={index}
-                            className="px-2 py-1 text-xs bg-blue-600 text-white rounded font-medium"
+                            className={getTlMultiTagChipClass(tag)}
                           >
                             {tag.trim()}
                           </span>
@@ -1032,15 +1058,9 @@ export default function TLCustomersTable({
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {customer.tl_next_followup
-                      ? dayjs(customer.tl_next_followup).format(
-                          "DD MMM, YYYY HH:mm",
-                        )
-                      : customer.latest_next_followup
-                        ? dayjs(customer.latest_next_followup).format(
-                            "DD MMM, YYYY HH:mm",
-                          )
-                        : "N/A"}
+                    {pickEffectiveNextFollowup(customer)?.format(
+                      "DD MMM, YYYY HH:mm",
+                    ) ?? "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
