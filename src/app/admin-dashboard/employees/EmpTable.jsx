@@ -100,7 +100,7 @@ const EmployeeCard = ({
 
 const EmpTable = ({ employees }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [isMobile, setIsMobile] = useState(false);
   const [showReportingManagerModal, setShowReportingManagerModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState("");
