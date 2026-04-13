@@ -249,6 +249,7 @@ const EmpTable = ({ employees }) => {
   const [bulkRole, setBulkRole] = useState("ACCOUNTANT");
   const [bulkOperation, setBulkOperation] = useState("REPLACE");
   const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
+  const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const router = useRouter();
 
@@ -381,21 +382,27 @@ const EmpTable = ({ employees }) => {
   }, [bulkRole]);
 
   useEffect(() => {
-    // Auto-load defaults whenever role changes
+    // Auto-load defaults when opening modal or changing role,
+    // but don't override manual checkbox changes.
+    if (!showGlobalModulesModal) return;
+    if (bulkTouched) return;
     setBulkSelectedModules(defaultModulesForSelectedRole);
-  }, [defaultModulesForSelectedRole]);
+  }, [showGlobalModulesModal, bulkRole, bulkTouched, defaultModulesForSelectedRole]);
 
   const setRoleAndResetSelection = (role) => {
     setBulkRole(role);
+    setBulkTouched(false);
   };
 
   const toggleBulkChild = (key) => {
+    setBulkTouched(true);
     setBulkSelectedModules((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
   };
 
   const toggleBulkParent = (section) => {
+    setBulkTouched(true);
     const hasChildren = section.children.length > 0;
     const childKeys = section.children.map((c) => c.key);
     const keys = hasChildren ? childKeys : [section.key];
@@ -412,6 +419,7 @@ const EmpTable = ({ employees }) => {
   };
 
   const toggleBulkAll = () => {
+    setBulkTouched(true);
     const allSelected = ALL_MODULE_KEYS.every((k) => bulkSelectedModules.includes(k));
     setBulkSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
   };
