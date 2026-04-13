@@ -62,14 +62,27 @@ export async function middleware(request) {
         }
       }
 
-      if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN") {
-        return NextResponse.redirect(new URL("/user-dashboard", request.url));
+      // Prospects module is used by SALES roles too.
+      if (pathname.startsWith("/admin-dashboard/prospects")) {
+        if (["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"].includes(role)) {
+          return NextResponse.next();
+        }
       }
 
-      if (pathname.startsWith("/admin-dashboard/company-documents")) {
-        if (!["SUPERADMIN"].includes(role)) {
-          return NextResponse.redirect(new URL("/admin-dashboard", request.url));
+      // Allow accountant-only admin pages before the global admin-dashboard redirect.
+      if (pathname.startsWith("/admin-dashboard/client-expenses")) {
+        if (role === "ACCOUNTANT" || role === "SUPERADMIN") {
+          return NextResponse.next();
         }
+      }
+      if (pathname.startsWith("/admin-dashboard/statements")) {
+        if (role === "ACCOUNTANT" || role === "SUPERADMIN") {
+          return NextResponse.next();
+        }
+      }
+
+      if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN") {
+        return NextResponse.redirect(new URL("/user-dashboard", request.url));
       }
 
       // SUPERADMIN-only modules (even if link is known)
@@ -88,20 +101,6 @@ export async function middleware(request) {
       if (pathname.startsWith("/empcrm/admin-dashboard/profile/approvals-admin")) {
         if (role !== "SUPERADMIN") {
           return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
-        }
-      }
-
-      // Spare Parts (user dashboard)
-      if (pathname.startsWith("/user-dashboard/spare")) {
-        if (role !== "SUPERADMIN") {
-          return NextResponse.redirect(new URL("/user-dashboard", request.url));
-        }
-      }
-
-      // Company documents (user dashboard)
-      if (pathname.startsWith("/user-dashboard/company-documents")) {
-        if (role !== "SUPERADMIN") {
-          return NextResponse.redirect(new URL("/user-dashboard", request.url));
         }
       }
 

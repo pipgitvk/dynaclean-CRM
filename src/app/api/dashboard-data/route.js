@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
+import { isSuperAdminRole } from "@/lib/dataScope";
 
 export async function GET(req) {
   const conn = await getDbConnection();
@@ -13,12 +14,9 @@ export async function GET(req) {
   const username = session?.username || null;
   const role = session?.role || null;
 
-  // Roles that can see data for all employees
-  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "HR"];
-
   let selectedEmployee = searchParams.get("employee") || "all";
-  if (!privilegedRoles.includes(role) && username) {
-    // For non-privileged users (e.g. SALES), always restrict to their own username
+  if (!isSuperAdminRole(role) && username) {
+    // For all non-superadmin users, always restrict to their own username
     selectedEmployee = username;
   }
 
@@ -38,8 +36,8 @@ export async function GET(req) {
     const [employeeRows] = await conn.execute(employeeQuery);
     let employees = employeeRows.map((row) => row.username);
 
-    // Non-privileged users should only see themselves in the dropdown
-    if (!privilegedRoles.includes(role) && username) {
+    // Only SUPERADMIN can see all employees in the dropdown
+    if (!isSuperAdminRole(role) && username) {
       employees = employees.filter((u) => u === username);
       if (employees.length === 0) {
         employees = [username];

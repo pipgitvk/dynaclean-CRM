@@ -159,8 +159,29 @@ const QuickEditPage = () => {
   const [newProfilePic, setNewProfilePic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [moduleSearch, setModuleSearch] = useState("");
 
   const today = new Date().toISOString().split("T")[0];
+
+  const moduleIndex = MODULE_TREE.flatMap((section) =>
+    (section.children?.length ? section.children : [{ key: section.key, label: section.label }]).map(
+      (child) => ({
+        key: child.key,
+        label: child.label,
+        sectionKey: section.key,
+        sectionLabel: section.label,
+      }),
+    ),
+  );
+
+  const moduleSuggestions = (() => {
+    const q = moduleSearch.trim().toLowerCase();
+    if (!q) return [];
+    const matches = moduleIndex
+      .filter((m) => String(m.label || "").toLowerCase().includes(q))
+      .slice(0, 12);
+    return matches;
+  })();
 
   useEffect(() => {
     const fetchEmployeeData = async () => {
@@ -245,6 +266,76 @@ const QuickEditPage = () => {
   const toggleAll = () => {
     const allSelected = ALL_MODULE_KEYS.every((k) => selectedModules.includes(k));
     setSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
+  };
+
+  const setAccountantDefaults = () => {
+    const defaults = [
+      "manual-payments",
+      "dd-management",
+      "company-documents",
+      "client-expenses",
+      "statements",
+      "salary-slips",
+      "targets-monitor",
+      "invoices",
+      "payment-pending",
+      "customer-payment-behavior",
+      "attendance-log",
+      "quotations",
+      "expenses",
+      "service-records",
+      "assets",
+      "product-stock",
+      "product-accessories",
+      "purchase-direct-in",
+      "purchase-request",
+      "purchase-warehouse-in",
+      "purchases",
+      "spare-parts",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "production-status",
+      "bom-list",
+      "employee-crm",
+    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
+  const setTeamLeaderDefaults = () => {
+    const defaults = [
+      "tl-customers",
+      "view-customers",
+      "add-customer",
+      "employee-crm",
+      "lead-reports",
+      "quotations-report",
+      "order-report",
+      "demo-followups",
+      "item-wise-sales",
+      "customer-payment-behavior",
+      "payment-pending",
+      "leads-upload",
+      "my-leads",
+    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
+  const setSalesDefaults = () => {
+    const defaults = [
+      "view-customers",
+      "add-customer",
+      "orders-process",
+      "orders-delay",
+    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
   };
 
   const handleSubmit = async (e) => {
@@ -471,17 +562,102 @@ const QuickEditPage = () => {
               </p>
             </div>
             {canEditModuleAccess && (
-              <button
-                type="button"
-                onClick={toggleAll}
-                className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors flex-shrink-0 ${
-                  allSelected
-                    ? "bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200"
-                    : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
-                }`}
-              >
-                {allSelected ? "Deselect All" : "Select All"}
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="relative hidden sm:block">
+                  <input
+                    value={moduleSearch}
+                    onChange={(e) => setModuleSearch(e.target.value)}
+                    placeholder="Search modules…"
+                    className="text-xs px-3 py-1.5 rounded-full border border-gray-300 bg-white w-[220px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                  {moduleSuggestions.length > 0 && (
+                    <div className="absolute right-0 mt-1 w-[360px] max-w-[80vw] bg-white border border-gray-200 rounded-lg shadow-lg z-10 overflow-hidden">
+                      <div className="px-3 py-2 text-[11px] text-gray-500 border-b border-gray-100">
+                        Suggestions
+                      </div>
+                      <div className="max-h-64 overflow-auto">
+                        {moduleSuggestions.map((m) => {
+                          const checked = selectedModules.includes(m.key);
+                          return (
+                            <button
+                              key={`${m.sectionKey}:${m.key}`}
+                              type="button"
+                              onClick={() => {
+                                if (!canEditModuleAccess) return;
+                                toggleChild(m.key);
+                                setModuleSearch("");
+                              }}
+                              className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 flex items-center justify-between gap-2 ${
+                                checked ? "text-blue-800" : "text-gray-700"
+                              }`}
+                              title={`${m.sectionLabel} → ${m.label}`}
+                            >
+                              <span className="min-w-0">
+                                <span className="font-medium truncate block">{m.label}</span>
+                                <span className="text-[11px] text-gray-500 truncate block">
+                                  {m.sectionLabel}
+                                </span>
+                              </span>
+                              <span
+                                className={`text-[11px] px-2 py-0.5 rounded-full border flex-shrink-0 ${
+                                  checked
+                                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                                    : "bg-gray-50 border-gray-200 text-gray-600"
+                                }`}
+                              >
+                                {checked ? "Selected" : "Select"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {String(employee.userRole || "").trim().toUpperCase() === "ACCOUNTANT" && (
+                  <button
+                    type="button"
+                    onClick={setAccountantDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    title="Set recommended defaults for Accountant"
+                  >
+                    Set Accountant Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "TEAM LEADER" && (
+                  <button
+                    type="button"
+                    onClick={setTeamLeaderDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                    title="Set recommended defaults for Team Leader"
+                  >
+                    Set TL Defaults
+                  </button>
+                )}
+                {["SALES", "SALES HEAD"].includes(
+                  String(employee.userRole || "").trim().toUpperCase(),
+                ) && (
+                  <button
+                    type="button"
+                    onClick={setSalesDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors"
+                    title="Set recommended defaults for Sales"
+                  >
+                    Set Sales Defaults
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+                    allSelected
+                      ? "bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200"
+                      : "bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200"
+                  }`}
+                >
+                  {allSelected ? "Deselect All" : "Select All"}
+                </button>
+              </div>
             )}
           </div>
 
