@@ -50,9 +50,16 @@ export async function GET(req) {
     });
   } catch (error) {
     console.error("Database query error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch dashboard data." },
-      { status: 500 }
-    );
+    const msg = String(error?.message || "");
+    if (msg.toLowerCase().includes("too many connections")) {
+      return NextResponse.json({
+        username,
+        quotationsCount: 0,
+        customersCount: 0,
+        ordersCount: 0,
+        warning: "DB overloaded (too many connections)",
+      });
+    }
+    return NextResponse.json({ error: "Failed to fetch dashboard data." }, { status: 500 });
   }
 }

@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
-/** Attendance rules: SUPERADMIN + ADMIN. */
-const ATTENDANCE_RULES_MIDDLEWARE_ROLES = ["SUPERADMIN", "ADMIN"];
+/** Attendance rules: SUPERADMIN + ADMIN + HR roles. */
+const ATTENDANCE_RULES_MIDDLEWARE_ROLES = [
+  "SUPERADMIN",
+  "ADMIN",
+  "HR",
+  "HR HEAD",
+  "HR Executive",
+];
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 

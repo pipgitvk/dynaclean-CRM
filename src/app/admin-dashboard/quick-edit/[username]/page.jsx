@@ -299,7 +299,9 @@ const QuickEditPage = () => {
       "production-status",
       "bom-list",
       "employee-crm",
-    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
 
     const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
     setSelectedModules(Array.isArray(effective) ? effective : []);
@@ -320,7 +322,9 @@ const QuickEditPage = () => {
       "payment-pending",
       "leads-upload",
       "my-leads",
-    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
 
     const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
     setSelectedModules(Array.isArray(effective) ? effective : []);
@@ -328,11 +332,11 @@ const QuickEditPage = () => {
 
   const setSalesDefaults = () => {
     const defaults = [
-      "view-customers",
-      "add-customer",
       "orders-process",
       "orders-delay",
-    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
 
     const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
     setSelectedModules(Array.isArray(effective) ? effective : []);
@@ -348,7 +352,9 @@ const QuickEditPage = () => {
       "product-stock",
       "spare-parts",
       "employee-crm",
-    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
 
     const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
     setSelectedModules(Array.isArray(effective) ? effective : []);
@@ -400,7 +406,32 @@ const QuickEditPage = () => {
       "bom-list",
       // Employee CRM
       "employee-crm",
-    ].filter((k) => ALL_MODULE_KEYS.includes(k));
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+    
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
+  const setHrDefaults = () => {
+    const defaults = [
+      // Dashboard essentials
+      "dashboard-home",
+      "attendance-details",
+      "regularization-approvals",
+      "fast-card",
+      // Employee + EMPCRM
+      "employee-list",
+      "employee-crm",
+      // Attendance rules
+      "attendance-rules",
+      // Hiring (EMPCRM admin)
+      "hiring-process",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
 
     const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
     setSelectedModules(Array.isArray(effective) ? effective : []);
@@ -733,6 +764,18 @@ const QuickEditPage = () => {
                     title="Set recommended defaults for Admin"
                   >
                     Set Admin Defaults
+                  </button>
+                )}
+                {["HR", "HR HEAD", "HR EXECUTIVE"].includes(
+                  String(employee.userRole || "").trim().toUpperCase(),
+                ) && (
+                  <button
+                    type="button"
+                    onClick={setHrDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+                    title="Set recommended defaults for HR"
+                  >
+                    Set HR Defaults
                   </button>
                 )}
                 <button

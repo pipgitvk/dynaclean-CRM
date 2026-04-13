@@ -10,6 +10,7 @@ import {
   parseModuleAccess,
   isSectionAllowed,
   applySuperadminOnlyModuleRestrictions,
+  applyRoleDenyModuleRestrictions,
   SUPERADMIN_ONLY_MODULE_KEYS,
 } from "@/lib/moduleAccess";
 import { getDbConnection } from "@/lib/db";
@@ -286,7 +287,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/digital-marketer-leads",
     name: "24h Fresh Leads",
-    moduleKey: "dashboard",
+    moduleKey: "dm-fresh-leads",
     roles: ["DIGITAL MARKETER", "SUPERADMIN"],
     icon: "Clock",
   },
@@ -628,21 +629,21 @@ const allMenuItems = [
   {
     path: "/user-dashboard/qa",
     name: "Knowledge Base",
-    moduleKey: "documents",
+    moduleKey: "qa",
     roles: ["ALL"],
     icon: "BookOpen",
   },
   {
     path: "/user-dashboard/company-documents",
     name: "Company Documents",
-    moduleKey: "documents",
+    moduleKey: "company-documents",
     roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
     icon: "FileText",
   },
   {
     path: "/user-dashboard/employees",
     name: "Employees",
-    moduleKey: "employee",
+    moduleKey: "employee-list",
     roles: ["HR"],
     icon: "UserPlus",
   },
@@ -656,14 +657,14 @@ const allMenuItems = [
   {
     path: "/user-dashboard/dd-management",
     name: "DD Management",
-    moduleKey: "documents",
+    moduleKey: "dd-management",
     roles: ["ADMIN", "ACCOUNTANT"],
     icon: "DollarSign",
   },
   {
     path: "/empcrm/user-dashboard",
     name: "Employee CRM",
-    moduleKey: "employee",
+    moduleKey: "employee-crm",
     roles: ["ALL"],
     icon: "User",
   },
@@ -706,10 +707,11 @@ export default async function getSidebarMenuItems() {
   // Step 2: filter by module_access (SUPERADMIN bypasses this — sees everything)
   if (roleKey !== "SUPERADMIN") {
     const allowedModulesRaw = await getUserModuleAccess(username);
-    const allowedModules = applySuperadminOnlyModuleRestrictions(
+    const allowedModules1 = applySuperadminOnlyModuleRestrictions(
       allowedModulesRaw,
       roleKey,
     );
+    const allowedModules = applyRoleDenyModuleRestrictions(allowedModules1, roleKey);
     // allowedModules === null means column not set yet → show all (backward compat)
     if (allowedModules !== null) {
       const filterByModuleAccess = (list) =>
@@ -718,9 +720,13 @@ export default async function getSidebarMenuItems() {
             const children = item?.children?.length
               ? filterByModuleAccess(item.children)
               : [];
-            const allowed = !item?.moduleKey
-              ? true
-              : isSectionAllowed(item.moduleKey, allowedModules);
+            // When module_access is configured, a leaf link MUST have a moduleKey to be shown.
+            // Otherwise older menu entries would "leak" through and ignore module_access.
+            const allowed = item?.moduleKey
+              ? isSectionAllowed(item.moduleKey, allowedModules)
+              : item?.path
+                ? false
+                : true;
             // If it has children, keep it only if any child remains.
             if (children.length > 0) return { ...item, children };
             // Leaf: keep only if allowed.

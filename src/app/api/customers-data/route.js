@@ -7,6 +7,12 @@ import {
   getScopedUsername,
   isSuperAdminRole,
 } from "@/lib/dataScope";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+
+function isHrPrivilegedCustomersRole(role) {
+  const r = normalizeRoleKey(role || "");
+  return r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE";
+}
 
 export async function GET(req) {
   const conn = await getDbConnection();
@@ -39,8 +45,8 @@ export async function GET(req) {
     let employees = employeeRows.map((row) => row.username);
 
     // Employee filter dropdown:
-    // SUPERADMIN can filter by any rep; everyone else should only see themselves.
-    if (!isSuperAdminRole(role)) {
+    // SUPERADMIN + HR roles can filter by any rep; everyone else should only see themselves.
+    if (!isSuperAdminRole(role) && !isHrPrivilegedCustomersRole(role)) {
       employees = username ? [username] : [];
     }
 
@@ -69,16 +75,18 @@ export async function GET(req) {
     }
 
     // Data visibility:
-    // SUPERADMIN → all rows
+    // SUPERADMIN + HR roles → all rows
     // everyone else → only rows assigned/owned by them (or deny if username missing)
-    const ownership = buildOwnershipWhere({
-      role,
-      username,
-      columns: ["lead_source", "sales_representative", "assigned_to"],
-    });
-    if (ownership.sql) {
-      whereClause += ` AND ${ownership.sql}`;
-      params.push(...ownership.params);
+    if (!isSuperAdminRole(role) && !isHrPrivilegedCustomersRole(role)) {
+      const ownership = buildOwnershipWhere({
+        role,
+        username,
+        columns: ["lead_source", "sales_representative", "assigned_to"],
+      });
+      if (ownership.sql) {
+        whereClause += ` AND ${ownership.sql}`;
+        params.push(...ownership.params);
+      }
     }
 
     // Optional employee filter (only within already-visible rows)
