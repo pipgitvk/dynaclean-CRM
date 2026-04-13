@@ -388,6 +388,18 @@ export function applyRoleMaxAllowedModuleRestrictions(allowedKeys, role) {
 }
 
 /**
+ * Returns the MAX allowed module keys for a role (hard cap), or null if not configured.
+ * @param {string} role
+ * @returns {string[]|null}
+ */
+export function getRoleMaxAllowedModuleKeys(role) {
+  const r = String(role ?? "").trim().toUpperCase();
+  const cap = ROLE_MAX_ALLOWED_MODULE_KEYS[r];
+  if (!cap) return null;
+  return [...cap];
+}
+
+/**
  * Check whether a sidebar section should be visible given the allowed keys array.
  * A section is accessible if:
  *   - allowedKeys is null (= all allowed), OR
