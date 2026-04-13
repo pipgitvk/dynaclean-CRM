@@ -33,6 +33,27 @@ function stripSuperadminOnlyMenuItems(items, roleKey) {
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
+function roleMatches(itemRoles, roleKey) {
+  const roles = Array.isArray(itemRoles) && itemRoles.length > 0 ? itemRoles : ["ALL"];
+  const norm = (r) => normalizeRoleKey(r) || String(r || "").trim().toUpperCase();
+  const wanted = norm(roleKey);
+  return roles.some((r) => {
+    const rr = norm(r);
+    return rr === "ALL" || rr === wanted;
+  });
+}
+
+function filterByRole(list, roleKey) {
+  return (list || [])
+    .map((item) => {
+      const children = item?.children?.length ? filterByRole(item.children, roleKey) : [];
+      const keepSelf = roleMatches(item?.roles, roleKey);
+      if (children.length > 0) return { ...item, children };
+      return keepSelf ? item : null;
+    })
+    .filter(Boolean);
+}
+
 const allMenuItems = [
   {
     path: "/user-dashboard",
@@ -708,7 +729,7 @@ export default async function getSidebarMenuItems() {
   const username = payload?.username || null;
 
   // Module access is the source of truth (per-user selection in Quick Edit).
-  let items = [...allMenuItems];
+  let items = filterByRole(allMenuItems, roleKey);
 
   // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
   items = stripSuperadminOnlyMenuItems(items, roleKey);
