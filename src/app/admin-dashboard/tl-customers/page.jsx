@@ -49,7 +49,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       tlf.notes as tl_notes,
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
-      tlf.followed_by as tl_followed_by
+      tlf.followed_by as tl_followed_by,
+      ${showTLOnly ? "fu.followup_start_at" : "NULL AS followup_start_at"}
     FROM customers c
     LEFT JOIN (
       SELECT customer_id, next_followup_date, followed_date, notes, followed_by,
@@ -61,6 +62,15 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
+    ${showTLOnly ? `LEFT JOIN (
+      SELECT customer_id, MIN(dt) AS followup_start_at
+      FROM (
+        SELECT customer_id, created_at AS dt FROM TL_followups
+        UNION ALL
+        SELECT customer_id, time_stamp AS dt FROM customers_followup
+      ) earliest_fu
+      GROUP BY customer_id
+    ) fu ON fu.customer_id = c.customer_id` : ""}
     WHERE 1=1
   `;
 
@@ -293,6 +303,10 @@ export default async function AdminTLCustomersPage({ searchParams }) {
 
   const [allCustomersForKPI] = await conn.execute(kpiQuery, kpiParams);
 
+  const isSuperAdmin = String(payload.role ?? payload.userRole ?? "")
+    .trim()
+    .toUpperCase() === "SUPERADMIN";
+
   // Fetch employees for only sales role
   const [employees] = await conn.execute(
     `SELECT DISTINCT username, username as name FROM rep_list WHERE userRole IN ('SALES') AND status = 1 ORDER BY username`,
@@ -323,6 +337,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
         pageSize={pageSize}
         isAdmin={true}
         tlOnly={showTLOnly}
+        isSuperAdmin={isSuperAdmin}
       />
     </div>
   );
