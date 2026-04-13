@@ -188,11 +188,13 @@ export const SUPERADMIN_ONLY_MODULE_KEYS = new Set([
   // Products
   "spare-parts",
   // Documents
+  "documents",
   "company-documents",
   // Admin-only features
   "attendance-rules",
   "import-crm",
   "hiring-process",
+  "final-profile-approval",
 ]);
 
 /**

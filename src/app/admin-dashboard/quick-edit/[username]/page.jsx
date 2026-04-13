@@ -5,7 +5,12 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { MODULE_TREE, ALL_MODULE_KEYS, getChildKeys } from "@/lib/moduleAccess";
+import {
+  MODULE_TREE,
+  ALL_MODULE_KEYS,
+  getChildKeys,
+  applySuperadminOnlyModuleRestrictions,
+} from "@/lib/moduleAccess";
 
 /* ── Tri-state parent checkbox ── */
 function ParentCheckbox({ sectionKey, selected, canEdit, onChange }) {
@@ -173,7 +178,11 @@ const QuickEditPage = () => {
 
         // API already resolves NULL → all keys; [] → empty; use as-is
         if (Array.isArray(emp.module_access)) {
-          setSelectedModules(emp.module_access);
+          const effective = applySuperadminOnlyModuleRestrictions(
+            emp.module_access,
+            emp.userRole,
+          );
+          setSelectedModules(Array.isArray(effective) ? effective : []);
         } else {
           setSelectedModules([...ALL_MODULE_KEYS]);
         }

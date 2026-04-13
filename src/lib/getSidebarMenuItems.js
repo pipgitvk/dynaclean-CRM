@@ -10,8 +10,24 @@ import {
   parseModuleAccess,
   isSectionAllowed,
   applySuperadminOnlyModuleRestrictions,
+  SUPERADMIN_ONLY_MODULE_KEYS,
 } from "@/lib/moduleAccess";
 import { getDbConnection } from "@/lib/db";
+
+function stripSuperadminOnlyMenuItems(items, roleKey) {
+  if (roleKey === "SUPERADMIN") return items;
+  return (items || [])
+    .map((item) => {
+      if (item?.moduleKey && SUPERADMIN_ONLY_MODULE_KEYS.has(item.moduleKey)) {
+        return null;
+      }
+      if (item?.children?.length) {
+        return { ...item, children: stripSuperadminOnlyMenuItems(item.children, roleKey) };
+      }
+      return item;
+    })
+    .filter(Boolean);
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -660,6 +676,9 @@ export default async function getSidebarMenuItems() {
       item.roles.includes("ALL") ||
       item.roles.some((r) => normalizeRoleKey(r) === roleKey),
   );
+
+  // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
+  items = stripSuperadminOnlyMenuItems(items, roleKey);
 
   // Step 2: filter by module_access (SUPERADMIN bypasses this — sees everything)
   if (roleKey !== "SUPERADMIN") {

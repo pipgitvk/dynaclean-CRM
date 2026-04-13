@@ -85,6 +85,12 @@ export async function middleware(request) {
         }
       }
 
+      if (pathname.startsWith("/empcrm/admin-dashboard/profile/approvals-admin")) {
+        if (role !== "SUPERADMIN") {
+          return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
+        }
+      }
+
       // Spare Parts (user dashboard)
       if (pathname.startsWith("/user-dashboard/spare")) {
         if (role !== "SUPERADMIN") {

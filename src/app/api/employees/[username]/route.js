@@ -6,7 +6,11 @@ import path from "path";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getMainSessionPayload } from "@/lib/auth";
-import { parseModuleAccess, ALL_MODULE_KEYS } from "@/lib/moduleAccess";
+import {
+  parseModuleAccess,
+  ALL_MODULE_KEYS,
+  applySuperadminOnlyModuleRestrictions,
+} from "@/lib/moduleAccess";
 // Login username rename disabled — keep import commented if re-enabled:
 // import { renameRepListUsername } from "@/lib/renameRepListUsername";
 
@@ -83,7 +87,11 @@ export async function GET(request, { params }) {
 
     const emp = rows[0];
     // Backward compat: NULL module_access → all modules granted
-    const moduleAccess = parseModuleAccess(emp.module_access ?? null);
+    const moduleAccessRaw = parseModuleAccess(emp.module_access ?? null);
+    const moduleAccess = applySuperadminOnlyModuleRestrictions(
+      moduleAccessRaw,
+      emp.userRole,
+    );
 
     return NextResponse.json({
       employee: { ...emp, module_access: moduleAccess },
@@ -155,7 +163,8 @@ export async function PUT(request, { params }) {
       try {
         const parsed = JSON.parse(moduleAccessRaw);
         if (Array.isArray(parsed)) {
-          moduleAccessToSet = JSON.stringify(parsed);
+          const effective = applySuperadminOnlyModuleRestrictions(parsed, userRole);
+          moduleAccessToSet = JSON.stringify(effective ?? []);
         }
       } catch {
         // ignore malformed input
