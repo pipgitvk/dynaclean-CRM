@@ -850,6 +850,113 @@ export default async function getSidebarMenuItems() {
     items = filterByPathAllowlist(items);
   }
 
+  // Digital Marketer should only see a small allowlist of screens.
+  if (roleKey === "DIGITAL MARKETER") {
+    const allowedExactPaths = new Set([
+      "/user-dashboard",
+      "/user-dashboard/",
+    ]);
+    const allowedPrefixes = [
+      "/user-dashboard/new_upload", // leads upload
+      "/user-dashboard/blogs",
+      "/user-dashboard/my-leads",
+      "/user-dashboard/quotations",
+      "/user-dashboard/email-templates",
+      "/user-dashboard/product-stock", // price list
+      "/user-dashboard/spare", // spare list
+      "/empcrm/user-dashboard",
+    ];
+
+    const isAllowedPath = (p) => {
+      const path = String(p || "");
+      if (allowedExactPaths.has(path)) return true;
+      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
+    };
+
+    const filterByPathAllowlist = (list) =>
+      (list || [])
+        .map((item) => {
+          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
+          if (
+            item?.moduleKey === "dashboard" &&
+            item?.path === "/user-dashboard" &&
+            Array.isArray(item?.children) &&
+            item.children.length > 0
+          ) {
+            return item;
+          }
+          const children = item?.children?.length
+            ? filterByPathAllowlist(item.children)
+            : [];
+          const pathOk = item?.path ? isAllowedPath(item.path) : false;
+          if (children.length > 0) return { ...item, children };
+          if (pathOk) return item;
+          return null;
+        })
+        .filter(Boolean);
+
+    items = filterByPathAllowlist(items);
+  }
+
+  // Admin should only see a small allowlist of screens in user dashboard.
+  if (roleKey === "ADMIN") {
+    const allowedExactPaths = new Set([
+      "/user-dashboard",
+      "/user-dashboard/",
+    ]);
+    const allowedPrefixes = [
+      "/admin-dashboard/prospects",
+      "/user-dashboard/reports/customer-payment-behavior",
+      "/user-dashboard/reports/payment-pending",
+      "/user-dashboard/manual-payments",
+      "/user-dashboard/company-documents",
+      "/user-dashboard/dd-management",
+      "/admin-dashboard/attendance-rules",
+      "/user-dashboard/quotations",
+      "/user-dashboard/view_service_reports",
+      "/user-dashboard/warranty",
+      "/user-dashboard/installation-videos",
+      "/user-dashboard/assets-management",
+      "/user-dashboard/product-stock",
+      "/user-dashboard/product-accessories",
+      "/user-dashboard/purchase",
+      "/user-dashboard/spare",
+      "/user-dashboard/spare/purchase",
+      "/user-dashboard/productions",
+      "/empcrm/user-dashboard",
+    ];
+
+    const isAllowedPath = (p) => {
+      const path = String(p || "");
+      if (allowedExactPaths.has(path)) return true;
+      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
+    };
+
+    const filterByPathAllowlist = (list) =>
+      (list || [])
+        .map((item) => {
+          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
+          if (
+            item?.moduleKey === "dashboard" &&
+            item?.path === "/user-dashboard" &&
+            Array.isArray(item?.children) &&
+            item.children.length > 0
+          ) {
+            return item;
+          }
+          const children = item?.children?.length
+            ? filterByPathAllowlist(item.children)
+            : [];
+          const pathOk = item?.path ? isAllowedPath(item.path) : false;
+          if (children.length > 0) return { ...item, children };
+          if (pathOk) return item;
+          return null;
+        })
+        .filter(Boolean);
+
+    items = filterByPathAllowlist(items);
+  }
+
   // Step 2: filter by module_access (SUPERADMIN bypasses this — sees everything)
   if (roleKey !== "SUPERADMIN") {
     const allowedModulesRaw = await getUserModuleAccess(username);
