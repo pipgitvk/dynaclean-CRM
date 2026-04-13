@@ -151,6 +151,7 @@ import {
   ATTENDANCE_RULES_ALLOWED_ROLES,
   normalizeRoleKey,
 } from "@/lib/adminAttendanceRulesAuth";
+import { parseModuleAccess, isSectionAllowed } from "@/lib/moduleAccess";
 
 const FINAL_PROFILE_APPROVAL_PATH =
   "/empcrm/admin-dashboard/profile/approvals-admin";
@@ -193,6 +194,7 @@ const allMenuItems = [
   //dashboard section
   {
     name: "Dashboard",
+    moduleKey: "dashboard",
     roles: ["SUPERADMIN"],
     icon: "Home",
     children: [
@@ -343,6 +345,7 @@ const allMenuItems = [
   },
   {
     name: "Prospects",
+    moduleKey: "prospects",
     roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
     icon: "UserPlus",
     children: [
@@ -364,6 +367,7 @@ const allMenuItems = [
   // tl management section
   {
     name: "TL Management",
+    moduleKey: "tl-management",
     roles: ["SUPERADMIN"],
     icon: "Users",
     children: [
@@ -448,6 +452,7 @@ const allMenuItems = [
   // product section
   {
     name: "Products",
+    moduleKey: "products",
     roles: ["SUPERADMIN"],
     icon: "ShoppingCart",
     children: [
@@ -583,6 +588,7 @@ const allMenuItems = [
   // employee section
   {
     name: "Employee",
+    moduleKey: "employee",
     roles: ["SUPERADMIN"],
     icon: "UserCircle",
     children: [
@@ -605,6 +611,7 @@ const allMenuItems = [
   // company documents section
   {
     name: "Documents",
+    moduleKey: "documents",
     roles: ["SUPERADMIN"],
     icon: "FileText",
     children: [
@@ -657,6 +664,7 @@ const allMenuItems = [
   // payments section
   {
     name: "Payments",
+    moduleKey: "payments",
     roles: ["SUPERADMIN"],
     icon: "DollarSign",
     children: [
@@ -682,6 +690,7 @@ const allMenuItems = [
   },
   {
     name: "Tally Payments",
+    moduleKey: "tally-payments",
     roles: ["SUPERADMIN", "ACCOUNTANT"],
     icon: "Receipt",
     children: [
@@ -718,6 +727,7 @@ const allMenuItems = [
   
     {
       name: "Import CRM",
+      moduleKey: "import-crm",
       roles: ["SUPERADMIN"],
       icon: "Import",
       children: [
@@ -773,18 +783,21 @@ const allMenuItems = [
   {
     path: "/admin-dashboard/attendance-rules",
     name: "Attendance rules",
+    moduleKey: "attendance-rules",
     roles: [...ATTENDANCE_RULES_ALLOWED_ROLES],
     icon: "Clock",
   },
   {
     path: "/empcrm/admin-dashboard/profile/approvals-admin",
     name: "Final profile approval",
+    moduleKey: "final-profile-approval",
     roles: ["SUPERADMIN"],
     icon: "UserCircle",
   },
   {
     path: "/admin-dashboard/hiring-process",
     name: "Hiring Process",
+    moduleKey: "hiring-process",
     roles: ["SUPERADMIN"],
     icon: "Briefcase",
   },
@@ -833,9 +846,66 @@ async function getAdminRoleKeyNormalized() {
   return normalizeRoleKey(role || "GUEST") || "GUEST";
 }
 
+async function getSessionUsername() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(
+      token,
+      new TextEncoderImpl().encode(JWT_SECRET),
+    );
+    return payload?.username || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch module_access for the logged-in user from rep_list.
+ * Returns parsed array of module keys, or null if column doesn't exist / user not found.
+ */
+async function getUserModuleAccess(username) {
+  if (!username) return null;
+  try {
+    const conn = await getDbConnection();
+    const [rows] = await conn.execute(
+      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+      [username],
+    );
+    if (!rows.length) return null;
+    return parseModuleAccess(rows[0].module_access ?? null);
+  } catch {
+    // If column doesn't exist yet, allow all
+    return null;
+  }
+}
+
+/**
+ * Filter top-level menu items by the user's allowed modules.
+ * Uses isSectionAllowed which checks both parent key AND any child key.
+ * Items without a moduleKey are always shown.
+ * SUPERADMIN always sees everything (no module restriction).
+ */
+function filterMenuItemsByModuleAccess(items, allowedModules) {
+  if (!allowedModules) return items;
+  return items.filter((item) => {
+    if (!item.moduleKey) return true;
+    return isSectionAllowed(item.moduleKey, allowedModules);
+  });
+}
+
 export default async function getSidebarMenuItems() {
   const roleKeyNormalized = await getAdminRoleKeyNormalized();
   let items = filterMenuItemsByRole(allMenuItems, roleKeyNormalized);
+
+  // Apply module_access filtering for non-SUPERADMIN users
+  if (roleKeyNormalized !== "SUPERADMIN") {
+    const username = await getSessionUsername();
+    const allowedModules = await getUserModuleAccess(username);
+    items = filterMenuItemsByModuleAccess(items, allowedModules);
+  }
+
   if (roleKeyNormalized === "SUPERADMIN") {
     const pending = await countPendingFinalProfileApprovals();
     items = attachFinalProfileApprovalBadge(items, pending);

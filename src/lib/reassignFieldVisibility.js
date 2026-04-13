@@ -26,6 +26,22 @@ function hasAnyKey(keys, setOrArray) {
   return arr.some((k) => keys.includes(k));
 }
 
+/** True when HR flagged work experience table rows and/or experience-related document uploads. */
+export function reassignKeysImplyExperience(keys) {
+  if (!Array.isArray(keys) || keys.length === 0) return false;
+  if (keys.includes("section_experience")) return true;
+  return hasAnyKey(keys, EXPERIENCE_COLUMN_KEYS) || hasAnyKey(keys, EXPERIENCE_DOCUMENT_REASSIGN_KEYS);
+}
+
+/**
+ * Employee re-submit screen: show work experience UI if the profile is experienced OR HR asked for
+ * experience corrections (even when is_experienced was wrongly stored as false).
+ */
+export function effectiveExperiencedForEmployeeReassignUi(isExperienced, keys) {
+  if (!isReassignFieldMode(keys)) return isExperienced;
+  return isExperienced || reassignKeysImplyExperience(keys);
+}
+
 export function parseReassignKeys(raw) {
   if (raw == null) return null;
   try {
@@ -58,11 +74,12 @@ export function shouldShowBankingBlock(keys) {
 /** Banking account + tax IDs + work experience (and related document uploads) in one card. */
 export function shouldShowBankingDetailsCard(keys, isExperienced) {
   if (!isReassignFieldMode(keys)) return true;
+  const eff = effectiveExperiencedForEmployeeReassignUi(isExperienced, keys);
   if (shouldShowBankingBlock(keys)) return true;
   if (keys.some((k) => TAX_STATUTORY_KEYS_IN_BANKING_CARD.has(k))) return true;
-  if (isExperienced && keys.includes("section_experience")) return true;
-  if (isExperienced && hasAnyKey(keys, EXPERIENCE_COLUMN_KEYS)) return true;
-  if (isExperienced && hasAnyKey(keys, EXPERIENCE_DOCUMENT_REASSIGN_KEYS)) return true;
+  if (eff && keys.includes("section_experience")) return true;
+  if (eff && hasAnyKey(keys, EXPERIENCE_COLUMN_KEYS)) return true;
+  if (eff && hasAnyKey(keys, EXPERIENCE_DOCUMENT_REASSIGN_KEYS)) return true;
   return false;
 }
 
