@@ -2,6 +2,11 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  buildOwnershipWhere,
+  getScopedUsername,
+  isSuperAdminRole,
+} from "@/lib/dataScope";
 
 export async function GET(req) {
   const conn = await getDbConnection();
@@ -12,11 +17,8 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const role = (payload.role || payload.userRole || "").toUpperCase().trim();
-    const username = payload.username || null;
-    /** Navbar search + customers-data: only these roles see all customers; everyone else is scoped to their assignments. */
-    const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER"];
-    const isPrivileged = privilegedRoles.includes(role);
+    const role = String(payload.role || payload.userRole || "");
+    const username = getScopedUsername(payload);
 
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get("mode") || "table";
@@ -36,9 +38,10 @@ export async function GET(req) {
     );
     let employees = employeeRows.map((row) => row.username);
 
-    // For non-privileged users (e.g. sales), restrict employee list to themselves
-    if (!isPrivileged && username) {
-      employees = [username];
+    // Employee filter dropdown:
+    // SUPERADMIN can filter by any rep; everyone else should only see themselves.
+    if (!isSuperAdminRole(role)) {
+      employees = username ? [username] : [];
     }
 
     let whereClause = " WHERE 1=1";
@@ -65,13 +68,21 @@ export async function GET(req) {
       params.push(stage);
     }
 
-    // Role-based scoping and employee filter
-    if (!isPrivileged && username) {
-      // Non-privileged users only see their own assigned customers (lead_source, sales_representative, assigned_to)
-      whereClause += " AND (lead_source = ? OR sales_representative = ? OR assigned_to = ?)";
-      params.push(username, username, username);
-    } else if (employeeName && employeeName !== "all") {
-      // Admin-style filter: match on any of the responsible columns
+    // Data visibility:
+    // SUPERADMIN → all rows
+    // everyone else → only rows assigned/owned by them (or deny if username missing)
+    const ownership = buildOwnershipWhere({
+      role,
+      username,
+      columns: ["lead_source", "sales_representative", "assigned_to"],
+    });
+    if (ownership.sql) {
+      whereClause += ` AND ${ownership.sql}`;
+      params.push(...ownership.params);
+    }
+
+    // Optional employee filter (only within already-visible rows)
+    if (employeeName && employeeName !== "all") {
       whereClause += " AND (lead_source = ? OR sales_representative = ? OR assigned_to = ?)";
       params.push(employeeName, employeeName, employeeName);
     }

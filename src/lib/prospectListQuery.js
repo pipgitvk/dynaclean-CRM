@@ -53,7 +53,7 @@ export function buildProspectsListWhereClause({
   adminFilters = null,
 }) {
   const r = String(role ?? "").toUpperCase().trim();
-  const isAdmin = r === "SUPERADMIN" || r === "ADMIN";
+  const isAdmin = r === "SUPERADMIN";
   const parts = [];
   const params = [];
 
