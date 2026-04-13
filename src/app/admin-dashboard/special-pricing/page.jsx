@@ -1,13 +1,10 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isUnknownApprovalNoteColumnError } from "@/lib/specialPriceApprovalNoteColumn";
 import Link from "next/link";
 import SpecialPriceDetailsModal from "@/components/specialPrice/SpecialPriceDetailsModal";
-import {
-  approveSpecialPrice,
-  rejectSpecialPrice,
-  updateSpecialPrice,
-  deleteSpecialPrice,
-} from "./_actions";
+import { updateSpecialPrice, deleteSpecialPrice } from "./_actions";
+import SpecialPriceApproveRejectButtons from "@/components/specialPrice/SpecialPriceApproveRejectButtons";
 import SpecialPricingSearch from "./SpecialPricingSearch";
 import StatusFilter from "./StatusFilter";
 
@@ -61,8 +58,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
     whereClause = `WHERE ${conditions.join(" AND ")}`;
   }
 
-  const [rows] = await conn.execute(
-    `
+  const listSqlBase = `
     SELECT
       sp.id,
       sp.customer_id,
@@ -74,6 +70,7 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
       sp.set_date,
       sp.approved_by,
       sp.approved_date,
+      NOTE_PLACEHOLDER
       c.first_name,
       c.last_name,
       p.item_name,
@@ -85,9 +82,23 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
     ${whereClause}
     ORDER BY sp.set_date DESC
     LIMIT ? OFFSET ?
-  `,
-    [...whereParams, PAGE_SIZE, offset],
-  );
+  `;
+  const listParams = [...whereParams, PAGE_SIZE, offset];
+
+  let rows;
+  try {
+    const sql = listSqlBase.replace(
+      "NOTE_PLACEHOLDER",
+      "sp.approval_note,\n      ",
+    );
+    const result = await conn.execute(sql, listParams);
+    rows = result[0];
+  } catch (e) {
+    if (!isUnknownApprovalNoteColumnError(e)) throw e;
+    const sql = listSqlBase.replace("NOTE_PLACEHOLDER", "");
+    const result = await conn.execute(sql, listParams);
+    rows = result[0];
+  }
 
   const [countRows] = await conn.execute(
     `
@@ -209,6 +220,14 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                             : ""
                         }`
                       : null;
+                  const rejectedMeta =
+                    isRejected && row.approved_by
+                      ? `Rejected by ${row.approved_by}${
+                          row.approved_date
+                            ? ` on ${new Date(row.approved_date).toLocaleString()}`
+                            : ""
+                        }`
+                      : null;
 
                   return (
                     <tr key={row.id} className="border-t">
@@ -254,6 +273,21 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                               {approvedMeta}
                             </span>
                           )}
+                          {rejectedMeta && (
+                            <span className="text-[11px] text-gray-500">
+                              {rejectedMeta}
+                            </span>
+                          )}
+                          {(isApproved || isRejected) && row.approval_note && (
+                            <div className="text-[11px] text-gray-700 max-w-[min(240px,28vw)] text-center leading-snug border-t border-gray-200/80 pt-1.5 mt-0.5">
+                              <span className="font-semibold text-gray-600">
+                                Note:{" "}
+                              </span>
+                              <span className="whitespace-pre-wrap break-words">
+                                {row.approval_note}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="p-3 text-sm">{row.set_by}</td>
@@ -278,32 +312,14 @@ export default async function AdminSpecialPricingPage({ searchParams }) {
                               setDate: row.set_date,
                               approvedBy: row.approved_by,
                               approvedDate: row.approved_date,
+                              approvalNote: row.approval_note,
                             }}
                             onUpdate={updateSpecialPrice}
                             onDelete={deleteSpecialPrice}
                           />
                         </div>
                         {!isApproved && !isRejected && (
-                          <div className="flex flex-wrap gap-2">
-                            <form action={approveSpecialPrice} className="inline">
-                              <input type="hidden" name="id" value={row.id} />
-                              <button
-                                type="submit"
-                                className="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-green-700"
-                              >
-                                Approve
-                              </button>
-                            </form>
-                            <form action={rejectSpecialPrice} className="inline">
-                              <input type="hidden" name="id" value={row.id} />
-                              <button
-                                type="submit"
-                                className="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-red-700"
-                              >
-                                Reject
-                              </button>
-                            </form>
-                          </div>
+                          <SpecialPriceApproveRejectButtons id={row.id} />
                         )}
                       </td>
                     </tr>

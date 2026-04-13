@@ -26,6 +26,7 @@ export default function SpecialPriceDetailsModal({
     setDate,
     approvedBy,
     approvedDate,
+    approvalNote,
   } = details;
 
   const formattedSetDate = setDate
@@ -131,7 +132,16 @@ export default function SpecialPriceDetailsModal({
                 </div>
                 {approvedBy && approvedDate && (
                   <div className="text-xs text-gray-600">
-                    Approved by {approvedBy} on {formattedApprovedDate}
+                    {isRejected ? "Rejected" : "Approved"} by {approvedBy} on{" "}
+                    {formattedApprovedDate}
+                  </div>
+                )}
+                {approvalNote && (isApproved || isRejected) && (
+                  <div className="text-xs text-gray-700 mt-2 pt-2 border-t border-gray-200">
+                    <div className="font-semibold text-gray-600 mb-0.5">Note</div>
+                    <div className="whitespace-pre-wrap text-gray-800">
+                      {approvalNote}
+                    </div>
                   </div>
                 )}
               </div>
