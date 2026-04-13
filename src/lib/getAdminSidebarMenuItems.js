@@ -151,7 +151,11 @@ import {
   ATTENDANCE_RULES_ALLOWED_ROLES,
   normalizeRoleKey,
 } from "@/lib/adminAttendanceRulesAuth";
-import { parseModuleAccess, isSectionAllowed } from "@/lib/moduleAccess";
+import {
+  parseModuleAccess,
+  isSectionAllowed,
+  applySuperadminOnlyModuleRestrictions,
+} from "@/lib/moduleAccess";
 
 const FINAL_PROFILE_APPROVAL_PATH =
   "/empcrm/admin-dashboard/profile/approvals-admin";
@@ -901,7 +905,11 @@ export default async function getSidebarMenuItems() {
   // Apply module_access filtering for non-SUPERADMIN users
   if (roleKeyNormalized !== "SUPERADMIN") {
     const username = await getSessionUsername();
-    const allowedModules = await getUserModuleAccess(username);
+    const allowedModulesRaw = await getUserModuleAccess(username);
+    const allowedModules = applySuperadminOnlyModuleRestrictions(
+      allowedModulesRaw,
+      roleKeyNormalized,
+    );
     items = filterMenuItemsByModuleAccess(items, allowedModules);
   }
 

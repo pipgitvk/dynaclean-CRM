@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
-/** Must match `ATTENDANCE_RULES_ALLOWED_ROLES` in `@/lib/adminAttendanceRulesAuth`. */
-const ATTENDANCE_RULES_MIDDLEWARE_ROLES = ["SUPERADMIN", "ADMIN", "HR"];
+/** Attendance rules: SUPERADMIN only. */
+const ATTENDANCE_RULES_MIDDLEWARE_ROLES = ["SUPERADMIN"];
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -67,8 +67,41 @@ export async function middleware(request) {
       }
 
       if (pathname.startsWith("/admin-dashboard/company-documents")) {
-        if (!["SUPERADMIN", "ADMIN", "ACCOUNTANT"].includes(role)) {
+        if (!["SUPERADMIN"].includes(role)) {
           return NextResponse.redirect(new URL("/admin-dashboard", request.url));
+        }
+      }
+
+      // SUPERADMIN-only modules (even if link is known)
+      if (pathname.startsWith("/admin-dashboard/import-crm")) {
+        if (role !== "SUPERADMIN") {
+          return NextResponse.redirect(new URL("/admin-dashboard", request.url));
+        }
+      }
+
+      if (pathname.startsWith("/admin-dashboard/hiring-process")) {
+        if (role !== "SUPERADMIN") {
+          return NextResponse.redirect(new URL("/admin-dashboard", request.url));
+        }
+      }
+
+      if (pathname.startsWith("/empcrm/admin-dashboard/profile/approvals-admin")) {
+        if (role !== "SUPERADMIN") {
+          return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
+        }
+      }
+
+      // Spare Parts (user dashboard)
+      if (pathname.startsWith("/user-dashboard/spare")) {
+        if (role !== "SUPERADMIN") {
+          return NextResponse.redirect(new URL("/user-dashboard", request.url));
+        }
+      }
+
+      // Company documents (user dashboard)
+      if (pathname.startsWith("/user-dashboard/company-documents")) {
+        if (role !== "SUPERADMIN") {
+          return NextResponse.redirect(new URL("/user-dashboard", request.url));
         }
       }
 

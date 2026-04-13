@@ -181,6 +181,35 @@ export function parseModuleAccess(raw) {
 }
 
 /**
+ * SUPERADMIN-only modules that must never be granted to other roles,
+ * even under backward-compat "grant all when module_access is NULL".
+ */
+export const SUPERADMIN_ONLY_MODULE_KEYS = new Set([
+  // Products
+  "spare-parts",
+  // Documents
+  "documents",
+  "company-documents",
+  // Admin-only features
+  "attendance-rules",
+  "import-crm",
+  "hiring-process",
+  "final-profile-approval",
+]);
+
+/**
+ * Enforce SUPERADMIN-only modules at the module_access level.
+ * @param {string[]|null|undefined} allowedKeys
+ * @param {string} role
+ */
+export function applySuperadminOnlyModuleRestrictions(allowedKeys, role) {
+  const r = String(role ?? "").trim().toUpperCase();
+  if (r === "SUPERADMIN") return allowedKeys ?? null;
+  if (!allowedKeys) return allowedKeys ?? null;
+  return allowedKeys.filter((k) => !SUPERADMIN_ONLY_MODULE_KEYS.has(k));
+}
+
+/**
  * Check whether a sidebar section should be visible given the allowed keys array.
  * A section is accessible if:
  *   - allowedKeys is null (= all allowed), OR
