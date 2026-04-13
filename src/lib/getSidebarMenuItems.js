@@ -761,8 +761,12 @@ export default async function getSidebarMenuItems() {
               : item?.path
                 ? false
                 : true;
-            // If it has children, keep it only if any child remains.
-            if (children.length > 0) return { ...item, children };
+            // If it originally has children, keep it only if any child remains.
+            // This prevents "empty groups" (e.g. Orders) from showing just because
+            // a broad parent moduleKey like "dashboard" is allowed.
+            if (item?.children?.length) {
+              return children.length > 0 ? { ...item, children } : null;
+            }
             // Leaf: keep only if allowed.
             return allowed ? item : null;
           })
