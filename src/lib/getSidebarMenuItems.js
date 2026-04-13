@@ -42,48 +42,56 @@ const allMenuItems = [
       {
         path: "/user-dashboard",
         name: "Dashboard",
+        moduleKey: "dashboard-home",
         roles: ["ALL"],
         icon: "Home",
       },
       {
         path: "/user-dashboard/lead-reports",
         name: "Lead Reports",
+        moduleKey: "lead-reports",
         roles: ["SALES", "SALES HEAD"],
         icon: "FileText",
       },
       {
         path: "/user-dashboard/today-reports",
         name: "Today Report",
+        moduleKey: "daily-report",
         roles: ["TEAM LEADER", "ADMIN", "HR", "SALES", "SALES HEAD"],
         icon: "FileText",
       },
       {
         path: "/user-dashboard/attendance/",
         name: "Attendance details",
+        moduleKey: "attendance-details",
         roles: ["ALL"],
         icon: "ListOrdered",
       },
       {
         path: "/user-dashboard/attendance-regularization-approvals",
         name: "Regularization approvals",
+        moduleKey: "regularization-approvals",
         roles: ["ALL"],
         icon: "CheckSquare",
       },
       {
         path: "/user-dashboard/task-manager",
         name: "Task Manager",
+        moduleKey: "task-manager",
         roles: ["ALL"],
         icon: "ClipboardList",
       },
       {
         path: "/user-dashboard/expenses",
         name: "Expense",
+        moduleKey: "expenses",
         roles: ["ALL"],
         icon: "DollarSign",
       },
       {
         path: "/user-dashboard/report-data",
         name: "Fast Card",
+        moduleKey: "fast-card",
         roles: ["ALL"],
         icon: "ShieldCheck",
       },
@@ -93,7 +101,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/reports/customer-payment-behavior",
     name: "Customer Payment Behavior",
-    moduleKey: "payments",
+    moduleKey: "customer-payment-behavior",
     roles: ["ADMIN", "ACCOUNTANT", "SALES", "SALES HEAD"],
     icon: "FileText",
   },
@@ -118,6 +126,7 @@ const allMenuItems = [
       {
         path: "/user-dashboard/order-followups",
         name: "Order Report",
+        moduleKey: "order-report",
         roles: ["TEAM LEADER"],
         icon: "FileText",
       },
@@ -130,28 +139,40 @@ const allMenuItems = [
       {
         path: "/user-dashboard/reports/payment-pending",
         name: "Payment Pending",
+        moduleKey: "payment-pending",
         roles: ["TEAM LEADER"],
         icon: "DollarSign",
       },
       {
         path: "/user-dashboard/reports/item-wise-sales",
         name: "Item Wise Sales",
+        moduleKey: "item-wise-sales",
         roles: ["TEAM LEADER"],
         icon: "FileText",
       },
       {
         path: "/user-dashboard/reports/customer-payment-behavior",
         name: "Customer Payment Behavior",
+        moduleKey: "customer-payment-behavior",
         roles: ["TEAM LEADER"],
         icon: "FileText",
       },
     ],
   },
 
+  // Admin can see the user-dashboard Order Report too (module_access controls actual visibility)
+  {
+    path: "/user-dashboard/order-followups",
+    name: "Order Report",
+    moduleKey: "order-report",
+    roles: ["ADMIN"],
+    icon: "FileText",
+  },
+
   {
     path: "/user-dashboard/reports/payment-pending",
     name: "Payment Pending",
-    moduleKey: "payments",
+    moduleKey: "payment-pending",
     roles: [
       "ADMIN",
       "ACCOUNTANT",
@@ -165,7 +186,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/manual-payments",
     name: "Manual Payments",
-    moduleKey: "payments",
+    moduleKey: "manual-payments",
     roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
     icon: "Receipt",
   },
@@ -213,12 +234,14 @@ const allMenuItems = [
       {
         path: "/user-dashboard/order",
         name: "Order Process",
+        moduleKey: "orders-process",
         roles: ["ALL"],
         icon: "ListOrdered",
       },
       {
         path: "/user-dashboard/order/delivery-status",
         name: "Delay Delivery",
+        moduleKey: "orders-delay",
         roles: ["ALL"],
         icon: "ListOrdered",
       },
@@ -228,7 +251,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/monitor-targets",
     name: "Target Monitor",
-    moduleKey: "dashboard",
+    moduleKey: "targets-monitor",
     roles: ["ACCOUNTANT"],
     icon: "DollarSign",
   },
@@ -242,21 +265,21 @@ const allMenuItems = [
   {
     path: "/user-dashboard/new_upload",
     name: "Leads Upload",
-    moduleKey: "dashboard",
+    moduleKey: "leads-upload",
     roles: ["DIGITAL MARKETER", "TEAM LEADER"],
     icon: "Upload",
   },
   {
     path: "/user-dashboard/blogs",
     name: "Blog",
-    moduleKey: "dashboard",
+    moduleKey: "blog",
     roles: ["DIGITAL MARKETER"],
     icon: "Upload",
   },
   {
     path: "/user-dashboard/my-leads",
     name: "My Leads",
-    moduleKey: "dashboard",
+    moduleKey: "my-leads",
     roles: ["DIGITAL MARKETER", "TEAM LEADER"],
     icon: "Upload",
   },
@@ -299,12 +322,14 @@ const allMenuItems = [
       {
         path: "/user-dashboard/customers",
         name: "View Customers",
+        moduleKey: "view-customers",
         roles: ["ALL"],
         icon: "ScrollText",
       },
       {
         path: "/user-dashboard/add-customer",
         name: "Add Customer",
+        moduleKey: "add-customer",
         roles: ["ALL"],
         icon: "FilePlus2",
       },
@@ -321,14 +346,14 @@ const allMenuItems = [
   {
     path: "/user-dashboard/demo_details",
     name: "Demo Details",
-    moduleKey: "dashboard",
+    moduleKey: "demo-details",
     roles: ["ALL"],
     icon: "PlayCircle",
   },
   {
     path: "/user-dashboard/quotations",
     name: "Quotation",
-    moduleKey: "tl-management",
+    moduleKey: "quotations",
     roles: [
       "SALES",
       "SALES HEAD",
@@ -345,7 +370,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/invoices",
     name: "Invoices",
-    moduleKey: "tl-management",
+    moduleKey: "invoices",
     roles: [
       "ACCOUNTANT"
     ],
@@ -355,7 +380,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/all-expenses",
     name: "View Expenses",
-    moduleKey: "payments",
+    moduleKey: "expenses",
     roles: ["ACCOUNTANT", "ADMIN", "TEAM LEADER"],
     icon: "DollarSign",
   },
@@ -374,6 +399,7 @@ const allMenuItems = [
       {
         path: "/user-dashboard/view_service_reports",
         name: "Service Records",
+        moduleKey: "service-records",
         roles: [
           "ACCOUNTANT",
           "SERVICE ENGINEER",
@@ -386,6 +412,7 @@ const allMenuItems = [
       {
         path: "/user-dashboard/view_service_reports/upcoming-installation",
         name: "Upcoming Installations",
+        moduleKey: "upcoming-installations",
         roles: [
           "ACCOUNTANT",
           "SERVICE ENGINEER",
@@ -670,292 +697,11 @@ export default async function getSidebarMenuItems() {
   const roleKey = normalizeRoleKey(role) || "GUEST";
   const username = payload?.username || null;
 
-  // Step 1: filter by role
-  let items = allMenuItems.filter(
-    (item) =>
-      item.roles.includes("ALL") ||
-      item.roles.some((r) => normalizeRoleKey(r) === roleKey),
-  );
+  // Module access is the source of truth (per-user selection in Quick Edit).
+  let items = [...allMenuItems];
 
   // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
   items = stripSuperadminOnlyMenuItems(items, roleKey);
-
-  // Accountant should only see a very small allowlist of screens.
-  if (roleKey === "ACCOUNTANT") {
-    const allowedExactPaths = new Set([
-      "/user-dashboard",
-      "/user-dashboard/",
-    ]);
-    const allowedPrefixes = [
-      "/user-dashboard/manual-payments",
-      "/user-dashboard/dd-management",
-      "/user-dashboard/company-documents",
-      "/admin-dashboard/client-expenses",
-      "/admin-dashboard/statements",
-      "/user-dashboard/monitor-targets",
-      "/user-dashboard/invoices",
-      "/user-dashboard/reports/payment-pending",
-      "/user-dashboard/reports/customer-payment-behavior",
-      "/user-dashboard/attendance-log",
-      "/user-dashboard/quotations",
-      "/user-dashboard/all-expenses",
-      "/user-dashboard/view_service_reports",
-      "/user-dashboard/assets-management",
-      "/user-dashboard/product-stock",
-      "/user-dashboard/product-accessories",
-      "/user-dashboard/purchase",
-      "/user-dashboard/spare",
-      "/user-dashboard/spare/purchase",
-      "/user-dashboard/productions",
-      "/empcrm/user-dashboard",
-    ];
-
-    const isAllowedPath = (p) => {
-      const path = String(p || "");
-      if (allowedExactPaths.has(path)) return true;
-      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
-    };
-
-    const filterByPathAllowlist = (list) =>
-      (list || [])
-        .map((item) => {
-          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
-          if (
-            item?.moduleKey === "dashboard" &&
-            item?.path === "/user-dashboard" &&
-            Array.isArray(item?.children) &&
-            item.children.length > 0
-          ) {
-            return item;
-          }
-          const children = item?.children?.length
-            ? filterByPathAllowlist(item.children)
-            : [];
-          const pathOk = item?.path ? isAllowedPath(item.path) : false;
-          if (children.length > 0) return { ...item, children };
-          if (pathOk) return item;
-          // Keep the top-level dashboard container if it has /user-dashboard path
-          return null;
-        })
-        .filter(Boolean);
-
-    items = filterByPathAllowlist(items);
-  }
-
-  // Team Leader should only see a small allowlist of screens.
-  if (roleKey === "TEAM LEADER") {
-    const allowedExactPaths = new Set([
-      "/user-dashboard",
-      "/user-dashboard/",
-    ]);
-    const allowedPrefixes = [
-      "/user-dashboard/tl-customers",
-      "/user-dashboard/customers",
-      "/user-dashboard/add-customer",
-      "/user-dashboard/reports/customer-payment-behavior",
-      "/user-dashboard/reports/payment-pending",
-      "/user-dashboard/reports/item-wise-sales",
-      "/user-dashboard/lead-reports",
-      "/user-dashboard/quot-report",
-      "/user-dashboard/order-followups",
-      "/user-dashboard/demo-registrations",
-      "/user-dashboard/new_upload",
-      "/user-dashboard/my-leads",
-      "/empcrm/user-dashboard",
-      "/empcrm/user-dashboard/profile",
-    ];
-
-    const isAllowedPath = (p) => {
-      const path = String(p || "");
-      if (allowedExactPaths.has(path)) return true;
-      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
-    };
-
-    const filterByPathAllowlist = (list) =>
-      (list || [])
-        .map((item) => {
-          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
-          if (
-            item?.moduleKey === "dashboard" &&
-            item?.path === "/user-dashboard" &&
-            Array.isArray(item?.children) &&
-            item.children.length > 0
-          ) {
-            return item;
-          }
-          const children = item?.children?.length
-            ? filterByPathAllowlist(item.children)
-            : [];
-          const pathOk = item?.path ? isAllowedPath(item.path) : false;
-          if (children.length > 0) return { ...item, children };
-          if (pathOk) return item;
-          return null;
-        })
-        .filter(Boolean);
-
-    items = filterByPathAllowlist(items);
-  }
-
-  // Sales roles should only see a small allowlist of screens.
-  if (roleKey === "SALES" || roleKey === "SALES HEAD") {
-    const allowedExactPaths = new Set([
-      "/user-dashboard",
-      "/user-dashboard/",
-    ]);
-    const allowedPrefixes = [
-      "/user-dashboard/today-reports",
-      "/user-dashboard/lead-reports",
-      "/admin-dashboard/prospects",
-      "/user-dashboard/customers",
-      "/user-dashboard/add-customer",
-      "/user-dashboard/reports/customer-payment-behavior",
-      "/user-dashboard/reports/payment-pending",
-      "/user-dashboard/quotations",
-      "/user-dashboard/order",
-      "/user-dashboard/order/delivery-status",
-      "/user-dashboard/view_service_reports/upcoming-installation",
-      "/user-dashboard/installation-videos",
-      "/user-dashboard/product-stock",
-      "/empcrm/user-dashboard",
-    ];
-
-    const isAllowedPath = (p) => {
-      const path = String(p || "");
-      if (allowedExactPaths.has(path)) return true;
-      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
-    };
-
-    const filterByPathAllowlist = (list) =>
-      (list || [])
-        .map((item) => {
-          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
-          if (
-            item?.moduleKey === "dashboard" &&
-            item?.path === "/user-dashboard" &&
-            Array.isArray(item?.children) &&
-            item.children.length > 0
-          ) {
-            return item;
-          }
-          const children = item?.children?.length
-            ? filterByPathAllowlist(item.children)
-            : [];
-          const pathOk = item?.path ? isAllowedPath(item.path) : false;
-          if (children.length > 0) return { ...item, children };
-          if (pathOk) return item;
-          return null;
-        })
-        .filter(Boolean);
-
-    items = filterByPathAllowlist(items);
-  }
-
-  // Digital Marketer should only see a small allowlist of screens.
-  if (roleKey === "DIGITAL MARKETER") {
-    const allowedExactPaths = new Set([
-      "/user-dashboard",
-      "/user-dashboard/",
-    ]);
-    const allowedPrefixes = [
-      "/user-dashboard/new_upload", // leads upload
-      "/user-dashboard/blogs",
-      "/user-dashboard/my-leads",
-      "/user-dashboard/quotations",
-      "/user-dashboard/email-templates",
-      "/user-dashboard/product-stock", // price list
-      "/user-dashboard/spare", // spare list
-      "/empcrm/user-dashboard",
-    ];
-
-    const isAllowedPath = (p) => {
-      const path = String(p || "");
-      if (allowedExactPaths.has(path)) return true;
-      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
-    };
-
-    const filterByPathAllowlist = (list) =>
-      (list || [])
-        .map((item) => {
-          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
-          if (
-            item?.moduleKey === "dashboard" &&
-            item?.path === "/user-dashboard" &&
-            Array.isArray(item?.children) &&
-            item.children.length > 0
-          ) {
-            return item;
-          }
-          const children = item?.children?.length
-            ? filterByPathAllowlist(item.children)
-            : [];
-          const pathOk = item?.path ? isAllowedPath(item.path) : false;
-          if (children.length > 0) return { ...item, children };
-          if (pathOk) return item;
-          return null;
-        })
-        .filter(Boolean);
-
-    items = filterByPathAllowlist(items);
-  }
-
-  // Admin should only see a small allowlist of screens in user dashboard.
-  if (roleKey === "ADMIN") {
-    const allowedExactPaths = new Set([
-      "/user-dashboard",
-      "/user-dashboard/",
-    ]);
-    const allowedPrefixes = [
-      "/admin-dashboard/prospects",
-      "/user-dashboard/reports/customer-payment-behavior",
-      "/user-dashboard/reports/payment-pending",
-      "/user-dashboard/manual-payments",
-      "/user-dashboard/company-documents",
-      "/user-dashboard/dd-management",
-      "/admin-dashboard/attendance-rules",
-      "/user-dashboard/quotations",
-      "/user-dashboard/view_service_reports",
-      "/user-dashboard/warranty",
-      "/user-dashboard/installation-videos",
-      "/user-dashboard/assets-management",
-      "/user-dashboard/product-stock",
-      "/user-dashboard/product-accessories",
-      "/user-dashboard/purchase",
-      "/user-dashboard/spare",
-      "/user-dashboard/spare/purchase",
-      "/user-dashboard/productions",
-      "/empcrm/user-dashboard",
-    ];
-
-    const isAllowedPath = (p) => {
-      const path = String(p || "");
-      if (allowedExactPaths.has(path)) return true;
-      return allowedPrefixes.some((prefix) => path.startsWith(prefix));
-    };
-
-    const filterByPathAllowlist = (list) =>
-      (list || [])
-        .map((item) => {
-          // Always keep the full Dashboard *section* (not every dashboard-tagged item).
-          if (
-            item?.moduleKey === "dashboard" &&
-            item?.path === "/user-dashboard" &&
-            Array.isArray(item?.children) &&
-            item.children.length > 0
-          ) {
-            return item;
-          }
-          const children = item?.children?.length
-            ? filterByPathAllowlist(item.children)
-            : [];
-          const pathOk = item?.path ? isAllowedPath(item.path) : false;
-          if (children.length > 0) return { ...item, children };
-          if (pathOk) return item;
-          return null;
-        })
-        .filter(Boolean);
-
-    items = filterByPathAllowlist(items);
-  }
 
   // Step 2: filter by module_access (SUPERADMIN bypasses this — sees everything)
   if (roleKey !== "SUPERADMIN") {
@@ -966,10 +712,23 @@ export default async function getSidebarMenuItems() {
     );
     // allowedModules === null means column not set yet → show all (backward compat)
     if (allowedModules !== null) {
-      items = items.filter((item) => {
-        if (!item.moduleKey) return true; // no restriction → always show
-        return isSectionAllowed(item.moduleKey, allowedModules);
-      });
+      const filterByModuleAccess = (list) =>
+        (list || [])
+          .map((item) => {
+            const children = item?.children?.length
+              ? filterByModuleAccess(item.children)
+              : [];
+            const allowed = !item?.moduleKey
+              ? true
+              : isSectionAllowed(item.moduleKey, allowedModules);
+            // If it has children, keep it only if any child remains.
+            if (children.length > 0) return { ...item, children };
+            // Leaf: keep only if allowed.
+            return allowed ? item : null;
+          })
+          .filter(Boolean);
+
+      items = filterByModuleAccess(items);
     }
   }
 

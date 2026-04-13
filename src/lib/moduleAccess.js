@@ -33,6 +33,9 @@ export const MODULE_TREE = [
       { key: "dm-fresh-leads",               label: "24h Fresh Leads (DM)" },
       { key: "task-manager",                 label: "Task Manager" },
       { key: "demo-details",                 label: "Demo Details" },
+      { key: "attendance-details",           label: "Attendance details" },
+      { key: "regularization-approvals",     label: "Regularization approvals" },
+      { key: "fast-card",                    label: "Fast Card" },
     ],
   },
   {

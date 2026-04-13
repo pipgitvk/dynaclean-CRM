@@ -356,6 +356,15 @@ const QuickEditPage = () => {
 
   const setAdminDefaults = () => {
     const defaults = [
+      // Dashboard (admin should see these by default)
+      "dashboard-home",
+      "lead-reports",
+      "daily-report",
+      "attendance-details",
+      "regularization-approvals",
+      "task-manager",
+      "expenses",
+      "fast-card",
       // Prospects
       "prospects-view",
       "prospects-add",
