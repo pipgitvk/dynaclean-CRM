@@ -1,5 +1,6 @@
 import { getDbConnection } from "@/lib/db";
 import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
+import { resolveTamilAssigneeUsername } from "@/lib/tamilAssigneeResolve";
 import {
   extractProductFromMetaFieldData,
   buildProductsInterestLabel,
@@ -289,20 +290,31 @@ export async function insertLeadIntoDb(lead, options = {}) {
   const conn = await getDbConnection();
   const forceAssignTo = options.forceAssignTo;
 
-  let repRows = [];
+  let assignedTo;
+  /** If true, skip UPDATE lead_distribution (assignee only in rep_list or literal fallback). */
+  let skipLeadDistributionUpdate = false;
 
   if (forceAssignTo) {
-    const [rows] = await conn.execute(
-      `SELECT * FROM lead_distribution WHERE is_active = 1 AND UPPER(TRIM(username)) = UPPER(TRIM(?)) LIMIT 1`,
-      [forceAssignTo],
-    );
-    repRows = rows;
-    if (!repRows.length) {
-      throw new Error(
-        `Rep "${forceAssignTo}" not found in lead_distribution (check username spelling / active flag)`,
+    const resolved = await resolveTamilAssigneeUsername(conn, forceAssignTo);
+    assignedTo = resolved.username;
+    skipLeadDistributionUpdate = !resolved.incrementLeadDistribution;
+
+    if (resolved.incrementLeadDistribution) {
+      const [ldRows] = await conn.execute(
+        `SELECT * FROM lead_distribution WHERE is_active = 1 AND UPPER(TRIM(username)) = UPPER(?) LIMIT 1`,
+        [assignedTo],
       );
+      const rep = ldRows[0];
+      if (rep && rep.assigned_count >= rep.max_leads) {
+        await conn.execute(
+          `UPDATE lead_distribution SET assigned_count = 0 WHERE is_active = 1 AND UPPER(TRIM(username)) = UPPER(?)`,
+          [assignedTo],
+        );
+      }
     }
   } else {
+    let repRows = [];
+
     const normalizedLanguage = lead.language?.toUpperCase();
 
     if (normalizedLanguage === "TAMIL") {
@@ -329,51 +341,32 @@ export async function insertLeadIntoDb(lead, options = {}) {
       );
       repRows = rows;
     }
+
+    if (repRows.length === 0) {
+      throw new Error("No reps available");
+    }
+
+    let selectedRep = null;
+
+    for (const rep of repRows) {
+      if (rep.assigned_count < rep.max_leads) {
+        selectedRep = rep;
+        break;
+      }
+    }
+
+    if (!selectedRep) {
+      await conn.execute(
+        `UPDATE lead_distribution
+         SET assigned_count = 0
+         WHERE is_active = 1`,
+      );
+      selectedRep = repRows[0];
+    }
+
+    assignedTo = selectedRep.username;
   }
 
-  if (repRows.length === 0) {
-    throw new Error("No reps available");
-  }
-
-
-  // Round-robin
-  // let selectedRep = null;
-  // for (const rep of repRows) {
-  //   if (rep.assigned_count < rep.max_leads) {
-  //     selectedRep = rep;
-  //     break;
-  //   }
-  // }
-
-  // if (!selectedRep) {
-  //   await conn.execute(
-  //     `UPDATE lead_distribution
-  //      SET assigned_count = 0
-  //      WHERE is_active = 1`,
-  //   );
-  //   selectedRep = repRows[0];
-  // }
-
-let selectedRep = null;
-
-for (const rep of repRows) {
-  if (rep.assigned_count < rep.max_leads) {
-    selectedRep = rep;
-    break;
-  }
-}
-
-if (!selectedRep) {
-  await conn.execute(
-    `UPDATE lead_distribution
-     SET assigned_count = 0
-     WHERE is_active = 1`,
-  );
-  selectedRep = repRows[0];
-}
-
-
-  const assignedTo = selectedRep.username;
   const now = new Date();
 
   // Final safety: skip if phone already exists (last 10 digits only)
@@ -441,13 +434,15 @@ if (!selectedRep) {
     ],
   );
 
-  await conn.execute(
-    `UPDATE lead_distribution
-       SET assigned_count = assigned_count + 1,
-           last_assigned_at = ?
-     WHERE username = ?`,
-    [now, assignedTo],
-  );
+  if (!skipLeadDistributionUpdate) {
+    await conn.execute(
+      `UPDATE lead_distribution
+         SET assigned_count = assigned_count + 1,
+             last_assigned_at = ?
+       WHERE UPPER(TRIM(username)) = UPPER(?)`,
+      [now, assignedTo],
+    );
+  }
 
   return { skipped: false, customerId };
 }

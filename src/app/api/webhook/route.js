@@ -5,6 +5,7 @@ import {
   buildProductsInterestLabel,
 } from "@/lib/metaLeadProduct";
 import { TAMIL_META_FORM_ID, TAMIL_META_ASSIGNEE_USERNAME } from "@/lib/metaTamilLeadForm";
+import { resolveTamilAssigneeUsername } from "@/lib/tamilAssigneeResolve";
 
 // Disable caching - fixes 405 Method Not Allowed on production (Vercel, nginx, etc.)
 export const dynamic = "force-dynamic";
@@ -149,53 +150,37 @@ export async function POST(request) {
     if (!phone && !email)
       return new Response("Missing contact info", { status: 400 });
 
-    // --- Fetch all active reps ---
-    const [repRows] = await conn.execute(`
+    const normalizedLanguage = language?.toUpperCase()?.trim();
+    const tamilPipeline =
+      formIdForRouting === TAMIL_META_FORM_ID || normalizedLanguage === "TAMIL";
+
+    let assignedTo;
+    /** Only increment lead_distribution when that user is on the Tamil pipeline list there */
+    let skipWebhookLeadDistributionUpdate = false;
+
+    if (tamilPipeline) {
+      const resolved = await resolveTamilAssigneeUsername(conn, TAMIL_META_ASSIGNEE_USERNAME);
+      assignedTo = resolved.username;
+      skipWebhookLeadDistributionUpdate = !resolved.incrementLeadDistribution;
+    } else {
+      const [repRows] = await conn.execute(`
       SELECT * FROM lead_distribution
       WHERE is_active = 1
       ORDER BY priority ASC, last_assigned_at ASC
     `);
 
-    if (!repRows.length)
-      return new Response("No reps available", { status: 503 });
+      if (!repRows.length)
+        return new Response("No reps available", { status: 503 });
 
-    // --- Assign rep: fixed form (Tamil pipeline) → KAVYA; else language Tamil → KAVYA; else round-robin ---
-    let assignedRep = null;
-
-    if (formIdForRouting === TAMIL_META_FORM_ID) {
-      assignedRep = repRows.find((r) => r.username === TAMIL_META_ASSIGNEE_USERNAME) || null;
-      if (!assignedRep) {
-        console.error(
-          `❌ ${TAMIL_META_ASSIGNEE_USERNAME} not found in lead_distribution (Tamil form)`,
-        );
-        return new Response("KAVYA not configured", { status: 500 });
-      }
-    }
-
-    const normalizedLanguage = language?.toUpperCase()?.trim();
-
-    if (!assignedRep && normalizedLanguage === "TAMIL") {
-      assignedRep = repRows.find((r) => r.username === TAMIL_META_ASSIGNEE_USERNAME) || null;
-
-      if (!assignedRep) {
-        console.error("❌ KAVYA not found in lead_distribution table");
-        return new Response("KAVYA not configured", { status: 500 });
-      }
-    }
-
-    // --- Round-robin fallback ---
-    if (!assignedRep) {
-      assignedRep =
+      let assignedRep =
         repRows.find((r) => r.assigned_count < r.max_leads) || repRows[0];
-      // reset counts if all reached max
       if (assignedRep.assigned_count >= assignedRep.max_leads) {
         await conn.execute(
           `UPDATE lead_distribution SET assigned_count = 0 WHERE is_active = 1`,
         );
       }
+      assignedTo = assignedRep.username;
     }
-
-    const assignedTo = assignedRep.username;
 
 
     // --- Check if customer already exists (PHONE - last 10 digits only) ---
@@ -283,16 +268,18 @@ customerId =await customerResult.insertId; // ✅ FIXED
       ],
     );
 
-    // Step 8: Update selected rep’s lead count and timestamp
-    await conn.execute(
-      `
+    // Step 8: Update lead_distribution only when assignee is on that list
+    if (!skipWebhookLeadDistributionUpdate) {
+      await conn.execute(
+        `
       UPDATE lead_distribution
       SET assigned_count = assigned_count + 1,
           last_assigned_at = ?
-      WHERE username = ?
+      WHERE UPPER(TRIM(username)) = UPPER(?)
     `,
-      [now, assignedTo],
-    );
+        [now, assignedTo],
+      );
+    }
 
     // await conn.end();
 
