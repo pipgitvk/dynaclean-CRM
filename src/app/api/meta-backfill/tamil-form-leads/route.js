@@ -4,11 +4,11 @@
  * POST: { since, until, autoImport: true } — imports only new phones, assigned to KAVYA
  */
 import { NextResponse } from "next/server";
-import { getDbConnection } from "@/lib/db";
 import { getSessionPayload, getMainSessionPayload } from "@/lib/auth";
 import { normalizePhone } from "@/lib/phone-check";
 import {
   fetchTamilFormLeadsFromMeta,
+  getExistingNormalizedPhonesSet,
   importNewTamilFormLeads,
 } from "@/lib/tamilFormMetaLeads";
 import {
@@ -67,28 +67,21 @@ export async function GET(request) {
       );
     }
 
-    const phones = leadsInRange.map((l) => l.phone).filter((p) => !!p);
-    let existingPhones = new Set();
-    if (phones.length) {
-      const conn = await getDbConnection();
-      const placeholders = phones.map(() => "?").join(",");
-      const [rows] = await conn.execute(
-        `SELECT phone FROM customers WHERE phone IN (${placeholders})`,
-        phones,
-      );
-      existingPhones = new Set(rows.map((r) => normalizePhone(r.phone)));
-    }
+    const existingLast10 = await getExistingNormalizedPhonesSet(leadsInRange);
 
-    const leads = leadsInRange.map((l) => ({
-      leadgen_id: l.leadgen_id,
-      created_time: l.created_time,
-      first_name: l.first_name,
-      phone: l.phone,
-      email: l.email,
-      address: l.address,
-      products_interest: l.products_interest,
-      already_in_db: !!(l.phone && existingPhones.has(l.phone)),
-    }));
+    const leads = leadsInRange.map((l) => {
+      const n = normalizePhone(l.phone);
+      return {
+        leadgen_id: l.leadgen_id,
+        created_time: l.created_time,
+        first_name: l.first_name,
+        phone: l.phone,
+        email: l.email,
+        address: l.address,
+        products_interest: l.products_interest,
+        already_in_db: n.length === 10 && existingLast10.has(n),
+      };
+    });
 
     return NextResponse.json({
       success: true,

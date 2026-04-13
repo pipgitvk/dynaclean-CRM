@@ -574,8 +574,13 @@ export default function MetaBackfillPage() {
         return;
       }
       const summary = data.importSummary;
+      const errRows = (summary?.results || []).filter((r) => r.error);
+      const errDetail =
+        errRows.length > 0
+          ? ` — e.g. lead ${errRows[0].leadgen_id}: ${errRows[0].error}`
+          : "";
       setTamilImportMessage(
-        `Imported: ${summary?.imported ?? 0}, Skipped: ${summary?.skipped ?? 0}, Errors: ${summary?.errors ?? 0}.`,
+        `Imported: ${summary?.imported ?? 0}, Skipped: ${summary?.skipped ?? 0}, Errors: ${summary?.errors ?? 0}.${errDetail}`,
       );
       const resList = await fetch(
         `/api/meta-backfill/tamil-form-leads?since=${encodeURIComponent(s)}&until=${encodeURIComponent(u)}`,

@@ -3,7 +3,7 @@
  * Shared by /api/meta-backfill/tamil-form-leads and /api/cron/meta-backfill-tamil
  */
 import { getDbConnection } from "@/lib/db";
-import { normalizePhone } from "@/lib/phone-check";
+import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
 import {
   extractProductFromMetaFieldData,
   buildProductsInterestLabel,
@@ -97,6 +97,31 @@ export async function fetchTamilFormLeadsFromMeta({ since, until, token }) {
   };
 }
 
+/** Normalized last-10 phones that already exist in `customers` (matches insertLeadIntoDb duplicate logic). */
+export async function getExistingNormalizedPhonesSet(leadsInRange) {
+  const normalizedCandidates = [
+    ...new Set(
+      leadsInRange
+        .map((l) => normalizePhone(l.phone))
+        .filter((p) => p && p.length === 10),
+    ),
+  ];
+  const existingLast10 = new Set();
+  if (!normalizedCandidates.length) return existingLast10;
+
+  const conn = await getDbConnection();
+  const whereOr = normalizedCandidates.map(() => `(${PHONE_LAST10_WHERE})`).join(" OR ");
+  const [dupRows] = await conn.execute(
+    `SELECT phone FROM customers WHERE ${whereOr}`,
+    normalizedCandidates,
+  );
+  for (const r of dupRows) {
+    const n = normalizePhone(r.phone);
+    if (n.length === 10) existingLast10.add(n);
+  }
+  return existingLast10;
+}
+
 /** Import leads not yet in DB; all assigned to TAMIL_META_ASSIGNEE_USERNAME */
 export async function importNewTamilFormLeads({ since, until }) {
   const token = process.env.FB_PAGE_TOKEN;
@@ -119,21 +144,13 @@ export async function importNewTamilFormLeads({ since, until }) {
     };
   }
 
-  const phones = leadsInRange.map((l) => l.phone).filter((p) => !!p);
-  let existingPhones = new Set();
-  if (phones.length) {
-    const conn = await getDbConnection();
-    const placeholders = phones.map(() => "?").join(",");
-    const [rows] = await conn.execute(
-      `SELECT phone FROM customers WHERE phone IN (${placeholders})`,
-      phones,
-    );
-    existingPhones = new Set(rows.map((r) => normalizePhone(r.phone)));
-  }
+  const existingLast10 = await getExistingNormalizedPhonesSet(leadsInRange);
 
-  const newLeads = leadsInRange.filter(
-    (l) => l.phone && !existingPhones.has(l.phone),
-  );
+  const newLeads = leadsInRange.filter((l) => {
+    const n = normalizePhone(l.phone);
+    if (!n || n.length !== 10) return false;
+    return !existingLast10.has(n);
+  });
 
   const results = [];
   for (const lead of newLeads) {
@@ -144,7 +161,10 @@ export async function importNewTamilFormLeads({ since, until }) {
       results.push({ leadgen_id: lead.leadgen_id, ...insertResult });
     } catch (err) {
       console.error("Tamil form import error", lead.leadgen_id, err);
-      results.push({ leadgen_id: lead.leadgen_id, error: "exception" });
+      results.push({
+        leadgen_id: lead.leadgen_id,
+        error: err?.message || String(err),
+      });
     }
   }
 
