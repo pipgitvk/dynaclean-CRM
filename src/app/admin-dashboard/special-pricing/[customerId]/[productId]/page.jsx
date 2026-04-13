@@ -1,7 +1,9 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isUnknownApprovalNoteColumnError } from "@/lib/specialPriceApprovalNoteColumn";
 import { redirect } from "next/navigation";
-import { approveSpecialPrice, deleteSpecialPrice, rejectSpecialPrice, updateSpecialPrice } from "../../_actions";
+import { deleteSpecialPrice, updateSpecialPrice } from "../../_actions";
+import SpecialPriceApproveRejectButtons from "@/components/specialPrice/SpecialPriceApproveRejectButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +18,7 @@ export default async function ProductSpecialPrice({ params }) {
 
   const conn = await getDbConnection();
 
-  const [rows] = await conn.execute(
-    `
+  const detailSql = `
     SELECT 
       sp.id,
       sp.special_price,
@@ -25,6 +26,7 @@ export default async function ProductSpecialPrice({ params }) {
       sp.set_date,
       sp.approved_by,
       sp.approved_date,
+      NOTE_PLACEHOLDER
       c.first_name,
       c.last_name,
       p.item_name,
@@ -35,9 +37,23 @@ export default async function ProductSpecialPrice({ params }) {
     JOIN products_list p ON sp.product_id = p.id
     WHERE sp.customer_id = ? AND sp.product_id = ?
     LIMIT 1
-    `,
-    [Number(customerId), Number(productId)]
-  );
+  `;
+  const detailParams = [Number(customerId), Number(productId)];
+
+  let rows;
+  try {
+    const sql = detailSql.replace(
+      "NOTE_PLACEHOLDER",
+      "sp.approval_note,\n      ",
+    );
+    const result = await conn.execute(sql, detailParams);
+    rows = result[0];
+  } catch (e) {
+    if (!isUnknownApprovalNoteColumnError(e)) throw e;
+    const sql = detailSql.replace("NOTE_PLACEHOLDER", "");
+    const result = await conn.execute(sql, detailParams);
+    rows = result[0];
+  }
 
   const data = rows[0];
 
@@ -78,6 +94,21 @@ export default async function ProductSpecialPrice({ params }) {
               {new Date(data.approved_date).toLocaleString()}
             </span>
           )}
+          {data.status === "rejected" && data.approved_by && data.approved_date && (
+            <span className="text-xs text-gray-600 ml-6">
+              Rejected by {data.approved_by} on{" "}
+              {new Date(data.approved_date).toLocaleString()}
+            </span>
+          )}
+          {(data.status === "approved" || data.status === "rejected") &&
+            data.approval_note && (
+              <span className="text-xs text-gray-700 ml-6 block mt-2 pt-2 border-t border-gray-200 w-full max-w-xl">
+                <strong className="text-gray-600">Note</strong>
+                <div className="whitespace-pre-wrap mt-0.5">
+                  {data.approval_note}
+                </div>
+              </span>
+            )}
         </p>
       </div>
 
@@ -106,20 +137,8 @@ export default async function ProductSpecialPrice({ params }) {
 
       {/* APPROVE / REJECT */}
       {data.status === "pending" && (
-        <div className="flex gap-4 mt-6">
-          <form action={approveSpecialPrice}>
-            <input type="hidden" name="id" value={data.id} />
-            <button className="bg-green-600 text-white px-4 py-2 rounded">
-              Approve
-            </button>
-          </form>
-
-          <form action={rejectSpecialPrice}>
-            <input type="hidden" name="id" value={data.id} />
-            <button className="bg-red-600 text-white px-4 py-2 rounded">
-              Reject
-            </button>
-          </form>
+        <div className="mt-6">
+          <SpecialPriceApproveRejectButtons id={data.id} variant="page" />
         </div>
       )}
 
