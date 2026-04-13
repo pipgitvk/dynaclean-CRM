@@ -3,7 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { parseHiringPayload, toMysqlDatetime } from "@/lib/hiringPayload";
-import { logHiringStatusChange } from "@/lib/hiringStatusHistory";
+import { logHiringNoteUpdate, logHiringStatusChange } from "@/lib/hiringStatusHistory";
 
 function assertSuperadmin(payload) {
   if (!payload?.username) {
@@ -178,12 +178,13 @@ export async function PATCH(request) {
     let result;
     try {
       await conn.beginTransaction();
-      const [rows] = await conn.execute(`SELECT status FROM hr_hiring_entries WHERE id = ?`, [id]);
+      const [rows] = await conn.execute(`SELECT status, note FROM hr_hiring_entries WHERE id = ?`, [id]);
       if (!rows.length) {
         await conn.rollback();
         return NextResponse.json({ success: false, error: "Record not found." }, { status: 404 });
       }
       const prevStatus = rows[0].status != null ? String(rows[0].status) : "";
+      const prevNote = rows[0].note != null ? String(rows[0].note) : "";
 
       const [upd] = await conn.execute(
         `UPDATE hr_hiring_entries SET
@@ -211,8 +212,13 @@ export async function PATCH(request) {
         ]
       );
       result = upd;
-      if (upd.affectedRows && prevStatus !== d.status) {
-        await logHiringStatusChange(conn, id, prevStatus, d.status, payload.username);
+      const newNote = d.note != null ? String(d.note) : "";
+      if (upd.affectedRows) {
+        if (prevStatus !== d.status) {
+          await logHiringStatusChange(conn, id, prevStatus, d.status, payload.username, newNote);
+        } else if (prevNote !== newNote) {
+          await logHiringNoteUpdate(conn, id, d.status, payload.username, newNote);
+        }
       }
       await conn.commit();
     } catch (e) {

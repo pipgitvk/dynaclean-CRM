@@ -157,6 +157,7 @@ export default function AdminHiringProcessPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyEntry, setHistoryEntry] = useState(null);
   const [historyRows, setHistoryRows] = useState([]);
+  const [historyError, setHistoryError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
   /** @type {null | Record<string, any>} */
@@ -214,19 +215,18 @@ export default function AdminHiringProcessPage() {
     setHistoryLoading(true);
     setHistoryEntry(null);
     setHistoryRows([]);
+    setHistoryError(null);
     try {
       const res = await fetch(`/api/admin/hiring-process/history?entryId=${entryId}`, { cache: "no-store" });
       const json = await res.json();
       if (!json.success) {
-        setError(json.error || "Failed to load history");
-        setHistoryOpen(false);
+        setHistoryError(json.error || "Failed to load history");
         return;
       }
       setHistoryEntry(json.entry);
       setHistoryRows(json.history || []);
     } catch (e) {
-      setError(e.message || "Network error");
-      setHistoryOpen(false);
+      setHistoryError(e.message || "Network error");
     } finally {
       setHistoryLoading(false);
     }
@@ -236,6 +236,7 @@ export default function AdminHiringProcessPage() {
     setHistoryOpen(false);
     setHistoryEntry(null);
     setHistoryRows([]);
+    setHistoryError(null);
   };
 
   const openEdit = async (entryId) => {
@@ -590,10 +591,10 @@ export default function AdminHiringProcessPage() {
       {historyOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
           <div className="absolute inset-0" onClick={closeHistory} aria-hidden />
-          <div className="relative z-10 flex max-h-[min(90dvh,100%)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl">
+          <div className="relative z-10 flex max-h-[min(90dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl">
             <div className="flex items-start justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40 px-4 py-4">
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-slate-900">Status history</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Status &amp; notes history</h2>
                 {historyEntry && (
                   <p className="mt-1 text-sm text-slate-600">
                     <span className="font-medium text-slate-800">{historyEntry.candidate_name}</span>
@@ -608,12 +609,22 @@ export default function AdminHiringProcessPage() {
                   </p>
                 )}
                 {historyEntry && (
-                  <p className="mt-1 text-xs text-slate-500">
-                    Logged by HR user:{" "}
-                    <strong className="font-medium text-slate-700">{historyEntry.created_by_username}</strong>
-                    {" · Created "}
-                    {formatDt(historyEntry.created_at)}
-                  </p>
+                  <>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Logged by HR:{" "}
+                      <strong className="font-medium text-slate-700">{historyEntry.created_by_username}</strong>
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                      <span>Record created {formatDt(historyEntry.created_at)}</span>
+                      <span className="text-slate-300" aria-hidden>
+                        ·
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="font-medium text-slate-600">Current status:</span>
+                        <StatusChip status={historyEntry.status} />
+                      </span>
+                    </div>
+                  </>
                 )}
               </div>
               <button
@@ -631,33 +642,75 @@ export default function AdminHiringProcessPage() {
                   <Loader2 className="h-5 w-5 animate-spin" />
                   Loading…
                 </div>
-              ) : historyRows.length === 0 ? (
-                <p className="py-6 text-center text-sm text-slate-500">No history rows yet. Run the status history migration.</p>
+              ) : historyError ? (
+                <p className="py-6 text-center text-sm text-red-700">{historyError}</p>
               ) : (
-                <ol className="relative space-y-0 border-l-2 border-indigo-200 pl-4">
-                  {historyRows.map((h) => (
-                    <li key={h.id} className="relative pb-6 last:pb-0">
-                      <span className="absolute -left-[21px] top-1 flex h-3 w-3 rounded-full border-2 border-white bg-indigo-500 shadow-sm" />
-                      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{formatDt(h.logged_at)}</p>
-                      <p className="mt-1 text-sm text-slate-800">
-                        {h.status_before == null || h.status_before === "" ? (
-                          <>
-                            <span className="font-semibold text-emerald-700">Created</span>
-                            {" · Status: "}
-                            <span className="font-medium">{h.status_after}</span>
-                          </>
-                        ) : (
-                          <>
-                            Status: <span className="text-slate-500 line-through">{h.status_before}</span>
-                            {" → "}
-                            <span className="font-semibold text-indigo-800">{h.status_after}</span>
-                          </>
-                        )}
+                <>
+                  {historyEntry ? (
+                    <div className="mb-5 rounded-xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/90 to-white px-3.5 py-3 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/90">Note * (latest saved)</p>
+                      <p className="mt-2 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">
+                        {historyEntry.note != null && String(historyEntry.note).trim() !== ""
+                          ? String(historyEntry.note)
+                          : "—"}
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-500">By {h.actor_username}</p>
-                    </li>
-                  ))}
-                </ol>
+                    </div>
+                  ) : null}
+                  {historyRows.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-slate-500">
+                      No history yet. Save status changes or notes to build a timeline.
+                    </p>
+                  ) : (
+                    <ol className="relative space-y-0 border-l-[3px] border-indigo-200 pl-4">
+                      {historyRows.map((h) => {
+                        const sb = h.status_before != null ? String(h.status_before) : "";
+                        const sa = h.status_after != null ? String(h.status_after) : "";
+                        const noteOnly = sb !== "" && sa !== "" && sb === sa;
+                        const noteText =
+                          h.note != null && String(h.note).trim() !== "" ? String(h.note).trim() : null;
+                        return (
+                          <li key={h.id} className="relative pb-7 last:pb-0">
+                            <span className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-indigo-600 shadow-sm ring-2 ring-indigo-200/60" />
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                              {formatDt(h.logged_at)}
+                            </p>
+                            <p className="mt-1.5 text-sm leading-snug text-slate-800">
+                              {sb === "" ? (
+                                <>
+                                  <span className="font-semibold text-emerald-800">Created</span>
+                                  <span className="text-slate-600"> – Status: </span>
+                                  <span className="font-medium text-slate-900">{sa}</span>
+                                </>
+                              ) : noteOnly ? (
+                                <>
+                                  <span className="font-semibold text-slate-800">Note updated</span>
+                                  <span className="text-slate-600"> – Status: </span>
+                                  <span className="font-medium text-slate-900">{sa}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-slate-700">Status: </span>
+                                  <span className="text-slate-400 line-through decoration-slate-400">{sb}</span>
+                                  <span className="text-slate-600"> → </span>
+                                  <span className="font-semibold text-indigo-900">{sa}</span>
+                                </>
+                              )}
+                            </p>
+                            <div className="mt-2 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-2">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Note *</p>
+                              <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap break-words">
+                                {noteText ?? "—"}
+                              </p>
+                            </div>
+                            <p className="mt-2 text-xs text-slate-500">
+                              By <span className="font-medium text-slate-600">{h.actor_username}</span>
+                            </p>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+                </>
               )}
             </div>
           </div>
