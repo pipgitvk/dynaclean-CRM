@@ -11,6 +11,7 @@ import {
   isSectionAllowed,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
+  applyRoleMaxAllowedModuleRestrictions,
   SUPERADMIN_ONLY_MODULE_KEYS,
 } from "@/lib/moduleAccess";
 import { getDbConnection } from "@/lib/db";
@@ -207,12 +208,14 @@ const allMenuItems = [
       {
         path: "/admin-dashboard/client-expenses/cards",
         name: "Client Expenses",
+        moduleKey: "client-expenses",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
         icon: "FileText",
       },
       {
         path: "/admin-dashboard/statements",
         name: "Statement",
+        moduleKey: "statements",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
         icon: "Receipt",
       },
@@ -711,7 +714,11 @@ export default async function getSidebarMenuItems() {
       allowedModulesRaw,
       roleKey,
     );
-    const allowedModules = applyRoleDenyModuleRestrictions(allowedModules1, roleKey);
+    const allowedModules2 = applyRoleDenyModuleRestrictions(allowedModules1, roleKey);
+    const allowedModules = applyRoleMaxAllowedModuleRestrictions(
+      allowedModules2,
+      roleKey,
+    );
     // allowedModules === null means column not set yet → show all (backward compat)
     if (allowedModules !== null) {
       const filterByModuleAccess = (list) =>
