@@ -12,25 +12,10 @@ import {
   MODULE_TREE,
   ALL_MODULE_KEYS,
   getChildKeys,
-  getRoleMaxAllowedModuleKeys,
 } from "@/lib/moduleAccess";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
-}
-
-function intersectSets(arrOfArrays) {
-  const lists = (arrOfArrays || []).filter(Boolean);
-  if (lists.length === 0) return [];
-  const [first, ...rest] = lists;
-  const set = new Set(first);
-  for (const list of rest) {
-    const s2 = new Set(list);
-    for (const k of [...set]) {
-      if (!s2.has(k)) set.delete(k);
-    }
-  }
-  return [...set];
 }
 
 /* ── Tri-state parent checkbox ── */
@@ -417,24 +402,13 @@ const EmpTable = ({ employees }) => {
     }
   };
 
-  const defaultModulesForSelectedRole = useMemo(() => {
-    const cap = getRoleMaxAllowedModuleKeys(bulkRole) || [];
-    // Only allow known keys
-    const known = new Set(ALL_MODULE_KEYS);
-    return cap.filter((k) => known.has(k));
-  }, [bulkRole]);
-
-  const getDefaultsForRole = (role) => {
-    const cap = getRoleMaxAllowedModuleKeys(role) || [];
-    const known = new Set(ALL_MODULE_KEYS);
-    return cap.filter((k) => known.has(k));
-  };
+  const getDefaultsForRole = () => [];
 
   const getSavedOrDefaultModulesForRole = (role) => {
     const key = String(role || "").trim();
     const saved = bulkRoleSelections?.[key];
     if (Array.isArray(saved)) return saved;
-    return getDefaultsForRole(role);
+    return getDefaultsForRole();
   };
 
   const setRoleAndResetSelection = (role) => {
@@ -622,9 +596,6 @@ const EmpTable = ({ employees }) => {
                   <div className="text-xs text-gray-500">
                     {bulkSelectedModules.length} selected
                   </div>
-                </div>
-                <div className="text-[11px] text-gray-500">
-                  Default modules for {bulkRole}: {defaultModulesForSelectedRole.length}
                 </div>
               </div>
 

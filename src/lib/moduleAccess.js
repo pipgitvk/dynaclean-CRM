@@ -236,167 +236,20 @@ export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
 }
 
 /**
- * Role-specific allow lists (hard cap). If set for a role, user can never see
- * modules outside this set (even if module_access includes them).
- *
- * This matches the requirement: "is role ko itne hi modules default me dikhne chahiye,
- * iske alawa na kam na zyada" while still allowing per-user toggles within the set.
+ * Back-compat export: historically this applied a per-role "max allowed" cap.
+ * Requirement changed: admins must be able to grant more OR fewer modules than presets,
+ * so this is now a no-op.
  */
-const ROLE_MAX_ALLOWED_MODULE_KEYS = {
-  ACCOUNTANT: new Set([
-    "dashboard-home",
-    "manual-payments",
-    "dd-management",
-    "company-documents",
-    "client-expenses",
-    "statements",
-    "targets-monitor",
-    "invoices",
-    "payment-pending",
-    "customer-payment-behavior",
-    "attendance-log",
-    "quotations",
-    "expenses",
-    "service-records",
-    "assets",
-    "product-stock",
-    "product-accessories",
-    "purchase-direct-in",
-    "purchase-request",
-    "purchase-warehouse-in",
-    "purchases",
-    "spare-parts",
-    "spare-direct-in",
-    "spare-request",
-    "spare-warehouse-in",
-    "spare-purchases",
-    "production-status",
-    "bom-list",
-    "employee-crm",
-    "salary-slips",
-  ]),
-  "TEAM LEADER": new Set([
-    "dashboard-home",
-    "tl-customers",
-    "view-customers",
-    "add-customer",
-    "customer-payment-behavior",
-    "payment-pending",
-    "item-wise-sales",
-    "lead-reports",
-    "quotations-report",
-    "order-report",
-    "demo-followups",
-    "leads-upload",
-    "my-leads",
-    "employee-crm",
-  ]),
-  SALES: new Set([
-    "dashboard-home",
-    "view-customers",
-    "add-customer",
-    "quotations",
-    "prospects-view",
-    "prospects-add",
-    "prospects-new",
-    "customer-payment-behavior",
-    "payment-pending",
-    "item-wise-sales",
-    "lead-reports",
-    "quotations-report",
-    "order-report",
-    "demo-followups",
-    "leads-upload",
-    "my-leads",
-    "employee-crm",
-  ]),
-  "SALES HEAD": new Set([
-    "dashboard-home",
-    "view-customers",
-    "add-customer",
-    "quotations",
-    "prospects-view",
-    "prospects-add",
-    "prospects-new",
-    "customer-payment-behavior",
-    "payment-pending",
-    "item-wise-sales",
-    "lead-reports",
-    "quotations-report",
-    "order-report",
-    "demo-followups",
-    "leads-upload",
-    "my-leads",
-    "employee-crm",
-  ]),
-  "DIGITAL MARKETER": new Set([
-    "dashboard-home",
-    "leads-upload",
-    "blog",
-    "my-leads",
-    "quotations",
-    "email-templates",
-    "product-stock",
-    "spare-parts",
-    "employee-crm",
-  ]),
-  ADMIN: new Set([
-    "dashboard-home",
-    "attendance-details",
-    "regularization-approvals",
-    "task-manager",
-    "expenses",
-    "fast-card",
-    "prospects-view",
-    "prospects-add",
-    "prospects-new",
-    "customer-payment-behavior",
-    "payment-pending",
-    "manual-payments",
-    "company-documents",
-    "dd-management",
-    "attendance-rules",
-    "quotations",
-    "service-records",
-    "warranty-console",
-    "registered-products",
-    "warranty-map",
-    "product-stock",
-    "product-accessories",
-    "purchase-direct-in",
-    "purchase-request",
-    "purchase-warehouse-in",
-    "purchases",
-    "spare-parts",
-    "spare-direct-in",
-    "spare-request",
-    "spare-warehouse-in",
-    "spare-purchases",
-    "production-status",
-    "bom-list",
-    "employee-crm",
-    "qa",
-  ]),
-};
-
-export function applyRoleMaxAllowedModuleRestrictions(allowedKeys, role) {
-  if (!allowedKeys) return allowedKeys ?? null;
-  const r = String(role ?? "").trim().toUpperCase();
-  const cap = ROLE_MAX_ALLOWED_MODULE_KEYS[r];
-  if (!cap) return allowedKeys;
-  return allowedKeys.filter((k) => cap.has(k));
+export function applyRoleMaxAllowedModuleRestrictions(allowedKeys) {
+  return allowedKeys ?? null;
 }
 
 /**
- * Returns the MAX allowed module keys for a role (hard cap), or null if not configured.
- * @param {string} role
- * @returns {string[]|null}
+ * Back-compat export: returns null (no hard cap).
+ * @returns {null}
  */
-export function getRoleMaxAllowedModuleKeys(role) {
-  const r = String(role ?? "").trim().toUpperCase();
-  const cap = ROLE_MAX_ALLOWED_MODULE_KEYS[r];
-  if (!cap) return null;
-  return [...cap];
+export function getRoleMaxAllowedModuleKeys() {
+  return null;
 }
 
 /**
