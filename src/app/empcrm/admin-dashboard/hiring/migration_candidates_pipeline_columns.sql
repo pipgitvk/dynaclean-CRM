@@ -41,7 +41,7 @@ ALTER TABLE candidates
 ALTER TABLE candidates
   ADD COLUMN probation_months TINYINT UNSIGNED NULL DEFAULT NULL AFTER `package`;
 
--- 4) Selected-candidate + scores + salary (API requires hr_interview_score + current_salary on save)
+-- 4) Selected-candidate + scores + HR rating + salary (API requires hr_interview_score, hr_score_rating, current_salary on save)
 ALTER TABLE candidates
   ADD COLUMN selected_resume VARCHAR(500) NULL DEFAULT NULL AFTER probation_months;
 
@@ -52,4 +52,11 @@ ALTER TABLE candidates
   ADD COLUMN hr_interview_score TINYINT UNSIGNED NULL DEFAULT NULL AFTER mgmt_interview_score;
 
 ALTER TABLE candidates
-  ADD COLUMN current_salary VARCHAR(255) NULL DEFAULT NULL AFTER hr_interview_score;
+  ADD COLUMN hr_score_rating VARCHAR(32) NULL DEFAULT NULL COMMENT 'average | poor | good | very-good'
+  AFTER hr_interview_score;
+
+ALTER TABLE candidates
+  ADD COLUMN current_salary VARCHAR(255) NULL DEFAULT NULL AFTER hr_score_rating;
+
+ALTER TABLE candidates
+  ADD COLUMN expected_salary VARCHAR(255) NULL DEFAULT NULL AFTER current_salary;

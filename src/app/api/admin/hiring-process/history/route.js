@@ -30,7 +30,7 @@ export async function GET(req) {
       `SELECT c.id, c.created_by,
        COALESCE(ep.full_name, c.created_by) AS creator_name,
        ep.designation AS creator_role,
-       c.candidate_name, c.designation, c.status, c.hr_interview_score, c.current_salary, c.note, c.created_at
+       c.candidate_name, c.designation, c.status, c.hr_interview_score, c.current_salary, c.expected_salary, c.note, c.created_at
        FROM candidates c
        LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(c.created_by))
        WHERE c.id = ?`,
@@ -41,10 +41,14 @@ export async function GET(req) {
     }
 
     const [history] = await conn.execute(
-      `SELECT id, \`status\`, updated_by, note, logged_at
-       FROM candidates_followups
-       WHERE entry_id = ?
-       ORDER BY logged_at ASC, id ASC`,
+      `SELECT h.id, h.\`status\`, h.updated_by,
+       COALESCE(ep.full_name, h.updated_by) AS updater_name,
+       ep.designation AS updater_role,
+       h.note, h.logged_at
+       FROM candidates_followups h
+       LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.updated_by))
+       WHERE h.entry_id = ?
+       ORDER BY h.logged_at ASC, h.id ASC`,
       [entryId]
     );
 

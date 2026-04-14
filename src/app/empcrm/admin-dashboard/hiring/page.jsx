@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
+import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS } from "@/lib/hiringPayload";
 
 /** Shared field styles */
 const fieldClass =
@@ -39,8 +40,6 @@ function hiringStatusSelectOptions(rowStatus) {
   return STATUS_OPTIONS;
 }
 
-const TAG_OPTIONS = ["Probation", "Permanent", "Terminate", "Follow-Up"];
-
 const MARITAL_OPTIONS = ["Unmarried", "Married"];
 
 const EXPERIENCE_OPTIONS = [
@@ -49,6 +48,13 @@ const EXPERIENCE_OPTIONS = [
 ];
 
 const INTERVIEW_MODE_OPTIONS = ["Virtual", "Walk-in"];
+
+const HR_SCORE_RATING_LABELS = {
+  average: "Average",
+  poor: "Poor",
+  good: "Good",
+  "very-good": "Very good",
+};
 
 /** Month filter dropdown: value 1–12, label full month name */
 const MONTH_FILTER_OPTIONS = Array.from({ length: 12 }, (_, i) => {
@@ -163,7 +169,9 @@ export default function HiringPage() {
   const [selectedResume, setSelectedResume] = useState("");
   const [mgmtInterviewScore, setMgmtInterviewScore] = useState("");
   const [hrInterviewScore, setHrInterviewScore] = useState("");
+  const [hrScoreRating, setHrScoreRating] = useState("");
   const [currentSalary, setCurrentSalary] = useState("");
+  const [expectedSalary, setExpectedSalary] = useState("");
   const [note, setNote] = useState("");
 
   const [filterYear, setFilterYear] = useState(now.getFullYear());
@@ -243,7 +251,9 @@ export default function HiringPage() {
     setSelectedResume("");
     setMgmtInterviewScore("");
     setHrInterviewScore("");
+    setHrScoreRating("");
     setCurrentSalary("");
+    setExpectedSalary("");
     setNote("");
   };
 
@@ -284,7 +294,9 @@ export default function HiringPage() {
           selected_resume: selectedResume.trim() || null,
           mgmt_interview_score: mgmtInterviewScore !== "" ? Number(mgmtInterviewScore) : null,
           hr_interview_score: hrInterviewScore !== "" ? Number(hrInterviewScore) : null,
+          hr_score_rating: hrScoreRating.trim() || null,
           current_salary: currentSalary.trim() || null,
+          expected_salary: expectedSalary.trim() || null,
           note,
         }),
       });
@@ -342,7 +354,9 @@ export default function HiringPage() {
         row.hr_interview_score != null && row.hr_interview_score !== ""
           ? String(row.hr_interview_score)
           : "",
+      hrScoreRating: row.hr_score_rating != null ? String(row.hr_score_rating) : "",
       currentSalary: row.current_salary ?? "",
+      expectedSalary: row.expected_salary ?? "",
       note: row.note ?? "",
     });
   };
@@ -392,7 +406,9 @@ export default function HiringPage() {
             followUp.mgmtInterviewScore !== "" ? Number(followUp.mgmtInterviewScore) : null,
           hr_interview_score:
             followUp.hrInterviewScore !== "" ? Number(followUp.hrInterviewScore) : null,
+          hr_score_rating: followUp.hrScoreRating?.trim() || null,
           current_salary: followUp.currentSalary?.trim() || null,
+          expected_salary: followUp.expectedSalary?.trim() || null,
           note: followUp.note,
         }),
       });
@@ -447,7 +463,9 @@ export default function HiringPage() {
         row.hr_interview_score != null && row.hr_interview_score !== ""
           ? String(row.hr_interview_score)
           : "",
+      hrScoreRating: row.hr_score_rating != null ? String(row.hr_score_rating) : "",
       currentSalary: row.current_salary ?? "",
+      expectedSalary: row.expected_salary ?? "",
       note: row.note ?? "",
     });
   };
@@ -499,7 +517,9 @@ export default function HiringPage() {
             editing.mgmtInterviewScore !== "" ? Number(editing.mgmtInterviewScore) : null,
           hr_interview_score:
             editing.hrInterviewScore !== "" ? Number(editing.hrInterviewScore) : null,
+          hr_score_rating: editing.hrScoreRating?.trim() || null,
           current_salary: editing.currentSalary?.trim() || null,
+          expected_salary: editing.expectedSalary?.trim() || null,
           note: editing.note,
         }),
       });
@@ -704,7 +724,10 @@ export default function HiringPage() {
                     Package
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
-                    Score
+                    Mgmt
+                  </th>
+                  <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
+                    HR
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
                     Actions
@@ -714,7 +737,7 @@ export default function HiringPage() {
               <tbody>
                 {entries.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-14 text-center">
+                    <td colSpan={13} className="px-4 py-14 text-center">
                       <p className="text-sm font-medium text-slate-600">No records for this filter.</p>
                       <p className="mt-1 text-xs text-slate-400">Try another year, month, or designation.</p>
                     </td>
@@ -761,6 +784,16 @@ export default function HiringPage() {
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
                         {row.mgmt_interview_score != null ? `${row.mgmt_interview_score}/10` : "—"}
                       </td>
+                      <td className="max-w-[9rem] px-3 py-2.5 text-slate-600 sm:px-4">
+                        <span className="block tabular-nums">
+                          {row.hr_interview_score != null ? `${row.hr_interview_score}/10` : "—"}
+                        </span>
+                        {row.hr_score_rating ? (
+                          <span className="mt-0.5 block text-xs font-medium text-slate-500">
+                            {HR_SCORE_RATING_LABELS[row.hr_score_rating] ?? row.hr_score_rating}
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-3 py-2.5 text-right sm:px-4">
                         <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
                           <button
@@ -801,22 +834,34 @@ export default function HiringPage() {
       {historyOpen && (
         <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
           <div className="absolute inset-0" onClick={closeHistory} aria-hidden />
-          <div className="relative z-10 flex max-h-[min(90dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl">
+          <div className="relative z-10 flex max-h-[min(90dvh,100%)] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl">
             <div className="flex items-start justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40 px-4 py-4">
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold text-slate-900">Status history</h2>
                 {historyEntry && (
-                  <p className="mt-1 text-sm text-slate-600">
-                    <span className="font-medium text-slate-800">{historyEntry.candidate_name}</span>
-                    {" · "}
-                    <span className="text-slate-500">#{historyEntry.id}</span>
-                    {historyEntry.designation ? (
-                      <>
-                        {" · "}
-                        <span className="text-slate-600">{historyEntry.designation}</span>
-                      </>
-                    ) : null}
-                  </p>
+                  <>
+                    <p className="mt-1 text-sm text-slate-600">
+                      <span className="font-medium text-slate-800">{historyEntry.candidate_name}</span>
+                      {" · "}
+                      <span className="text-slate-500">#{historyEntry.id}</span>
+                      {historyEntry.designation ? (
+                        <>
+                          {" · "}
+                          <span className="text-slate-600">{historyEntry.designation}</span>
+                        </>
+                      ) : null}
+                    </p>
+                    <div className="mt-3 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Latest note on record
+                      </p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">
+                        {historyEntry.note != null && String(historyEntry.note).trim() !== ""
+                          ? String(historyEntry.note)
+                          : "—"}
+                      </p>
+                    </div>
+                  </>
                 )}
               </div>
               <button
@@ -848,20 +893,30 @@ export default function HiringPage() {
                     </p>
                   ) : (
                     <div className="overflow-x-auto rounded-xl border border-slate-200/90">
-                      <table className="w-full min-w-[240px] border-collapse text-left text-sm">
+                      <table className="w-full min-w-[520px] border-collapse text-left text-sm">
                         <thead>
                           <tr className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100/90">
                             <th className="whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
                               When
                             </th>
                             <th className="whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
+                              HR
+                            </th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
                               status
+                            </th>
+                            <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
+                              Note
                             </th>
                           </tr>
                         </thead>
                         <tbody>
                           {statusRows.map((h) => {
                             const sa = h.status != null ? String(h.status).trim() : "";
+                            const noteText =
+                              h.note != null && String(h.note).trim() !== "" ? String(h.note).trim() : null;
+                            const hrName = h.updater_name != null ? String(h.updater_name).trim() : "";
+                            const hrUser = h.updated_by != null ? String(h.updated_by).trim() : "";
                             return (
                               <tr
                                 key={h.id}
@@ -870,8 +925,28 @@ export default function HiringPage() {
                                 <td className="whitespace-nowrap px-3 py-2.5 align-top text-xs text-slate-600 sm:px-4">
                                   {formatDt(h.logged_at)}
                                 </td>
+                                <td className="max-w-[10rem] px-3 py-2.5 align-top sm:max-w-[12rem] sm:px-4">
+                                  <span className="block text-xs font-semibold text-slate-800">
+                                    {hrName || hrUser || "—"}
+                                  </span>
+                                  {h.updater_role != null && String(h.updater_role).trim() !== "" ? (
+                                    <span className="mt-0.5 block text-[11px] text-slate-500">
+                                      {String(h.updater_role).trim()}
+                                    </span>
+                                  ) : null}
+                                  {hrName && hrUser && hrName !== hrUser ? (
+                                    <span className="mt-0.5 block text-[10px] text-slate-400">@{hrUser}</span>
+                                  ) : null}
+                                </td>
                                 <td className="px-3 py-2.5 align-top sm:px-4">
                                   <StatusChip status={sa} />
+                                </td>
+                                <td className="min-w-[8rem] max-w-[18rem] px-3 py-2.5 align-top text-xs leading-relaxed text-slate-700 sm:px-4">
+                                  {noteText ? (
+                                    <span className="whitespace-pre-wrap break-words">{noteText}</span>
+                                  ) : (
+                                    <span className="text-slate-400">—</span>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -942,7 +1017,6 @@ export default function HiringPage() {
                       if (v !== "Selected") {
                         next.selectedResume = "";
                         next.mgmtInterviewScore = "";
-                        next.hrInterviewScore = "";
                       }
                       return next;
                     });
@@ -1116,6 +1190,22 @@ export default function HiringPage() {
                   />
                 </div>
                 <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">HR score *</label>
+                  <select
+                    required
+                    value={followUp.hrScoreRating ?? ""}
+                    onChange={(e) => updateFollowUp("hrScoreRating", e.target.value)}
+                    className={formSelectClass}
+                  >
+                    <option value="">— Select —</option>
+                    {HR_SCORE_RATING_OPTIONS.map((v) => (
+                      <option key={v} value={v}>
+                        {HR_SCORE_RATING_LABELS[v] ?? v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="sm:col-span-2">
                   <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary *</label>
                   <input
                     required
@@ -1124,6 +1214,16 @@ export default function HiringPage() {
                     onChange={(e) => updateFollowUp("currentSalary", e.target.value)}
                     className={formFieldClass}
                     placeholder="e.g. 25000"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Expected salary</label>
+                  <input
+                    type="text"
+                    value={followUp.expectedSalary ?? ""}
+                    onChange={(e) => updateFollowUp("expectedSalary", e.target.value)}
+                    className={formFieldClass}
+                    placeholder="Optional"
                   />
                 </div>
               </div>
@@ -1245,6 +1345,23 @@ export default function HiringPage() {
                   </div>
 
                   <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">HR score *</label>
+                    <select
+                      required
+                      value={hrScoreRating}
+                      onChange={(e) => setHrScoreRating(e.target.value)}
+                      className={formSelectClass}
+                    >
+                      <option value="">— Select —</option>
+                      {HR_SCORE_RATING_OPTIONS.map((v) => (
+                        <option key={v} value={v}>
+                          {HR_SCORE_RATING_LABELS[v] ?? v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary *</label>
                     <input
                       required
@@ -1253,6 +1370,17 @@ export default function HiringPage() {
                       onChange={(e) => setCurrentSalary(e.target.value)}
                       className={formFieldClass}
                       placeholder="e.g. 25000"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Expected salary</label>
+                    <input
+                      type="text"
+                      value={expectedSalary}
+                      onChange={(e) => setExpectedSalary(e.target.value)}
+                      className={formFieldClass}
+                      placeholder="Optional"
                     />
                   </div>
 
@@ -1588,6 +1716,22 @@ export default function HiringPage() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">HR score *</label>
+                  <select
+                    required
+                    value={editing.hrScoreRating ?? ""}
+                    onChange={(e) => updateEdit("hrScoreRating", e.target.value)}
+                    className={formSelectClass}
+                  >
+                    <option value="">— Select —</option>
+                    {HR_SCORE_RATING_OPTIONS.map((v) => (
+                      <option key={v} value={v}>
+                        {HR_SCORE_RATING_LABELS[v] ?? v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Current Salary *</label>
                   <input
                     required
@@ -1596,6 +1740,16 @@ export default function HiringPage() {
                     onChange={(e) => updateEdit("currentSalary", e.target.value)}
                     className={formFieldClass}
                     placeholder="e.g. 25000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Expected salary</label>
+                  <input
+                    type="text"
+                    value={editing.expectedSalary ?? ""}
+                    onChange={(e) => updateEdit("expectedSalary", e.target.value)}
+                    className={formFieldClass}
+                    placeholder="Optional"
                   />
                 </div>
                 <div>
