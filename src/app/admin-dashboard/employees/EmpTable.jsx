@@ -1,7 +1,7 @@
 // app/EmpTable.jsx
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Link from "next/link";
@@ -237,10 +237,38 @@ const EmpTable = ({ employees }) => {
   const [bulkOperation, setBulkOperation] = useState("REPLACE");
   const [bulkSelectedModules, setBulkSelectedModules] = useState([]);
   const [bulkRoleSelections, setBulkRoleSelections] = useState({});
+  const [bulkRoleLoading, setBulkRoleLoading] = useState(false);
   const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkModuleSearch, setBulkModuleSearch] = useState("");
   const router = useRouter();
+
+  const persistBulkSelectionForRole = useCallback((role, modules) => {
+    const key = String(role || "").trim();
+    if (!key) return;
+    setBulkRoleSelections((prev) => ({
+      ...(prev || {}),
+      [key]: Array.isArray(modules) ? modules : [],
+    }));
+  }, []);
+
+  const fetchRoleModulesFromDB = useCallback(async (role) => {
+    const key = String(role || "").trim();
+    if (!key) return [];
+    setBulkRoleLoading(true);
+    try {
+      const res = await fetch(`/api/admin/bulk-module-access?role=${encodeURIComponent(key)}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      const modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
+      setBulkRoleSelections((prev) => ({ ...(prev || {}), [key]: modules }));
+      return modules;
+    } catch {
+      return [];
+    } finally {
+      setBulkRoleLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -402,28 +430,20 @@ const EmpTable = ({ employees }) => {
     }
   };
 
-  const getDefaultsForRole = () => [];
-
-  const getSavedOrDefaultModulesForRole = (role) => {
-    const key = String(role || "").trim();
-    const saved = bulkRoleSelections?.[key];
-    if (Array.isArray(saved)) return saved;
-    return getDefaultsForRole();
-  };
-
-  const setRoleAndResetSelection = (role) => {
+  const setRoleAndResetSelection = async (role) => {
+    // Persist the in-progress selection for the current role before switching.
+    persistBulkSelectionForRole(bulkRole, bulkSelectedModules);
     setBulkRole(role);
     setBulkTouched(false);
-    setBulkSelectedModules(getSavedOrDefaultModulesForRole(role));
+    const key = String(role || "").trim();
+    const cached = bulkRoleSelections?.[key];
+    if (Array.isArray(cached)) {
+      setBulkSelectedModules(cached);
+    } else {
+      const fromDB = await fetchRoleModulesFromDB(role);
+      setBulkSelectedModules(fromDB);
+    }
   };
-
-  useEffect(() => {
-    if (!showGlobalModulesModal) return;
-    setBulkRoleSelections((prev) => ({
-      ...(prev || {}),
-      [String(bulkRole || "").trim()]: bulkSelectedModules,
-    }));
-  }, [showGlobalModulesModal, bulkRole, bulkSelectedModules]);
 
   const toggleBulkChild = (key) => {
     setBulkTouched(true);
@@ -477,6 +497,13 @@ const EmpTable = ({ employees }) => {
         throw new Error(data?.message || "Failed to apply module access.");
       }
       toast.success(`Applied to ${data.updated ?? 0} users`);
+      // Clear cached state so next open fetches fresh from DB
+      const key = String(bulkRole || "").trim();
+      setBulkRoleSelections((prev) => {
+        const next = { ...(prev || {}) };
+        delete next[key];
+        return next;
+      });
       setShowGlobalModulesModal(false);
       router.refresh();
     } catch (e) {
@@ -522,9 +549,16 @@ const EmpTable = ({ employees }) => {
         </Link>
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             setBulkTouched(false);
-            setBulkSelectedModules(getSavedOrDefaultModulesForRole(bulkRole));
+            const key = String(bulkRole || "").trim();
+            const cached = bulkRoleSelections?.[key];
+            if (Array.isArray(cached)) {
+              setBulkSelectedModules(cached);
+            } else {
+              const fromDB = await fetchRoleModulesFromDB(bulkRole);
+              setBulkSelectedModules(fromDB);
+            }
             setShowGlobalModulesModal(true);
           }}
           className="text-white bg-emerald-600 hover:bg-emerald-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
@@ -541,7 +575,10 @@ const EmpTable = ({ employees }) => {
                 Global Module Access (Role-wise)
               </h2>
               <button
-                onClick={() => setShowGlobalModulesModal(false)}
+                onClick={() => {
+                  persistBulkSelectionForRole(bulkRole, bulkSelectedModules);
+                  setShowGlobalModulesModal(false);
+                }}
                 className="text-gray-500 hover:text-gray-700 p-1"
                 disabled={bulkSaving}
               >
@@ -556,7 +593,7 @@ const EmpTable = ({ employees }) => {
                   <select
                     value={bulkRole}
                     onChange={(e) => setRoleAndResetSelection(e.target.value)}
-                    disabled={bulkSaving}
+                    disabled={bulkSaving || bulkRoleLoading}
                     className="w-full border rounded-md px-3 py-2 text-sm"
                   >
                     {allRoles.map((r) => (
@@ -565,6 +602,9 @@ const EmpTable = ({ employees }) => {
                       </option>
                     ))}
                   </select>
+                  {bulkRoleLoading && (
+                    <p className="text-xs text-blue-500 mt-1">Loading from DB...</p>
+                  )}
                 </div>
 
                 <div>
@@ -648,7 +688,10 @@ const EmpTable = ({ employees }) => {
             <div className="flex justify-end gap-2 mt-6">
               <button
                 type="button"
-                onClick={() => setShowGlobalModulesModal(false)}
+                onClick={() => {
+                  persistBulkSelectionForRole(bulkRole, bulkSelectedModules);
+                  setShowGlobalModulesModal(false);
+                }}
                 disabled={bulkSaving}
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
               >

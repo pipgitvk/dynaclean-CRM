@@ -33,6 +33,48 @@ function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
 }
 
+/**
+ * GET /api/admin/bulk-module-access?role=ACCOUNTANT
+ * Returns the union of module_access across all users of the given role.
+ * Used by Global Module Access modal to pre-load current state from DB.
+ */
+export async function GET(req) {
+  const actor = await getMainSessionPayload();
+  if (actor?.role !== "SUPERADMIN") {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const role = normRole(searchParams.get("role") || "");
+  if (!role) {
+    return NextResponse.json({ message: "role query param is required" }, { status: 400 });
+  }
+
+  const db = await getDbConnection();
+  await ensureModuleAccessColumn(db);
+
+  const [rows] = await db.query(
+    `SELECT module_access, userRole FROM rep_list WHERE UPPER(TRIM(userRole)) = ?`,
+    [role],
+  );
+
+  if (!rows.length) {
+    return NextResponse.json({ role, moduleKeys: [] });
+  }
+
+  // Union of all users' module_access for this role
+  const unionSet = new Set();
+  for (const row of rows) {
+    const keys = parseModuleAccess(row.module_access ?? null);
+    for (const k of keys) unionSet.add(k);
+  }
+
+  const known = new Set(ALL_MODULE_KEYS);
+  const moduleKeys = uniqueStrings([...unionSet]).filter((k) => known.has(k));
+
+  return NextResponse.json({ role, moduleKeys, userCount: rows.length });
+}
+
 export async function POST(req) {
   const actor = await getMainSessionPayload();
   if (actor?.role !== "SUPERADMIN") {

@@ -10,7 +10,12 @@ import {
   ALL_MODULE_KEYS,
   getChildKeys,
   applySuperadminOnlyModuleRestrictions,
+  applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
+
+function uniqueStrings(arr) {
+  return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
+}
 
 /* ── Tri-state parent checkbox ── */
 function ParentCheckbox({ sectionKey, selected, canEdit, onChange }) {
@@ -155,11 +160,13 @@ const QuickEditPage = () => {
   });
   const [canEditEmployeeStatus, setCanEditEmployeeStatus] = useState(false);
   const [canEditModuleAccess, setCanEditModuleAccess] = useState(false);
-  const [selectedModules, setSelectedModules] = useState([...ALL_MODULE_KEYS]);
+  const [selectedModules, setSelectedModules] = useState([]);
   const [newProfilePic, setNewProfilePic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [moduleSearch, setModuleSearch] = useState("");
+  const didHydrateModulesRef = useRef(false);
+  const userEditedModulesRef = useRef(false);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -197,15 +204,17 @@ const QuickEditPage = () => {
         setCanEditEmployeeStatus(!!data.canEditEmployeeStatus);
         setCanEditModuleAccess(!!data.canEditModuleAccess);
 
-        // API already resolves NULL → all keys; [] → empty; use as-is
-        if (Array.isArray(emp.module_access)) {
-          const effective = applySuperadminOnlyModuleRestrictions(
-            emp.module_access,
-            emp.userRole,
-          );
-          setSelectedModules(Array.isArray(effective) ? effective : []);
+        // IMPORTANT: render exactly what's stored in DB in the checkbox UI.
+        // Do not silently strip keys on load (that feels like "ticks removed by themselves").
+        // Enforcement happens on SAVE instead.
+        if (userEditedModulesRef.current && didHydrateModulesRef.current) {
+          // User started editing; don't let a duplicate fetch (e.g. React StrictMode) reset UI.
+        } else if (Array.isArray(emp.module_access)) {
+          setSelectedModules(emp.module_access);
+          didHydrateModulesRef.current = true;
         } else {
           setSelectedModules([...ALL_MODULE_KEYS]);
+          didHydrateModulesRef.current = true;
         }
       } catch (err) {
         setError(err.message);
@@ -236,6 +245,7 @@ const QuickEditPage = () => {
 
   /* Toggle individual child key */
   const toggleChild = (key) => {
+    userEditedModulesRef.current = true;
     setSelectedModules((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
@@ -243,6 +253,7 @@ const QuickEditPage = () => {
 
   /* Toggle entire parent section (all children + parent key) */
   const toggleParent = (section) => {
+    userEditedModulesRef.current = true;
     const hasChildren = section.children.length > 0;
     const childKeys = section.children.map((c) => c.key);
     const keys = hasChildren ? childKeys : [section.key];
@@ -264,11 +275,13 @@ const QuickEditPage = () => {
 
   /* Select / deselect all modules */
   const toggleAll = () => {
+    userEditedModulesRef.current = true;
     const allSelected = ALL_MODULE_KEYS.every((k) => selectedModules.includes(k));
     setSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
   };
 
   const setAccountantDefaults = () => {
+    userEditedModulesRef.current = true;
     const defaults = [
       "manual-payments",
       "dd-management",
@@ -308,6 +321,7 @@ const QuickEditPage = () => {
   };
 
   const setTeamLeaderDefaults = () => {
+    userEditedModulesRef.current = true;
     const defaults = [
       "tl-customers",
       "view-customers",
@@ -331,6 +345,7 @@ const QuickEditPage = () => {
   };
 
   const setSalesDefaults = () => {
+    userEditedModulesRef.current = true;
     const defaults = [
       "orders-process",
       "orders-delay",
@@ -343,6 +358,7 @@ const QuickEditPage = () => {
   };
 
   const setDigitalMarketerDefaults = () => {
+    userEditedModulesRef.current = true;
     const defaults = [
       "leads-upload",
       "blog",
@@ -361,6 +377,7 @@ const QuickEditPage = () => {
   };
 
   const setAdminDefaults = () => {
+    userEditedModulesRef.current = true;
     const defaults = [
       // Dashboard (admin should see these by default)
       "dashboard-home",
@@ -416,6 +433,7 @@ const QuickEditPage = () => {
   };
 
   const setHrDefaults = () => {
+    userEditedModulesRef.current = true;
     const defaults = [
       // Dashboard essentials
       "dashboard-home",
@@ -466,8 +484,25 @@ const QuickEditPage = () => {
     formData.append("userRole", employee.userRole);
     if (canEditEmployeeStatus)
       formData.append("status", String(employee.status === 1 ? 1 : 0));
-    if (canEditModuleAccess)
-      formData.append("module_access", JSON.stringify(selectedModules));
+    if (canEditModuleAccess) {
+      const known = new Set(ALL_MODULE_KEYS);
+      const before = uniqueStrings(selectedModules);
+      const cleanedUnknown = before.filter((k) => known.has(k));
+      const enforced =
+        applyRoleDenyModuleRestrictions(
+          applySuperadminOnlyModuleRestrictions(cleanedUnknown, employee.userRole) ?? [],
+          employee.userRole,
+        ) ?? [];
+      const toSave = uniqueStrings(enforced);
+
+      if (toSave.length !== before.length) {
+        toast.error("Some invalid/superadmin-only/HR-blocked modules were removed before saving.");
+      }
+
+      // Keep UI aligned with what will actually persist
+      setSelectedModules(toSave);
+      formData.append("module_access", JSON.stringify(toSave));
+    }
     if (newProfilePic) {
       formData.append("profile_pic", newProfilePic);
     } else {
