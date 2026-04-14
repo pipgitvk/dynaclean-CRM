@@ -257,7 +257,10 @@ const EmpTable = ({ employees }) => {
     if (!key) return [];
     setBulkRoleLoading(true);
     try {
-      const res = await fetch(`/api/admin/bulk-module-access?role=${encodeURIComponent(key)}`);
+      const res = await fetch(
+        `/api/admin/bulk-module-access?role=${encodeURIComponent(key)}&t=${Date.now()}`,
+        { cache: "no-store" },
+      );
       if (!res.ok) return [];
       const data = await res.json();
       const modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
