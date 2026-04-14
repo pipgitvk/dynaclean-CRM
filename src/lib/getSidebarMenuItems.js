@@ -339,7 +339,7 @@ const allMenuItems = [
   {
     // path: "/user-dashboard/customers",
     name: "View Customers",
-    moduleKey: "tl-management",
+    moduleKey: "view-customers",
     roles: ["ALL"],
     icon: "ScrollText",
     children: [
@@ -362,7 +362,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/tl-customers",
     name: "TL Management",
-    moduleKey: "tl-management",
+    moduleKey: "tl-customers",
     roles: ["TEAM LEADER"],
     icon: "Users",
   },
@@ -410,7 +410,7 @@ const allMenuItems = [
   },
   {
     name: "Service History",
-    moduleKey: "tl-management",
+    moduleKey: "service-records",
     roles: [
       "SERVICE ENGINEER",
       "SERVICE HEAD",
