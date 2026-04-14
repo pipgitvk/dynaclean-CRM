@@ -194,7 +194,6 @@ export const SUPERADMIN_ONLY_MODULE_KEYS = new Set([
   // Admin-only features
   "attendance-rules",
   "import-crm",
-  "hiring-process",
   "final-profile-approval",
 ]);
 

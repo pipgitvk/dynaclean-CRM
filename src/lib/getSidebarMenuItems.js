@@ -79,7 +79,7 @@ const allMenuItems = [
         path: "/user-dashboard/today-reports",
         name: "Today Report",
         moduleKey: "daily-report",
-        roles: ["TEAM LEADER", "ADMIN", "HR", "SALES", "SALES HEAD"],
+        roles: ["TEAM LEADER", "ADMIN", "HR", "SALES", "SALES HEAD", "WAREHOUSE INCHARGE"],
         icon: "FileText",
       },
       {
