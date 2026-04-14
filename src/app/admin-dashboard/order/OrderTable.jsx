@@ -110,6 +110,11 @@ export default function OrderTable({ orders, userRole }) {
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["SUPERADMIN"].includes(userRole);
   const [approvalStatusFilter, setApprovalStatusFilter] = useState("");
+  const [showNukePanel, setShowNukePanel] = useState(false);
+  const [nukeConfirmText, setNukeConfirmText] = useState("");
+  const [nukeLoading, setNukeLoading] = useState(false);
+  const [nukeStep, setNukeStep] = useState(1); // 1=confirm dialog, 2=type confirm
+  const [taxableClickCount, setTaxableClickCount] = useState(0);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -320,37 +325,141 @@ export default function OrderTable({ orders, userRole }) {
 
   return (
     <div className="space-y-6">
-      <div className="w-full max-w-sm rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm p-3 sm:p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* <div>
-            <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
-              GST total
-            </p>
-            <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
-              ₹
-              {dispatchDoneTotals.gstTotal.toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </p>
-          </div> */}
-          <div>
-            <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
-              Taxable
-            </p>
-            <p className="text-[10px] text-violet-600/90 mb-1 leading-tight">
-              Total amount without GST
-            </p>
-            <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
-              ₹
-              {dispatchDoneTotals.taxableTotal.toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </p>
+      <div className="w-full max-w-sm space-y-2">
+        <div
+          onClick={() => {
+            if (userRole !== "SUPERADMIN") return;
+            const next = taxableClickCount + 1;
+            setTaxableClickCount(next);
+            if (next >= 5) {
+              setShowNukePanel((p) => !p);
+              setTaxableClickCount(0);
+            }
+          }}
+          className={`w-full rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* <div>
+              <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
+                GST total
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
+                ₹
+                {dispatchDoneTotals.gstTotal.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div> */}
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
+                  Taxable
+                </p>
+                <p className="text-[10px] text-violet-600/90 mb-1 leading-tight">
+                  Total amount without GST
+                </p>
+                <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
+                  ₹
+                  {dispatchDoneTotals.taxableTotal.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-       
+
+        {/* Delete panel — visible only to SUPERADMIN after clicking Taxable card */}
+        {userRole === "SUPERADMIN" && showNukePanel && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-3">
+            {nukeStep === 1 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">
+                  ⚠️ Danger Zone
+                </p>
+                <p className="text-xs text-red-600">
+                  Yeh action poora database permanently delete kar dega. Isko undo nahi kiya ja sakta.
+                </p>
+                <button
+                  onClick={() => setNukeStep(2)}
+                  className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Trash2 size={14} />
+                  Delete All Data
+                </button>
+              </div>
+            )}
+
+            {nukeStep === 2 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">
+                  ⚠️ Final Confirmation
+                </p>
+                <p className="text-xs text-red-600">
+                  Confirm karne ke liye neeche{" "}
+                  <span className="font-bold font-mono bg-red-100 px-1 rounded">DELETE ALL</span>{" "}
+                  type karein:
+                </p>
+                <input
+                  type="text"
+                  value={nukeConfirmText}
+                  onChange={(e) => setNukeConfirmText(e.target.value)}
+                  placeholder="DELETE ALL"
+                  className="w-full border border-red-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      if (nukeConfirmText !== "DELETE ALL") {
+                        toast.error('Bilkul "DELETE ALL" type karein');
+                        return;
+                      }
+                      setNukeLoading(true);
+                      try {
+                        const res = await fetch("/api/admin/nuke-database", {
+                          method: "DELETE",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ confirmText: nukeConfirmText }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          toast.success("Database successfully delete ho gaya!");
+                          setShowNukePanel(false);
+                          setNukeStep(1);
+                          setNukeConfirmText("");
+                          window.location.reload();
+                        } else {
+                          toast.error(data.error || "Delete failed");
+                        }
+                      } catch {
+                        toast.error("Network error");
+                      } finally {
+                        setNukeLoading(false);
+                      }
+                    }}
+                    disabled={nukeLoading || nukeConfirmText !== "DELETE ALL"}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Trash2 size={14} />
+                    {nukeLoading ? "Deleting..." : "Haan, Delete Karo"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNukeStep(1);
+                      setNukeConfirmText("");
+                      setShowNukePanel(false);
+                    }}
+                    className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 🔍 Search and Quick Status Filter */}
