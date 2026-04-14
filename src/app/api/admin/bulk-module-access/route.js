@@ -6,7 +6,6 @@ import {
   parseModuleAccess,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
-  applyRoleMaxAllowedModuleRestrictions,
 } from "@/lib/moduleAccess";
 
 const VALID_OPERATIONS = new Set(["REPLACE", "MERGE", "REMOVE"]);
@@ -103,7 +102,6 @@ export async function POST(req) {
 
     next = applySuperadminOnlyModuleRestrictions(next, userRole) ?? [];
     next = applyRoleDenyModuleRestrictions(next, userRole) ?? [];
-    next = applyRoleMaxAllowedModuleRestrictions(next, userRole) ?? [];
     next = uniqueStrings(next);
 
     await db.query(

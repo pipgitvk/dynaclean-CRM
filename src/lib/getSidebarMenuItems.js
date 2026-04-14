@@ -11,7 +11,6 @@ import {
   isSectionAllowed,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
-  applyRoleMaxAllowedModuleRestrictions,
   SUPERADMIN_ONLY_MODULE_KEYS,
 } from "@/lib/moduleAccess";
 import { getDbConnection } from "@/lib/db";
@@ -742,10 +741,7 @@ export default async function getSidebarMenuItems() {
       roleKey,
     );
     const allowedModules2 = applyRoleDenyModuleRestrictions(allowedModules1, roleKey);
-    const allowedModules = applyRoleMaxAllowedModuleRestrictions(
-      allowedModules2,
-      roleKey,
-    );
+    const allowedModules = allowedModules2;
     // allowedModules === null means column not set yet → show all (backward compat)
     if (allowedModules !== null) {
       const filterByModuleAccess = (list) =>
