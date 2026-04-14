@@ -15,6 +15,29 @@ function assertHrRole(payload) {
   return null;
 }
 
+function isMysqlUnknownColumnError(err) {
+  const msg = `${err?.message || ""} ${err?.sqlMessage || ""}`;
+  return (
+    msg.includes("Unknown column") ||
+    err?.code === "ER_BAD_FIELD_ERROR" ||
+    err?.errno === 1054
+  );
+}
+
+/** Appends MySQL text so the UI shows the real missing column (e.g. created_by, package, hr_interview_score). */
+function hiringUnknownColumnResponse(err) {
+  const mysqlMessage = String(err?.sqlMessage ?? err?.message ?? "").trim();
+  const base =
+    "DB column mismatch. Run empcrm/admin-dashboard/hiring/migration_candidates_pipeline_columns.sql (skip #1060 duplicates). If the column is created_by, run migration_candidates_rename_created_by.sql.";
+  const extra =
+    isMysqlUnknownColumnError(err) && mysqlMessage
+      ? ` ${mysqlMessage}`
+      : isMysqlUnknownColumnError(err)
+        ? ` (MySQL ${err?.code || err?.errno || "bad field"})`
+        : "";
+  return NextResponse.json({ success: false, error: base + extra }, { status: 503 });
+}
+
 /** GET ?year=&month=&interview_mode=&designation= optional filters (date parts match hire, interview, or created date). */
 export async function GET(req) {
   try {
@@ -99,7 +122,7 @@ export async function GET(req) {
     return NextResponse.json({ success: true, entries: rows, next_id, designations });
   } catch (error) {
     console.error("[empcrm/hiring GET]", error);
-    const msg = error?.message || "";
+    const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
     if (msg.includes("candidates") && msg.includes("doesn't exist")) {
       return NextResponse.json(
         {
@@ -110,15 +133,8 @@ export async function GET(req) {
         { status: 503 }
       );
     }
-    if (msg.includes("Unknown column")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "DB columns missing. Run hiring migrations (extended_fields, package, probation_months as needed).",
-        },
-        { status: 503 }
-      );
+    if (isMysqlUnknownColumnError(error)) {
+      return hiringUnknownColumnResponse(error);
     }
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
@@ -185,7 +201,7 @@ export async function POST(request) {
     return NextResponse.json({ success: true, message: "Record saved." });
   } catch (error) {
     console.error("[empcrm/hiring POST]", error);
-    const msg = error?.message || "";
+    const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
     if (msg.includes("candidates") && msg.includes("doesn't exist")) {
       return NextResponse.json(
         {
@@ -196,7 +212,7 @@ export async function POST(request) {
         { status: 503 }
       );
     }
-    if (msg.includes("Unknown column")) {
+    if (isMysqlUnknownColumnError(error)) {
       if (msg.includes("note") && msg.includes("candidates_followups")) {
         return NextResponse.json(
           {
@@ -207,14 +223,7 @@ export async function POST(request) {
           { status: 503 }
         );
       }
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "DB columns missing. Run hiring migrations (extended_fields, package, probation_months as needed).",
-        },
-        { status: 503 }
-      );
+      return hiringUnknownColumnResponse(error);
     }
     if (msg.includes("candidates_followups") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
       return NextResponse.json(
@@ -320,8 +329,8 @@ export async function PATCH(request) {
     return NextResponse.json({ success: true, message: "Record updated." });
   } catch (error) {
     console.error("[empcrm/hiring PATCH]", error);
-    const msg = error?.message || "";
-    if (msg.includes("Unknown column")) {
+    const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;
+    if (isMysqlUnknownColumnError(error)) {
       if (msg.includes("note") && msg.includes("candidates_followups")) {
         return NextResponse.json(
           {
@@ -332,14 +341,7 @@ export async function PATCH(request) {
           { status: 503 }
         );
       }
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "DB columns missing. Run hiring migrations (extended_fields, package, probation_months as needed).",
-        },
-        { status: 503 }
-      );
+      return hiringUnknownColumnResponse(error);
     }
     if (msg.includes("candidates_followups") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
       return NextResponse.json(
