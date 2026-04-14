@@ -463,7 +463,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/email-templates",
     name: "Email Templates",
-    moduleKey: "documents",
+    moduleKey: "email-templates",
     roles: ["ADMIN", "GRAPHIC DESIGNER", "SERVICE HEAD", "DIGITAL MARKETER"],
     icon: "Mail",
   },
@@ -499,20 +499,22 @@ const allMenuItems = [
   },
   {
     name: "Materials",
-    moduleKey: "documents",
-    roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "GRAPHIC DESIGNER"],
+    moduleKey: "installation-videos",
+    roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "GRAPHIC DESIGNER", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
     icon: "ScrollText",
     children: [
       {
         path: "/user-dashboard/installation-videos",
         name: "Installation Videos",
-        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "GRAPHIC DESIGNER"],
+        moduleKey: "installation-videos",
+        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "GRAPHIC DESIGNER", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "PlayCircle",
       },
       {
         path: "/user-dashboard/installation-videos/manage",
         name: "Manage Video Links",
-        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "GRAPHIC DESIGNER"],
+        moduleKey: "installation-videos",
+        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "GRAPHIC DESIGNER", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "FilePlus2",
       },
     ],
@@ -520,14 +522,14 @@ const allMenuItems = [
   {
     path: "/user-dashboard/installation-videos",
     name: "Installation Videos",
-    moduleKey: "documents",
+    moduleKey: "installation-videos",
     roles: ["SALES", "SALES HEAD"],
     icon: "PlayCircle",
   },
   {
     path: "/user-dashboard/assets-management",
     name: "Assets",
-    moduleKey: "documents",
+    moduleKey: "assets",
     roles: ["ADMIN", "ACCOUNTANT"],
     icon: "FileText",
   },

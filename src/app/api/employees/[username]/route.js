@@ -86,12 +86,10 @@ export async function GET(request, { params }) {
     const canEditModuleAccess = mainPayload?.role === "SUPERADMIN";
 
     const emp = rows[0];
-    // Backward compat: NULL module_access → all modules granted
-    const moduleAccessRaw = parseModuleAccess(emp.module_access ?? null);
-    const moduleAccess = applySuperadminOnlyModuleRestrictions(
-      moduleAccessRaw,
-      emp.userRole,
-    );
+    // Return the raw parsed module_access — DO NOT strip here.
+    // Stripping (superadmin-only, HR deny, etc.) happens at save time in the PUT handler
+    // and at sidebar-render time. Stripping in GET causes the UI to "lose" ticks on reload.
+    const moduleAccess = parseModuleAccess(emp.module_access ?? null);
 
     return NextResponse.json({
       employee: { ...emp, module_access: moduleAccess },
