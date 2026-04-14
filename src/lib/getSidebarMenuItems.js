@@ -471,25 +471,28 @@ const allMenuItems = [
   {
     name: "Warranty",
     moduleKey: "products",
-    roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER"],
+    roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "WAREHOUSE INCHARGE", "ACCOUNTANT"],
     icon: "ScrollText",
     children: [
       {
         path: "/user-dashboard/warranty",
         name: "Register Product",
-        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER"],
+        moduleKey: "warranty-console",
+        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "WAREHOUSE INCHARGE", "ACCOUNTANT"],
         icon: "ShieldCheck",
       },
       {
         path: "/user-dashboard/warranty/products",
         name: "Registered Products",
-        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER"],
+        moduleKey: "registered-products",
+        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "WAREHOUSE INCHARGE", "ACCOUNTANT"],
         icon: "ShieldCheck",
       },
       {
         path: "/user-dashboard/warranty/map",
         name: "Map View",
-        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER"],
+        moduleKey: "warranty-map",
+        roles: ["ADMIN", "SERVICE HEAD", "TEAM LEADER", "WAREHOUSE INCHARGE", "ACCOUNTANT"],
         icon: "MapPin",
       },
     ],
@@ -531,7 +534,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/product-stock",
     name: "Price List",
-    moduleKey: "products",
+    moduleKey: "product-stock",
     roles: [
       "ADMIN",
       "ACCOUNTANT",
@@ -546,7 +549,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/product-accessories",
     name: "Product Accessories",
-    moduleKey: "products",
+    moduleKey: "product-accessories",
     roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
     icon: "ClipboardList",
   },
@@ -559,24 +562,28 @@ const allMenuItems = [
       {
         path: "/user-dashboard/purchase/direct-in",
         name: "Direct In",
+        moduleKey: "purchase-direct-in",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "PackageCheck",
       },
       {
         path: "/user-dashboard/purchase/generate-request",
         name: "Generate Request",
+        moduleKey: "purchase-request",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "FilePlus",
       },
       {
         path: "/user-dashboard/purchase/warehouse-in",
         name: "Warehouse In",
+        moduleKey: "purchase-warehouse-in",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "PackageCheck",
       },
       {
         path: "/user-dashboard/purchase/purchases",
         name: "Purchases",
+        moduleKey: "purchases",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "ShoppingBag",
       },
@@ -585,7 +592,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/spare",
     name: "Spare Parts",
-    moduleKey: "products",
+    moduleKey: "spare-parts",
     roles: [
       "ADMIN",
       "ACCOUNTANT",
@@ -606,24 +613,28 @@ const allMenuItems = [
       {
         path: "/user-dashboard/spare/purchase/direct-in",
         name: "Direct In",
+        moduleKey: "spare-direct-in",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "PackageCheck",
       },
       {
         path: "/user-dashboard/spare/purchase/generate-request",
         name: "Generate Request",
+        moduleKey: "spare-request",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "FilePlus",
       },
       {
         path: "/user-dashboard/spare/purchase/warehouse-in",
         name: "Warehouse In",
+        moduleKey: "spare-warehouse-in",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "PackageCheck",
       },
       {
         path: "/user-dashboard/spare/purchase/purchases",
         name: "Purchases",
+        moduleKey: "spare-purchases",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE"],
         icon: "ShoppingBag",
       },
@@ -638,12 +649,14 @@ const allMenuItems = [
       {
         path: "/user-dashboard/productions/status",
         name: "Production Status",
+        moduleKey: "production-status",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER"],
         icon: "ListOrdered",
       },
       {
         path: "/user-dashboard/productions/bom-list",
         name: "BOM List",
+        moduleKey: "bom-list",
         roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER"],
         icon: "ClipboardList",
       },
