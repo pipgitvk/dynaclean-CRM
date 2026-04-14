@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dayjs from "dayjs";
-import { CalendarDays, Sparkles, StickyNote, User } from "lucide-react";
+import { CalendarDays, Edit, Eye, Sparkles, StickyNote, User } from "lucide-react";
 import {
   NEXT_FOLLOWUP_DATE_TRAFFIC_LEGEND,
   getTrafficGradientForHours,
@@ -37,7 +37,7 @@ function DetailRow({ icon: Icon, label, children }) {
   );
 }
 
-function TLCustomerFollowUpCard({ customer, detailHref }) {
+function TLCustomerFollowUpCard({ customer, detailHref, followupHref }) {
   const hours = getHoursUntilNextFollowup(customer);
   const bg = getTrafficGradientForHours(hours);
 
@@ -113,6 +113,25 @@ function TLCustomerFollowUpCard({ customer, detailHref }) {
             </span>
           )}
         </div>
+
+        <div className="mt-4 flex gap-2">
+          <Link
+            href={detailHref}
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-white/25 bg-white/15 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/25"
+            title="View Details"
+          >
+            <Eye className="h-3 w-3" />
+            View
+          </Link>
+          <Link
+            href={followupHref}
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-white/25 bg-white/15 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/25"
+            title="Add TL Follow-up"
+          >
+            <Edit className="h-3 w-3" />
+            Add TL Follow-up
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -168,6 +187,7 @@ export default function TLCustomerFollowUpCards({ customers, basePath, queryStri
                 key={c.customer_id}
                 customer={c}
                 detailHref={`${basePath}/${c.customer_id}${qs}`}
+                followupHref={`${basePath}/${c.customer_id}/followup${qs}`}
               />
             ))}
           </div>

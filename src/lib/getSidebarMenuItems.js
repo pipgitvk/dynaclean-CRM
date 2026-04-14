@@ -68,34 +68,27 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Home",
       },
-      {
-        path: "/user-dashboard/lead-reports",
-        name: "Lead Reports",
-        moduleKey: "lead-reports",
-        roles: ["SALES", "SALES HEAD"],
-        icon: "FileText",
-      },
-      {
-        path: "/user-dashboard/today-reports",
-        name: "Today Report",
-        moduleKey: "daily-report",
-        roles: ["TEAM LEADER", "ADMIN", "HR", "SALES", "SALES HEAD", "WAREHOUSE INCHARGE"],
-        icon: "FileText",
-      },
-      {
-        path: "/user-dashboard/attendance/",
-        name: "Attendance details",
-        moduleKey: "attendance-details",
-        roles: ["ALL"],
-        icon: "ListOrdered",
-      },
-      {
-        path: "/user-dashboard/attendance-regularization-approvals",
-        name: "Regularization approvals",
-        moduleKey: "regularization-approvals",
-        roles: ["ALL"],
-        icon: "CheckSquare",
-      },
+      // {
+      //   path: "/user-dashboard/today-reports",
+      //   name: "Today Report",
+      //   moduleKey: "daily-report",
+      //   roles: ["TEAM LEADER", "ADMIN", "HR", "SALES", "SALES HEAD", "WAREHOUSE INCHARGE"],
+      //   icon: "FileText",
+      // },
+      // {
+      //   path: "/user-dashboard/attendance/",
+      //   name: "Attendance details",
+      //   moduleKey: "attendance-details",
+      //   roles: ["ALL"],
+      //   icon: "ListOrdered",
+      // },
+      // {
+      //   path: "/user-dashboard/attendance-regularization-approvals",
+      //   name: "Regularization approvals",
+      //   moduleKey: "regularization-approvals",
+      //   roles: ["ALL"],
+      //   icon: "CheckSquare",
+      // },
       {
         path: "/user-dashboard/task-manager",
         name: "Task Manager",
@@ -116,6 +109,124 @@ const allMenuItems = [
         moduleKey: "fast-card",
         roles: ["ALL"],
         icon: "ShieldCheck",
+      },
+    ],
+  },
+
+  {
+    name: "Leads",
+    moduleKey: "leads-group",
+    roles: ["SALES", "SALES HEAD"],
+    icon: "Users",
+    children: [
+      {
+        path: "/user-dashboard/add-customer",
+        name: "Add Customer",
+        moduleKey: "add-customer",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "FilePlus2",
+      },
+      {
+        path: "/user-dashboard/customers",
+        name: "View Customer",
+        moduleKey: "view-customers",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "ScrollText",
+      },
+      {
+        path: "/user-dashboard/lead-reports",
+        name: "Lead Reports",
+        moduleKey: "lead-reports",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "FileText",
+      },
+    ],
+  },
+
+  {
+    name: "Sales",
+    moduleKey: "sales-group",
+    roles: ["SALES", "SALES HEAD"],
+    icon: "ShoppingBag",
+    children: [
+      {
+        path: "/user-dashboard/quotations",
+        name: "Quotation",
+        moduleKey: "quotations",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/demo_details",
+        name: "Demo Details",
+        moduleKey: "demo-details",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "PlayCircle",
+      },
+      {
+        path: "/admin-dashboard/prospects",
+        name: "Prospects",
+        moduleKey: "prospects",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "UserPlus",
+      },
+      {
+        path: "/user-dashboard/order",
+        name: "Order Process",
+        moduleKey: "orders-process",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "ListOrdered",
+      },
+      {
+        path: "/user-dashboard/reports/payment-pending",
+        name: "Payment Pending",
+        moduleKey: "payment-pending",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "DollarSign",
+      },
+    ],
+  },
+
+  {
+    name: "Resource Center",
+    moduleKey: "resource-center",
+    roles: ["SALES", "SALES HEAD"],
+    icon: "BookOpen",
+    children: [
+      {
+        path: "/user-dashboard/blogs",
+        name: "Catalogue",
+        moduleKey: "blog",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "ScrollText",
+      },
+      {
+        path: "/user-dashboard/product-stock",
+        name: "Price List",
+        moduleKey: "product-stock",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/installation-videos",
+        name: "Installation Videos",
+        moduleKey: "installation-videos",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "PlayCircle",
+      },
+      {
+        path: "/user-dashboard/assets-management",
+        name: "Assets",
+        moduleKey: "assets",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/qa",
+        name: "Knowledge Base",
+        moduleKey: "qa",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "BookOpen",
       },
     ],
   },
@@ -198,8 +309,6 @@ const allMenuItems = [
     roles: [
       "ADMIN",
       "ACCOUNTANT",
-      "SALES",
-      "SALES HEAD",
       "BACK OFFICE",
       "GEM PORTAL",
     ],
@@ -216,7 +325,7 @@ const allMenuItems = [
     path: "/admin-dashboard/prospects",
     name: "Prospects",
     moduleKey: "prospects",
-    roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
+    roles: ["SUPERADMIN", "ADMIN"],
     icon: "UserPlus",
   },
   {
@@ -259,7 +368,7 @@ const allMenuItems = [
         path: "/user-dashboard/order",
         name: "Order Process",
         moduleKey: "orders-process",
-        roles: ["ALL"],
+        roles: ["ADMIN", "SUPERADMIN", "TEAM LEADER", "SERVICE HEAD", "BACK OFFICE", "DIGITAL MARKETER", "GEM PORTAL", "ACCOUNTANT", "WAREHOUSE INCHARGE", "HR"],
         icon: "ListOrdered",
       },
       {
@@ -340,21 +449,21 @@ const allMenuItems = [
     // path: "/user-dashboard/customers",
     name: "View Customers",
     moduleKey: "view-customers",
-    roles: ["ALL"],
+    roles: ["ADMIN", "SUPERADMIN", "TEAM LEADER", "SERVICE HEAD", "BACK OFFICE", "DIGITAL MARKETER", "GEM PORTAL", "ACCOUNTANT", "WAREHOUSE INCHARGE", "HR"],
     icon: "ScrollText",
     children: [
       {
         path: "/user-dashboard/customers",
         name: "View Customers",
         moduleKey: "view-customers",
-        roles: ["ALL"],
+        roles: ["ADMIN", "SUPERADMIN", "TEAM LEADER", "SERVICE HEAD", "BACK OFFICE", "DIGITAL MARKETER", "GEM PORTAL", "ACCOUNTANT", "WAREHOUSE INCHARGE", "HR"],
         icon: "ScrollText",
       },
       {
         path: "/user-dashboard/add-customer",
         name: "Add Customer",
         moduleKey: "add-customer",
-        roles: ["ALL"],
+        roles: ["ADMIN", "SUPERADMIN", "TEAM LEADER", "SERVICE HEAD", "BACK OFFICE", "DIGITAL MARKETER", "GEM PORTAL", "ACCOUNTANT", "WAREHOUSE INCHARGE", "HR"],
         icon: "FilePlus2",
       },
     ],
@@ -371,7 +480,7 @@ const allMenuItems = [
     path: "/user-dashboard/demo_details",
     name: "Demo Details",
     moduleKey: "demo-details",
-    roles: ["ALL"],
+    roles: ["ADMIN", "SUPERADMIN", "TEAM LEADER", "SERVICE HEAD", "BACK OFFICE", "DIGITAL MARKETER", "GEM PORTAL", "ACCOUNTANT", "WAREHOUSE INCHARGE", "HR"],
     icon: "PlayCircle",
   },
   {
@@ -379,8 +488,6 @@ const allMenuItems = [
     name: "Quotation",
     moduleKey: "quotations",
     roles: [
-      "SALES",
-      "SALES HEAD",
       "ADMIN",
       "SERVICE HEAD",
       "BACK OFFICE",
@@ -523,7 +630,7 @@ const allMenuItems = [
     path: "/user-dashboard/installation-videos",
     name: "Installation Videos",
     moduleKey: "installation-videos",
-    roles: ["SALES", "SALES HEAD"],
+    roles: ["ADMIN", "SUPERADMIN", "TEAM LEADER"],
     icon: "PlayCircle",
   },
   {
@@ -543,8 +650,6 @@ const allMenuItems = [
       "WAREHOUSE INCHARGE",
       "DIGITAL MARKETER",
       "TEAM LEADER",
-      "SALES",
-      "SALES HEAD",
     ],
     icon: "FileText",
   },
@@ -668,7 +773,7 @@ const allMenuItems = [
     path: "/user-dashboard/qa",
     name: "Knowledge Base",
     moduleKey: "qa",
-    roles: ["ALL"],
+    roles: ["ADMIN", "SUPERADMIN", "TEAM LEADER", "SERVICE HEAD", "BACK OFFICE", "DIGITAL MARKETER", "GEM PORTAL", "ACCOUNTANT", "WAREHOUSE INCHARGE", "HR"],
     icon: "BookOpen",
   },
   {
@@ -744,6 +849,17 @@ export default async function getSidebarMenuItems() {
 
   // Module access is the source of truth (per-user selection in Quick Edit).
   let items = filterByRole(allMenuItems, roleKey);
+
+  // For SALES / SALES HEAD: flatten the "Dashboard" group children to top-level
+  const salesRoles = ["SALES", "SALES_HEAD", "SALES HEAD"];
+  if (salesRoles.includes(roleKey)) {
+    items = items.flatMap((item) => {
+      if (item.moduleKey === "dashboard" && item.children?.length) {
+        return item.children;
+      }
+      return [item];
+    });
+  }
 
   // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
   items = stripSuperadminOnlyMenuItems(items, roleKey);
