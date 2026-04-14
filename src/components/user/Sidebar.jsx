@@ -113,6 +113,7 @@ import {
   Package,
   Import,
   Ship,
+  ClipboardCheck,
 } from "lucide-react";
 
 // Icon map
@@ -149,6 +150,7 @@ const iconMap = {
   Package,
   Import,
   Ship,
+  ClipboardCheck,
 };
 
 //this is test

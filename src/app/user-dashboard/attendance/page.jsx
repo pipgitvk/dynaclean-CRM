@@ -155,8 +155,8 @@ const AttendancePage = () => {
     setRegModalOpen(true);
   };
 
-  const showRegActionCol = filterStatus === "regularize";
-  const tableColSpanEmpty = showRegActionCol ? 7 : 6;
+  const showRegActionCol = true;
+  const tableColSpanEmpty = 7;
 
   const handleShowAll = () => {
     setFilterStatus("all");
@@ -314,9 +314,17 @@ const AttendancePage = () => {
   return (
     <>
       <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          Attendance details
-        </h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 text-center flex-1">
+            Attendance details
+          </h1>
+          <button
+            onClick={() => setFilterStatus("regularize")}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-teal-600 text-white hover:bg-teal-700 transition-colors shadow-md shrink-0"
+          >
+            Regularize Attendance
+          </button>
+        </div>
 
         {/* Summary Statistics Section */}
         <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">

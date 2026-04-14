@@ -1,7 +1,7 @@
 // app/empcrm/user-dashboard/attendance/page.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -12,6 +12,7 @@ import {
   isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -23,6 +24,10 @@ const AttendancePage = () => {
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
   const [rules, setRules] = useState(DEFAULT_ATTENDANCE_RULES);
+  const [myRegRequests, setMyRegRequests] = useState([]);
+  const [regModalOpen, setRegModalOpen] = useState(false);
+  const [regModalLog, setRegModalLog] = useState(null);
+  const [regModalDateKey, setRegModalDateKey] = useState("");
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -60,9 +65,55 @@ const AttendancePage = () => {
     }
   };
 
+  const refreshRegularization = useCallback(async () => {
+    try {
+      const res = await fetch("/api/attendance/regularization?scope=mine");
+      if (res.ok) {
+        const d = await res.json().catch(() => ({}));
+        if (d.success) setMyRegRequests(d.requests || []);
+      }
+    } catch {
+      /* optional */
+    }
+  }, []);
+
   useEffect(() => {
     fetchAttendance();
   }, []);
+
+  useEffect(() => {
+    if (!loading) refreshRegularization();
+  }, [loading, refreshRegularization]);
+
+  const logDateKeyForReg = (log) =>
+    log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
+
+  const rowNeedsRegularization = (log) => {
+    if (log.type !== "present") return false;
+    const checkinOk = getCheckinStatus(log.checkin_time) === "onTime";
+    const checkoutOk = getCheckoutStatus(log.checkout_time) === "onTime";
+    return !checkinOk || !checkoutOk;
+  };
+
+  const pendingRegByDate = useMemo(() => {
+    const m = new Map();
+    for (const r of myRegRequests) {
+      if (r.status !== "pending") continue;
+      let k = r.log_date;
+      if (k == null) continue;
+      if (typeof k === "string") k = k.slice(0, 10);
+      else if (k instanceof Date) k = k.toISOString().slice(0, 10);
+      else k = String(k).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) m.set(k, r);
+    }
+    return m;
+  }, [myRegRequests]);
+
+  const openRegularizeModal = (log) => {
+    setRegModalLog(log);
+    setRegModalDateKey(logDateKeyForReg(log));
+    setRegModalOpen(true);
+  };
 
   const openHolidayModal = async () => {
     try {
@@ -237,9 +288,17 @@ const AttendancePage = () => {
   return (
     <>
       <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">
-          Attendance details
-        </h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 text-center flex-1">
+            Attendance details
+          </h1>
+          <button
+            onClick={() => setFilterStatus("regularize")}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-teal-600 text-white hover:bg-teal-700 transition-colors shadow-md shrink-0"
+          >
+            Regularize Attendance
+          </button>
+        </div>
 
         {/* Summary Statistics Section */}
         <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
@@ -360,6 +419,15 @@ const AttendancePage = () => {
                 }`}
             >
               Show On Time
+            </button>
+            <button
+              onClick={() => setFilterStatus("regularize")}
+              className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "regularize"
+                ? "bg-teal-600 text-white shadow-md"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+            >
+              Regularize attendance
             </button>
             <button
               onClick={openHolidayModal}
@@ -514,6 +582,11 @@ const AttendancePage = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Check-out
                 </th>
+                {filterStatus === "regularize" && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -587,10 +660,27 @@ const AttendancePage = () => {
                         >
                           {formatTime(log.checkout_time)}
                         </td>
+                        {filterStatus === "regularize" && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            {rowNeedsRegularization(log) ? (
+                              pendingRegByDate.get(logDateKeyForReg(log)) ? (
+                                <span className="text-amber-700 font-medium">Pending</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openRegularizeModal(log)}
+                                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                                >
+                                  Regularize
+                                </button>
+                              )
+                            ) : null}
+                          </td>
+                        )}
                       </>
                     ) : (
                       <td
-                        colSpan="5"
+                        colSpan={filterStatus === "regularize" ? 6 : 5}
                         className={`px-6 py-4 text-center ${log.type === "absent"
                           ? "bg-orange-50 text-orange-700"
                           : log.type === "leave"
@@ -619,7 +709,7 @@ const AttendancePage = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={filterStatus === "regularize" ? 7 : 6} className="px-6 py-4 text-center text-gray-500">
                     No attendance logs found for the selected filter.
                   </td>
                 </tr>
@@ -628,6 +718,20 @@ const AttendancePage = () => {
           </table>
         </div>
       </div>
+      <AttendanceRegularizeModal
+        open={regModalOpen}
+        log={regModalLog}
+        logDateKey={regModalDateKey}
+        onClose={() => {
+          setRegModalOpen(false);
+          setRegModalLog(null);
+          setRegModalDateKey("");
+        }}
+        onSubmitted={() => {
+          refreshRegularization();
+        }}
+      />
+
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-4">
