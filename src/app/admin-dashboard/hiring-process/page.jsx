@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Filter, History, Loader2, Pencil, Trash2, X } from "lucide-react";
+import { HIRING_TAG_OPTIONS as TAG_OPTIONS } from "@/lib/hiringPayload";
 
 const fieldClass =
   "rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-400";
@@ -55,7 +56,6 @@ function hiringStatusSelectOptions(rowStatus) {
     ? STATUS_OPTIONS_WITH_LEGACY_STATUS_FOLLOWUP
     : STATUS_OPTIONS;
 }
-const TAG_OPTIONS = ["Probation", "Permanent", "Terminate", "Follow-Up"];
 const MARITAL_OPTIONS = ["Unmarried", "Married"];
 const EXPERIENCE_OPTIONS = [
   { value: "fresher", label: "Fresher" },
@@ -595,22 +595,34 @@ export default function AdminHiringProcessPage() {
       {historyOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-[2px] sm:items-center sm:p-4">
           <div className="absolute inset-0" onClick={closeHistory} aria-hidden />
-          <div className="relative z-10 flex max-h-[min(90dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl">
+          <div className="relative z-10 flex max-h-[min(90dvh,100%)] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl">
             <div className="flex items-start justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40 px-4 py-4">
               <div className="min-w-0">
                 <h2 className="text-lg font-semibold text-slate-900">Status history</h2>
                 {historyEntry && (
-                  <p className="mt-1 text-sm text-slate-600">
-                    <span className="font-medium text-slate-800">{historyEntry.candidate_name}</span>
-                    {" · "}
-                    <span className="text-slate-500">#{historyEntry.id}</span>
-                    {historyEntry.designation ? (
-                      <>
-                        {" · "}
-                        <span className="text-slate-600">{historyEntry.designation}</span>
-                      </>
-                    ) : null}
-                  </p>
+                  <>
+                    <p className="mt-1 text-sm text-slate-600">
+                      <span className="font-medium text-slate-800">{historyEntry.candidate_name}</span>
+                      {" · "}
+                      <span className="text-slate-500">#{historyEntry.id}</span>
+                      {historyEntry.designation ? (
+                        <>
+                          {" · "}
+                          <span className="text-slate-600">{historyEntry.designation}</span>
+                        </>
+                      ) : null}
+                    </p>
+                    <div className="mt-3 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Latest note on record (HR)
+                      </p>
+                      <p className="mt-1.5 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">
+                        {historyEntry.note != null && String(historyEntry.note).trim() !== ""
+                          ? String(historyEntry.note)
+                          : "—"}
+                      </p>
+                    </div>
+                  </>
                 )}
               </div>
               <button
@@ -642,20 +654,30 @@ export default function AdminHiringProcessPage() {
                     </p>
                   ) : (
                     <div className="overflow-x-auto rounded-xl border border-slate-200/90">
-                      <table className="w-full min-w-[240px] border-collapse text-left text-sm">
+                      <table className="w-full min-w-[520px] border-collapse text-left text-sm">
                         <thead>
                           <tr className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100/90">
                             <th className="whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
                               When
                             </th>
                             <th className="whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
+                              HR
+                            </th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
                               status
+                            </th>
+                            <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
+                              Note
                             </th>
                           </tr>
                         </thead>
                         <tbody>
                           {statusRows.map((h) => {
                             const sa = h.status != null ? String(h.status).trim() : "";
+                            const noteText =
+                              h.note != null && String(h.note).trim() !== "" ? String(h.note).trim() : null;
+                            const hrName = h.updater_name != null ? String(h.updater_name).trim() : "";
+                            const hrUser = h.updated_by != null ? String(h.updated_by).trim() : "";
                             return (
                               <tr
                                 key={h.id}
@@ -664,8 +686,28 @@ export default function AdminHiringProcessPage() {
                                 <td className="whitespace-nowrap px-3 py-2.5 align-top text-xs text-slate-600 sm:px-4">
                                   {formatDt(h.logged_at)}
                                 </td>
+                                <td className="max-w-[10rem] px-3 py-2.5 align-top sm:max-w-[12rem] sm:px-4">
+                                  <span className="block text-xs font-semibold text-slate-800">
+                                    {hrName || hrUser || "—"}
+                                  </span>
+                                  {h.updater_role != null && String(h.updater_role).trim() !== "" ? (
+                                    <span className="mt-0.5 block text-[11px] text-slate-500">
+                                      {String(h.updater_role).trim()}
+                                    </span>
+                                  ) : null}
+                                  {hrName && hrUser && hrName !== hrUser ? (
+                                    <span className="mt-0.5 block text-[10px] text-slate-400">@{hrUser}</span>
+                                  ) : null}
+                                </td>
                                 <td className="px-3 py-2.5 align-top sm:px-4">
                                   <StatusChip status={sa} />
+                                </td>
+                                <td className="min-w-[8rem] max-w-[18rem] px-3 py-2.5 align-top text-xs leading-relaxed text-slate-700 sm:px-4">
+                                  {noteText ? (
+                                    <span className="whitespace-pre-wrap break-words">{noteText}</span>
+                                  ) : (
+                                    <span className="text-slate-400">—</span>
+                                  )}
                                 </td>
                               </tr>
                             );

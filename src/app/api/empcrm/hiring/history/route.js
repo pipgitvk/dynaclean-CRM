@@ -27,7 +27,7 @@ export async function GET(req) {
 
     const conn = await getDbConnection();
     const [entryRows] = await conn.execute(
-      `SELECT id, created_by, candidate_name, designation, status, hr_interview_score, current_salary, note, created_at
+      `SELECT id, created_by, candidate_name, designation, status, hr_interview_score, hr_score_rating, current_salary, expected_salary, note, created_at
        FROM candidates
        WHERE id = ? AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))`,
       [entryId, payload.username]
@@ -37,10 +37,14 @@ export async function GET(req) {
     }
 
     const [history] = await conn.execute(
-      `SELECT id, \`status\`, updated_by, note, logged_at
-       FROM candidates_followups
-       WHERE entry_id = ?
-       ORDER BY logged_at ASC, id ASC`,
+      `SELECT h.id, h.\`status\`, h.updated_by,
+       COALESCE(ep.full_name, h.updated_by) AS updater_name,
+       ep.designation AS updater_role,
+       h.note, h.logged_at
+       FROM candidates_followups h
+       LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.updated_by))
+       WHERE h.entry_id = ?
+       ORDER BY h.logged_at ASC, h.id ASC`,
       [entryId]
     );
 

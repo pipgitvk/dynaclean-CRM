@@ -17,11 +17,22 @@ const HIRING_STATUS_OPTIONS = [
   "Reject",
 ];
 
-const HIRING_TAG_OPTIONS = ["Probation", "Permanent", "Terminate", "Follow-Up"];
+export const HIRING_TAG_OPTIONS = [
+  "Probation",
+  "Permanent",
+  "Terminate",
+  "Follow-Up",
+  "Denied",
+  "Post-ponding",
+  "Not-looking",
+];
 
 const HIRING_MARITAL_OPTIONS = ["Unmarried", "Married"];
 const HIRING_EXPERIENCE_VALUES = ["fresher", "experience"];
 const HIRING_INTERVIEW_MODES = ["Virtual", "Walk-in"];
+
+/** HR qualitative score (dropdown) — stored as-is in DB */
+export const HR_SCORE_RATING_OPTIONS = ["average", "poor", "good", "very-good"];
 
 function normalizeStatus(v) {
   const s = String(v ?? "").trim();
@@ -99,9 +110,16 @@ export function parseHiringPayload(body) {
   }
 
   const current_salary = String(body.current_salary ?? "").trim() || null;
+  const expected_salary = String(body.expected_salary ?? "").trim() || null;
+
+  const hr_score_rating_raw = String(body.hr_score_rating ?? "").trim();
+  const hr_score_rating = HR_SCORE_RATING_OPTIONS.includes(hr_score_rating_raw) ? hr_score_rating_raw : null;
 
   if (!hr_interview_score) {
     return { error: "HR interview score (1–10) is required." };
+  }
+  if (!hr_score_rating) {
+    return { error: "HR score is required (average, poor, good, or very good)." };
   }
   if (!current_salary) {
     return { error: "Current salary is required." };
@@ -174,7 +192,9 @@ export function parseHiringPayload(body) {
       selected_resume,
       mgmt_interview_score,
       hr_interview_score,
+      hr_score_rating,
       current_salary,
+      expected_salary,
       note,
     },
   };
