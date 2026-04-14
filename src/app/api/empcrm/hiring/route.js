@@ -50,42 +50,47 @@ export async function GET(req) {
     const ymClause = ymWhere.length ? ` AND ${ymWhere.join(" AND ")}` : "";
     const modeClause = modeFilter ? ` AND interview_mode = ?` : "";
 
-    let distSql = `SELECT DISTINCT TRIM(designation) AS d FROM hr_hiring_entries
-      WHERE LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))${ymClause}${modeClause}
+    let distSql = `SELECT DISTINCT TRIM(designation) AS d FROM candidates
+      WHERE LOWER(TRIM(created_by)) = LOWER(TRIM(?))${ymClause}${modeClause}
       AND TRIM(COALESCE(designation, '')) != '' ORDER BY d`;
     const distParams = [payload.username, ...ymParams];
     if (modeFilter) distParams.push(modeFilter);
     const [distRows] = await conn.execute(distSql, distParams);
     const designations = distRows.map((r) => r.d).filter((x) => x != null && String(x).trim() !== "");
 
-    let sql = `SELECT id, created_by_username, candidate_name, emp_contact, designation, marital_status,
-         experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\` AS package,
-         probation_months, note, created_at
-         FROM hr_hiring_entries WHERE LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))`;
+    let sql = `SELECT h.id, h.created_by,
+         COALESCE(ep.full_name, h.created_by) AS creator_name,
+         ep.designation AS creator_role,
+         h.candidate_name, h.emp_contact, h.designation, h.marital_status,
+         h.experience_type, h.interview_at, h.rescheduled_at, h.next_followup_at, h.interview_mode, h.status, h.tag, h.hire_date, h.\`package\` AS package,
+         h.probation_months, h.selected_resume, h.mgmt_interview_score, h.hr_interview_score, h.current_salary, h.note, h.created_at
+         FROM candidates h
+         LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
+         WHERE LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))`;
     const params = [payload.username];
     if (year != null && year !== "") {
-      sql += ` AND YEAR(COALESCE(hire_date, DATE(interview_at), DATE(created_at))) = ?`;
+      sql += ` AND YEAR(COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at))) = ?`;
       params.push(parseInt(year, 10));
     }
     if (month != null && month !== "") {
-      sql += ` AND MONTH(COALESCE(hire_date, DATE(interview_at), DATE(created_at))) = ?`;
+      sql += ` AND MONTH(COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at))) = ?`;
       params.push(parseInt(month, 10));
     }
     if (modeFilter != null) {
-      sql += ` AND interview_mode = ?`;
+      sql += ` AND h.interview_mode = ?`;
       params.push(modeFilter);
     }
     if (designationTrimmed != null) {
-      sql += ` AND TRIM(designation) = ?`;
+      sql += ` AND TRIM(h.designation) = ?`;
       params.push(designationTrimmed);
     }
-    sql += ` ORDER BY COALESCE(hire_date, DATE(interview_at), DATE(created_at)) DESC, id DESC`;
+    sql += ` ORDER BY COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at)) DESC, h.id DESC`;
 
     const [rows] = await conn.execute(sql, params);
     let next_id = 1;
     try {
       const [[row]] = await conn.execute(
-        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM hr_hiring_entries`
+        `SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM candidates`
       );
       if (row && Number.isFinite(Number(row.next_id))) next_id = Number(row.next_id);
     } catch {
@@ -95,12 +100,12 @@ export async function GET(req) {
   } catch (error) {
     console.error("[empcrm/hiring GET]", error);
     const msg = error?.message || "";
-    if (msg.includes("hr_hiring_entries") && msg.includes("doesn't exist")) {
+    if (msg.includes("candidates") && msg.includes("doesn't exist")) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Table missing. Run migration: empcrm/admin-dashboard/hiring/migration_hr_hiring_entries.sql",
+            "Table missing. Run migration: empcrm/admin-dashboard/hiring/migration_candidates.sql",
         },
         { status: 503 }
       );
@@ -137,10 +142,11 @@ export async function POST(request) {
     try {
       await conn.beginTransaction();
       const [result] = await conn.execute(
-        `INSERT INTO hr_hiring_entries (
-        created_by_username, candidate_name, emp_contact, designation, marital_status,
-        experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\`, probation_months, note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO candidates (
+        created_by, candidate_name, emp_contact, designation, marital_status,
+        experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\`, probation_months,
+        selected_resume, mgmt_interview_score, hr_interview_score, current_salary, note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           payload.username,
           d.candidate_name,
@@ -157,6 +163,10 @@ export async function POST(request) {
           d.hire_date,
           d.packageStr,
           d.probation_months,
+          d.selected_resume,
+          d.mgmt_interview_score,
+          d.hr_interview_score,
+          d.current_salary,
           d.note,
         ]
       );
@@ -176,18 +186,18 @@ export async function POST(request) {
   } catch (error) {
     console.error("[empcrm/hiring POST]", error);
     const msg = error?.message || "";
-    if (msg.includes("hr_hiring_entries") && msg.includes("doesn't exist")) {
+    if (msg.includes("candidates") && msg.includes("doesn't exist")) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "Table missing. Run migration: empcrm/admin-dashboard/hiring/migration_hr_hiring_entries.sql",
+            "Table missing. Run migration: empcrm/admin-dashboard/hiring/migration_candidates.sql",
         },
         { status: 503 }
       );
     }
     if (msg.includes("Unknown column")) {
-      if (msg.includes("note") && msg.includes("hr_hiring_entry_status_history")) {
+      if (msg.includes("note") && msg.includes("candidates_followups")) {
         return NextResponse.json(
           {
             success: false,
@@ -206,7 +216,7 @@ export async function POST(request) {
         { status: 503 }
       );
     }
-    if (msg.includes("hr_hiring_entry_status_history") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
+    if (msg.includes("candidates_followups") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
       return NextResponse.json(
         {
           success: false,
@@ -245,7 +255,7 @@ export async function PATCH(request) {
     try {
       await conn.beginTransaction();
       const [rows] = await conn.execute(
-        `SELECT status, note FROM hr_hiring_entries WHERE id = ? AND LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))`,
+        `SELECT status, note FROM candidates WHERE id = ? AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))`,
         [id, payload.username]
       );
       if (!rows.length) {
@@ -256,11 +266,12 @@ export async function PATCH(request) {
       const prevNote = rows[0].note != null ? String(rows[0].note) : "";
 
       const [upd] = await conn.execute(
-        `UPDATE hr_hiring_entries SET
+        `UPDATE candidates SET
         candidate_name = ?, emp_contact = ?, designation = ?, marital_status = ?,
         experience_type = ?, interview_at = ?, rescheduled_at = ?, next_followup_at = ?, interview_mode = ?, status = ?, tag = ?,
-        hire_date = ?, \`package\` = ?, probation_months = ?, note = ?
-      WHERE id = ? AND LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))`,
+        hire_date = ?, \`package\` = ?, probation_months = ?,
+        selected_resume = ?, mgmt_interview_score = ?, hr_interview_score = ?, current_salary = ?, note = ?
+      WHERE id = ? AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))`,
         [
           d.candidate_name,
           d.emp_contact,
@@ -276,6 +287,10 @@ export async function PATCH(request) {
           d.hire_date,
           d.packageStr,
           d.probation_months,
+          d.selected_resume,
+          d.mgmt_interview_score,
+          d.hr_interview_score,
+          d.current_salary,
           d.note,
           id,
           payload.username,
@@ -307,7 +322,7 @@ export async function PATCH(request) {
     console.error("[empcrm/hiring PATCH]", error);
     const msg = error?.message || "";
     if (msg.includes("Unknown column")) {
-      if (msg.includes("note") && msg.includes("hr_hiring_entry_status_history")) {
+      if (msg.includes("note") && msg.includes("candidates_followups")) {
         return NextResponse.json(
           {
             success: false,
@@ -326,7 +341,7 @@ export async function PATCH(request) {
         { status: 503 }
       );
     }
-    if (msg.includes("hr_hiring_entry_status_history") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
+    if (msg.includes("candidates_followups") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
       return NextResponse.json(
         {
           success: false,

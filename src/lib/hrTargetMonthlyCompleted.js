@@ -35,15 +35,15 @@ export async function computeCompletedForDesignation(conn, username, year, month
   let hireCompleted = 0;
   try {
     const [hireRows] = await conn.execute(
-      `SELECT COUNT(*) AS c FROM hr_hiring_entries
-       WHERE LOWER(TRIM(created_by_username)) = LOWER(TRIM(?))
+      `SELECT COUNT(*) AS c FROM candidates
+       WHERE LOWER(TRIM(created_by)) = LOWER(TRIM(?))
          AND YEAR(hire_date) = ? AND MONTH(hire_date) = ?
          AND LOWER(TRIM(designation)) = LOWER(TRIM(?))`,
       [username, year, month, d]
     );
     hireCompleted = Number(hireRows[0]?.c ?? 0) || 0;
   } catch (hireErr) {
-    if (!String(hireErr?.message || "").includes("hr_hiring_entries")) {
+    if (!String(hireErr?.message || "").includes("candidates")) {
       console.error("[hrTargetMonthlyCompleted] hire count skipped:", hireErr?.message || hireErr);
     }
     hireCompleted = 0;
