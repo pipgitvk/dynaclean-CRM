@@ -27,8 +27,13 @@ export async function GET(req) {
 
     const conn = await getDbConnection();
     const [entryRows] = await conn.execute(
-      `SELECT id, created_by_username, candidate_name, designation, status, note, created_at
-       FROM hr_hiring_entries WHERE id = ?`,
+      `SELECT c.id, c.created_by,
+       COALESCE(ep.full_name, c.created_by) AS creator_name,
+       ep.designation AS creator_role,
+       c.candidate_name, c.designation, c.status, c.hr_interview_score, c.current_salary, c.note, c.created_at
+       FROM candidates c
+       LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(c.created_by))
+       WHERE c.id = ?`,
       [entryId]
     );
     if (!entryRows.length) {
@@ -36,8 +41,8 @@ export async function GET(req) {
     }
 
     const [history] = await conn.execute(
-      `SELECT id, status_before, status_after, actor_username, note, logged_at
-       FROM hr_hiring_entry_status_history
+      `SELECT id, \`status\`, updated_by, note, logged_at
+       FROM candidates_followups
        WHERE entry_id = ?
        ORDER BY logged_at ASC, id ASC`,
       [entryId]
@@ -51,12 +56,32 @@ export async function GET(req) {
   } catch (error) {
     console.error("[admin/hiring-process/history GET]", error);
     const msg = error?.message || "";
-    if (msg.includes("hr_hiring_entry_status_history") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
+    if (msg.includes("candidates_followups") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
       return NextResponse.json(
         {
           success: false,
           error:
             "History table missing. Run admin-dashboard/hiring-process/migration_hr_hiring_status_history.sql",
+        },
+        { status: 503 }
+      );
+    }
+    if (msg.includes("Unknown column") && (msg.includes("'status'") || msg.includes("`status`"))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Run migration: empcrm/admin-dashboard/hiring/migration_candidates_followups_status_only.sql",
+        },
+        { status: 503 }
+      );
+    }
+    if (msg.includes("Unknown column") && (msg.includes("'updated_by'") || msg.includes("`updated_by`"))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Run migration: empcrm/admin-dashboard/hiring/migration_candidates_followups_actor_to_updated_by.sql",
         },
         { status: 503 }
       );

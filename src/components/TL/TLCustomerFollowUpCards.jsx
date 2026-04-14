@@ -117,7 +117,7 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref }) {
         <div className="mt-4 flex gap-2">
           <Link
             href={detailHref}
-            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-white/25 bg-white/15 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/25"
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-blue-200 bg-white/90 px-2 py-1.5 text-[11px] font-semibold text-blue-600 transition hover:bg-white"
             title="View Details"
           >
             <Eye className="h-3 w-3" />
@@ -125,7 +125,7 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref }) {
           </Link>
           <Link
             href={followupHref}
-            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-white/25 bg-white/15 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/25"
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-cyan-200 bg-white/90 px-2 py-1.5 text-[11px] font-semibold text-cyan-800 transition hover:bg-white"
             title="Add TL Follow-up"
           >
             <Edit className="h-3 w-3" />

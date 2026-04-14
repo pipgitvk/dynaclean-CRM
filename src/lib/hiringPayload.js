@@ -1,10 +1,19 @@
 const HIRING_STATUS_OPTIONS = [
+  // Current statuses
+  "Follow-up",
+  "Shortlisted",
+  "Selected",
+  "Negotiation",
+  "Hold",
+  "Backup",
+  "Hired",
+  "Rejected",
+  // Legacy — kept so old DB rows can still be saved without being reset
   "Shortlisted for interview",
   "Rescheduled",
   "next-follow-up",
   "follow-up",
   "Waiting List",
-  "Hired",
   "Reject",
 ];
 
@@ -16,9 +25,9 @@ const HIRING_INTERVIEW_MODES = ["Virtual", "Walk-in"];
 
 function normalizeStatus(v) {
   const s = String(v ?? "").trim();
-  if (!s) return "Shortlisted for interview";
+  if (!s) return "Shortlisted";
   if (HIRING_STATUS_OPTIONS.includes(s)) return s;
-  return "Shortlisted for interview";
+  return "Shortlisted";
 }
 
 function normalizeTag(v) {
@@ -50,6 +59,7 @@ export function parseHiringPayload(body) {
   const note = String(body.note ?? "").trim();
   const status = normalizeStatus(body.status);
   const isHired = status === "Hired";
+  const isSelected = status === "Selected";
   const isRescheduled = status === "Rescheduled";
   const isNextFollowUp = status === "next-follow-up";
   const rescheduled_at_raw = String(body.rescheduled_at ?? "").trim();
@@ -67,6 +77,34 @@ export function parseHiringPayload(body) {
       return { error: "When tag is Probation, enter probation duration (1–120 months)." };
     }
     probation_months = pm;
+  }
+
+  const selected_resume = isSelected ? String(body.selected_resume ?? "").trim() || null : null;
+
+  let mgmt_interview_score = null;
+  if (isSelected) {
+    const mgmtRaw = String(body.mgmt_interview_score ?? "").trim();
+    if (mgmtRaw !== "") {
+      const n = parseInt(mgmtRaw, 10);
+      if (Number.isFinite(n) && n >= 1 && n <= 10) mgmt_interview_score = n;
+    }
+  }
+
+  // Always parsed — field is always visible (not Selected-only)
+  let hr_interview_score = null;
+  const hrRaw = String(body.hr_interview_score ?? "").trim();
+  if (hrRaw !== "") {
+    const n = parseInt(hrRaw, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= 10) hr_interview_score = n;
+  }
+
+  const current_salary = String(body.current_salary ?? "").trim() || null;
+
+  if (!hr_interview_score) {
+    return { error: "HR interview score (1–10) is required." };
+  }
+  if (!current_salary) {
+    return { error: "Current salary is required." };
   }
 
   if (!candidate_name || !designation || !emp_contact) {
@@ -103,6 +141,12 @@ export function parseHiringPayload(body) {
   if (isNextFollowUp && !next_followup_at_raw) {
     return { error: "Next follow-up date and time is required when status is next-follow-up." };
   }
+  if (isSelected && !selected_resume) {
+    return { error: "Resume is required when status is Selected." };
+  }
+  if (isSelected && mgmt_interview_score === null) {
+    return { error: "Management interview score (1–10) is required when status is Selected." };
+  }
 
   let resolved_next_followup_at = null;
   if (isNextFollowUp) {
@@ -127,7 +171,12 @@ export function parseHiringPayload(body) {
       hire_date,
       packageStr,
       probation_months,
+      selected_resume,
+      mgmt_interview_score,
+      hr_interview_score,
+      current_salary,
       note,
     },
   };
 }
+

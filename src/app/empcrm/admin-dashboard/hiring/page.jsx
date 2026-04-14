@@ -10,29 +10,33 @@ const filterSelectClass = `w-full ${fieldClass} min-h-[44px]`;
 const formFieldClass = `w-full ${fieldClass}`;
 const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900`;
 
-/** Status dropdown: no standalone "follow-up" — use Hired → tag Follow-Up. Legacy rows may still be "follow-up". */
 const STATUS_OPTIONS = [
-  "Shortlisted for interview",
-  "Rescheduled",
-  "next-follow-up",
-  "Waiting List",
+  "Follow-up",
+  "Shortlisted",
+  "Selected",
+  "Negotiation",
+  "Hold",
+  "Backup",
   "Hired",
-  "Reject",
+  "Rejected",
 ];
-const STATUS_OPTIONS_WITH_LEGACY_STATUS_FOLLOWUP = [
+
+/** Legacy statuses that may exist in DB — shown in dropdown only when the row already has one. */
+const LEGACY_STATUSES = [
   "Shortlisted for interview",
   "Rescheduled",
   "next-follow-up",
   "follow-up",
   "Waiting List",
-  "Hired",
   "Reject",
 ];
 
 function hiringStatusSelectOptions(rowStatus) {
-  return String(rowStatus || "").trim() === "follow-up"
-    ? STATUS_OPTIONS_WITH_LEGACY_STATUS_FOLLOWUP
-    : STATUS_OPTIONS;
+  const s = String(rowStatus || "").trim();
+  if (s && !STATUS_OPTIONS.includes(s) && LEGACY_STATUSES.includes(s)) {
+    return [...STATUS_OPTIONS, s];
+  }
+  return STATUS_OPTIONS;
 }
 
 const TAG_OPTIONS = ["Probation", "Permanent", "Terminate", "Follow-Up"];
@@ -94,13 +98,21 @@ function formatDt(v) {
 }
 
 const STATUS_CHIP_STYLES = {
+  "Follow-up":   "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
+  Shortlisted:   "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
+  Selected:      "bg-indigo-50 text-indigo-900 border-indigo-200 ring-1 ring-indigo-500/15",
+  Negotiation:   "bg-orange-50 text-orange-900 border-orange-200 ring-1 ring-orange-500/15",
+  Hold:          "bg-yellow-50 text-yellow-900 border-yellow-200 ring-1 ring-yellow-500/15",
+  Backup:        "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20",
+  Hired:         "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
+  Rejected:      "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
+  // Legacy — old rows still render with correct colours
   "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
-  Rescheduled: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
+  Rescheduled:   "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "next-follow-up": "bg-cyan-50 text-cyan-900 border-cyan-200 ring-1 ring-cyan-500/15",
-  "follow-up": "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/15",
-  "Waiting List": "bg-violet-50 text-violet-900 border-violet-200 ring-1 ring-violet-500/15",
-  Hired: "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
-  Reject: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
+  "follow-up":   "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/15",
+  "Waiting List":"bg-violet-50 text-violet-900 border-violet-200 ring-1 ring-violet-500/15",
+  Reject:        "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
 };
 
 /** MySQL / ISO datetime → datetime-local input value */
@@ -143,11 +155,15 @@ export default function HiringPage() {
   const [rescheduled_at, setRescheduledAt] = useState("");
   const [next_followup_at, setNextFollowupAt] = useState("");
   const [interview_mode, setInterviewMode] = useState("");
-  const [status, setStatus] = useState("Shortlisted for interview");
+  const [status, setStatus] = useState("Shortlisted");
   const [tag, setTag] = useState("");
   const [hire_date, setHireDate] = useState("");
   const [offerPackage, setOfferPackage] = useState("");
   const [probationMonths, setProbationMonths] = useState("");
+  const [selectedResume, setSelectedResume] = useState("");
+  const [mgmtInterviewScore, setMgmtInterviewScore] = useState("");
+  const [hrInterviewScore, setHrInterviewScore] = useState("");
+  const [currentSalary, setCurrentSalary] = useState("");
   const [note, setNote] = useState("");
 
   const [filterYear, setFilterYear] = useState(now.getFullYear());
@@ -219,11 +235,15 @@ export default function HiringPage() {
     setRescheduledAt("");
     setNextFollowupAt("");
     setInterviewMode("");
-    setStatus("Shortlisted for interview");
+    setStatus("Shortlisted");
     setTag("");
     setHireDate("");
     setOfferPackage("");
     setProbationMonths("");
+    setSelectedResume("");
+    setMgmtInterviewScore("");
+    setHrInterviewScore("");
+    setCurrentSalary("");
     setNote("");
   };
 
@@ -261,6 +281,10 @@ export default function HiringPage() {
             hired && tag === "Probation" && probationMonths !== ""
               ? Number(probationMonths)
               : null,
+          selected_resume: selectedResume.trim() || null,
+          mgmt_interview_score: mgmtInterviewScore !== "" ? Number(mgmtInterviewScore) : null,
+          hr_interview_score: hrInterviewScore !== "" ? Number(hrInterviewScore) : null,
+          current_salary: currentSalary.trim() || null,
           note,
         }),
       });
@@ -301,7 +325,7 @@ export default function HiringPage() {
       rescheduled_at: toDatetimeLocalValue(row.rescheduled_at),
       next_followup_at: toDatetimeLocalValue(row.next_followup_at),
       interview_mode: row.interview_mode ?? "",
-      status: row.status || "Shortlisted for interview",
+      status: row.status || "Shortlisted",
       tag: row.tag ?? "",
       hire_date: row.hire_date ? String(row.hire_date).slice(0, 10) : "",
       offerPackage: row.package ?? "",
@@ -309,6 +333,16 @@ export default function HiringPage() {
         row.probation_months != null && row.probation_months !== ""
           ? String(row.probation_months)
           : "",
+      selectedResume: row.selected_resume ?? "",
+      mgmtInterviewScore:
+        row.mgmt_interview_score != null && row.mgmt_interview_score !== ""
+          ? String(row.mgmt_interview_score)
+          : "",
+      hrInterviewScore:
+        row.hr_interview_score != null && row.hr_interview_score !== ""
+          ? String(row.hr_interview_score)
+          : "",
+      currentSalary: row.current_salary ?? "",
       note: row.note ?? "",
     });
   };
@@ -353,6 +387,12 @@ export default function HiringPage() {
             hired && followUp.tag === "Probation" && followUp.probationMonths !== ""
               ? Number(followUp.probationMonths)
               : null,
+          selected_resume: followUp.selectedResume?.trim() || null,
+          mgmt_interview_score:
+            followUp.mgmtInterviewScore !== "" ? Number(followUp.mgmtInterviewScore) : null,
+          hr_interview_score:
+            followUp.hrInterviewScore !== "" ? Number(followUp.hrInterviewScore) : null,
+          current_salary: followUp.currentSalary?.trim() || null,
           note: followUp.note,
         }),
       });
@@ -390,7 +430,7 @@ export default function HiringPage() {
       rescheduled_at: toDatetimeLocalValue(row.rescheduled_at),
       next_followup_at: toDatetimeLocalValue(row.next_followup_at),
       interview_mode: row.interview_mode ?? "",
-      status: row.status || "Shortlisted for interview",
+      status: row.status || "Shortlisted",
       tag: row.tag ?? "",
       hire_date: row.hire_date ? String(row.hire_date).slice(0, 10) : "",
       offerPackage: row.package ?? "",
@@ -398,6 +438,16 @@ export default function HiringPage() {
         row.probation_months != null && row.probation_months !== ""
           ? String(row.probation_months)
           : "",
+      selectedResume: row.selected_resume ?? "",
+      mgmtInterviewScore:
+        row.mgmt_interview_score != null && row.mgmt_interview_score !== ""
+          ? String(row.mgmt_interview_score)
+          : "",
+      hrInterviewScore:
+        row.hr_interview_score != null && row.hr_interview_score !== ""
+          ? String(row.hr_interview_score)
+          : "",
+      currentSalary: row.current_salary ?? "",
       note: row.note ?? "",
     });
   };
@@ -444,6 +494,12 @@ export default function HiringPage() {
             hired && editing.tag === "Probation" && editing.probationMonths !== ""
               ? Number(editing.probationMonths)
               : null,
+          selected_resume: editing.selectedResume?.trim() || null,
+          mgmt_interview_score:
+            editing.mgmtInterviewScore !== "" ? Number(editing.mgmtInterviewScore) : null,
+          hr_interview_score:
+            editing.hrInterviewScore !== "" ? Number(editing.hrInterviewScore) : null,
+          current_salary: editing.currentSalary?.trim() || null,
           note: editing.note,
         }),
       });
@@ -647,6 +703,9 @@ export default function HiringPage() {
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
                     Package
                   </th>
+                  <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
+                    Score
+                  </th>
                   <th className="whitespace-nowrap px-3 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
                     Actions
                   </th>
@@ -655,7 +714,7 @@ export default function HiringPage() {
               <tbody>
                 {entries.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-14 text-center">
+                    <td colSpan={12} className="px-4 py-14 text-center">
                       <p className="text-sm font-medium text-slate-600">No records for this filter.</p>
                       <p className="mt-1 text-xs text-slate-400">Try another year, month, or designation.</p>
                     </td>
@@ -698,6 +757,9 @@ export default function HiringPage() {
                       </td>
                       <td className="max-w-[120px] truncate px-3 py-2.5 text-slate-600 sm:px-4" title={row.package || ""}>
                         {row.package || "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
+                        {row.mgmt_interview_score != null ? `${row.mgmt_interview_score}/10` : "—"}
                       </td>
                       <td className="px-3 py-2.5 text-right sm:px-4">
                         <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
@@ -742,7 +804,7 @@ export default function HiringPage() {
           <div className="relative z-10 flex max-h-[min(90dvh,100%)] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-slate-200 bg-white shadow-2xl sm:max-h-[85vh] sm:rounded-2xl">
             <div className="flex items-start justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40 px-4 py-4">
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-slate-900">Status &amp; notes history</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Status history</h2>
                 {historyEntry && (
                   <p className="mt-1 text-sm text-slate-600">
                     <span className="font-medium text-slate-800">{historyEntry.candidate_name}</span>
@@ -755,20 +817,6 @@ export default function HiringPage() {
                       </>
                     ) : null}
                   </p>
-                )}
-                {historyEntry && (
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-                    <span>
-                      Record created {formatDt(historyEntry.created_at)}
-                    </span>
-                    <span className="text-slate-300" aria-hidden>
-                      ·
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="font-medium text-slate-600">Current status:</span>
-                      <StatusChip status={historyEntry.status} />
-                    </span>
-                  </div>
                 )}
               </div>
               <button
@@ -789,72 +837,50 @@ export default function HiringPage() {
               ) : historyError ? (
                 <p className="py-6 text-center text-sm text-red-700">{historyError}</p>
               ) : (
-                <>
-                  {historyEntry ? (
-                    <div className="mb-5 rounded-xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/90 to-white px-3.5 py-3 shadow-sm">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/90">Note * (latest saved)</p>
-                      <p className="mt-2 text-sm leading-relaxed text-slate-800 whitespace-pre-wrap break-words">
-                        {historyEntry.note != null && String(historyEntry.note).trim() !== ""
-                          ? String(historyEntry.note)
-                          : "—"}
-                      </p>
-                    </div>
-                  ) : null}
-                  {historyRows.length === 0 ? (
+                (() => {
+                  const statusRows = historyRows.filter((h) => {
+                    const s = h.status != null ? String(h.status).trim() : "";
+                    return !!s;
+                  });
+                  return statusRows.length === 0 ? (
                     <p className="py-4 text-center text-sm text-slate-500">
-                      No history yet. Save status changes or notes to build a timeline.
+                      No status changes yet. Each update appears as a new row below.
                     </p>
                   ) : (
-                <ol className="relative space-y-0 border-l-[3px] border-indigo-200 pl-4">
-                  {historyRows.map((h) => {
-                    const sb = h.status_before != null ? String(h.status_before) : "";
-                    const sa = h.status_after != null ? String(h.status_after) : "";
-                    const noteOnly = sb !== "" && sa !== "" && sb === sa;
-                    const noteText =
-                      h.note != null && String(h.note).trim() !== "" ? String(h.note).trim() : null;
-                    return (
-                      <li key={h.id} className="relative pb-7 last:pb-0">
-                        <span className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-indigo-600 shadow-sm ring-2 ring-indigo-200/60" />
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                          {formatDt(h.logged_at)}
-                        </p>
-                        <p className="mt-1.5 text-sm leading-snug text-slate-800">
-                          {sb === "" ? (
-                            <>
-                              <span className="font-semibold text-emerald-800">Created</span>
-                              <span className="text-slate-600"> – Status: </span>
-                              <span className="font-medium text-slate-900">{sa}</span>
-                            </>
-                          ) : noteOnly ? (
-                            <>
-                              <span className="font-semibold text-slate-800">Note updated</span>
-                              <span className="text-slate-600"> – Status: </span>
-                              <span className="font-medium text-slate-900">{sa}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-slate-700">Status: </span>
-                              <span className="text-slate-400 line-through decoration-slate-400">{sb}</span>
-                              <span className="text-slate-600"> → </span>
-                              <span className="font-semibold text-indigo-900">{sa}</span>
-                            </>
-                          )}
-                        </p>
-                        <div className="mt-2 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-2">
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Note *</p>
-                          <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap break-words">
-                            {noteText ?? "—"}
-                          </p>
-                        </div>
-                        <p className="mt-2 text-xs text-slate-500">
-                          By <span className="font-medium text-slate-600">{h.actor_username}</span>
-                        </p>
-                      </li>
-                    );
-                  })}
-                </ol>
-                  )}
-                </>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200/90">
+                      <table className="w-full min-w-[240px] border-collapse text-left text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100/90">
+                            <th className="whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
+                              When
+                            </th>
+                            <th className="whitespace-nowrap px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4">
+                              status
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {statusRows.map((h) => {
+                            const sa = h.status != null ? String(h.status).trim() : "";
+                            return (
+                              <tr
+                                key={h.id}
+                                className="border-b border-slate-100 transition-colors even:bg-slate-50/50 last:border-b-0"
+                              >
+                                <td className="whitespace-nowrap px-3 py-2.5 align-top text-xs text-slate-600 sm:px-4">
+                                  {formatDt(h.logged_at)}
+                                </td>
+                                <td className="px-3 py-2.5 align-top sm:px-4">
+                                  <StatusChip status={sa} />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()
               )}
             </div>
           </div>
@@ -913,6 +939,11 @@ export default function HiringPage() {
                       }
                       if (v !== "Rescheduled") next.rescheduled_at = "";
                       if (v !== "next-follow-up" && v !== "Hired") next.next_followup_at = "";
+                      if (v !== "Selected") {
+                        next.selectedResume = "";
+                        next.mgmtInterviewScore = "";
+                        next.hrInterviewScore = "";
+                      }
                       return next;
                     });
                   }}
@@ -1038,6 +1069,65 @@ export default function HiringPage() {
                 </div>
               )}
 
+              {followUp.status === "Selected" && (
+                <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+                  <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-slate-700">Resume *</label>
+                      <input
+                        required={followUp.status === "Selected"}
+                        type="text"
+                        value={followUp.selectedResume ?? ""}
+                        onChange={(e) => updateFollowUp("selectedResume", e.target.value)}
+                        className={formFieldClass}
+                        placeholder="Resume link or description"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">Management Interview Score (1–10) *</label>
+                      <input
+                        required={followUp.status === "Selected"}
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={followUp.mgmtInterviewScore ?? ""}
+                        onChange={(e) => updateFollowUp("mgmtInterviewScore", e.target.value)}
+                        className={`max-w-[160px] ${formFieldClass}`}
+                        placeholder="1 – 10"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10) *</label>
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={followUp.hrInterviewScore ?? ""}
+                    onChange={(e) => updateFollowUp("hrInterviewScore", e.target.value)}
+                    className={`max-w-[160px] ${formFieldClass}`}
+                    placeholder="1 – 10"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary *</label>
+                  <input
+                    required
+                    type="text"
+                    value={followUp.currentSalary ?? ""}
+                    onChange={(e) => updateFollowUp("currentSalary", e.target.value)}
+                    className={formFieldClass}
+                    placeholder="e.g. 25000"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Note *</label>
                 <input
@@ -1141,6 +1231,32 @@ export default function HiringPage() {
                   </div>
 
                   <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10) *</label>
+                    <input
+                      required
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={hrInterviewScore}
+                      onChange={(e) => setHrInterviewScore(e.target.value)}
+                      className={`max-w-[160px] ${formFieldClass}`}
+                      placeholder="1 – 10"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary *</label>
+                    <input
+                      required
+                      type="text"
+                      value={currentSalary}
+                      onChange={(e) => setCurrentSalary(e.target.value)}
+                      className={formFieldClass}
+                      placeholder="e.g. 25000"
+                    />
+                  </div>
+
+                  <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">Marital status *</label>
                     <select
                       required
@@ -1218,6 +1334,11 @@ export default function HiringPage() {
                         }
                         if (v !== "Rescheduled") setRescheduledAt("");
                         if (v !== "next-follow-up" && v !== "Hired") setNextFollowupAt("");
+                        if (v !== "Selected") {
+                          setSelectedResume("");
+                          setMgmtInterviewScore("");
+                          setHrInterviewScore("");
+                        }
                       }}
                       className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                     >
@@ -1338,6 +1459,38 @@ export default function HiringPage() {
                     </div>
                   )}
 
+                  {status === "Selected" && (
+                    <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
+                      <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <label className="mb-1 block text-sm font-medium text-slate-700">Resume *</label>
+                          <input
+                            required={status === "Selected"}
+                            type="text"
+                            value={selectedResume}
+                            onChange={(e) => setSelectedResume(e.target.value)}
+                            className={formFieldClass}
+                            placeholder="Resume link or description"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-medium text-slate-700">Management Interview Score (1–10) *</label>
+                          <input
+                            required={status === "Selected"}
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={mgmtInterviewScore}
+                            onChange={(e) => setMgmtInterviewScore(e.target.value)}
+                            className={`max-w-[160px] ${formFieldClass}`}
+                            placeholder="1 – 10"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="sm:col-span-2">
                     <label className="mb-1 block text-sm font-medium text-slate-700">Note *</label>
                     <input
@@ -1422,6 +1575,30 @@ export default function HiringPage() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">HR Interview Score (1–10) *</label>
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={editing.hrInterviewScore ?? ""}
+                    onChange={(e) => updateEdit("hrInterviewScore", e.target.value)}
+                    className={`max-w-[160px] ${formFieldClass}`}
+                    placeholder="1 – 10"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Current Salary *</label>
+                  <input
+                    required
+                    type="text"
+                    value={editing.currentSalary ?? ""}
+                    onChange={(e) => updateEdit("currentSalary", e.target.value)}
+                    className={formFieldClass}
+                    placeholder="e.g. 25000"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Marital status *</label>
                   <select
                     required
@@ -1479,6 +1656,38 @@ export default function HiringPage() {
                     ))}
                   </select>
                 </div>
+                {editing.status === "Selected" && (
+                  <div className="sm:col-span-2 space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+                    <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Resume *</label>
+                        <input
+                          required
+                          type="text"
+                          value={editing.selectedResume ?? ""}
+                          onChange={(e) => updateEdit("selectedResume", e.target.value)}
+                          className={formFieldClass}
+                          placeholder="Resume link or description"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Management Interview Score (1–10) *</label>
+                        <input
+                          required
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={editing.mgmtInterviewScore ?? ""}
+                          onChange={(e) => updateEdit("mgmtInterviewScore", e.target.value)}
+                          className={`max-w-[160px] ${formFieldClass}`}
+                          placeholder="1 – 10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="sm:col-span-2 rounded-xl border border-slate-200/90 bg-slate-50/90 px-3 py-3">
                   <p className="text-xs font-medium text-slate-600">Current status &amp; note</p>
                   <p className="mt-1 text-xs text-slate-500">

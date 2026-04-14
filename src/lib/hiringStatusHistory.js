@@ -5,13 +5,13 @@ function normNote(n) {
 }
 
 /**
- * Append rows to hr_hiring_entry_status_history (must exist — run migration).
+ * Append rows to candidates_followups (must exist — run migration).
  * @param {import('mysql2/promise').PoolConnection} conn
  */
 export async function logHiringCreated(conn, entryId, statusAfter, actorUsername, note = null) {
   await conn.execute(
-    `INSERT INTO hr_hiring_entry_status_history (entry_id, status_before, status_after, actor_username, note)
-     VALUES (?, NULL, ?, ?, ?)`,
+    `INSERT INTO candidates_followups (entry_id, \`status\`, updated_by, note)
+     VALUES (?, ?, ?, ?)`,
     [entryId, statusAfter, actorUsername, normNote(note)]
   );
 }
@@ -24,22 +24,16 @@ export async function logHiringStatusChange(conn, entryId, statusBefore, statusA
   const b = String(statusAfter ?? "").trim();
   if (a === b) return;
   await conn.execute(
-    `INSERT INTO hr_hiring_entry_status_history (entry_id, status_before, status_after, actor_username, note)
-     VALUES (?, ?, ?, ?, ?)`,
-    [entryId, a || null, b, actorUsername, normNote(note)]
+    `INSERT INTO candidates_followups (entry_id, \`status\`, updated_by, note)
+     VALUES (?, ?, ?, ?)`,
+    [entryId, b, actorUsername, normNote(note)]
   );
 }
 
 /**
- * Log when the note field changes but status stays the same.
+ * Note-only edits: not stored in candidates_followups (table is status-only audit).
  * @param {import('mysql2/promise').PoolConnection} conn
  */
-export async function logHiringNoteUpdate(conn, entryId, status, actorUsername, note = null) {
-  const s = String(status ?? "").trim();
-  if (!s) return;
-  await conn.execute(
-    `INSERT INTO hr_hiring_entry_status_history (entry_id, status_before, status_after, actor_username, note)
-     VALUES (?, ?, ?, ?, ?)`,
-    [entryId, s, s, actorUsername, normNote(note)]
-  );
+export async function logHiringNoteUpdate(_conn, _entryId, _status, _actorUsername, _note = null) {
+  /* no-op: followups table stores status-only events */
 }
