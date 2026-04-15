@@ -14,7 +14,67 @@ import {
   TAMIL_META_ASSIGNEE_USERNAME,
 } from "@/lib/metaTamilLeadForm";
 
-export async function fetchTamilFormLeadsFromMeta({ since, until, token }) {
+async function resolveCampaignNameForAd(adId, token) {
+  const adRes = await fetch(
+    `https://graph.facebook.com/v18.0/${adId}?fields=campaign_id&access_token=${token}`,
+  );
+  const adJson = await adRes.json();
+  const campaign_id = adJson?.campaign_id;
+  if (!campaign_id) return "";
+  const campRes = await fetch(
+    `https://graph.facebook.com/v18.0/${campaign_id}?fields=name&access_token=${token}`,
+  );
+  const campJson = await campRes.json();
+  return campJson?.name || "";
+}
+
+/**
+ * Sets `lead.products_interest` on each lead (form product + optional Meta campaign name).
+ * @param {boolean} [options.skipCampaignResolve] — no ad/campaign Graph calls (cron fast path)
+ */
+export async function enrichTamilLeadsProducts(leadsInRange, token, options = {}) {
+  const { skipCampaignResolve = false } = options;
+  if (skipCampaignResolve) {
+    for (const lead of leadsInRange) {
+      const formProduct = extractProductFromMetaFieldData(lead.field_data || []);
+      lead.products_interest =
+        buildProductsInterestLabel({ formProduct, campaignName: "" }) || formProduct || "";
+    }
+    return;
+  }
+
+  const concRaw = Number(process.env.TAMIL_META_CAMPAIGN_FETCH_CONCURRENCY);
+  const concurrency = Math.max(
+    1,
+    Math.min(25, Number.isFinite(concRaw) && concRaw > 0 ? concRaw : 12),
+  );
+
+  async function enrichOne(lead) {
+    const formProduct = extractProductFromMetaFieldData(lead.field_data || []);
+    let campaignName = "";
+    if (lead.ad_id) {
+      try {
+        campaignName = await resolveCampaignNameForAd(lead.ad_id, token);
+      } catch (err) {
+        console.warn("Tamil form: campaign resolve failed", lead.ad_id, err);
+      }
+    }
+    lead.products_interest =
+      buildProductsInterestLabel({ formProduct, campaignName }) || formProduct || "";
+  }
+
+  for (let i = 0; i < leadsInRange.length; i += concurrency) {
+    const chunk = leadsInRange.slice(i, i + concurrency);
+    await Promise.all(chunk.map((lead) => enrichOne(lead)));
+  }
+}
+
+export async function fetchTamilFormLeadsFromMeta({
+  since,
+  until,
+  token,
+  skipCampaignResolve = false,
+}) {
   let url = new URL(`https://graph.facebook.com/v18.0/${TAMIL_META_FORM_ID}/leads`);
   url.searchParams.set("access_token", token);
   url.searchParams.set("limit", "100");
@@ -65,30 +125,7 @@ export async function fetchTamilFormLeadsFromMeta({ since, until, token }) {
     return created >= sinceDate && created <= untilDate;
   });
 
-  for (const lead of leadsInRange) {
-    const formProduct = extractProductFromMetaFieldData(lead.field_data || []);
-    let campaignName = "";
-    if (lead.ad_id) {
-      try {
-        const adRes = await fetch(
-          `https://graph.facebook.com/v18.0/${lead.ad_id}?fields=campaign_id&access_token=${token}`,
-        );
-        const adJson = await adRes.json();
-        const campaign_id = adJson?.campaign_id;
-        if (campaign_id) {
-          const campRes = await fetch(
-            `https://graph.facebook.com/v18.0/${campaign_id}?fields=name&access_token=${token}`,
-          );
-          const campJson = await campRes.json();
-          campaignName = campJson?.name || "";
-        }
-      } catch (err) {
-        console.warn("Tamil form: campaign resolve failed", lead.ad_id, err);
-      }
-    }
-    lead.products_interest =
-      buildProductsInterestLabel({ formProduct, campaignName }) || formProduct || "";
-  }
+  await enrichTamilLeadsProducts(leadsInRange, token, { skipCampaignResolve });
 
   return {
     error: null,
@@ -123,7 +160,7 @@ export async function getExistingNormalizedPhonesSet(leadsInRange) {
 }
 
 /** Import leads not yet in DB; all assigned to TAMIL_META_ASSIGNEE_USERNAME */
-export async function importNewTamilFormLeads({ since, until }) {
+export async function importNewTamilFormLeads({ since, until, skipCampaignResolve = false }) {
   const token = process.env.FB_PAGE_TOKEN;
   if (!token) {
     return { ok: false, error: "FB_PAGE_TOKEN not configured", status: 500 };
@@ -133,6 +170,7 @@ export async function importNewTamilFormLeads({ since, until }) {
     since,
     until,
     token,
+    skipCampaignResolve,
   });
 
   if (error) {

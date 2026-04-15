@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import TLCustomersTable from "./TLCustomersTable";
+import { SQL_EFFECTIVE_NEXT_FOLLOWUP } from "@/lib/tlEffectiveNextFollowupSql";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,6 @@ export default async function TLCustomersPage({ searchParams }) {
     status,
     stage,
     tag,
-    fromDate,
-    toDate,
     nextFromDate,
     nextToDate,
     lead_campaign,
@@ -128,40 +127,14 @@ export default async function TLCustomersPage({ searchParams }) {
     query += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
   }
 
-  // Filter by follow-up date range (when status/stage was set)
-  // Use TL followup date if tlOnly is true, otherwise use latest from either table
-  if (fromDate && toDate) {
-    if (showTLOnly) {
-      query += ` AND tlf.followed_date BETWEEN ? AND ?`;
-    } else {
-      query += ` AND COALESCE(tlf.followed_date, cf.followed_date) BETWEEN ? AND ?`;
-    }
-    params.push(`${fromDate} 00:00:00`, `${toDate} 23:59:59`);
-  } else if (fromDate) {
-    if (showTLOnly) {
-      query += ` AND tlf.followed_date >= ?`;
-    } else {
-      query += ` AND COALESCE(tlf.followed_date, cf.followed_date) >= ?`;
-    }
-    params.push(`${fromDate} 00:00:00`);
-  } else if (toDate) {
-    if (showTLOnly) {
-      query += ` AND tlf.followed_date <= ?`;
-    } else {
-      query += ` AND COALESCE(tlf.followed_date, cf.followed_date) <= ?`;
-    }
-    params.push(`${toDate} 23:59:59`);
-  }
-
-  // Filter by next follow-up range (TL next_followup if present else latest)
   if (nextFromDate && nextToDate) {
-    query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) BETWEEN ? AND ?`;
+    query += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} BETWEEN ? AND ?`;
     params.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
   } else if (nextFromDate) {
-    query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) >= ?`;
+    query += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} >= ?`;
     params.push(`${nextFromDate} 00:00:00`);
   } else if (nextToDate) {
-    query += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) <= ?`;
+    query += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} <= ?`;
     params.push(`${nextToDate} 23:59:59`);
   }
 
@@ -254,38 +227,14 @@ export default async function TLCustomersPage({ searchParams }) {
     kpiQuery += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
   }
 
-  // Filter by follow-up date range (same logic as main query)
-  if (fromDate && toDate) {
-    if (showTLOnly) {
-      kpiQuery += ` AND tlf.followed_date BETWEEN ? AND ?`;
-    } else {
-      kpiQuery += ` AND COALESCE(tlf.followed_date, cf.followed_date) BETWEEN ? AND ?`;
-    }
-    kpiParams.push(`${fromDate} 00:00:00`, `${toDate} 23:59:59`);
-  } else if (fromDate) {
-    if (showTLOnly) {
-      kpiQuery += ` AND tlf.followed_date >= ?`;
-    } else {
-      kpiQuery += ` AND COALESCE(tlf.followed_date, cf.followed_date) >= ?`;
-    }
-    kpiParams.push(`${fromDate} 00:00:00`);
-  } else if (toDate) {
-    if (showTLOnly) {
-      kpiQuery += ` AND tlf.followed_date <= ?`;
-    } else {
-      kpiQuery += ` AND COALESCE(tlf.followed_date, cf.followed_date) <= ?`;
-    }
-    kpiParams.push(`${toDate} 23:59:59`);
-  }
-
   if (nextFromDate && nextToDate) {
-    kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) BETWEEN ? AND ?`;
+    kpiQuery += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} BETWEEN ? AND ?`;
     kpiParams.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
   } else if (nextFromDate) {
-    kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) >= ?`;
+    kpiQuery += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} >= ?`;
     kpiParams.push(`${nextFromDate} 00:00:00`);
   } else if (nextToDate) {
-    kpiQuery += ` AND COALESCE(tlf.next_followup_date, cf.next_followup_date) <= ?`;
+    kpiQuery += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} <= ?`;
     kpiParams.push(`${nextToDate} 23:59:59`);
   }
 

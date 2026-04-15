@@ -22,6 +22,12 @@ export default function StatementTable({ rows }) {
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [skippedRows, setSkippedRows] = useState([]);
+  const [showSkippedModal, setShowSkippedModal] = useState(false);
+  const [selectedSkipped, setSelectedSkipped] = useState(new Set());
+  const [forceImporting, setForceImporting] = useState(false);
+  const [editData, setEditData] = useState({});   // idx → {trans_id,date,type,amount,description}
+  const [forceResult, setForceResult] = useState(null); // {inserted,updated,errors}
   /** When search is numeric expense id: expense.transaction_id for trans_id match (unsettled rows). */
   const [expenseTxnForIdSearch, setExpenseTxnForIdSearch] = useState(null);
   const [expenseIdResolved, setExpenseIdResolved] = useState(null);
@@ -88,11 +94,13 @@ export default function StatementTable({ rows }) {
           const desc = (row.description || "").toLowerCase();
           const cheqNo = (row.cheq_no || "").toLowerCase();
           const amount = String(row.amount || "");
+          const invoiceNo = (row.invoice_number || "").toLowerCase();
           if (
             !transId.includes(q) &&
             !desc.includes(q) &&
             !cheqNo.includes(q) &&
-            !amount.includes(q)
+            !amount.includes(q) &&
+            !invoiceNo.includes(q)
           ) {
             return false;
           }
@@ -122,6 +130,15 @@ export default function StatementTable({ rows }) {
     runningBalance += row.type === "Credit" ? amt : -amt;
     balanceMap[row.id] = runningBalance;
   }
+
+  /** Bank file balance when imported; else sum from 0 over filtered rows (misleading for partial data). */
+  const displayBalance = (row) => {
+    const cb = row.closing_balance;
+    if (cb != null && cb !== "" && !Number.isNaN(Number(cb))) {
+      return Number(cb);
+    }
+    return Math.abs(balanceMap[row.id] ?? 0);
+  };
 
   const handleSort = (key) => {
     setSortConfig((prev) =>
@@ -158,6 +175,8 @@ export default function StatementTable({ rows }) {
           return row.type === "Credit" ? Number(row.amount || 0) : 0;
         case "status":
           return (row.client_expense_id ? "settled" : "unsettled");
+        case "balance":
+          return displayBalance(row);
         default:
           return 0;
       }
@@ -196,7 +215,7 @@ export default function StatementTable({ rows }) {
       startY: 22,
       theme: "plain",
       head: [
-        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Debit", "Credit", "Status", "Balance"],
+        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Debit", "Credit", "Status", "Invoice No", "Balance"],
       ],
       body: sortedRows.map((row) => [
         String(row.id),
@@ -208,23 +227,25 @@ export default function StatementTable({ rows }) {
         (row.description || "-").toString().slice(0, 22),
         row.type === "Debit" ? formatPdfAmount(row.amount) : "-",
         row.type === "Credit" ? formatPdfAmount(row.amount) : "-",
-        row.client_expense_id ? "Settled" : "Unsettled",
-        formatPdfAmount(Math.abs(balanceMap[row.id] ?? 0)),
+        row.invoice_status || (row.client_expense_id ? "Settled" : "Unsettled"),
+        row.invoice_number || "-",
+        formatPdfAmount(displayBalance(row)),
       ]),
       styles: { fontSize: 7 },
       headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
       columnStyles: {
-        0: { cellWidth: 12 },
-        1: { cellWidth: 28 },
-        2: { cellWidth: 24 },
-        3: { cellWidth: 24 },
-        4: { cellWidth: 24 },
-        5: { cellWidth: 24 },
-        6: { cellWidth: 40 },
-        7: { cellWidth: 18 },
-        8: { cellWidth: 22 },
-        9: { cellWidth: 20 },
-        10: { cellWidth: 28 },
+        0: { cellWidth: 10 },
+        1: { cellWidth: 24 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 32 },
+        7: { cellWidth: 16 },
+        8: { cellWidth: 16 },
+        9: { cellWidth: 18 },
+        10: { cellWidth: 26 },
+        11: { cellWidth: 22 },
       },
       margin: { left: 14, right: 14 },
     });
@@ -246,7 +267,18 @@ export default function StatementTable({ rows }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import failed");
-      toast.success(`Imported: ${data.inserted} inserted, ${data.skipped} skipped`);
+
+      if (data.warning) {
+        toast(`⚠ ${data.warning}`, { icon: "⚠️", duration: 6000 });
+      }
+      if (data.skipped > 0 && data.skipped_rows?.length > 0) {
+        setSkippedRows(data.skipped_rows);
+        setSelectedSkipped(new Set(data.skipped_rows.map((_, i) => i).filter((i) => data.skipped_rows[i].rowData)));
+        setShowSkippedModal(true);
+        toast.success(`Inserted: ${data.inserted} | Skipped: ${data.skipped} — check skipped records`);
+      } else {
+        toast.success(`Imported: ${data.inserted} inserted${data.skipped > 0 ? `, ${data.skipped} skipped` : ""}`);
+      }
       router.refresh();
     } catch (err) {
       toast.error(err.message || "Import failed");
@@ -254,6 +286,61 @@ export default function StatementTable({ rows }) {
       setImporting(false);
       e.target.value = "";
     }
+  };
+
+  const handleForceImport = async () => {
+    const rowsToImport = skippedRows
+      .filter((_, i) => selectedSkipped.has(i))
+      .map((row, i) => {
+        if (!selectedSkipped.has(i)) return null;
+        // Duplicate row — use original rowData
+        if (row.rowData) return row.rowData;
+        // Parse-error row — use manually edited data
+        const ed = editData[i];
+        if (ed && ed.trans_id && ed.date && ed.amount && ed.type) return ed;
+        return null;
+      })
+      .filter(Boolean);
+
+    if (rowsToImport.length === 0) {
+      toast.error("Select rows to import. For parse-error rows, fill in the required fields first.");
+      return;
+    }
+
+    setForceImporting(true);
+    setForceResult(null);
+    try {
+      const res = await fetch("/api/statements/force-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ rows: rowsToImport }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Force import failed");
+      setForceResult(data);
+      if (data.errors?.length === 0) {
+        toast.success(`Done: ${data.inserted} inserted, ${data.updated} updated — date filter reset to show all`);
+        // Reset date filter so imported records (possibly old dates) are visible
+        setDateFrom("");
+        setDateTo("");
+      } else {
+        toast.error(`${data.errors.length} row(s) failed — see details`);
+      }
+      router.refresh();
+    } catch (err) {
+      toast.error(err.message || "Force import failed");
+    } finally {
+      setForceImporting(false);
+    }
+  };
+
+  const closeSkippedModal = () => {
+    setShowSkippedModal(false);
+    setSkippedRows([]);
+    setSelectedSkipped(new Set());
+    setEditData({});
+    setForceResult(null);
   };
 
   const handleDownloadDemo = (format) => {
@@ -333,8 +420,8 @@ export default function StatementTable({ rows }) {
             id="statements-search"
             type="search"
             enterKeyHint="search"
-            placeholder="Trans ID, text search… · Digits only = expense ID"
-            title="Letters/text: filter Trans ID, description, cheque, amount. Numbers only (e.g. 2): that expense — settled link OR expense Transaction ID = statement Trans ID."
+            placeholder="Trans ID, Invoice No, description, amount…"
+            title="Search by Trans ID, Invoice Number, description, cheque no, or amount. Digits only = expense ID."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 outline-none"
@@ -430,7 +517,14 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("debit")} className="p-3 cursor-pointer select-none">Debit<SortIcon column="debit" /></th>
               <th onClick={() => handleSort("credit")} className="p-3 cursor-pointer select-none">Credit<SortIcon column="credit" /></th>
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
-              <th className="p-3">Balance</th>
+              <th className="p-3">Invoice No</th>
+              <th
+                onClick={() => handleSort("balance")}
+                className="p-3 cursor-pointer select-none"
+                title="Bank closing balance from file when imported; otherwise calculated on filtered rows"
+              >
+                Balance<SortIcon column="balance" />
+              </th>
               <th className="p-3">Action</th>
             </tr>
           </thead>
@@ -462,12 +556,41 @@ export default function StatementTable({ rows }) {
                     {row.type === "Credit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}
                   </td>
                   <td className="p-3">
-                    <span className={row.client_expense_id ? "text-green-600 font-medium" : "text-amber-600 font-medium"}>
-                      {row.client_expense_id ? "Settled" : "Unsettled"}
-                    </span>
+                    {row.invoice_status ? (
+                      <span className={
+                        row.invoice_status === "Settled"
+                          ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"
+                          : row.invoice_status === "Partial Paid"
+                          ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"
+                          : "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
+                      }>
+                        {row.invoice_status}
+                      </span>
+                    ) : (
+                      <span className={row.client_expense_id ? "text-green-600 font-medium text-sm" : "text-amber-600 font-medium text-sm"}>
+                        {row.client_expense_id ? "Settled" : "Unsettled"}
+                      </span>
+                    )}
                   </td>
-                  <td className="p-3 font-medium">
-                    ₹{Math.abs(balanceMap[row.id] ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                  <td className="p-3">
+                    {row.invoice_number ? (
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded whitespace-nowrap">
+                        {row.invoice_number}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
+                  </td>
+                  <td
+                    className="p-3 font-medium"
+                    title={
+                      row.closing_balance != null
+                        ? "Closing balance from bank file (import)"
+                        : "Running total from filtered rows (not bank book)"
+                    }
+                  >
+                    ₹{displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </td>
                   <td className="p-3 flex gap-2 items-center">
                     <button
                       type="button"
@@ -489,7 +612,7 @@ export default function StatementTable({ rows }) {
               ))
             ) : (
               <tr>
-                <td colSpan="12" className="p-4 text-center text-gray-500">
+                <td colSpan="13" className="p-4 text-center text-gray-500">
                   No entries found.
                 </td>
               </tr>
@@ -517,7 +640,40 @@ export default function StatementTable({ rows }) {
             <div><strong>Description:</strong> {row.description || "-"}</div>
             <div><strong>Debit:</strong> <span className="text-red-600">{row.type === "Debit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}</span></div>
             <div><strong>Credit:</strong> <span className="text-green-600">{row.type === "Credit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}</span></div>
-            <div><strong>Status:</strong> <span className={row.client_expense_id ? "text-green-600" : "text-amber-600"}>{row.client_expense_id ? "Settled" : "Unsettled"}</span></div>
+            <div>
+              <strong>Status:</strong>{" "}
+              {row.invoice_status ? (
+                <span className={
+                  row.invoice_status === "Settled"
+                    ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"
+                    : row.invoice_status === "Partial Paid"
+                    ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"
+                    : "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
+                }>
+                  {row.invoice_status}
+                </span>
+              ) : (
+                <span className={row.client_expense_id ? "text-green-600" : "text-amber-600"}>
+                  {row.client_expense_id ? "Settled" : "Unsettled"}
+                </span>
+              )}
+            </div>
+            <div>
+              <strong>Invoice No:</strong>{" "}
+              {row.invoice_number ? (
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
+                  {row.invoice_number}
+                </span>
+              ) : (
+                <span className="text-gray-400">—</span>
+              )}
+            </div>
+            <div>
+              <strong>Balance:</strong>{" "}
+              <span className="font-semibold">
+                ₹{displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
             <div className="flex items-center gap-4 pt-2">
               <button type="button" onClick={() => setModalId(row.id)} className="text-blue-600 hover:underline">
                 <Eye size={16} /> View
@@ -529,6 +685,222 @@ export default function StatementTable({ rows }) {
           </div>
         ))}
       </div>
+
+      {/* Skipped Rows Modal */}
+      {showSkippedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="sticky top-0 bg-orange-600 rounded-t-lg px-6 py-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  Skipped Records ({skippedRows.length})
+                </h3>
+                <p className="text-orange-100 text-xs mt-0.5">
+                  <span className="font-medium">Orange</span> = Duplicate (select to overwrite) &nbsp;|&nbsp;
+                  <span className="font-medium">Red</span> = Parse error — fill in missing fields to import
+                </p>
+              </div>
+              <button type="button" onClick={closeSkippedModal} className="p-1 hover:bg-orange-700 rounded text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-4 space-y-3">
+              {/* Force import result banner */}
+              {forceResult && (
+                <div className={`rounded p-3 text-sm border ${forceResult.errors?.length > 0 ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}`}>
+                  <p className="font-semibold mb-1">
+                    {forceResult.errors?.length === 0
+                      ? "✓ Force import complete — date filter has been reset, search by Trans ID to find your record"
+                      : "⚠ Force import finished with errors"}
+                  </p>
+                  <div className="flex gap-4 flex-wrap">
+                    <span className="text-green-700">✓ Inserted: <strong>{forceResult.inserted}</strong></span>
+                    <span className="text-blue-700">↻ Updated: <strong>{forceResult.updated}</strong></span>
+                    {forceResult.errors?.length > 0 && (
+                      <span className="text-red-700">✕ Failed: <strong>{forceResult.errors.length}</strong></span>
+                    )}
+                  </div>
+                  {forceResult.errors?.length > 0 && (
+                    <ul className="mt-2 text-xs text-red-600 list-disc list-inside">
+                      {forceResult.errors.map((e, i) => (
+                        <li key={i}><span className="font-mono">{e.trans_id}</span>: {e.reason}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {/* Select all duplicates */}
+              <div className="flex items-center gap-4 text-sm">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={
+                      skippedRows.filter((r) => r.rowData).length > 0 &&
+                      skippedRows.every((r, i) => !r.rowData || selectedSkipped.has(i))
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedSkipped(new Set(skippedRows.map((_, i) => i).filter((i) => skippedRows[i].rowData)));
+                      } else {
+                        setSelectedSkipped(new Set());
+                      }
+                    }}
+                    className="w-4 h-4"
+                  />
+                  Select all duplicates ({skippedRows.filter((r) => r.rowData).length})
+                </label>
+                <span className="text-gray-400 text-xs">{selectedSkipped.size} selected for import</span>
+              </div>
+
+              {/* Rows */}
+              <div className="space-y-2">
+                {skippedRows.map((row, idx) => {
+                  const isDuplicate = !!row.rowData;
+                  const isSelected = selectedSkipped.has(idx);
+                  const ed = editData[idx] || {};
+                  const isEditComplete = !isDuplicate && ed.trans_id && ed.date && ed.amount && ed.type;
+                  const isEditSelected = selectedSkipped.has(idx);
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`border rounded p-3 text-sm transition-colors ${
+                        isDuplicate
+                          ? isSelected ? "border-orange-400 bg-orange-50" : "border-orange-200 bg-orange-50/30"
+                          : isEditSelected ? "border-blue-400 bg-blue-50" : "border-red-200 bg-red-50/30"
+                      }`}
+                    >
+                      {/* Row header */}
+                      <div className="flex flex-wrap items-center gap-3 mb-2">
+                        <input
+                          type="checkbox"
+                          checked={isDuplicate ? isSelected : isEditSelected && isEditComplete}
+                          disabled={!isDuplicate && !isEditComplete}
+                          onChange={() => {
+                            setSelectedSkipped((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(idx)) next.delete(idx);
+                              else next.add(idx);
+                              return next;
+                            });
+                          }}
+                          className="w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
+                          title={!isDuplicate && !isEditComplete ? "Fill in required fields below to enable" : ""}
+                        />
+                        <span className="font-mono font-medium">{row.trans_id || "-"}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          isDuplicate ? "bg-orange-100 text-orange-700" : "bg-red-100 text-red-700"
+                        }`}>
+                          {row.reason}
+                        </span>
+                        {!isDuplicate && (
+                          <span className="text-xs text-blue-600 font-medium">
+                            ← Fill required fields below to import
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Existing data preview / edit form */}
+                      {isDuplicate ? (
+                        <div className="flex flex-wrap gap-4 text-xs text-gray-600">
+                          <span>Date: <strong>{row.date ? new Date(row.date).toLocaleDateString("en-IN") : "-"}</strong></span>
+                          <span>Type: <strong className={row.type === "Credit" ? "text-green-700" : "text-red-700"}>{row.type || "-"}</strong></span>
+                          <span>Amount: <strong>₹{Number(row.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></span>
+                          <span className="max-w-xs truncate">Desc: <strong>{row.description || "-"}</strong></span>
+                        </div>
+                      ) : (
+                        /* Parse-error inline edit form */
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-0.5">Trans ID *</label>
+                            <input
+                              type="text"
+                              className="w-full border rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-400"
+                              value={ed.trans_id ?? row.trans_id ?? ""}
+                              onChange={(e) => setEditData((p) => ({ ...p, [idx]: { ...p[idx], trans_id: e.target.value } }))}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-0.5">Date *</label>
+                            <input
+                              type="date"
+                              className="w-full border rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-400"
+                              value={ed.date ?? ""}
+                              onChange={(e) => setEditData((p) => ({ ...p, [idx]: { ...p[idx], date: e.target.value } }))}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-0.5">Type *</label>
+                            <select
+                              className="w-full border rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-400"
+                              value={ed.type ?? "Credit"}
+                              onChange={(e) => setEditData((p) => ({ ...p, [idx]: { ...p[idx], type: e.target.value } }))}
+                            >
+                              <option value="Credit">Credit</option>
+                              <option value="Debit">Debit</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-0.5">Amount *</label>
+                            <input
+                              type="number"
+                              min="0"
+                              className="w-full border rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-400"
+                              value={ed.amount ?? ""}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditData((p) => {
+                                  const updated = { ...p[idx], amount: val };
+                                  // auto-select once complete
+                                  if (updated.trans_id && updated.date && updated.amount && updated.type) {
+                                    setSelectedSkipped((prev) => new Set([...prev, idx]));
+                                  }
+                                  return { ...p, [idx]: updated };
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="sm:col-span-4">
+                            <label className="block text-xs text-gray-500 mb-0.5">Description</label>
+                            <input
+                              type="text"
+                              className="w-full border rounded px-2 py-1 text-xs focus:ring-1 focus:ring-blue-400"
+                              value={ed.description ?? row.description ?? ""}
+                              onChange={(e) => setEditData((p) => ({ ...p, [idx]: { ...p[idx], description: e.target.value } }))}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t p-4 flex justify-between items-center bg-gray-50 rounded-b-lg">
+              <p className="text-xs text-gray-500">
+                Total skipped: <strong>{skippedRows.length}</strong> &nbsp;|&nbsp; Selected: <strong>{selectedSkipped.size}</strong>
+              </p>
+              <div className="flex gap-3">
+                <button onClick={closeSkippedModal} className="px-4 py-2 border rounded text-sm hover:bg-gray-100">
+                  Close
+                </button>
+                <button
+                  onClick={handleForceImport}
+                  disabled={forceImporting || selectedSkipped.size === 0}
+                  className="px-5 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  {forceImporting ? "Importing..." : `Force Import (${selectedSkipped.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Expense View Modal */}
       {modalId && (

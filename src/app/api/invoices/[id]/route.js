@@ -96,6 +96,8 @@ export async function PATCH(req, context) {
       eway_bill_no = null,
       delivery_challan_no = null,
       created_at = null,
+      customer_id: bodyCustomerId,
+      linked_trans_ids: bodyLinkedTransIds,
     } = body;
 
     if (!invoice_number || !customer_name || !billing_address) {
@@ -113,7 +115,46 @@ export async function PATCH(req, context) {
     }
 
     const pool = await getDbConnection();
+
+    let linkedTransIdsSql;
+    if (Array.isArray(bodyLinkedTransIds)) {
+      linkedTransIdsSql =
+        bodyLinkedTransIds.length > 0
+          ? JSON.stringify(bodyLinkedTransIds)
+          : null;
+    } else {
+      const [[lr]] = await pool.execute(
+        `SELECT linked_trans_ids AS v FROM invoices WHERE id = ? LIMIT 1`,
+        [invoiceId],
+      );
+      linkedTransIdsSql = lr?.v ?? null;
+    }
+
+    let customerIdVal = bodyCustomerId;
+    if (customerIdVal === undefined) {
+      const [[cr]] = await pool.execute(
+        `SELECT customer_id AS v FROM invoices WHERE id = ? LIMIT 1`,
+        [invoiceId],
+      );
+      customerIdVal = cr?.v ?? null;
+    }
+
     conn = await pool.getConnection();
+
+    try {
+      await conn.execute("SELECT customer_id FROM invoices LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoices ADD COLUMN customer_id VARCHAR(64) NULL");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT linked_trans_ids FROM invoices LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoices ADD COLUMN linked_trans_ids TEXT NULL");
+      } catch (__) {}
+    }
 
     const [[existing]] = await conn.execute(
       `SELECT id FROM invoices WHERE id = ? LIMIT 1`,
@@ -177,6 +218,7 @@ export async function PATCH(req, context) {
           subtotal = ?, cgst = ?, sgst = ?, igst = ?, total_tax = ?, grand_total = ?,
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
+          customer_id = ?, linked_trans_ids = ?,
           created_at = ?
         WHERE id = ?`,
         [
@@ -209,6 +251,8 @@ export async function PATCH(req, context) {
           buyers_order_no,
           eway_bill_no,
           delivery_challan_no,
+        customerIdVal ?? null,
+        linkedTransIdsSql,
           createdAtSql,
           invoiceId,
         ],
@@ -222,7 +266,8 @@ export async function PATCH(req, context) {
           gst_number = ?, state = ?, state_code = ?,
           subtotal = ?, cgst = ?, sgst = ?, igst = ?, total_tax = ?, grand_total = ?,
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
-          buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?
+          buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
+          customer_id = ?, linked_trans_ids = ?
         WHERE id = ?`,
         [
           quotation_id,
@@ -254,6 +299,8 @@ export async function PATCH(req, context) {
           buyers_order_no,
           eway_bill_no,
           delivery_challan_no,
+        customerIdVal ?? null,
+        linkedTransIdsSql,
           invoiceId,
         ],
       );

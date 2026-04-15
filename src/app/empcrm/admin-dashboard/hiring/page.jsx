@@ -178,6 +178,10 @@ export default function HiringPage() {
   const [filterMonth, setFilterMonth] = useState("");
   const [filterMode, setFilterMode] = useState("");
   const [filterDesignation, setFilterDesignation] = useState("");
+  const [filterJoinFrom, setFilterJoinFrom] = useState("");
+  const [filterJoinTo, setFilterJoinTo] = useState("");
+  const [filterInterviewFrom, setFilterInterviewFrom] = useState("");
+  const [filterInterviewTo, setFilterInterviewTo] = useState("");
   const [designationOptions, setDesignationOptions] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -229,6 +233,10 @@ export default function HiringPage() {
       if (filterMonth) url += `&month=${filterMonth}`;
       if (filterMode) url += `&interview_mode=${encodeURIComponent(filterMode)}`;
       if (filterDesignation) url += `&designation=${encodeURIComponent(filterDesignation)}`;
+      if (filterJoinFrom) url += `&join_from=${encodeURIComponent(filterJoinFrom)}`;
+      if (filterJoinTo) url += `&join_to=${encodeURIComponent(filterJoinTo)}`;
+      if (filterInterviewFrom) url += `&interview_from=${encodeURIComponent(filterInterviewFrom)}`;
+      if (filterInterviewTo) url += `&interview_to=${encodeURIComponent(filterInterviewTo)}`;
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (json.success) {
@@ -243,7 +251,7 @@ export default function HiringPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterYear, filterMonth, filterMode, filterDesignation]);
+  }, [filterYear, filterMonth, filterMode, filterDesignation, filterJoinFrom, filterJoinTo, filterInterviewFrom, filterInterviewTo]);
 
   useEffect(() => {
     load();
@@ -697,6 +705,76 @@ export default function HiringPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* ── Joining date range ── */}
+          <div className="flex flex-col gap-1 min-w-0 sm:col-span-2 lg:col-span-4">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Joining date (from – to)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={filterJoinFrom}
+                onChange={(e) => setFilterJoinFrom(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Joining from"
+              />
+              <span className="text-xs text-slate-400">–</span>
+              <input
+                type="date"
+                value={filterJoinTo}
+                min={filterJoinFrom || undefined}
+                onChange={(e) => setFilterJoinTo(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Joining to"
+              />
+              {(filterJoinFrom || filterJoinTo) && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterJoinFrom(""); setFilterJoinTo(""); }}
+                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  title="Clear"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ── Interview date range ── */}
+          <div className="flex flex-col gap-1 min-w-0 sm:col-span-2 lg:col-span-4">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Interview date (from – to)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={filterInterviewFrom}
+                onChange={(e) => setFilterInterviewFrom(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Interview from"
+              />
+              <span className="text-xs text-slate-400">–</span>
+              <input
+                type="date"
+                value={filterInterviewTo}
+                min={filterInterviewFrom || undefined}
+                onChange={(e) => setFilterInterviewTo(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Interview to"
+              />
+              {(filterInterviewFrom || filterInterviewTo) && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterInterviewFrom(""); setFilterInterviewTo(""); }}
+                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  title="Clear"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

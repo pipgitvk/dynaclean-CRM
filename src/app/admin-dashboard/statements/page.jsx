@@ -31,8 +31,31 @@ export default async function StatementsPage() {
         await conn.execute("ALTER TABLE statements ADD COLUMN txn_posted_date DATE NULL AFTER txn_dated_deb");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT invoice_number FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN invoice_number VARCHAR(100) NULL");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT invoice_status FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN invoice_status VARCHAR(50) NULL");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT closing_balance FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute(
+          "ALTER TABLE statements ADD COLUMN closing_balance DECIMAL(18,2) NULL COMMENT 'Bank running balance from import'"
+        );
+      } catch (__) {}
+    }
     const [result] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, created_at
        FROM statements
        ORDER BY date DESC, id DESC`
     );

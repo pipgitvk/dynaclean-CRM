@@ -26,6 +26,31 @@ function campaignLeadBucket(raw) {
   return null;
 }
 
+/** Avoid `Unexpected token '<'` when nginx returns HTML 504/502 instead of JSON */
+async function parseJsonFromResponse(res) {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (
+    trimmed.startsWith("<!DOCTYPE") ||
+    trimmed.startsWith("<html") ||
+    /504\s+Gateway|Gateway\s+Time-?out/i.test(trimmed) ||
+    res.status === 504
+  ) {
+    throw new Error(
+      "Gateway timeout (504): server/proxy stopped waiting. Try a shorter date range, or raise nginx proxy_read_timeout for this site.",
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      trimmed.startsWith("<")
+        ? "Server returned HTML instead of JSON (often a proxy error)."
+        : "Response was not valid JSON.",
+    );
+  }
+}
+
 function getAutoPollEnabled() {
   if (typeof window === "undefined") return false;
   try {
@@ -255,7 +280,7 @@ export default function MetaBackfillPage() {
         // Same as main Meta cron: server cron route (no admin session / impersonation issues)
         const res = await fetch("/api/cron/meta-backfill-tamil", { signal: ctrl.signal });
         clearTimeout(timeout);
-        const data = await res.json();
+        const data = await parseJsonFromResponse(res);
         setTamilCronTestResult({
           ok: res.ok,
           data: res.ok
@@ -498,7 +523,7 @@ export default function MetaBackfillPage() {
     setTamilCronTestLoading(true);
     try {
       const res = await fetch("/api/cron/meta-backfill-tamil");
-      const data = await res.json();
+      const data = await parseJsonFromResponse(res);
       setTamilCronTestResult({
         ok: res.ok,
         data: res.ok
@@ -534,7 +559,7 @@ export default function MetaBackfillPage() {
       const res = await fetch(
         `/api/meta-backfill/tamil-form-leads?since=${encodeURIComponent(range.since)}&until=${encodeURIComponent(range.until)}`,
       );
-      const data = await res.json();
+      const data = await parseJsonFromResponse(res);
       if (!res.ok) {
         const metaMsg =
           data?.metaError?.message || data?.metaError?.error?.message || data?.message;
@@ -564,7 +589,7 @@ export default function MetaBackfillPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ since: s, until: u, autoImport: true }),
       });
-      const data = await res.json();
+      const data = await parseJsonFromResponse(res);
       if (!res.ok) {
         const metaMsg =
           data?.metaError?.message || data?.metaError?.error?.message || data?.message;
@@ -585,7 +610,7 @@ export default function MetaBackfillPage() {
       const resList = await fetch(
         `/api/meta-backfill/tamil-form-leads?since=${encodeURIComponent(s)}&until=${encodeURIComponent(u)}`,
       );
-      const listData = await resList.json();
+      const listData = await parseJsonFromResponse(resList);
       if (resList.ok) setTamilLeads(listData.leads || []);
     } catch (err) {
       console.error(err);

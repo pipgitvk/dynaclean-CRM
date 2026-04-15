@@ -5,6 +5,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import InvoiceItemsTable from "./new/invoice-table";
 import TaxAndSummary from "./new/Tax-invoice";
+import PaymentLinkModal from "@/app/user-dashboard/invoices/new/PaymentLinkModal";
 
 const emptyItem = () => ({
   item_name: "",
@@ -44,6 +45,20 @@ function toDatetimeLocalValue(v) {
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
+function parseLinkedTransIds(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (typeof raw === "string") {
+    try {
+      const p = JSON.parse(raw);
+      return Array.isArray(p) ? p.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function mapItemFromDb(row) {
   return {
     ...emptyItem(),
@@ -73,6 +88,7 @@ export default function InvoiceEditModal({
   const [createdAtLocal, setCreatedAtLocal] = useState("");
   const [items, setItems] = useState([emptyItem()]);
   const [form, setForm] = useState({
+    customer_id: "",
     customer_name: "",
     customer_email: "",
     customer_phone: "",
@@ -97,6 +113,8 @@ export default function InvoiceEditModal({
   const [cgstRate, setCgstRate] = useState(9);
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
+  const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
+  const [linkedTransIds, setLinkedTransIds] = useState([]);
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
@@ -136,7 +154,9 @@ export default function InvoiceEditModal({
         // Order date is the editable business date.
         setInvoiceDate(dateInputValue(inv.created_at || inv.invoice_date) || "");
         setCreatedAtLocal(toDatetimeLocalValue(inv.created_at) || "");
+        setLinkedTransIds(parseLinkedTransIds(inv.linked_trans_ids));
         setForm({
+          customer_id: inv.customer_id != null ? String(inv.customer_id) : "",
           customer_name: inv.customer_name || "",
           customer_email: inv.customer_email || "",
           customer_phone: inv.customer_phone || "",
@@ -159,6 +179,7 @@ export default function InvoiceEditModal({
           delivery_challan_no: inv.delivery_challan_no ?? "",
           order_date: dateInputValue(inv.order_date) || "",
         });
+        setShowPaymentLinkModal(false);
         setNotes(inv.notes || "");
         setEditableTerms(inv.terms_conditions || "");
 
@@ -267,6 +288,8 @@ export default function InvoiceEditModal({
         eway_bill_no: form.eway_bill_no?.trim() || null,
         delivery_challan_no: form.delivery_challan_no?.trim() || null,
         created_at: createdAtLocal || null,
+        customer_id: String(form.customer_id || "").trim() || null,
+        linked_trans_ids: linkedTransIds,
       };
 
       const res = await fetch(`/api/invoices/${invoiceId}`, {
@@ -277,6 +300,27 @@ export default function InvoiceEditModal({
       const out = await res.json();
       if (!res.ok || !out.success) {
         throw new Error(out.error || "Save failed");
+      }
+      if (linkedTransIds.length > 0 && invoiceNumber.trim()) {
+        const invoiceStatusForStmt =
+          form.payment_status === "PAID"
+            ? "Settled"
+            : form.payment_status === "PARTIAL"
+              ? "Partial Paid"
+              : "Unsettled";
+        try {
+          await fetch("/api/statements", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              trans_ids: linkedTransIds,
+              invoice_number: invoiceNumber.trim(),
+              invoice_status: invoiceStatusForStmt,
+            }),
+          });
+        } catch (patchErr) {
+          console.error("Failed to link statements:", patchErr);
+        }
       }
       toast.success("Invoice updated");
       onSaved?.();
@@ -293,6 +337,7 @@ export default function InvoiceEditModal({
   const viewHref = `${viewHrefBase}/${encodeURIComponent(invoiceNumber || "_")}`;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-gray-50 shrink-0">
@@ -323,6 +368,30 @@ export default function InvoiceEditModal({
             <p className="text-center py-12 text-gray-600">Loading…</p>
           ) : (
             <form onSubmit={handleSave} className="space-y-4 text-sm">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentLinkModal(true)}
+                  className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700"
+                >
+                  Payment Link
+                </button>
+              </div>
+              {linkedTransIds.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-200 rounded p-3">
+                  <span className="text-xs font-semibold text-blue-700 mr-1">
+                    Linked Trans IDs:
+                  </span>
+                  {linkedTransIds.map((tid) => (
+                    <span
+                      key={tid}
+                      className="bg-blue-100 text-blue-800 text-xs font-mono px-2 py-1 rounded-full"
+                    >
+                      {tid}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-gray-600 mb-1">Invoice no.</label>
@@ -400,6 +469,19 @@ export default function InvoiceEditModal({
                     onChange={(e) =>
                       setForm({ ...form, customer_phone: e.target.value })
                     }
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600 mb-1">
+                    Customer ID (payment link)
+                  </label>
+                  <input
+                    className="w-full border rounded px-2 py-1.5 font-mono text-xs"
+                    value={form.customer_id}
+                    onChange={(e) =>
+                      setForm({ ...form, customer_id: e.target.value })
+                    }
+                    placeholder="Optional — for statement filter"
                   />
                 </div>
                 <div>
@@ -531,14 +613,11 @@ export default function InvoiceEditModal({
                     type="number"
                     min="0"
                     step="0.01"
-                    className="w-full border rounded px-2 py-1.5"
+                    className="w-full border rounded px-2 py-1.5 bg-gray-100 cursor-not-allowed"
                     value={form.amount_paid}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        amount_paid: Number(e.target.value),
-                      })
-                    }
+                    readOnly
+                    tabIndex={-1}
+                    title="Set via Payment Link"
                   />
                 </div>
                 <div>
@@ -622,5 +701,31 @@ export default function InvoiceEditModal({
         </div>
       </div>
     </div>
+    <PaymentLinkModal
+      open={showPaymentLinkModal}
+      onClose={() => setShowPaymentLinkModal(false)}
+      defaultCustomerId={form.customer_id}
+      defaultAmount={taxSummary.grandTotal}
+      lockedTransIds={linkedTransIds}
+      onApply={(transIds, paymentStatus, amountPaid) => {
+        setLinkedTransIds((prev) => [
+          ...prev,
+          ...transIds.filter((t) => !prev.includes(t)),
+        ]);
+        if (amountPaid > 0) {
+          setForm((prev) => ({
+            ...prev,
+            amount_paid: amountPaid,
+            payment_status:
+              paymentStatus === "Settled"
+                ? "PAID"
+                : paymentStatus === "Partial Paid"
+                  ? "PARTIAL"
+                  : prev.payment_status,
+          }));
+        }
+      }}
+    />
+    </>
   );
 }

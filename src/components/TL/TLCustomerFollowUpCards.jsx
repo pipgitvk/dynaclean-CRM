@@ -1,13 +1,27 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import dayjs from "dayjs";
 import { CalendarDays, Edit, Eye, Sparkles, StickyNote, User } from "lucide-react";
-import {
-  NEXT_FOLLOWUP_DATE_TRAFFIC_LEGEND,
-  getTrafficGradientForHours,
-} from "@/utils/hiringFollowUpUrgency";
+import { getTlFollowUpCardGradientForHours } from "@/utils/hiringFollowUpUrgency";
 import { pickEffectiveNextFollowup } from "@/utils/tlNextFollowupResolve";
+
+/** Legend for TL strip: red = before now, blue = after now (same rule as {@link getTlFollowUpCardGradientForHours}). */
+const TL_CARD_LEGEND = [
+  {
+    key: "red",
+    title: "Red",
+    caption: "Next follow-up datetime is already before now (overdue)",
+    dotClass: "bg-gradient-to-r from-rose-200 to-rose-50",
+  },
+  {
+    key: "blue",
+    title: "Blue",
+    caption: "Next follow-up is still in the future (from current date & time)",
+    dotClass: "bg-gradient-to-r from-sky-300 to-sky-100",
+  },
+];
 
 /** Hours until effective next follow-up — same instant as the Schedule line. */
 function getHoursUntilNextFollowup(customer) {
@@ -39,7 +53,7 @@ function DetailRow({ icon: Icon, label, children }) {
 
 function TLCustomerFollowUpCard({ customer, detailHref, followupHref }) {
   const hours = getHoursUntilNextFollowup(customer);
-  const bg = getTrafficGradientForHours(hours);
+  const bg = getTlFollowUpCardGradientForHours(hours);
 
   const nextD = pickEffectiveNextFollowup(customer);
   const nextLabel = nextD ? nextD.format("DD MMM, YYYY HH:mm") : "—";
@@ -137,27 +151,51 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref }) {
   );
 }
 
+function sortCustomersForFollowupCards(customers) {
+  const now = dayjs();
+  const rows = customers
+    .map((c) => ({ c, next: pickEffectiveNextFollowup(c) }))
+    .filter(({ next }) => next != null && next.isValid());
+  rows.sort((a, b) => {
+    const ha = a.next.diff(now, "hour", true);
+    const hb = b.next.diff(now, "hour", true);
+    const aOver = ha < 0;
+    const bOver = hb < 0;
+    if (aOver && !bOver) return -1;
+    if (!aOver && bOver) return 1;
+    if (aOver && bOver) return ha - hb;
+    return ha - hb;
+  });
+  return rows.map(({ c }) => c);
+}
+
 export default function TLCustomerFollowUpCards({ customers, basePath, queryString }) {
   const qs = queryString ? `?${queryString}` : "";
+  const cardCustomers = useMemo(
+    () => sortCustomersForFollowupCards(customers),
+    [customers],
+  );
 
   return (
     <section className="border-b border-gray-200 bg-slate-50/80 px-6 py-6">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <h2 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">TL follow-up</h2>
-        {customers.length > 0 ? (
-          <span className="text-xs font-medium text-slate-500">{customers.length} on this page (filtered)</span>
+        {cardCustomers.length > 0 ? (
+          <span className="text-xs font-medium text-slate-500">
+            {cardCustomers.length} with a next follow-up time (vs current clock)
+          </span>
         ) : null}
       </div>
 
       <div
         className="mb-4 flex flex-wrap gap-x-5 gap-y-2 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 sm:px-4"
         role="list"
-        aria-label="Card colours by next follow-up date"
+        aria-label="Card colours by next follow-up vs now"
       >
         <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-[11px]">
-          Card colours (by next follow-up date)
+          Card colours (red = before now, blue = after now)
         </span>
-        {NEXT_FOLLOWUP_DATE_TRAFFIC_LEGEND.map((item) => (
+        {TL_CARD_LEGEND.map((item) => (
           <span
             key={item.key}
             className="inline-flex items-center gap-2 text-[11px] text-slate-700 sm:text-xs"
@@ -175,14 +213,16 @@ export default function TLCustomerFollowUpCards({ customers, basePath, queryStri
         ))}
       </div>
 
-      {customers.length === 0 ? (
+      {cardCustomers.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200/90 bg-white/60 px-4 py-8 text-center">
-          <p className="text-sm text-slate-600">No TL entries match the current filters.</p>
+          <p className="text-sm text-slate-600">
+            No customers on this view have a scheduled next follow-up time to show in cards.
+          </p>
         </div>
       ) : (
         <div className="w-full overflow-x-auto pb-2 pt-0.5 [scrollbar-gutter:stable]">
           <div className="flex min-w-0 flex-row flex-nowrap gap-4 sm:gap-5">
-            {customers.map((c) => (
+            {cardCustomers.map((c) => (
               <TLCustomerFollowUpCard
                 key={c.customer_id}
                 customer={c}

@@ -50,6 +50,10 @@ export async function GET(req) {
     const month = searchParams.get("month");
     const designationParam = searchParams.get("designation");
     const modeParam = searchParams.get("interview_mode");
+    const joinFromParam = searchParams.get("join_from");
+    const joinToParam = searchParams.get("join_to");
+    const interviewFromParam = searchParams.get("interview_from");
+    const interviewToParam = searchParams.get("interview_to");
     const designationTrimmed =
       designationParam != null && String(designationParam).trim() !== ""
         ? String(designationParam).trim()
@@ -57,6 +61,11 @@ export async function GET(req) {
     const HIRING_INTERVIEW_MODES = ["Virtual", "Walk-in"];
     const modeRaw = modeParam != null && String(modeParam).trim() !== "" ? String(modeParam).trim() : null;
     const modeFilter = modeRaw != null && HIRING_INTERVIEW_MODES.includes(modeRaw) ? modeRaw : null;
+    const isValidDate = (v) => v && /^\d{4}-\d{2}-\d{2}$/.test(v.trim());
+    const joinFrom = isValidDate(joinFromParam) ? joinFromParam.trim() : null;
+    const joinTo = isValidDate(joinToParam) ? joinToParam.trim() : null;
+    const interviewFrom = isValidDate(interviewFromParam) ? interviewFromParam.trim() : null;
+    const interviewTo = isValidDate(interviewToParam) ? interviewToParam.trim() : null;
 
     const conn = await getDbConnection();
 
@@ -106,6 +115,22 @@ export async function GET(req) {
     if (designationTrimmed != null) {
       sql += ` AND TRIM(h.designation) = ?`;
       params.push(designationTrimmed);
+    }
+    if (joinFrom) {
+      sql += ` AND h.hire_date >= ?`;
+      params.push(joinFrom);
+    }
+    if (joinTo) {
+      sql += ` AND h.hire_date <= ?`;
+      params.push(joinTo);
+    }
+    if (interviewFrom) {
+      sql += ` AND DATE(h.interview_at) >= ?`;
+      params.push(interviewFrom);
+    }
+    if (interviewTo) {
+      sql += ` AND DATE(h.interview_at) <= ?`;
+      params.push(interviewTo);
     }
     sql += ` ORDER BY COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at)) DESC, h.id DESC`;
 
