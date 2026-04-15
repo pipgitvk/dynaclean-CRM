@@ -20,6 +20,23 @@ export default function Navbar({ onToggleSidebar }) {
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const searchRef = useRef(null);
 
+  const updateDropdownPosition = () => {
+    const el = searchRef.current;
+    if (!el || typeof window === "undefined") return;
+    const rect = el.getBoundingClientRect();
+    const margin = 8;
+    const minDropdownWidth = 260;
+    const maxWidth = window.innerWidth - margin * 2;
+    const width = Math.min(Math.max(rect.width, minDropdownWidth), maxWidth);
+    let left = rect.left + rect.width / 2 - width / 2;
+    if (left < margin) left = margin;
+    if (left + width > window.innerWidth - margin) {
+      left = window.innerWidth - margin - width;
+    }
+    const top = rect.bottom + margin;
+    setDropdownPosition({ top, left, width });
+  };
+
   useEffect(() => {
     // Get username from localStorage or session
     const storedUser = localStorage.getItem("username");
@@ -44,16 +61,16 @@ export default function Navbar({ onToggleSidebar }) {
     return () => clearTimeout(delay);
   }, [query]);
 
-  // Update dropdown position for portal
   useEffect(() => {
-    if (showDropdown && searchRef.current && typeof window !== "undefined") {
-      const rect = searchRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: rect.left,
-        width: Math.max(rect.width, 280),
-      });
-    }
+    if (!showDropdown || typeof window === "undefined") return;
+    updateDropdownPosition();
+    const onReposition = () => updateDropdownPosition();
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
   }, [showDropdown, results.length, loading]);
 
   // Close dropdown on click outside
@@ -128,148 +145,152 @@ export default function Navbar({ onToggleSidebar }) {
     router.push(newTaskRoute);
   };
 
+  const searchDropdown =
+    typeof window !== "undefined" &&
+    showDropdown &&
+    createPortal(
+      results.length > 0 ? (
+        <div
+          data-header-search-dropdown
+          className="fixed bg-white border rounded-lg shadow-xl z-[9999] max-h-[min(18rem,70vh)] overflow-y-auto"
+          style={{
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width,
+          }}
+        >
+          {results.map((c) => (
+            <div
+              key={c.customer_id}
+              className="flex justify-between items-center gap-2 px-3 py-2 hover:bg-gray-100 border-b last:border-b-0 cursor-pointer"
+            >
+              <div className="text-sm min-w-0">
+                <div className="font-medium truncate">
+                  {c.first_name} {c.company && `(${c.company})`}
+                </div>
+                <div className="text-xs text-gray-500 truncate">
+                  ID: {c.customer_id} • {c.lead_source || "—"}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDropdown(false);
+                  setResults([]);
+                  setQuery("");
+                  const base = pathname?.startsWith("/admin-dashboard")
+                    ? "admin-dashboard"
+                    : "user-dashboard";
+                  router.push(`/${base}/view-customer/${c.customer_id}`);
+                }}
+                className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex-shrink-0"
+              >
+                View
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : loading ? (
+        <div
+          data-header-search-dropdown
+          className="fixed bg-white border rounded-lg shadow-xl z-[9999] p-3 text-sm text-gray-500"
+          style={{
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width,
+          }}
+        >
+          Searching...
+        </div>
+      ) : (
+        <div
+          data-header-search-dropdown
+          className="fixed bg-white border rounded-lg shadow-xl z-[9999] p-3 text-sm text-gray-500"
+          style={{
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width,
+          }}
+        >
+          No results found
+        </div>
+      ),
+      document.body
+    );
+
   return (
     <nav
-      className={`w-full min-h-[64px] h-16 bg-gradient-to-r ${
+      className={`w-full min-h-16 h-auto py-2 sm:py-0 sm:h-16 bg-gradient-to-r ${
         theme.navbar?.gradient || theme.sidebar.gradient
       } ${
         theme.navbar?.textureClass || ""
-      } shadow-lg flex items-center justify-between px-4 md:px-6 lg:px-8 border-b ${
+      } shadow-lg flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 px-3 sm:px-4 md:px-6 lg:px-8 border-b ${
         theme.sidebar.border
       } transition-colors duration-300 flex-shrink-0`}
     >
-      {/* Left Section - Menu Toggle */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-shrink-0">
         <button
           onClick={onToggleSidebar}
-          className={`${theme.sidebar.text} ${theme.sidebar.hover} p-2 rounded-lg transition-all`}
+          className={`${theme.sidebar.text} ${theme.sidebar.hover} p-2 rounded-lg transition-all flex-shrink-0`}
           aria-label="Toggle Sidebar"
         >
           <Menu size={24} />
         </button>
 
-        {/* Welcome Text - Hidden on mobile */}
-        <div className="hidden md:flex items-center gap-2">
-          <User size={20} className={theme.sidebar.text} />
-          <span className={`font-medium ${theme.sidebar.text}`}>
+        <div className="hidden lg:flex items-center gap-2 min-w-0">
+          <User size={20} className={`${theme.sidebar.text} flex-shrink-0`} />
+          <span className={`font-medium ${theme.sidebar.text} truncate`}>
             {username ? `Welcome, ${username}` : "Welcome"} - {userRole}
           </span>
         </div>
       </div>
 
-      {/* Right Section - Actions - scroll on very small screens so Logout stays accessible */}
-      <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1 justify-end overflow-x-auto hide-scrollbar">
-        {/* Search - Narrower on mobile so Logout stays visible */}
-        <div ref={searchRef} className="relative flex-shrink-0">
-          <div className="flex items-center gap-1 sm:gap-2 border rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 w-28 sm:w-48 md:w-72 bg-white">
+      <div className="flex flex-1 min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div ref={searchRef} className="relative flex-1 min-w-0 w-full sm:max-w-2xl">
+          <div className="flex items-center gap-2 border rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 w-full bg-white min-h-[44px]">
             <input
               type="text"
               placeholder="Search customer..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => {
+                if (showDropdown) updateDropdownPosition();
+              }}
               className="flex-1 min-w-0 outline-none text-sm"
             />
-            <Search size={18} className="text-gray-600 flex-shrink-0" />
+            <Search size={18} className="text-gray-600 flex-shrink-0" aria-hidden />
           </div>
-
-          {/* Search Results Dropdown - Portal to avoid overflow clipping */}
-          {typeof window !== "undefined" &&
-            showDropdown &&
-            createPortal(
-              results.length > 0 ? (
-                <div
-                  data-header-search-dropdown
-                  className="fixed bg-white border rounded-lg shadow-xl z-[9999] max-h-72 overflow-y-auto"
-                  style={{
-                    top: dropdownPosition.top,
-                    left: dropdownPosition.left,
-                    width: dropdownPosition.width,
-                  }}
-                >
-                  {results.map((c) => (
-                    <div
-                      key={c.customer_id}
-                      className="flex justify-between items-center px-3 py-2 hover:bg-gray-100 border-b last:border-b-0 cursor-pointer"
-                    >
-                      <div className="text-sm">
-                        <div className="font-medium">
-                          {c.first_name} {c.company && `(${c.company})`}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          ID: {c.customer_id} • {c.lead_source || "—"}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setShowDropdown(false);
-                          setResults([]);
-                          setQuery("");
-                          const base = pathname?.startsWith("/admin-dashboard") ? "admin-dashboard" : "user-dashboard";
-                          router.push(`/${base}/view-customer/${c.customer_id}`);
-                        }}
-                        className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        View
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : loading ? (
-                <div
-                  data-header-search-dropdown
-                  className="fixed bg-white border rounded-lg shadow-xl z-[9999] p-3 text-sm text-gray-500"
-                  style={{
-                    top: dropdownPosition.top,
-                    left: dropdownPosition.left,
-                    width: dropdownPosition.width,
-                  }}
-                >
-                  Searching...
-                </div>
-              ) : (
-                <div
-                  data-header-search-dropdown
-                  className="fixed bg-white border rounded-lg shadow-xl z-[9999] p-3 text-sm text-gray-500"
-                  style={{
-                    top: dropdownPosition.top,
-                    left: dropdownPosition.left,
-                    width: dropdownPosition.width,
-                  }}
-                >
-                  No results found
-                </div>
-              ),
-              document.body
-            )}
+          {searchDropdown}
         </div>
 
-        {/* add cutomer button  */}
-        <Link
-          href="/admin-dashboard/add-customer"
-          className="flex items-center gap-2 text-white bg-green-600 hover:bg-green-700 px-3 py-2.5 md:px-4 md:py-2.5 rounded-lg transition-all shadow-md hover:shadow-lg font-medium flex-shrink-0"
-          aria-label="Add Customer"
-        >
-          <UserPlus size={20} />
-        </Link>
-        {/* New Task Button */}
-        <button
-          onClick={handleNewTask}
-          className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 md:px-4 md:py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex-shrink-0"
-          aria-label="New Task"
-        >
-          <Plus size={18} />
-          <span className="hidden sm:inline font-medium">New Task</span>
-        </button>
+        <div className="flex items-center justify-end gap-2 md:gap-3 flex-shrink-0">
+          <Link
+            href="/admin-dashboard/add-customer"
+            className="flex items-center justify-center text-white bg-green-600 hover:bg-green-700 px-2.5 py-2.5 sm:px-3 md:px-4 rounded-lg transition-all shadow-md hover:shadow-lg font-medium min-h-[44px] min-w-[44px] sm:min-w-0"
+            aria-label="Add Customer"
+          >
+            <UserPlus size={20} />
+          </Link>
+          <button
+            type="button"
+            onClick={handleNewTask}
+            className="flex items-center justify-center gap-2 text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-2 sm:px-3 md:px-4 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px]"
+            aria-label="New Task"
+          >
+            <Plus size={18} />
+            <span className="hidden sm:inline font-medium">New Task</span>
+          </button>
 
-        {/* Logout Button - Always visible on mobile */}
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 text-white bg-red-500 hover:bg-red-600 px-3 py-2 md:px-4 md:py-2 rounded-lg transition-all shadow-md hover:shadow-lg flex-shrink-0"
-          aria-label="Logout"
-        >
-          <LogOut size={18} />
-          <span className="hidden sm:inline font-medium">Logout</span>
-        </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center justify-center gap-2 text-white bg-red-500 hover:bg-red-600 px-2.5 py-2 sm:px-3 md:px-4 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px]"
+            aria-label="Logout"
+          >
+            <LogOut size={18} />
+            <span className="hidden sm:inline font-medium">Logout</span>
+          </button>
+        </div>
       </div>
     </nav>
   );
