@@ -199,6 +199,29 @@ export default function HiringPage() {
   /** @type {null | Record<string, any>} */
   const [followUp, setFollowUp] = useState(null);
 
+  const [resumeUploadBusy, setResumeUploadBusy] = useState(false);
+  const [resumeUploadError, setResumeUploadError] = useState(null);
+
+  const handleResumeFile = useCallback(async (file, applyUrl) => {
+    if (!file) return;
+    setResumeUploadBusy(true);
+    setResumeUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/empcrm/hiring/upload-resume", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Upload failed");
+      const url = String(json.url || "").trim();
+      if (!url) throw new Error("Invalid response");
+      applyUrl(url);
+    } catch (e) {
+      setResumeUploadError(e.message || "Upload failed");
+    } finally {
+      setResumeUploadBusy(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -255,6 +278,7 @@ export default function HiringPage() {
     setCurrentSalary("");
     setExpectedSalary("");
     setNote("");
+    setResumeUploadError(null);
   };
 
   const handleSubmit = async (e) => {
@@ -1148,15 +1172,46 @@ export default function HiringPage() {
                   <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-sm font-medium text-slate-700">Resume *</label>
+                      <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="hiring-resume-followup">
+                        Resume *
+                      </label>
                       <input
-                        required={followUp.status === "Selected"}
-                        type="text"
-                        value={followUp.selectedResume ?? ""}
-                        onChange={(e) => updateFollowUp("selectedResume", e.target.value)}
-                        className={formFieldClass}
-                        placeholder="Resume link or description"
+                        id="hiring-resume-followup"
+                        type="file"
+                        accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp,image/gif"
+                        disabled={resumeUploadBusy || saving}
+                        className={`${formFieldClass} py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-indigo-800`}
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = "";
+                          await handleResumeFile(f, (url) => updateFollowUp("selectedResume", url));
+                        }}
                       />
+                      {followUp.selectedResume ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                          <a
+                            href={followUp.selectedResume}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-indigo-700 underline"
+                          >
+                            View uploaded file
+                          </a>
+                          <button
+                            type="button"
+                            className="text-red-600 hover:underline"
+                            onClick={() => {
+                              updateFollowUp("selectedResume", "");
+                              setResumeUploadError(null);
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : null}
+                      {resumeUploadBusy ? <p className="mt-1 text-xs text-slate-500">Uploading…</p> : null}
+                      {resumeUploadError ? <p className="mt-1 text-xs text-red-600">{resumeUploadError}</p> : null}
+                      <p className="mt-1 text-[11px] text-slate-500">PDF, Word, or image — max 8 MB</p>
                     </div>
                     <div>
                       <label className="mb-1 block text-sm font-medium text-slate-700">Management Interview Score (1–10) *</label>
@@ -1592,15 +1647,46 @@ export default function HiringPage() {
                       <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">
-                          <label className="mb-1 block text-sm font-medium text-slate-700">Resume *</label>
+                          <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="hiring-resume-add">
+                            Resume *
+                          </label>
                           <input
-                            required={status === "Selected"}
-                            type="text"
-                            value={selectedResume}
-                            onChange={(e) => setSelectedResume(e.target.value)}
-                            className={formFieldClass}
-                            placeholder="Resume link or description"
+                            id="hiring-resume-add"
+                            type="file"
+                            accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp,image/gif"
+                            disabled={resumeUploadBusy || saving}
+                            className={`${formFieldClass} py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-indigo-800`}
+                            onChange={async (e) => {
+                              const f = e.target.files?.[0];
+                              e.target.value = "";
+                              await handleResumeFile(f, setSelectedResume);
+                            }}
                           />
+                          {selectedResume ? (
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                              <a
+                                href={selectedResume}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-indigo-700 underline"
+                              >
+                                View uploaded file
+                              </a>
+                              <button
+                                type="button"
+                                className="text-red-600 hover:underline"
+                                onClick={() => {
+                                  setSelectedResume("");
+                                  setResumeUploadError(null);
+                                }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ) : null}
+                          {resumeUploadBusy ? <p className="mt-1 text-xs text-slate-500">Uploading…</p> : null}
+                          {resumeUploadError ? <p className="mt-1 text-xs text-red-600">{resumeUploadError}</p> : null}
+                          <p className="mt-1 text-[11px] text-slate-500">PDF, Word, or image — max 8 MB</p>
                         </div>
                         <div>
                           <label className="mb-1 block text-sm font-medium text-slate-700">Management Interview Score (1–10) *</label>
@@ -1815,15 +1901,46 @@ export default function HiringPage() {
                     <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="sm:col-span-2">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Resume *</label>
+                        <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="hiring-resume-edit">
+                          Resume *
+                        </label>
                         <input
-                          required
-                          type="text"
-                          value={editing.selectedResume ?? ""}
-                          onChange={(e) => updateEdit("selectedResume", e.target.value)}
-                          className={formFieldClass}
-                          placeholder="Resume link or description"
+                          id="hiring-resume-edit"
+                          type="file"
+                          accept=".pdf,.doc,.docx,image/jpeg,image/png,image/webp,image/gif"
+                          disabled={resumeUploadBusy || saving}
+                          className={`${formFieldClass} py-2 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-indigo-800`}
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = "";
+                            await handleResumeFile(f, (url) => updateEdit("selectedResume", url));
+                          }}
                         />
+                        {editing.selectedResume ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                            <a
+                              href={editing.selectedResume}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-indigo-700 underline"
+                            >
+                              View uploaded file
+                            </a>
+                            <button
+                              type="button"
+                              className="text-red-600 hover:underline"
+                              onClick={() => {
+                                updateEdit("selectedResume", "");
+                                setResumeUploadError(null);
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : null}
+                        {resumeUploadBusy ? <p className="mt-1 text-xs text-slate-500">Uploading…</p> : null}
+                        {resumeUploadError ? <p className="mt-1 text-xs text-red-600">{resumeUploadError}</p> : null}
+                        <p className="mt-1 text-[11px] text-slate-500">PDF, Word, or image — max 8 MB</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Management Interview Score (1–10) *</label>
