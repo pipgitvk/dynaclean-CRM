@@ -22,3 +22,20 @@ export function pickEffectiveNextFollowup(customer) {
   }
   return ds.reduce((a, b) => (a.isAfter(b) ? a : b));
 }
+
+/**
+ * When TL management mode is on: show the **later** scheduled next follow-up
+ * between TL and regular follow-up (`GREATEST` of the two datetimes), so the
+ * column reflects the latest calendar date, not the earliest upcoming slot.
+ *
+ * @param {{ tl_next_followup?: unknown; latest_next_followup?: unknown }} customer
+ * @returns {import("dayjs").Dayjs | null}
+ */
+export function pickLatestChronologicalNextFollowup(customer) {
+  const raw = [customer.tl_next_followup, customer.latest_next_followup].filter(
+    (x) => x != null && x !== "",
+  );
+  const ds = raw.map((r) => dayjs(r)).filter((d) => d.isValid());
+  if (!ds.length) return null;
+  return ds.reduce((a, b) => (a.isAfter(b) ? a : b));
+}

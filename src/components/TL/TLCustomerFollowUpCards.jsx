@@ -5,7 +5,16 @@ import Link from "next/link";
 import dayjs from "dayjs";
 import { CalendarDays, Edit, Eye, StickyNote, User } from "lucide-react";
 import { getTlFollowUpCardGradientForHours } from "@/utils/hiringFollowUpUrgency";
-import { pickEffectiveNextFollowup } from "@/utils/tlNextFollowupResolve";
+import {
+  pickEffectiveNextFollowup,
+  pickLatestChronologicalNextFollowup,
+} from "@/utils/tlNextFollowupResolve";
+
+function pickNextFollowupForDisplay(customer, useLatest) {
+  return useLatest
+    ? pickLatestChronologicalNextFollowup(customer)
+    : pickEffectiveNextFollowup(customer);
+}
 
 /** Legend for TL strip: red = before now, blue = after now (same rule as {@link getTlFollowUpCardGradientForHours}). */
 const TL_CARD_LEGEND = [
@@ -23,9 +32,9 @@ const TL_CARD_LEGEND = [
   },
 ];
 
-/** Hours until effective next follow-up — same instant as the Schedule line. */
-function getHoursUntilNextFollowup(customer) {
-  const next = pickEffectiveNextFollowup(customer);
+/** Hours until displayed next follow-up — same instant as the Schedule line. */
+function getHoursUntilNextFollowup(customer, useLatest) {
+  const next = pickNextFollowupForDisplay(customer, useLatest);
   if (!next) return null;
   return next.diff(dayjs(), "hour", true);
 }
@@ -51,11 +60,11 @@ function DetailRow({ icon: Icon, label, children }) {
   );
 }
 
-function TLCustomerFollowUpCard({ customer, detailHref, followupHref }) {
-  const hours = getHoursUntilNextFollowup(customer);
+function TLCustomerFollowUpCard({ customer, detailHref, followupHref, useLatestNextFollowup }) {
+  const hours = getHoursUntilNextFollowup(customer, useLatestNextFollowup);
   const bg = getTlFollowUpCardGradientForHours(hours);
 
-  const nextD = pickEffectiveNextFollowup(customer);
+  const nextD = pickNextFollowupForDisplay(customer, useLatestNextFollowup);
   const nextLabel = nextD ? nextD.format("DD MMM, YYYY HH:mm") : "—";
 
   const tagParts = customer.multi_tag
@@ -147,10 +156,10 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref }) {
   );
 }
 
-function sortCustomersForFollowupCards(customers) {
+function sortCustomersForFollowupCards(customers, useLatest) {
   const now = dayjs();
   const rows = customers
-    .map((c) => ({ c, next: pickEffectiveNextFollowup(c) }))
+    .map((c) => ({ c, next: pickNextFollowupForDisplay(c, useLatest) }))
     .filter(({ next }) => next != null && next.isValid());
   rows.sort((a, b) => {
     const ha = a.next.diff(now, "hour", true);
@@ -165,11 +174,16 @@ function sortCustomersForFollowupCards(customers) {
   return rows.map(({ c }) => c);
 }
 
-export default function TLCustomerFollowUpCards({ customers, basePath, queryString }) {
+export default function TLCustomerFollowUpCards({
+  customers,
+  basePath,
+  queryString,
+  useLatestNextFollowup = false,
+}) {
   const qs = queryString ? `?${queryString}` : "";
   const cardCustomers = useMemo(
-    () => sortCustomersForFollowupCards(customers),
-    [customers],
+    () => sortCustomersForFollowupCards(customers, useLatestNextFollowup),
+    [customers, useLatestNextFollowup],
   );
 
   return (
@@ -224,6 +238,7 @@ export default function TLCustomerFollowUpCards({ customers, basePath, queryStri
                 customer={c}
                 detailHref={`${basePath}/${c.customer_id}${qs}`}
                 followupHref={`${basePath}/${c.customer_id}/followup${qs}`}
+                useLatestNextFollowup={useLatestNextFollowup}
               />
             ))}
           </div>

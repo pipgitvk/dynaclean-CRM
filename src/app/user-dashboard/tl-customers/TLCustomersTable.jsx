@@ -18,7 +18,10 @@ import {
   getTlCustomersTableTagOptions,
   getTlMultiTagChipClass,
 } from "@/utils/tlFollowupTagOptions";
-import { pickEffectiveNextFollowup } from "@/utils/tlNextFollowupResolve";
+import {
+  pickEffectiveNextFollowup,
+  pickLatestChronologicalNextFollowup,
+} from "@/utils/tlNextFollowupResolve";
 import TLCustomerFollowUpCards from "@/components/TL/TLCustomerFollowUpCards";
 
 export default function TLCustomersTable({
@@ -860,6 +863,7 @@ export default function TLCustomersTable({
           customers={getFilteredCustomers()}
           basePath={basePath}
           queryString={queryString}
+          useLatestNextFollowup
         />
       ) : null}
 
@@ -1005,9 +1009,10 @@ export default function TLCustomersTable({
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {pickEffectiveNextFollowup(customer)?.format(
-                      "DD MMM, YYYY HH:mm",
-                    ) ?? "N/A"}
+                    {(tlOnly
+                      ? pickLatestChronologicalNextFollowup(customer)
+                      : pickEffectiveNextFollowup(customer)
+                    )?.format("DD MMM, YYYY HH:mm") ?? "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
