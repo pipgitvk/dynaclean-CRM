@@ -220,15 +220,15 @@ export default function Navbar({ onToggleSidebar }) {
 
   return (
     <nav
-      className={`w-full min-h-16 h-auto py-2 sm:py-0 sm:h-16 bg-gradient-to-r ${
+      className={`w-full min-h-16 h-auto py-2 min-[1100px]:py-0 min-[1100px]:h-16 bg-gradient-to-r ${
         theme.navbar?.gradient || theme.sidebar.gradient
       } ${
         theme.navbar?.textureClass || ""
-      } shadow-lg flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 px-3 sm:px-4 md:px-6 lg:px-8 border-b ${
+      } shadow-lg flex flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-4 md:px-6 lg:px-8 border-b ${
         theme.sidebar.border
       } transition-colors duration-300 flex-shrink-0`}
     >
-      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-shrink-0">
+      <div className="flex items-center gap-4 min-w-0 flex-shrink-0">
         <button
           onClick={onToggleSidebar}
           className={`${theme.sidebar.text} ${theme.sidebar.hover} p-2 rounded-lg transition-all flex-shrink-0`}
@@ -237,7 +237,7 @@ export default function Navbar({ onToggleSidebar }) {
           <Menu size={24} />
         </button>
 
-        <div className="hidden lg:flex items-center gap-2 min-w-0">
+        <div className="hidden min-[1100px]:flex items-center gap-2 min-w-0">
           <User size={20} className={`${theme.sidebar.text} flex-shrink-0`} />
           <span className={`font-medium ${theme.sidebar.text} truncate`}>
             {username ? `Welcome, ${username}` : "Welcome"} - {userRole}
@@ -245,9 +245,12 @@ export default function Navbar({ onToggleSidebar }) {
         </div>
       </div>
 
-      <div className="flex flex-1 min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div ref={searchRef} className="relative flex-1 min-w-0 w-full sm:max-w-2xl">
-          <div className="flex items-center gap-2 border rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 w-full bg-white min-h-[44px]">
+      <div className="flex flex-1 min-w-0 flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-end min-[1100px]:gap-4 min-[1100px]:overflow-visible overflow-x-auto">
+        <div
+          ref={searchRef}
+          className="relative flex-1 min-w-0 w-full min-[1100px]:w-72 min-[1100px]:flex-none min-[1100px]:flex-shrink-0"
+        >
+          <div className="flex items-center gap-1 min-[1100px]:gap-2 border rounded-lg px-2 min-[1100px]:px-3 py-2 min-[1100px]:py-2.5 w-full bg-white min-h-[44px] min-[1100px]:min-h-0 min-[1100px]:h-10">
             <input
               type="text"
               placeholder="Search customer..."
@@ -263,10 +266,10 @@ export default function Navbar({ onToggleSidebar }) {
           {searchDropdown}
         </div>
 
-        <div className="flex items-center justify-end gap-2 md:gap-3 flex-shrink-0">
+        <div className="flex items-center justify-end gap-2 md:gap-4 flex-shrink-0">
           <Link
             href="/admin-dashboard/add-customer"
-            className="flex items-center justify-center text-white bg-green-600 hover:bg-green-700 px-2.5 py-2.5 sm:px-3 md:px-4 rounded-lg transition-all shadow-md hover:shadow-lg font-medium min-h-[44px] min-w-[44px] sm:min-w-0"
+            className="flex items-center justify-center gap-2 text-white bg-green-600 hover:bg-green-700 px-3 py-2.5 min-[1100px]:px-4 min-[1100px]:py-2.5 rounded-lg transition-all shadow-md hover:shadow-lg font-medium min-h-[44px] min-[1100px]:min-h-0 min-w-[44px] min-[1100px]:min-w-0"
             aria-label="Add Customer"
           >
             <UserPlus size={20} />
@@ -274,7 +277,7 @@ export default function Navbar({ onToggleSidebar }) {
           <button
             type="button"
             onClick={handleNewTask}
-            className="flex items-center justify-center gap-2 text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-2 sm:px-3 md:px-4 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px]"
+            className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 min-[1100px]:px-4 min-[1100px]:py-2 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px] min-[1100px]:min-h-0"
             aria-label="New Task"
           >
             <Plus size={18} />
@@ -284,7 +287,7 @@ export default function Navbar({ onToggleSidebar }) {
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center justify-center gap-2 text-white bg-red-500 hover:bg-red-600 px-2.5 py-2 sm:px-3 md:px-4 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px]"
+            className="flex items-center gap-2 text-white bg-red-500 hover:bg-red-600 px-3 py-2 min-[1100px]:px-4 min-[1100px]:py-2 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px] min-[1100px]:min-h-0"
             aria-label="Logout"
           >
             <LogOut size={18} />
