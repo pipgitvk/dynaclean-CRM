@@ -144,7 +144,13 @@ export async function POST(req) {
       buyers_order_no = null,
       eway_bill_no = null,
       delivery_challan_no = null,
+      linked_trans_ids = null,
     } = body;
+
+    const linkedTransIdsJson =
+      linked_trans_ids && linked_trans_ids.length > 0
+        ? JSON.stringify(linked_trans_ids)
+        : null;
 
     const pool = await getDbConnection();
     conn = await pool.getConnection();
@@ -198,13 +204,25 @@ export async function POST(req) {
 
       try {
         // Insert the invoice header
+        // Ensure linked_trans_ids column exists
+        try {
+          await conn.execute("SELECT linked_trans_ids FROM invoices LIMIT 1");
+        } catch (_) {
+          try {
+            await conn.execute(
+              "ALTER TABLE invoices ADD COLUMN linked_trans_ids TEXT NULL"
+            );
+          } catch (__) {}
+        }
+
         const [result] = await conn.execute(
           `INSERT INTO invoices 
            (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
             subtotal, cgst, sgst, igst, total_tax, grand_total, amount_paid, balance_amount, 
-            payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
+            linked_trans_ids, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             quotation_id,
             finalInvoiceNumber,
@@ -239,6 +257,7 @@ export async function POST(req) {
             buyers_order_no,
             eway_bill_no,
             delivery_challan_no,
+            linkedTransIdsJson,
           ],
         );
 

@@ -20,7 +20,15 @@ export async function GET(request) {
     const daysBack = Number(process.env.TAMIL_CRON_DAYS_BACK) || 7;
     const { since, until } = getTamilCronDateRange(daysBack);
 
-    const result = await importNewTamilFormLeads({ since, until });
+    const skipCampaign =
+      process.env.TAMIL_CRON_SKIP_CAMPAIGN_RESOLVE === "1" ||
+      process.env.TAMIL_CRON_SKIP_CAMPAIGN_RESOLVE === "true";
+
+    const result = await importNewTamilFormLeads({
+      since,
+      until,
+      skipCampaignResolve: skipCampaign,
+    });
 
     if (!result.ok) {
       if (result.error === "FB_PAGE_TOKEN not configured") {

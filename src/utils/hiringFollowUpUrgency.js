@@ -88,6 +88,20 @@ export function getTrafficGradientForHours(hours) {
 }
 
 /**
+ * TL customer follow-up cards: strictly vs **now** — overdue (any past) → red,
+ * any future instant → blue (no 24h “red window”, no green band).
+ */
+export function getTlFollowUpCardGradientForHours(hours) {
+  if (hours == null || Number.isNaN(hours)) {
+    return SLATE_FALLBACK;
+  }
+  if (hours < 0) {
+    return TRAFFIC_RED;
+  }
+  return TRAFFIC_LIGHT_BLUE;
+}
+
+/**
  * Darker traffic variants (optional); not used by the current hiring card layout.
  */
 export function getTrafficOuterGradientForHours(hours) {

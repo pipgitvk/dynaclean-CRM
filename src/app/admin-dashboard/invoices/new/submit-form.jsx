@@ -709,14 +709,11 @@ const fetchQuotationAndFill = async () => {
   <input
     type="number"
     min="0"
-    className={`input w-full ${
-      isFromQuotation ? "bg-gray-100 cursor-not-allowed" : ""
-    }`}
+    className="input w-full bg-gray-100 cursor-not-allowed"
     value={form.amount_paid}
-    readOnly={isFromQuotation} 
-    onChange={(e) =>
-      setForm({ ...form, amount_paid: Number(e.target.value) })
-    }
+    readOnly
+    tabIndex={-1}
+    title="Set via Payment Link or quotation load"
   />
 </div>
 

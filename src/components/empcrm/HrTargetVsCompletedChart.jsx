@@ -31,11 +31,14 @@ function formatAmount(n) {
   return Math.round(Number(n)).toString();
 }
 
-/** One designation: two bars scaled with globalMax, inside the single shared chart row */
-function DesignationBarGroup({ designation, target, completed, globalMax }) {
-  const maxVal = Math.max(globalMax, 1);
-  const targetH = Math.round((Number(target) / maxVal) * 100);
-  const completedH = Math.round((Number(completed) / maxVal) * 100);
+/** One designation: target column is always full height (the bar *is* the goal); done scales vs that row's target. */
+function DesignationBarGroup({ designation, target, completed }) {
+  const t = Number(target);
+  const hasTarget = Number.isFinite(t) && t > 0;
+  const targetH = hasTarget ? 100 : 0;
+  const doneNum = Number(completed);
+  const doneRawPct = hasTarget ? Math.round((doneNum / t) * 100) : 0;
+  const completedH = hasTarget ? Math.min(100, Math.max(doneRawPct, doneNum > 0 ? 4 : 0)) : 0;
 
   return (
     <div className="flex flex-col items-center min-w-[108px] flex-shrink-0 px-2 border-r border-gray-100 last:border-r-0">
@@ -60,7 +63,7 @@ function DesignationBarGroup({ designation, target, completed, globalMax }) {
           <div className="w-full h-28 flex flex-col justify-end rounded-md bg-gray-100/80 overflow-hidden">
             <div
               className="w-full rounded-b-md bg-emerald-500 min-h-[3px] transition-all"
-              style={{ height: `${Math.max(completedH, Number(completed) > 0 ? 4 : 0)}%` }}
+              style={{ height: `${completedH}%` }}
               title="Completed"
             />
           </div>
@@ -74,11 +77,6 @@ function DesignationBarGroup({ designation, target, completed, globalMax }) {
 
 /** Bar row per designation (one HR or single-HR view). */
 function ItemsChartBlock({ items }) {
-  const globalMax = useMemo(() => {
-    if (!items.length) return 1;
-    return Math.max(1, ...items.flatMap((r) => [Number(r.target) || 0, Number(r.completed) || 0]));
-  }, [items]);
-
   if (!items.length) return null;
 
   return (
@@ -90,7 +88,6 @@ function ItemsChartBlock({ items }) {
             designation={row.designation}
             target={row.target ?? 0}
             completed={row.completed ?? 0}
-            globalMax={globalMax}
           />
         ))}
       </div>

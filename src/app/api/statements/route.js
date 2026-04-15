@@ -24,10 +24,36 @@ export async function GET(req) {
         await conn.execute("ALTER TABLE statements ADD COLUMN txn_posted_date DATE NULL AFTER txn_dated_deb");
       } catch (__) {}
     }
+    // Ensure invoice_number column exists
+    try {
+      await conn.execute("SELECT invoice_number FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN invoice_number VARCHAR(100) NULL");
+      } catch (__) {}
+    }
+
     let rows;
+    // Ensure invoice_status column exists
+    try {
+      await conn.execute("SELECT invoice_status FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN invoice_status VARCHAR(50) NULL");
+      } catch (__) {}
+    }
+
+    try {
+      await conn.execute("SELECT closing_balance FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN closing_balance DECIMAL(18,2) NULL");
+      } catch (__) {}
+    }
+
     if (expenseId) {
       [rows] = await conn.execute(
-        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, created_at
+        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, created_at
          FROM statements
          WHERE client_expense_id = ?
          ORDER BY id DESC`,
@@ -35,7 +61,7 @@ export async function GET(req) {
       );
     } else {
       [rows] = await conn.execute(
-        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, created_at
+        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, created_at
          FROM statements
          ORDER BY date DESC, id DESC`
       );
@@ -141,6 +167,57 @@ export async function POST(req) {
       );
     }
     console.error("[statements-api] POST error:", err?.message || err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+// PATCH: link invoice_number to statements by trans_ids
+export async function PATCH(req) {
+  try {
+    const token = req.cookies.get("token")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
+
+    const { trans_ids, invoice_number, invoice_status } = await req.json();
+
+    if (!invoice_number || !Array.isArray(trans_ids) || trans_ids.length === 0) {
+      return NextResponse.json(
+        { error: "invoice_number and trans_ids array are required" },
+        { status: 400 }
+      );
+    }
+
+    const conn = await getDbConnection();
+
+    // Ensure invoice_number column exists
+    try {
+      await conn.execute("SELECT invoice_number FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN invoice_number VARCHAR(100) NULL");
+      } catch (__) {}
+    }
+    // Ensure invoice_status column exists
+    try {
+      await conn.execute("SELECT invoice_status FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN invoice_status VARCHAR(50) NULL");
+      } catch (__) {}
+    }
+
+    const placeholders = trans_ids.map(() => "?").join(", ");
+    const statusVal = invoice_status || "Unsettled";
+    await conn.execute(
+      `UPDATE statements SET invoice_number = ?, invoice_status = ? WHERE trans_id IN (${placeholders})`,
+      [invoice_number, statusVal, ...trans_ids]
+    );
+
+    return NextResponse.json({ success: true, updated: trans_ids.length });
+  } catch (err) {
+    console.error("[statements-api] PATCH error:", err?.message || err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

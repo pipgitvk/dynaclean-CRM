@@ -45,8 +45,6 @@ export default function TLCustomersTable({
   );
   const [selectedStage, setSelectedStage] = useState(searchParams?.stage || "");
   const [selectedTag, setSelectedTag] = useState(searchParams?.tag || "");
-  const [fromDate, setFromDate] = useState(searchParams?.fromDate || "");
-  const [toDate, setToDate] = useState(searchParams?.toDate || "");
   const [nextFromDate, setNextFromDate] = useState(
     searchParams?.nextFromDate || "",
   );
@@ -158,11 +156,7 @@ export default function TLCustomersTable({
   const fetchLatestQuotation = async ({ customerId }) => {
     // console.log("Fetching quotations for user:", customerId);
     setLoading(true);
-    let url = `/api/quotations-show?customer_id=${encodeURIComponent(customerId)}`;
-
-    // Append filters to the API request URL
-    if (fromDate) url += `&from_date=${fromDate}`;
-    if (toDate) url += `&to_date=${toDate}`;
+    const url = `/api/quotations-show?customer_id=${encodeURIComponent(customerId)}`;
 
     try {
       const res = await fetch(url, { next: { revalidate: 3600 } });
@@ -272,8 +266,6 @@ export default function TLCustomersTable({
     //   if (selectedStatus) params.set("status", selectedStatus);
     //   if (selectedStage) params.set("stage", selectedStage);
     //   if (selectedTag) params.set("tag", selectedTag);
-    //   if (fromDate) params.set("fromDate", fromDate);
-    //   if (toDate) params.set("toDate", toDate);
     //   if (nextFromDate) params.set("nextFromDate", nextFromDate);
     //   if (nextToDate) params.set("nextToDate", nextToDate);
 
@@ -293,8 +285,6 @@ export default function TLCustomersTable({
       if (selectedStatus) params.set("status", selectedStatus);
       if (selectedStage) params.set("stage", selectedStage);
       if (selectedTag) params.set("tag", selectedTag);
-      if (fromDate) params.set("fromDate", fromDate);
-      if (toDate) params.set("toDate", toDate);
       if (nextFromDate) params.set("nextFromDate", nextFromDate);
       if (nextToDate) params.set("nextToDate", nextToDate);
       router.push(`${basePath}?${params.toString()}`);
@@ -308,8 +298,6 @@ export default function TLCustomersTable({
       setSelectedStatus("");
       setSelectedStage("");
       setSelectedTag("");
-      setFromDate("");
-      setToDate("");
       setNextFromDate("");
       setNextToDate("");
       router.push(basePath);
@@ -324,8 +312,6 @@ export default function TLCustomersTable({
       if (selectedStatus) params.set("status", selectedStatus);
       if (selectedStage) params.set("stage", selectedStage);
       if (selectedTag) params.set("tag", selectedTag);
-      if (fromDate) params.set("fromDate", fromDate);
-      if (toDate) params.set("toDate", toDate);
       if (nextFromDate) params.set("nextFromDate", nextFromDate);
       if (nextToDate) params.set("nextToDate", nextToDate);
 
@@ -342,8 +328,6 @@ export default function TLCustomersTable({
   if (selectedStatus) currentQuery.set("status", selectedStatus);
   if (selectedStage) currentQuery.set("stage", selectedStage);
   if (selectedTag) currentQuery.set("tag", selectedTag);
-  if (fromDate) currentQuery.set("fromDate", fromDate);
-  if (toDate) currentQuery.set("toDate", toDate);
   if (nextFromDate) currentQuery.set("nextFromDate", nextFromDate);
   if (nextToDate) currentQuery.set("nextToDate", nextToDate);
   if (tlOnly !== undefined)
@@ -531,8 +515,6 @@ export default function TLCustomersTable({
                         if (status) params.set("status", status);
                         if (selectedStage) params.set("stage", selectedStage);
                         if (selectedTag) params.set("tag", selectedTag);
-                        if (fromDate) params.set("fromDate", fromDate);
-                        if (toDate) params.set("toDate", toDate);
                         if (nextFromDate)
                           params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
@@ -580,8 +562,6 @@ export default function TLCustomersTable({
                           params.set("status", selectedStatus);
                         if (stage) params.set("stage", stage);
                         if (selectedTag) params.set("tag", selectedTag);
-                        if (fromDate) params.set("fromDate", fromDate);
-                        if (toDate) params.set("toDate", toDate);
                         if (nextFromDate)
                           params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
@@ -636,8 +616,6 @@ export default function TLCustomersTable({
                           params.set("status", selectedStatus);
                         if (selectedStage) params.set("stage", selectedStage);
                         if (tag) params.set("tag", tag);
-                        if (fromDate) params.set("fromDate", fromDate);
-                        if (toDate) params.set("toDate", toDate);
                         if (nextFromDate)
                           params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
@@ -658,38 +636,10 @@ export default function TLCustomersTable({
                   </select>
                 </div>
 
-                {/* Follow-up Date From */}
+                {/* Next Followup (same value as table column "Next Followup") */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Follow-up From
-                  </label>
-                  <input
-                    type="date"
-                    placeholder="Follow-up date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Follow-up Date To */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Follow-up To
-                  </label>
-                  <input
-                    type="date"
-                    placeholder="Follow-up date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                {/* Next Follow-up From */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Next Follow-up From
+                    Next Followup from
                   </label>
                   <input
                     type="date"
@@ -700,10 +650,9 @@ export default function TLCustomersTable({
                   />
                 </div>
 
-                {/* Next Follow-up To */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Next Follow-up To
+                    Next Followup to
                   </label>
                   <input
                     type="date"
@@ -759,8 +708,6 @@ export default function TLCustomersTable({
                           params.set("status", selectedStatus);
                         if (selectedStage) params.set("stage", selectedStage);
                         if (selectedTag) params.set("tag", selectedTag);
-                        if (fromDate) params.set("fromDate", fromDate);
-                        if (toDate) params.set("toDate", toDate);
                         if (nextFromDate)
                           params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
