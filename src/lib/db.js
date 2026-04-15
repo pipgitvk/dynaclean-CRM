@@ -1,24 +1,22 @@
-
-
 // lib/db.js
 import mysql from "mysql2/promise";
 import { promises as dns } from "dns";
 
-let resolvedIp = null;
-let pool = null; // single global pool
+/** Survives Next.js dev HMR so we do not open a new pool per module reload (avoids MySQL "Too many connections"). */
+const g = globalThis;
 
-// Resolve DB host to IPv4 (once per runtime)
+// Resolve DB host to IPv4 (once per process)
 async function resolveDbHost() {
-  if (resolvedIp) return resolvedIp;
+  if (g.__mysqlResolvedIpv4) return g.__mysqlResolvedIpv4;
 
   const host = process.env.DB_HOST;
   if (!host) throw new Error("DB_HOST is missing in environment variables.");
 
   try {
     const { address } = await dns.lookup(host, { family: 4 });
-    resolvedIp = address;
-    console.log(`✅ [DB] Resolved ${host} to IPv4: ${resolvedIp}`);
-    return resolvedIp;
+    g.__mysqlResolvedIpv4 = address;
+    console.log(`✅ [DB] Resolved ${host} to IPv4: ${address}`);
+    return address;
   } catch (err) {
     console.error("❌ [DB] Failed to resolve DB_HOST:", err);
     throw new Error("DNS resolution failed for DB_HOST");
@@ -26,10 +24,10 @@ async function resolveDbHost() {
 }
 
 export async function getDbConnection() {
-  if (!pool) {
+  if (!g.__mysqlPool) {
     const host = await resolveDbHost();
 
-    pool = mysql.createPool({
+    g.__mysqlPool = mysql.createPool({
       host,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
@@ -49,5 +47,5 @@ export async function getDbConnection() {
     console.log("✅ [DB] Connection pool created");
   }
 
-  return pool;
+  return g.__mysqlPool;
 }
