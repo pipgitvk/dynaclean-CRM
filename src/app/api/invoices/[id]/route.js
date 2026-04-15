@@ -17,13 +17,40 @@ export async function GET(_req, context) {
 
     const conn = await getDbConnection();
 
-    const [[invoice]] = await conn.execute(
+    const [[inv]] = await conn.execute(
       `SELECT * FROM invoices WHERE id = ? LIMIT 1`,
       [invoiceId],
     );
 
-    if (!invoice) {
+    if (!inv) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    const invoice = { ...inv };
+    const noCustomerId =
+      invoice.customer_id == null ||
+      String(invoice.customer_id).trim() === "";
+    const qRef =
+      invoice.quotation_id != null
+        ? String(invoice.quotation_id).trim()
+        : "";
+    if (noCustomerId && qRef !== "") {
+      try {
+        const [[qr]] = await conn.execute(
+          `SELECT customer_id AS cid FROM quotations_records
+           WHERE TRIM(CAST(\`S.No.\` AS CHAR)) = TRIM(CAST(? AS CHAR))
+           LIMIT 1`,
+          [qRef],
+        );
+        if (qr?.cid != null && String(qr.cid).trim() !== "") {
+          invoice.customer_id = qr.cid;
+        }
+      } catch (lookupErr) {
+        console.warn(
+          "Invoice GET: quotation customer_id lookup skipped:",
+          lookupErr?.message || lookupErr,
+        );
+      }
     }
 
     const [items] = await conn.execute(
