@@ -7,22 +7,41 @@ import Link from "next/link";
 export default function FastCardsWidget() {
   const [cardData, setCardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [allowed, setAllowed] = useState(true);
 
   useEffect(() => {
-    const fetchCardData = async () => {
+    const init = async () => {
       try {
-        const response = await fetch("/api/card-data");
-        if (!response.ok) throw new Error("Failed to fetch");
-        const result = await response.json();
-        setCardData(result);
+        const [modulesRes, cardRes] = await Promise.all([
+          fetch("/api/my-modules"),
+          fetch("/api/card-data"),
+        ]);
+
+        if (modulesRes.ok) {
+          const { allowedModules } = await modulesRes.json();
+          // null means all allowed; otherwise check if fast-card is in the list
+          if (allowedModules !== null && !allowedModules.includes("fast-card")) {
+            setAllowed(false);
+            setLoading(false);
+            return;
+          }
+        }
+
+        if (cardRes.ok) {
+          const result = await cardRes.json();
+          setCardData(result);
+        }
       } catch {
         setCardData(null);
       } finally {
         setLoading(false);
       }
     };
-    fetchCardData();
+    init();
   }, []);
+
+  // Module not allowed — render nothing
+  if (!loading && !allowed) return null;
 
   const cards = [
     {

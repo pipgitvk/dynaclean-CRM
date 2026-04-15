@@ -4,6 +4,8 @@ import AttendanceTracker from "@/components/AttendanceTracker";
 import EmployeeTargetGraph from "@/components/targets/EmployeeTargetGraph";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
+import FastCardsWidget from "@/components/FastCardsWidget";
+import TodayReportButton from "@/components/TodayReportButton";
 
 export default function GemPortalDashboard({ user }) {
   return (
@@ -21,6 +23,11 @@ export default function GemPortalDashboard({ user }) {
               </h1>
               <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
             </div>
+            <TodayReportButton />
+          </div>
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fast Cards</p>
+            <FastCardsWidget />
           </div>
         </div>
 

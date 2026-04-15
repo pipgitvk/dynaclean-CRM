@@ -4,6 +4,8 @@ import AttendanceTracker from "@/components/AttendanceTracker";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import UpcomingTeamLeaderFollowups from "@/components/Leads/UpcomingTeamLeaderFollowups";
+import FastCardsWidget from "@/components/FastCardsWidget";
+import TodayReportButton from "@/components/TodayReportButton";
 
 export default function TeamLeaderDashboard({ user }) {
   return (
@@ -13,14 +15,19 @@ export default function TeamLeaderDashboard({ user }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
 
         <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-4 md:p-6">
-          <div className="flex flex-col sm:flex-row items-start gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <ProfilePicUploader user={user} />
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-semibold">
                 Welcome, <span className="text-green-700">{user.username}</span>
               </h1>
               <p className="text-sm text-gray-500">Role: {user.userRole}</p>
             </div>
+            <TodayReportButton />
+          </div>
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fast Cards</p>
+            <FastCardsWidget />
           </div>
         </div>
 

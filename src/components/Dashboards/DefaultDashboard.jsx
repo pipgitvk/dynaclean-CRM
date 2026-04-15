@@ -6,6 +6,8 @@ import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import HrTargetVsCompletedChart from "@/components/empcrm/HrTargetVsCompletedChart";
 import HiringCandidatesFollowUpSection from "@/components/empcrm/hiring/HiringCandidatesFollowUpSection";
 import { canAccessHiringModule, canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
+import FastCardsWidget from "@/components/FastCardsWidget";
+import TodayReportButton from "@/components/TodayReportButton";
 
 export default function DefaultDashboard({ user }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
@@ -23,14 +25,19 @@ export default function DefaultDashboard({ user }) {
         <div
           className={`bg-white rounded-xl shadow-md p-4 md:p-6 min-w-0 ${showHrTargetChart ? "" : "lg:col-span-2"}`}
         >
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <ProfilePicUploader user={user} />
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-semibold">
                 Welcome, <span className={welcomeNameClass}>{user.username}</span>
               </h1>
               <p className="text-sm text-gray-500">Role: {user.userRole}</p>
             </div>
+            <TodayReportButton />
+          </div>
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fast Cards</p>
+            <FastCardsWidget />
           </div>
         </div>
 

@@ -4,9 +4,8 @@ import AttendanceTracker from "@/components/AttendanceTracker";
 import EmployeeTargetGraph from "@/components/targets/EmployeeTargetGraph";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
-import Link from "next/link";
-import { FileText } from "lucide-react";
 import FastCardsWidget from "@/components/FastCardsWidget";
+import TodayReportButton from "@/components/TodayReportButton";
 
 export default function SalesDashboard({ user }) {
   return (
@@ -25,13 +24,7 @@ export default function SalesDashboard({ user }) {
                 </h1>
                 <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
               </div>
-              <Link
-                href="/user-dashboard/today-reports"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shrink-0"
-              >
-                <FileText size={16} />
-                Today Report
-              </Link>
+              <TodayReportButton />
             </div>
 
             {/* Fast Cards inline */}
