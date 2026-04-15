@@ -3,12 +3,23 @@ import Link from "next/link";
 // import ProfilePicUploader from "@/app/user-dashboard/ProfilePicUploader";
 // import AttendanceTracker from "@/components/AttendanceTracker";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
+import FastCardsWidget from "@/components/FastCardsWidget";
+import TodayReportButton from "@/components/TodayReportButton";
 
 export default function WarehouseInchargeDashboard({ user, counts }) {
   return (
     <div className="space-y-4 md:space-y-6">
 
       
+
+      {/* Fast Cards + Today Report */}
+      <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fast Cards</p>
+          <TodayReportButton />
+        </div>
+        <FastCardsWidget />
+      </div>
 
       {/* Pending Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
