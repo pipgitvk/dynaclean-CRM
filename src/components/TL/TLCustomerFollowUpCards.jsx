@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import dayjs from "dayjs";
-import { CalendarDays, Edit, Eye, Sparkles, StickyNote, User } from "lucide-react";
+import { CalendarDays, Edit, Eye, StickyNote, User } from "lucide-react";
 import { getTlFollowUpCardGradientForHours } from "@/utils/hiringFollowUpUrgency";
 import { pickEffectiveNextFollowup } from "@/utils/tlNextFollowupResolve";
 
@@ -73,10 +73,6 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref }) {
       <div className="relative z-10 flex min-h-0 flex-1 flex-col p-6">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">
-              <Sparkles className="h-3 w-3 opacity-90" />
-              Customer
-            </p>
             <Link
               href={detailHref}
               className="block text-xl font-bold leading-tight tracking-tight text-white line-clamp-2 hover:underline"
