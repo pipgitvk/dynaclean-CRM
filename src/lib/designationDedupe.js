@@ -55,6 +55,14 @@ export function dedupeDesignationStrings(rawList) {
   return out.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
+/** Normalized keys hidden from designation dropdowns / filters (data may still exist in DB). */
+const DESIGNATION_DROPDOWN_BLOCKLIST_KEYS = new Set(["full stack developer", "digital marketer"]);
+
+/** Remove blocklisted designations from API-fed option lists. */
+export function omitBlockedDesignations(designations) {
+  return (designations || []).filter((d) => !DESIGNATION_DROPDOWN_BLOCKLIST_KEYS.has(normalizeDesignationKey(d)));
+}
+
 /** Merge master list with extra values (e.g. current form value); dedupes by normalized key. */
 export function mergeDesignationOptions(baseList, ...extras) {
   const all = [...(baseList || [])];

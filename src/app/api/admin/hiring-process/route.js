@@ -4,6 +4,7 @@ import { getSessionPayload } from "@/lib/auth";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { parseHiringPayload, toMysqlDatetime } from "@/lib/hiringPayload";
 import { logHiringNoteUpdate, logHiringStatusChange } from "@/lib/hiringStatusHistory";
+import { omitBlockedDesignations } from "@/lib/designationDedupe";
 
 function assertSuperadmin(payload) {
   if (!payload?.username) {
@@ -89,7 +90,9 @@ export async function GET(req) {
     if (modeFilter) distParams.push(modeFilter);
     if (createdByTrimmed) distParams.push(createdByTrimmed);
     const [distRows] = await conn.execute(distSql, distParams);
-    const designations = distRows.map((r) => r.d).filter((x) => x != null && String(x).trim() !== "");
+    const designations = omitBlockedDesignations(
+      distRows.map((r) => r.d).filter((x) => x != null && String(x).trim() !== "")
+    );
 
     let hrSql = `SELECT DISTINCT TRIM(created_by) AS u FROM candidates
       WHERE TRIM(COALESCE(created_by, '')) != ''${ymClause}${modeClause}${designationClause} ORDER BY u`;

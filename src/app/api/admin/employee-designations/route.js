@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
-import { dedupeDesignationStrings } from "@/lib/designationDedupe";
+import { dedupeDesignationStrings, omitBlockedDesignations } from "@/lib/designationDedupe";
 
 /**
  * GET: distinct job designations from employee_profiles and candidates (for HR target dropdown).
@@ -50,7 +50,7 @@ export async function GET() {
       /* candidates table optional */
     }
 
-    const list = dedupeDesignationStrings(raw);
+    const list = omitBlockedDesignations(dedupeDesignationStrings(raw));
 
     return NextResponse.json({ success: true, designations: list });
   } catch (error) {
