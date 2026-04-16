@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarClock, Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
 import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS } from "@/lib/hiringPayload";
+import { mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 
 /** Shared field styles */
 const fieldClass =
@@ -183,6 +184,7 @@ export default function HiringPage() {
   const [filterInterviewFrom, setFilterInterviewFrom] = useState("");
   const [filterInterviewTo, setFilterInterviewTo] = useState("");
   const [designationOptions, setDesignationOptions] = useState([]);
+  const [loadingDesignations, setLoadingDesignations] = useState(true);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -241,7 +243,6 @@ export default function HiringPage() {
       const json = await res.json();
       if (json.success) {
         setEntries(json.entries || []);
-        setDesignationOptions(Array.isArray(json.designations) ? json.designations : []);
         if (typeof json.next_id === "number" && Number.isFinite(json.next_id)) {
           setNextId(json.next_id);
         }
@@ -258,11 +259,42 @@ export default function HiringPage() {
   }, [load]);
 
   useEffect(() => {
-    if (!filterDesignation || loading) return;
-    if (!designationOptions.includes(filterDesignation)) {
-      setFilterDesignation("");
-    }
-  }, [designationOptions, filterDesignation, loading]);
+    let cancelled = false;
+    (async () => {
+      setLoadingDesignations(true);
+      try {
+        const res = await fetch("/api/empcrm/hiring-designations", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && json.success) {
+          setDesignationOptions(Array.isArray(json.designations) ? json.designations : []);
+        }
+      } catch {
+        if (!cancelled) setDesignationOptions([]);
+      } finally {
+        if (!cancelled) setLoadingDesignations(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!filterDesignation || loadingDesignations) return;
+    const k = normalizeDesignationKey(filterDesignation);
+    const ok = designationOptions.some((d) => normalizeDesignationKey(d) === k);
+    if (!ok) setFilterDesignation("");
+  }, [designationOptions, filterDesignation, loadingDesignations]);
+
+  const addFormDesignations = useMemo(
+    () => mergeDesignationOptions(designationOptions, designation),
+    [designationOptions, designation]
+  );
+
+  const editFormDesignations = useMemo(
+    () => mergeDesignationOptions(designationOptions, editing?.designation),
+    [designationOptions, editing?.designation]
+  );
 
   const resetForm = () => {
     setCandidateName("");
@@ -471,7 +503,7 @@ export default function HiringPage() {
       id: row.id,
       candidate_name: row.candidate_name ?? "",
       emp_contact: row.emp_contact ?? "",
-      designation: row.designation ?? "",
+      designation: resolveCanonicalDesignation(row.designation ?? "", designationOptions),
       marital_status: row.marital_status ?? "",
       experience_type: row.experience_type ?? "",
       interview_at: toDatetimeLocalValue(row.interview_at),
@@ -712,21 +744,21 @@ export default function HiringPage() {
             <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
               Joining date (from – to)
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <input
                 type="date"
                 value={filterJoinFrom}
                 onChange={(e) => setFilterJoinFrom(e.target.value)}
-                className={`${fieldClass} flex-1 min-w-0`}
+                className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
                 title="Joining from"
               />
-              <span className="text-xs text-slate-400">–</span>
+              <span className="hidden text-xs text-slate-400 sm:inline">–</span>
               <input
                 type="date"
                 value={filterJoinTo}
                 min={filterJoinFrom || undefined}
                 onChange={(e) => setFilterJoinTo(e.target.value)}
-                className={`${fieldClass} flex-1 min-w-0`}
+                className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
                 title="Joining to"
               />
               {(filterJoinFrom || filterJoinTo) && (
@@ -1076,7 +1108,7 @@ export default function HiringPage() {
             onClick={() => !saving && closeFollowUp()}
             aria-hidden
           />
-          <div className="relative z-10 mx-0 max-h-[min(92dvh,100%)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-slate-200/90 bg-white shadow-2xl sm:mx-auto sm:max-h-[90vh] sm:rounded-2xl">
+          <div className="relative z-10 mx-0 max-h-[min(92dvh,100dvh)] w-full min-w-0 max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-slate-200/90 bg-white shadow-2xl sm:mx-auto sm:max-h-[min(90vh,92dvh)] sm:rounded-2xl">
             <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-amber-50/80 to-indigo-50/30 px-4 py-3.5 sm:px-5 sm:py-4">
               <div className="min-w-0">
                 <h2 id="follow-up-title" className="text-base font-semibold text-slate-900 sm:text-lg">
@@ -1097,7 +1129,10 @@ export default function HiringPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleFollowUpSubmit} className="space-y-4 px-4 py-4 sm:px-5 sm:py-5 pb-6">
+            <form
+              onSubmit={handleFollowUpSubmit}
+              className="space-y-4 px-4 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-5 sm:pb-6"
+            >
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Status *</label>
                 <select
@@ -1310,9 +1345,8 @@ export default function HiringPage() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10) *</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
                   <input
-                    required
                     type="number"
                     min={1}
                     max={10}
@@ -1323,9 +1357,8 @@ export default function HiringPage() {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">HR score *</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">HR score</label>
                   <select
-                    required
                     value={followUp.hrScoreRating ?? ""}
                     onChange={(e) => updateFollowUp("hrScoreRating", e.target.value)}
                     className={formSelectClass}
@@ -1339,9 +1372,8 @@ export default function HiringPage() {
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary *</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary</label>
                   <input
-                    required
                     type="text"
                     value={followUp.currentSalary ?? ""}
                     onChange={(e) => updateFollowUp("currentSalary", e.target.value)}
@@ -1454,19 +1486,27 @@ export default function HiringPage() {
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">Designation *</label>
-                    <input
+                    <select
                       required
                       value={designation}
                       onChange={(e) => setDesignation(e.target.value)}
-                      placeholder="Same as target row if applicable"
-                      className={formFieldClass}
-                    />
+                      disabled={loadingDesignations}
+                      className={formSelectClass}
+                    >
+                      <option value="">
+                        {loadingDesignations ? "Loading designations…" : "— Select designation —"}
+                      </option>
+                      {addFormDesignations.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10) *</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
                     <input
-                      required
                       type="number"
                       min={1}
                       max={10}
@@ -1478,9 +1518,8 @@ export default function HiringPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">HR score *</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">HR score</label>
                     <select
-                      required
                       value={hrScoreRating}
                       onChange={(e) => setHrScoreRating(e.target.value)}
                       className={formSelectClass}
@@ -1495,9 +1534,8 @@ export default function HiringPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary *</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary</label>
                     <input
-                      required
                       type="text"
                       value={currentSalary}
                       onChange={(e) => setCurrentSalary(e.target.value)}
@@ -1518,9 +1556,8 @@ export default function HiringPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Marital status *</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Marital status</label>
                     <select
-                      required
                       value={marital_status}
                       onChange={(e) => setMaritalStatus(e.target.value)}
                       className={formSelectClass}
@@ -1535,9 +1572,8 @@ export default function HiringPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Experience / Fresher *</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Experience / Fresher</label>
                     <select
-                      required
                       value={experience_type}
                       onChange={(e) => setExperienceType(e.target.value)}
                       className={formSelectClass}
@@ -1552,10 +1588,9 @@ export default function HiringPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time *</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time</label>
                     <input
                       type="datetime-local"
-                      required
                       value={interview_at}
                       onChange={(e) => setInterviewAt(e.target.value)}
                       className={formFieldClass}
@@ -1563,9 +1598,8 @@ export default function HiringPage() {
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Mode of interview *</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Mode of interview</label>
                     <select
-                      required
                       value={interview_mode}
                       onChange={(e) => setInterviewMode(e.target.value)}
                       className={formSelectClass}
@@ -1822,7 +1856,7 @@ export default function HiringPage() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="mx-0 max-h-[min(92dvh,100%)] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-t-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/10 sm:mx-auto sm:max-h-[92vh] sm:rounded-2xl">
+          <div className="mx-0 max-h-[min(92dvh,100dvh)] w-full min-w-0 max-w-2xl overflow-y-auto overscroll-contain rounded-t-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/10 sm:mx-auto sm:max-h-[min(92vh,100dvh)] sm:rounded-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/30 px-4 py-3.5 sm:px-5 sm:py-4 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-4">
               <h3 className="min-w-0 truncate text-base font-semibold text-slate-900 sm:text-lg">
                 Edit record <span className="font-normal text-slate-500">#{editing.id}</span>
@@ -1859,17 +1893,26 @@ export default function HiringPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Designation *</label>
-                  <input
+                  <select
                     required
                     value={editing.designation}
                     onChange={(e) => updateEdit("designation", e.target.value)}
-                    className={formFieldClass}
-                  />
+                    disabled={loadingDesignations}
+                    className={formSelectClass}
+                  >
+                    <option value="">
+                      {loadingDesignations ? "Loading designations…" : "— Select designation —"}
+                    </option>
+                    {editFormDesignations.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">HR Interview Score (1–10) *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">HR Interview Score (1–10)</label>
                   <input
-                    required
                     type="number"
                     min={1}
                     max={10}
@@ -1880,9 +1923,8 @@ export default function HiringPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">HR score *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">HR score</label>
                   <select
-                    required
                     value={editing.hrScoreRating ?? ""}
                     onChange={(e) => updateEdit("hrScoreRating", e.target.value)}
                     className={formSelectClass}
@@ -1896,9 +1938,8 @@ export default function HiringPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Current Salary *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Current Salary</label>
                   <input
-                    required
                     type="text"
                     value={editing.currentSalary ?? ""}
                     onChange={(e) => updateEdit("currentSalary", e.target.value)}
@@ -1917,9 +1958,8 @@ export default function HiringPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Marital status *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Marital status</label>
                   <select
-                    required
                     value={editing.marital_status}
                     onChange={(e) => updateEdit("marital_status", e.target.value)}
                     className={formSelectClass}
@@ -1933,9 +1973,8 @@ export default function HiringPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Experience / Fresher *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Experience / Fresher</label>
                   <select
-                    required
                     value={editing.experience_type}
                     onChange={(e) => updateEdit("experience_type", e.target.value)}
                     className={formSelectClass}
@@ -1949,19 +1988,17 @@ export default function HiringPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Interview date &amp; time *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Interview date &amp; time</label>
                   <input
                     type="datetime-local"
-                    required
                     value={editing.interview_at}
                     onChange={(e) => updateEdit("interview_at", e.target.value)}
                     className={formFieldClass}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Mode of interview *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Mode of interview</label>
                   <select
-                    required
                     value={editing.interview_mode}
                     onChange={(e) => updateEdit("interview_mode", e.target.value)}
                     className={formSelectClass}

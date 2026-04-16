@@ -94,7 +94,7 @@ export default function TLCustomersTable({
             "Lost",
             "Disqualified / Invalid Lead",
           ];
-          if (excludedStages.includes(customer.stage)) return false;
+          if (excludedStages.includes(customer.stage)) return false;  
 
           const followupTime = pickEffectiveNextFollowup(customer);
           if (!followupTime) return false;
