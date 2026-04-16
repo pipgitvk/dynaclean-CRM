@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canAccessHiringModule } from "@/lib/hrTargetEligibleRoles";
+import { omitBlockedDesignations } from "@/lib/designationDedupe";
 
 /**
  * GET — distinct designations from `hr_designation_monthly_targets` assigned to the logged-in HR (`hr_username`).
@@ -42,9 +43,11 @@ export async function GET() {
       [payload.username]
     );
 
-    const designations = (rows || [])
-      .map((r) => (r.d != null ? String(r.d).trim() : ""))
-      .filter((s) => s !== "");
+    const designations = omitBlockedDesignations(
+      (rows || [])
+        .map((r) => (r.d != null ? String(r.d).trim() : ""))
+        .filter((s) => s !== "")
+    );
 
     return NextResponse.json({ success: true, designations });
   } catch (error) {

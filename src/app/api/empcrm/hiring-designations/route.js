@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canAccessHiringModule } from "@/lib/hrTargetEligibleRoles";
-import { dedupeDesignationStrings } from "@/lib/designationDedupe";
+import { dedupeDesignationStrings, omitBlockedDesignations } from "@/lib/designationDedupe";
 
 function assertHrRole(payload) {
   if (!payload?.username) {
@@ -55,7 +55,7 @@ export async function GET() {
       /* candidates optional */
     }
 
-    const designations = dedupeDesignationStrings(raw);
+    const designations = omitBlockedDesignations(dedupeDesignationStrings(raw));
     return NextResponse.json({ success: true, designations });
   } catch (error) {
     console.error("[empcrm/hiring-designations]", error);

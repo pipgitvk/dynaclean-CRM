@@ -4,6 +4,7 @@ import { getSessionPayload } from "@/lib/auth";
 import { canAccessHiringModule } from "@/lib/hrTargetEligibleRoles";
 import { logHiringCreated, logHiringNoteUpdate, logHiringStatusChange } from "@/lib/hiringStatusHistory";
 import { parseHiringPayload, toMysqlDatetime } from "@/lib/hiringPayload";
+import { omitBlockedDesignations } from "@/lib/designationDedupe";
 
 function assertHrRole(payload) {
   if (!payload?.username) {
@@ -88,7 +89,9 @@ export async function GET(req) {
     const distParams = [payload.username, ...ymParams];
     if (modeFilter) distParams.push(modeFilter);
     const [distRows] = await conn.execute(distSql, distParams);
-    const designations = distRows.map((r) => r.d).filter((x) => x != null && String(x).trim() !== "");
+    const designations = omitBlockedDesignations(
+      distRows.map((r) => r.d).filter((x) => x != null && String(x).trim() !== "")
+    );
 
     let sql = `SELECT h.id, h.created_by,
          COALESCE(ep.full_name, h.created_by) AS creator_name,
