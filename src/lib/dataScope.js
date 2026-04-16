@@ -4,6 +4,12 @@ export function isSuperAdminRole(role) {
   return normalizeRoleKey(role) === "SUPERADMIN";
 }
 
+/** SUPERADMIN and ADMIN may view any employee on the daily dashboard; all other roles are self-only. */
+export function canViewAllEmployeeDailyReports(role) {
+  const k = normalizeRoleKey(role);
+  return k === "SUPERADMIN" || k === "ADMIN";
+}
+
 export function getScopedUsername(payload) {
   const u = String(payload?.username ?? "").trim();
   return u || null;

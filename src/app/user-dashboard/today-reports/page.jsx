@@ -8,6 +8,7 @@ import { Search } from "lucide-react";
 import dayjs from "dayjs";
 import weekday from "dayjs/plugin/weekday";
 import weekOfYear from "dayjs/plugin/weekOfYear";
+import { canViewAllEmployeeDailyReports } from "@/lib/dataScope";
 
 dayjs.extend(weekday);
 dayjs.extend(weekOfYear);
@@ -99,9 +100,8 @@ export default function DashboardPage() {
         const me = await res.json();
         setCurrentUser(me);
 
-        const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "HR"];
-        if (!privilegedRoles.includes(me.userRole)) {
-          // For sales / normal employees, force their own username
+        if (!canViewAllEmployeeDailyReports(me.userRole)) {
+          // Same as employee daily report: own data only (incl. Global Module Access grants)
           setSelectedEmployee(me.username);
         }
       } catch (e) {
@@ -177,15 +177,13 @@ export default function DashboardPage() {
             className="w-full md:w-64 px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"
             disabled={
               currentUser &&
-              !["ADMIN", "SUPERADMIN", "TEAM LEADER", "HR"].includes(
-                currentUser.userRole
-              )
+              !canViewAllEmployeeDailyReports(currentUser.userRole)
             }
           >
             {(!currentUser ||
-              ["ADMIN", "SUPERADMIN", "TEAM LEADER", "HR"].includes(
-                currentUser.userRole
-              )) && <option value="all">All Employees</option>}
+              canViewAllEmployeeDailyReports(currentUser.userRole)) && (
+              <option value="all">All Employees</option>
+            )}
             {employees &&
               employees.map((emp) => (
                 <option key={emp} value={emp}>
