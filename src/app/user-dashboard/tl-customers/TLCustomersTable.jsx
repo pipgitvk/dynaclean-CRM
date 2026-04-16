@@ -18,10 +18,7 @@ import {
   getTlCustomersTableTagOptions,
   getTlMultiTagChipClass,
 } from "@/utils/tlFollowupTagOptions";
-import {
-  pickEffectiveNextFollowup,
-  pickLatestChronologicalNextFollowup,
-} from "@/utils/tlNextFollowupResolve";
+import { pickEffectiveNextFollowup } from "@/utils/tlNextFollowupResolve";
 import {
   formatCrmDatetimeForISTDisplay,
   formatCrmDayjsForISTDisplay,
@@ -1014,12 +1011,15 @@ export default function TLCustomersTable({
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {formatCrmDayjsForISTDisplay(
-                      tlOnly
-                        ? pickLatestChronologicalNextFollowup(customer)
-                        : pickEffectiveNextFollowup(customer),
-                      "DD MMM, YYYY HH:mm",
-                    ) || "N/A"}
+                    {tlOnly
+                      ? formatCrmDatetimeForISTDisplay(
+                          customer.tl_next_followup,
+                          "DD MMM, YYYY HH:mm",
+                        ) || "N/A"
+                      : formatCrmDayjsForISTDisplay(
+                          pickEffectiveNextFollowup(customer),
+                          "DD MMM, YYYY HH:mm",
+                        ) || "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
