@@ -1,7 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import dayjs from "dayjs";
 import Link from "next/link";
+import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 import {
   ArrowLeft,
   Phone,
@@ -92,7 +92,10 @@ export default async function TLCustomerDetailPage({ params }) {
                 </span>
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {dayjs(customer.date_created).format("MMM DD, YYYY")}
+                  {formatCrmDatetimeForISTDisplay(
+                    customer.date_created,
+                    "MMM DD, YYYY",
+                  ) || "—"}
                 </span>
               </div>
             </div>
@@ -265,9 +268,10 @@ export default async function TLCustomerDetailPage({ params }) {
                               {isTLFollowup ? "TL" : "Emp"}
                             </span>
                             <span className="text-gray-500">
-                              {dayjs(
+                              {formatCrmDatetimeForISTDisplay(
                                 followup.time_stamp || followup.created_at,
-                              ).format("MMM DD, YYYY • hh:mm A")}
+                                "MMM DD, YYYY • hh:mm A",
+                              ) || "—"}
                             </span>
                             <span className="text-gray-600">
                               <strong>By:</strong> {followup.followed_by}
@@ -320,9 +324,10 @@ export default async function TLCustomerDetailPage({ params }) {
                                 <span className="text-gray-500">Next:</span>
                                 <p className="text-orange-800 font-medium flex items-center gap-1">
                                   <Clock className="w-3 h-3" />
-                                  {dayjs(followup.next_followup_date).format(
-                                    "MMM DD, HH:mm",
-                                  )}
+                                  {formatCrmDatetimeForISTDisplay(
+                                    followup.next_followup_date,
+                                    "MMM DD, hh:mm A",
+                                  ) || "—"}
                                 </p>
                               </div>
                             )}
@@ -333,9 +338,10 @@ export default async function TLCustomerDetailPage({ params }) {
                                 </span>
                                 <p className="text-yellow-800 font-medium flex items-center gap-1">
                                   <Target className="w-3 h-3" />
-                                  {dayjs(followup.estimated_order_date).format(
+                                  {formatCrmDatetimeForISTDisplay(
+                                    followup.estimated_order_date,
                                     "MMM DD",
-                                  )}
+                                  ) || "—"}
                                 </p>
                               </div>
                             )}
