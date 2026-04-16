@@ -26,7 +26,7 @@ export function isCrmDbStoredUtc() {
  * Parse a CRM datetime for display/sort: naive strings are UTC wall-clock when DB
  * stores UTC; otherwise treated as local wall-clock (typical local dev).
  */
-function parseCrmDatetimeToDayjs(value) {
+export function parseCrmDatetimeToDayjs(value) {
   if (value == null || value === '') return null;
   const s = String(value).trim();
   if (!s) return null;
@@ -47,6 +47,12 @@ function parseCrmDatetimeToDayjs(value) {
  */
 export function formatCrmDatetimeForISTDisplay(value, format = 'DD MMM, YYYY hh:mm A') {
   const d = parseCrmDatetimeToDayjs(value);
+  if (!d || !d.isValid()) return '';
+  return d.utcOffset(IST_OFFSET_MINUTES).format(format);
+}
+
+/** Format an instant already parsed with {@link parseCrmDatetimeToDayjs} (e.g. from TL pick helpers) for IST display. */
+export function formatCrmDayjsForISTDisplay(d, format = 'DD MMM, YYYY HH:mm') {
   if (!d || !d.isValid()) return '';
   return d.utcOffset(IST_OFFSET_MINUTES).format(format);
 }

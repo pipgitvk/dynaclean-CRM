@@ -9,6 +9,7 @@ import {
   pickEffectiveNextFollowup,
   pickLatestChronologicalNextFollowup,
 } from "@/utils/tlNextFollowupResolve";
+import { formatCrmDayjsForISTDisplay } from "@/lib/timezone";
 
 function pickNextFollowupForDisplay(customer, useLatest) {
   return useLatest
@@ -65,7 +66,8 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref, useLatestN
   const bg = getTlFollowUpCardGradientForHours(hours);
 
   const nextD = pickNextFollowupForDisplay(customer, useLatestNextFollowup);
-  const nextLabel = nextD ? nextD.format("DD MMM, YYYY HH:mm") : "—";
+  const nextLabel =
+    formatCrmDayjsForISTDisplay(nextD, "DD MMM, YYYY HH:mm") || "—";
 
   const tagParts = customer.multi_tag
     ? customer.multi_tag

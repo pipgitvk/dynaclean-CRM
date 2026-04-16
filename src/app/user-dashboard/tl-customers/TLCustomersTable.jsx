@@ -22,6 +22,10 @@ import {
   pickEffectiveNextFollowup,
   pickLatestChronologicalNextFollowup,
 } from "@/utils/tlNextFollowupResolve";
+import {
+  formatCrmDatetimeForISTDisplay,
+  formatCrmDayjsForISTDisplay,
+} from "@/lib/timezone";
 import TLCustomerFollowUpCards from "@/components/TL/TLCustomerFollowUpCards";
 
 export default function TLCustomersTable({
@@ -959,9 +963,10 @@ export default function TLCustomersTable({
                   {tlOnly ? (
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                       {customer.followup_start_at
-                        ? dayjs(customer.followup_start_at).format(
+                        ? formatCrmDatetimeForISTDisplay(
+                            customer.followup_start_at,
                             "DD MMM, YYYY HH:mm",
-                          )
+                          ) || "N/A"
                         : "N/A"}
                     </td>
                   ) : (
@@ -1009,16 +1014,19 @@ export default function TLCustomersTable({
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {(tlOnly
-                      ? pickLatestChronologicalNextFollowup(customer)
-                      : pickEffectiveNextFollowup(customer)
-                    )?.format("DD MMM, YYYY HH:mm") ?? "N/A"}
+                    {formatCrmDayjsForISTDisplay(
+                      tlOnly
+                        ? pickLatestChronologicalNextFollowup(customer)
+                        : pickEffectiveNextFollowup(customer),
+                      "DD MMM, YYYY HH:mm",
+                    ) || "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {customer.estimated_order_date
-                      ? dayjs(customer.estimated_order_date).format(
+                      ? formatCrmDatetimeForISTDisplay(
+                          customer.estimated_order_date,
                           "DD MMM, YYYY HH:mm",
-                        )
+                        ) || "N/A"
                       : "N/A"}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
