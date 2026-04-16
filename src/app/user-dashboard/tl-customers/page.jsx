@@ -122,9 +122,9 @@ export default async function TLCustomersPage({ searchParams }) {
     }
   }
 
-  // Filter to show only TL entries (customers with TL followup OR regular followup - includes new automatic leads)
+  // TL toggle on: only customers who have at least one TL_followups row (TL ne follow-up dala ho)
   if (showTLOnly) {
-    query += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
+    query += ` AND tlf.customer_id IS NOT NULL`;
   }
 
   if (nextFromDate && nextToDate) {
@@ -224,7 +224,7 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   if (showTLOnly) {
-    kpiQuery += ` AND (tlf.customer_id IS NOT NULL OR cf.customer_id IS NOT NULL)`;
+    kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
   }
 
   if (nextFromDate && nextToDate) {
