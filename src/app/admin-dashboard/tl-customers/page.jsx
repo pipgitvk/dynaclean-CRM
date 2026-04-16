@@ -2,7 +2,10 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import TLCustomersTable from "@/app/user-dashboard/tl-customers/TLCustomersTable";
 import Link from "next/link";
-import { SQL_EFFECTIVE_NEXT_FOLLOWUP } from "@/lib/tlEffectiveNextFollowupSql";
+import {
+  SQL_EFFECTIVE_NEXT_FOLLOWUP,
+  SQL_LATEST_CHRONOLOGICAL_NEXT_FOLLOWUP,
+} from "@/lib/tlEffectiveNextFollowupSql";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +33,9 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   const pageSize = 50; // Number of records per page
   const offset = (currentPage - 1) * pageSize;
   const showTLOnly = tlOnly === "true";
+  const sqlNextForDateFilter = showTLOnly
+    ? SQL_LATEST_CHRONOLOGICAL_NEXT_FOLLOWUP
+    : SQL_EFFECTIVE_NEXT_FOLLOWUP;
 
   const conn = await getDbConnection();
 
@@ -115,15 +121,15 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     query += ` AND tlf.customer_id IS NOT NULL`;
   }
 
-  // Next Followup column uses pickEffectiveNextFollowup → same logic in SQL
+  // Next follow-up date filter must match the column: TL mode → GREATEST; else → effective
   if (nextFromDate && nextToDate) {
-    query += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} BETWEEN ? AND ?`;
+    query += ` AND ${sqlNextForDateFilter} BETWEEN ? AND ?`;
     params.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
   } else if (nextFromDate) {
-    query += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} >= ?`;
+    query += ` AND ${sqlNextForDateFilter} >= ?`;
     params.push(`${nextFromDate} 00:00:00`);
   } else if (nextToDate) {
-    query += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} <= ?`;
+    query += ` AND ${sqlNextForDateFilter} <= ?`;
     params.push(`${nextToDate} 23:59:59`);
   }
 
@@ -212,13 +218,13 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   if (nextFromDate && nextToDate) {
-    kpiQuery += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} BETWEEN ? AND ?`;
+    kpiQuery += ` AND ${sqlNextForDateFilter} BETWEEN ? AND ?`;
     kpiParams.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
   } else if (nextFromDate) {
-    kpiQuery += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} >= ?`;
+    kpiQuery += ` AND ${sqlNextForDateFilter} >= ?`;
     kpiParams.push(`${nextFromDate} 00:00:00`);
   } else if (nextToDate) {
-    kpiQuery += ` AND ${SQL_EFFECTIVE_NEXT_FOLLOWUP} <= ?`;
+    kpiQuery += ` AND ${sqlNextForDateFilter} <= ?`;
     kpiParams.push(`${nextToDate} 23:59:59`);
   }
 

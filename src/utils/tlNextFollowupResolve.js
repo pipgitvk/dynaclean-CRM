@@ -47,3 +47,13 @@ export function pickLatestChronologicalNextFollowup(customer) {
   if (!ds.length) return null;
   return ds.reduce((a, b) => (a.isAfter(b) ? a : b));
 }
+
+/** Raw DB row (e.g. TL_followups) — true if next_followup_date is a non-empty parseable datetime. */
+export function hasRowNextFollowupDate(row) {
+  const v = row?.next_followup_date;
+  if (v == null) return false;
+  const s = String(v).trim();
+  if (!s) return false;
+  const t = Date.parse(s);
+  return !Number.isNaN(t);
+}

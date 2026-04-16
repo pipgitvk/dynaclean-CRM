@@ -2,6 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import Link from "next/link";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
+import { hasRowNextFollowupDate } from "@/utils/tlNextFollowupResolve";
 import {
   ArrowLeft,
   Phone,
@@ -27,13 +28,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function TLCustomerDetailPage({ params }) {
+export default async function TLCustomerDetailPage({ params, searchParams }) {
   const payload = await getSessionPayload();
   if (!payload) {
     return <div className="p-8 text-red-600">Unauthorized</div>;
   }
 
   const { customerId } = await params;
+  const sp = await searchParams;
+  const tlOnlyStrict = sp?.tlOnly === "true";
   const conn = await getDbConnection();
 
   // Fetch customer details
@@ -60,11 +63,29 @@ export default async function TLCustomerDetailPage({ params }) {
     [customerId],
   );
 
+  const tlRows = tlFollowups.map((f) => ({ ...f, followupType: "TL" }));
+  const tlForTimeline = tlOnlyStrict
+    ? tlRows.filter((f) => hasRowNextFollowupDate(f))
+    : tlRows;
+  const empRows = empFollowups.map((f) => ({
+    ...f,
+    followupType: "Employee",
+  }));
+  const timelineRows = [...tlForTimeline, ...empRows].sort(
+    (a, b) =>
+      new Date(b.time_stamp || b.created_at) -
+      new Date(a.time_stamp || a.created_at),
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <Link
-          href="/user-dashboard/tl-customers"
+          href={
+            tlOnlyStrict
+              ? "/user-dashboard/tl-customers?tlOnly=true"
+              : "/user-dashboard/tl-customers"
+          }
           className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6 transition-colors"
         >
           <ArrowLeft size={20} />
@@ -114,7 +135,7 @@ export default async function TLCustomerDetailPage({ params }) {
                 {customer.status}
               </span>
               <Link
-                href={`/user-dashboard/tl-customers/${customerId}/followup`}
+                href={`/user-dashboard/tl-customers/${customerId}/followup${tlOnlyStrict ? "?tlOnly=true" : ""}`}
                 className="group relative p-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200"
                 title="Add TL Follow-up"
               >
@@ -203,41 +224,35 @@ export default async function TLCustomerDetailPage({ params }) {
             Follow-up Activity Timeline
           </h2>
 
-          {tlFollowups.length === 0 && empFollowups.length === 0 ? (
+          {timelineRows.length === 0 ? (
             <div className="text-center py-6">
               <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No follow-ups yet</p>
+              <p className="text-gray-500">
+                {tlOnlyStrict && tlFollowups.length > 0
+                  ? "No TL follow-ups with a next date on this view."
+                  : "No follow-ups yet"}
+              </p>
               <p className="text-gray-400 text-xs">
-                Start tracking customer interactions
+                {tlOnlyStrict && tlFollowups.length > 0
+                  ? "Turn TL filter off or add a next follow-up on TL entries."
+                  : "Start tracking customer interactions"}
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Combined and sorted follow-ups */}
-              {[
-                ...tlFollowups.map((f) => ({ ...f, followupType: "TL" })),
-                ...empFollowups.map((f) => ({
-                  ...f,
-                  followupType: "Employee",
-                })),
-              ]
-                .sort(
-                  (a, b) =>
-                    new Date(b.time_stamp || b.created_at) -
-                    new Date(a.time_stamp || a.created_at),
-                )
-                .map((followup, index) => {
+              {timelineRows.map((followup, index) => {
                   const isTLFollowup = followup.followupType === "TL";
-                  const isEmployeeFollowup =
-                    followup.followupType === "Employee";
+                  const rowKey = isTLFollowup
+                    ? `tl-${followup.id ?? followup.created_at}`
+                    : `emp-${String(followup.time_stamp)}`;
 
                   return (
                     <div
-                      key={`${isTLFollowup ? "tl" : "emp"}-${index}`}
+                      key={rowKey}
                       className="relative"
                     >
                       {/* Timeline line */}
-                      {index < [...tlFollowups, ...empFollowups].length - 1 && (
+                      {index < timelineRows.length - 1 && (
                         <div className="absolute left-3 top-8 w-0.5 h-full bg-gray-200 -z-10"></div>
                       )}
 
