@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { ArrowLeft, Eye, Pencil, Plus, Search, X } from "lucide-react";
+import { mergeDesignationOptions, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 
 const MONTHS = [
   { value: 1, label: "January" },
@@ -70,6 +71,8 @@ export default function HrDesignationTargetsPage() {
 
   const [hrUsers, setHrUsers] = useState([]);
   const [loadingHrUsers, setLoadingHrUsers] = useState(true);
+  const [designationOptions, setDesignationOptions] = useState([]);
+  const [loadingDesignations, setLoadingDesignations] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
   const [viewRow, setViewRow] = useState(null);
@@ -127,6 +130,40 @@ export default function HrDesignationTargetsPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingDesignations(true);
+      try {
+        const res = await fetch("/api/admin/employee-designations", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && json.success) setDesignationOptions(Array.isArray(json.designations) ? json.designations : []);
+      } catch {
+        if (!cancelled) setDesignationOptions([]);
+      } finally {
+        if (!cancelled) setLoadingDesignations(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const suggestedDesignationForFormHr = useMemo(() => {
+    const u = hrUsers.find((x) => x.username === formHr);
+    return u?.suggested_designation?.trim() || "";
+  }, [hrUsers, formHr]);
+
+  const addModalDesignations = useMemo(
+    () => mergeDesignationOptions(designationOptions, suggestedDesignationForFormHr, formDesignation),
+    [designationOptions, suggestedDesignationForFormHr, formDesignation]
+  );
+
+  const editModalDesignations = useMemo(
+    () => mergeDesignationOptions(designationOptions, editRow?.designation, formDesignation),
+    [designationOptions, editRow?.designation, formDesignation]
+  );
 
   const openAdd = () => {
     setFormMonth(month);
@@ -216,7 +253,7 @@ export default function HrDesignationTargetsPage() {
   };
 
   const openEdit = (row) => {
-    setFormDesignation(row.designation || "");
+    setFormDesignation(resolveCanonicalDesignation(row.designation, designationOptions));
     setFormHr(row.hr_username === "—" ? "" : row.hr_username || "");
     setFormTarget(String(row.target_amount ?? ""));
     setFormMonth(row.month);
@@ -265,11 +302,11 @@ export default function HrDesignationTargetsPage() {
   const monthLabel = MONTHS.find((m) => m.value === month)?.label || month;
 
   return (
-    <div className="min-h-screen bg-gray-50/80 pb-12">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="min-h-screen overflow-x-hidden bg-gray-50/80 pb-[max(3rem,env(safe-area-inset-bottom))]">
+      <div className="mx-auto max-w-6xl px-3 py-5 sm:px-6 sm:py-8">
         {/* Top toolbar */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-6">
-          <div className="flex flex-wrap items-end gap-3 sm:gap-4">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex min-w-0 flex-wrap items-end gap-3 sm:gap-4">
             <Link
               href="/admin-dashboard"
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -302,12 +339,12 @@ export default function HrDesignationTargetsPage() {
                 className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-gray-900 text-sm"
               />
             </div>
-            <p className="text-sm text-gray-500 pb-2">
+            <p className="w-full pb-2 text-xs text-gray-500 sm:w-auto sm:text-sm">
               Showing targets active in {monthLabel} {year}
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center w-full lg:w-auto">
-            <div className="relative flex-1 lg:min-w-[240px]">
+          <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
+            <div className="relative min-w-0 flex-1 lg:min-w-[240px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="search"
@@ -347,13 +384,13 @@ export default function HrDesignationTargetsPage() {
         )}
 
         {/* Chart card */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 sm:p-8 mb-8">
-          <h1 className="text-center text-xl sm:text-2xl font-bold text-gray-900">Target vs achieved</h1>
-          <p className="text-center text-sm text-gray-500 mt-2 max-w-2xl mx-auto">
+        <div className="mb-8 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-8">
+          <h1 className="text-center text-lg font-bold text-gray-900 sm:text-xl md:text-2xl">Target vs achieved</h1>
+          <p className="mx-auto mt-2 max-w-2xl text-center text-xs text-gray-500 sm:text-sm">
             {monthLabel} {year}
           </p>
 
-          <div className="mt-8 h-[380px] w-full min-w-0">
+          <div className="mt-5 h-[min(48vh,340px)] w-full min-w-0 sm:mt-8 sm:h-[380px]">
             {loading ? (
               <div className="h-full flex items-center justify-center text-gray-500 text-sm">Loading chart…</div>
             ) : !hasHrUsernameColumn ? (
@@ -366,21 +403,21 @@ export default function HrDesignationTargetsPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={filteredChart}
-                  margin={{ top: 16, right: 24, left: 8, bottom: 72 }}
+                  margin={{ top: 12, right: 8, left: 4, bottom: 64 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis
                     dataKey="chart_name"
-                    tick={{ fontSize: 11, fill: "#4b5563" }}
+                    tick={{ fontSize: 10, fill: "#4b5563" }}
                     interval={0}
-                    angle={-40}
+                    angle={-38}
                     textAnchor="end"
-                    height={70}
+                    height={68}
                   />
                   <YAxis
                     tickFormatter={formatChartAxis}
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
-                    width={56}
+                    tick={{ fontSize: 10, fill: "#6b7280" }}
+                    width={48}
                   />
                   <Tooltip content={<ChartTooltip />} />
                   <Legend wrapperStyle={{ paddingTop: 16 }} />
@@ -399,22 +436,22 @@ export default function HrDesignationTargetsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-200 bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Target list</h2>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-200 bg-gray-50 px-4 py-3 sm:px-5 sm:py-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-700 sm:text-sm">Target list</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="touch-pan-x overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+            <table className="min-w-[720px] w-full text-xs sm:text-sm">
               <thead>
-                <tr className="bg-gray-100 text-gray-700 text-xs uppercase tracking-wide border-b border-gray-200">
-                  <th className="text-left font-semibold px-4 py-3">Username</th>
-                  <th className="text-left font-semibold px-4 py-3">Designation</th>
-                  <th className="text-right font-semibold px-4 py-3">Target</th>
-                  <th className="text-right font-semibold px-4 py-3">Achieved</th>
-                  <th className="text-center font-semibold px-4 py-3">Start date</th>
-                  <th className="text-center font-semibold px-4 py-3">End date</th>
-                  <th className="text-left font-semibold px-4 py-3">Assigned by</th>
-                  <th className="text-center font-semibold px-4 py-3 w-36">Actions</th>
+                <tr className="border-b border-gray-200 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-700 sm:text-xs">
+                  <th className="whitespace-nowrap px-2 py-2.5 text-left sm:px-4 sm:py-3">Username</th>
+                  <th className="min-w-[7rem] px-2 py-2.5 text-left sm:px-4 sm:py-3">Designation</th>
+                  <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-4 sm:py-3">Target</th>
+                  <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-4 sm:py-3">Achieved</th>
+                  <th className="whitespace-nowrap px-2 py-2.5 text-center sm:px-4 sm:py-3">Start date</th>
+                  <th className="whitespace-nowrap px-2 py-2.5 text-center sm:px-4 sm:py-3">End date</th>
+                  <th className="min-w-[6rem] px-2 py-2.5 text-left sm:px-4 sm:py-3">Assigned by</th>
+                  <th className="w-28 whitespace-nowrap px-2 py-2.5 text-center sm:w-36 sm:px-4 sm:py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -433,19 +470,23 @@ export default function HrDesignationTargetsPage() {
                 ) : (
                   filteredRows.map((row) => (
                     <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/80">
-                      <td className="px-4 py-3 text-gray-900 font-medium">{row.hr_username}</td>
-                      <td className="px-4 py-3 text-gray-700">{row.designation}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-gray-900">
+                      <td className="px-2 py-2.5 font-medium text-gray-900 sm:px-4 sm:py-3">{row.hr_username}</td>
+                      <td className="max-w-[10rem] truncate px-2 py-2.5 text-gray-700 sm:max-w-none sm:px-4 sm:py-3" title={row.designation}>
+                        {row.designation}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-gray-900 sm:px-4 sm:py-3">
                         {formatTargetPlain(row.target_amount)}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums text-emerald-700 font-medium">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-right font-medium tabular-nums text-emerald-700 sm:px-4 sm:py-3">
                         {formatTargetPlain(row.achieved)}
                       </td>
-                      <td className="px-4 py-3 text-center text-gray-600">{row.start_date}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">{row.end_date}</td>
-                      <td className="px-4 py-3 text-gray-600">{row.assigned_by}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="whitespace-nowrap px-2 py-2.5 text-center text-gray-600 sm:px-4 sm:py-3">{row.start_date}</td>
+                      <td className="whitespace-nowrap px-2 py-2.5 text-center text-gray-600 sm:px-4 sm:py-3">{row.end_date}</td>
+                      <td className="max-w-[8rem] truncate px-2 py-2.5 text-gray-600 sm:max-w-none sm:px-4 sm:py-3" title={row.assigned_by}>
+                        {row.assigned_by}
+                      </td>
+                      <td className="px-2 py-2.5 sm:px-4 sm:py-3">
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
                           <button
                             type="button"
                             onClick={() => setViewRow(row)}
@@ -482,15 +523,25 @@ export default function HrDesignationTargetsPage() {
 
       {/* Add modal */}
       {addOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-gray-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Add target</h3>
-              <button type="button" onClick={() => setAddOpen(false)} className="p-1 rounded-lg hover:bg-gray-100">
-                <X className="w-5 h-5 text-gray-500" />
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default bg-transparent"
+            onClick={() => setAddOpen(false)}
+            aria-label="Close dialog"
+          />
+          <div className="relative z-10 max-h-[min(92dvh,100%)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[90vh] sm:rounded-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:py-4">
+              <h3 className="text-base font-semibold text-gray-900 sm:text-lg">Add target</h3>
+              <button type="button" onClick={() => setAddOpen(false)} className="rounded-lg p-1 hover:bg-gray-100">
+                <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
-            <form onSubmit={submitAdd} className="p-5 space-y-4">
+            <form onSubmit={submitAdd} className="space-y-4 p-4 sm:p-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">HR user *</label>
                 <select
@@ -500,7 +551,7 @@ export default function HrDesignationTargetsPage() {
                     setFormHr(v);
                     const u = hrUsers.find((x) => x.username === v);
                     const sug = u?.suggested_designation?.trim() || "";
-                    if (sug) setFormDesignation(sug);
+                    if (sug) setFormDesignation(resolveCanonicalDesignation(sug, designationOptions));
                   }}
                   required
                   disabled={loadingHrUsers}
@@ -516,14 +567,20 @@ export default function HrDesignationTargetsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Designation *</label>
-                <input
-                  type="text"
+                <select
                   required
                   value={formDesignation}
                   onChange={(e) => setFormDesignation(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
-                  placeholder="e.g. SALES EXECUTIVE"
-                />
+                  disabled={loadingDesignations}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+                >
+                  <option value="">{loadingDesignations ? "Loading designations…" : "— Select designation —"}</option>
+                  {addModalDesignations.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Target Hiring</label>
@@ -539,11 +596,11 @@ export default function HrDesignationTargetsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Month</label>
                   <select
                     value={formMonth}
                     onChange={(e) => setFormMonth(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base sm:py-2 sm:text-sm"
                   >
                     {MONTHS.map((m) => (
                       <option key={m.value} value={m.value}>
@@ -553,29 +610,29 @@ export default function HrDesignationTargetsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Year</label>
                   <input
                     type="number"
                     min={2000}
                     max={2100}
                     value={formYear}
                     onChange={(e) => setFormYear(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base sm:py-2 sm:text-sm"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:pb-0 sm:pt-2">
                 <button
                   type="button"
                   onClick={() => setAddOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="w-full min-h-[44px] rounded-lg border border-gray-300 py-2.5 text-gray-700 hover:bg-gray-50 sm:w-auto sm:min-h-0 sm:px-4 sm:py-2"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-lg bg-slate-800 text-white font-medium hover:bg-slate-900 disabled:opacity-50"
+                  className="w-full min-h-[44px] rounded-lg bg-slate-800 py-2.5 font-medium text-white hover:bg-slate-900 disabled:opacity-50 sm:w-auto sm:min-h-0 sm:px-5 sm:py-2"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>
@@ -587,15 +644,25 @@ export default function HrDesignationTargetsPage() {
 
       {/* View modal */}
       {viewRow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-gray-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Target details</h3>
-              <button type="button" onClick={() => setViewRow(null)} className="p-1 rounded-lg hover:bg-gray-100">
-                <X className="w-5 h-5 text-gray-500" />
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default bg-transparent"
+            onClick={() => setViewRow(null)}
+            aria-label="Close dialog"
+          />
+          <div className="relative z-10 max-h-[min(90dvh,100%)] w-full max-w-md overflow-y-auto rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[85vh] sm:rounded-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:py-4">
+              <h3 className="text-base font-semibold text-gray-900 sm:text-lg">Target details</h3>
+              <button type="button" onClick={() => setViewRow(null)} className="rounded-lg p-1 hover:bg-gray-100">
+                <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
-            <div className="p-5 space-y-3 text-sm">
+            <div className="space-y-3 p-4 text-sm sm:p-5">
               <p>
                 <span className="text-gray-500">Username:</span>{" "}
                 <span className="font-medium text-gray-900">{viewRow.hr_username}</span>
@@ -623,11 +690,11 @@ export default function HrDesignationTargetsPage() {
                 <span className="text-gray-900">{viewRow.assigned_by}</span>
               </p>
             </div>
-            <div className="px-5 py-4 border-t border-gray-200 flex justify-end">
+            <div className="flex justify-end border-t border-gray-200 px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-4 sm:pb-4">
               <button
                 type="button"
                 onClick={() => setViewRow(null)}
-                className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium"
+                className="min-h-[44px] w-full rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-medium text-white sm:min-h-0 sm:w-auto sm:py-2"
               >
                 Close
               </button>
@@ -638,15 +705,25 @@ export default function HrDesignationTargetsPage() {
 
       {/* Edit modal */}
       {editRow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" role="dialog">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-gray-200">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Edit target</h3>
-              <button type="button" onClick={() => setEditRow(null)} className="p-1 rounded-lg hover:bg-gray-100">
-                <X className="w-5 h-5 text-gray-500" />
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default bg-transparent"
+            onClick={() => setEditRow(null)}
+            aria-label="Close dialog"
+          />
+          <div className="relative z-10 max-h-[min(92dvh,100%)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[90vh] sm:rounded-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:py-4">
+              <h3 className="text-base font-semibold text-gray-900 sm:text-lg">Edit target</h3>
+              <button type="button" onClick={() => setEditRow(null)} className="rounded-lg p-1 hover:bg-gray-100">
+                <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
-            <form onSubmit={submitEdit} className="p-5 space-y-4">
+            <form onSubmit={submitEdit} className="space-y-4 p-4 sm:p-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">HR username *</label>
                 <input
@@ -659,13 +736,20 @@ export default function HrDesignationTargetsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Designation *</label>
-                <input
-                  type="text"
+                <select
                   required
                   value={formDesignation}
                   onChange={(e) => setFormDesignation(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
-                />
+                  disabled={loadingDesignations}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+                >
+                  <option value="">{loadingDesignations ? "Loading designations…" : "— Select designation —"}</option>
+                  {editModalDesignations.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Target amount *</label>
@@ -681,11 +765,11 @@ export default function HrDesignationTargetsPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Month</label>
                   <select
                     value={formMonth}
                     onChange={(e) => setFormMonth(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base sm:py-2 sm:text-sm"
                   >
                     {MONTHS.map((m) => (
                       <option key={m.value} value={m.value}>
@@ -695,29 +779,29 @@ export default function HrDesignationTargetsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Year</label>
                   <input
                     type="number"
                     min={2000}
                     max={2100}
                     value={formYear}
                     onChange={(e) => setFormYear(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base sm:py-2 sm:text-sm"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex flex-col-reverse gap-2 border-t border-gray-100 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:pb-0 sm:pt-2">
                 <button
                   type="button"
                   onClick={() => setEditRow(null)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="w-full min-h-[44px] rounded-lg border border-gray-300 py-2.5 text-gray-700 hover:bg-gray-50 sm:w-auto sm:min-h-0 sm:px-4 sm:py-2"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-lg bg-slate-800 text-white font-medium hover:bg-slate-900 disabled:opacity-50"
+                  className="w-full min-h-[44px] rounded-lg bg-slate-800 py-2.5 font-medium text-white hover:bg-slate-900 disabled:opacity-50 sm:w-auto sm:min-h-0 sm:px-5 sm:py-2"
                 >
                   {saving ? "Saving…" : "Update"}
                 </button>

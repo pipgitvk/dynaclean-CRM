@@ -115,30 +115,17 @@ export function parseHiringPayload(body) {
   const hr_score_rating_raw = String(body.hr_score_rating ?? "").trim();
   const hr_score_rating = HR_SCORE_RATING_OPTIONS.includes(hr_score_rating_raw) ? hr_score_rating_raw : null;
 
-  if (!hr_interview_score) {
-    return { error: "HR interview score (1–10) is required." };
-  }
-  if (!hr_score_rating) {
-    return { error: "HR score is required (average, poor, good, or very good)." };
-  }
-  if (!current_salary) {
-    return { error: "Current salary is required." };
-  }
-
   if (!candidate_name || !designation || !emp_contact) {
     return { error: "Employee name, contact, and designation are required." };
   }
-  if (!marital_raw || !HIRING_MARITAL_OPTIONS.includes(marital_raw)) {
-    return { error: "Marital status is required." };
+  if (marital_raw && !HIRING_MARITAL_OPTIONS.includes(marital_raw)) {
+    return { error: "Invalid marital status." };
   }
-  if (!experience_raw || !HIRING_EXPERIENCE_VALUES.includes(experience_raw)) {
-    return { error: "Experience / Fresher is required." };
+  if (experience_raw && !HIRING_EXPERIENCE_VALUES.includes(experience_raw)) {
+    return { error: "Invalid experience / fresher value." };
   }
-  if (!interview_at_raw) {
-    return { error: "Interview date and time is required." };
-  }
-  if (!interview_mode_raw || !HIRING_INTERVIEW_MODES.includes(interview_mode_raw)) {
-    return { error: "Mode of interview is required." };
+  if (interview_mode_raw && !HIRING_INTERVIEW_MODES.includes(interview_mode_raw)) {
+    return { error: "Invalid mode of interview." };
   }
   if (!note) {
     return { error: "Note is required." };
@@ -178,12 +165,12 @@ export function parseHiringPayload(body) {
       candidate_name,
       emp_contact,
       designation,
-      marital_status: marital_raw,
-      experience_type: experience_raw,
-      interview_at: interview_at_raw,
+      marital_status: marital_raw || null,
+      experience_type: experience_raw || null,
+      interview_at: interview_at_raw || null,
       rescheduled_at: isRescheduled ? rescheduled_at_raw : null,
       next_followup_at: resolved_next_followup_at,
-      interview_mode: interview_mode_raw,
+      interview_mode: interview_mode_raw || null,
       status,
       tag,
       hire_date,
