@@ -2,6 +2,11 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import TLCustomersTable from "./TLCustomersTable";
 import { SQL_EFFECTIVE_NEXT_FOLLOWUP } from "@/lib/tlEffectiveNextFollowupSql";
+import {
+  mysqlBoundsForIstDateRange,
+  mysqlLowerBoundIstDayStart,
+  mysqlUpperBoundIstDayEnd,
+} from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -131,25 +136,35 @@ export default async function TLCustomersPage({ searchParams }) {
 
   if (nextFromDate && nextToDate) {
     if (showTLOnly) {
+      const ist = mysqlBoundsForIstDateRange(nextFromDate, nextToDate);
       query += ` AND tlf.next_followup_date IS NOT NULL AND tlf.next_followup_date BETWEEN ? AND ?`;
+      if (ist) {
+        params.push(ist.start, ist.end);
+      } else {
+        params.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
+      }
     } else {
       query += ` AND ${sqlNextForDateFilter} BETWEEN ? AND ?`;
+      params.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
     }
-    params.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
   } else if (nextFromDate) {
     if (showTLOnly) {
+      const lo = mysqlLowerBoundIstDayStart(nextFromDate);
       query += ` AND tlf.next_followup_date IS NOT NULL AND tlf.next_followup_date >= ?`;
+      params.push(lo ?? `${nextFromDate} 00:00:00`);
     } else {
       query += ` AND ${sqlNextForDateFilter} >= ?`;
+      params.push(`${nextFromDate} 00:00:00`);
     }
-    params.push(`${nextFromDate} 00:00:00`);
   } else if (nextToDate) {
     if (showTLOnly) {
+      const hi = mysqlUpperBoundIstDayEnd(nextToDate);
       query += ` AND tlf.next_followup_date IS NOT NULL AND tlf.next_followup_date <= ?`;
+      params.push(hi ?? `${nextToDate} 23:59:59`);
     } else {
       query += ` AND ${sqlNextForDateFilter} <= ?`;
+      params.push(`${nextToDate} 23:59:59`);
     }
-    params.push(`${nextToDate} 23:59:59`);
   }
 
   // Filter by lead_campaign
@@ -243,25 +258,35 @@ export default async function TLCustomersPage({ searchParams }) {
 
   if (nextFromDate && nextToDate) {
     if (showTLOnly) {
+      const ist = mysqlBoundsForIstDateRange(nextFromDate, nextToDate);
       kpiQuery += ` AND tlf.next_followup_date IS NOT NULL AND tlf.next_followup_date BETWEEN ? AND ?`;
+      if (ist) {
+        kpiParams.push(ist.start, ist.end);
+      } else {
+        kpiParams.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
+      }
     } else {
       kpiQuery += ` AND ${sqlNextForDateFilter} BETWEEN ? AND ?`;
+      kpiParams.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
     }
-    kpiParams.push(`${nextFromDate} 00:00:00`, `${nextToDate} 23:59:59`);
   } else if (nextFromDate) {
     if (showTLOnly) {
+      const lo = mysqlLowerBoundIstDayStart(nextFromDate);
       kpiQuery += ` AND tlf.next_followup_date IS NOT NULL AND tlf.next_followup_date >= ?`;
+      kpiParams.push(lo ?? `${nextFromDate} 00:00:00`);
     } else {
       kpiQuery += ` AND ${sqlNextForDateFilter} >= ?`;
+      kpiParams.push(`${nextFromDate} 00:00:00`);
     }
-    kpiParams.push(`${nextFromDate} 00:00:00`);
   } else if (nextToDate) {
     if (showTLOnly) {
+      const hi = mysqlUpperBoundIstDayEnd(nextToDate);
       kpiQuery += ` AND tlf.next_followup_date IS NOT NULL AND tlf.next_followup_date <= ?`;
+      kpiParams.push(hi ?? `${nextToDate} 23:59:59`);
     } else {
       kpiQuery += ` AND ${sqlNextForDateFilter} <= ?`;
+      kpiParams.push(`${nextToDate} 23:59:59`);
     }
-    kpiParams.push(`${nextToDate} 23:59:59`);
   }
 
   if (lead_campaign) {

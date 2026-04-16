@@ -136,6 +136,42 @@ export function convertISTtoUTC(istDatetimeString) {
 }
 
 /**
+ * MySQL DATETIME bounds for filtering UTC-stored CRM timestamps by IST calendar day(s).
+ * HTML date inputs send YYYY-MM-DD meaning "that calendar day in India", not UTC midnight.
+ * Without this, BETWEEN 'YYYY-MM-DD 00:00:00' and '... 23:59:59' wrongly includes rows that
+ * display as the next IST day (e.g. 22:xx UTC on "Apr 17" still shows Apr 18 in IST).
+ *
+ * @param {string} fromYmd - YYYY-MM-DD
+ * @param {string} toYmd - YYYY-MM-DD
+ * @returns {{ start: string, end: string } | null}
+ */
+export function mysqlBoundsForIstDateRange(fromYmd, toYmd) {
+  const a = String(fromYmd || "").trim();
+  const b = String(toYmd || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b)) {
+    return null;
+  }
+  const start = convertISTtoUTC(a);
+  const end = convertISTtoUTC(`${b} 23:59:59`);
+  if (!start || !end) return null;
+  return { start, end };
+}
+
+/** Lower bound: start of IST day as stored MySQL UTC (or naive in local dev). */
+export function mysqlLowerBoundIstDayStart(fromYmd) {
+  const a = String(fromYmd || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(a)) return null;
+  return convertISTtoUTC(a);
+}
+
+/** Upper bound: end of IST day as stored MySQL UTC (or naive in local dev). */
+export function mysqlUpperBoundIstDayEnd(toYmd) {
+  const b = String(toYmd || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b)) return null;
+  return convertISTtoUTC(`${b} 23:59:59`);
+}
+
+/**
  * No conversion when fetching from database
  * Return data as-is - let the frontend/display handle timezone if needed
  */
