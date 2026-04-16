@@ -5,16 +5,19 @@ import Link from "next/link";
 import dayjs from "dayjs";
 import { CalendarDays, Edit, Eye, StickyNote, User } from "lucide-react";
 import { getTlFollowUpCardGradientForHours } from "@/utils/hiringFollowUpUrgency";
+import { pickEffectiveNextFollowup } from "@/utils/tlNextFollowupResolve";
 import {
-  pickEffectiveNextFollowup,
-  pickLatestChronologicalNextFollowup,
-} from "@/utils/tlNextFollowupResolve";
-import { formatCrmDayjsForISTDisplay } from "@/lib/timezone";
+  formatCrmDayjsForISTDisplay,
+  parseCrmDatetimeToDayjs,
+} from "@/lib/timezone";
 
+/** When useLatest (TL list cards): only TL row next date — same as TL column on the table. */
 function pickNextFollowupForDisplay(customer, useLatest) {
-  return useLatest
-    ? pickLatestChronologicalNextFollowup(customer)
-    : pickEffectiveNextFollowup(customer);
+  if (useLatest) {
+    const d = parseCrmDatetimeToDayjs(customer.tl_next_followup);
+    return d?.isValid?.() ? d : null;
+  }
+  return pickEffectiveNextFollowup(customer);
 }
 
 /** Legend for TL strip: red = before now, blue = after now (same rule as {@link getTlFollowUpCardGradientForHours}). */
