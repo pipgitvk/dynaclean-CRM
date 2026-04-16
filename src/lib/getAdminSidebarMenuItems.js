@@ -198,7 +198,7 @@ const allMenuItems = [
   {
     name: "Dashboard",
     moduleKey: "dashboard",
-    roles: ["SUPERADMIN"],
+    roles: ["SUPERADMIN", "ADMIN"],
     icon: "Home",
     children: [
       {
@@ -216,7 +216,7 @@ const allMenuItems = [
       {
         path: "/admin-dashboard/today-reports",
         name: "Daily Report",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "ADMIN"],
         icon: "FileText",
       },
       {

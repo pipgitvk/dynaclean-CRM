@@ -3,7 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import dayjs from "dayjs";
 import { getSessionPayload } from "@/lib/auth";
-import { isSuperAdminRole } from "@/lib/dataScope";
+import { canViewAllEmployeeDailyReports } from "@/lib/dataScope";
 
 export async function GET(req) {
   const conn = await getDbConnection();
@@ -11,12 +11,15 @@ export async function GET(req) {
 
   // Identify the logged-in user
   const session = await getSessionPayload();
-  const username = session?.username || null;
-  const role = session?.role || null;
+  if (!session?.username) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const username = session.username;
+  const role = session?.role ?? session?.userRole ?? null;
 
   let selectedEmployee = searchParams.get("employee") || "all";
-  if (!isSuperAdminRole(role) && username) {
-    // For all non-superadmin users, always restrict to their own username
+  if (!canViewAllEmployeeDailyReports(role)) {
+    // Module-only / employee view: always own data (same as user-dashboard today-reports)
     selectedEmployee = username;
   }
 
@@ -36,8 +39,8 @@ export async function GET(req) {
     const [employeeRows] = await conn.execute(employeeQuery);
     let employees = employeeRows.map((row) => row.username);
 
-    // Only SUPERADMIN can see all employees in the dropdown
-    if (!isSuperAdminRole(role) && username) {
+    // Only SUPERADMIN and ADMIN get the full employee list for filtering
+    if (!canViewAllEmployeeDailyReports(role)) {
       employees = employees.filter((u) => u === username);
       if (employees.length === 0) {
         employees = [username];
