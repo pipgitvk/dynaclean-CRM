@@ -39,9 +39,14 @@ export async function GET(req) {
            INNER JOIN (
              SELECT MIN(id) AS id
              FROM client_expenses
-             GROUP BY client_name, COALESCE(group_name, ''), expense_name
+             GROUP BY client_name, COALESCE(group_name, '')
            ) r ON ce.id = r.id
-           ${subHeadJoin}
+           LEFT JOIN (
+             SELECT ce_inner.client_name, ce_inner.group_name, GROUP_CONCAT(DISTINCT cesh_inner.sub_head ORDER BY cesh_inner.sub_head SEPARATOR ', ') AS sub_heads_joined
+             FROM client_expenses ce_inner
+             JOIN client_expense_sub_heads cesh_inner ON ce_inner.id = cesh_inner.client_expense_id
+             GROUP BY ce_inner.client_name, ce_inner.group_name
+           ) sh ON ce.client_name = sh.client_name AND COALESCE(ce.group_name, '') = COALESCE(sh.group_name, '')
            ORDER BY ce.id DESC`,
         )
       : await conn.execute(

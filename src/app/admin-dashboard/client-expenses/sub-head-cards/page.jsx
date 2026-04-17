@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Layers, IndianRupee, ChevronRight, ArrowLeft } from "lucide-react";
+import { Layers, IndianRupee, ChevronRight, ArrowLeft, Plus } from "lucide-react";
 import { getDbConnection } from "@/lib/db";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
@@ -175,6 +175,13 @@ export default async function SubHeadCardsPage({ searchParams }) {
               className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 whitespace-nowrap"
             >
               Refresh
+            </Link>
+            <Link
+              href={`/admin-dashboard/client-expenses/add?${baseParams}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap"
+            >
+              <Plus size={16} />
+              Add Sub-head
             </Link>
           </div>
         </div>

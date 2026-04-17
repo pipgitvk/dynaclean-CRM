@@ -62,6 +62,8 @@ export default async function ClientExpensesPage({ searchParams }) {
     return client === selectedClient && group === selectedGroup;
   });
 
+  const groupHasSubHeads = filteredRows.some((r) => r.sub_head && String(r.sub_head).trim() !== "");
+
   const rowsBySubHead = selectedSubHead
     ? filteredRows.filter((r) => {
         const sh = (r.sub_head || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -76,6 +78,7 @@ export default async function ClientExpensesPage({ searchParams }) {
       client={selectedClient}
       group={selectedGroup}
       initialSearchQuery={initialTxn}
+      groupHasSubHeads={groupHasSubHeads}
     />
   );
 }

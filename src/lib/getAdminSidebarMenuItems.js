@@ -559,13 +559,6 @@ const allMenuItems = [
     icon: "Receipt",
     children: [
       {
-        path: "/user-dashboard",
-        name: "Back to user dashboard",
-        roles: ["ACCOUNTANT"],
-        icon: "ArrowLeft",
-        sidebarVariant: "lightRed",
-      },
-      {
         path: "/admin-dashboard/client-expenses",
         name: "Main Expenses",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
@@ -640,13 +633,6 @@ const allMenuItems = [
     roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD", "ACCOUNTANT"],
     icon: "Target",
     children: [
-      {
-        path: "/user-dashboard",
-        name: "Back to user dashboard",
-        roles: ["SALES", "SALES HEAD"],
-        icon: "ArrowLeft",
-        sidebarVariant: "lightRed",
-      },
       {
         path: "/admin-dashboard/prospects",
         name: "Prospect",
