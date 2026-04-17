@@ -49,6 +49,40 @@ function getUniqueSubHeads(rows) {
   return result;
 }
 
+/**
+ * When the same expense line exists twice (template + statement clone) with the same
+ * amount and name, keep the row whose sub-heads are a strict subset of the other —
+ * the narrower row reflects the user's statement allocation.
+ */
+function dropBroaderDuplicateSubRows(rows) {
+  const parsed = rows.map((r) => ({
+    r,
+    shList: (r.sub_head || "").split(",").map((s) => s.trim()).filter(Boolean),
+    amt: Number(r.amount || 0),
+    name: String(r.expense_name || "").trim(),
+  }));
+  const dropIdx = new Set();
+  for (let i = 0; i < parsed.length; i++) {
+    for (let j = 0; j < parsed.length; j++) {
+      if (i === j) continue;
+      const a = parsed[i];
+      const b = parsed[j];
+      if (!a.name || a.name !== b.name) continue;
+      if (!Number.isFinite(a.amt) || a.amt !== b.amt) continue;
+      const Sa = a.shList;
+      const Sb = b.shList;
+      if (Sa.length === 0 || Sb.length === 0) continue;
+      const setA = new Set(Sa);
+      const setB = new Set(Sb);
+      if (Sa.length > Sb.length && [...Sb].every((s) => setA.has(s))) {
+        dropIdx.add(i);
+        break;
+      }
+    }
+  }
+  return parsed.filter((_, i) => !dropIdx.has(i)).map((p) => p.r);
+}
+
 export default async function SubHeadCardsPage({ searchParams }) {
   const sp = await searchParams;
   const client = sp?.client || null;
@@ -77,7 +111,9 @@ export default async function SubHeadCardsPage({ searchParams }) {
     const blankGroup = isBlankGroupQueryParam(group);
     const [result] = await conn.execute(
       blankGroup
-        ? `SELECT ce.id, ce.amount,
+        ? `SELECT ce.id,
+                  MAX(ce.expense_name) as expense_name,
+                  MAX(ce.amount) as amount,
                   GROUP_CONCAT(cesh.sub_head SEPARATOR ', ') as sub_head
            FROM client_expenses ce
            LEFT JOIN client_expense_sub_heads cesh ON ce.id = cesh.client_expense_id
@@ -85,7 +121,9 @@ export default async function SubHeadCardsPage({ searchParams }) {
              AND (ce.group_name IS NULL OR TRIM(COALESCE(ce.group_name, '')) = '')
            GROUP BY ce.id
            ORDER BY ce.id DESC`
-        : `SELECT ce.id, ce.amount,
+        : `SELECT ce.id,
+                  MAX(ce.expense_name) as expense_name,
+                  MAX(ce.amount) as amount,
                   GROUP_CONCAT(cesh.sub_head SEPARATOR ', ') as sub_head
            FROM client_expenses ce
            LEFT JOIN client_expense_sub_heads cesh ON ce.id = cesh.client_expense_id
@@ -94,7 +132,7 @@ export default async function SubHeadCardsPage({ searchParams }) {
            ORDER BY ce.id DESC`,
       blankGroup ? [client] : [client, group],
     );
-    rows = result;
+    rows = dropBroaderDuplicateSubRows(result);
   } catch (err) {
     console.error("[sub-head-cards] DB error:", err?.message);
   }
@@ -107,6 +145,7 @@ export default async function SubHeadCardsPage({ searchParams }) {
       const shList = (row.sub_head || "").split(",").map((s) => s.trim()).filter(Boolean);
       const matches = sh === "—" ? shList.length === 0 : shList.includes(sh);
       if (matches) {
+        // Full amount goes to each selected sub-head row (no splitting).
         totalAmount += Number(row.amount || 0);
         count += 1;
       }

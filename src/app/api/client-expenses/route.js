@@ -25,21 +25,31 @@ export async function GET(req) {
 
     const selectCols = `ce.id, ce.expense_name, ce.client_name, ce.group_name, ce.tax_applicable, ce.tax_type, ce.main_head, ce.head, ce.supply, ce.type_of_ledger, ce.cgst, ce.sgst, ce.igst, ce.hsn, ce.transaction_id, ce.gst_rate, ce.amount, ce.created_at`;
 
+    const subHeadJoin = `
+           LEFT JOIN (
+             SELECT client_expense_id, GROUP_CONCAT(sub_head ORDER BY id SEPARATOR ', ') AS sub_heads_joined
+             FROM client_expense_sub_heads
+             GROUP BY client_expense_id
+           ) sh ON sh.client_expense_id = ce.id`;
+
     const [rows] = rootOnly
       ? await conn.execute(
-          `SELECT ${selectCols}
+          `SELECT ${selectCols}, COALESCE(sh.sub_heads_joined, '') AS sub_heads_joined
            FROM client_expenses ce
            INNER JOIN (
              SELECT MIN(id) AS id
              FROM client_expenses
              GROUP BY client_name, COALESCE(group_name, ''), expense_name
            ) r ON ce.id = r.id
+           ${subHeadJoin}
            ORDER BY ce.id DESC`,
         )
       : await conn.execute(
-          `SELECT id, expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount, created_at
-           FROM client_expenses
-           ORDER BY id DESC`,
+          `SELECT ce.id, ce.expense_name, ce.client_name, ce.group_name, ce.tax_applicable, ce.tax_type, ce.main_head, ce.head, ce.supply, ce.type_of_ledger, ce.cgst, ce.sgst, ce.igst, ce.hsn, ce.transaction_id, ce.gst_rate, ce.amount, ce.created_at,
+                  COALESCE(sh.sub_heads_joined, '') AS sub_heads_joined
+           FROM client_expenses ce
+           ${subHeadJoin}
+           ORDER BY ce.id DESC`,
         );
 
     return NextResponse.json({ clientExpenses: rows });

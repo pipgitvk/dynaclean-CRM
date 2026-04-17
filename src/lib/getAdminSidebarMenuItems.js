@@ -194,25 +194,26 @@ const TextEncoderImpl =
   typeof TextEncoder !== "undefined" ? TextEncoder : NodeTextEncoder;
 
 const allMenuItems = [
-  //dashboard section
   {
+    path: "/admin-dashboard",
     name: "Dashboard",
     moduleKey: "dashboard",
     roles: ["SUPERADMIN", "ADMIN"],
     icon: "Home",
+  },
+  {
+    path: "/admin-dashboard/tl-customers",
+    name: "TL Management",
+    moduleKey: "tl-management",
+    roles: ["SUPERADMIN"],
+    icon: "Users",
+  },
+  {
+    name: "Reports",
+    moduleKey: "dashboard",
+    roles: ["SUPERADMIN", "ADMIN"],
+    icon: "ScrollText",
     children: [
-      {
-        path: "/admin-dashboard",
-        name: "Dashboard",
-        roles: ["ALL"],
-        icon: "Home",
-      },
-      // {
-      //   path: "/admin-dashboard/attendance-regularization",
-      //   name: "Attendance regularization",
-      //   roles: ["SUPERADMIN", "ADMIN", "HR"],
-      //   icon: "Clock",
-      // },
       {
         path: "/admin-dashboard/today-reports",
         name: "Daily Report",
@@ -220,105 +221,54 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
-        name: "Reports",
+        path: "/admin-dashboard/lead-reports",
+        name: "Lead Reports",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/quot-report",
+        name: "Quotations Report",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/order-followups",
+        name: "Order Report",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/reports/item-wise-sales",
+        name: "Item Wise Sales",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/reports/customer-payment-behavior",
+        name: "Customer Payment Behavior",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+    ],
+  },
+  {
+    name: "Leads Management",
+    moduleKey: "tl-management",
+    roles: ["SUPERADMIN", "DIGITAL MARKETER"],
+    icon: "Users",
+    children: [
+      {
+        path: "/admin-dashboard/add-customer",
+        name: "Add Customer",
+        roles: ["SUPERADMIN"],
+        icon: "FilePlus2",
+      },
+      {
+        path: "/admin-dashboard/customers",
+        name: "View Customers",
         roles: ["SUPERADMIN"],
         icon: "ScrollText",
-        children: [
-          {
-            path: "/admin-dashboard/lead-reports",
-            name: "Lead Reports",
-            roles: ["SUPERADMIN"],
-            icon: "FileText",
-          },
-          {
-            path: "/admin-dashboard/quot-report",
-            name: "Quotations Report",
-            roles: ["SUPERADMIN"],
-            icon: "FileText",
-          },
-          {
-            path: "/admin-dashboard/order-followups",
-            name: "Order Report",
-            roles: ["SUPERADMIN"],
-            icon: "FileText",
-          },
-          {
-            path: "/admin-dashboard/demo-registrations",
-            name: "Demo Followups",
-            roles: ["SUPERADMIN"],
-            icon: "FileText",
-          },
-
-          {
-            path: "/admin-dashboard/reports/item-wise-sales",
-            name: "Item Wise Sales",
-            roles: ["SUPERADMIN"],
-            icon: "FileText",
-          },
-          {
-            path: "/admin-dashboard/reports/customer-payment-behavior",
-            name: "Customer Payment Behavior",
-            roles: ["SUPERADMIN"],
-            icon: "FileText",
-          },
-        ],
-      },
-      {
-        name: "Targets",
-        roles: ["SUPERADMIN"],
-        icon: "Target",
-        children: [
-          // {
-          //   path: "/admin-dashboard/assign-targets",
-          //   name: "Assign",
-          //   roles: ["SUPERADMIN"],
-          //   icon: "FileText",
-          // },
-          {
-            path: "/admin-dashboard/hr-designation-targets",
-            name: "HR designation targets",
-            roles: ["SUPERADMIN"],
-            icon: "FileText",
-          },
-          {
-            path: "/admin-dashboard/monitor-targets",
-            name: "Monitor",
-            roles: ["SUPERADMIN", "ACCOUNTANT"],
-            icon: "FileText",
-          },
-        ],
-      },
-      {
-        path: "/admin-dashboard/lead-distribution",
-        name: "Lead Distribution",
-        roles: ["SUPERADMIN"],
-        icon: "ScrollText",
-      },
-      {
-        name: "Orders",
-        roles: ["SUPERADMIN"],
-        icon: "ListOrdered",
-        children: [
-          {
-            path: "/admin-dashboard/order",
-            name: "Order Process",
-            roles: ["SUPERADMIN"],
-            icon: "ListOrdered",
-          },
-          {
-            path: "/admin-dashboard/order/delivery-status",
-            name: "Delay Delivery",
-            roles: ["SUPERADMIN"],
-            icon: "ListOrdered",
-          },
-        ],
-      },
-      
-      {
-        path: "/admin-dashboard/bulk-reassign",
-        name: "Bulk Reassign Leads",
-        roles: ["SUPERADMIN"],
-        icon: "Upload",
       },
       {
         path: "/admin-dashboard/my-leads",
@@ -333,10 +283,36 @@ const allMenuItems = [
         icon: "Clock",
       },
       {
+        path: "/admin-dashboard/lead-distribution",
+        name: "Lead Distribution",
+        roles: ["SUPERADMIN"],
+        icon: "ScrollText",
+      },
+      {
+        path: "/admin-dashboard/bulk-reassign",
+        name: "Bulk Reassign Leads",
+        roles: ["SUPERADMIN"],
+        icon: "Upload",
+      },
+    ],
+  },
+  {
+    name: "Activities",
+    moduleKey: "dashboard",
+    roles: ["SUPERADMIN"],
+    icon: "ClipboardList",
+    children: [
+      {
         path: "/admin-dashboard/task-manager",
         name: "Task Manager",
         roles: ["SUPERADMIN"],
         icon: "ClipboardList",
+      },
+      {
+        path: "/admin-dashboard/demo-registrations",
+        name: "Demo Followups",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
       },
       {
         path: "/admin-dashboard/demo_details",
@@ -347,72 +323,11 @@ const allMenuItems = [
     ],
   },
   {
-    name: "Prospects",
-    moduleKey: "prospects",
-    roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
-    icon: "UserPlus",
-    children: [
-      {
-        path: "/user-dashboard",
-        name: "Back to user dashboard",
-        roles: ["SALES", "SALES HEAD"],
-        icon: "ArrowLeft",
-        sidebarVariant: "lightRed",
-      },
-      {
-        path: "/admin-dashboard/prospects",
-        name: "View prospects",
-        roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
-        icon: "UserPlus",
-      },
-    ],
-  },
-  // tl management section
-  {
-    name: "TL Management",
+    name: "Sales",
     moduleKey: "tl-management",
     roles: ["SUPERADMIN"],
-    icon: "Users",
+    icon: "FileSignature",
     children: [
-      {
-        path: "/admin-dashboard/tl-customers",
-        name: "TL Management",
-        roles: ["SUPERADMIN"],
-        icon: "Users",
-      },
-      {
-        path: "/admin-dashboard/add-customer",
-        name: "Add Customer",
-        roles: ["SUPERADMIN"],
-        icon: "FilePlus2",
-      },
-      {
-        path: "/admin-dashboard/customers",
-        name: "View Customers",
-        roles: ["SUPERADMIN"],
-        icon: "ScrollText",
-      },
-  //       {
-  //   name: "Special Pricing",
-  //   path: "/admin-dashboard/special-pricing",
-  //   roles: ["SUPERADMIN"],
-  //   icon: "ScrollText",
-  //   children: [
-  //     {
-  //       path: "/admin-dashboard/special-pricing",
-  //       name: "All Special Prices",
-  //       roles: ["ADMIN"],
-  //       icon: "List",
-  //     },
-  //     {
-  //       path: "/admin-dashboard/special-pricing/new",
-  //       name: "Create Special Price",
-  //       roles: ["ADMIN"],
-  //       icon: "FilePlus2",
-  //     }
-  //   ],
-  // },
-     
       {
         path: "/admin-dashboard/quotations",
         name: "Quotation",
@@ -426,38 +341,68 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
-        name: "Service History",
+        path: "/admin-dashboard/order",
+        name: "Order Process",
         roles: ["SUPERADMIN"],
-        icon: "BookOpen",
-        children: [
-          {
-            path: "/admin-dashboard/view_service_reports",
-            name: "Service Records",
-            roles: ["SUPERADMIN"],
-            icon: "BookOpen",
-          },
-          {
-            path: "/admin-dashboard/view_service_reports/upcoming-installation",
-            name: "Upcoming Installations",
-            roles: ["SUPERADMIN"],
-            icon: "BookOpen",
-          },
-          {
-            path: "/admin-dashboard/view_service_reports/map",
-            name: "Service Map",
-            roles: ["SUPERADMIN"],
-            icon: "MapPin",
-          },
-        ],
+        icon: "ListOrdered",
+      },
+      {
+        path: "/admin-dashboard/order/delivery-status",
+        name: "Delay Delivery",
+        roles: ["SUPERADMIN"],
+        icon: "ListOrdered",
       },
     ],
   },
-  // product section
   {
-    name: "Products",
+    name: "Service & After-Sales",
+    moduleKey: "service-after-sales",
+    roles: ["SUPERADMIN"],
+    icon: "ShieldCheck",
+    children: [
+      {
+        path: "/admin-dashboard/warranty",
+        name: "Register Product",
+        roles: ["SUPERADMIN"],
+        icon: "ShieldCheck",
+      },
+      {
+        path: "/admin-dashboard/warranty/products",
+        name: "Registered Products",
+        roles: ["SUPERADMIN"],
+        icon: "ShieldCheck",
+      },
+      {
+        path: "/admin-dashboard/view_service_reports",
+        name: "Service History",
+        roles: ["SUPERADMIN"],
+        icon: "BookOpen",
+      },
+      {
+        path: "/admin-dashboard/view_service_reports/upcoming-installation",
+        name: "Upcoming Installations",
+        roles: ["SUPERADMIN"],
+        icon: "BookOpen",
+      },
+      {
+        path: "/admin-dashboard/view_service_reports/map",
+        name: "Service Map",
+        roles: ["SUPERADMIN"],
+        icon: "MapPin",
+      },
+      {
+        path: "/admin-dashboard/warranty/map",
+        name: "Map View",
+        roles: ["SUPERADMIN"],
+        icon: "MapPin",
+      },
+    ],
+  },
+  {
+    name: "Products & Inventory",
     moduleKey: "products",
     roles: ["SUPERADMIN"],
-    icon: "ShoppingCart",
+    icon: "Grid3x3",
     children: [
       {
         path: "/admin-dashboard/product-stock",
@@ -472,7 +417,21 @@ const allMenuItems = [
         icon: "ClipboardList",
       },
       {
-        name: "Purchase Products",
+        path: "/admin-dashboard/spare",
+        name: "Spare Parts",
+        roles: ["SUPERADMIN"],
+        icon: "ClipboardList",
+      },
+    ],
+  },
+  {
+    name: "Procurement",
+    moduleKey: "products",
+    roles: ["SUPERADMIN"],
+    icon: "ShoppingCart",
+    children: [
+      {
+        name: "Purchase – Products",
         roles: ["SUPERADMIN"],
         icon: "ShoppingCart",
         children: [
@@ -503,13 +462,7 @@ const allMenuItems = [
         ],
       },
       {
-        path: "/admin-dashboard/spare",
-        name: "Spare Parts",
-        roles: ["SUPERADMIN"],
-        icon: "ClipboardList",
-      },
-      {
-        name: "Purchase Spares",
+        name: "Purchase – Spares",
         roles: ["SUPERADMIN"],
         icon: "ShoppingCart",
         children: [
@@ -539,136 +492,32 @@ const allMenuItems = [
           },
         ],
       },
-      {
-        name: "Productions",
-        roles: ["SUPERADMIN"],
-        icon: "PackageCheck",
-        children: [
-          {
-            path: "/admin-dashboard/productions/status",
-            name: "Production Status",
-            roles: ["SUPERADMIN"],
-            icon: "ListOrdered",
-          },
-          {
-            path: "/admin-dashboard/productions/bom-list",
-            name: "BOM List",
-            roles: ["SUPERADMIN"],
-            icon: "ClipboardList",
-          },
-        ],
-      },
-      {
-        name: "Warranty",
-        roles: ["SUPERADMIN"],
-        icon: "ShieldCheck",
-        children: [
-          {
-            path: "/admin-dashboard/warranty",
-            name: "Product Console",
-            roles: ["SUPERADMIN"],
-            icon: "ShieldCheck",
-          },
-          {
-            path: "/admin-dashboard/warranty/products",
-            name: "Registered Products",
-            roles: ["SUPERADMIN"],
-            icon: "ShieldCheck",
-          },
-          {
-            path: "/admin-dashboard/warranty/map",
-            name: "Map View",
-            roles: ["SUPERADMIN"],
-            icon: "MapPin",
-          },
-        ],
-      },
     ],
   },
-
-  
-
-  // employee section
   {
-    name: "Employee",
-    moduleKey: "employee",
+    name: "Production",
+    moduleKey: "products",
     roles: ["SUPERADMIN"],
-    icon: "UserCircle",
+    icon: "PackageCheck",
     children: [
       {
-        path: "/admin-dashboard/employees",
-        name: "Employee",
+        path: "/admin-dashboard/productions/status",
+        name: "Production Status",
         roles: ["SUPERADMIN"],
-        icon: "ShieldCheck",
+        icon: "ListOrdered",
       },
-
       {
-        path: "/empcrm",
-        name: "Employee CRM",
-        roles: ["SUPERADMIN", "HR", "HR HEAD"],
-        icon: "User",
+        path: "/admin-dashboard/productions/bom-list",
+        name: "BOM List",
+        roles: ["SUPERADMIN"],
+        icon: "ClipboardList",
       },
     ],
   },
-
-  // company documents section
   {
-    name: "Documents",
-    moduleKey: "documents",
-    roles: ["SUPERADMIN"],
-    icon: "FileText",
-    children: [
-      {
-        path: "/admin-dashboard/company-documents",
-        name: "Company Documents",
-        roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
-        icon: "FileText",
-      },
-      {
-        path: "/admin-dashboard/dd-management",
-        name: "DD Management",
-        roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
-        icon: "Receipt",
-      },
-      {
-        name: "Knowledge Base",
-        roles: ["SUPERADMIN"],
-        icon: "BookOpen",
-        children: [
-          {
-            path: "/admin-dashboard/qa-approval",
-            name: "Q&A Approval",
-            roles: ["SUPERADMIN"],
-            icon: "BookOpen",
-          },
-          {
-            path: "/admin-dashboard/qa",
-            name: "Q&A",
-            roles: ["SUPERADMIN"],
-            icon: "BookOpen",
-          },
-        ],
-      },
-      {
-        path: "/admin-dashboard/email-templates",
-        name: "Email Templates",
-        roles: ["SUPERADMIN"],
-        icon: "Mail",
-      },
-      {
-        path: "/admin-dashboard/holidays",
-        name: "Holidays",
-        roles: ["SUPERADMIN"],
-        icon: "Calendar",
-      },
-    ],
-  },
-
-  // payments section
-  {
-    name: "Payments",
+    name: "Accounting",
     moduleKey: "payments",
-    roles: ["SUPERADMIN"],
+    roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
     icon: "DollarSign",
     children: [
       {
@@ -685,14 +534,26 @@ const allMenuItems = [
       },
       {
         path: "/admin-dashboard/expenses",
-        name: "Expense",
+        name: "Employee Expense",
         roles: ["SUPERADMIN"],
         icon: "DollarSign",
+      },
+      {
+        path: "/admin-dashboard/dd-management",
+        name: "DD Management",
+        roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
+        icon: "Receipt",
+      },
+      {
+        path: "/admin-dashboard/import-crm/billing",
+        name: "Billing",
+        roles: ["SUPERADMIN"],
+        icon: "Receipt",
       },
     ],
   },
   {
-    name: "Tally Payments",
+    name: "Main Expenses",
     moduleKey: "tally-payments",
     roles: ["SUPERADMIN", "ACCOUNTANT"],
     icon: "Receipt",
@@ -705,104 +566,185 @@ const allMenuItems = [
         sidebarVariant: "lightRed",
       },
       {
-        path: "/admin-dashboard/client-expenses/cards",
-        name: "Client Expenses",
+        path: "/admin-dashboard/client-expenses",
+        name: "Main Expenses",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
-        icon: "Users",
+        icon: "Receipt",
       },
       {
         path: "/admin-dashboard/statements",
-        name: "Statement",
+        name: "Statements",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
         icon: "Receipt",
+      },
+    ],
+  },
+  {
+    name: "Employees",
+    moduleKey: "employee",
+    roles: ["SUPERADMIN", "HR", "HR HEAD"],
+    icon: "UserCircle",
+    children: [
+      {
+        path: "/admin-dashboard/employees",
+        name: "Employee list",
+        roles: ["SUPERADMIN"],
+        icon: "ShieldCheck",
+      },
+      {
+        path: "/empcrm",
+        name: "Employee CRM",
+        roles: ["SUPERADMIN", "HR", "HR HEAD"],
+        icon: "User",
+      },
+    ],
+  },
+  {
+    name: "HR Operations",
+    roles: ["SUPERADMIN", "ADMIN", "HR", "ACCOUNTANT"],
+    icon: "Briefcase",
+    children: [
+      {
+        path: "/admin-dashboard/attendance-rules",
+        name: "Attendance Rules",
+        accessKey: "attendance-rules",
+        roles: [...ATTENDANCE_RULES_ALLOWED_ROLES],
+        icon: "Clock",
+      },
+      {
+        path: "/admin-dashboard/hiring-process",
+        name: "Hiring Process",
+        accessKey: "hiring-process",
+        roles: ["SUPERADMIN"],
+        icon: "Briefcase",
+      },
+      {
+        path: "/empcrm/admin-dashboard/profile/approvals-admin",
+        name: "Final Profile Approval",
+        accessKey: "final-profile-approval",
+        roles: ["SUPERADMIN"],
+        icon: "UserCircle",
       },
       {
         path: "/empcrm/admin-dashboard/salary-slips",
-        name: "Salary slips",
+        name: "Salary Slips",
+        accessKey: "salary-slips",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
         icon: "Receipt",
       },
-      
     ],
   },
-
-
-  
-    {
-      name: "Import CRM",
-      moduleKey: "import-crm",
-      roles: ["SUPERADMIN"],
-      icon: "Import",
-      children: [
-        
-        {
-          path: "/admin-dashboard/import-crm/agents",
-          name: "Agents",
-          roles: ["SUPERADMIN"],
-          icon: "UserPlus",
-        },
-        {
-          path: "/admin-dashboard/import-crm/suppliers",
-          name: "Suppliers",
-          roles: ["SUPERADMIN"],
-          icon: "Users",
-        },
-        {
-          path: "/admin-dashboard/import-crm/shipments",
-          name: "Shipments",
-          roles: ["SUPERADMIN"],
-          icon: "Ship",
-        },
-        {
-          path: "/admin-dashboard/import-crm/quote-submissions",
-          name: "Quote submissions",
-          roles: ["SUPERADMIN"],
-          icon: "ScrollText",
-        },
-        {
-          path: "/admin-dashboard/import-crm/award-followups",
-          name: "Award follow-ups",
-          roles: ["SUPERADMIN"],
-          icon: "PackageCheck",
-        },
-        {
-          path: "/admin-dashboard/import-crm/billing",
-          name: "Billing",
-          roles: ["SUPERADMIN"],
-          icon: "Receipt",
-        },
-      
-        
-        
-      
-         // {
-         //   path: "/admin-dashboard/import-crm/purchase-orders",
-         //   name: "Purchase Orders",
-         //   roles: ["SUPERADMIN"],
-        //   icon: "FileText",
-        // },
-      ],
-    },
   {
-    path: "/admin-dashboard/attendance-rules",
-    name: "Attendance rules",
-    moduleKey: "attendance-rules",
-    roles: [...ATTENDANCE_RULES_ALLOWED_ROLES],
-    icon: "Clock",
+    name: "Targets",
+    moduleKey: "targets",
+    roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD", "ACCOUNTANT"],
+    icon: "Target",
+    children: [
+      {
+        path: "/user-dashboard",
+        name: "Back to user dashboard",
+        roles: ["SALES", "SALES HEAD"],
+        icon: "ArrowLeft",
+        sidebarVariant: "lightRed",
+      },
+      {
+        path: "/admin-dashboard/prospects",
+        name: "Prospect",
+        accessKey: "prospects-view",
+        roles: ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"],
+        icon: "UserPlus",
+      },
+      {
+        path: "/admin-dashboard/hr-designation-targets",
+        name: "HR Targets",
+        accessKey: "hr-designation-targets",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/monitor-targets",
+        name: "Sales Target",
+        accessKey: "sales-target",
+        roles: ["SUPERADMIN", "ACCOUNTANT"],
+        icon: "Target",
+      },
+    ],
   },
   {
-    path: "/empcrm/admin-dashboard/profile/approvals-admin",
-    name: "Final profile approval",
-    moduleKey: "final-profile-approval",
+    name: "Import CRM",
+    moduleKey: "import-crm",
     roles: ["SUPERADMIN"],
-    icon: "UserCircle",
+    icon: "Import",
+    children: [
+      {
+        path: "/admin-dashboard/import-crm/suppliers",
+        name: "Suppliers",
+        roles: ["SUPERADMIN"],
+        icon: "Users",
+      },
+      {
+        path: "/admin-dashboard/import-crm/shipments",
+        name: "Shipments",
+        roles: ["SUPERADMIN"],
+        icon: "Ship",
+      },
+      {
+        path: "/admin-dashboard/import-crm/agents",
+        name: "Agents",
+        roles: ["SUPERADMIN"],
+        icon: "UserPlus",
+      },
+      {
+        path: "/admin-dashboard/import-crm/quote-submissions",
+        name: "Quote Submissions",
+        roles: ["SUPERADMIN"],
+        icon: "ScrollText",
+      },
+      {
+        path: "/admin-dashboard/import-crm/award-followups",
+        name: "Award Follow-ups",
+        roles: ["SUPERADMIN"],
+        icon: "PackageCheck",
+      },
+    ],
   },
   {
-    path: "/admin-dashboard/hiring-process",
-    name: "Hiring Process",
-    moduleKey: "hiring-process",
-    roles: ["SUPERADMIN"],
-    icon: "Briefcase",
+    name: "Resource Center",
+    moduleKey: "documents",
+    roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
+    icon: "BookOpen",
+    children: [
+      {
+        path: "/admin-dashboard/company-documents",
+        name: "Company Documents",
+        roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/qa",
+        name: "Q&A",
+        roles: ["SUPERADMIN"],
+        icon: "BookOpen",
+      },
+      {
+        path: "/admin-dashboard/qa-approval",
+        name: "Q&A Approval",
+        roles: ["SUPERADMIN"],
+        icon: "BookOpen",
+      },
+      {
+        path: "/admin-dashboard/email-templates",
+        name: "Email Templates",
+        roles: ["SUPERADMIN"],
+        icon: "Mail",
+      },
+      {
+        path: "/admin-dashboard/holidays",
+        name: "Holidays",
+        roles: ["SUPERADMIN"],
+        icon: "Calendar",
+      },
+    ],
   },
 ];
 
@@ -885,17 +827,33 @@ async function getUserModuleAccess(username) {
 }
 
 /**
- * Filter top-level menu items by the user's allowed modules.
- * Uses isSectionAllowed which checks both parent key AND any child key.
- * Items without a moduleKey are always shown.
- * SUPERADMIN always sees everything (no module restriction).
+ * Filter menu items by module_access (non-SUPERADMIN).
+ * Parents with moduleKey: section visible if any child key matches (isSectionAllowed).
+ * Nested children: recurse. Leaves with accessKey: require that exact key.
  */
+function filterMenuItemDeep(item, allowedModules) {
+  if (item.children?.length) {
+    const sectionOk =
+      !item.moduleKey || isSectionAllowed(item.moduleKey, allowedModules);
+    if (!sectionOk) return null;
+    const children = item.children
+      .map((ch) => filterMenuItemDeep(ch, allowedModules))
+      .filter(Boolean);
+    if (children.length === 0) return null;
+    return { ...item, children };
+  }
+  const sectionOk =
+    !item.moduleKey || isSectionAllowed(item.moduleKey, allowedModules);
+  if (!sectionOk) return null;
+  if (item.accessKey) {
+    return allowedModules.includes(item.accessKey) ? item : null;
+  }
+  return item;
+}
+
 function filterMenuItemsByModuleAccess(items, allowedModules) {
   if (!allowedModules) return items;
-  return items.filter((item) => {
-    if (!item.moduleKey) return true;
-    return isSectionAllowed(item.moduleKey, allowedModules);
-  });
+  return items.map((item) => filterMenuItemDeep(item, allowedModules)).filter(Boolean);
 }
 
 export default async function getSidebarMenuItems() {

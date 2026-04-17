@@ -9,124 +9,152 @@ import { LogIn, Key, Edit, Shield, UserPlus, X } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import toast from "react-hot-toast";
 import {
-  MODULE_TREE,
+  getModuleTreeForEmployeeBulkUi,
   ALL_MODULE_KEYS,
-  getChildKeys,
+  collectModuleKeysFromUiNode,
+  buildModuleUiSearchIndex,
 } from "@/lib/moduleAccess";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
 }
 
-/* ── Tri-state parent checkbox ── */
-function ParentCheckbox({ sectionKey, selected, disabled, onChange }) {
-  const childKeys = getChildKeys(sectionKey);
-  const hasChildren = childKeys.length > 0;
-
-  const checkedCount = hasChildren
-    ? childKeys.filter((k) => selected.includes(k)).length
-    : selected.includes(sectionKey)
-      ? 1
-      : 0;
-
-  const total = hasChildren ? childKeys.length : 1;
-  const allChecked = checkedCount === total;
-  const someChecked = checkedCount > 0 && checkedCount < total;
-
-  const ref = useRef(null);
-  useEffect(() => {
-    if (ref.current) ref.current.indeterminate = someChecked;
-  }, [ref, someChecked]);
-
-  return (
-    <input
-      ref={ref}
-      type="checkbox"
-      checked={allChecked}
-      onChange={onChange}
-      disabled={disabled}
-      className="w-4 h-4 accent-blue-600 flex-shrink-0 cursor-pointer disabled:cursor-not-allowed"
-    />
-  );
-}
-
-function SectionBlock({ section, selected, disabled, onToggleParent, onToggleChild }) {
+/** Global Module Access: mirrors super-admin sidebar (single row vs nested groups). */
+function ModuleUiBlock({
+  node,
+  selected,
+  disabled,
+  onToggleGroup,
+  onToggleChild,
+  depth = 0,
+}) {
   const [open, setOpen] = useState(true);
-  const hasChildren = section.children.length > 0;
-  const childKeys = section.children.map((c) => c.key);
-  const checkedCount = hasChildren
-    ? childKeys.filter((k) => selected.includes(k)).length
-    : selected.includes(section.key)
-      ? 1
-      : 0;
-  const total = hasChildren ? childKeys.length : 1;
-  const allChecked = checkedCount === total;
-  const noneChecked = checkedCount === 0;
+  const parentRef = useRef(null);
+  const isGroup = node.kind === "group";
+  const keys = isGroup ? collectModuleKeysFromUiNode(node) : [];
+  const checkedCount = isGroup ? keys.filter((k) => selected.includes(k)).length : 0;
+  const total = isGroup ? keys.length : 0;
+  const allChecked = isGroup && total > 0 && checkedCount === total;
+  const someChecked = isGroup && checkedCount > 0 && checkedCount < total;
+  const noneChecked = isGroup && checkedCount === 0;
+
+  useEffect(() => {
+    if (parentRef.current && isGroup) {
+      parentRef.current.indeterminate = someChecked;
+    }
+  }, [isGroup, someChecked]);
+
+  if (node.kind === "single") {
+    const isChecked = selected.includes(node.key);
+    return (
+      <div
+        id={`bulk-section-${node.id}`}
+        className={`border rounded-lg overflow-hidden transition-all ${
+          isChecked
+            ? "border-blue-300 bg-blue-50/40"
+            : "border-gray-200 bg-white"
+        }`}
+      >
+        <label className="flex items-center gap-2 px-3 py-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={() => !disabled && onToggleChild(node.key)}
+            disabled={disabled}
+            className="w-4 h-4 accent-blue-600 flex-shrink-0"
+          />
+          <span className="text-sm font-semibold text-gray-800">{node.label}</span>
+        </label>
+      </div>
+    );
+  }
+
+  if (!isGroup || !node.children?.length) return null;
+
+  const shellClass =
+    depth === 0
+      ? allChecked
+        ? "border-blue-300 bg-blue-50/40"
+        : noneChecked
+          ? "border-gray-200 bg-white"
+          : "border-amber-200 bg-amber-50/30"
+      : "border-gray-200 bg-gray-50/50";
 
   return (
     <div
-      id={`bulk-section-${section.key}`}
-      className={`border rounded-lg overflow-hidden transition-all ${
-        allChecked
-          ? "border-blue-300 bg-blue-50/40"
-          : noneChecked
-            ? "border-gray-200 bg-white"
-            : "border-amber-200 bg-amber-50/30"
-      }`}
+      id={`bulk-section-${node.id}`}
+      className={`border rounded-lg overflow-hidden transition-all ${shellClass}`}
     >
       <div className="flex items-center justify-between px-3 py-2.5 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <input
+            ref={parentRef}
             type="checkbox"
             checked={allChecked}
-            onChange={() => onToggleParent(section)}
+            onChange={() => !disabled && onToggleGroup(node)}
             disabled={disabled}
             className="w-4 h-4 accent-blue-600 flex-shrink-0 cursor-pointer disabled:cursor-not-allowed"
           />
-          <span className="text-sm font-semibold truncate">{section.label}</span>
-          {hasChildren && (
-            <span className="text-xs text-gray-400 flex-shrink-0">
-              ({checkedCount}/{total})
-            </span>
-          )}
-        </div>
-        {hasChildren && (
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-xs px-1"
-            title={open ? "Collapse" : "Expand"}
+          <span
+            className={`text-sm font-semibold truncate ${depth > 0 ? "text-gray-700" : ""}`}
           >
-            {open ? "▲" : "▼"}
-          </button>
-        )}
+            {node.label}
+          </span>
+          <span className="text-xs text-gray-400 flex-shrink-0">
+            ({checkedCount}/{total})
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-xs px-1"
+          title={open ? "Collapse" : "Expand"}
+        >
+          {open ? "▲" : "▼"}
+        </button>
       </div>
 
-      {hasChildren && open && (
-        <div className="px-3 pb-3 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5 border-t border-gray-100">
-          {section.children.map((child) => {
-            const isChecked = selected.includes(child.key);
-            return (
-              <label
-                key={child.key}
-                id={`bulk-module-${child.key}`}
-                className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border cursor-pointer transition-colors text-xs ${
-                  isChecked
-                    ? "bg-blue-50 border-blue-200 text-blue-800"
-                    : "bg-white border-gray-100 text-gray-500 hover:border-blue-200"
-                } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => !disabled && onToggleChild(child.key)}
-                  disabled={disabled}
-                  className="w-3.5 h-3.5 accent-blue-600 flex-shrink-0"
-                />
-                <span className="leading-tight">{child.label}</span>
-              </label>
-            );
-          })}
+      {open && (
+        <div
+          className={`border-t border-gray-100 px-3 pb-3 pt-2 ${
+            depth > 0 ? "ml-1 border-l-2 border-gray-200 pl-3" : ""
+          }`}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {node.children.map((ch) =>
+              ch.kind === "group" ? (
+                <div key={ch.id} className="col-span-full">
+                  <ModuleUiBlock
+                    node={ch}
+                    selected={selected}
+                    disabled={disabled}
+                    onToggleGroup={onToggleGroup}
+                    onToggleChild={onToggleChild}
+                    depth={depth + 1}
+                  />
+                </div>
+              ) : (
+                <label
+                  key={ch.key}
+                  id={`bulk-module-${ch.key}`}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border cursor-pointer transition-colors text-xs ${
+                    selected.includes(ch.key)
+                      ? "bg-blue-50 border-blue-200 text-blue-800"
+                      : "bg-white border-gray-100 text-gray-500 hover:border-blue-200"
+                  } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(ch.key)}
+                    onChange={() => !disabled && onToggleChild(ch.key)}
+                    disabled={disabled}
+                    className="w-3.5 h-3.5 accent-blue-600 flex-shrink-0"
+                  />
+                  <span className="leading-tight">{ch.label}</span>
+                </label>
+              ),
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -394,22 +422,12 @@ const EmpTable = ({ employees }) => {
     "WAREHOUSE INCHARGE",
   ];
 
-  const bulkModuleIndex = useMemo(() => {
-    const out = [];
-    for (const section of MODULE_TREE || []) {
-      const sectionLabel = String(section?.label || "");
-      const sectionKey = String(section?.key || "");
-      for (const child of section?.children || []) {
-        out.push({
-          key: String(child?.key || ""),
-          label: String(child?.label || ""),
-          sectionKey,
-          sectionLabel,
-        });
-      }
-    }
-    return out.filter((x) => x.key && x.label);
-  }, []);
+  const bulkModuleTree = useMemo(() => getModuleTreeForEmployeeBulkUi(), []);
+
+  const bulkModuleIndex = useMemo(
+    () => buildModuleUiSearchIndex(bulkModuleTree || []),
+    [bulkModuleTree],
+  );
 
   const bulkModuleSuggestions = useMemo(() => {
     const q = String(bulkModuleSearch || "").trim().toLowerCase();
@@ -423,11 +441,11 @@ const EmpTable = ({ employees }) => {
     return hits.slice(0, 8);
   }, [bulkModuleSearch, bulkModuleIndex]);
 
-  const scrollToBulkModule = (moduleKey, sectionKey) => {
-    const el =
-      document.getElementById(`bulk-module-${moduleKey}`) ||
-      document.getElementById(`bulk-section-${sectionKey}`) ||
-      document.getElementById(`bulk-section-dashboard`);
+  const scrollToBulkModule = (entry) => {
+    const id =
+      entry?.scrollId ||
+      (entry?.key ? `bulk-module-${entry.key}` : null);
+    const el = id ? document.getElementById(id) : null;
     if (el?.scrollIntoView) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
     }
@@ -455,19 +473,17 @@ const EmpTable = ({ employees }) => {
     );
   };
 
-  const toggleBulkParent = (section) => {
+  const toggleBulkGroup = (node) => {
     setBulkTouched(true);
-    const hasChildren = section.children.length > 0;
-    const childKeys = section.children.map((c) => c.key);
-    const keys = hasChildren ? childKeys : [section.key];
+    const keys = collectModuleKeysFromUiNode(node);
+    if (keys.length === 0) return;
     setBulkSelectedModules((prev) => {
       const alreadyAllChecked = keys.every((k) => prev.includes(k));
       if (alreadyAllChecked) {
-        return prev.filter((k) => !keys.includes(k) && k !== section.key);
+        return prev.filter((k) => !keys.includes(k));
       }
       const next = new Set(prev);
       keys.forEach((k) => next.add(k));
-      next.add(section.key);
       return [...next];
     });
   };
@@ -663,7 +679,7 @@ const EmpTable = ({ employees }) => {
                           className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
                           onClick={() => {
                             setBulkModuleSearch("");
-                            scrollToBulkModule(m.key, m.sectionKey);
+                            scrollToBulkModule(m);
                           }}
                         >
                           <div className="font-medium text-gray-800">{m.label}</div>
@@ -674,13 +690,13 @@ const EmpTable = ({ employees }) => {
                   )}
                 </div>
                 <div className="space-y-3">
-                  {MODULE_TREE.map((section) => (
-                    <SectionBlock
-                      key={section.key}
-                      section={section}
+                  {bulkModuleTree.map((node) => (
+                    <ModuleUiBlock
+                      key={node.id}
+                      node={node}
                       selected={bulkSelectedModules}
                       disabled={bulkSaving}
-                      onToggleParent={toggleBulkParent}
+                      onToggleGroup={toggleBulkGroup}
                       onToggleChild={toggleBulkChild}
                     />
                   ))}

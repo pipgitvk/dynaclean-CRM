@@ -4,6 +4,7 @@ import { jwtVerify } from "jose";
 import {
   cloneClientExpenseFromTemplate,
   deleteDedicatedExpenseForStatement,
+  applyExpenseAllocation,
 } from "@/lib/statementClientExpenseLink";
 import { revalidateClientExpensePages } from "@/lib/revalidateClientExpensePages";
 import { resetMysqlAutoIncrementIfEmpty } from "@/lib/resetMysqlAutoIncrementIfEmpty";
@@ -19,8 +20,25 @@ export async function GET(req, { params }) {
 
     const { id } = await params;
     const conn = await getDbConnection();
+    // Ensure invoice_status column exists
+    try {
+      await conn.execute("SELECT invoice_status FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN invoice_status VARCHAR(50) NULL");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT expense_allocation FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute(
+          "ALTER TABLE statements ADD COLUMN expense_allocation TEXT NULL AFTER client_expense_id",
+        );
+      } catch (__) {}
+    }
     const [rows] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, invoice_status, expense_allocation, created_at
        FROM statements WHERE id = ?`,
       [id]
     );
@@ -47,7 +65,37 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const data = await req.json();
-    const { trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id } = data;
+    const {
+      trans_id,
+      date,
+      txn_dated_deb,
+      txn_posted_date,
+      cheq_no,
+      description,
+      type,
+      amount,
+      client_expense_id,
+      expense_allocation,
+    } = data;
+
+    let expenseAllocationJson = null;
+    const allocObj =
+      expense_allocation != null && typeof expense_allocation === "object"
+        ? {
+            includeHead: expense_allocation.includeHead !== false,
+            includeSubs: Array.isArray(expense_allocation.includeSubs)
+              ? expense_allocation.includeSubs.map((s) => String(s || "").trim()).filter(Boolean)
+              : [],
+            headLabel:
+              expense_allocation.headLabel != null &&
+              String(expense_allocation.headLabel).trim() !== ""
+                ? String(expense_allocation.headLabel).trim()
+                : null,
+          }
+        : null;
+    if (allocObj != null) {
+      expenseAllocationJson = JSON.stringify(allocObj);
+    }
 
     if (!trans_id || !date || !type || amount == null || amount === "") {
       return NextResponse.json(
@@ -57,6 +105,15 @@ export async function PUT(req, { params }) {
     }
 
     const pool = await getDbConnection();
+    try {
+      await pool.execute("SELECT expense_allocation FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await pool.execute(
+          "ALTER TABLE statements ADD COLUMN expense_allocation TEXT NULL AFTER client_expense_id",
+        );
+      } catch (__) {}
+    }
     const conn = await pool.getConnection();
     const [existing] = await conn.execute(
       "SELECT id FROM statements WHERE trans_id = ? AND id != ?",
@@ -100,7 +157,7 @@ export async function PUT(req, { params }) {
         const [result] = await conn.execute(
           `UPDATE statements SET
         trans_id = ?, date = ?, txn_dated_deb = ?, txn_posted_date = ?, cheq_no = ?,
-        description = ?, type = ?, amount = ?, client_expense_id = ?
+        description = ?, type = ?, amount = ?, client_expense_id = ?, expense_allocation = ?
        WHERE id = ?`,
           [
             trans_id,
@@ -112,6 +169,7 @@ export async function PUT(req, { params }) {
             type,
             newAmt,
             formEid,
+            expenseAllocationJson,
             id,
           ],
         );
@@ -123,6 +181,9 @@ export async function PUT(req, { params }) {
           `UPDATE client_expenses SET amount = ROUND(?, 2), transaction_id = ? WHERE id = ?`,
           [newAmt, trans_id, formEid],
         );
+        if (allocObj != null) {
+          await applyExpenseAllocation(conn, formEid, allocObj, null);
+        }
         revalidateExpenseIds.add(formEid);
       } else {
         if (prevEid != null && Number.isFinite(prevEid) && prevEid >= 1) {
@@ -132,10 +193,30 @@ export async function PUT(req, { params }) {
 
         let finalExpenseId = null;
         if (formEid != null) {
-          finalExpenseId = await cloneClientExpenseFromTemplate(conn, formEid, {
-            amount: newAmt,
-            transId: trans_id,
-          });
+          // If user picked an already-dedicated expense for this statement (txn matches),
+          // reuse it instead of creating yet another clone.
+          const [ceRows] = await conn.execute(
+            `SELECT id, transaction_id FROM client_expenses WHERE id = ?`,
+            [formEid],
+          );
+          const ce = ceRows?.[0];
+          const ceTxn = String(ce?.transaction_id ?? "").trim();
+          if (ce && ceTxn === String(trans_id ?? "").trim()) {
+            finalExpenseId = Number(ce.id);
+            await conn.execute(
+              `UPDATE client_expenses SET amount = ROUND(?, 2), transaction_id = ? WHERE id = ?`,
+              [newAmt, trans_id, finalExpenseId],
+            );
+            if (allocObj != null) {
+              await applyExpenseAllocation(conn, finalExpenseId, allocObj, null);
+            }
+          } else {
+            finalExpenseId = await cloneClientExpenseFromTemplate(conn, formEid, {
+              amount: newAmt,
+              transId: trans_id,
+              allocation: allocObj || undefined,
+            });
+          }
           if (finalExpenseId != null) {
             revalidateExpenseIds.add(formEid);
             revalidateExpenseIds.add(finalExpenseId);
@@ -145,7 +226,7 @@ export async function PUT(req, { params }) {
         const [result] = await conn.execute(
           `UPDATE statements SET
         trans_id = ?, date = ?, txn_dated_deb = ?, txn_posted_date = ?, cheq_no = ?,
-        description = ?, type = ?, amount = ?, client_expense_id = ?
+        description = ?, type = ?, amount = ?, client_expense_id = ?, expense_allocation = ?
        WHERE id = ?`,
           [
             trans_id,
@@ -157,6 +238,7 @@ export async function PUT(req, { params }) {
             type,
             newAmt,
             finalExpenseId,
+            expenseAllocationJson,
             id,
           ],
         );

@@ -84,7 +84,34 @@ export async function POST(req) {
     await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
     const data = await req.json();
-    const { trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id } = data;
+    const {
+      trans_id,
+      date,
+      txn_dated_deb,
+      txn_posted_date,
+      cheq_no,
+      description,
+      type,
+      amount,
+      client_expense_id,
+      expense_allocation,
+    } = data;
+
+    const allocObj =
+      expense_allocation != null && typeof expense_allocation === "object"
+        ? {
+            includeHead: expense_allocation.includeHead !== false,
+            includeSubs: Array.isArray(expense_allocation.includeSubs)
+              ? expense_allocation.includeSubs.map((s) => String(s || "").trim()).filter(Boolean)
+              : [],
+            headLabel:
+              expense_allocation.headLabel != null &&
+              String(expense_allocation.headLabel).trim() !== ""
+                ? String(expense_allocation.headLabel).trim()
+                : null,
+          }
+        : null;
+    const expenseAllocationJson = allocObj != null ? JSON.stringify(allocObj) : null;
 
     if (!trans_id || !date || !type || amount == null || amount === "") {
       return NextResponse.json(
@@ -116,6 +143,16 @@ export async function POST(req) {
     const expenseIdVal = client_expense_id ? Number(client_expense_id) : null;
     const amt = Number(amount) || 0;
 
+    try {
+      await pool.execute("SELECT expense_allocation FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await pool.execute(
+          "ALTER TABLE statements ADD COLUMN expense_allocation TEXT NULL AFTER client_expense_id",
+        );
+      } catch (__) {}
+    }
+
     const c = await pool.getConnection();
     const revalidateIds = new Set();
     try {
@@ -129,13 +166,14 @@ export async function POST(req) {
         finalExpenseId = await cloneClientExpenseFromTemplate(c, expenseIdVal, {
           amount: amt,
           transId: trans_id,
+          allocation: allocObj || undefined,
         });
         revalidateIds.add(expenseIdVal);
         if (finalExpenseId != null) revalidateIds.add(finalExpenseId);
       }
       await c.execute(
-        `INSERT INTO statements (trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO statements (trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, expense_allocation)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           trans_id,
           date,
@@ -146,6 +184,7 @@ export async function POST(req) {
           type,
           amt,
           finalExpenseId,
+          expenseAllocationJson,
         ],
       );
       await c.commit();

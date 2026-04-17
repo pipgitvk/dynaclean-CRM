@@ -12,10 +12,31 @@ import autoTable from "jspdf-autotable";
 export default function StatementTable({ rows }) {
   const router = useRouter();
   const fileInputRef = useRef(null);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState(() => dayjs().startOf("month").format("YYYY-MM-DD"));
-  const [dateTo, setDateTo] = useState(() => dayjs().endOf("month").format("YYYY-MM-DD"));
+  const STORAGE_KEY = "statements.filters.v1";
+  const readPersisted = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.sessionStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const persisted = readPersisted();
+  const defaultMonthStart = () => dayjs().startOf("month").format("YYYY-MM-DD");
+  const defaultMonthEnd = () => dayjs().endOf("month").format("YYYY-MM-DD");
+  const [statusFilter, setStatusFilter] = useState(() => persisted?.statusFilter ?? "");
+  const [searchQuery, setSearchQuery] = useState(() => persisted?.searchQuery ?? "");
+  const [dateFrom, setDateFrom] = useState(
+    () => persisted?.dateFrom ?? defaultMonthStart()
+  );
+  const [dateTo, setDateTo] = useState(
+    () => persisted?.dateTo ?? defaultMonthEnd()
+  );
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [modalId, setModalId] = useState(null);
   const [expense, setExpense] = useState(null);
@@ -195,11 +216,31 @@ export default function StatementTable({ rows }) {
     return <span className="ml-1">{sortConfig.direction === "asc" ? "▲" : "▼"}</span>;
   };
 
+  // Persist filters so typed search doesn't clear unless user hits Reset.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const isDefaultMonthRange =
+        dateFrom === defaultMonthStart() && dateTo === defaultMonthEnd();
+      // Reset / default view: no search, no status, current month — don't persist.
+      if (!statusFilter && !searchQuery && isDefaultMonthRange) {
+        window.sessionStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+      window.sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ statusFilter, searchQuery, dateFrom, dateTo })
+      );
+    } catch {
+      // ignore storage errors (quota / privacy mode)
+    }
+  }, [statusFilter, searchQuery, dateFrom, dateTo]);
+
   const handleReset = () => {
     setStatusFilter("");
     setSearchQuery("");
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(defaultMonthStart());
+    setDateTo(defaultMonthEnd());
   };
 
   const formatPdfAmount = (n) => {

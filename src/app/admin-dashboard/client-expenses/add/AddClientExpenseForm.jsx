@@ -1,9 +1,11 @@
 "use client";
 
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, useWatch, Controller } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import SubHeadMultiSelect from "../SubHeadMultiSelect";
+
 export default function AddClientExpenseForm() {
   const router = useRouter();
   const [isSubmitting, setSubmitting] = useState(false);
@@ -14,7 +16,7 @@ export default function AddClientExpenseForm() {
       main_head: "Direct",
       supply: "goods",
       head: "",
-      sub_head: "",
+      sub_heads: [],
       tax_rate: "",
       tax_applicable: "No",
       tax_type: "",
@@ -30,6 +32,22 @@ export default function AddClientExpenseForm() {
   const taxRate = useWatch({ control, name: "tax_rate", defaultValue: "" });
   const amount = useWatch({ control, name: "amount", defaultValue: "" });
   const showSubHead = mainHead === "Direct" || mainHead === "Indirect";
+  const selectedHead = useWatch({ control, name: "head", defaultValue: "" });
+  const skipHeadClearRef = useRef(true);
+
+  useEffect(() => {
+    if (skipHeadClearRef.current) {
+      skipHeadClearRef.current = false;
+      return;
+    }
+    setValue("sub_heads", []);
+  }, [selectedHead, setValue]);
+
+  useEffect(() => {
+    if (mainHead !== "Direct" && mainHead !== "Indirect") {
+      setValue("sub_heads", []);
+    }
+  }, [mainHead, setValue]);
 
   useEffect(() => {
     if (!taxApplicable || !taxType) return;
@@ -83,7 +101,12 @@ export default function AddClientExpenseForm() {
           type_of_ledger: data.type_of_ledger || null,
           hsn: data.hsn || null,
           transaction_id: null,
-          sub_heads: data.sub_head ? [data.sub_head] : [],
+          sub_heads:
+            data.main_head === "Direct" || data.main_head === "Indirect"
+              ? Array.isArray(data.sub_heads)
+                ? data.sub_heads.filter(Boolean)
+                : []
+              : [],
           amount: data.amount != null && data.amount !== "" ? Number(data.amount) : null,
         }),
       });
@@ -138,17 +161,21 @@ export default function AddClientExpenseForm() {
           </select>
         </div>
         {showSubHead && (
-          <div>
-            <label className="block text-sm font-medium mb-1">Sub-head</label>
-            <select
-              {...register("sub_head")}
-              className="w-full border p-2 rounded-md"
-            >
-              <option value="">Select sub-head</option>
-              {subHeadOptions.map((h) => (
-                <option key={h} value={h}>{h}</option>
-              ))}
-            </select>
+          <div className="min-w-0">
+            <label className="block text-sm font-medium mb-1">
+              Sub-head <span className="text-gray-500 font-normal">(one or more)</span>
+            </label>
+            <Controller
+              name="sub_heads"
+              control={control}
+              render={({ field }) => (
+                <SubHeadMultiSelect
+                  options={subHeadOptions}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
           </div>
         )}
         <div>
