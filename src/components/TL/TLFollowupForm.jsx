@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Save, X } from "lucide-react";
-import { getTlTagOptions } from "@/utils/tlFollowupTagOptions";
+import {
+  getTlTagOptions,
+  getTlMultiTagChipClass,
+  TL_MUTEX_TAG_PAIR,
+  dedupeMutuallyExclusiveTlTags,
+} from "@/utils/tlFollowupTagOptions";
 
 export default function TLFollowupForm({
   customerId,
@@ -93,7 +98,9 @@ export default function TLFollowupForm({
           .map((t) => t.trim())
           .filter(Boolean)
       : [];
-    const multi_tag = parsedTags.filter((t) => allowed.has(t));
+    const multi_tag = dedupeMutuallyExclusiveTlTags(
+      parsedTags.filter((t) => allowed.has(t)),
+    );
 
     setFormData((prev) => ({
       ...prev,
@@ -157,10 +164,11 @@ export default function TLFollowupForm({
         }
 
         if (newTags.includes(tag)) {
-          // Remove tag if already selected
           newTags = newTags.filter((t) => t !== tag);
+        } else if (TL_MUTEX_TAG_PAIR.includes(tag)) {
+          newTags = newTags.filter((t) => !TL_MUTEX_TAG_PAIR.includes(t));
+          newTags.push(tag);
         } else {
-          // Add tag
           newTags.push(tag);
         }
       }
@@ -353,12 +361,12 @@ export default function TLFollowupForm({
               {tagOptions.map((tag) => (
                 <label
                   key={tag}
-                  className={`inline-flex items-center px-4 py-2 rounded-md cursor-pointer transition-colors ${
+                  className={`inline-flex items-center cursor-pointer transition-colors ${
                     formData.multi_tag.includes(tag)
                       ? tag === "N/A"
-                        ? "bg-gray-500 text-white"
-                        : "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        ? "px-4 py-2 rounded-md bg-gray-500 text-white"
+                        : getTlMultiTagChipClass(tag, "form")
+                      : "px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                 >
                   <input
@@ -374,7 +382,7 @@ export default function TLFollowupForm({
             <p className="mt-1 text-xs text-gray-500">
               {formData.multi_tag.includes("N/A")
                 ? "N/A is selected (no other tags can be selected)"
-                : "Select multiple tags. Selecting N/A will clear all others."}
+                : "Select multiple tags. Postponing and Declined: only one at a time. N/A clears all others."}
             </p>
           </div>
 
