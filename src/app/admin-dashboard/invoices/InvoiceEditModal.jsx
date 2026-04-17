@@ -113,6 +113,7 @@ export default function InvoiceEditModal({
   const [cgstRate, setCgstRate] = useState(9);
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
+  const [roundOff, setRoundOff] = useState(0);
   const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [linkedTransIds, setLinkedTransIds] = useState([]);
 
@@ -129,9 +130,9 @@ export default function InvoiceEditModal({
     const sgst = (subtotal * sgstRate) / 100;
     const igst = (subtotal * igstRate) / 100;
     const totalTax = cgst + sgst + igst;
-    const grandTotal = subtotal + totalTax;
+    const grandTotal = subtotal + totalTax + (parseFloat(roundOff) || 0);
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal };
-  }, [items, cgstRate, sgstRate, igstRate]);
+  }, [items, cgstRate, sgstRate, igstRate, roundOff]);
 
   useEffect(() => {
     if (!open || !invoiceId) return;
@@ -182,6 +183,7 @@ export default function InvoiceEditModal({
         setShowPaymentLinkModal(false);
         setNotes(inv.notes || "");
         setEditableTerms(inv.terms_conditions || "");
+        setRoundOff(Number(inv.round_off) || 0);
 
         const loadedItems =
           Array.isArray(data.items) && data.items.length
@@ -278,6 +280,7 @@ export default function InvoiceEditModal({
         sgst: taxSummary.sgst,
         igst: taxSummary.igst,
         total_tax: taxSummary.totalTax,
+        round_off: parseFloat(roundOff) || 0,
         grand_total: taxSummary.grandTotal,
         amount_paid: amountPaid,
         balance_amount: balanceAmount,
@@ -646,6 +649,8 @@ export default function InvoiceEditModal({
                 cgst={taxSummary.cgst}
                 sgst={taxSummary.sgst}
                 igst={taxSummary.igst}
+                roundOff={roundOff}
+                setRoundOff={setRoundOff}
                 grandTotal={taxSummary.grandTotal}
                 cgstRate={cgstRate}
                 sgstRate={sgstRate}

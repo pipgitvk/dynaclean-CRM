@@ -7,6 +7,8 @@ export default function TaxAndSummary({
   cgst,
   sgst,
   igst,
+  roundOff,
+  setRoundOff,
   grandTotal,
   cgstRate,
   sgstRate,
@@ -95,6 +97,16 @@ export default function TaxAndSummary({
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Total GST:</span>
             <span>₹ {(cgst + sgst + igst).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between py-1 border-b items-center">
+            <span className="font-medium">Round Off:</span>
+            <input
+              type="number"
+              value={roundOff}
+              onChange={(e) => setRoundOff(parseFloat(e.target.value) || 0)}
+              className="w-24 p-1 border rounded text-right"
+              step="0.01"
+            />
           </div>
           <div className="flex justify-between py-2 mt-2 text-lg font-bold text-red-600">
             <span>Grand Total:</span>

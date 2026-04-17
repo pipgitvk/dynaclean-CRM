@@ -81,6 +81,7 @@ export async function POST(req) {
       cgst,
       sgst,
       igst,
+      round_off,
       grand_total,
       cgstRate,
       sgstRate,
@@ -123,8 +124,8 @@ export async function POST(req) {
         // Try inserting the header row
         await conn.execute(
           `INSERT INTO quotations_records 
-           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, emp_name, subtotal, grand_total, term_con, payment_term_days, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             finalQuoteNumber,
             serverQuoteDate,
@@ -138,6 +139,7 @@ export async function POST(req) {
             cgst + sgst + igst,
             username,
             subtotal,
+            round_off || 0,
             grand_total,
             terms,
             payment_term_days ?? null,

@@ -40,6 +40,12 @@ export default function QuotationViewer({
 }) {
   const containerRef = useRef();
   const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
+
+  // Calculate true grand total dynamically, just in case database has a mismatch
+  const calcSubtotal = Number(header.subtotal) || 0;
+  const calcGst = Number(header.gst) || 0;
+  const calcRoundOff = Number(header.round_off) || 0;
+  const displayGrandTotal = (calcSubtotal + calcGst + calcRoundOff).toFixed(2);
   // Map payment_term_days to readable text
   const paymentTermDays = useMemo(() => {
     const map = {
@@ -516,7 +522,7 @@ export default function QuotationViewer({
                 </td>
                 <td className="p-2">{totalQty}</td>
                 <td colSpan={5} className="p-2 text-right sm:text-center">
-                  ₹{header.grand_total}
+                  ₹{displayGrandTotal}
                 </td>
               </tr>
             </tfoot>
@@ -591,9 +597,19 @@ export default function QuotationViewer({
               <span>Sub Total:</span>
               <span>₹{header.subtotal}</span>
             </div>
+            <div className="flex-1 flex justify-between">
+              <span>Total GST:</span>
+              <span>₹{header.gst}</span>
+            </div>
+            {header.round_off && Number(header.round_off) !== 0 ? (
+              <div className="flex-1 flex justify-between">
+                <span>Round Off:</span>
+                <span>₹{header.round_off}</span>
+              </div>
+            ) : null}
             <div className="flex-1 flex justify-between font-bold text-lg text-red-600">
               <span>Grand Total:</span>
-              <span>₹{header.grand_total}</span>
+              <span>₹{displayGrandTotal}</span>
             </div>
           </div>
         </div>
