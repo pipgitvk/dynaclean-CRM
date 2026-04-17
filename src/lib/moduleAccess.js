@@ -26,8 +26,6 @@ export const MODULE_TREE = [
       { key: "orders-delay", label: "Delay Delivery" },
       { key: "bulk-reassign", label: "Bulk Reassign Leads" },
       { key: "my-leads", label: "My Leads" },
-      { key: "leads-upload", label: "Leads Upload" },
-      { key: "blog", label: "Blog" },
       { key: "dm-fresh-leads", label: "24h Fresh Leads (DM)" },
       { key: "task-manager", label: "Task Manager" },
       { key: "demo-details", label: "Demo Details" },
@@ -45,10 +43,12 @@ export const MODULE_TREE = [
       { key: "view-customers", label: "View Customers" },
       { key: "quotations", label: "Quotations" },
       { key: "invoices", label: "Invoices" },
-      { key: "service-records", label: "Service Records" },
-      { key: "upcoming-installations", label: "Upcoming Installations" },
-      { key: "service-map", label: "Service Map" },
     ],
+  },
+  {
+    key: "leads-management",
+    label: "Leads Management",
+    children: [{ key: "leads-upload", label: "Leads Upload" }],
   },
   {
     key: "targets",
@@ -59,6 +59,18 @@ export const MODULE_TREE = [
       { key: "prospects-new", label: "New Prospect" },
       { key: "hr-designation-targets", label: "HR Targets" },
       { key: "sales-target", label: "Sales Target" },
+    ],
+  },
+  {
+    key: "service-after-sales",
+    label: "Service & After-Sales",
+    children: [
+      { key: "warranty-console", label: "Register Product" },
+      { key: "registered-products", label: "Registered Products" },
+      { key: "warranty-map", label: "Map View" },
+      { key: "service-records", label: "Service Records" },
+      { key: "upcoming-installations", label: "Upcoming Installations" },
+      { key: "service-map", label: "Service Map" },
     ],
   },
   {
@@ -78,9 +90,6 @@ export const MODULE_TREE = [
       { key: "spare-purchases", label: "Spare – Purchases" },
       { key: "production-status", label: "Production Status" },
       { key: "bom-list", label: "BOM List" },
-      { key: "warranty-console", label: "Add in warranty" },
-      { key: "registered-products", label: "Registered Products" },
-      { key: "warranty-map", label: "Map View" },
     ],
   },
   {
@@ -98,14 +107,17 @@ export const MODULE_TREE = [
     children: [
       { key: "payment-pending", label: "Payment Pending" },
       { key: "manual-payments", label: "Manual Payments" },
-      { key: "expenses", label: "Expenses" },
+      { key: "expenses", label: "Expense" },
+      { key: "view-expenses", label: "View Expenses" },
+      { key: "dd-management", label: "DD Management" },
+      { key: "import-billing", label: "Billing" },
     ],
   },
   {
     key: "tally-payments",
-    label: "Tally Payments",
+    label: "Main Expenses",
     children: [
-      { key: "client-expenses", label: "Client Expenses" },
+      { key: "client-expenses", label: "Main Expenses" },
       { key: "statements", label: "Statements" },
       { key: "salary-slips", label: "Salary Slips" },
     ],
@@ -115,12 +127,13 @@ export const MODULE_TREE = [
     label: "Resource Center",
     children: [
       { key: "company-documents", label: "Company Documents" },
-      { key: "dd-management", label: "DD Management" },
+      { key: "blog", label: "Blog" },
       { key: "qa-approval", label: "Q&A Approval" },
       { key: "qa", label: "Q&A" },
       { key: "email-templates", label: "Email Templates" },
       { key: "holidays", label: "Holidays" },
       { key: "installation-videos", label: "Installation Videos" },
+      { key: "installation-videos-manage", label: "Manage Video Links" },
       { key: "assets", label: "Assets" },
     ],
   },
@@ -133,7 +146,6 @@ export const MODULE_TREE = [
       { key: "import-shipments", label: "Shipments" },
       { key: "import-quote-submissions", label: "Quote Submissions" },
       { key: "import-award-followups", label: "Award Follow-ups" },
-      { key: "import-billing", label: "Billing" },
     ],
   },
   {
@@ -154,15 +166,7 @@ export const MODULE_TREE = [
 ];
 
 /** Child keys not shown in super-admin sidebar → grouped under “Others” in bulk module UI */
-export const MODULE_CHILD_KEYS_OTHERS_ONLY = new Set([
-  "blog",
-  "leads-upload",
-  "attendance-details",
-  "regularization-approvals",
-  "installation-videos",
-  "assets",
-  "attendance-log",
-]);
+export const MODULE_CHILD_KEYS_OTHERS_ONLY = new Set(["attendance-log"]);
 
 /**
  * Super-admin sidebar mirror for Global Module Access UI.
@@ -177,8 +181,9 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "dashboard-home", label: "Dashboard" },
       { kind: "leaf", key: "task-manager", label: "Task Manager" },
-      { kind: "leaf", key: "expenses", label: "Expense" },
       { kind: "leaf", key: "fast-card", label: "Fast Card" },
+      { kind: "leaf", key: "attendance-details", label: "Attendance details" },
+      { kind: "leaf", key: "regularization-approvals", label: "Regularization approvals" },
     ],
   },
   { kind: "single", id: "tl-management", label: "TL Management", key: "tl-customers" },
@@ -206,6 +211,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "dm-fresh-leads", label: "24h Fresh Leads (DM)" },
       { kind: "leaf", key: "lead-distribution", label: "Lead Distribution" },
       { kind: "leaf", key: "bulk-reassign", label: "Bulk Reassign Leads" },
+      { kind: "leaf", key: "leads-upload", label: "Leads Upload" },
     ],
   },
   {
@@ -233,7 +239,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     id: "service-after-sales",
     label: "Service & After-Sales",
     children: [
-      { kind: "leaf", key: "warranty-console", label: "Add in warranty" },
+      { kind: "leaf", key: "warranty-console", label: "Register Product" },
       { kind: "leaf", key: "registered-products", label: "Registered Products" },
       { kind: "leaf", key: "service-records", label: "Service History" },
       { kind: "leaf", key: "upcoming-installations", label: "Upcoming Installations" },
@@ -296,6 +302,8 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "payment-pending", label: "Payment Pending" },
       { kind: "leaf", key: "manual-payments", label: "Manual Payments" },
+      { kind: "leaf", key: "expenses", label: "Expense" },
+      { kind: "leaf", key: "view-expenses", label: "View Expenses" },
       { kind: "leaf", key: "dd-management", label: "DD Management" },
       { kind: "leaf", key: "import-billing", label: "Billing" },
     ],
@@ -303,9 +311,9 @@ export const SUPERADMIN_MODULE_UI_NODES = [
   {
     kind: "group",
     id: "tally-payments",
-    label: "Tally Payments",
+    label: "Main Expenses",
     children: [
-      { kind: "leaf", key: "client-expenses", label: "Tally Payments" },
+      { kind: "leaf", key: "client-expenses", label: "Main Expenses" },
       { kind: "leaf", key: "statements", label: "Statements" },
     ],
   },
@@ -359,10 +367,14 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     label: "Resource Center",
     children: [
       { kind: "leaf", key: "company-documents", label: "Company Documents" },
+      { kind: "leaf", key: "blog", label: "Blog" },
       { kind: "leaf", key: "qa", label: "Q&A" },
       { kind: "leaf", key: "qa-approval", label: "Q&A Approval" },
       { kind: "leaf", key: "email-templates", label: "Email Templates" },
       { kind: "leaf", key: "holidays", label: "Holidays" },
+      { kind: "leaf", key: "installation-videos", label: "Installation Videos" },
+      { kind: "leaf", key: "installation-videos-manage", label: "Manage Video Links" },
+      { kind: "leaf", key: "assets", label: "Assets" },
     ],
   },
 ];
@@ -484,6 +496,18 @@ export function normalizeModuleAccessKeys(keys) {
       out.add("targets");
       continue;
     }
+    // Legacy: one "expenses" toggle used to gate both submit + view-all screens
+    if (key === "expenses") {
+      out.add("expenses");
+      out.add("view-expenses");
+      continue;
+    }
+    // Legacy: installation-videos previously gated both list + manage pages
+    if (key === "installation-videos") {
+      out.add("installation-videos");
+      out.add("installation-videos-manage");
+      continue;
+    }
     out.add(key);
   }
   return [...out].filter((k) => known.has(k));
@@ -513,15 +537,11 @@ export function parseModuleAccess(raw) {
 }
 
 /**
- * SUPERADMIN-only modules that must never be granted to other roles,
- * even under backward-compat "grant all when module_access is NULL".
+ * Keys removed here are stripped from non-SUPERADMIN module_access (legacy guard).
+ * Attendance rules & final profile approval are grantable via Global module access to HR/admin;
+ * route-level auth remains on each page.
  */
-export const SUPERADMIN_ONLY_MODULE_KEYS = new Set([
-  // Admin-only features
-  "attendance-rules",
-  "import-crm",
-  "final-profile-approval",
-]);
+export const SUPERADMIN_ONLY_MODULE_KEYS = new Set([]);
 
 /**
  * Enforce SUPERADMIN-only modules at the module_access level.

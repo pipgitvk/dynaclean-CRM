@@ -356,13 +356,13 @@ const allMenuItems = [
   },
   {
     name: "Service & After-Sales",
-    moduleKey: "tl-management",
+    moduleKey: "service-after-sales",
     roles: ["SUPERADMIN"],
     icon: "ShieldCheck",
     children: [
       {
         path: "/admin-dashboard/warranty",
-        name: "Add in warranty",
+        name: "Register Product",
         roles: ["SUPERADMIN"],
         icon: "ShieldCheck",
       },

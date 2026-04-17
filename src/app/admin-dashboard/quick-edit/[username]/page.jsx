@@ -296,6 +296,7 @@ const QuickEditPage = () => {
       "attendance-log",
       "quotations",
       "expenses",
+      "view-expenses",
       "service-records",
       "assets",
       "product-stock",
@@ -387,6 +388,7 @@ const QuickEditPage = () => {
       "regularization-approvals",
       "task-manager",
       "expenses",
+      "view-expenses",
       "fast-card",
       // Prospects
       "prospects-view",

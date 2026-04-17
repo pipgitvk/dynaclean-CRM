@@ -114,6 +114,8 @@ import {
   Import,
   Ship,
   ClipboardCheck,
+  Target,
+  Briefcase,
 } from "lucide-react";
 
 // Icon map
@@ -151,6 +153,8 @@ const iconMap = {
   Import,
   Ship,
   ClipboardCheck,
+  Target,
+  Briefcase,
 };
 
 //this is test
@@ -165,8 +169,8 @@ export default function Sidebar({
   const [openMenus, setOpenMenus] = useState({});
   const { theme } = useTheme();
 
-  const toggleMenu = (name) => {
-    setOpenMenus((prev) => ({ ...prev, [name]: !prev[name] }));
+  const toggleMenu = (key) => {
+    setOpenMenus((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleLinkClick = () => {
@@ -177,6 +181,54 @@ export default function Sidebar({
     ) {
       onCloseSidebar();
     }
+  };
+
+  const renderMenuList = (items, parentKey = "") => {
+    return items.map((item, idx) => {
+      const keyBase = parentKey ? `${parentKey}-` : "";
+      const itemKey = `${keyBase}${item.path || item.name || idx}`;
+      const Icon = iconMap[item.icon] || null;
+
+      if (item.children?.length) {
+        const isSubOpen = openMenus[itemKey];
+        return (
+          <li key={itemKey} className="m-2">
+            <button
+              type="button"
+              onClick={() => toggleMenu(itemKey)}
+              className={`flex items-center gap-2 w-full ${theme.sidebar.hover} rounded-md transition-colors p-2`}
+            >
+              {Icon && <Icon size={20} />}
+              <span>{item.name}</span>
+              {isSubOpen ? (
+                <ChevronDown size={16} />
+              ) : (
+                <ChevronRight size={16} />
+              )}
+            </button>
+
+            {isSubOpen && (
+              <ul className="ml-6 mt-2 space-y-1">
+                {renderMenuList(item.children, itemKey)}
+              </ul>
+            )}
+          </li>
+        );
+      }
+
+      return (
+        <li key={itemKey} className="m-2">
+          <Link
+            href={item.path}
+            className={`flex items-center gap-2 text-sm ${parentKey ? `${theme.sidebar.submenuText} hover:text-white ${theme.sidebar.submenuHover}` : theme.sidebar.hover} rounded-md transition-colors p-2`}
+            onClick={handleLinkClick}
+          >
+            {Icon && <Icon size={parentKey ? 16 : 20} />}
+            <span>{item.name}</span>
+          </Link>
+        </li>
+      );
+    });
   };
 
   return (
@@ -207,66 +259,7 @@ export default function Sidebar({
               <span>Back to CRM</span>
             </Link>
           )}
-          <ul className="space-y-2 mt-10">
-            {menuItems.map((item) => {
-              const Icon = iconMap[item.icon] || null;
-
-              // 🔹 If item has children → submenu
-              if (item.children) {
-                const isSubOpen = openMenus[item.name];
-                return (
-                  <li key={item.name} className="m-2">
-                    <button
-                      onClick={() => toggleMenu(item.name)}
-                      className={`flex items-center gap-2 w-full ${theme.sidebar.hover} rounded-md transition-colors p-2`}
-                    >
-                      {Icon && <Icon size={20} />}
-                      <span>{item.name}</span>
-                      {isSubOpen ? (
-                        <ChevronDown size={16} />
-                      ) : (
-                        <ChevronRight size={16} />
-                      )}
-                    </button>
-
-                    {isSubOpen && (
-                      <ul className="ml-6 mt-2 space-y-1">
-                        {item.children.map((child) => {
-                          const ChildIcon = iconMap[child.icon] || null;
-                          return (
-                            <li key={child.path}>
-                              <Link
-                                href={child.path}
-                                className={`flex items-center gap-2 text-sm ${theme.sidebar.submenuText} hover:text-white ${theme.sidebar.submenuHover} rounded-md transition-colors p-2`}
-                                onClick={handleLinkClick}
-                              >
-                                {ChildIcon && <ChildIcon size={16} />}
-                                <span>{child.name}</span>
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </li>
-                );
-              }
-
-              // 🔹 Normal single item
-              return (
-                <li key={item.path} className="m-2">
-                  <Link
-                    href={item.path}
-                    className={`flex items-center gap-2 ${theme.sidebar.hover} rounded-md transition-colors p-2`}
-                    onClick={handleLinkClick}
-                  >
-                    {Icon && <Icon size={20} />}
-                    <span>{item.name}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          <ul className="space-y-2 mt-10">{renderMenuList(menuItems)}</ul>
         </>
       )}
     </div>
