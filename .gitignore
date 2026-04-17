@@ -4,7 +4,9 @@ node_modules/
 dist/
 build/
 *.log
-public/
+# Ignore everything under public (uploads/generated) except committed static assets.
+public/*
+!public/logo.png
 .env
 
 uploads/
