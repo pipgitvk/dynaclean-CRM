@@ -61,6 +61,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
   const [cgstRate, setCgstRate] = useState(9);
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
+  const [roundOff, setRoundOff] = useState(0);
 
   // Supplier state is fixed
   const SUPPLIER_STATE_CODE = "07";
@@ -155,10 +156,10 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
     const sgst = (subtotal * sgstRate) / 100;
     const igst = (subtotal * igstRate) / 100;
     const totalTax = cgst + sgst + igst;
-    const grandTotal = subtotal + totalTax;
+    const grandTotal = subtotal + totalTax + (parseFloat(roundOff) || 0);
 
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal };
-  }, [items, cgstRate, sgstRate, igstRate]);
+  }, [items, cgstRate, sgstRate, igstRate, roundOff]);
 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
 
@@ -286,6 +287,7 @@ const balanceAmount = taxSummary.grandTotal - amountPaid;
         sgst: taxSummary.sgst,
         igst: taxSummary.igst,
         total_tax: taxSummary.totalTax,
+        round_off: parseFloat(roundOff) || 0,
         grand_total: taxSummary.grandTotal,
         amount_paid: amountPaid,
         // balance_amount: taxSummary.grandTotal,
@@ -404,6 +406,10 @@ const fetchQuotationAndFill = async () => {
     imageUrl: it.img_url || "",             
   }))
 );
+
+    if (quotation.round_off) {
+      setRoundOff(Number(quotation.round_off) || 0);
+    }
 
 
     toast.success("Quotation loaded successfully");
@@ -805,19 +811,21 @@ const fetchQuotationAndFill = async () => {
 
       {/* Tax Summary */}
       <TaxAndSummary
-        items={items}
-        subtotal={taxSummary.subtotal}
-        cgst={taxSummary.cgst}
-        sgst={taxSummary.sgst}
-        igst={taxSummary.igst}
-        grandTotal={taxSummary.grandTotal}
-        cgstRate={cgstRate}
-        sgstRate={sgstRate}
-        igstRate={igstRate}
-        setCgstRate={setCgstRate}
-        setSgstRate={setSgstRate}
-        setIgstRate={setIgstRate}
-      />
+          items={items}
+          subtotal={taxSummary.subtotal}
+          cgst={taxSummary.cgst}
+          sgst={taxSummary.sgst}
+          igst={taxSummary.igst}
+          roundOff={roundOff}
+          setRoundOff={setRoundOff}
+          grandTotal={taxSummary.grandTotal}
+          cgstRate={cgstRate}
+          sgstRate={sgstRate}
+          igstRate={igstRate}
+          setCgstRate={setCgstRate}
+          setSgstRate={setSgstRate}
+          setIgstRate={setIgstRate}
+        />
 
       {/* Notes, Terms & Bank Details */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-6">

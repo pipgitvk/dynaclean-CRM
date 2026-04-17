@@ -9,7 +9,12 @@ const REVERT_WINDOW_HOURS = 4;
 
 function canRevert(approvalDate) {
   if (!approvalDate) return false;
-  const approvedAt = new Date(approvalDate).getTime();
+  // Parse DB string as UTC
+  let dateStr = String(approvalDate);
+  if (!dateStr.includes('Z')) {
+    dateStr = dateStr.replace(' ', 'T') + 'Z';
+  }
+  const approvedAt = new Date(dateStr).getTime();
   const now = Date.now();
   const hoursPassed = (now - approvedAt) / (1000 * 60 * 60);
   return hoursPassed < REVERT_WINDOW_HOURS;

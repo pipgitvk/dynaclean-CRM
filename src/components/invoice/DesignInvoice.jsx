@@ -1833,6 +1833,9 @@ const NewInvoice = ({ invoice }) => {
       totals.totalQuantity += parseFloat(item.quantity) || 0;
     });
 
+    const roundOff = parseFloat(invoice.round_off) || 0;
+    totals.grandTotal += roundOff;
+
     return totals;
   };
 
@@ -1937,6 +1940,7 @@ const NewInvoice = ({ invoice }) => {
           maximumFractionDigits: 2,
         })
       : "0.00",
+    roundOff: parseFloat(invoice.round_off) || 0,
     total: itemTotals.grandTotal
       ? parseFloat(itemTotals.grandTotal).toLocaleString("en-IN", {
           minimumFractionDigits: 2,
@@ -3513,10 +3517,15 @@ const NewInvoice = ({ invoice }) => {
         </table>
 
         {/* Tax Amount in Words */}
-        <div style={{ marginBottom: "15px", fontSize: "9px" }}>
+        <div style={{ marginBottom: "15px", fontSize: "9px", display: "flex", justifyContent: "space-between" }}>
           <strong>
             Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
           </strong>
+          {data.roundOff !== 0 && (
+            <strong style={{ fontSize: "10px" }}>
+              Round Off: {data.roundOff > 0 ? `+₹${data.roundOff}` : `-₹${Math.abs(data.roundOff)}`}
+            </strong>
+          )}
         </div>
 
         {/* Terms & Bank Details */}

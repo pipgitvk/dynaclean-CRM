@@ -129,6 +129,7 @@ export async function GET(req) {
 
         amount_paid: Number(amountPaid),
         due_date: dueDate,
+        round_off: quotation.round_off || 0,
 
         terms_conditions: quotation.term_con || "",
 

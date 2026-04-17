@@ -58,6 +58,7 @@ export default function QuotationForm() {
   const [cgstRate, setCgstRate] = useState(9);
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
+  const [roundOff, setRoundOff] = useState(0);
 
   // Supplier state is fixed (header shows: GSTIN: 07AAKCD6495M1ZV | State: Tamil Nadu (33))
   const SUPPLIER_STATE_CODE = "07";
@@ -158,10 +159,10 @@ export default function QuotationForm() {
     const cgst = (subtotal * cgstRate) / 100;
     const sgst = (subtotal * sgstRate) / 100;
     const igst = (subtotal * igstRate) / 100;
-    const grandTotal = subtotal + cgst + sgst + igst;
+    const grandTotal = subtotal + cgst + sgst + igst + (parseFloat(roundOff) || 0);
 
     return { subtotal, cgst, sgst, igst, grandTotal };
-  }, [items, cgstRate, sgstRate, igstRate]);
+  }, [items, cgstRate, sgstRate, igstRate, roundOff]);
 
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -471,6 +472,7 @@ export default function QuotationForm() {
         cgst: taxSummary.cgst,
         sgst: taxSummary.sgst,
         igst: taxSummary.igst,
+        round_off: parseFloat(roundOff) || 0,
         grand_total: grandTotal,
         cgstRate,
         sgstRate,
@@ -815,6 +817,8 @@ export default function QuotationForm() {
           cgst={taxSummary.cgst}
           sgst={taxSummary.sgst}
           igst={taxSummary.igst}
+          roundOff={roundOff}
+          setRoundOff={setRoundOff}
           grandTotal={taxSummary.grandTotal}
           cgstRate={cgstRate}
           sgstRate={sgstRate}

@@ -341,6 +341,8 @@ export default function TaxAndSummary({
   cgst,
   sgst,
   igst,
+  roundOff,
+  setRoundOff,
   grandTotal,
   cgstRate,
   sgstRate,
@@ -422,6 +424,17 @@ export default function TaxAndSummary({
               <span>₹ {igst?.toFixed(2) || "0.00"}</span>
             </div>
           )}
+
+          <div className="flex justify-between items-center text-gray-600 mt-2">
+            <span className="font-semibold text-gray-800">Round Off</span>
+            <input
+              type="number"
+              step="0.01"
+              value={roundOff}
+              onChange={(e) => setRoundOff(parseFloat(e.target.value) || 0)}
+              className="w-20 text-right p-1 border rounded text-xs"
+            />
+          </div>
         </div>
       </div>
 

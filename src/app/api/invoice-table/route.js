@@ -135,6 +135,7 @@ export async function POST(req) {
       sgst,
       igst,
       total_tax,
+      round_off,
       grand_total,
       amount_paid = 0,
       balance_amount,
@@ -234,10 +235,10 @@ export async function POST(req) {
           `INSERT INTO invoices 
            (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
-            subtotal, cgst, sgst, igst, total_tax, grand_total, amount_paid, balance_amount, 
+            subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
             payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
             customer_id, linked_trans_ids, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             quotation_id,
             finalInvoiceNumber,
@@ -263,6 +264,7 @@ export async function POST(req) {
             sgst,
             igst,
             total_tax,
+            round_off || 0,
             grand_total,
             amount_paid,
             balance_amount,
