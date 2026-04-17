@@ -112,7 +112,7 @@ export async function POST(req) {
     }
 
     // 4. Approval Logic
-    const isAutoApproved = ["SUPERADMIN", "ADMIN"].includes(userRole);
+    const isAutoApproved = ["SUPERADMIN"].includes(userRole);
     const approvalStatus = isAutoApproved ? "approved" : "pending";
     const salesStatus = isAutoApproved ? 1 : 0;
 
