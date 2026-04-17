@@ -337,12 +337,15 @@ const convertNumberToWords = (num) => {
 };
 
 export default function TaxAndSummary({
+  items,
   subtotal,
   cgst,
   sgst,
   igst,
   roundOff,
   setRoundOff,
+  isAutoRoundOff,
+  setIsAutoRoundOff,
   grandTotal,
   cgstRate,
   sgstRate,
@@ -350,7 +353,7 @@ export default function TaxAndSummary({
   setCgstRate,
   setSgstRate,
   setIgstRate,
-  interstate = false,
+  interstate,
 }) {
 
   return (
@@ -426,13 +429,25 @@ export default function TaxAndSummary({
           )}
 
           <div className="flex justify-between items-center text-gray-600 mt-2">
-            <span className="font-semibold text-gray-800">Round Off</span>
+            <span className="font-semibold text-gray-800 flex items-center gap-2">
+              Round Off
+              <label className="flex items-center text-xs font-normal text-gray-600 gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAutoRoundOff}
+                  onChange={(e) => setIsAutoRoundOff(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Auto
+              </label>
+            </span>
             <input
               type="number"
               step="0.01"
               value={roundOff}
               onChange={(e) => setRoundOff(parseFloat(e.target.value) || 0)}
-              className="w-20 text-right p-1 border rounded text-xs"
+              className={`w-20 text-right p-1 border rounded text-xs ${isAutoRoundOff ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              disabled={isAutoRoundOff}
             />
           </div>
         </div>

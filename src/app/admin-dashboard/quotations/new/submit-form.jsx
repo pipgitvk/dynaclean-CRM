@@ -59,6 +59,7 @@ export default function QuotationForm() {
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
   const [roundOff, setRoundOff] = useState(0);
+  const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
 
   // Supplier state is fixed (header shows: GSTIN: 07AAKCD6495M1ZV | State: Tamil Nadu (33))
   const SUPPLIER_STATE_CODE = "07";
@@ -159,10 +160,24 @@ export default function QuotationForm() {
     const cgst = (subtotal * cgstRate) / 100;
     const sgst = (subtotal * sgstRate) / 100;
     const igst = (subtotal * igstRate) / 100;
-    const grandTotal = subtotal + cgst + sgst + igst + (parseFloat(roundOff) || 0);
+    
+    const totalBeforeRound = subtotal + cgst + sgst + igst;
+    let finalRoundOff = parseFloat(roundOff) || 0;
+    
+    if (isAutoRoundOff) {
+      finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
+    }
+    
+    const grandTotal = totalBeforeRound + finalRoundOff;
 
-    return { subtotal, cgst, sgst, igst, grandTotal };
-  }, [items, cgstRate, sgstRate, igstRate, roundOff]);
+    return { subtotal, cgst, sgst, igst, grandTotal, finalRoundOff };
+  }, [items, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff]);
+
+  useEffect(() => {
+    if (isAutoRoundOff) {
+      setRoundOff(parseFloat(taxSummary.finalRoundOff.toFixed(2)));
+    }
+  }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -461,7 +476,7 @@ export default function QuotationForm() {
 
       const subtotal = taxSummary.subtotal;
       const totalGST = taxSummary.cgst + taxSummary.sgst + taxSummary.igst;
-      const grandTotal = subtotal + totalGST;
+      const grandTotal = taxSummary.grandTotal;
 
       const dataToSend = {
         ...form,
@@ -819,6 +834,8 @@ export default function QuotationForm() {
           igst={taxSummary.igst}
           roundOff={roundOff}
           setRoundOff={setRoundOff}
+          isAutoRoundOff={isAutoRoundOff}
+          setIsAutoRoundOff={setIsAutoRoundOff}
           grandTotal={taxSummary.grandTotal}
           cgstRate={cgstRate}
           sgstRate={sgstRate}
