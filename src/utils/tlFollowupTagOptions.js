@@ -1,5 +1,8 @@
 /** TL follow-up tag chips — shared by form and TL customers filter */
 
+/** Stored label for postpone + declined intent (replaces legacy `"Postponing"`). */
+export const TL_POSTPONDING_DECLINED_TAG = "Postponding/Declined";
+
 export const BASE_TL_TAG_OPTIONS = [
   "Demo",
   "Prime",
@@ -10,8 +13,7 @@ export const BASE_TL_TAG_OPTIONS = [
   "Strong FollowUp",
   "Service Issue",
   "Running Orders",
-  "Postponing",
-  "Declined",
+  TL_POSTPONDING_DECLINED_TAG,
   "Clear",
   "order-recieved",
   "cancel order",
@@ -32,29 +34,21 @@ export const TL_CUSTOMERS_TABLE_BASE_TAGS = [
   "Repeat order",
   "Mail",
   "Running Orders",
-  "Postponing",
-  "Declined",
+  TL_POSTPONDING_DECLINED_TAG,
   "Clear",
   "order-recieved",
   "cancel order",
 ];
 
-/** Only one of these may be selected at a time in TL follow-up (mutually exclusive). */
-export const TL_MUTEX_TAG_PAIR = ["Postponing", "Declined"];
-
-/**
- * If both Postponing and Declined appear, keeps the last one (edit/load safety).
- */
-export function dedupeMutuallyExclusiveTlTags(tags) {
-  const mutex = TL_MUTEX_TAG_PAIR;
-  const other = tags.filter((t) => !mutex.includes(t));
-  const mutexHits = tags.filter((t) => mutex.includes(t));
-  if (mutexHits.length === 0) return [...tags];
-  return [...other, mutexHits[mutexHits.length - 1]];
-}
-
 export function getTlCustomersTableTagOptions() {
   return [...TL_CUSTOMERS_TABLE_BASE_TAGS];
+}
+
+/** Map old DB value `Postponing` → {@link TL_POSTPONDING_DECLINED_TAG}. */
+export function normalizeLegacyPostponingTagLabel(tag) {
+  const s = String(tag).trim();
+  if (s === "Postponing") return TL_POSTPONDING_DECLINED_TAG;
+  return s;
 }
 
 const CHIP_BASE_TABLE =
@@ -100,7 +94,7 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
   if (norm === "prime") {
     return `${base} bg-yellow-400 text-yellow-950`;
   }
-  if (norm === "postponing" || norm === "declined") {
+  if (norm === "postponding/declined" || norm === "postponing") {
     return `${base} bg-orange-100 text-orange-900 border border-orange-300/90`;
   }
 

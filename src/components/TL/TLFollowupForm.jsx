@@ -6,8 +6,7 @@ import { Calendar, Save, X } from "lucide-react";
 import {
   getTlTagOptions,
   getTlMultiTagChipClass,
-  TL_MUTEX_TAG_PAIR,
-  dedupeMutuallyExclusiveTlTags,
+  normalizeLegacyPostponingTagLabel,
 } from "@/utils/tlFollowupTagOptions";
 
 export default function TLFollowupForm({
@@ -98,9 +97,9 @@ export default function TLFollowupForm({
           .map((t) => t.trim())
           .filter(Boolean)
       : [];
-    const multi_tag = dedupeMutuallyExclusiveTlTags(
-      parsedTags.filter((t) => allowed.has(t)),
-    );
+    const multi_tag = parsedTags
+      .map(normalizeLegacyPostponingTagLabel)
+      .filter((t) => allowed.has(t));
 
     setFormData((prev) => ({
       ...prev,
@@ -165,9 +164,6 @@ export default function TLFollowupForm({
 
         if (newTags.includes(tag)) {
           newTags = newTags.filter((t) => t !== tag);
-        } else if (TL_MUTEX_TAG_PAIR.includes(tag)) {
-          newTags = newTags.filter((t) => !TL_MUTEX_TAG_PAIR.includes(t));
-          newTags.push(tag);
         } else {
           newTags.push(tag);
         }
@@ -357,7 +353,8 @@ export default function TLFollowupForm({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Tags (Multiple Selection)
             </label>
-            <div className="flex flex-wrap gap-2">
+
+            <div className="flex flex-wrap items-center gap-2">
               {tagOptions.map((tag) => (
                 <label
                   key={tag}
@@ -382,7 +379,7 @@ export default function TLFollowupForm({
             <p className="mt-1 text-xs text-gray-500">
               {formData.multi_tag.includes("N/A")
                 ? "N/A is selected (no other tags can be selected)"
-                : "Select multiple tags. Postponing and Declined: only one at a time. N/A clears all others."}
+                : "Select multiple tags. Selecting N/A will clear all others."}
             </p>
           </div>
 
