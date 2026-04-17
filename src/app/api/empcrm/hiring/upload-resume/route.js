@@ -3,6 +3,7 @@ import path from "path";
 import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { canAccessHiringModule } from "@/lib/hrTargetEligibleRoles";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
@@ -30,6 +31,9 @@ const EXT_BY_MIME = {
 function assertHrRole(payload) {
   if (!payload?.username) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (normalizeRoleKey(payload.role ?? payload.userRole) === "SUPERADMIN") {
+    return null;
   }
   if (!canAccessHiringModule(payload.role ?? payload.userRole)) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });

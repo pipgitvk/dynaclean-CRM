@@ -27,9 +27,15 @@ export async function GET(req) {
 
     const conn = await getDbConnection();
     const [entryRows] = await conn.execute(
-      `SELECT id, created_by, candidate_name, designation, status, hr_interview_score, hr_score_rating, current_salary, expected_salary, note, created_at
-       FROM candidates
-       WHERE id = ? AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))`,
+      `SELECT c.id, c.created_by,
+       COALESCE(ep.full_name, c.created_by) AS creator_name,
+       ep.designation AS creator_role,
+       c.candidate_name, c.emp_contact, c.designation, c.marital_status, c.experience_type,
+       c.interview_at, c.rescheduled_at, c.next_followup_at, c.interview_mode,
+       c.status, c.hr_interview_score, c.current_salary, c.expected_salary, c.note, c.created_at
+       FROM candidates c
+       LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(c.created_by))
+       WHERE c.id = ? AND LOWER(TRIM(c.created_by)) = LOWER(TRIM(?))`,
       [entryId, payload.username]
     );
     if (!entryRows.length) {

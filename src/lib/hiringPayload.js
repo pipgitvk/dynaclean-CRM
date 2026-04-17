@@ -57,9 +57,12 @@ export function toMysqlDatetime(v) {
 
 /**
  * Shared create/update validation for hiring entries.
+ * @param {object} body
+ * @param {{ skipSelectedResumeValidation?: boolean }} [options] — Superadmin `candidates` PATCH has no resume/mgmt fields; set true to allow status Selected without those assets.
  * @returns {{ error: string } | { data: object }}
  */
-export function parseHiringPayload(body) {
+export function parseHiringPayload(body, options = {}) {
+  const skipSelectedResumeValidation = options.skipSelectedResumeValidation === true;
   const candidate_name = String(body.candidate_name ?? "").trim();
   const designation = String(body.designation ?? "").trim();
   const emp_contact = String(body.emp_contact ?? "").trim();
@@ -72,7 +75,10 @@ export function parseHiringPayload(body) {
   const isHired = status === "Hired";
   const isSelected = status === "Selected";
   const isRescheduled = status === "Rescheduled";
-  const isNextFollowUp = status === "next-follow-up";
+  /** Legacy slug — next slot is required. */
+  const isNextFollowUpStrict = status === "next-follow-up";
+  /** Current label — optional next slot if provided. */
+  const isFollowUpLabel = status === "Follow-up";
   const rescheduled_at_raw = String(body.rescheduled_at ?? "").trim();
   const next_followup_at_raw = String(body.next_followup_at ?? "").trim();
   const tagForHired = isHired ? normalizeTag(body.tag) : null;
@@ -143,18 +149,20 @@ export function parseHiringPayload(body) {
   if (isRescheduled && !rescheduled_at_raw) {
     return { error: "Rescheduled date and time is required when status is Rescheduled." };
   }
-  if (isNextFollowUp && !next_followup_at_raw) {
+  if (isNextFollowUpStrict && !next_followup_at_raw) {
     return { error: "Next follow-up date and time is required when status is next-follow-up." };
   }
-  if (isSelected && !selected_resume) {
+  if (isSelected && !skipSelectedResumeValidation && !selected_resume) {
     return { error: "Resume is required when status is Selected." };
   }
-  if (isSelected && mgmt_interview_score === null) {
+  if (isSelected && !skipSelectedResumeValidation && mgmt_interview_score === null) {
     return { error: "Management interview score (1–10) is required when status is Selected." };
   }
 
   let resolved_next_followup_at = null;
-  if (isNextFollowUp) {
+  if (isNextFollowUpStrict) {
+    resolved_next_followup_at = next_followup_at_raw;
+  } else if (isFollowUpLabel && next_followup_at_raw) {
     resolved_next_followup_at = next_followup_at_raw;
   } else if (isHiredFollowUpTag && next_followup_at_raw) {
     resolved_next_followup_at = next_followup_at_raw;

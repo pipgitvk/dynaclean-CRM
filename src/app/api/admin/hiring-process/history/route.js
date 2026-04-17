@@ -30,7 +30,9 @@ export async function GET(req) {
       `SELECT c.id, c.created_by,
        COALESCE(ep.full_name, c.created_by) AS creator_name,
        ep.designation AS creator_role,
-       c.candidate_name, c.designation, c.status, c.hr_interview_score, c.current_salary, c.expected_salary, c.note, c.created_at
+       c.candidate_name, c.emp_contact, c.designation, c.marital_status, c.experience_type,
+       c.interview_at, c.rescheduled_at, c.next_followup_at, c.interview_mode,
+       c.status, c.hr_interview_score, c.current_salary, c.expected_salary, c.note, c.created_at
        FROM candidates c
        LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(c.created_by))
        WHERE c.id = ?`,
