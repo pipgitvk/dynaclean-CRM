@@ -204,6 +204,8 @@ export default function QuotationForm() {
   const [stateSuggestions, setStateSuggestions] = useState([]);
   const [showStateSuggestions, setShowStateSuggestions] = useState(false);
 
+  const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
+
   const taxSummary = useMemo(() => {
     let subtotal = 0;
 
@@ -217,10 +219,23 @@ export default function QuotationForm() {
     const sgst = sgstRate > 0 ? subtotal * (sgstRate / 100) : 0;
     const igst = igstRate > 0 ? subtotal * (igstRate / 100) : 0;
 
-    const grandTotal = subtotal + cgst + sgst + igst + (parseFloat(roundOff) || 0);
+    const totalBeforeRound = subtotal + cgst + sgst + igst;
+    let finalRoundOff = parseFloat(roundOff) || 0;
+    
+    if (isAutoRoundOff) {
+      finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
+    }
 
-    return { subtotal, cgst, sgst, igst, grandTotal };
-  }, [items, cgstRate, sgstRate, igstRate, roundOff]);
+    const grandTotal = totalBeforeRound + finalRoundOff;
+
+    return { subtotal, cgst, sgst, igst, grandTotal, finalRoundOff };
+  }, [items, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff]);
+
+  useEffect(() => {
+    if (isAutoRoundOff) {
+      setRoundOff(parseFloat(taxSummary.finalRoundOff.toFixed(2)));
+    }
+  }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -459,7 +474,7 @@ Thanks for doing business with us!`,
 
       const subtotal = taxSummary.subtotal;
       const totalGST = taxSummary.cgst + taxSummary.sgst + taxSummary.igst;
-      const grandTotal = subtotal + totalGST;
+      const grandTotal = taxSummary.grandTotal;
 
       const dataToSend = {
         ...form,
@@ -800,6 +815,8 @@ Thanks for doing business with us!`,
           igst={taxSummary.igst}
           roundOff={roundOff}
           setRoundOff={setRoundOff}
+          isAutoRoundOff={isAutoRoundOff}
+          setIsAutoRoundOff={setIsAutoRoundOff}
           grandTotal={taxSummary.grandTotal}
           cgstRate={cgstRate}
           sgstRate={sgstRate}

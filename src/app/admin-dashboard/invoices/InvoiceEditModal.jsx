@@ -114,6 +114,7 @@ export default function InvoiceEditModal({
   const [sgstRate, setSgstRate] = useState(9);
   const [igstRate, setIgstRate] = useState(0);
   const [roundOff, setRoundOff] = useState(0);
+  const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
   const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [linkedTransIds, setLinkedTransIds] = useState([]);
 
@@ -130,9 +131,24 @@ export default function InvoiceEditModal({
     const sgst = (subtotal * sgstRate) / 100;
     const igst = (subtotal * igstRate) / 100;
     const totalTax = cgst + sgst + igst;
-    const grandTotal = subtotal + totalTax + (parseFloat(roundOff) || 0);
-    return { subtotal, cgst, sgst, igst, totalTax, grandTotal };
-  }, [items, cgstRate, sgstRate, igstRate, roundOff]);
+    
+    const totalBeforeRound = subtotal + totalTax;
+    let finalRoundOff = parseFloat(roundOff) || 0;
+    
+    if (isAutoRoundOff) {
+      finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
+    }
+    
+    const grandTotal = totalBeforeRound + finalRoundOff;
+    
+    return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
+  }, [items, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff]);
+
+  useEffect(() => {
+    if (isAutoRoundOff) {
+      setRoundOff(parseFloat(taxSummary.finalRoundOff.toFixed(2)));
+    }
+  }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
   useEffect(() => {
     if (!open || !invoiceId) return;
@@ -184,6 +200,7 @@ export default function InvoiceEditModal({
         setNotes(inv.notes || "");
         setEditableTerms(inv.terms_conditions || "");
         setRoundOff(Number(inv.round_off) || 0);
+        setIsAutoRoundOff(false); // If editing, assume they want to keep their existing value unless they re-check it.
 
         const loadedItems =
           Array.isArray(data.items) && data.items.length
@@ -651,6 +668,8 @@ export default function InvoiceEditModal({
                 igst={taxSummary.igst}
                 roundOff={roundOff}
                 setRoundOff={setRoundOff}
+                isAutoRoundOff={isAutoRoundOff}
+                setIsAutoRoundOff={setIsAutoRoundOff}
                 grandTotal={taxSummary.grandTotal}
                 cgstRate={cgstRate}
                 sgstRate={sgstRate}

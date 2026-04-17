@@ -9,6 +9,8 @@ export default function TaxAndSummary({
   igst,
   roundOff,
   setRoundOff,
+  isAutoRoundOff,
+  setIsAutoRoundOff,
   grandTotal,
   cgstRate,
   sgstRate,
@@ -99,13 +101,25 @@ export default function TaxAndSummary({
             <span>₹ {(cgst + sgst + igst).toFixed(2)}</span>
           </div>
           <div className="flex justify-between py-1 border-b items-center">
-            <span className="font-medium">Round Off:</span>
+            <span className="font-medium flex items-center gap-2">
+              Round Off:
+              <label className="flex items-center text-xs font-normal text-gray-600 gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAutoRoundOff}
+                  onChange={(e) => setIsAutoRoundOff(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Auto
+              </label>
+            </span>
             <input
               type="number"
               value={roundOff}
               onChange={(e) => setRoundOff(parseFloat(e.target.value) || 0)}
-              className="w-24 p-1 border rounded text-right"
+              className={`w-24 p-1 border rounded text-right ${isAutoRoundOff ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               step="0.01"
+              disabled={isAutoRoundOff}
             />
           </div>
           <div className="flex justify-between py-2 mt-2 text-lg font-bold text-red-600">
