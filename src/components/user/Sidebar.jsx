@@ -182,11 +182,11 @@ export default function Sidebar({
   return (
     <div
       className={clsx(
-        `h-full bg-gradient-to-b ${theme.sidebar.gradient} ${theme.sidebar.text} ${theme.sidebar.textureClass || ""} overflow-y-auto overflow-x-hidden transition-all duration-300 ease-in-out shadow-2xl border-r ${theme.sidebar.border}`,
-        isOpen ? "w-64" : "w-0",
+        `h-full bg-gradient-to-b ${theme.sidebar.gradient} ${theme.sidebar.text} ${theme.sidebar.textureClass || ""} overflow-y-auto overflow-x-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden transition-all duration-300 ease-in-out shadow-2xl border-r ${theme.sidebar.border}`,
+        isOpen ? "w-72" : "w-0",
       )}
       style={{
-        minWidth: isOpen ? "16rem" : "0",
+        minWidth: isOpen ? "18rem" : "0",
         padding: isOpen ? "1rem" : "0",
       }}
     >

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 import TransactionIdSuggestInput from "../../TransactionIdSuggestInput";
+import SubHeadMultiSelect from "../../SubHeadMultiSelect";
 
 export default function EditClientExpensePage() {
   const { id } = useParams();
@@ -24,7 +25,7 @@ export default function EditClientExpensePage() {
     tax_type: "",
     main_head: "Direct",
     head: "",
-    sub_head: "",
+    sub_heads: [],
     supply: "goods",
     type_of_ledger: "",
     amount: "",
@@ -53,9 +54,13 @@ export default function EditClientExpensePage() {
         let heads = (cat?.categories || []).map((c) => c.name);
         let subHeadsList = (subCat?.subCategories || []).map((c) => c.name);
         const loadedHead = row.head || "";
-        const loadedSubHead = Array.isArray(row.sub_heads) && row.sub_heads[0] ? row.sub_heads[0] : "";
+        const loadedSubHeads = Array.isArray(row.sub_heads)
+          ? row.sub_heads.map((s) => String(s || "").trim()).filter(Boolean)
+          : [];
         if (loadedHead && !heads.includes(loadedHead)) heads = [loadedHead, ...heads];
-        if (loadedSubHead && !subHeadsList.includes(loadedSubHead)) subHeadsList = [loadedSubHead, ...subHeadsList];
+        for (const sh of loadedSubHeads) {
+          if (!subHeadsList.includes(sh)) subHeadsList = [...subHeadsList, sh];
+        }
         setHeadOptions(heads);
         setSubHeadOptions(subHeadsList);
         const loadedForm = {
@@ -67,7 +72,7 @@ export default function EditClientExpensePage() {
           tax_type: row.tax_type || "",
           main_head: row.main_head || "Direct",
           head: loadedHead,
-          sub_head: loadedSubHead,
+          sub_heads: loadedSubHeads,
           supply: row.supply || "goods",
           type_of_ledger: row.type_of_ledger || "",
           amount: row.amount != null ? String(row.amount) : "",
@@ -110,6 +115,12 @@ export default function EditClientExpensePage() {
     const { name, value } = e.target;
     setForm((prev) => {
       const next = { ...prev, [name]: value };
+      if (name === "head") {
+        next.sub_heads = [];
+      }
+      if (name === "main_head" && value !== "Direct" && value !== "Indirect") {
+        next.sub_heads = [];
+      }
       if (["amount", "tax_rate", "tax_type"].includes(name)) {
         return recalcTax(next);
       }
@@ -143,7 +154,12 @@ export default function EditClientExpensePage() {
           main_head: form.main_head,
           head: form.head || null,
           supply: form.supply || null,
-          sub_heads: form.sub_head ? [form.sub_head] : [],
+          sub_heads:
+            form.main_head === "Direct" || form.main_head === "Indirect"
+              ? Array.isArray(form.sub_heads)
+                ? form.sub_heads.filter(Boolean)
+                : []
+              : [],
           type_of_ledger: form.type_of_ledger || null,
           amount: form.amount != null && form.amount !== "" ? Number(form.amount) : null,
           hsn: form.hsn || null,
@@ -200,19 +216,15 @@ export default function EditClientExpensePage() {
             </select>
           </div>
           {showSubHead && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Sub-head</label>
-              <select
-                name="sub_head"
-                value={form.sub_head}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-              >
-                <option value="">Select sub-head</option>
-                {subHeadOptions.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
+            <div className="min-w-0">
+              <label className="block text-sm font-medium mb-1">
+                Sub-head <span className="text-gray-500 font-normal">(one or more)</span>
+              </label>
+              <SubHeadMultiSelect
+                options={subHeadOptions}
+                value={form.sub_heads}
+                onChange={(v) => setForm((p) => ({ ...p, sub_heads: v }))}
+              />
             </div>
           )}
           <div>

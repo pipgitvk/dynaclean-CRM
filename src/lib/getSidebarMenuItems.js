@@ -166,7 +166,7 @@ const allMenuItems = [
       {
         path: "/admin-dashboard/prospects",
         name: "Prospects",
-        moduleKey: "prospects",
+        moduleKey: "targets",
         roles: ["SALES", "SALES HEAD"],
         icon: "UserPlus",
       },
@@ -324,19 +324,19 @@ const allMenuItems = [
   {
     path: "/admin-dashboard/prospects",
     name: "Prospects",
-    moduleKey: "prospects",
+    moduleKey: "targets",
     roles: ["SUPERADMIN", "ADMIN"],
     icon: "UserPlus",
   },
   {
-    name: "Tally Payments",
+    name: "Main Expenses",
     moduleKey: "tally-payments",
     roles: ["SUPERADMIN", "ACCOUNTANT"],
     icon: "Receipt",
     children: [
       {
         path: "/admin-dashboard/client-expenses/cards",
-        name: "Client Expenses",
+        name: "Main Expenses",
         moduleKey: "client-expenses",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
         icon: "FileText",
@@ -354,7 +354,7 @@ const allMenuItems = [
   {
     path: "/empcrm/admin-dashboard/salary-slips",
     name: "Salary slips",
-    moduleKey: "tally-payments",
+    moduleKey: "salary-slips",
     roles: ["SUPERADMIN", "ACCOUNTANT"],
     icon: "Receipt",
   },
@@ -384,7 +384,7 @@ const allMenuItems = [
   {
     path: "/user-dashboard/monitor-targets",
     name: "Target Monitor",
-    moduleKey: "targets-monitor",
+    moduleKey: "sales-target",
     roles: ["ACCOUNTANT"],
     icon: "DollarSign",
   },

@@ -4,13 +4,15 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { useState, useEffect } from "react";
+import StatementExpensePicker from "../StatementExpensePicker";
 
 export default function AddStatementForm({ expenseId, defaultAmount }) {
   const router = useRouter();
   const [isSubmitting, setSubmitting] = useState(false);
   const [expenses, setExpenses] = useState([]);
+  const [expenseAllocation, setExpenseAllocation] = useState(null);
   const [lastBalance, setLastBalance] = useState(0);
-  const { register, handleSubmit, reset, watch } = useForm({
+  const { register, handleSubmit, reset, watch, setValue } = useForm({
     defaultValues: {
       type: "Credit",
       client_expense_id: expenseId || "",
@@ -34,8 +36,16 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
           });
           const one = await rOne.json();
           if (one?.id && !one.error) {
-            const { sub_heads: _s, ...rest } = one;
-            list = [...list, rest];
+            const { sub_heads, ...rest } = one;
+            list = [
+              ...list,
+              {
+                ...rest,
+                sub_heads_joined: Array.isArray(sub_heads)
+                  ? sub_heads.map((s) => String(s || "").trim()).filter(Boolean).join(", ")
+                  : "",
+              },
+            ];
           }
         }
         list.sort((a, b) => Number(b.id) - Number(a.id));
@@ -78,6 +88,7 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
           type: data.type,
           amount: data.amount,
           client_expense_id: data.client_expense_id ? Number(data.client_expense_id) : null,
+          expense_allocation: expenseAllocation,
         }),
       });
 
@@ -183,20 +194,16 @@ export default function AddStatementForm({ expenseId, defaultAmount }) {
             {String(type).toLowerCase() === "credit" ? "Last balance − amount" : "Last balance + amount"}
           </p>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Expense ID</label>
-          <select
-            {...register("client_expense_id")}
-            className="w-full border p-2 rounded-md"
-          >
-            <option value="">Select expense</option>
-            {expenses.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.id} — {e.expense_name || ""} ({e.client_name || ""}
-                {e.transaction_id ? ` · Txn: ${e.transaction_id}` : ""})
-              </option>
-            ))}
-          </select>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <StatementExpensePicker
+            expenses={expenses}
+            value={watch("client_expense_id") || ""}
+            allocation={expenseAllocation}
+            onChange={(id, alloc) => {
+              setValue("client_expense_id", id);
+              setExpenseAllocation(alloc ?? null);
+            }}
+          />
         </div>
       </div>
 

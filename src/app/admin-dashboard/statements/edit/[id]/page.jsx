@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
+import StatementExpensePicker from "../../StatementExpensePicker";
 
 export default function EditStatementPage() {
   const { id } = useParams();
@@ -21,8 +22,10 @@ export default function EditStatementPage() {
     type: "Credit",
     amount: "",
     client_expense_id: "",
+    invoice_status: "",
   });
   const [expenses, setExpenses] = useState([]);
+  const [expenseAllocation, setExpenseAllocation] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,8 +61,16 @@ export default function EditStatementPage() {
           });
           const one = await rOne.json();
           if (one?.id && !one.error) {
-            const { sub_heads: _s, ...rest } = one;
-            list = [...list, rest];
+            const { sub_heads, ...rest } = one;
+            list = [
+              ...list,
+              {
+                ...rest,
+                sub_heads_joined: Array.isArray(sub_heads)
+                  ? sub_heads.map((s) => String(s || "").trim()).filter(Boolean).join(", ")
+                  : "",
+              },
+            ];
           }
         }
 
@@ -67,6 +78,16 @@ export default function EditStatementPage() {
 
         if (cancelled) return;
         setExpenses(list);
+        let pa = null;
+        try {
+          const raw = row.expense_allocation;
+          if (raw) {
+            pa = typeof raw === "string" ? JSON.parse(raw) : raw;
+          }
+        } catch {
+          pa = null;
+        }
+        setExpenseAllocation(pa);
         setForm({
           trans_id: row.trans_id || "",
           date: row.date ? dayjs(row.date).format("YYYY-MM-DD") : "",
@@ -83,6 +104,7 @@ export default function EditStatementPage() {
           type: row.type || "Credit",
           amount: row.amount ?? "",
           client_expense_id: linked ? String(linked) : "",
+          invoice_status: row.invoice_status || "",
         });
       } catch (e) {
         if (!cancelled) setError("Failed to load statement");
@@ -118,6 +140,7 @@ export default function EditStatementPage() {
           type: form.type,
           amount: form.amount,
           client_expense_id: form.client_expense_id ? Number(form.client_expense_id) : null,
+          expense_allocation: expenseAllocation,
         }),
       });
       const data = await res.json();
@@ -135,6 +158,9 @@ export default function EditStatementPage() {
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (error && !form.trans_id) return <div className="p-6 text-red-600">{error}</div>;
+
+  const isSettled =
+    String(form.invoice_status || "").trim().toLowerCase() === "settled";
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow">
@@ -219,22 +245,23 @@ export default function EditStatementPage() {
             required
           />
         </div>
-        <div>
-          <label className="block text-sm mb-1">Expense ID</label>
-          <select
-            name="client_expense_id"
+        <div className="sm:col-span-2">
+          <StatementExpensePicker
+            expenses={expenses}
             value={form.client_expense_id}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          >
-            <option value="">Select expense</option>
-            {expenses.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.id} — {e.expense_name || ""} ({e.client_name || ""}
-                {e.transaction_id ? ` · Txn: ${e.transaction_id}` : ""})
-              </option>
-            ))}
-          </select>
+            allocation={expenseAllocation}
+            statementTransId={form.trans_id}
+            disabled={isSettled || saving}
+            onChange={(cid, alloc) => {
+              setForm((p) => ({ ...p, client_expense_id: cid || "" }));
+              setExpenseAllocation(alloc ?? null);
+            }}
+          />
+          {isSettled && (
+            <p className="text-xs text-gray-500 mt-1">
+              Expense ID is locked because this statement is Settled.
+            </p>
+          )}
         </div>
         <div className="sm:col-span-2">
           <label className="block text-sm mb-1">Description</label>

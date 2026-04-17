@@ -289,7 +289,7 @@ const QuickEditPage = () => {
       "client-expenses",
       "statements",
       "salary-slips",
-      "targets-monitor",
+      "sales-target",
       "invoices",
       "payment-pending",
       "customer-payment-behavior",
