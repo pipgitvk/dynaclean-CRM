@@ -47,6 +47,31 @@ export async function GET(req) {
     if (denied) return denied;
 
     const { searchParams } = new URL(req.url);
+    const entryIdParam = searchParams.get("entryId");
+    if (entryIdParam != null && String(entryIdParam).trim() !== "") {
+      const id = parseInt(entryIdParam, 10);
+      if (!Number.isFinite(id) || id < 1) {
+        return NextResponse.json({ success: false, error: "Valid entryId is required." }, { status: 400 });
+      }
+      const conn = await getDbConnection();
+      const [rows] = await conn.execute(
+        `SELECT h.id, h.created_by,
+         COALESCE(ep.full_name, h.created_by) AS creator_name,
+         ep.designation AS creator_role,
+         h.candidate_name, h.emp_contact, h.designation, h.marital_status,
+         h.experience_type, h.interview_at, h.rescheduled_at, h.next_followup_at, h.interview_mode, h.status, h.tag, h.hire_date, h.\`package\` AS package,
+         h.probation_months, h.selected_resume, h.mgmt_interview_score, h.hr_interview_score, h.hr_score_rating, h.current_salary, h.expected_salary, h.note, h.created_at
+         FROM candidates h
+         LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
+         WHERE h.id = ? AND LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))`,
+        [id, payload.username]
+      );
+      if (!rows.length) {
+        return NextResponse.json({ success: false, error: "Record not found." }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, entry: rows[0] });
+    }
+
     const year = searchParams.get("year");
     const month = searchParams.get("month");
     const designationParam = searchParams.get("designation");

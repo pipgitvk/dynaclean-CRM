@@ -4,6 +4,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -192,11 +193,16 @@ export default function Sidebar({
           <div
             className={`mb-4 border-b ${theme.sidebar.border} pb-3`}
           >
-            <h2
-              className={`text-xl font-bold ${theme.sidebar.text}`}
-            >
-              Admin Dashboard
-            </h2>
+            <div className="mb-1 flex justify-center px-1">
+              <Image
+                src="/logo.png"
+                alt="DYNACLEAN"
+                width={220}
+                height={72}
+                className="h-auto w-full max-w-[220px] object-contain"
+                priority
+              />
+            </div>
             {showBackToUserCrm && (
               <Link
                 href="/user-dashboard"

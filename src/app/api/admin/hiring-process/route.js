@@ -36,10 +36,17 @@ export async function GET(req) {
       }
       const conn = await getDbConnection();
       const [rows] = await conn.execute(
-        `SELECT id, created_by, candidate_name, emp_contact, designation, marital_status,
-         experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\` AS package,
-         probation_months, note, created_at
-         FROM candidates WHERE id = ?`,
+        `SELECT c.id, c.created_by,
+         COALESCE(ep.full_name, c.created_by) AS creator_name,
+         ep.designation AS creator_role,
+         c.candidate_name, c.emp_contact, c.designation, c.marital_status,
+         c.experience_type, c.interview_at, c.rescheduled_at, c.next_followup_at, c.interview_mode, c.status, c.tag, c.hire_date, c.\`package\` AS package,
+         c.probation_months,
+         c.selected_resume, c.mgmt_interview_score, c.hr_interview_score, c.hr_score_rating, c.current_salary, c.expected_salary,
+         c.note, c.created_at
+         FROM candidates c
+         LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(c.created_by))
+         WHERE c.id = ?`,
         [id]
       );
       if (!rows.length) {
@@ -197,7 +204,9 @@ export async function PATCH(request) {
         `UPDATE candidates SET
           candidate_name = ?, emp_contact = ?, designation = ?, marital_status = ?,
           experience_type = ?, interview_at = ?, rescheduled_at = ?, next_followup_at = ?, interview_mode = ?, status = ?, tag = ?,
-          hire_date = ?, \`package\` = ?, probation_months = ?, note = ?
+          hire_date = ?, \`package\` = ?, probation_months = ?,
+          selected_resume = ?, mgmt_interview_score = ?, hr_interview_score = ?, hr_score_rating = ?, current_salary = ?, expected_salary = ?,
+          note = ?
         WHERE id = ?`,
         [
           d.candidate_name,
@@ -214,6 +223,12 @@ export async function PATCH(request) {
           d.hire_date,
           d.packageStr,
           d.probation_months,
+          d.selected_resume,
+          d.mgmt_interview_score,
+          d.hr_interview_score,
+          d.hr_score_rating,
+          d.current_salary,
+          d.expected_salary,
           d.note,
           id,
         ]
