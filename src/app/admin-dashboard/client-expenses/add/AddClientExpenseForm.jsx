@@ -6,13 +6,19 @@ import toast from "react-hot-toast";
 import { useState, useEffect, useRef } from "react";
 import SubHeadMultiSelect from "../SubHeadMultiSelect";
 
-export default function AddClientExpenseForm() {
+export default function AddClientExpenseForm({ initialClient = "", initialGroup = "" }) {
   const router = useRouter();
   const [isSubmitting, setSubmitting] = useState(false);
   const [headOptions, setHeadOptions] = useState([]);
   const [subHeadOptions, setSubHeadOptions] = useState([]);
+  
+  // Clean up '—' placeholder for group name
+  const defaultGroup = (initialGroup === "—" || initialGroup === "-" || initialGroup === "–") ? "" : initialGroup;
+
   const { register, handleSubmit, reset, control, setValue } = useForm({
     defaultValues: {
+      client_name: initialClient,
+      group_name: defaultGroup,
       main_head: "Direct",
       supply: "goods",
       head: "",
@@ -115,7 +121,12 @@ export default function AddClientExpenseForm() {
 
       if (res.ok) {
         toast.success("Client expense added successfully!");
-        router.push("/admin-dashboard/client-expenses/cards");
+        if (initialClient) {
+          const groupParam = initialGroup ? encodeURIComponent(initialGroup) : "%E2%80%94";
+          router.push(`/admin-dashboard/client-expenses/sub-head-cards?client=${encodeURIComponent(initialClient)}&group=${groupParam}`);
+        } else {
+          router.push("/admin-dashboard/client-expenses/cards");
+        }
       } else {
         toast.error(result.error || "Failed to add client expense");
       }

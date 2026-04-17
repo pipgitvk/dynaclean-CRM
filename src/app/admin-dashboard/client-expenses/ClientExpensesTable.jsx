@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X, Calendar } from "lucide-react";
 
-export default function ClientExpensesTable({ rows, client, group, initialSearchQuery = "" }) {
+export default function ClientExpensesTable({ rows, client, group, initialSearchQuery = "", groupHasSubHeads = true }) {
   const router = useRouter();
 
   useEffect(() => {
@@ -151,7 +151,9 @@ export default function ClientExpensesTable({ rows, client, group, initialSearch
               onClick={() =>
                 router.push(
                   client && group
-                    ? `/admin-dashboard/client-expenses/sub-head-cards?client=${encodeURIComponent(client)}&group=${encodeURIComponent(group)}`
+                    ? groupHasSubHeads
+                      ? `/admin-dashboard/client-expenses/sub-head-cards?client=${encodeURIComponent(client)}&group=${encodeURIComponent(group)}`
+                      : "/admin-dashboard/client-expenses/cards"
                     : "/admin-dashboard/client-expenses/cards"
                 )
               }
