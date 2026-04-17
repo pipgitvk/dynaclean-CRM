@@ -60,8 +60,15 @@ export async function POST(req) {
                     { status: 400 }
                 );
             }
-            const approvedAt = new Date(approvalDate).getTime();
+            
+            // Parse DB string as UTC
+            let dateStr = String(approvalDate);
+            if (!dateStr.includes('Z')) {
+              dateStr = dateStr.replace(' ', 'T') + 'Z';
+            }
+            const approvedAt = new Date(dateStr).getTime();
             const hoursPassed = (Date.now() - approvedAt) / (1000 * 60 * 60);
+            
             if (hoursPassed >= 4) {
                 return NextResponse.json(
                     { success: false, error: "Revert is only allowed within 4 hours of approval/rejection." },
