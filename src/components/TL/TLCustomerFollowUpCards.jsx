@@ -50,7 +50,8 @@ function customerDisplayName(c) {
   return "—";
 }
 
-function DetailRow({ icon: Icon, label, children }) {
+function DetailRow({ icon: Icon, label, children, isOverdue }) {
+  const iconBox = `shadow-none ${isOverdue ? "bg-rose-100" : "bg-sky-100"}`;
   return (
     <div className="flex gap-3 px-3 py-2.5 sm:px-3.5 sm:py-3">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 shadow-none">
@@ -67,6 +68,9 @@ function DetailRow({ icon: Icon, label, children }) {
 function TLCustomerFollowUpCard({ customer, detailHref, followupHref, useLatestNextFollowup }) {
   const hours = getHoursUntilNextFollowup(customer, useLatestNextFollowup);
   const bg = getTlFollowUpCardGradientForHours(hours);
+  const isOverdue = hours !== null && hours < 0;
+  const innerBg = isOverdue ? "bg-rose-50/90" : "bg-sky-50/90";
+  const iconBg = isOverdue ? "bg-rose-100" : "bg-sky-100";
 
   const nextD = pickNextFollowupForDisplay(customer, useLatestNextFollowup);
   const nextLabel =
@@ -99,8 +103,8 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref, useLatestN
           </span>
         </div>
 
-        <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm">
-          <DetailRow icon={User} label="User">
+        <div className={`divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200/90 shadow-sm ${innerBg}`}>
+          <DetailRow icon={User} label="User" isOverdue={isOverdue}>
             <span className="line-clamp-2">{customer.lead_source || "Unassigned"}</span>
           </DetailRow>
           <div className="flex gap-3 px-3 py-2.5 sm:px-3.5 sm:py-3">
@@ -109,12 +113,12 @@ function TLCustomerFollowUpCard({ customer, detailHref, followupHref, useLatestN
             </div>
             <div className="min-w-0 flex-1 space-y-1.5 pt-0.5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Schedule</p>
-              <p className="text-sm font-medium text-cyan-800">
-                Next follow-up · {nextLabel}
+              <p className="text-sm font-medium text-slate-900">
+                <span className="text-slate-600">Next follow-up · </span>{nextLabel}
               </p>
             </div>
           </div>
-          <DetailRow icon={StickyNote} label="Notes">
+          <DetailRow icon={StickyNote} label="Notes" isOverdue={isOverdue}>
             <span className="line-clamp-4 whitespace-pre-wrap break-words">
               {customer.tl_notes?.trim() ? customer.tl_notes : "—"}
             </span>

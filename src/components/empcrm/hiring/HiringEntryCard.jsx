@@ -123,9 +123,10 @@ export default function HiringEntryCard({ row, onEdit, showEditButton = true, co
   const bg = cardBackground(row, colorScheme);
   const traffic = colorScheme === "traffic" || colorScheme === "tl-followup";
   const trafficHours = getHoursForTrafficCard(row, colorScheme);
+  const isOverdue = colorScheme === "tl-followup" && trafficHours !== null && trafficHours !== undefined && trafficHours < 0;
   const trafficLightInner = colorScheme === "tl-followup" ? true : (traffic && trafficHours !== undefined && trafficHours !== null);
   const panelClass = trafficLightInner
-    ? `divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200/90 shadow-sm ${colorScheme === "tl-followup" ? "bg-sky-50/90" : "bg-white"}`
+    ? `divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200/90 shadow-sm ${colorScheme === "tl-followup" ? (isOverdue ? "bg-rose-50/90" : "bg-sky-50/90") : "bg-white"}`
     : traffic
       ? "divide-y divide-black/10 overflow-hidden rounded-2xl border border-black/15 bg-black/10"
       : "divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/15 bg-black/15 shadow-inner backdrop-blur-[2px]";
@@ -167,10 +168,10 @@ export default function HiringEntryCard({ row, onEdit, showEditButton = true, co
         </div>
 
         <div className={panelClass}>
-          <DetailRow icon={Phone} label="Contact" traffic={traffic} trafficLightInner={trafficLightInner} colorScheme={colorScheme}>
+          <DetailRow icon={Phone} label="Contact" traffic={traffic} trafficLightInner={trafficLightInner} colorScheme={colorScheme} isOverdue={isOverdue}>
             <span className="truncate">{row.emp_contact || "—"}</span>
           </DetailRow>
-          <DetailRow icon={Briefcase} label="Role" traffic={traffic} trafficLightInner={trafficLightInner} colorScheme={colorScheme}>
+          <DetailRow icon={Briefcase} label="Role" traffic={traffic} trafficLightInner={trafficLightInner} colorScheme={colorScheme} isOverdue={isOverdue}>
             <span className="line-clamp-2">{row.designation || "—"}</span>
           </DetailRow>
           <div className="flex gap-3 px-3 py-2.5 sm:px-3.5 sm:py-3">
