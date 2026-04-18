@@ -14,8 +14,10 @@ const formFieldClass = `w-full ${fieldClass}`;
 const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900`;
 
 const STATUS_OPTIONS = [
-  "Follow-up",
-  "Have not talked",
+  "Toggle",
+  "Didn't receive the call",
+  "Cut the call",
+  "Not reachable",
   "Shortlisted",
   "Selected",
   "Negotiation",
@@ -27,6 +29,7 @@ const STATUS_OPTIONS = [
 
 /** Legacy statuses that may exist in DB — shown in dropdown only when the row already has one. */
 const LEGACY_STATUSES = [
+  "Have not talked",
   "Shortlisted for interview",
   "Rescheduled",
   "next-follow-up",
@@ -59,19 +62,6 @@ const HR_SCORE_RATING_LABELS = {
   "very-good": "Very good",
 };
 
-/** Month filter dropdown: value 1–12, label full month name */
-const MONTH_FILTER_OPTIONS = Array.from({ length: 12 }, (_, i) => {
-  const m = i + 1;
-  const label = new Date(2024, i, 1).toLocaleString("en-IN", { month: "long" });
-  return { value: String(m), label };
-});
-
-/** Newest first: next calendar year down through 12 prior years */
-const YEAR_FILTER_OPTIONS = (() => {
-  const y = new Date().getFullYear();
-  return Array.from({ length: 14 }, (_, i) => y + 1 - i);
-})();
-
 function formatInterviewAt(v) {
   if (!v) return "—";
   try {
@@ -91,7 +81,11 @@ function formatInterviewAt(v) {
 }
 
 const STATUS_CHIP_STYLES = {
+  Toggle:        "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Follow-up":   "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
+  "Didn't receive the call": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
+  "Cut the call": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
+  "Not reachable": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   "Have not talked": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   Shortlisted:   "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
   Selected:      "bg-indigo-50 text-indigo-900 border-indigo-200 ring-1 ring-indigo-500/15",
@@ -128,7 +122,6 @@ function StatusChip({ status, tag }) {
 }
 
 export default function HiringPage() {
-  const now = new Date();
   const [candidate_name, setCandidateName] = useState("");
   const [emp_contact, setEmpContact] = useState("");
   const [designation, setDesignation] = useState("");
@@ -138,7 +131,7 @@ export default function HiringPage() {
   const [rescheduled_at, setRescheduledAt] = useState("");
   const [next_followup_at, setNextFollowupAt] = useState("");
   const [interview_mode, setInterviewMode] = useState("");
-  const [status, setStatus] = useState("Follow-up");
+  const [status, setStatus] = useState("Toggle");
   const [tag, setTag] = useState("");
   const [hire_date, setHireDate] = useState("");
   const [offerPackage, setOfferPackage] = useState("");
@@ -152,14 +145,16 @@ export default function HiringPage() {
   const [currentLocation, setCurrentLocation] = useState("");
   const [note, setNote] = useState("");
 
-  const [filterYear, setFilterYear] = useState(now.getFullYear());
-  const [filterMonth, setFilterMonth] = useState("");
   const [filterMode, setFilterMode] = useState("");
   const [filterDesignation, setFilterDesignation] = useState("");
   const [filterJoinFrom, setFilterJoinFrom] = useState("");
   const [filterJoinTo, setFilterJoinTo] = useState("");
   const [filterInterviewFrom, setFilterInterviewFrom] = useState("");
   const [filterInterviewTo, setFilterInterviewTo] = useState("");
+  const [filterCandidateName, setFilterCandidateName] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterNextFollowupFrom, setFilterNextFollowupFrom] = useState("");
+  const [filterNextFollowupTo, setFilterNextFollowupTo] = useState("");
   const [designationOptions, setDesignationOptions] = useState([]);
   const [loadingDesignations, setLoadingDesignations] = useState(true);
   const [entries, setEntries] = useState([]);
@@ -196,14 +191,21 @@ export default function HiringPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `/api/empcrm/hiring?year=${filterYear}`;
-      if (filterMonth) url += `&month=${filterMonth}`;
-      if (filterMode) url += `&interview_mode=${encodeURIComponent(filterMode)}`;
-      if (filterDesignation) url += `&designation=${encodeURIComponent(filterDesignation)}`;
-      if (filterJoinFrom) url += `&join_from=${encodeURIComponent(filterJoinFrom)}`;
-      if (filterJoinTo) url += `&join_to=${encodeURIComponent(filterJoinTo)}`;
-      if (filterInterviewFrom) url += `&interview_from=${encodeURIComponent(filterInterviewFrom)}`;
-      if (filterInterviewTo) url += `&interview_to=${encodeURIComponent(filterInterviewTo)}`;
+      let url = `/api/empcrm/hiring?`;
+      const params = new URLSearchParams();
+      if (filterCandidateName) params.append("candidate_name", filterCandidateName);
+      if (filterStatus) params.append("status", filterStatus);
+      if (filterNextFollowupFrom) params.append("next_followup_from", filterNextFollowupFrom);
+      if (filterNextFollowupTo) params.append("next_followup_to", filterNextFollowupTo);
+      if (filterMode) params.append("interview_mode", filterMode);
+      if (filterDesignation) params.append("designation", filterDesignation);
+      if (filterJoinFrom) params.append("join_from", filterJoinFrom);
+      if (filterJoinTo) params.append("join_to", filterJoinTo);
+      if (filterInterviewFrom) params.append("interview_from", filterInterviewFrom);
+      if (filterInterviewTo) params.append("interview_to", filterInterviewTo);
+      
+      url += params.toString();
+
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (json.success) {
@@ -217,7 +219,10 @@ export default function HiringPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterYear, filterMonth, filterMode, filterDesignation, filterJoinFrom, filterJoinTo, filterInterviewFrom, filterInterviewTo]);
+  }, [
+    filterCandidateName, filterStatus, filterNextFollowupFrom, filterNextFollowupTo,
+    filterMode, filterDesignation, filterJoinFrom, filterJoinTo, filterInterviewFrom, filterInterviewTo
+  ]);
 
   useEffect(() => {
     load();
@@ -266,7 +271,7 @@ export default function HiringPage() {
     setRescheduledAt("");
     setNextFollowupAt("");
     setInterviewMode("");
-    setStatus("Follow-up");
+    setStatus("Toggle");
     setTag("");
     setHireDate("");
     setOfferPackage("");
@@ -302,11 +307,9 @@ export default function HiringPage() {
           experience_type: experience_type || null,
           interview_at: interview_at || null,
           rescheduled_at: rescheduled ? rescheduled_at || null : null,
-          next_followup_at: nextFollowUp
+          next_followup_at: (status !== "Rejected" && status !== "Reject")
             ? next_followup_at || null
-            : hiredFollowUpTag
-              ? next_followup_at || null
-              : null,
+            : null,
           interview_mode: interview_mode || null,
           status,
           tag: hired ? tag || null : null,
@@ -391,26 +394,22 @@ export default function HiringPage() {
         </div>
         <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-12">
           <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-2">
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Year</label>
-            <select
-              className={filterSelectClass}
-              value={String(filterYear)}
-              onChange={(e) => setFilterYear(Number(e.target.value))}
-            >
-              {YEAR_FILTER_OPTIONS.map((y) => (
-                <option key={y} value={String(y)}>
-                  {y}
-                </option>
-              ))}
-            </select>
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Emp Name</label>
+            <input
+              type="text"
+              placeholder="Search name"
+              className={`${fieldClass} min-h-[44px]`}
+              value={filterCandidateName}
+              onChange={(e) => setFilterCandidateName(e.target.value)}
+            />
           </div>
           <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-3">
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Month</label>
-            <select className={filterSelectClass} value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
-              <option value="">All months</option>
-              {MONTH_FILTER_OPTIONS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Status</label>
+            <select className={filterSelectClass} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
                 </option>
               ))}
             </select>
@@ -511,6 +510,41 @@ export default function HiringPage() {
               )}
             </div>
           </div>
+
+          {/* ── Next Follow-up date range ── */}
+          <div className="flex flex-col gap-1 min-w-0 sm:col-span-2 lg:col-span-4">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Next follow-up date (from – to)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={filterNextFollowupFrom}
+                onChange={(e) => setFilterNextFollowupFrom(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up from"
+              />
+              <span className="text-xs text-slate-400">–</span>
+              <input
+                type="date"
+                value={filterNextFollowupTo}
+                min={filterNextFollowupFrom || undefined}
+                onChange={(e) => setFilterNextFollowupTo(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up to"
+              />
+              {(filterNextFollowupFrom || filterNextFollowupTo) && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterNextFollowupFrom(""); setFilterNextFollowupTo(""); }}
+                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  title="Clear"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -552,13 +586,10 @@ export default function HiringPage() {
                     Status
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
-                    Tag
+                    Next follow-up date
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
                     Joining date
-                  </th>
-                  <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
-                    Package
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
                     Mgmt
@@ -611,12 +642,11 @@ export default function HiringPage() {
                       <td className="px-3 py-2.5 align-top sm:px-4">
                         <StatusChip status={row.status} tag={row.tag} />
                       </td>
-                      <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.tag || "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
+                        {row.next_followup_at ? formatInterviewAt(row.next_followup_at) : "—"}
+                      </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
                         {row.hire_date ? String(row.hire_date).slice(0, 10) : "—"}
-                      </td>
-                      <td className="max-w-[120px] truncate px-3 py-2.5 text-slate-600 sm:px-4" title={row.package || ""}>
-                        {row.package || "—"}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
                         {row.mgmt_interview_score != null ? `${row.mgmt_interview_score}/10` : "—"}
@@ -684,6 +714,11 @@ export default function HiringPage() {
             </div>
             <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-5 sm:py-4">
+                {message && message.type === "error" && (
+                  <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800 border border-red-200">
+                    {message.text}
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2">
                   <div className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 px-3 py-2.5 sm:col-span-2">
                     <span className="text-xs font-medium uppercase tracking-wide text-indigo-700/80">ID</span>
@@ -737,7 +772,7 @@ export default function HiringPage() {
                     </select>
                   </div>
 
-                  {!["Follow-up", "Have not talked", "next-follow-up", "follow-up"].includes(status) && (
+                  {!["Toggle", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (
                     <>
                       <div>
                         <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -869,7 +904,7 @@ export default function HiringPage() {
                       onChange={(e) => {
                         const v = e.target.value;
                         setStatus(v);
-                        if (v !== "Hired" && v !== "Have not talked") {
+                        if (v !== "Hired") {
                           setTag("");
                         }
                         if (v !== "Hired") {
@@ -878,7 +913,7 @@ export default function HiringPage() {
                           setProbationMonths("");
                         }
                         if (v !== "Rescheduled") setRescheduledAt("");
-                        if (v !== "next-follow-up" && v !== "Hired") setNextFollowupAt("");
+                        if (v === "Rejected" || v === "Reject") setNextFollowupAt("");
                       }}
                       className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                     >
@@ -889,25 +924,6 @@ export default function HiringPage() {
                       ))}
                     </select>
                   </div>
-
-                  {status === "Have not talked" && (
-                    <div className="sm:col-span-2">
-                      <label className="mb-1 block text-sm font-medium text-slate-700">Reason *</label>
-                      <select
-                        required={status === "Have not talked"}
-                        value={tag}
-                        onChange={(e) => setTag(e.target.value)}
-                        className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
-                      >
-                        <option value="">— Select —</option>
-                        {HAVE_NOT_TALKED_REASONS.map((reason) => (
-                          <option key={reason} value={reason}>
-                            {reason}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
 
                   {status === "Rescheduled" && (
                     <div className="sm:col-span-2">
@@ -924,14 +940,14 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {status === "next-follow-up" && (
+                  {status !== "Rejected" && status !== "Reject" && (
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-sm font-medium text-slate-700">
                         Next follow-up date &amp; time *
                       </label>
                       <input
                         type="datetime-local"
-                        required={status === "next-follow-up"}
+                        required={status !== "Rejected" && status !== "Reject"}
                         value={next_followup_at}
                         onChange={(e) => setNextFollowupAt(e.target.value)}
                         className={formFieldClass}
@@ -1018,7 +1034,7 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {!["Follow-up", "Have not talked", "next-follow-up", "follow-up"].includes(status) && (
+                  {!["Toggle", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (
                     <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                       <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

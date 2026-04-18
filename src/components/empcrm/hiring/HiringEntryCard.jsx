@@ -2,7 +2,7 @@
 
 import { CalendarDays, Pencil, Phone, Briefcase, Sparkles } from "lucide-react";
 import { getGradientColor } from "@/utils/getGradientColor";
-import { getHoursForTrafficCard, getTrafficGradientForHours } from "@/utils/hiringFollowUpUrgency";
+import { getHoursForTrafficCard, getTrafficGradientForHours, getTlFollowUpCardGradientForHours } from "@/utils/hiringFollowUpUrgency";
 
 export const STATUS_CHIP_STYLES = {
   "Shortlisted for interview": "bg-white/20 text-white border-white/30 ring-1 ring-white/10",
@@ -67,9 +67,14 @@ export function HiringStatusChip({ status, variant = "light" }) {
 function cardBackground(row, colorScheme = "gradient") {
   const st = String(row.status || "").trim();
 
+  if (colorScheme === "tl-followup") {
+    const th = getHoursForTrafficCard(row, colorScheme);
+    return getTlFollowUpCardGradientForHours(th);
+  }
+
   if (colorScheme === "traffic") {
     const th = getHoursForTrafficCard(row, colorScheme);
-    if (th !== undefined) {
+    if (th !== undefined && th !== null) {
       return getTrafficGradientForHours(th);
     }
   }
@@ -116,9 +121,9 @@ function DetailRow({ icon: Icon, label, children, traffic, trafficLightInner }) 
 
 export default function HiringEntryCard({ row, onEdit, showEditButton = true, colorScheme = "gradient" }) {
   const bg = cardBackground(row, colorScheme);
-  const traffic = colorScheme === "traffic";
+  const traffic = colorScheme === "traffic" || colorScheme === "tl-followup";
   const trafficHours = getHoursForTrafficCard(row, colorScheme);
-  const trafficLightInner = traffic && trafficHours !== undefined;
+  const trafficLightInner = colorScheme === "tl-followup" ? true : (traffic && trafficHours !== undefined && trafficHours !== null);
   const panelClass = trafficLightInner
     ? "divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm"
     : traffic
@@ -182,58 +187,89 @@ export default function HiringEntryCard({ row, onEdit, showEditButton = true, co
               >
                 Schedule
               </p>
-              <p
-                className={
-                  trafficLightInner ? "text-sm font-medium text-slate-900" : "text-sm font-medium text-white"
-                }
-              >
-                <span className={trafficLightInner ? "text-slate-600" : "text-white/80"}>Interview · </span>
-                {formatInterviewAt(row.interview_at)}
-              </p>
-              {row.status === "Rescheduled" && row.rescheduled_at ? (
-                <p
-                  className={
-                    trafficLightInner ? "text-xs font-medium text-sky-700" : "text-xs font-medium text-sky-100"
-                  }
-                >
-                  Rescheduled → {formatInterviewAt(row.rescheduled_at)}
-                </p>
-              ) : null}
-              {row.status === "next-follow-up" && row.next_followup_at ? (
-                <p
-                  className={
-                    trafficLightInner ? "text-xs font-medium text-cyan-800" : "text-xs font-medium text-cyan-100"
-                  }
-                >
-                  Next follow-up · {formatInterviewAt(row.next_followup_at)}
-                </p>
-              ) : null}
-              {row.status === "follow-up" && row.next_followup_at ? (
-                <p
-                  className={
-                    trafficLightInner ? "text-xs font-medium text-teal-800" : "text-xs font-medium text-teal-100"
-                  }
-                >
-                  Follow-up · {formatInterviewAt(row.next_followup_at)}
-                </p>
-              ) : null}
-              {row.status === "Hired" && String(row.tag || "").trim() === "Follow-Up" && row.next_followup_at ? (
-                <p
-                  className={
-                    trafficLightInner ? "text-xs font-medium text-emerald-800" : "text-xs font-medium text-emerald-100"
-                  }
-                >
-                  Tag follow-up · {formatInterviewAt(row.next_followup_at)}
-                </p>
-              ) : null}
-              <p
-                className={
-                  trafficLightInner ? "pt-0.5 text-xs text-slate-700" : "pt-0.5 text-xs text-white/85"
-                }
-              >
-                <span className={trafficLightInner ? "text-slate-500" : "text-white/60"}>Mode · </span>
-                {row.interview_mode || "—"}
-              </p>
+              {colorScheme === "tl-followup" ? (
+                <>
+                  <p
+                    className={
+                      trafficLightInner ? "text-sm font-medium text-slate-900" : "text-sm font-medium text-white"
+                    }
+                  >
+                    <span className={trafficLightInner ? "text-slate-600" : "text-white/80"}>Next follow-up · </span>
+                    {formatInterviewAt(row.next_followup_at)}
+                  </p>
+                  <p
+                    className={
+                      trafficLightInner ? "text-xs font-medium text-slate-700" : "text-xs font-medium text-white/90"
+                    }
+                  >
+                    <span className={trafficLightInner ? "text-slate-500" : "text-white/70"}>Interview · </span>
+                    {formatInterviewAt(row.interview_at)}
+                  </p>
+                  <p
+                    className={
+                      trafficLightInner ? "pt-0.5 text-xs text-slate-700" : "pt-0.5 text-xs text-white/85"
+                    }
+                  >
+                    <span className={trafficLightInner ? "text-slate-500" : "text-white/60"}>Mode · </span>
+                    {row.interview_mode || "—"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p
+                    className={
+                      trafficLightInner ? "text-sm font-medium text-slate-900" : "text-sm font-medium text-white"
+                    }
+                  >
+                    <span className={trafficLightInner ? "text-slate-600" : "text-white/80"}>Interview · </span>
+                    {formatInterviewAt(row.interview_at)}
+                  </p>
+                  {row.status === "Rescheduled" && row.rescheduled_at ? (
+                    <p
+                      className={
+                        trafficLightInner ? "text-xs font-medium text-sky-700" : "text-xs font-medium text-sky-100"
+                      }
+                    >
+                      Rescheduled → {formatInterviewAt(row.rescheduled_at)}
+                    </p>
+                  ) : null}
+                  {row.status === "next-follow-up" && row.next_followup_at ? (
+                    <p
+                      className={
+                        trafficLightInner ? "text-xs font-medium text-cyan-800" : "text-xs font-medium text-cyan-100"
+                      }
+                    >
+                      Next follow-up · {formatInterviewAt(row.next_followup_at)}
+                    </p>
+                  ) : null}
+                  {row.status === "follow-up" && row.next_followup_at ? (
+                    <p
+                      className={
+                        trafficLightInner ? "text-xs font-medium text-teal-800" : "text-xs font-medium text-teal-100"
+                      }
+                    >
+                      Follow-up · {formatInterviewAt(row.next_followup_at)}
+                    </p>
+                  ) : null}
+                  {row.status === "Hired" && String(row.tag || "").trim() === "Follow-Up" && row.next_followup_at ? (
+                    <p
+                      className={
+                        trafficLightInner ? "text-xs font-medium text-emerald-800" : "text-xs font-medium text-emerald-100"
+                      }
+                    >
+                      Tag follow-up · {formatInterviewAt(row.next_followup_at)}
+                    </p>
+                  ) : null}
+                  <p
+                    className={
+                      trafficLightInner ? "pt-0.5 text-xs text-slate-700" : "pt-0.5 text-xs text-white/85"
+                    }
+                  >
+                    <span className={trafficLightInner ? "text-slate-500" : "text-white/60"}>Mode · </span>
+                    {row.interview_mode || "—"}
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

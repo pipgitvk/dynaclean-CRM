@@ -4,46 +4,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import HiringEntryCard from "./HiringEntryCard";
-import { HIRING_URGENCY_LEGEND } from "@/utils/hiringFollowUpUrgency";
-
-const CANDIDATES_FOLLOWUP_STATUSES = new Set([
-  "Rescheduled",
-  "next-follow-up",
-  "follow-up",
-  "Waiting List",
-]);
+import { TL_FOLLOWUP_LEGEND } from "@/utils/hiringFollowUpUrgency";
 
 function isCandidatesFollowUpRow(row) {
-  const st = String(row?.status || "").trim();
-  if (st === "Hired" && String(row?.tag || "").trim() === "Follow-Up") return true;
-  return CANDIDATES_FOLLOWUP_STATUSES.has(st);
+  return true;
 }
 
 const HIRING_ROUTE = "/empcrm/admin-dashboard/hiring";
 
 function scheduleSortKey(row) {
-  const st = String(row.status || "").trim();
-  if (st === "Rescheduled" && row.rescheduled_at) {
-    const ms = new Date(row.rescheduled_at).getTime();
-    return Number.isFinite(ms) ? ms : Infinity;
-  }
-  if ((st === "next-follow-up" || st === "follow-up") && row.next_followup_at) {
+  if (row.next_followup_at) {
     const ms = new Date(row.next_followup_at).getTime();
-    return Number.isFinite(ms) ? ms : Infinity;
-  }
-  if (st === "Hired" && String(row.tag || "").trim() === "Follow-Up") {
-    if (row.next_followup_at) {
-      const ms = new Date(row.next_followup_at).getTime();
-      return Number.isFinite(ms) ? ms : Infinity;
-    }
-    if (row.hire_date) {
-      const hd = String(row.hire_date).slice(0, 10);
-      const ms = new Date(`${hd}T12:00:00`).getTime();
-      return Number.isFinite(ms) ? ms : Infinity;
-    }
-  }
-  if (row.interview_at) {
-    const ms = new Date(row.interview_at).getTime();
     return Number.isFinite(ms) ? ms : Infinity;
   }
   return Infinity;
@@ -154,7 +125,7 @@ export default function HiringCandidatesFollowUpSection({
         <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:text-[11px]">
           Card colours (by next relevant date)
         </span>
-        {HIRING_URGENCY_LEGEND.map((item) => (
+        {TL_FOLLOWUP_LEGEND.map((item) => (
           <span key={item.key} className="inline-flex items-center gap-2 text-[11px] text-slate-700 sm:text-xs" role="listitem">
             <span
               className={`h-2.5 w-9 shrink-0 rounded-full shadow-sm ring-1 ring-black/5 ${item.dotClass}`}
@@ -168,14 +139,14 @@ export default function HiringCandidatesFollowUpSection({
       {followUpCandidates.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200/90 bg-slate-50/60 px-4 py-8 text-center">
           <p className="text-sm text-slate-600">
-            No candidates in follow-up (including Hired with tag Follow-Up) for this year.
+            No candidates found for this year.
           </p>
         </div>
       ) : (
         <div className="w-full overflow-x-auto pb-2 pt-0.5 [scrollbar-gutter:stable]">
           <div className="flex min-w-0 flex-row flex-nowrap gap-4 sm:gap-5">
             {followUpCandidates.map((row) => (
-              <HiringEntryCard key={row.id} row={row} showEditButton={false} colorScheme="traffic" />
+              <HiringEntryCard key={row.id} row={row} showEditButton={false} colorScheme="tl-followup" />
             ))}
           </div>
         </div>

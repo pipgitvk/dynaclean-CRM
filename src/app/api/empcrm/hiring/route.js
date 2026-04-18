@@ -72,18 +72,30 @@ export async function GET(req) {
       return NextResponse.json({ success: true, entry: rows[0] });
     }
 
-    const year = searchParams.get("year");
-    const month = searchParams.get("month");
+    const candidateNameParam = searchParams.get("candidate_name");
+    const statusParam = searchParams.get("status");
     const designationParam = searchParams.get("designation");
     const modeParam = searchParams.get("interview_mode");
     const joinFromParam = searchParams.get("join_from");
     const joinToParam = searchParams.get("join_to");
     const interviewFromParam = searchParams.get("interview_from");
     const interviewToParam = searchParams.get("interview_to");
+    const nextFollowupFromParam = searchParams.get("next_followup_from");
+    const nextFollowupToParam = searchParams.get("next_followup_to");
+    
     const designationTrimmed =
       designationParam != null && String(designationParam).trim() !== ""
         ? String(designationParam).trim()
         : null;
+    const candidateNameTrimmed =
+      candidateNameParam != null && String(candidateNameParam).trim() !== ""
+        ? String(candidateNameParam).trim()
+        : null;
+    const statusTrimmed =
+      statusParam != null && String(statusParam).trim() !== ""
+        ? String(statusParam).trim()
+        : null;
+
     const HIRING_INTERVIEW_MODES = ["Virtual", "Walk-in"];
     const modeRaw = modeParam != null && String(modeParam).trim() !== "" ? String(modeParam).trim() : null;
     const modeFilter = modeRaw != null && HIRING_INTERVIEW_MODES.includes(modeRaw) ? modeRaw : null;
@@ -92,26 +104,17 @@ export async function GET(req) {
     const joinTo = isValidDate(joinToParam) ? joinToParam.trim() : null;
     const interviewFrom = isValidDate(interviewFromParam) ? interviewFromParam.trim() : null;
     const interviewTo = isValidDate(interviewToParam) ? interviewToParam.trim() : null;
+    const nextFollowupFrom = isValidDate(nextFollowupFromParam) ? nextFollowupFromParam.trim() : null;
+    const nextFollowupTo = isValidDate(nextFollowupToParam) ? nextFollowupToParam.trim() : null;
 
     const conn = await getDbConnection();
 
-    const ymWhere = [];
-    const ymParams = [];
-    if (year != null && year !== "") {
-      ymWhere.push(`YEAR(COALESCE(hire_date, DATE(interview_at), DATE(created_at))) = ?`);
-      ymParams.push(parseInt(year, 10));
-    }
-    if (month != null && month !== "") {
-      ymWhere.push(`MONTH(COALESCE(hire_date, DATE(interview_at), DATE(created_at))) = ?`);
-      ymParams.push(parseInt(month, 10));
-    }
-    const ymClause = ymWhere.length ? ` AND ${ymWhere.join(" AND ")}` : "";
     const modeClause = modeFilter ? ` AND interview_mode = ?` : "";
 
     let distSql = `SELECT DISTINCT TRIM(designation) AS d FROM candidates
-      WHERE LOWER(TRIM(created_by)) = LOWER(TRIM(?))${ymClause}${modeClause}
+      WHERE LOWER(TRIM(created_by)) = LOWER(TRIM(?))${modeClause}
       AND TRIM(COALESCE(designation, '')) != '' ORDER BY d`;
-    const distParams = [payload.username, ...ymParams];
+    const distParams = [payload.username];
     if (modeFilter) distParams.push(modeFilter);
     const [distRows] = await conn.execute(distSql, distParams);
     const designations = omitBlockedDesignations(
@@ -128,13 +131,19 @@ export async function GET(req) {
          LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
          WHERE LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))`;
     const params = [payload.username];
-    if (year != null && year !== "") {
-      sql += ` AND YEAR(COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at))) = ?`;
-      params.push(parseInt(year, 10));
+    
+    if (candidateNameTrimmed != null) {
+      sql += ` AND h.candidate_name LIKE ?`;
+      params.push(`%${candidateNameTrimmed}%`);
     }
-    if (month != null && month !== "") {
-      sql += ` AND MONTH(COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at))) = ?`;
-      params.push(parseInt(month, 10));
+    if (statusTrimmed != null) {
+      if (["Didn't receive the call", "Cut the call", "Not reachable"].includes(statusTrimmed)) {
+        sql += ` AND (h.status = ? OR (h.status = 'Have not talked' AND h.tag = ?))`;
+        params.push(statusTrimmed, statusTrimmed);
+      } else {
+        sql += ` AND h.status = ?`;
+        params.push(statusTrimmed);
+      }
     }
     if (modeFilter != null) {
       sql += ` AND h.interview_mode = ?`;
@@ -159,6 +168,14 @@ export async function GET(req) {
     if (interviewTo) {
       sql += ` AND DATE(h.interview_at) <= ?`;
       params.push(interviewTo);
+    }
+    if (nextFollowupFrom) {
+      sql += ` AND DATE(h.next_followup_at) >= ?`;
+      params.push(nextFollowupFrom);
+    }
+    if (nextFollowupTo) {
+      sql += ` AND DATE(h.next_followup_at) <= ?`;
+      params.push(nextFollowupTo);
     }
     sql += ` ORDER BY COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at)) DESC, h.id DESC`;
 
@@ -215,7 +232,7 @@ export async function POST(request) {
         created_by, candidate_name, emp_contact, designation, marital_status,
         experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\`, probation_months,
         selected_resume, mgmt_interview_score, hr_interview_score, hr_score_rating, current_salary, expected_salary, current_location, note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           payload.username,
           d.candidate_name,

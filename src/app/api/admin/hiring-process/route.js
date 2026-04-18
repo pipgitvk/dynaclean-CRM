@@ -55,11 +55,22 @@ export async function GET(req) {
       return NextResponse.json({ success: true, entry: rows[0] });
     }
 
-    const year = searchParams.get("year");
-    const month = searchParams.get("month");
+    const candidateNameParam = searchParams.get("candidate_name");
+    const statusParam = searchParams.get("status");
+    const nextFollowupFromParam = searchParams.get("next_followup_from");
+    const nextFollowupToParam = searchParams.get("next_followup_to");
     const designationParam = searchParams.get("designation");
     const modeParam = searchParams.get("interview_mode");
     const createdByParam = searchParams.get("created_by");
+    
+    const candidateNameTrimmed =
+      candidateNameParam != null && String(candidateNameParam).trim() !== ""
+        ? String(candidateNameParam).trim()
+        : null;
+    const statusTrimmed =
+      statusParam != null && String(statusParam).trim() !== ""
+        ? String(statusParam).trim()
+        : null;
     const designationTrimmed =
       designationParam != null && String(designationParam).trim() !== ""
         ? String(designationParam).trim()
@@ -70,30 +81,23 @@ export async function GET(req) {
         : null;
     const modeRaw = modeParam != null && String(modeParam).trim() !== "" ? String(modeParam).trim() : null;
     const modeFilter = modeRaw != null && HIRING_INTERVIEW_MODES.includes(modeRaw) ? modeRaw : null;
+    
+    const isValidDate = (v) => v && /^\d{4}-\d{2}-\d{2}$/.test(v.trim());
+    const nextFollowupFrom = isValidDate(nextFollowupFromParam) ? nextFollowupFromParam.trim() : null;
+    const nextFollowupTo = isValidDate(nextFollowupToParam) ? nextFollowupToParam.trim() : null;
 
     const conn = await getDbConnection();
 
-    const ymWhere = [];
-    const ymParams = [];
-    if (year != null && year !== "") {
-      ymWhere.push(`YEAR(COALESCE(hire_date, DATE(interview_at), DATE(created_at))) = ?`);
-      ymParams.push(parseInt(year, 10));
-    }
-    if (month != null && month !== "") {
-      ymWhere.push(`MONTH(COALESCE(hire_date, DATE(interview_at), DATE(created_at))) = ?`);
-      ymParams.push(parseInt(month, 10));
-    }
-    const ymClause = ymWhere.length ? ` AND ${ymWhere.join(" AND ")}` : "";
     const modeClause = modeFilter ? ` AND interview_mode = ?` : "";
     const designationClause = designationTrimmed ? ` AND TRIM(designation) = ?` : "";
 
     let distSql = `SELECT DISTINCT TRIM(designation) AS d FROM candidates
-      WHERE 1=1${ymClause}${modeClause}`;
+      WHERE 1=1${modeClause}`;
     if (createdByTrimmed) {
       distSql += ` AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))`;
     }
     distSql += ` AND TRIM(COALESCE(designation, '')) != '' ORDER BY d`;
-    const distParams = [...ymParams];
+    const distParams = [];
     if (modeFilter) distParams.push(modeFilter);
     if (createdByTrimmed) distParams.push(createdByTrimmed);
     const [distRows] = await conn.execute(distSql, distParams);
@@ -102,8 +106,8 @@ export async function GET(req) {
     );
 
     let hrSql = `SELECT DISTINCT TRIM(created_by) AS u FROM candidates
-      WHERE TRIM(COALESCE(created_by, '')) != ''${ymClause}${modeClause}${designationClause} ORDER BY u`;
-    const hrParams = [...ymParams];
+      WHERE TRIM(COALESCE(created_by, '')) != ''${modeClause}${designationClause} ORDER BY u`;
+    const hrParams = [];
     if (modeFilter) hrParams.push(modeFilter);
     if (designationTrimmed) hrParams.push(designationTrimmed);
     const [hrRows] = await conn.execute(hrSql, hrParams);
@@ -120,13 +124,27 @@ export async function GET(req) {
        LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(e.created_by))
        WHERE 1=1`;
     const params = [];
-    if (year != null && year !== "") {
-      sql += ` AND YEAR(COALESCE(e.hire_date, DATE(e.interview_at), DATE(e.created_at))) = ?`;
-      params.push(parseInt(year, 10));
+    
+    if (candidateNameTrimmed != null) {
+      sql += ` AND e.candidate_name LIKE ?`;
+      params.push(`%${candidateNameTrimmed}%`);
     }
-    if (month != null && month !== "") {
-      sql += ` AND MONTH(COALESCE(e.hire_date, DATE(e.interview_at), DATE(e.created_at))) = ?`;
-      params.push(parseInt(month, 10));
+    if (statusTrimmed != null) {
+      if (["Didn't receive the call", "Cut the call", "Not reachable"].includes(statusTrimmed)) {
+        sql += ` AND (e.status = ? OR (e.status = 'Have not talked' AND e.tag = ?))`;
+        params.push(statusTrimmed, statusTrimmed);
+      } else {
+        sql += ` AND e.status = ?`;
+        params.push(statusTrimmed);
+      }
+    }
+    if (nextFollowupFrom) {
+      sql += ` AND DATE(e.next_followup_at) >= ?`;
+      params.push(nextFollowupFrom);
+    }
+    if (nextFollowupTo) {
+      sql += ` AND DATE(e.next_followup_at) <= ?`;
+      params.push(nextFollowupTo);
     }
     if (modeFilter != null) {
       sql += ` AND e.interview_mode = ?`;
@@ -205,7 +223,7 @@ export async function PATCH(request) {
           candidate_name = ?, emp_contact = ?, designation = ?, marital_status = ?,
           experience_type = ?, interview_at = ?, rescheduled_at = ?, next_followup_at = ?, interview_mode = ?, status = ?, tag = ?,
           hire_date = ?, \`package\` = ?, probation_months = ?,
-          selected_resume = ?, mgmt_interview_score = ?, hr_interview_score = ?, hr_score_rating = ?, current_salary = ?, expected_salary = ?,
+          selected_resume = ?, mgmt_interview_score = ?, hr_interview_score = ?, hr_score_rating = ?, current_salary = ?, expected_salary = ?, current_location = ?,
           note = ?
         WHERE id = ?`,
         [
@@ -229,6 +247,7 @@ export async function PATCH(request) {
           d.hr_score_rating,
           d.current_salary,
           d.expected_salary,
+          d.current_location,
           d.note,
           id,
         ]
