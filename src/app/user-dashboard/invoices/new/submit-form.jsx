@@ -423,7 +423,7 @@ const fetchQuotationAndFill = async () => {
 
     if (quotation.round_off) {
       setRoundOff(Number(quotation.round_off) || 0);
-      setIsAutoRoundOff(false);
+      // setIsAutoRoundOff(false); // Keep true by default
     }
 
 

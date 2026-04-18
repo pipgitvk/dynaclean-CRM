@@ -200,7 +200,7 @@ export default function InvoiceEditModal({
         setNotes(inv.notes || "");
         setEditableTerms(inv.terms_conditions || "");
         setRoundOff(Number(inv.round_off) || 0);
-        setIsAutoRoundOff(false); // If editing, assume they want to keep their existing value unless they re-check it.
+        // setIsAutoRoundOff(false); // Keep it true by default as requested
 
         const loadedItems =
           Array.isArray(data.items) && data.items.length
