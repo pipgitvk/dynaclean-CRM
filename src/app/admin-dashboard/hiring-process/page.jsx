@@ -264,7 +264,7 @@ export default function AdminHiringProcessPage() {
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.interview_mode || "—"}</td>
                       <td className="px-3 py-2.5 align-top sm:px-4">
-                        <StatusChip status={row.status} />
+                        <StatusChip status={row.status} tag={row.tag} />
                       </td>
                       <td className="px-3 py-2.5 align-top sm:px-4">
                         <CreatedByChip name={row.creator_name} role={row.creator_role} />

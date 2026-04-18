@@ -83,18 +83,20 @@ export function formatInterviewAt(v) {
   }
 }
 
-export function StatusChip({ status }) {
+export function StatusChip({ status, tag }) {
   const s = String(status || "").trim();
   if (!s) {
     return <span className="text-gray-400 text-xs">—</span>;
   }
   const style = STATUS_CHIP_STYLES[s] || "bg-gray-50 text-gray-800 border-gray-200 ring-1 ring-gray-400/10";
+  const displayLabel = s === "Have not talked" && tag ? tag : s;
+
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 sm:px-2.5 py-1 text-[10px] sm:text-xs font-semibold whitespace-normal text-left leading-snug max-w-[9rem] sm:max-w-[11rem] ${style}`}
-      title={s}
+      title={displayLabel}
     >
-      {s}
+      {displayLabel}
     </span>
   );
 }
