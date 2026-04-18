@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import HiringEntryCard from "./HiringEntryCard";
 import { TL_FOLLOWUP_LEGEND } from "@/utils/hiringFollowUpUrgency";
@@ -37,6 +38,7 @@ export default function HiringCandidatesFollowUpSection({
   year: yearProp,
   showOpenHiringLink = false,
 }) {
+  const router = useRouter();
   const year = yearProp ?? new Date().getFullYear();
   const controlled = entriesProp !== undefined;
 
@@ -146,7 +148,14 @@ export default function HiringCandidatesFollowUpSection({
         <div className="w-full overflow-x-auto pb-2 pt-0.5 [scrollbar-gutter:stable]">
           <div className="flex min-w-0 flex-row flex-nowrap gap-4 sm:gap-5">
             {followUpCandidates.map((row) => (
-              <HiringEntryCard key={row.id} row={row} showEditButton={false} colorScheme="tl-followup" />
+              <HiringEntryCard
+                key={row.id}
+                row={row}
+                showEditButton={false}
+                showViewButton={true}
+                onView={() => router.push(`${HIRING_ROUTE}/${row.id}/view`)}
+                colorScheme="tl-followup"
+              />
             ))}
           </div>
         </div>

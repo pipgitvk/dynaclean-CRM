@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Pencil, Phone, Briefcase, Sparkles } from "lucide-react";
+import { CalendarDays, Pencil, Phone, Briefcase, Sparkles, Eye } from "lucide-react";
 import { getGradientColor } from "@/utils/getGradientColor";
 import { getHoursForTrafficCard, getTrafficGradientForHours, getTlFollowUpCardGradientForHours } from "@/utils/hiringFollowUpUrgency";
 
@@ -119,7 +119,7 @@ function DetailRow({ icon: Icon, label, children, traffic, trafficLightInner }) 
   );
 }
 
-export default function HiringEntryCard({ row, onEdit, showEditButton = true, colorScheme = "gradient" }) {
+export default function HiringEntryCard({ row, onEdit, onView, showEditButton = true, showViewButton = false, colorScheme = "gradient" }) {
   const bg = cardBackground(row, colorScheme);
   const traffic = colorScheme === "traffic" || colorScheme === "tl-followup";
   const trafficHours = getHoursForTrafficCard(row, colorScheme);
@@ -275,21 +275,40 @@ export default function HiringEntryCard({ row, onEdit, showEditButton = true, co
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <HiringStatusChip status={row.status} variant="onCard" />
-          {row.tag ? (
-            <span
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <HiringStatusChip status={row.status} variant="onCard" />
+            {row.tag ? (
+              <span
+                className={
+                  trafficLightInner
+                    ? "rounded-full border border-white/20 bg-white/12 px-2.5 py-1 text-[10px] font-semibold text-white/95"
+                    : traffic
+                      ? "rounded-full border border-black/15 bg-black/15 px-2.5 py-1 text-[10px] font-semibold text-white/95"
+                      : "rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/95 backdrop-blur-sm"
+                }
+              >
+                {row.tag}
+              </span>
+            ) : null}
+          </div>
+          
+          {showViewButton && (
+            <button
+              type="button"
+              onClick={onView}
               className={
                 trafficLightInner
-                  ? "rounded-full border border-white/20 bg-white/12 px-2.5 py-1 text-[10px] font-semibold text-white/95"
+                  ? "flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/40 bg-white/30 px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-white/40"
                   : traffic
-                    ? "rounded-full border border-black/15 bg-black/15 px-2.5 py-1 text-[10px] font-semibold text-white/95"
-                    : "rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/95 backdrop-blur-sm"
+                    ? "flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-black/25 bg-black/25 px-3 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-black/35"
+                    : "flex shrink-0 items-center justify-center gap-1.5 rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/25"
               }
             >
-              {row.tag}
-            </span>
-          ) : null}
+              <Eye className="h-3.5 w-3.5" />
+              View
+            </button>
+          )}
         </div>
       </div>
 
