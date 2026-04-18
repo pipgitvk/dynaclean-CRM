@@ -125,7 +125,7 @@ export default function HiringEntryCard({ row, onEdit, showEditButton = true, co
   const trafficHours = getHoursForTrafficCard(row, colorScheme);
   const trafficLightInner = colorScheme === "tl-followup" ? true : (traffic && trafficHours !== undefined && trafficHours !== null);
   const panelClass = trafficLightInner
-    ? "divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm"
+    ? `divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200/90 shadow-sm ${colorScheme === "tl-followup" ? "bg-sky-50/90" : "bg-white"}`
     : traffic
       ? "divide-y divide-black/10 overflow-hidden rounded-2xl border border-black/15 bg-black/10"
       : "divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/15 bg-black/15 shadow-inner backdrop-blur-[2px]";
@@ -167,10 +167,10 @@ export default function HiringEntryCard({ row, onEdit, showEditButton = true, co
         </div>
 
         <div className={panelClass}>
-          <DetailRow icon={Phone} label="Contact" traffic={traffic} trafficLightInner={trafficLightInner}>
+          <DetailRow icon={Phone} label="Contact" traffic={traffic} trafficLightInner={trafficLightInner} colorScheme={colorScheme}>
             <span className="truncate">{row.emp_contact || "—"}</span>
           </DetailRow>
-          <DetailRow icon={Briefcase} label="Role" traffic={traffic} trafficLightInner={trafficLightInner}>
+          <DetailRow icon={Briefcase} label="Role" traffic={traffic} trafficLightInner={trafficLightInner} colorScheme={colorScheme}>
             <span className="line-clamp-2">{row.designation || "—"}</span>
           </DetailRow>
           <div className="flex gap-3 px-3 py-2.5 sm:px-3.5 sm:py-3">
