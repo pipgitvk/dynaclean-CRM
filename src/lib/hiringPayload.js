@@ -1,7 +1,9 @@
 const HIRING_STATUS_OPTIONS = [
   // Current statuses
-  "Follow-up",
-  "Have not talked",
+  "Toggle",
+  "Didn't receive the call",
+  "Cut the call",
+  "Not reachable",
   "Shortlisted",
   "Selected",
   "Negotiation",
@@ -10,6 +12,8 @@ const HIRING_STATUS_OPTIONS = [
   "Hired",
   "Rejected",
   // Legacy — kept so old DB rows can still be saved without being reset
+  "Have not talked",
+  "Follow-up",
   "Shortlisted for interview",
   "Rescheduled",
   "next-follow-up",
@@ -43,9 +47,9 @@ export const HR_SCORE_RATING_OPTIONS = ["average", "poor", "good", "very-good"];
 
 function normalizeStatus(v) {
   const s = String(v ?? "").trim();
-  if (!s) return "Follow-up";
+  if (!s) return "Toggle";
   if (HIRING_STATUS_OPTIONS.includes(s)) return s;
-  return "Follow-up";
+  return "Toggle";
 }
 
 function normalizeTag(v, isReason = false) {
@@ -85,18 +89,18 @@ export function parseHiringPayload(body, options = {}) {
   const isHired = status === "Hired";
   const isSelected = status === "Selected";
   const isRescheduled = status === "Rescheduled";
-  const isHaveNotTalked = status === "Have not talked";
+  const isHaveNotTalked = ["Didn't receive the call", "Cut the call", "Not reachable"].includes(status) || status === "Have not talked";
   /** Legacy slug — next slot is required. */
   const isNextFollowUpStrict = status === "next-follow-up";
   /** Current label — optional next slot if provided. */
-  const isFollowUpLabel = status === "Follow-up";
+  const isFollowUpLabel = status === "Toggle";
   const rescheduled_at_raw = String(body.rescheduled_at ?? "").trim();
   const next_followup_at_raw = String(body.next_followup_at ?? "").trim();
   const tagForHired = isHired ? normalizeTag(body.tag) : null;
   const isHiredFollowUpTag = isHired && tagForHired === "Follow-Up";
   const tagForHaveNotTalked = isHaveNotTalked ? normalizeTag(body.tag, true) : null;
   const hire_date = isHired ? String(body.hire_date ?? "").trim() || null : null;
-  const tag = isHired ? tagForHired : (isHaveNotTalked ? tagForHaveNotTalked : null);
+  const tag = isHired ? tagForHired : null;
   const packageStr = isHired ? String(body.package ?? "").trim() || null : null;
 
   let probation_months = null;
@@ -154,7 +158,7 @@ export function parseHiringPayload(body, options = {}) {
   if (isHired && !tag) {
     return { error: "Tag is required when status is Hired." };
   }
-  if (isHaveNotTalked && !tag) {
+  if (isHaveNotTalked && status === "Have not talked" && !tagForHaveNotTalked) {
     return { error: "Reason is required when status is Have not talked." };
   }
   if (isHired && !packageStr) {
@@ -163,8 +167,8 @@ export function parseHiringPayload(body, options = {}) {
   if (isRescheduled && !rescheduled_at_raw) {
     return { error: "Rescheduled date and time is required when status is Rescheduled." };
   }
-  if (isNextFollowUpStrict && !next_followup_at_raw) {
-    return { error: "Next follow-up date and time is required when status is next-follow-up." };
+  if (status !== "Rejected" && status !== "Reject" && !next_followup_at_raw) {
+    return { error: "Next follow-up date and time is required for this status." };
   }
   if (isSelected && !skipSelectedResumeValidation && !selected_resume) {
     return { error: "Resume is required when status is Selected." };
@@ -173,14 +177,7 @@ export function parseHiringPayload(body, options = {}) {
     return { error: "Management interview score (1–10) is required when status is Selected." };
   }
 
-  let resolved_next_followup_at = null;
-  if (isNextFollowUpStrict) {
-    resolved_next_followup_at = next_followup_at_raw;
-  } else if (isFollowUpLabel && next_followup_at_raw) {
-    resolved_next_followup_at = next_followup_at_raw;
-  } else if (isHiredFollowUpTag && next_followup_at_raw) {
-    resolved_next_followup_at = next_followup_at_raw;
-  }
+  const resolved_next_followup_at = (status !== "Rejected" && status !== "Reject") ? next_followup_at_raw : null;
 
   return {
     data: {
@@ -194,7 +191,7 @@ export function parseHiringPayload(body, options = {}) {
       next_followup_at: resolved_next_followup_at,
       interview_mode: interview_mode_raw || null,
       status,
-      tag,
+      tag: isHaveNotTalked && status === "Have not talked" ? tagForHaveNotTalked : tag,
       hire_date,
       packageStr,
       probation_months,

@@ -10,7 +10,12 @@ export const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900
 
 /** @type {Record<string, string>} */
 export const STATUS_CHIP_STYLES = {
+  Toggle: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Follow-up": "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
+  "Didn't receive the call": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
+  "Cut the call": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
+  "Not reachable": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
+  "Have not talked": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   Shortlisted: "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
   Selected: "bg-indigo-50 text-indigo-900 border-indigo-200 ring-1 ring-indigo-500/15",
   Negotiation: "bg-orange-50 text-orange-900 border-orange-200 ring-1 ring-orange-500/15",
@@ -38,8 +43,10 @@ export const YEAR_FILTER_OPTIONS = (() => {
 })();
 
 export const STATUS_OPTIONS = [
-  "Follow-up",
-  "Have not talked",
+  "Toggle",
+  "Didn't receive the call",
+  "Cut the call",
+  "Not reachable",
   "Shortlisted",
   "Selected",
   "Negotiation",

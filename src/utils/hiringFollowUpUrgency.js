@@ -92,10 +92,7 @@ export function getTrafficGradientForHours(hours) {
  * any future instant → blue (no 24h “red window”, no green band).
  */
 export function getTlFollowUpCardGradientForHours(hours) {
-  if (hours == null || Number.isNaN(hours)) {
-    return SLATE_FALLBACK;
-  }
-  if (hours < 0) {
+  if (hours != null && !Number.isNaN(hours) && hours < 0) {
     return TRAFFIC_RED;
   }
   return TRAFFIC_LIGHT_BLUE;
@@ -122,8 +119,17 @@ export function getTrafficOuterGradientForHours(hours) {
  * Returns `undefined` when this row uses a non-traffic card background (e.g. plain Hired, Reject).
  */
 export function getHoursForTrafficCard(row, colorScheme) {
-  if (colorScheme !== "traffic") return undefined;
+  if (colorScheme !== "traffic" && colorScheme !== "tl-followup") return undefined;
   const st = String(row?.status || "").trim();
+  
+  if (colorScheme === "tl-followup") {
+    // Strictly next_followup_at for tl-followup
+    if (!row.next_followup_at) return null;
+    const ms = new Date(row.next_followup_at).getTime();
+    if (Number.isNaN(ms)) return null;
+    return (ms - Date.now()) / 3600000;
+  }
+
   const hiredFollowUpTag = st === "Hired" && String(row?.tag || "").trim() === "Follow-Up";
   if (hiredFollowUpTag) {
     const ms = getScheduleMsForFollowUpCard(row);
@@ -155,6 +161,19 @@ export const HIRING_URGENCY_LEGEND = [
     key: "green",
     label: "Green",
     dotClass: "bg-gradient-to-r from-emerald-200 to-emerald-50",
+  },
+];
+
+export const TL_FOLLOWUP_LEGEND = [
+  {
+    key: "red",
+    label: "Red (Overdue / Time crossed)",
+    dotClass: "bg-gradient-to-r from-rose-200 to-rose-50",
+  },
+  {
+    key: "lightBlue",
+    label: "Blue (Upcoming / No date)",
+    dotClass: "bg-gradient-to-r from-sky-300 to-sky-100",
   },
 ];
 

@@ -172,11 +172,9 @@ export default function EmpcrmHiringEditPage() {
           experience_type: editing.experience_type || null,
           interview_at: editing.interview_at || null,
           rescheduled_at: rescheduled ? editing.rescheduled_at || null : null,
-          next_followup_at: nextFollowUp
+          next_followup_at: (editing.status !== "Rejected" && editing.status !== "Reject")
             ? editing.next_followup_at || null
-            : hiredFollowUpTag
-              ? editing.next_followup_at || null
-              : null,
+            : null,
           interview_mode: editing.interview_mode || null,
           status: editing.status,
           tag: hired ? editing.tag || null : editing.status === "Have not talked" ? editing.tag || null : null,
@@ -309,7 +307,7 @@ export default function EmpcrmHiringEditPage() {
                 ))}
               </select>
             </div>
-            {!["Follow-up", "Have not talked", "next-follow-up", "follow-up"].includes(editing.status) && (
+            {!["Toggle", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
               <>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -434,7 +432,7 @@ export default function EmpcrmHiringEditPage() {
                   setEditing((prev) => {
                     if (!prev) return prev;
                     const next = { ...prev, status: v };
-                    if (v !== "Hired" && v !== "Have not talked") {
+                    if (v !== "Hired") {
                       next.tag = "";
                     }
                     if (v !== "Hired") {
@@ -443,7 +441,7 @@ export default function EmpcrmHiringEditPage() {
                       next.probationMonths = "";
                     }
                     if (v !== "Rescheduled") next.rescheduled_at = "";
-                    if (v !== "next-follow-up" && v !== "Hired") next.next_followup_at = "";
+                    if (v === "Rejected" || v === "Reject") next.next_followup_at = "";
                     return next;
                   });
                 }}
@@ -456,25 +454,6 @@ export default function EmpcrmHiringEditPage() {
                 ))}
               </select>
             </div>
-
-            {editing.status === "Have not talked" && (
-              <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-slate-700">Reason *</label>
-                <select
-                  required={editing.status === "Have not talked"}
-                  value={editing.tag}
-                  onChange={(e) => updateEdit("tag", e.target.value)}
-                  className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
-                >
-                  <option value="">— Select —</option>
-                  {HAVE_NOT_TALKED_REASONS.map((reason) => (
-                    <option key={reason} value={reason}>
-                      {reason}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             {editing.status === "Rescheduled" && (
               <div className="sm:col-span-2">
@@ -489,12 +468,12 @@ export default function EmpcrmHiringEditPage() {
               </div>
             )}
 
-            {editing.status === "next-follow-up" && (
+            {editing.status !== "Rejected" && editing.status !== "Reject" && (
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Next follow-up date &amp; time *</label>
                 <input
                   type="datetime-local"
-                  required={editing.status === "next-follow-up"}
+                  required={editing.status !== "Rejected" && editing.status !== "Reject"}
                   value={editing.next_followup_at ?? ""}
                   onChange={(e) => updateEdit("next_followup_at", e.target.value)}
                   className={formFieldClass}
@@ -586,7 +565,7 @@ export default function EmpcrmHiringEditPage() {
               </div>
             )}
 
-            {!["Follow-up", "Have not talked", "next-follow-up", "follow-up"].includes(editing.status) && (
+            {!["Toggle", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
               <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                 <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

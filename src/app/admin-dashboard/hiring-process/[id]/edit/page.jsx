@@ -104,6 +104,7 @@ export default function HiringProcessEditPage() {
         hrScoreRating: row.hr_score_rating != null ? String(row.hr_score_rating) : "",
         currentSalary: row.current_salary ?? "",
         expectedSalary: row.expected_salary ?? "",
+        current_location: row.current_location ?? "",
         note: row.note ?? "",
       });
     } catch (e) {
@@ -165,6 +166,7 @@ export default function HiringProcessEditPage() {
           hr_score_rating: editing.hrScoreRating?.trim() || null,
           current_salary: editing.currentSalary?.trim() || null,
           expected_salary: editing.expectedSalary?.trim() || null,
+          current_location: editing.current_location?.trim() || null,
           note: editing.note,
         }),
       });
@@ -309,6 +311,16 @@ export default function HiringProcessEditPage() {
                 onChange={(e) => updateEdit("expectedSalary", e.target.value)}
                 className={formFieldClass}
                 placeholder="Optional"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Current location</label>
+              <input
+                type="text"
+                value={editing.current_location ?? ""}
+                onChange={(e) => updateEdit("current_location", e.target.value)}
+                className={formFieldClass}
+                placeholder="e.g. Mumbai, Delhi"
               />
             </div>
             <div>

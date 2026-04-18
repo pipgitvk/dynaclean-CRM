@@ -8,9 +8,9 @@ import {
   filterSelectClass,
   formatInterviewAt,
   INTERVIEW_MODE_OPTIONS,
-  MONTH_FILTER_OPTIONS,
+  STATUS_OPTIONS,
   StatusChip,
-  YEAR_FILTER_OPTIONS,
+  fieldClass,
 } from "./shared";
 
 export default function AdminHiringProcessPage() {
@@ -18,8 +18,12 @@ export default function AdminHiringProcessPage() {
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filterYear, setFilterYear] = useState(now.getFullYear());
-  const [filterMonth, setFilterMonth] = useState("");
+  
+  const [filterCandidateName, setFilterCandidateName] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterNextFollowupFrom, setFilterNextFollowupFrom] = useState("");
+  const [filterNextFollowupTo, setFilterNextFollowupTo] = useState("");
+  
   const [filterMode, setFilterMode] = useState("");
   const [filterDesignation, setFilterDesignation] = useState("");
   const [filterHr, setFilterHr] = useState("");
@@ -31,11 +35,18 @@ export default function AdminHiringProcessPage() {
     setLoading(true);
     setError(null);
     try {
-      let url = `/api/admin/hiring-process?year=${filterYear}`;
-      if (filterMonth) url += `&month=${filterMonth}`;
-      if (filterMode) url += `&interview_mode=${encodeURIComponent(filterMode)}`;
-      if (filterDesignation) url += `&designation=${encodeURIComponent(filterDesignation)}`;
-      if (filterHr) url += `&created_by=${encodeURIComponent(filterHr)}`;
+      let url = `/api/admin/hiring-process?`;
+      const params = new URLSearchParams();
+      if (filterCandidateName) params.append("candidate_name", filterCandidateName);
+      if (filterStatus) params.append("status", filterStatus);
+      if (filterNextFollowupFrom) params.append("next_followup_from", filterNextFollowupFrom);
+      if (filterNextFollowupTo) params.append("next_followup_to", filterNextFollowupTo);
+      if (filterMode) params.append("interview_mode", filterMode);
+      if (filterDesignation) params.append("designation", filterDesignation);
+      if (filterHr) params.append("created_by", filterHr);
+
+      url += params.toString();
+
       const res = await fetch(url, { cache: "no-store" });
       const json = await res.json();
       if (!json.success) {
@@ -52,7 +63,10 @@ export default function AdminHiringProcessPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterYear, filterMonth, filterMode, filterDesignation, filterHr]);
+  }, [
+    filterCandidateName, filterStatus, filterNextFollowupFrom, filterNextFollowupTo,
+    filterMode, filterDesignation, filterHr
+  ]);
 
   useEffect(() => {
     load();
@@ -114,27 +128,23 @@ export default function AdminHiringProcessPage() {
           <h2 className="text-sm font-semibold text-slate-800">Filters</h2>
         </div>
         <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-12">
-          <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-1 lg:col-span-2">
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Year</label>
-            <select
-              className={filterSelectClass}
-              value={String(filterYear)}
-              onChange={(e) => setFilterYear(Number(e.target.value))}
-            >
-              {YEAR_FILTER_OPTIONS.map((y) => (
-                <option key={y} value={String(y)}>
-                  {y}
-                </option>
-              ))}
-            </select>
+          <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-2">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Emp Name</label>
+            <input
+              type="text"
+              placeholder="Search name"
+              className={`${fieldClass} min-h-[44px]`}
+              value={filterCandidateName}
+              onChange={(e) => setFilterCandidateName(e.target.value)}
+            />
           </div>
-          <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-1 lg:col-span-2">
-            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Month</label>
-            <select className={filterSelectClass} value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
-              <option value="">All months</option>
-              {MONTH_FILTER_OPTIONS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
+          <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-2">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Status</label>
+            <select className={filterSelectClass} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
                 </option>
               ))}
             </select>
@@ -175,6 +185,40 @@ export default function AdminHiringProcessPage() {
                 </option>
               ))}
             </select>
+          </div>
+          
+          <div className="flex flex-col gap-1 min-w-0 sm:col-span-2 lg:col-span-4">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              Next follow-up date (from – to)
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={filterNextFollowupFrom}
+                onChange={(e) => setFilterNextFollowupFrom(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up from"
+              />
+              <span className="text-xs text-slate-400">–</span>
+              <input
+                type="date"
+                value={filterNextFollowupTo}
+                min={filterNextFollowupFrom || undefined}
+                onChange={(e) => setFilterNextFollowupTo(e.target.value)}
+                className={`${fieldClass} flex-1 min-w-0`}
+                title="Next follow-up to"
+              />
+              {(filterNextFollowupFrom || filterNextFollowupTo) && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterNextFollowupFrom(""); setFilterNextFollowupTo(""); }}
+                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  title="Clear"
+                >
+                  <span className="text-xs">Clear</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -217,6 +261,9 @@ export default function AdminHiringProcessPage() {
                     Status
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
+                    Next follow-up date
+                  </th>
+                  <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
                     Created by
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
@@ -230,7 +277,7 @@ export default function AdminHiringProcessPage() {
                     <td colSpan={9} className="px-4 py-14 text-center">
                       <p className="text-sm font-medium text-slate-600">No records for this filter.</p>
                       <p className="mt-1 text-xs text-slate-400">
-                        Try another year, month, mode, designation, or HR user.
+                        Try another name, status, next follow-up date, mode, designation, or HR user.
                       </p>
                     </td>
                   </tr>
@@ -265,6 +312,9 @@ export default function AdminHiringProcessPage() {
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.interview_mode || "—"}</td>
                       <td className="px-3 py-2.5 align-top sm:px-4">
                         <StatusChip status={row.status} tag={row.tag} />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
+                        {row.next_followup_at ? formatInterviewAt(row.next_followup_at) : "—"}
                       </td>
                       <td className="px-3 py-2.5 align-top sm:px-4">
                         <CreatedByChip name={row.creator_name} role={row.creator_role} />
