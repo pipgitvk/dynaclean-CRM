@@ -39,6 +39,7 @@ export const YEAR_FILTER_OPTIONS = (() => {
 
 export const STATUS_OPTIONS = [
   "Follow-up",
+  "Have not talked",
   "Shortlisted",
   "Selected",
   "Negotiation",
@@ -66,8 +67,12 @@ export const INTERVIEW_MODE_OPTIONS = ["Virtual", "Walk-in"];
 export function formatInterviewAt(v) {
   if (!v) return "—";
   try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return String(v).slice(0, 16);
+    // API returns local datetime string like "2024-05-15T14:30:00.000Z" from MySQL
+    // If it's from MySQL and we just want to treat it as local time, we should append "Z" only if we want to parse it as UTC
+    // Since MySQL stores local time, we replace Z or append nothing and let browser parse it as local time
+    const s = String(v).replace("Z", "");
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s.slice(0, 16);
     return d.toLocaleString("en-IN", {
       day: "2-digit",
       month: "short",
@@ -116,8 +121,9 @@ export function CreatedByChip({ name, role }) {
 export function formatDt(v) {
   if (v == null || v === "") return "—";
   try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return String(v).slice(0, 19);
+    const s = String(v).replace("Z", "");
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s.slice(0, 19);
     return d.toLocaleString("en-IN", {
       day: "2-digit",
       month: "short",

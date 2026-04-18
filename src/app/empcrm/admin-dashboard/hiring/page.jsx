@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
-import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS } from "@/lib/hiringPayload";
+import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
 import { mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 
 /** Shared field styles */
@@ -15,6 +15,7 @@ const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900`;
 
 const STATUS_OPTIONS = [
   "Follow-up",
+  "Have not talked",
   "Shortlisted",
   "Selected",
   "Negotiation",
@@ -74,8 +75,9 @@ const YEAR_FILTER_OPTIONS = (() => {
 function formatInterviewAt(v) {
   if (!v) return "—";
   try {
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return String(v).slice(0, 16);
+    const s = String(v).replace("Z", "");
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s.slice(0, 16);
     return d.toLocaleString("en-IN", {
       day: "2-digit",
       month: "short",
@@ -90,6 +92,7 @@ function formatInterviewAt(v) {
 
 const STATUS_CHIP_STYLES = {
   "Follow-up":   "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
+  "Have not talked": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   Shortlisted:   "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
   Selected:      "bg-indigo-50 text-indigo-900 border-indigo-200 ring-1 ring-indigo-500/15",
   Negotiation:   "bg-orange-50 text-orange-900 border-orange-200 ring-1 ring-orange-500/15",
@@ -133,7 +136,7 @@ export default function HiringPage() {
   const [rescheduled_at, setRescheduledAt] = useState("");
   const [next_followup_at, setNextFollowupAt] = useState("");
   const [interview_mode, setInterviewMode] = useState("");
-  const [status, setStatus] = useState("Shortlisted");
+  const [status, setStatus] = useState("Follow-up");
   const [tag, setTag] = useState("");
   const [hire_date, setHireDate] = useState("");
   const [offerPackage, setOfferPackage] = useState("");
@@ -144,6 +147,7 @@ export default function HiringPage() {
   const [hrScoreRating, setHrScoreRating] = useState("");
   const [currentSalary, setCurrentSalary] = useState("");
   const [expectedSalary, setExpectedSalary] = useState("");
+  const [currentLocation, setCurrentLocation] = useState("");
   const [note, setNote] = useState("");
 
   const [filterYear, setFilterYear] = useState(now.getFullYear());
@@ -260,7 +264,7 @@ export default function HiringPage() {
     setRescheduledAt("");
     setNextFollowupAt("");
     setInterviewMode("");
-    setStatus("Shortlisted");
+    setStatus("Follow-up");
     setTag("");
     setHireDate("");
     setOfferPackage("");
@@ -271,6 +275,7 @@ export default function HiringPage() {
     setHrScoreRating("");
     setCurrentSalary("");
     setExpectedSalary("");
+    setCurrentLocation("");
     setNote("");
     setResumeUploadError(null);
   };
@@ -315,6 +320,7 @@ export default function HiringPage() {
           hr_score_rating: hrScoreRating.trim() || null,
           current_salary: currentSalary.trim() || null,
           expected_salary: expectedSalary.trim() || null,
+          current_location: currentLocation.trim() || null,
           note,
         }),
       });
@@ -729,114 +735,129 @@ export default function HiringPage() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={hrInterviewScore}
-                      onChange={(e) => setHrInterviewScore(e.target.value)}
-                      className={`max-w-[160px] ${formFieldClass}`}
-                      placeholder="1 – 10"
-                    />
-                  </div>
+                  {!["Follow-up", "Have not talked", "next-follow-up", "follow-up"].includes(status) && (
+                    <>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={hrInterviewScore}
+                          onChange={(e) => setHrInterviewScore(e.target.value)}
+                          className={`max-w-[160px] ${formFieldClass}`}
+                          placeholder="1 – 10"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">HR score</label>
-                    <select
-                      value={hrScoreRating}
-                      onChange={(e) => setHrScoreRating(e.target.value)}
-                      className={formSelectClass}
-                    >
-                      <option value="">— Select —</option>
-                      {HR_SCORE_RATING_OPTIONS.map((v) => (
-                        <option key={v} value={v}>
-                          {HR_SCORE_RATING_LABELS[v] ?? v}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">HR score</label>
+                        <select
+                          value={hrScoreRating}
+                          onChange={(e) => setHrScoreRating(e.target.value)}
+                          className={formSelectClass}
+                        >
+                          <option value="">— Select —</option>
+                          {HR_SCORE_RATING_OPTIONS.map((v) => (
+                            <option key={v} value={v}>
+                              {HR_SCORE_RATING_LABELS[v] ?? v}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary</label>
-                    <input
-                      type="text"
-                      value={currentSalary}
-                      onChange={(e) => setCurrentSalary(e.target.value)}
-                      className={formFieldClass}
-                      placeholder="e.g. 25000"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary</label>
+                        <input
+                          type="text"
+                          value={currentSalary}
+                          onChange={(e) => setCurrentSalary(e.target.value)}
+                          className={formFieldClass}
+                          placeholder="e.g. 25000"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Expected salary</label>
-                    <input
-                      type="text"
-                      value={expectedSalary}
-                      onChange={(e) => setExpectedSalary(e.target.value)}
-                      className={formFieldClass}
-                      placeholder="Optional"
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Expected salary</label>
+                        <input
+                          type="text"
+                          value={expectedSalary}
+                          onChange={(e) => setExpectedSalary(e.target.value)}
+                          className={formFieldClass}
+                          placeholder="Optional"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Marital status</label>
-                    <select
-                      value={marital_status}
-                      onChange={(e) => setMaritalStatus(e.target.value)}
-                      className={formSelectClass}
-                    >
-                      <option value="">— Select —</option>
-                      {MARITAL_OPTIONS.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Marital status</label>
+                        <select
+                          value={marital_status}
+                          onChange={(e) => setMaritalStatus(e.target.value)}
+                          className={formSelectClass}
+                        >
+                          <option value="">— Select —</option>
+                          {MARITAL_OPTIONS.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Experience / Fresher</label>
-                    <select
-                      value={experience_type}
-                      onChange={(e) => setExperienceType(e.target.value)}
-                      className={formSelectClass}
-                    >
-                      <option value="">— Select —</option>
-                      {EXPERIENCE_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Experience / Fresher</label>
+                        <select
+                          value={experience_type}
+                          onChange={(e) => setExperienceType(e.target.value)}
+                          className={formSelectClass}
+                        >
+                          <option value="">— Select —</option>
+                          {EXPERIENCE_OPTIONS.map((o) => (
+                            <option key={o.value} value={o.value}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time</label>
-                    <input
-                      type="datetime-local"
-                      value={interview_at}
-                      onChange={(e) => setInterviewAt(e.target.value)}
-                      className={formFieldClass}
-                    />
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time</label>
+                        <input
+                          type="datetime-local"
+                          value={interview_at}
+                          onChange={(e) => setInterviewAt(e.target.value)}
+                          className={formFieldClass}
+                        />
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Mode of interview</label>
-                    <select
-                      value={interview_mode}
-                      onChange={(e) => setInterviewMode(e.target.value)}
-                      className={formSelectClass}
-                    >
-                      <option value="">— Select —</option>
-                      {INTERVIEW_MODE_OPTIONS.map((m) => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Mode of interview</label>
+                        <select
+                          value={interview_mode}
+                          onChange={(e) => setInterviewMode(e.target.value)}
+                          className={formSelectClass}
+                        >
+                          <option value="">— Select —</option>
+                          {INTERVIEW_MODE_OPTIONS.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Current location</label>
+                        <input
+                          type="text"
+                          value={currentLocation}
+                          onChange={(e) => setCurrentLocation(e.target.value)}
+                          className={formFieldClass}
+                          placeholder="e.g. Mumbai, Delhi"
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div className="sm:col-span-2">
                     <label className="mb-1 block text-sm font-medium text-slate-700">Status *</label>
@@ -846,19 +867,16 @@ export default function HiringPage() {
                       onChange={(e) => {
                         const v = e.target.value;
                         setStatus(v);
-                        if (v !== "Hired") {
+                        if (v !== "Hired" && v !== "Have not talked") {
                           setTag("");
+                        }
+                        if (v !== "Hired") {
                           setHireDate("");
                           setOfferPackage("");
                           setProbationMonths("");
                         }
                         if (v !== "Rescheduled") setRescheduledAt("");
                         if (v !== "next-follow-up" && v !== "Hired") setNextFollowupAt("");
-                        if (v !== "Selected") {
-                          setSelectedResume("");
-                          setMgmtInterviewScore("");
-                          setHrInterviewScore("");
-                        }
                       }}
                       className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
                     >
@@ -869,6 +887,25 @@ export default function HiringPage() {
                       ))}
                     </select>
                   </div>
+
+                  {status === "Have not talked" && (
+                    <div className="sm:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-slate-700">Reason *</label>
+                      <select
+                        required={status === "Have not talked"}
+                        value={tag}
+                        onChange={(e) => setTag(e.target.value)}
+                        className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
+                      >
+                        <option value="">— Select —</option>
+                        {HAVE_NOT_TALKED_REASONS.map((reason) => (
+                          <option key={reason} value={reason}>
+                            {reason}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   {status === "Rescheduled" && (
                     <div className="sm:col-span-2">
@@ -979,13 +1016,13 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {status === "Selected" && (
+                  {!["Follow-up", "Have not talked", "next-follow-up", "follow-up"].includes(status) && (
                     <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                       <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="sm:col-span-2">
                           <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="hiring-resume-add">
-                            Resume *
+                            Resume {status === "Selected" && "*"}
                           </label>
                           <input
                             id="hiring-resume-add"
@@ -1026,7 +1063,7 @@ export default function HiringPage() {
                           <p className="mt-1 text-[11px] text-slate-500">PDF, Word, or image — max 8 MB</p>
                         </div>
                         <div>
-                          <label className="mb-1 block text-sm font-medium text-slate-700">Management Interview Score (1–10) *</label>
+                          <label className="mb-1 block text-sm font-medium text-slate-700">Management Interview Score (1–10) {status === "Selected" && "*"}</label>
                           <input
                             required={status === "Selected"}
                             type="number"

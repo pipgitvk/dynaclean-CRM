@@ -15,7 +15,8 @@ import {
 function formatHistoryWhen(v) {
   if (v == null || v === "") return "—";
   try {
-    const d = new Date(v);
+    const s = String(v).replace("Z", "");
+    const d = new Date(s);
     if (Number.isNaN(d.getTime())) return String(v).slice(0, 24);
     const datePart = d.toLocaleString("en-IN", {
       day: "2-digit",
@@ -184,6 +185,31 @@ export default function EmpcrmHiringViewPage() {
                           <dd className="mt-1 font-semibold text-gray-900">
                             {historyEntry.interview_mode != null && String(historyEntry.interview_mode).trim() !== ""
                               ? String(historyEntry.interview_mode).trim()
+                              : "—"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Resume</dt>
+                          <dd className="mt-1 font-semibold text-gray-900">
+                            {historyEntry.selected_resume ? (
+                              <a
+                                href={historyEntry.selected_resume}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-600 hover:underline"
+                              >
+                                View Resume
+                              </a>
+                            ) : (
+                              "—"
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Management Score</dt>
+                          <dd className="mt-1 font-semibold text-gray-900">
+                            {historyEntry.mgmt_interview_score != null && String(historyEntry.mgmt_interview_score).trim() !== ""
+                              ? `${historyEntry.mgmt_interview_score}/10`
                               : "—"}
                           </dd>
                         </div>

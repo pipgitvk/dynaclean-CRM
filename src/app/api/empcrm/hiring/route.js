@@ -60,7 +60,7 @@ export async function GET(req) {
          ep.designation AS creator_role,
          h.candidate_name, h.emp_contact, h.designation, h.marital_status,
          h.experience_type, h.interview_at, h.rescheduled_at, h.next_followup_at, h.interview_mode, h.status, h.tag, h.hire_date, h.\`package\` AS package,
-         h.probation_months, h.selected_resume, h.mgmt_interview_score, h.hr_interview_score, h.hr_score_rating, h.current_salary, h.expected_salary, h.note, h.created_at
+         h.probation_months, h.selected_resume, h.mgmt_interview_score, h.hr_interview_score, h.hr_score_rating, h.current_salary, h.expected_salary, h.current_location, h.note, h.created_at
          FROM candidates h
          LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
          WHERE h.id = ? AND LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))`,
@@ -123,7 +123,7 @@ export async function GET(req) {
          ep.designation AS creator_role,
          h.candidate_name, h.emp_contact, h.designation, h.marital_status,
          h.experience_type, h.interview_at, h.rescheduled_at, h.next_followup_at, h.interview_mode, h.status, h.tag, h.hire_date, h.\`package\` AS package,
-         h.probation_months, h.selected_resume, h.mgmt_interview_score, h.hr_interview_score, h.hr_score_rating, h.current_salary, h.expected_salary, h.note, h.created_at
+         h.probation_months, h.selected_resume, h.mgmt_interview_score, h.hr_interview_score, h.hr_score_rating, h.current_salary, h.expected_salary, h.current_location, h.note, h.created_at
          FROM candidates h
          LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
          WHERE LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))`;
@@ -214,7 +214,7 @@ export async function POST(request) {
         `INSERT INTO candidates (
         created_by, candidate_name, emp_contact, designation, marital_status,
         experience_type, interview_at, rescheduled_at, next_followup_at, interview_mode, status, tag, hire_date, \`package\`, probation_months,
-        selected_resume, mgmt_interview_score, hr_interview_score, hr_score_rating, current_salary, expected_salary, note
+        selected_resume, mgmt_interview_score, hr_interview_score, hr_score_rating, current_salary, expected_salary, current_location, note
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           payload.username,
@@ -238,6 +238,7 @@ export async function POST(request) {
           d.hr_score_rating,
           d.current_salary,
           d.expected_salary,
+          d.current_location,
           d.note,
         ]
       );
@@ -334,7 +335,7 @@ export async function PATCH(request) {
         candidate_name = ?, emp_contact = ?, designation = ?, marital_status = ?,
         experience_type = ?, interview_at = ?, rescheduled_at = ?, next_followup_at = ?, interview_mode = ?, status = ?, tag = ?,
         hire_date = ?, \`package\` = ?, probation_months = ?,
-        selected_resume = ?, mgmt_interview_score = ?, hr_interview_score = ?, hr_score_rating = ?, current_salary = ?, expected_salary = ?, note = ?
+        selected_resume = ?, mgmt_interview_score = ?, hr_interview_score = ?, hr_score_rating = ?, current_salary = ?, expected_salary = ?, current_location = ?, note = ?
       WHERE id = ? AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))`,
         [
           d.candidate_name,
@@ -357,6 +358,7 @@ export async function PATCH(request) {
           d.hr_score_rating,
           d.current_salary,
           d.expected_salary,
+          d.current_location,
           d.note,
           id,
           payload.username,
