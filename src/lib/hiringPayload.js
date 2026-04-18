@@ -31,7 +31,7 @@ export const HIRING_TAG_OPTIONS = [
 export const HAVE_NOT_TALKED_REASONS = [
   "Didn't receive the call",
   "Cut the call",
-  "Not answering"
+  "Not reachable"
 ];
 
 const HIRING_MARITAL_OPTIONS = ["Unmarried", "Married"];
