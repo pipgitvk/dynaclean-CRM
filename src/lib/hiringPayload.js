@@ -1,6 +1,7 @@
 const HIRING_STATUS_OPTIONS = [
   // Current statuses
   "Follow-up",
+  "Have not talked",
   "Shortlisted",
   "Selected",
   "Negotiation",
@@ -27,6 +28,12 @@ export const HIRING_TAG_OPTIONS = [
   "Not-looking",
 ];
 
+export const HAVE_NOT_TALKED_REASONS = [
+  "Didn't receive the call",
+  "Cut the call",
+  "Not answering"
+];
+
 const HIRING_MARITAL_OPTIONS = ["Unmarried", "Married"];
 const HIRING_EXPERIENCE_VALUES = ["fresher", "experience"];
 const HIRING_INTERVIEW_MODES = ["Virtual", "Walk-in"];
@@ -36,14 +43,17 @@ export const HR_SCORE_RATING_OPTIONS = ["average", "poor", "good", "very-good"];
 
 function normalizeStatus(v) {
   const s = String(v ?? "").trim();
-  if (!s) return "Shortlisted";
+  if (!s) return "Follow-up";
   if (HIRING_STATUS_OPTIONS.includes(s)) return s;
-  return "Shortlisted";
+  return "Follow-up";
 }
 
-function normalizeTag(v) {
+function normalizeTag(v, isReason = false) {
   const t = String(v ?? "").trim();
   if (!t) return null;
+  if (isReason) {
+    return HAVE_NOT_TALKED_REASONS.includes(t) ? t : null;
+  }
   return HIRING_TAG_OPTIONS.includes(t) ? t : null;
 }
 
@@ -75,6 +85,7 @@ export function parseHiringPayload(body, options = {}) {
   const isHired = status === "Hired";
   const isSelected = status === "Selected";
   const isRescheduled = status === "Rescheduled";
+  const isHaveNotTalked = status === "Have not talked";
   /** Legacy slug — next slot is required. */
   const isNextFollowUpStrict = status === "next-follow-up";
   /** Current label — optional next slot if provided. */
@@ -83,8 +94,9 @@ export function parseHiringPayload(body, options = {}) {
   const next_followup_at_raw = String(body.next_followup_at ?? "").trim();
   const tagForHired = isHired ? normalizeTag(body.tag) : null;
   const isHiredFollowUpTag = isHired && tagForHired === "Follow-Up";
+  const tagForHaveNotTalked = isHaveNotTalked ? normalizeTag(body.tag, true) : null;
   const hire_date = isHired ? String(body.hire_date ?? "").trim() || null : null;
-  const tag = tagForHired;
+  const tag = isHired ? tagForHired : (isHaveNotTalked ? tagForHaveNotTalked : null);
   const packageStr = isHired ? String(body.package ?? "").trim() || null : null;
 
   let probation_months = null;
@@ -96,15 +108,13 @@ export function parseHiringPayload(body, options = {}) {
     probation_months = pm;
   }
 
-  const selected_resume = isSelected ? String(body.selected_resume ?? "").trim() || null : null;
+  const selected_resume = String(body.selected_resume ?? "").trim() || null;
 
   let mgmt_interview_score = null;
-  if (isSelected) {
-    const mgmtRaw = String(body.mgmt_interview_score ?? "").trim();
-    if (mgmtRaw !== "") {
-      const n = parseInt(mgmtRaw, 10);
-      if (Number.isFinite(n) && n >= 1 && n <= 10) mgmt_interview_score = n;
-    }
+  const mgmtRaw = String(body.mgmt_interview_score ?? "").trim();
+  if (mgmtRaw !== "") {
+    const n = parseInt(mgmtRaw, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= 10) mgmt_interview_score = n;
   }
 
   // Always parsed — field is always visible (not Selected-only)
@@ -117,6 +127,7 @@ export function parseHiringPayload(body, options = {}) {
 
   const current_salary = String(body.current_salary ?? "").trim() || null;
   const expected_salary = String(body.expected_salary ?? "").trim() || null;
+  const current_location = String(body.current_location ?? "").trim() || null;
 
   const hr_score_rating_raw = String(body.hr_score_rating ?? "").trim();
   const hr_score_rating = HR_SCORE_RATING_OPTIONS.includes(hr_score_rating_raw) ? hr_score_rating_raw : null;
@@ -142,6 +153,9 @@ export function parseHiringPayload(body, options = {}) {
   }
   if (isHired && !tag) {
     return { error: "Tag is required when status is Hired." };
+  }
+  if (isHaveNotTalked && !tag) {
+    return { error: "Reason is required when status is Have not talked." };
   }
   if (isHired && !packageStr) {
     return { error: "Package is required when status is Hired." };
@@ -190,6 +204,7 @@ export function parseHiringPayload(body, options = {}) {
       hr_score_rating,
       current_salary,
       expected_salary,
+      current_location,
       note,
     },
   };

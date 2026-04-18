@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { HIRING_TAG_OPTIONS as TAG_OPTIONS, HR_SCORE_RATING_OPTIONS } from "@/lib/hiringPayload";
+import { HIRING_TAG_OPTIONS as TAG_OPTIONS, HR_SCORE_RATING_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
 import { mergeDesignationOptions } from "@/lib/designationDedupe";
 import {
   EXPERIENCE_OPTIONS,
@@ -131,6 +131,7 @@ export default function EmpcrmHiringEditPage() {
         hrScoreRating: row.hr_score_rating != null ? String(row.hr_score_rating) : "",
         currentSalary: row.current_salary ?? "",
         expectedSalary: row.expected_salary ?? "",
+        current_location: row.current_location ?? "",
         note: row.note ?? "",
       });
     } catch (e) {
@@ -178,7 +179,7 @@ export default function EmpcrmHiringEditPage() {
               : null,
           interview_mode: editing.interview_mode || null,
           status: editing.status,
-          tag: hired ? editing.tag || null : null,
+          tag: hired ? editing.tag || null : editing.status === "Have not talked" ? editing.tag || null : null,
           hire_date: hired ? editing.hire_date || null : null,
           package: hired ? String(editing.offerPackage || "").trim() || null : null,
           probation_months:
@@ -192,6 +193,7 @@ export default function EmpcrmHiringEditPage() {
           hr_score_rating: editing.hrScoreRating?.trim() || null,
           current_salary: editing.currentSalary?.trim() || null,
           expected_salary: editing.expectedSalary?.trim() || null,
+          current_location: editing.current_location?.trim() || null,
           note: editing.note,
         }),
       });
@@ -307,107 +309,121 @@ export default function EmpcrmHiringEditPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={editing.hrInterviewScore ?? ""}
-                onChange={(e) => updateEdit("hrInterviewScore", e.target.value)}
-                className={`max-w-[160px] ${formFieldClass}`}
-                placeholder="1 – 10"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">HR score</label>
-              <select
-                value={editing.hrScoreRating ?? ""}
-                onChange={(e) => updateEdit("hrScoreRating", e.target.value)}
-                className={formSelectClass}
-              >
-                <option value="">— Select —</option>
-                {HR_SCORE_RATING_OPTIONS.map((v) => (
-                  <option key={v} value={v}>
-                    {HR_SCORE_RATING_LABELS[v] ?? v}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary</label>
-              <input
-                type="text"
-                value={editing.currentSalary ?? ""}
-                onChange={(e) => updateEdit("currentSalary", e.target.value)}
-                className={formFieldClass}
-                placeholder="e.g. 25000"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Expected salary</label>
-              <input
-                type="text"
-                value={editing.expectedSalary ?? ""}
-                onChange={(e) => updateEdit("expectedSalary", e.target.value)}
-                className={formFieldClass}
-                placeholder="Optional"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Marital status</label>
-              <select
-                value={editing.marital_status ?? ""}
-                onChange={(e) => updateEdit("marital_status", e.target.value)}
-                className={formSelectClass}
-              >
-                <option value="">— Select —</option>
-                {MARITAL_OPTIONS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Experience / Fresher</label>
-              <select
-                value={editing.experience_type ?? ""}
-                onChange={(e) => updateEdit("experience_type", e.target.value)}
-                className={formSelectClass}
-              >
-                <option value="">— Select —</option>
-                {EXPERIENCE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time</label>
-              <input
-                type="datetime-local"
-                value={editing.interview_at ?? ""}
-                onChange={(e) => updateEdit("interview_at", e.target.value)}
-                className={formFieldClass}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Mode of interview</label>
-              <select
-                value={editing.interview_mode ?? ""}
-                onChange={(e) => updateEdit("interview_mode", e.target.value)}
-                className={formSelectClass}
-              >
-                <option value="">— Select —</option>
-                {INTERVIEW_MODE_OPTIONS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {!["Follow-up", "Have not talked", "next-follow-up", "follow-up"].includes(editing.status) && (
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={editing.hrInterviewScore ?? ""}
+                    onChange={(e) => updateEdit("hrInterviewScore", e.target.value)}
+                    className={`max-w-[160px] ${formFieldClass}`}
+                    placeholder="1 – 10"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">HR score</label>
+                  <select
+                    value={editing.hrScoreRating ?? ""}
+                    onChange={(e) => updateEdit("hrScoreRating", e.target.value)}
+                    className={formSelectClass}
+                  >
+                    <option value="">— Select —</option>
+                    {HR_SCORE_RATING_OPTIONS.map((v) => (
+                      <option key={v} value={v}>
+                        {HR_SCORE_RATING_LABELS[v] ?? v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Current Salary</label>
+                  <input
+                    type="text"
+                    value={editing.currentSalary ?? ""}
+                    onChange={(e) => updateEdit("currentSalary", e.target.value)}
+                    className={formFieldClass}
+                    placeholder="e.g. 25000"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Expected salary</label>
+                  <input
+                    type="text"
+                    value={editing.expectedSalary ?? ""}
+                    onChange={(e) => updateEdit("expectedSalary", e.target.value)}
+                    className={formFieldClass}
+                    placeholder="Optional"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Marital status</label>
+                  <select
+                    value={editing.marital_status ?? ""}
+                    onChange={(e) => updateEdit("marital_status", e.target.value)}
+                    className={formSelectClass}
+                  >
+                    <option value="">— Select —</option>
+                    {MARITAL_OPTIONS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Experience / Fresher</label>
+                  <select
+                    value={editing.experience_type ?? ""}
+                    onChange={(e) => updateEdit("experience_type", e.target.value)}
+                    className={formSelectClass}
+                  >
+                    <option value="">— Select —</option>
+                    {EXPERIENCE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time</label>
+                  <input
+                    type="datetime-local"
+                    value={editing.interview_at ?? ""}
+                    onChange={(e) => updateEdit("interview_at", e.target.value)}
+                    className={formFieldClass}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Mode of interview</label>
+                  <select
+                    value={editing.interview_mode ?? ""}
+                    onChange={(e) => updateEdit("interview_mode", e.target.value)}
+                    className={formSelectClass}
+                  >
+                    <option value="">— Select —</option>
+                    {INTERVIEW_MODE_OPTIONS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Current location</label>
+                  <input
+                    type="text"
+                    value={editing.current_location ?? ""}
+                    onChange={(e) => updateEdit("current_location", e.target.value)}
+                    className={formFieldClass}
+                    placeholder="e.g. Mumbai, Delhi"
+                  />
+                </div>
+              </>
+            )}
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-slate-700">Status *</label>
               <select
@@ -418,19 +434,16 @@ export default function EmpcrmHiringEditPage() {
                   setEditing((prev) => {
                     if (!prev) return prev;
                     const next = { ...prev, status: v };
-                    if (v !== "Hired") {
+                    if (v !== "Hired" && v !== "Have not talked") {
                       next.tag = "";
+                    }
+                    if (v !== "Hired") {
                       next.hire_date = "";
                       next.offerPackage = "";
                       next.probationMonths = "";
                     }
                     if (v !== "Rescheduled") next.rescheduled_at = "";
                     if (v !== "next-follow-up" && v !== "Hired") next.next_followup_at = "";
-                    if (v !== "Selected") {
-                      next.selectedResume = "";
-                      next.mgmtInterviewScore = "";
-                      next.hrInterviewScore = "";
-                    }
                     return next;
                   });
                 }}
@@ -443,6 +456,25 @@ export default function EmpcrmHiringEditPage() {
                 ))}
               </select>
             </div>
+
+            {editing.status === "Have not talked" && (
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">Reason *</label>
+                <select
+                  required={editing.status === "Have not talked"}
+                  value={editing.tag}
+                  onChange={(e) => updateEdit("tag", e.target.value)}
+                  className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
+                >
+                  <option value="">— Select —</option>
+                  {HAVE_NOT_TALKED_REASONS.map((reason) => (
+                    <option key={reason} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {editing.status === "Rescheduled" && (
               <div className="sm:col-span-2">
@@ -554,13 +586,13 @@ export default function EmpcrmHiringEditPage() {
               </div>
             )}
 
-            {editing.status === "Selected" && (
+            {!["Follow-up", "Have not talked", "next-follow-up", "follow-up"].includes(editing.status) && (
               <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                 <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="empcrm-hiring-resume-edit">
-                      Resume *
+                      Resume {editing.status === "Selected" && "*"}
                     </label>
                     <input
                       id="empcrm-hiring-resume-edit"
@@ -602,7 +634,7 @@ export default function EmpcrmHiringEditPage() {
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">
-                      Management Interview Score (1–10) *
+                      Management Interview Score (1–10) {editing.status === "Selected" && "*"}
                     </label>
                     <input
                       required={editing.status === "Selected"}
