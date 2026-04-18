@@ -67,9 +67,7 @@ export const INTERVIEW_MODE_OPTIONS = ["Virtual", "Walk-in"];
 export function formatInterviewAt(v) {
   if (!v) return "—";
   try {
-    // API returns local datetime string like "2024-05-15T14:30:00.000Z" from MySQL
-    // If it's from MySQL and we just want to treat it as local time, we should append "Z" only if we want to parse it as UTC
-    // Since MySQL stores local time, we replace Z or append nothing and let browser parse it as local time
+  
     const s = String(v).replace("Z", "");
     const d = new Date(s);
     if (Number.isNaN(d.getTime())) return s.slice(0, 16);
