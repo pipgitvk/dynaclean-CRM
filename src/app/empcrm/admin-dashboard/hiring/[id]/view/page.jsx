@@ -238,7 +238,7 @@ export default function EmpcrmHiringViewPage() {
                       <div className="mb-4">
                         <p className="text-sm font-medium text-gray-500">Status</p>
                         <div className="mt-2">
-                          <StatusChip status={historyEntry.status} />
+                          <StatusChip status={historyEntry.status} tag={historyEntry.tag} />
                         </div>
                       </div>
                       <div className="mb-4">
@@ -321,7 +321,7 @@ export default function EmpcrmHiringViewPage() {
                             ) : null}
                           </td>
                           <td className="px-4 py-3 align-top">
-                            <StatusChip status={sa} />
+                            <StatusChip status={sa} tag={h.tag} />
                           </td>
                           <td className="max-w-md px-4 py-3 align-top text-gray-800">
                             {noteText ? (

@@ -109,18 +109,20 @@ const STATUS_CHIP_STYLES = {
   Reject:        "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
 };
 
-function StatusChip({ status }) {
+function StatusChip({ status, tag }) {
   const s = String(status || "").trim();
   if (!s) {
     return <span className="text-gray-400 text-xs">—</span>;
   }
   const style = STATUS_CHIP_STYLES[s] || "bg-gray-50 text-gray-800 border-gray-200 ring-1 ring-gray-400/10";
+  const displayLabel = s === "Have not talked" && tag ? tag : s;
+
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 sm:px-2.5 py-1 text-[10px] sm:text-xs font-semibold whitespace-normal text-left leading-snug max-w-[9rem] sm:max-w-[11rem] ${style}`}
-      title={s}
+      title={displayLabel}
     >
-      {s}
+      {displayLabel}
     </span>
   );
 }
@@ -607,7 +609,7 @@ export default function HiringPage() {
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.interview_mode || "—"}</td>
                       <td className="px-3 py-2.5 align-top sm:px-4">
-                        <StatusChip status={row.status} />
+                        <StatusChip status={row.status} tag={row.tag} />
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.tag || "—"}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
