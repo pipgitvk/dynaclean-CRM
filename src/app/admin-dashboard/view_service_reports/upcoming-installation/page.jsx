@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { Eye } from "lucide-react";
 
 export default function UpcomingInstallationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -215,24 +217,29 @@ export default function UpcomingInstallationsPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 mt-3">
+            <div className="flex flex-col gap-2 mt-3">
+              <Link
+                href={`/admin-dashboard/order/${r.order_id}`}
+                className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                title="View Report"
+              >
+                <Eye size={14} className="mr-1" /> View
+              </Link>
               <button
                 onClick={() => handleAction(r.order_id, "INSTALLED")}
-                className="flex-1 px-3 py-2 bg-green-600 text-white text-xs rounded"
+                className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
               >
                 Installed
               </button>
-
               <button
                 onClick={() => openReturnModal(r.order_id)}
-                className="flex-1 px-3 py-2 bg-orange-600 text-white text-xs rounded"
+                className="w-full px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700"
               >
                 Partial Return
               </button>
-
               <button
                 onClick={() => handleAction(r.order_id, "RETURNED")}
-                className="flex-1 px-3 py-2 bg-red-600 text-white text-xs rounded"
+                className="w-full px-3 py-2 bg-red-600 text-white text-xs rounded hover:bg-red-700"
               >
                 Full Return
               </button>
@@ -274,25 +281,34 @@ export default function UpcomingInstallationsPage() {
                 <td className={`p-3 ${dateColor(r.installation_status)}`}>
                   {formatDays(r.days_until_installation)}
                 </td>
-                <td className="p-3 space-x-2">
-                  <button
-                    onClick={() => handleAction(r.order_id, "INSTALLED")}
-                    className="px-3 py-1 bg-green-600 text-white rounded text-xs"
-                  >
-                    Installed
-                  </button>
-                  <button
-                    onClick={() => openReturnModal(r.order_id)}
-                    className="px-3 py-1 bg-orange-600 text-white rounded text-xs"
-                  >
-                    Partial Return
-                  </button>
-                  <button
-                    onClick={() => handleAction(r.order_id, "RETURNED")}
-                    className="px-3 py-1 bg-red-600 text-white rounded text-xs"
-                  >
-                    Full Return
-                  </button>
+                <td className="p-3">
+                  <div className="flex flex-col gap-2 items-stretch">
+                    <Link
+                      href={`/admin-dashboard/order/${r.order_id}`}
+                      className="inline-flex justify-center items-center px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                      title="View Order / Report"
+                    >
+                      <Eye size={14} className="mr-1" /> View
+                    </Link>
+                    <button
+                      onClick={() => handleAction(r.order_id, "INSTALLED")}
+                      className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                    >
+                      Installed
+                    </button>
+                    <button
+                      onClick={() => openReturnModal(r.order_id)}
+                      className="px-3 py-1.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
+                    >
+                      Partial Return
+                    </button>
+                    <button
+                      onClick={() => handleAction(r.order_id, "RETURNED")}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                    >
+                      Full Return
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

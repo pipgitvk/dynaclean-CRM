@@ -44,6 +44,7 @@ export async function GET(request) {
         c.last_name,
         CONCAT(TRIM(c.first_name), ' ', TRIM(COALESCE(c.last_name, ''))) as name,
         c.phone as contact,
+        c.email,
         c.designation,
         c.report_to,
         COALESCE(c.working, 1) as working,
@@ -62,7 +63,7 @@ export async function GET(request) {
     // When viewing a contact who has a parent, include full ancestor chain + current
     // e.g. Vaccum Cleaners → show Ravindra → shalini → Vaccum Cleaners
     const [currentRows] = await connection.execute(
-      `SELECT c.customer_id, c.parent_customer_id, c.first_name, c.last_name, c.phone, c.designation, COALESCE(c.working, 1) as working
+      `SELECT c.customer_id, c.parent_customer_id, c.first_name, c.last_name, c.phone, c.email, c.designation, COALESCE(c.working, 1) as working
        FROM customers c WHERE c.customer_id = ?`,
       [customerId],
     );
@@ -75,7 +76,7 @@ export async function GET(request) {
       while (pid && !seen.has(pid)) {
         seen.add(pid);
         const [pRows] = await connection.execute(
-          `SELECT customer_id, parent_customer_id, first_name, last_name, phone, designation, COALESCE(working, 1) as working
+          `SELECT customer_id, parent_customer_id, first_name, last_name, phone, email, designation, COALESCE(working, 1) as working
            FROM customers WHERE customer_id = ?`,
           [pid],
         );
@@ -94,6 +95,7 @@ export async function GET(request) {
           customer_id: a.customer_id,
           name,
           contact: a.phone || "",
+          email: a.email || "",
           designation: a.designation || null,
           report_to: prevId,
           working: a.working ?? 1,
@@ -109,6 +111,7 @@ export async function GET(request) {
         customer_id: currentCustomer.customer_id,
         name: currentName,
         contact: currentCustomer.phone || "",
+        email: currentCustomer.email || "",
         designation: currentCustomer.designation || null,
         report_to: immediateParent?.customer_id ?? null,
         working: currentCustomer.working ?? 1,
@@ -142,7 +145,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { customer_id, name, contact, designation, report_to, working } = body;
+    const { customer_id, name, contact, email, designation, report_to, working } = body;
 
     if (!customer_id || !name) {
       return NextResponse.json(
@@ -216,7 +219,7 @@ export async function POST(request) {
         customer_id,
         first_name,
         last_name,
-        "",
+        email || "",
         phone,
         "",
         "",
@@ -257,7 +260,7 @@ export async function POST(request) {
         now,
         "Manual",
         `Contact added from parent customer ${customer_id}`,
-        "",
+        email || "",
       ],
     );
 
@@ -280,7 +283,7 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     const body = await request.json();
-    const { id, name, contact, designation, report_to, working } = body;
+    const { id, name, contact, email, designation, report_to, working } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -297,12 +300,13 @@ export async function PUT(request) {
 
     await connection.execute(
       `UPDATE customers 
-       SET first_name = ?, last_name = ?, phone = ?, designation = ?, report_to = ?, working = ?
+       SET first_name = ?, last_name = ?, phone = ?, email = ?, designation = ?, report_to = ?, working = ?
        WHERE customer_id = ?`,
       [
         first_name,
         last_name,
         contact || null,
+        email || "",
         designation || null,
         report_to || null,
         working !== undefined ? (working ? 1 : 0) : 1,

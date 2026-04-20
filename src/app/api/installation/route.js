@@ -55,39 +55,42 @@ export async function POST(req) {
       [serial_number]
     );
 
-    // await conn.end();
+    // If product exists, try to send an email, but don't fail the whole request if email fails.
+    if (rows.length > 0) {
+      const { email: recipientEmail, customer_name, product_name, model } = rows[0];
 
-    if (rows.length === 0) {
-      return NextResponse.json({ message: "Product not found" }, { status: 404 });
-    }
+      if (recipientEmail) {
+        // Prepare template data
+        const templateData = {
+          service_id: result.insertId,
+          customer_name,
+          product_name,
+          model,
+          serial_number,
+          site_person,
+          site_email,
+          site_contact,
+          installation_address,
+          service_type,
+          current_year: new Date().getFullYear(),
+        };
 
-    const { email: recipientEmail, customer_name, product_name, model } = rows[0];
-
-    // Prepare template data
-    const templateData = {
-      service_id: result.insertId,
-      customer_name,
-      product_name,
-      model,
-      serial_number,
-      site_person,
-      site_email,
-      site_contact,
-      installation_address,
-      service_type,
-      current_year: new Date().getFullYear(),
-    };
-
-    // Send email using template system
-    await sendTemplatedEmail(
-      'INSTALLATION',
-      templateData,
-      {
-        to: recipientEmail,
-        cc: "service@dynacleanindustries.com, dynacleanindustries@gmail.com",
-        bcc: "piptrade3@gmail.com",
+        try {
+          // Send email using template system
+          await sendTemplatedEmail(
+            'INSTALLATION',
+            templateData,
+            {
+              to: recipientEmail,
+              cc: "service@dynacleanindustries.com, dynacleanindustries@gmail.com",
+              bcc: "piptrade3@gmail.com",
+            }
+          );
+        } catch (emailError) {
+          console.error("Email sending failed (but installation request saved):", emailError);
+        }
       }
-    );
+    }
 
     return NextResponse.json({ message: "Installation request submitted successfully" });
   } catch (error) {

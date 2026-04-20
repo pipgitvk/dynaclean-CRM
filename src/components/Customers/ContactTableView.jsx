@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, XCircle, User, Phone, Briefcase, Edit } from "lucide-react";
+import { CheckCircle, XCircle, User, Phone, Briefcase, Edit, Mail } from "lucide-react";
 
 export default function ContactTableView({ contacts, onEdit }) {
   if (!contacts || contacts.length === 0) {
@@ -23,6 +23,9 @@ export default function ContactTableView({ contacts, onEdit }) {
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Contact
+              </th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                Email
               </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Designation
@@ -53,6 +56,18 @@ export default function ContactTableView({ contacts, onEdit }) {
                       <>
                         <Phone size={14} className="text-gray-500 mr-2" />
                         <span className="text-sm text-gray-700">{contact.contact}</span>
+                      </>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center">
+                    {contact.email ? (
+                      <>
+                        <Mail size={14} className="text-gray-500 mr-2" />
+                        <span className="text-sm text-gray-700">{contact.email}</span>
                       </>
                     ) : (
                       <span className="text-sm text-gray-400">-</span>
