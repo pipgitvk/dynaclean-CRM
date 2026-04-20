@@ -648,7 +648,9 @@ export default function ServiceTable({ serviceRecords, role }) {
                                 Complete Service
                               </Link>
                             </>
-                          ) : record.installation_report === "uploadFO" ? (
+                          ) : record.status?.toUpperCase() === "COMPLETED" &&
+                            (Number(record.view_status) === 1 ||
+                              record.installation_report === "uploadFO") ? (
                             <a
                               href={`/${dashboardPath}/view-service-report/${record.service_id}`}
                               target="_blank"
@@ -887,41 +889,55 @@ export default function ServiceTable({ serviceRecords, role }) {
                           Complete Service
                         </Link>
                       </>
-                    ) : record.view_status === 1 ? (
-                      record.installation_report === "uploadFO" ? (
-                        <a
-                          href={`/${dashboardPath}/view-service-report/${record.service_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                        >
-                          View Report
-                        </a>
-                      ) : record.installation_report &&
-                        record.installation_report.includes(",") ? (
-                        <div className="flex flex-wrap gap-1">
-                          {record.installation_report
-                            .split(",")
-                            .filter(Boolean)
-                            .map((file, index) => (
-                              <ServiceAttachmentLink
-                                key={index}
-                                filePath={file.trim()}
-                                fileName={`Report ${index + 1}`}
-                                className="px-2 py-1 text-xs bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                              />
-                            ))}
-                        </div>
-                      ) : (
-                        <ServiceAttachmentLink
-                          filePath={
-                            record.installation_report ||
-                            record.attachments?.split(",")[0]
-                          }
-                          fileName="View Report"
-                          className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
-                        />
-                      )
+                    ) : record.status?.toUpperCase() === "COMPLETED" &&
+                      (Number(record.view_status) === 1 ||
+                        record.installation_report === "uploadFO") ? (
+                      <a
+                        href={`/${dashboardPath}/view-service-report/${record.service_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                      >
+                        View Report
+                      </a>
+                    ) : record.final_report_path ? (
+                      <a
+                        href={
+                          record.final_report_path.startsWith("http")
+                            ? record.final_report_path
+                            : `https://service.dynacleanindustries.com/${record.final_report_path}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                      >
+                        View Report
+                      </a>
+                    ) : record.installation_report &&
+                      record.installation_report.includes(",") ? (
+                      <div className="flex flex-wrap gap-1">
+                        {record.installation_report
+                          .split(",")
+                          .filter(Boolean)
+                          .map((file, index) => (
+                            <ServiceAttachmentLink
+                              key={index}
+                              filePath={file.trim()}
+                              fileName={`Report ${index + 1}`}
+                              className="px-2 py-1 text-xs bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                            />
+                          ))}
+                      </div>
+                    ) : record.installation_report &&
+                      record.installation_report !== "uploadFO" ? (
+                      <ServiceAttachmentLink
+                        filePath={
+                          record.installation_report ||
+                          record.attachments?.split(",")[0]
+                        }
+                        fileName="View Report"
+                        className="px-3 py-2 text-sm bg-green-700 text-white rounded-md hover:bg-green-800 text-center"
+                      />
                     ) : (
                       <Link
                         href={`/${dashboardPath}/update-service/${record.service_id}`}

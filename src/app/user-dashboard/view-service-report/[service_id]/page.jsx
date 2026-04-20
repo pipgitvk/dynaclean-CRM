@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import dayjs from "dayjs";
 import { generateServiceReportPDF, downloadPDF } from "@/utils/pdfGenerator";
+import { isInstallationReportLayout } from "@/utils/reportLayout";
 import "./print.css";
 
 // Lightweight image component with prioritized fallbacks for signatures
@@ -84,6 +85,16 @@ export default function ViewServiceReport({ params }) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const { service_id } = React.use(params);
+
+  const installationLayout = isInstallationReportLayout(
+    report?.complaint_summary
+  );
+  const showLegacyInstallationExtras = Boolean(
+    report &&
+      report.service_type === "INSTALLATION" &&
+      !installationLayout
+  );
+
   useEffect(() => {
     const fetchReport = async () => {
       try {
@@ -174,7 +185,10 @@ export default function ViewServiceReport({ params }) {
     await compressImagesInClone(printContent);
 
     const printWindow = window.open("", "_blank", "height=600,width=800");
-    printWindow.document.write("<html><head><title>Service Report</title>");
+    const docTitle = isInstallationReportLayout(report.complaint_summary)
+      ? "Installation Report"
+      : "Service Report";
+    printWindow.document.write(`<html><head><title>${docTitle}</title>`);
     const styles = Array.from(document.styleSheets)
       .map((sheet) => {
         try {
@@ -291,10 +305,25 @@ export default function ViewServiceReport({ params }) {
         installation_date: product.installation_date,
         invoice_number: product.invoice_number,
         invoice_date: product.invoice_date,
+        contact_person: product.contact_person || product.site_person || "",
+        site_person: product.site_person || "",
       };
 
+      const pdfInstallationLayout = isInstallationReportLayout(
+        report.complaint_summary
+      );
       let installData = null;
-      if (report.service_type === "INSTALLATION" && install) {
+      if (pdfInstallationLayout) {
+        installData = install
+          ? {
+              installation_date: install.installation_date,
+              defects_on_inspection: install.defects_on_inspection,
+              engineer_remarks: install.engineer_remarks,
+              service_rating: install.service_rating,
+              customer_feedback: install.customer_feedback,
+            }
+          : {};
+      } else if (report.service_type === "INSTALLATION" && install) {
         installData = {
           defects_on_inspection: install.defects_on_inspection,
           engineer_remarks: install.engineer_remarks,
@@ -307,11 +336,19 @@ export default function ViewServiceReport({ params }) {
         installData,
         trainees,
         checklist: report.checklist,
-        service_rate: report.service_rate
+        service_rate: report.service_rate,
       });
 
-      const pdf = await generateServiceReportPDF(pdfData, productData, installData, trainees);
-      const filename = `Service_Report_${report.service_id}_${dayjs().format('YYYY-MM-DD')}.pdf`;
+      const pdf = await generateServiceReportPDF(
+        pdfData,
+        productData,
+        installData,
+        trainees,
+        { isInstallationLayout: pdfInstallationLayout }
+      );
+      const filename = pdfInstallationLayout
+        ? `Installation_Report_${report.service_id}_${dayjs().format("YYYY-MM-DD")}.pdf`
+        : `Service_Report_${report.service_id}_${dayjs().format("YYYY-MM-DD")}.pdf`;
 
       downloadPDF(pdf, filename);
     } catch (error) {
@@ -384,88 +421,133 @@ export default function ViewServiceReport({ params }) {
           </header>
 
           {/* Report Title */}
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 my-4 sm:my-6">
-            SERVICE REPORT
+          <h2
+            className={`text-2xl sm:text-3xl font-bold text-center text-gray-800 my-4 sm:my-6 ${
+              installationLayout
+                ? "underline decoration-2 underline-offset-4"
+                : ""
+            }`}
+          >
+            {installationLayout ? "INSTALLATION REPORT" : "SERVICE REPORT"}
           </h2>
 
           {/* Info Grid (Responsive) */}
-          <div className="mb-6 p-4 border rounded-md bg-gray-50">
-            <h3 className="text-lg font-semibold mb-3">
-              PRODUCT & CUSTOMER DETAILS
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6">
-              <ReadRow label="Service ID" value={report.service_id} />
-              <ReadRow
-                label="Service Date"
-                value={formatDate(report.complaint_date)}
-              />
-              <ReadRow
-                label="Complaint Number"
-                value={report.complaint_number}
-              />
-              <ReadRow label="Service Type" value={report.service_type} />
-              <ReadRow label="Serial Number" value={report.serial_number} />
-              <ReadRow label="Status" value={report.status} />
-              <ReadRow
-                label="Registration Date"
-                value={formatDate(report.reg_date)}
-              />
-              <ReadRow
-                label="Completed Date"
-                value={formatDate(report.completed_date)}
-              />
-              <ReadRow label="Product Name" value={product.product_name} />
-              <ReadRow label="Model" value={product.model} />
-              <ReadRow label="Customer Name" value={product.customer_name} />
-              <ReadRow label="Email" value={product.email} />
-              <ReadRow label="Contact" value={product.contact} />
-              <ReadRow
-                label="Customer Address"
-                value={product.customer_address}
-              />
-              <ReadRow
-                label="Installed Address"
-                value={product.installed_address}
-              />
-              <ReadRow
-                label="Installation Date"
-                value={formatDate(product.installation_date)}
-              />
-              <ReadRow label="Invoice Number" value={product.invoice_number} />
-              <ReadRow
-                label="Invoice Date"
-                value={formatDate(product.invoice_date)}
-              />
+          {installationLayout ? (
+            <div className="mb-6 p-4 border rounded-md bg-gray-50">
+              <h3 className="text-lg font-semibold mb-3">GENERAL INFORMATION</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6">
+                <ReadRow
+                  label="Installation Date"
+                  value={formatDate(
+                    install?.installation_date ||
+                      product.installation_date ||
+                      report.completed_date
+                  )}
+                />
+                <ReadRow label="Report ID" value={report.service_id} />
+                <ReadRow label="Customer Name" value={product.customer_name} />
+                <ReadRow label="Address" value={product.customer_address} />
+                <ReadRow
+                  label="Installation Address"
+                  value={product.installed_address}
+                />
+                <ReadRow
+                  label="Invoice Date"
+                  value={formatDate(product.invoice_date)}
+                />
+                <ReadRow label="Invoice Number" value={product.invoice_number} />
+                <ReadRow label="Serial" value={report.serial_number} />
+                <ReadRow
+                  label="Contact Person"
+                  value={product.contact_person || product.site_person}
+                />
+                <ReadRow label="Product Name" value={product.product_name} />
+                <ReadRow label="Contact Number" value={product.contact} />
+                <ReadRow label="Model" value={product.model} />
+                <ReadRow label="Email" value={product.email} />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mb-6 p-4 border rounded-md bg-gray-50">
+              <h3 className="text-lg font-semibold mb-3">
+                PRODUCT & CUSTOMER DETAILS
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-2 gap-x-6">
+                <ReadRow label="Service ID" value={report.service_id} />
+                <ReadRow
+                  label="Service Date"
+                  value={formatDate(report.complaint_date)}
+                />
+                <ReadRow
+                  label="Complaint Number"
+                  value={report.complaint_number}
+                />
+                <ReadRow label="Service Type" value={report.service_type} />
+                <ReadRow label="Serial Number" value={report.serial_number} />
+                <ReadRow label="Status" value={report.status} />
+                <ReadRow
+                  label="Registration Date"
+                  value={formatDate(report.reg_date)}
+                />
+                <ReadRow
+                  label="Completed Date"
+                  value={formatDate(report.completed_date)}
+                />
+                <ReadRow label="Product Name" value={product.product_name} />
+                <ReadRow label="Model" value={product.model} />
+                <ReadRow label="Customer Name" value={product.customer_name} />
+                <ReadRow label="Email" value={product.email} />
+                <ReadRow label="Contact" value={product.contact} />
+                <ReadRow
+                  label="Customer Address"
+                  value={product.customer_address}
+                />
+                <ReadRow
+                  label="Installed Address"
+                  value={product.installed_address}
+                />
+                <ReadRow
+                  label="Installation Date"
+                  value={formatDate(product.installation_date)}
+                />
+                <ReadRow label="Invoice Number" value={product.invoice_number} />
+                <ReadRow
+                  label="Invoice Date"
+                  value={formatDate(product.invoice_date)}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Checklist (Responsive) */}
-          <div className="mb-6 p-4 border rounded-md bg-gray-50">
-            <h3 className="text-lg font-semibold mb-3">
-              CHECKLIST
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-sm">
-              {CHECKLIST_ITEMS.map((item, index) => (
-                <div key={index} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={
-                      report && report.checklist
-                        ? report.checklist.includes(item)
-                        : false
-                    }
-                    readOnly
-                    className="mr-2 h-4 w-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-gray-900">{item}</span>
-                </div>
-              ))}
+          {!installationLayout && (
+            <div className="mb-6 p-4 border rounded-md bg-gray-50">
+              <h3 className="text-lg font-semibold mb-3">
+                CHECKLIST
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-sm">
+                {CHECKLIST_ITEMS.map((item, index) => (
+                  <div key={index} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={
+                        report && report.checklist
+                          ? report.checklist.includes(item)
+                          : false
+                      }
+                      readOnly
+                      className="mr-2 h-4 w-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-gray-900">{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* new part for the details */}
 
-          {report.service_type === "INSTALLATION" && (
+          {showLegacyInstallationExtras && (
             <>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -548,7 +630,143 @@ export default function ViewServiceReport({ params }) {
 
           {/* end of new part */}
 
+          {installationLayout && (
+            <>
+              <div className="mb-6 p-4 border rounded-md bg-gray-50">
+                <h3 className="text-lg font-semibold mb-3">
+                  SERVICE RENDERED: INSTALLATION AND DEMONSTRATION
+                </h3>
+                <p className="text-sm text-gray-800 mb-3">
+                  <span className="font-semibold">Status of Installation: </span>
+                  {String(report.status || "").toUpperCase() === "COMPLETED"
+                    ? "Complete"
+                    : "Incomplete"}
+                </p>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Defects found on inspection (if any)
+                  </label>
+                  <p className="w-full rounded-lg border border-gray-300 p-2 text-sm text-gray-900 bg-white break-words">
+                    {install?.defects_on_inspection || "N/A"}
+                  </p>
+                </div>
+                <div className="mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Engineer&apos;s Remarks
+                  </label>
+                  <p className="w-full rounded-lg border border-gray-300 p-2 text-sm text-gray-900 bg-white break-words">
+                    {install?.engineer_remarks || "N/A"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-6 p-4 border rounded-md bg-gray-50">
+                <h3 className="text-lg font-semibold mb-3">
+                  CUSTOMER TRAINING AND DEMONSTRATION RECORD
+                </h3>
+                <div className="overflow-x-auto mb-4">
+                  <table className="min-w-full text-left border-collapse border border-gray-300 text-sm">
+                    <thead className="bg-gray-200">
+                      <tr>
+                        <th className="p-2 border border-gray-300">S. No.</th>
+                        <th className="p-2 border border-gray-300">
+                          NAME OF TRAINEES
+                        </th>
+                        <th className="p-2 border border-gray-300">DESIGNATION</th>
+                        <th className="p-2 border border-gray-300">CONTACT NO.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trainees.length > 0 ? (
+                        trainees.map((trainee, index) => (
+                          <tr key={trainee.id || index}>
+                            <td className="p-2 border border-gray-300">
+                              {index + 1}
+                            </td>
+                            <td className="p-2 border border-gray-300">
+                              {trainee.name}
+                            </td>
+                            <td className="p-2 border border-gray-300">
+                              {trainee.designation}
+                            </td>
+                            <td className="p-2 border border-gray-300">
+                              {trainee.contact}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="p-4 text-center text-gray-500 border border-gray-300"
+                          >
+                            No trainees recorded.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                  <ReadRow label="Service Rating" value={report.service_rate} />
+                  <ReadRow
+                    label="Customer Feedback"
+                    value={
+                      report.feedback || install?.customer_feedback || "-"
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 signature-wrapper">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">
+                      Authorized Person (Engineer)
+                    </h3>
+                    {report.authorised_person_sign && (
+                      <ImageWithFallback
+                        id="engineer-signature-img-install"
+                        src={report.authorised_person_sign}
+                        alt="Engineer Signature"
+                        className="w-full h-auto object-contain border border-gray-300 rounded-md mb-4"
+                      />
+                    )}
+                    <ReadRow
+                      label="Name"
+                      value={report.authorised_person_name || "N/A"}
+                    />
+                    <ReadRow
+                      label="Designation"
+                      value={report.authorised_person_designation}
+                    />
+                    <ReadRow
+                      label="Mobile"
+                      value={report.authorised_person_mobile}
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Customer</h3>
+                    {report.customer_sign && (
+                      <ImageWithFallback
+                        id="customer-signature-img-install"
+                        src={report.customer_sign}
+                        alt="Customer Signature"
+                        className="w-full h-auto object-contain border border-gray-300 rounded-md mb-4"
+                      />
+                    )}
+                    <ReadRow label="Name" value={report.customer_name || "N/A"} />
+                    <ReadRow
+                      label="Designation"
+                      value={report.customer_designation}
+                    />
+                    <ReadRow label="Mobile" value={report.customer_mobile} />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Service Rendered (Responsive) */}
+          {!installationLayout && (
+          <>
           <div className="mb-6 p-4 border rounded-md bg-gray-50">
             <h3 className="text-lg font-semibold mb-3">SERVICE RENDERED</h3>
             <div className="grid grid-cols-1 gap-4">
@@ -698,6 +916,8 @@ export default function ViewServiceReport({ params }) {
               <ReadRow label="Mobile" value={report.customer_mobile} />
             </div>
           </div>
+          </>
+          )}
         </div>
 
         {/* Print and Download Buttons */}
