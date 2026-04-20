@@ -152,13 +152,13 @@ export default function StatementTable({ rows }) {
     balanceMap[row.id] = runningBalance;
   }
 
-  /** Bank file balance when imported; else sum from 0 over filtered rows (misleading for partial data). */
+  /** Bank file balance when imported; else return null to show no balance */
   const displayBalance = (row) => {
     const cb = row.closing_balance;
     if (cb != null && cb !== "" && !Number.isNaN(Number(cb))) {
       return Number(cb);
     }
-    return Math.abs(balanceMap[row.id] ?? 0);
+    return null;
   };
 
   const handleSort = (key) => {
@@ -244,6 +244,7 @@ export default function StatementTable({ rows }) {
   };
 
   const formatPdfAmount = (n) => {
+    if (n == null) return "—";
     const num = Number(n) || 0;
     return num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
@@ -627,10 +628,10 @@ export default function StatementTable({ rows }) {
                     title={
                       row.closing_balance != null
                         ? "Closing balance from bank file (import)"
-                        : "Running total from filtered rows (not bank book)"
+                        : "No closing balance provided in bank file"
                     }
                   >
-                    ₹{displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    {displayBalance(row) != null ? `₹${displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
                   </td>
                   <td className="p-3 flex gap-2 items-center">
                     <button
@@ -712,7 +713,7 @@ export default function StatementTable({ rows }) {
             <div>
               <strong>Balance:</strong>{" "}
               <span className="font-semibold">
-                ₹{displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                {displayBalance(row) != null ? `₹${displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
               </span>
             </div>
             <div className="flex items-center gap-4 pt-2">
