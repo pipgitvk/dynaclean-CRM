@@ -548,6 +548,23 @@ const AttendancePage = () => {
                     {log.holidayDescription && (
                       <p className="text-xs text-gray-500 mt-1">{log.holidayDescription}</p>
                     )}
+                    {log.type === "absent" && (
+                      <div className="mt-3">
+                        {pendingRegByDate.get(logDateKeyForReg(log)) ? (
+                          <span className="text-amber-700 font-medium text-sm">
+                            Pending approval
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openRegularizeModal(log)}
+                            className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                          >
+                            Regularize
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -702,6 +719,23 @@ const AttendancePage = () => {
                         )}
                         {log.holidayDescription && (
                           <p className="text-xs text-gray-500 mt-1">{log.holidayDescription}</p>
+                        )}
+                        {log.type === "absent" && (
+                          <div className="mt-3 flex justify-center">
+                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
+                              <span className="text-amber-700 font-medium text-sm">
+                                Pending approval
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openRegularizeModal(log)}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                              >
+                                Regularize
+                              </button>
+                            )}
+                          </div>
                         )}
                       </td>
                     )}

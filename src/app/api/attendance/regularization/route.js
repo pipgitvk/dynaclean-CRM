@@ -8,6 +8,10 @@ import {
   isReportingManagerOf,
   getReportingManagerForEmployee,
 } from "@/lib/reportingManager";
+import {
+  canProxyAttendanceRegularization,
+  resolveRoleForAttendanceAdmin,
+} from "@/lib/adminAttendanceRulesAuth";
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_MIME = new Set([
@@ -32,6 +36,14 @@ function mapRowToProposed(row) {
   const o = {};
   for (const c of COLS) {
     o[c] = row[c] ?? null;
+  }
+  return o;
+}
+
+function emptyOriginalProposed() {
+  const o = {};
+  for (const c of COLS) {
+    o[c] = null;
   }
   return o;
 }
@@ -142,6 +154,7 @@ export async function POST(request) {
     const checkinRaw = formData.get("checkin_time");
     const checkoutRaw = formData.get("checkout_time");
     const file = formData.get("attachment");
+    const forUsernameRaw = formData.get("for_username");
 
     if (!log_date || typeof log_date !== "string") {
       return NextResponse.json(
@@ -189,13 +202,25 @@ export async function POST(request) {
       }
     }
 
-    const manager = await getReportingManagerForEmployee(session.username);
+    let subjectUsername = session.username;
+    if (forUsernameRaw != null && String(forUsernameRaw).trim() !== "") {
+      const role = await resolveRoleForAttendanceAdmin(session);
+      if (!canProxyAttendanceRegularization(role)) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden" },
+          { status: 403 }
+        );
+      }
+      subjectUsername = String(forUsernameRaw).trim();
+    }
+
+    const manager = await getReportingManagerForEmployee(subjectUsername);
     if (!manager) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "No reporting manager is set for your account. Ask HR to assign a reporting manager in Employees.",
+            "No reporting manager is set for this employee. Ask HR to assign a reporting manager in Employees.",
         },
         { status: 400 }
       );
@@ -206,7 +231,7 @@ export async function POST(request) {
     const [pendingDup] = await conn.execute(
       `SELECT id FROM attendance_regularization_requests
        WHERE username = ? AND log_date = ? AND status = 'pending' LIMIT 1`,
-      [session.username, log_date]
+      [subjectUsername, log_date]
     );
     if (pendingDup.length > 0) {
       return NextResponse.json(
@@ -217,17 +242,11 @@ export async function POST(request) {
 
     const [logs] = await conn.execute(
       `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
-      [session.username, log_date]
+      [subjectUsername, log_date]
     );
-    if (logs.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "No attendance log found for that date." },
-        { status: 404 }
-      );
-    }
 
-    const logRow = logs[0];
-    const orig = mapRowToProposed(logRow);
+    const orig =
+      logs.length > 0 ? mapRowToProposed(logs[0]) : emptyOriginalProposed();
 
     const prop = { ...orig };
     prop.checkin_time = normalizeMysqlDatetime(
@@ -236,6 +255,19 @@ export async function POST(request) {
     prop.checkout_time = normalizeMysqlDatetime(
       checkoutRaw != null ? String(checkoutRaw) : null
     );
+
+    if (logs.length === 0) {
+      if (!prop.checkin_time || !prop.checkout_time) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "For a missed (absent) day, both check-in and check-out times are required.",
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     let publicUrl = null;
     if (hasFile) {
@@ -259,7 +291,7 @@ export async function POST(request) {
           : nameExt
         : extFromMime || (nameExt || ".bin");
 
-      const userFolder = String(session.username).replace(/[^a-zA-Z0-9._-]/g, "_");
+      const userFolder = String(subjectUsername).replace(/[^a-zA-Z0-9._-]/g, "_");
       const uploadDir = path.join(
         process.cwd(),
         "public",
@@ -292,7 +324,7 @@ export async function POST(request) {
         ?, ?, ?, ?, ?, ?, ?, ?,
         ?)`,
       [
-        session.username,
+        subjectUsername,
         log_date,
         reason,
         orig.checkin_time,
@@ -386,53 +418,87 @@ export async function PATCH(request) {
       `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
       [reqRow.username, reqRow.log_date]
     );
-    if (logRows.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Attendance log no longer exists for that date." },
-        { status: 404 }
-      );
-    }
 
-    const logRow = logRows[0];
-    let checkoutLat = logRow.checkout_latitude;
-    let checkoutLon = logRow.checkout_longitude;
-    let checkoutAddr = logRow.checkout_address;
+    let checkoutLat = logRows[0]?.checkout_latitude;
+    let checkoutLon = logRows[0]?.checkout_longitude;
+    let checkoutAddr = logRows[0]?.checkout_address;
+    let checkinLat = logRows[0]?.checkin_latitude;
+    let checkinLon = logRows[0]?.checkin_longitude;
+    let checkinAddr = logRows[0]?.checkin_address;
+
     if (reqRow.proposed_checkout_time && (checkoutLat == null || checkoutLon == null)) {
       checkoutLat = checkoutLat ?? 0;
       checkoutLon = checkoutLon ?? 0;
       checkoutAddr = checkoutAddr || "Manager-approved regularization";
     }
+    if (reqRow.proposed_checkin_time && (checkinLat == null || checkinLon == null)) {
+      checkinLat = checkinLat ?? 0;
+      checkinLon = checkinLon ?? 0;
+      checkinAddr = checkinAddr || "Manager-approved regularization";
+    }
 
-    await conn.execute(
-      `UPDATE attendance_logs SET
-        checkin_time = ?,
-        checkout_time = ?,
-        break_morning_start = ?,
-        break_morning_end = ?,
-        break_lunch_start = ?,
-        break_lunch_end = ?,
-        break_evening_start = ?,
-        break_evening_end = ?,
-        checkout_latitude = ?,
-        checkout_longitude = ?,
-        checkout_address = ?
-       WHERE username = ? AND date = ?`,
-      [
-        reqRow.proposed_checkin_time,
-        reqRow.proposed_checkout_time,
-        reqRow.proposed_break_morning_start,
-        reqRow.proposed_break_morning_end,
-        reqRow.proposed_break_lunch_start,
-        reqRow.proposed_break_lunch_end,
-        reqRow.proposed_break_evening_start,
-        reqRow.proposed_break_evening_end,
-        checkoutLat,
-        checkoutLon,
-        checkoutAddr,
-        reqRow.username,
-        reqRow.log_date,
-      ]
-    );
+    if (logRows.length === 0) {
+      await conn.execute(
+        `INSERT INTO attendance_logs (
+          username, date,
+          checkin_time, checkout_time,
+          break_morning_start, break_morning_end,
+          break_lunch_start, break_lunch_end,
+          break_evening_start, break_evening_end,
+          checkin_latitude, checkin_longitude, checkin_address,
+          checkout_latitude, checkout_longitude, checkout_address
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          reqRow.username,
+          reqRow.log_date,
+          reqRow.proposed_checkin_time,
+          reqRow.proposed_checkout_time,
+          reqRow.proposed_break_morning_start,
+          reqRow.proposed_break_morning_end,
+          reqRow.proposed_break_lunch_start,
+          reqRow.proposed_break_lunch_end,
+          reqRow.proposed_break_evening_start,
+          reqRow.proposed_break_evening_end,
+          checkinLat ?? null,
+          checkinLon ?? null,
+          checkinAddr ?? null,
+          checkoutLat ?? null,
+          checkoutLon ?? null,
+          checkoutAddr ?? null,
+        ]
+      );
+    } else {
+      await conn.execute(
+        `UPDATE attendance_logs SET
+          checkin_time = ?,
+          checkout_time = ?,
+          break_morning_start = ?,
+          break_morning_end = ?,
+          break_lunch_start = ?,
+          break_lunch_end = ?,
+          break_evening_start = ?,
+          break_evening_end = ?,
+          checkout_latitude = ?,
+          checkout_longitude = ?,
+          checkout_address = ?
+         WHERE username = ? AND date = ?`,
+        [
+          reqRow.proposed_checkin_time,
+          reqRow.proposed_checkout_time,
+          reqRow.proposed_break_morning_start,
+          reqRow.proposed_break_morning_end,
+          reqRow.proposed_break_lunch_start,
+          reqRow.proposed_break_lunch_end,
+          reqRow.proposed_break_evening_start,
+          reqRow.proposed_break_evening_end,
+          checkoutLat,
+          checkoutLon,
+          checkoutAddr,
+          reqRow.username,
+          reqRow.log_date,
+        ]
+      );
+    }
 
     await conn.execute(
       `UPDATE attendance_regularization_requests SET

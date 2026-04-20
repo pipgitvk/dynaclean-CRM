@@ -17,8 +17,23 @@ const MANAGE_ATTENDANCE_RULES_ROLES = new Set(
   ATTENDANCE_RULES_ALLOWED_ROLES.map((r) => normalizeRoleKey(r))
 );
 
+/** EMPCRM admin attendance + main admin — may submit regularization on behalf of an employee. */
+const PROXY_ATTENDANCE_REG_ROLES = new Set(
+  [
+    "SUPERADMIN",
+    "ADMIN",
+    "HR",
+    "HR HEAD",
+    "HR Executive",
+  ].map((r) => normalizeRoleKey(r))
+);
+
 export function canManageAttendanceRules(role) {
   return MANAGE_ATTENDANCE_RULES_ROLES.has(normalizeRoleKey(role));
+}
+
+export function canProxyAttendanceRegularization(role) {
+  return PROXY_ATTENDANCE_REG_ROLES.has(normalizeRoleKey(role));
 }
 
 /**
