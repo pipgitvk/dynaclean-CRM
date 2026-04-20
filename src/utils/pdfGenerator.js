@@ -1,5 +1,11 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { PDF_REPORT_STYLES } from '@/utils/pdfReportStyles';
+import {
+  getPdfLogoUrl,
+  getPdfSignatureOrigin,
+  signatureSrcForInstallationPdf,
+} from '@/utils/pdfCloudinaryAssets';
 
 const CHECKLIST_ITEMS = [
   "Voltage (V)",
@@ -61,7 +67,8 @@ const resolveSignatureSrc = (rawValue, dataValue) => {
 };
 
 // Generate HTML template for the service report
-const generateHTMLTemplate = (reportData, productData) => {
+const generateHTMLTemplate = (reportData, productData, assetOptions = {}) => {
+  const logoUrl = assetOptions.logoUrl || '/images/logo.png';
   const checklistArray = reportData.checklist ? reportData.checklist.split(',') : [];
 
   const engineerSignSrc = resolveSignatureSrc(
@@ -101,218 +108,13 @@ const generateHTMLTemplate = (reportData, productData) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Service Report</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 0;
-                padding: 10px;
-                font-size: 9px;
-                line-height: 1.2;
-            }
-                
-
-            .container {
-                max-width: 800px;
-                margin: 0 auto;
-                border: 1px solid #000;
-                padding: 10px;
-            }
-
-            .company-info {
-                display: flex;
-                align-items: flex-start;
-                justify-content: left;
-                margin-bottom: 10px;
-                gap: 15px;
-                font-size: 14px;
-            }
-
-            .logo {
-                max-width: 120px;
-                height: auto;
-                text-align: left;
-                vertical-align: middle;
-            }
-
-            .company-details h1 {
-                color: #c41e3a;
-                margin: 0 0 5px 0;
-                font-size: 18px;
-            }
-
-            .company-details p {
-                margin: 2px 0;
-                font-size: 12px;
-            }
-
-            .contact-info {
-                display: flex;
-                align-items: center;
-                margin: 1px 0;
-            }
-
-            .contact-info p {
-                margin: 0;
-                font-size: 12px; /* contact lines */
-            }
-
-            .contact-info .icon {
-                font-size: 10px;
-                margin-right: 3px;
-            }
-
-            h2 {
-                text-align: center;
-                margin: 12px 0;
-                font-size: 16px;
-                color: #000;
-            }
-
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 8px;
-                border: 0.5px solid #666;
-            }
-
-            th, td {
-                border: 0.5px solid #666;
-                line-height: 2.3;
-                padding: 3px;
-                text-align: left;
-                vertical-align: middle;
-                font-size: 12px; /* table data font size */
-                color: #000;
-            }
-
-            .service-group {
-                border: 1px solid #000;
-                padding: 6px;
-                margin: 6px 0;
-            }
-
-            .service-group h3 {
-                color: #000;
-                text-transform: uppercase;
-                margin: 0 0 6px 0;
-                font-size: 12px;
-            }
-
-            .form-group {
-                display: flex;
-                align-items: center;
-                margin: 3px 0;
-            }
-
-            .form-group label {
-                min-width: 100px;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            .form-group span {
-                min-width: 100px;
-                font-size: 12px;
-            }
-
-            .checkbox-group {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 6px;
-                margin: 6px 0;
-                color: #000;
-            }
-
-            .checkbox-item {
-                display: flex;
-                align-items: center;
-                font-size: 12px;
-            }
-
-            .checkbox-item input[type="checkbox"] {
-                margin-right: 3px;
-                transform: scale(0.8);
-            }
-
-            .signature-section {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
-                margin-top: 10px;
-            }
-
-            .signature-group {
-                border: 1px solid #000;
-                padding: 6px;
-                text-align: center;
-            }
-
-            .signature-box {
-                border: 1px solid #000;
-                height: 80px;
-                margin: 6px 0;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                background-color: #f9f9f9;
-            }
-
-            .signature-details {
-                text-align: left;
-                font-size: 10px;
-            }
-
-            .signature-details div {
-                margin: 1px 0;
-            }
-
-            .rating-section {
-                margin: 6px 0;
-            }
-
-            .rating-options {
-                display: flex;
-                gap: 10px;
-                margin: 3px 0;
-                flex-wrap: wrap;
-            }
-
-            .rating-option {
-                display: flex;
-                align-items: center;
-                font-size: 10px;
-            }
-
-            .rating-option input[type="radio"] {
-                margin-right: 3px;
-                transform: scale(0.8);
-            }
-
-            @media print {
-                @page {
-                    size: A4;
-                    margin: 0.5in;
-                }
-                
-                body {
-                    font-size: 12px !important;
-                }
-                
-                .container {
-                    border: none;
-                    padding: 0;
-                }
-                
-                .signature-box {
-                    height: 100px;
-                }
-            }
-        </style>
+        <style>${PDF_REPORT_STYLES}</style>
     </head>
     <body>
         <div class="container">
             <div class="company-info">
                 <div class="logo">
-                    <img src="/images/logo.png" alt="Dynaclean Industries" class="logo">
+                    <img src="${logoUrl}" alt="Dynaclean Industries" class="logo" crossorigin="anonymous">
                 </div>
                 <div class="company-details">
                     <h1>DYNACLEAN INDUSTRIES PRIVATE LIMITED</h1>
@@ -360,7 +162,7 @@ const generateHTMLTemplate = (reportData, productData) => {
                     <td><strong>Serial:</strong></td>
                     <td>${reportData.serial_number || ''}</td>
                     <td><strong>Contact Person:</strong></td>
-                    <td>${productData.contact_person || ''}</td>
+                    <td>${productData.contact_person || productData.site_person || ''}</td>
                 </tr>
                 <tr>
                     <td><strong>Product Name:</strong></td>
@@ -486,10 +288,244 @@ const generateHTMLTemplate = (reportData, productData) => {
   `;
 };
 
-export const generateServiceReportPDF = async (reportData, productData, installData = null, trainees = []) => {
+const generateInstallationHTMLTemplate = (
+  reportData,
+  productData,
+  installData,
+  trainees = [],
+  assetOptions = {}
+) => {
+  const logoUrl = assetOptions.logoUrl || '/images/logo.png';
+  const origin = assetOptions.origin || '';
+  const instDate = formatDate(
+    installData?.installation_date ||
+      productData?.installation_date ||
+      reportData?.completed_date
+  );
+  const contactPerson =
+    productData?.contact_person || productData?.site_person || "";
+  const rate = reportData.service_rate || installData?.service_rating || "";
+  const installationComplete =
+    String(reportData.status || "").toUpperCase() === "COMPLETED";
+
+  const traineeRows =
+    trainees && trainees.length > 0
+      ? trainees
+          .map(
+            (t, i) => `
+                        <tr>
+                            <td>${i + 1}</td>
+                            <td>${t.name || ""}</td>
+                            <td>${t.designation || ""}</td>
+                            <td>${t.contact || ""}</td>
+                        </tr>`
+          )
+          .join("")
+      : `<tr><td colspan="4" style="text-align:center">—</td></tr>`;
+
+  const engineerSrc = signatureSrcForInstallationPdf(
+    reportData,
+    'engineer',
+    origin
+  );
+  const customerSrc = signatureSrcForInstallationPdf(
+    reportData,
+    'customer',
+    origin
+  );
+  const engineerImg = engineerSrc
+    ? `<img src="${engineerSrc}" alt="Engineer Signature" crossorigin="anonymous" style="max-width: 100%; max-height: 100%;">`
+    : 'Signature';
+  const customerImg = customerSrc
+    ? `<img src="${customerSrc}" alt="Customer Signature" crossorigin="anonymous" style="max-width: 100%; max-height: 100%;">`
+    : 'Signature';
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Installation Report</title>
+        <style>${PDF_REPORT_STYLES}</style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="company-info">
+                <div class="logo">
+                    <img src="${logoUrl}" alt="Dynaclean Industries" class="logo" crossorigin="anonymous">
+                </div>
+                <div class="company-details">
+                    <h1>DYNACLEAN INDUSTRIES</h1>
+                    <p>1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,</p>
+                    <p>Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu, Pin: 641006.</p>
+                    <div class="contact-info">
+                        <span class="icon">&#9993;</span>
+                        <p>service@dynacleanindustries.com, sales@dynacleanindustries.com</p>
+                    </div>
+                    <div class="contact-info">
+                        <span class="icon">&#9990;</span>
+                        <p>011-45143666, +91-9205551085, +91-7982456944</p>
+                    </div>
+                </div>
+            </div>
+
+            <h2 class="installation-report-title">INSTALLATION REPORT</h2>
+
+            <table>
+                <tr>
+                    <td><strong>Installation Date:</strong></td>
+                    <td>${instDate}</td>
+                    <td><strong>Report ID:</strong></td>
+                    <td>${reportData.service_id || ""}</td>
+                </tr>
+                <tr>
+                    <td><strong>Customer Name:</strong></td>
+                    <td colspan="3">${productData.customer_name || ""}</td>
+                </tr>
+                <tr>
+                    <td><strong>Address:</strong></td>
+                    <td colspan="3">${productData.customer_address || ""}</td>
+                </tr>
+                <tr>
+                    <td><strong>Installation Address:</strong></td>
+                    <td colspan="3">${productData.installed_address || ""}</td>
+                </tr>
+                <tr>
+                    <td><strong>Invoice Date:</strong></td>
+                    <td>${formatDate(productData.invoice_date)}</td>
+                    <td><strong>Invoice No:</strong></td>
+                    <td>${productData.invoice_number || ""}</td>
+                </tr>
+                <tr>
+                    <td><strong>Serial:</strong></td>
+                    <td>${reportData.serial_number || ""}</td>
+                    <td><strong>Contact Person:</strong></td>
+                    <td>${contactPerson}</td>
+                </tr>
+                <tr>
+                    <td><strong>Product Name:</strong></td>
+                    <td>${productData.product_name || ""}</td>
+                    <td><strong>Contact Number:</strong></td>
+                    <td>${productData.contact || ""}</td>
+                </tr>
+                <tr>
+                    <td><strong>Model:</strong></td>
+                    <td>${productData.model || ""}</td>
+                    <td><strong>Email:</strong></td>
+                    <td>${productData.email || ""}</td>
+                </tr>
+            </table>
+
+            <div class="service-group">
+                <h3><strong>SERVICE RENDERED: INSTALLATION AND DEMONSTRATION</strong></h3>
+                <div class="install-status-row">
+                    <strong>Status of Installation:</strong>
+                    <label><input type="radio" ${installationComplete ? "checked" : ""} disabled> Complete</label>
+                    <label><input type="radio" ${!installationComplete ? "checked" : ""} disabled> Incomplete</label>
+                </div>
+                <div class="form-group">
+                    <label>Defects found on inspection (if any):</label>
+                    <span>${installData?.defects_on_inspection || ""}</span>
+                </div>
+                <div class="form-group">
+                    <label>Engineer's Remarks:</label>
+                    <span>${installData?.engineer_remarks || ""}</span>
+                </div>
+            </div>
+
+            <div class="service-group">
+                <h3><strong>CUSTOMER TRAINING AND DEMONSTRATION RECORD</strong></h3>
+                <table>
+                    <tr>
+                        <th>S. No.</th>
+                        <th>NAME OF TRAINEES</th>
+                        <th>DESIGNATION</th>
+                        <th>CONTACT NO.</th>
+                    </tr>
+                    ${traineeRows}
+                </table>
+
+                <div class="rating-section">
+                    <div class="form-group">
+                        <label><strong>Please Rate the service:</strong></label>
+                    </div>
+                    <div class="rating-options">
+                        <div class="rating-option">
+                            <input type="radio" ${rate === "extremelySatisfied" ? "checked" : ""} disabled>
+                            <span>Extremely satisfied</span>
+                        </div>
+                        <div class="rating-option">
+                            <input type="radio" ${rate === "satisfied" ? "checked" : ""} disabled>
+                            <span>Satisfied</span>
+                        </div>
+                        <div class="rating-option">
+                            <input type="radio" ${rate === "dissatisfied" ? "checked" : ""} disabled>
+                            <span>Dissatisfied</span>
+                        </div>
+                        <div class="rating-option">
+                            <input type="radio" ${rate === "annoyed" ? "checked" : ""} disabled>
+                            <span>Annoyed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><strong>Customer Feedback:</strong></label>
+                    <span>${reportData.feedback || installData?.customer_feedback || ""}</span>
+                </div>
+
+                <div class="signature-section">
+                    <div class="signature-group">
+                        <div><strong>Authorized Person Signature:</strong></div>
+                        <div class="signature-box">${engineerImg}</div>
+                        <div class="signature-details">
+                            <div><strong>Name:</strong> ${reportData.authorised_person_name || ""}</div>
+                            <div><strong>Designation:</strong> ${reportData.authorised_person_designation || ""}</div>
+                            <div><strong>Contact Number:</strong> ${reportData.authorised_person_mobile || ""}</div>
+                        </div>
+                    </div>
+                    <div class="signature-group">
+                        <div><strong>Customer Signature:</strong></div>
+                        <div class="signature-box">${customerImg}</div>
+                        <div class="signature-details">
+                            <div><strong>Name:</strong> ${reportData.customer_name || ""}</div>
+                            <div><strong>Designation:</strong> ${reportData.customer_designation || ""}</div>
+                            <div><strong>Contact Number:</strong> ${reportData.customer_mobile || ""}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+  `;
+};
+
+export const generateServiceReportPDF = async (
+  reportData,
+  productData,
+  installData = null,
+  trainees = [],
+  options = {}
+) => {
   try {
-    // Generate HTML template
-    const htmlContent = generateHTMLTemplate(reportData, productData);
+    const origin = getPdfSignatureOrigin(
+      typeof window !== 'undefined' ? window.location.origin : ''
+    );
+    const logoUrl = getPdfLogoUrl();
+    const assetOptions = { logoUrl, origin };
+
+    const useInstallation = options.isInstallationLayout === true;
+    const htmlContent = useInstallation
+      ? generateInstallationHTMLTemplate(
+          reportData,
+          productData,
+          installData,
+          trainees,
+          assetOptions
+        )
+      : generateHTMLTemplate(reportData, productData, assetOptions);
 
     // Create a temporary container element
     const tempContainer = document.createElement('div');
