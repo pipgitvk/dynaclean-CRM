@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, User, Phone, Briefcase, CheckCircle, XCircle, Edit, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronRight, User, Phone, Briefcase, CheckCircle, XCircle, Edit, ExternalLink, Mail } from "lucide-react";
 
 function ContactNode({ contact, children, level = 0, onEdit, basePath = "user-dashboard" }) {
   const [isExpanded, setIsExpanded] = useState(true);
@@ -45,6 +45,12 @@ function ContactNode({ contact, children, level = 0, onEdit, basePath = "user-da
                 <div className="flex items-center gap-2">
                   <Phone size={14} className="text-gray-500 flex-shrink-0" />
                   <span className="break-all">{contact.contact}</span>
+                </div>
+              )}
+              {contact.email && (
+                <div className="flex items-center gap-2">
+                  <Mail size={14} className="text-gray-500 flex-shrink-0" />
+                  <span className="break-all">{contact.email}</span>
                 </div>
               )}
             </div>
@@ -133,6 +139,12 @@ function MemberCustomerCard({ member, basePath = "user-dashboard" }) {
           <div className="flex items-center gap-1 text-sm text-gray-600 w-full sm:w-auto">
             <Phone size={14} className="flex-shrink-0" />
             <span className="break-all">{member.phone}</span>
+          </div>
+        )}
+        {member.email && (
+          <div className="flex items-center gap-1 text-sm text-gray-600 w-full sm:w-auto">
+            <Mail size={14} className="flex-shrink-0" />
+            <span className="break-all">{member.email}</span>
           </div>
         )}
       </div>

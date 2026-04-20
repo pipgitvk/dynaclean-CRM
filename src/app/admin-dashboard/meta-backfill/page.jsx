@@ -1169,29 +1169,14 @@ export default function MetaBackfillPage() {
               )}
           </div>
           <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
-            {/* <span className="font-medium text-emerald-900">assigned_by</span>
-            <span
-              className="inline-flex items-center border border-emerald-200 rounded px-2 py-1 bg-emerald-50/80 text-emerald-950 font-medium tabular-nums"
-              aria-label="Assigner (fixed)"
-            >
-              {ASSIGNED_BY_FIXED_USERNAME}
-            </span>
-            <button
-              type="button"
-              onClick={openAssignedByModal}
-              disabled={!since || !until}
-              className="px-3 py-1 rounded bg-teal-700 text-white text-sm hover:bg-teal-800 disabled:opacity-50"
-            >
-              View
-            </button> */}
-            {/* <span className="text-xs text-emerald-800/90 max-w-md">
-              Shows leads assigned or added by this user (where{" "}
-              <code className="bg-emerald-100/80 px-1 rounded">assigned_to</code> matches).
-            </span> */}
+            {/* ... */}
           </div>
 
-          <h2 className="font-medium mb-2 text-emerald-900 mt-4">
-            Assigned To ({leadsReport.from} to {leadsReport.to})
+          <h2 className="font-medium mb-2 text-emerald-900 mt-4 flex items-center gap-4">
+            <span>Assigned To ({leadsReport.from} to {leadsReport.to})</span>
+            <span className="text-sm text-emerald-800">
+              <strong>Total Leads Assigned :</strong> {leadsReportBreakdown.visible}
+            </span>
           </h2>
           <div className="overflow-x-auto border rounded bg-white">
             <table className="min-w-full text-sm">

@@ -6,6 +6,7 @@ import CustomerContactsModal from "@/components/Customers/CustomerContactsModal"
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
 import Link from "next/link";
 import axios from "axios";
+import { notFound } from "next/navigation";
 
 export default async function CustomerPage({ params }) {
   const { customerId } = await params;
@@ -27,6 +28,9 @@ export default async function CustomerPage({ params }) {
     [customerId],
   );
   const customer = custs[0];
+  if (!customer) {
+    notFound();
+  }
 
   // Fetch followup history
   const [fups] = await conn.execute(
@@ -37,23 +41,26 @@ export default async function CustomerPage({ params }) {
     [customerId],
   );
 
-   const phone=custs[0]?.phone;
-  // const phone = 9949297589;
-
-  const token = "MsvlRZ16sFnrtGcfuZ2Fjk3CIA4Zsm90jPUZFkVqDsI";
-
-  const result = await axios.get(
-    `https://srvr2.dynacleanindustries.com/api/customer-analysis/external/${phone}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-
-        "Content-Type": "application/json",
-      },
-    },
-  );
-  const cust_analysis_external = result.data;
-
+  let cust_analysis_external = {};
+  const phone = customer.phone != null ? String(customer.phone).trim() : "";
+  if (phone) {
+    const token = "MsvlRZ16sFnrtGcfuZ2Fjk3CIA4Zsm90jPUZFkVqDsI";
+    try {
+      const result = await axios.get(
+        `https://srvr2.dynacleanindustries.com/api/customer-analysis/external/${encodeURIComponent(phone)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 15000,
+        },
+      );
+      cust_analysis_external = result.data ?? {};
+    } catch {
+      // Optional external service — page must still render if API is down or returns an error
+    }
+  }
 
   // await conn.end();
 
