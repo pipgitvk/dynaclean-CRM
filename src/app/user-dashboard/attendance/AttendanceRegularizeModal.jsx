@@ -13,6 +13,8 @@ export default function AttendanceRegularizeModal({
   logDateKey,
   onClose,
   onSubmitted,
+  /** When set (e.g. EMPCRM admin acting for an employee), sent as for_username. */
+  forUsername,
 }) {
   const [reason, setReason] = useState("");
   const [checkin, setCheckin] = useState("");
@@ -40,18 +42,28 @@ export default function AttendanceRegularizeModal({
       return;
     }
 
+    const checkinMysql = datetimeLocalToMysql(checkin);
+    const checkoutMysql = datetimeLocalToMysql(checkout);
+    if (log.type === "absent" && (!checkinMysql || !checkoutMysql)) {
+      toast.error("For an absent day, check-in and check-out are required.");
+      return;
+    }
+
     setSaving(true);
     try {
       const fd = new FormData();
       fd.append("log_date", logDateKey);
+      if (forUsername && String(forUsername).trim()) {
+        fd.append("for_username", String(forUsername).trim());
+      }
       fd.append("reason", r);
       fd.append(
         "checkin_time",
-        datetimeLocalToMysql(checkin) ?? ""
+        checkinMysql ?? ""
       );
       fd.append(
         "checkout_time",
-        datetimeLocalToMysql(checkout) ?? ""
+        checkoutMysql ?? ""
       );
       if (file) {
         fd.append("attachment", file);
@@ -97,8 +109,16 @@ export default function AttendanceRegularizeModal({
             <span className="font-medium text-gray-900">
               {new Date(log.date).toLocaleDateString()}
             </span>
-            . Set check-in and check-out. Your reporting manager must approve
-            before the attendance log is updated.
+            {forUsername ? (
+              <>
+                {" "}
+                · Employee:{" "}
+                <span className="font-medium text-gray-900">{forUsername}</span>
+              </>
+            ) : null}
+            . Set check-in and check-out. For a missed day, both times are
+            required. The reporting manager must approve before the attendance
+            log is created or updated.
           </p>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">

@@ -14,6 +14,7 @@ import {
   isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
 
 function attendanceDateYmd(value) {
   if (value == null || value === "") return "";
@@ -74,6 +75,20 @@ const AttendancePage = () => {
   const [rules, setRules] = useState(DEFAULT_ATTENDANCE_RULES);
   /** Merged company + per-employee rules from fetch-all (keyed by username) */
   const [rulesByUsername, setRulesByUsername] = useState({});
+  const [regModalOpen, setRegModalOpen] = useState(false);
+  const [regModalLog, setRegModalLog] = useState(null);
+  const [regModalDateKey, setRegModalDateKey] = useState("");
+  const [regForUsername, setRegForUsername] = useState("");
+
+  const logDateKeyForReg = (log) =>
+    log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
+
+  const openAbsentRegularizeModal = (log) => {
+    setRegModalLog({ ...log, type: "absent" });
+    setRegModalDateKey(logDateKeyForReg(log));
+    setRegForUsername(log.username || "");
+    setRegModalOpen(true);
+  };
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -871,6 +886,17 @@ const AttendancePage = () => {
                       {log.holidayDescription && (
                         <p className="text-xs text-gray-500 mt-1">{log.holidayDescription}</p>
                       )}
+                      {log.type === "absent" && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => openAbsentRegularizeModal(log)}
+                            className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                          >
+                            Regularize
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1082,6 +1108,17 @@ const AttendancePage = () => {
                           {log.holidayDescription && (
                             <p className="text-xs text-gray-500 mt-1">{log.holidayDescription}</p>
                           )}
+                          {log.type === "absent" && (
+                            <div className="mt-3 flex justify-center">
+                              <button
+                                type="button"
+                                onClick={() => openAbsentRegularizeModal(log)}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                              >
+                                Regularize
+                              </button>
+                            </div>
+                          )}
                         </td>
                       )}
                     </tr>
@@ -1183,6 +1220,21 @@ const AttendancePage = () => {
           </div>
         </div>
       )}
+      <AttendanceRegularizeModal
+        open={regModalOpen}
+        log={regModalLog}
+        logDateKey={regModalDateKey}
+        forUsername={regForUsername || undefined}
+        onClose={() => {
+          setRegModalOpen(false);
+          setRegModalLog(null);
+          setRegModalDateKey("");
+          setRegForUsername("");
+        }}
+        onSubmitted={() => {
+          fetchAttendance();
+        }}
+      />
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-4">
