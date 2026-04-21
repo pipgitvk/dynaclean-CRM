@@ -1,6 +1,7 @@
 const HIRING_STATUS_OPTIONS = [
   // Current statuses
   "Toggle",
+  "Talked",
   "Didn't receive the call",
   "Cut the call",
   "Not reachable",
@@ -206,4 +207,3 @@ export function parseHiringPayload(body, options = {}) {
     },
   };
 }
-
