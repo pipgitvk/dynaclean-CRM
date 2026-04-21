@@ -27,23 +27,14 @@ function getUniqueSubHeads(rows) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    if (shList.length === 0) {
-      if (!seen.has("—")) {
-        seen.add("—");
-        result.push("—");
-      }
-    } else {
-      for (const sh of shList) {
-        if (!seen.has(sh)) {
-          seen.add(sh);
-          result.push(sh);
-        }
+    for (const sh of shList) {
+      if (!seen.has(sh)) {
+        seen.add(sh);
+        result.push(sh);
       }
     }
   }
   result.sort((a, b) => {
-    if (a === "—") return -1;
-    if (b === "—") return 1;
     return a.localeCompare(b);
   });
   return result;
@@ -143,8 +134,7 @@ export default async function SubHeadCardsPage({ searchParams }) {
     let count = 0;
     for (const row of rows) {
       const shList = (row.sub_head || "").split(",").map((s) => s.trim()).filter(Boolean);
-      const matches = sh === "—" ? shList.length === 0 : shList.includes(sh);
-      if (matches) {
+      if (shList.includes(sh)) {
         // Full amount goes to each selected sub-head row (no splitting).
         totalAmount += Number(row.amount || 0);
         count += 1;
@@ -202,9 +192,7 @@ export default async function SubHeadCardsPage({ searchParams }) {
                     <Layers className="w-3.5 h-3.5 shrink-0 text-gray-400" />
                     <span className="font-medium">sub_head:</span>
                   </div>
-                  <p className="text-sm font-semibold text-gray-800 truncate">
-                    {card.sub_head === "—" ? "No sub-head" : card.sub_head}
-                  </p>
+                  <p className="text-sm font-semibold text-gray-800 truncate">{card.sub_head}</p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
               </div>
