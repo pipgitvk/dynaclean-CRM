@@ -19,23 +19,14 @@ function getUniqueSubHeads(rows) {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
-    if (shList.length === 0) {
-      if (!seen.has("—")) {
-        seen.add("—");
-        result.push("—");
-      }
-    } else {
-      for (const sh of shList) {
-        if (!seen.has(sh)) {
-          seen.add(sh);
-          result.push(sh);
-        }
+    for (const sh of shList) {
+      if (!seen.has(sh)) {
+        seen.add(sh);
+        result.push(sh);
       }
     }
   }
   result.sort((a, b) => {
-    if (a === "—") return -1;
-    if (b === "—") return 1;
     return a.localeCompare(b);
   });
   return result;
@@ -115,8 +106,7 @@ export async function GET(req) {
       let count = 0;
       for (const row of rows) {
         const shList = (row.sub_head || "").split(",").map((s) => s.trim()).filter(Boolean);
-        const matches = sh === "—" ? shList.length === 0 : shList.includes(sh);
-        if (matches) {
+        if (shList.includes(sh)) {
           // Full amount applies to selected sub-heads (no splitting).
           totalAmount += Number(row.amount || 0);
           count += 1;
