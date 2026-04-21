@@ -15,6 +15,7 @@ const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900`;
 
 const STATUS_OPTIONS = [
   "Toggle",
+  "Talked",
   "Didn't receive the call",
   "Cut the call",
   "Not reachable",
@@ -82,6 +83,7 @@ function formatInterviewAt(v) {
 
 const STATUS_CHIP_STYLES = {
   Toggle:        "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
+  Talked:        "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Follow-up":   "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Didn't receive the call": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   "Cut the call": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
@@ -772,7 +774,7 @@ export default function HiringPage() {
                     </select>
                   </div>
 
-                  {!["Toggle", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (
+                  {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (
                     <>
                       <div>
                         <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -1034,7 +1036,7 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {!["Toggle", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (
+                  {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (
                     <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                       <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

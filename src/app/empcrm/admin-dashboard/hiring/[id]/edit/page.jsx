@@ -307,7 +307,7 @@ export default function EmpcrmHiringEditPage() {
                 ))}
               </select>
             </div>
-            {!["Toggle", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
+            {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
               <>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -565,7 +565,7 @@ export default function EmpcrmHiringEditPage() {
               </div>
             )}
 
-            {!["Toggle", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
+            {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
               <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                 <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
