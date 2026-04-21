@@ -131,13 +131,30 @@ export async function POST(req) {
     };
 
     // Send email using template system
-    await sendTemplatedEmail("COMPLAINT", templateData, {
-      to: toEmails.join(","),
-      cc: "service@dynacleanindustries.com",
-      attachments: attachments.map((att) => ({
-        path: path.join(process.cwd(), "public", att),
-      })),
-    });
+    try {
+      await sendTemplatedEmail("COMPLAINT", templateData, {
+        to: toEmails.join(","),
+        cc: "service@dynacleanindustries.com",
+        attachments: attachments.map((att) => ({
+          path: path.join(
+            process.cwd(),
+            "public",
+            typeof att === "string" ? att.replace(/^\/+/, "") : att,
+          ),
+        })),
+      });
+    } catch (emailError) {
+      console.error(
+        "Email sending failed (but complaint was saved):",
+        emailError,
+      );
+      return NextResponse.json({
+        success: true,
+        serviceId,
+        message:
+          "Complaint added successfully, but email notification could not be sent.",
+      });
+    }
 
     // await conn.end();
     return NextResponse.json({ success: true, serviceId: serviceId });
