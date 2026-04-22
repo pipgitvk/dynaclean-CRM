@@ -84,11 +84,46 @@ export default function StatementTable({ rows }) {
     };
   }, [searchQuery]);
 
+  const getLinkedPurchaseIds = (row) => {
+    const raw = row?.linked_purchase_ids;
+    if (raw == null || String(raw).trim() === "") return [];
+    try {
+      const parsed = JSON.parse(String(raw));
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((x) => Number(x))
+          .filter((x) => Number.isFinite(x) && x > 0);
+      }
+    } catch {}
+    return String(raw)
+      .split(",")
+      .map((x) => Number(String(x).trim()))
+      .filter((x) => Number.isFinite(x) && x > 0);
+  };
+
+  const isSettledRow = (row) => {
+    const linked = getLinkedPurchaseIds(row);
+    const inv = String(row?.invoice_status ?? "").trim();
+    if (inv === "Settled") return true;
+    if (row?.client_expense_id) return true;
+    if (linked.length > 0) return true;
+    return false;
+  };
+
+  const displayInvoiceStatus = (row) => {
+    const linked = getLinkedPurchaseIds(row);
+    const inv = row?.invoice_status != null ? String(row.invoice_status).trim() : "";
+    if ((inv === "" || inv === "Unsettled") && linked.length > 0) return "Settled";
+    if (inv) return inv;
+    return row?.client_expense_id ? "Settled" : "Unsettled";
+  };
+
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
       if (statusFilter) {
-        if (statusFilter === "Settled" && !row.client_expense_id) return false;
-        if (statusFilter === "Unsettled" && row.client_expense_id) return false;
+        const settled = isSettledRow(row);
+        if (statusFilter === "Settled" && !settled) return false;
+        if (statusFilter === "Unsettled" && settled) return false;
       }
       if (searchQuery.trim()) {
         const qRaw = searchQuery.trim();
@@ -195,7 +230,7 @@ export default function StatementTable({ rows }) {
         case "credit":
           return row.type === "Credit" ? Number(row.amount || 0) : 0;
         case "status":
-          return (row.client_expense_id ? "settled" : "unsettled");
+          return (isSettledRow(row) ? "settled" : "unsettled");
         case "balance":
           return displayBalance(row);
         default:
@@ -269,7 +304,7 @@ export default function StatementTable({ rows }) {
         (row.description || "-").toString().slice(0, 22),
         row.type === "Debit" ? formatPdfAmount(row.amount) : "-",
         row.type === "Credit" ? formatPdfAmount(row.amount) : "-",
-        row.invoice_status || (row.client_expense_id ? "Settled" : "Unsettled"),
+        displayInvoiceStatus(row),
         row.invoice_number || "-",
         formatPdfAmount(displayBalance(row)),
       ]),
@@ -433,8 +468,8 @@ export default function StatementTable({ rows }) {
       .finally(() => setExpenseLoading(false));
   }, [modalId]);
 
-  const filteredUnsettled = filteredRows.filter((r) => !r.client_expense_id).length;
-  const filteredSettled = filteredRows.filter((r) => r.client_expense_id).length;
+  const filteredUnsettled = filteredRows.filter((r) => !isSettledRow(r)).length;
+  const filteredSettled = filteredRows.filter((r) => isSettledRow(r)).length;
 
   return (
     <div className="space-y-4">
@@ -560,6 +595,7 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("credit")} className="p-3 cursor-pointer select-none">Credit<SortIcon column="credit" /></th>
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
               <th className="p-3">Invoice No</th>
+              <th className="p-3">Purchase IDs</th>
               <th
                 onClick={() => handleSort("balance")}
                 className="p-3 cursor-pointer select-none"
@@ -598,19 +634,19 @@ export default function StatementTable({ rows }) {
                     {row.type === "Credit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}
                   </td>
                   <td className="p-3">
-                    {row.invoice_status ? (
+                    {displayInvoiceStatus(row) ? (
                       <span className={
-                        row.invoice_status === "Settled"
+                        displayInvoiceStatus(row) === "Settled"
                           ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"
-                          : row.invoice_status === "Partial Paid"
+                          : displayInvoiceStatus(row) === "Partial Paid"
                           ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"
                           : "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
                       }>
-                        {row.invoice_status}
+                        {displayInvoiceStatus(row)}
                       </span>
                     ) : (
-                      <span className={row.client_expense_id ? "text-green-600 font-medium text-sm" : "text-amber-600 font-medium text-sm"}>
-                        {row.client_expense_id ? "Settled" : "Unsettled"}
+                      <span className={isSettledRow(row) ? "text-green-600 font-medium text-sm" : "text-amber-600 font-medium text-sm"}>
+                        {isSettledRow(row) ? "Settled" : "Unsettled"}
                       </span>
                     )}
                   </td>
@@ -622,6 +658,17 @@ export default function StatementTable({ rows }) {
                     ) : (
                       <span className="text-gray-300 text-xs">—</span>
                     )}
+                  </td>
+                  <td className="p-3">
+                    {(() => {
+                      const ids = getLinkedPurchaseIds(row);
+                      if (!ids.length) return <span className="text-gray-300 text-xs">—</span>;
+                      return (
+                        <span className="text-xs font-mono text-slate-700">
+                          {ids.map((x) => `#${x}`).join(", ")}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td
                     className="p-3 font-medium"
@@ -654,7 +701,7 @@ export default function StatementTable({ rows }) {
               ))
             ) : (
               <tr>
-                <td colSpan="13" className="p-4 text-center text-gray-500">
+                <td colSpan="14" className="p-4 text-center text-gray-500">
                   No entries found.
                 </td>
               </tr>
@@ -684,19 +731,19 @@ export default function StatementTable({ rows }) {
             <div><strong>Credit:</strong> <span className="text-green-600">{row.type === "Credit" ? `₹${Number(row.amount || 0).toFixed(2)}` : "-"}</span></div>
             <div>
               <strong>Status:</strong>{" "}
-              {row.invoice_status ? (
+              {displayInvoiceStatus(row) ? (
                 <span className={
-                  row.invoice_status === "Settled"
+                  displayInvoiceStatus(row) === "Settled"
                     ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"
-                    : row.invoice_status === "Partial Paid"
+                    : displayInvoiceStatus(row) === "Partial Paid"
                     ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"
                     : "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
                 }>
-                  {row.invoice_status}
+                  {displayInvoiceStatus(row)}
                 </span>
               ) : (
-                <span className={row.client_expense_id ? "text-green-600" : "text-amber-600"}>
-                  {row.client_expense_id ? "Settled" : "Unsettled"}
+                <span className={isSettledRow(row) ? "text-green-600" : "text-amber-600"}>
+                  {isSettledRow(row) ? "Settled" : "Unsettled"}
                 </span>
               )}
             </div>
@@ -709,6 +756,34 @@ export default function StatementTable({ rows }) {
               ) : (
                 <span className="text-gray-400">—</span>
               )}
+            </div>
+            <div>
+              <strong>Purchase IDs:</strong>{" "}
+              {(() => {
+                const raw = row.linked_purchase_ids;
+                let ids = [];
+                if (raw != null && String(raw).trim() !== "") {
+                  try {
+                    const parsed = JSON.parse(String(raw));
+                    if (Array.isArray(parsed)) {
+                      ids = parsed
+                        .map((x) => Number(x))
+                        .filter((x) => Number.isFinite(x) && x > 0);
+                    }
+                  } catch {
+                    ids = String(raw)
+                      .split(",")
+                      .map((x) => Number(String(x).trim()))
+                      .filter((x) => Number.isFinite(x) && x > 0);
+                  }
+                }
+                if (!ids.length) return <span className="text-gray-400">—</span>;
+                return (
+                  <span className="text-xs font-mono text-slate-700">
+                    {ids.map((x) => `#${x}`).join(", ")}
+                  </span>
+                );
+              })()}
             </div>
             <div>
               <strong>Balance:</strong>{" "}
