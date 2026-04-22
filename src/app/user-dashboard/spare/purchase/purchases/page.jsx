@@ -178,6 +178,202 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
   );
 }
 
+function LinkPaymentModal({ open, onClose, purchase }) {
+  const [loading, setLoading] = useState(false);
+  const [statements, setStatements] = useState([]);
+  const [search, setSearch] = useState("");
+  const [linkingId, setLinkingId] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setStatements([]);
+    setSearch("");
+    let cancelled = false;
+    setLoading(true);
+    fetch("/api/statements", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const rows = Array.isArray(data?.statements) ? data.statements : [];
+        setStatements(rows);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Failed to load statements");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const getLinkedPurchaseIds = (stmt) => {
+    const raw = stmt?.linked_purchase_ids;
+    if (raw == null || String(raw).trim() === "") return [];
+    try {
+      const parsed = JSON.parse(String(raw));
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((x) => Number(x))
+          .filter((x) => Number.isFinite(x) && x > 0);
+      }
+    } catch {}
+    return String(raw)
+      .split(",")
+      .map((x) => Number(String(x).trim()))
+      .filter((x) => Number.isFinite(x) && x > 0);
+  };
+
+  const eligibleStatements = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const isUnsettled = (s) =>
+      (String(s.invoice_status || "").trim() === "Unsettled") ||
+      (!s.invoice_status && !s.client_expense_id);
+    const isDebit = (s) => String(s.type || "").trim() === "Debit";
+
+    const pid = Number(purchase?.id);
+    let rows = statements.filter((s) => {
+      if (!isUnsettled(s) || !isDebit(s)) return false;
+      const linked = getLinkedPurchaseIds(s);
+      if (linked.length > 0 && (!Number.isFinite(pid) || !linked.includes(pid))) return false;
+      return true;
+    });
+
+    if (q) {
+      rows = rows.filter((s) => {
+        const id = String(s.id ?? "").toLowerCase();
+        const transId = String(s.trans_id ?? "").toLowerCase();
+        const desc = String(s.description ?? "").toLowerCase();
+        const amount = String(s.amount ?? "").toLowerCase();
+        return id.includes(q) || transId.includes(q) || desc.includes(q) || amount.includes(q);
+      });
+    }
+
+    return rows;
+  }, [statements, search, purchase?.id]);
+
+  const hasPurchaseId = (stmt) => {
+    const pid = Number(purchase?.id);
+    if (!Number.isFinite(pid) || pid <= 0) return false;
+    return getLinkedPurchaseIds(stmt).includes(pid);
+  };
+
+  async function linkToStatement(statementId) {
+    try {
+      if (!purchase?.id) return;
+      setLinkingId(statementId);
+      const res = await fetch(`/api/statements/${statementId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ purchase_id: purchase.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to link");
+      toast.success("Payment linked");
+      onClose();
+    } catch (e) {
+      toast.error(e.message || "Link failed");
+    } finally {
+      setLinkingId(null);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl p-4 max-h-[85vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-lg font-semibold">Link Payment</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Purchase #{purchase?.id} • Showing only Unsettled + Debit statements
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-500">✕</button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search statement..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-72"
+            />
+          </div>
+          <div className="text-xs text-gray-600">
+            {loading ? "Loading..." : `Showing ${eligibleStatements.length} statement(s)`}
+          </div>
+        </div>
+
+        <div className="border rounded overflow-hidden">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-100 text-left">
+              <tr>
+                <th className="p-3 border-b font-semibold">ID</th>
+                <th className="p-3 border-b font-semibold">Trans ID</th>
+                <th className="p-3 border-b font-semibold">Date</th>
+                <th className="p-3 border-b font-semibold">Description</th>
+                <th className="p-3 border-b font-semibold">Amount</th>
+                <th className="p-3 border-b font-semibold">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center text-gray-500">Loading...</td>
+                </tr>
+              ) : eligibleStatements.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center text-gray-500">No matching statements</td>
+                </tr>
+              ) : (
+                eligibleStatements.map((s) => {
+                  const already = hasPurchaseId(s);
+                  const linkedIds = getLinkedPurchaseIds(s);
+                  const linkedToOther =
+                    linkedIds.length > 0 && !linkedIds.includes(Number(purchase?.id));
+                  const disabled = already || linkedToOther || linkingId === s.id;
+                  const title = already
+                    ? "Already linked"
+                    : linkedToOther
+                    ? `Already linked to purchase #${linkedIds[0]}`
+                    : "Link this statement";
+                  return (
+                    <tr key={s.id} className="border-t hover:bg-gray-50">
+                      <td className="p-3">#{s.id}</td>
+                      <td className="p-3 font-mono text-xs">{s.trans_id || "—"}</td>
+                      <td className="p-3">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                      <td className="p-3 max-w-[420px] truncate" title={s.description || ""}>{s.description || "—"}</td>
+                      <td className="p-3 font-semibold text-red-700">₹{Number(s.amount || 0).toFixed(2)}</td>
+                      <td className="p-3">
+                        <button
+                          type="button"
+                          onClick={() => linkToStatement(s.id)}
+                          disabled={disabled}
+                          className={`px-3 py-1.5 rounded text-sm text-white ${disabled ? "bg-gray-400" : "bg-emerald-600 hover:bg-emerald-700"} disabled:opacity-50`}
+                          title={title}
+                        >
+                          {already ? "Linked" : linkingId === s.id ? "Linking..." : "Select"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SparePurchasesPage() {
   const [purchases, setPurchases] = useState([]);
   const [search, setSearch] = useState("");
@@ -188,6 +384,8 @@ export default function SparePurchasesPage() {
   const [detailPurchase, setDetailPurchase] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
   const [editRecord, setEditRecord] = useState(null);
+  const [linkPaymentOpen, setLinkPaymentOpen] = useState(false);
+  const [linkPurchase, setLinkPurchase] = useState(null);
 
   useEffect(() => {
     loadPurchases();
@@ -370,6 +568,13 @@ export default function SparePurchasesPage() {
                       >
                         Edit
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
+                        className="text-emerald-600 hover:underline text-sm"
+                      >
+                        Link Payment
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -381,6 +586,13 @@ export default function SparePurchasesPage() {
 
       {/* Edit Transport Modal */}
       <SpareEditTransportModal open={editOpen} onClose={() => setEditOpen(false)} record={editRecord} onSaved={loadPurchases} />
+
+      {/* Link Payment Modal */}
+      <LinkPaymentModal
+        open={linkPaymentOpen}
+        onClose={() => { setLinkPaymentOpen(false); setLinkPurchase(null); }}
+        purchase={linkPurchase}
+      />
 
       {detailPurchase && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60" onClick={() => setDetailPurchase(null)}>

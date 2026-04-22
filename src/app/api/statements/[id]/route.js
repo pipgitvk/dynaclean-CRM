@@ -37,8 +37,15 @@ export async function GET(req, { params }) {
         );
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT linked_purchase_ids FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN linked_purchase_ids TEXT NULL");
+      } catch (__) {}
+    }
     const [rows] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, invoice_status, expense_allocation, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, invoice_status, expense_allocation, linked_purchase_ids, created_at
        FROM statements WHERE id = ?`,
       [id]
     );
@@ -275,6 +282,89 @@ export async function PUT(req, { params }) {
       );
     }
     console.error("[statements-api] PUT error:", err?.message || err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req, { params }) {
+  try {
+    const token = req.cookies.get("token")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
+
+    const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+    const purchaseIdRaw = body?.purchase_id ?? body?.purchaseId;
+    const purchaseId = Number(purchaseIdRaw);
+    if (!Number.isFinite(purchaseId) || purchaseId <= 0) {
+      return NextResponse.json({ error: "purchase_id is required" }, { status: 400 });
+    }
+
+    const pool = await getDbConnection();
+    try {
+      await pool.execute("SELECT invoice_status FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await pool.execute("ALTER TABLE statements ADD COLUMN invoice_status VARCHAR(50) NULL");
+      } catch (__) {}
+    }
+    try {
+      await pool.execute("SELECT linked_purchase_ids FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await pool.execute("ALTER TABLE statements ADD COLUMN linked_purchase_ids TEXT NULL");
+      } catch (__) {}
+    }
+
+    const conn = await pool.getConnection();
+    try {
+      const [rows] = await conn.execute(
+        "SELECT linked_purchase_ids FROM statements WHERE id = ?",
+        [id],
+      );
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return NextResponse.json({ error: "Statement not found" }, { status: 404 });
+      }
+
+      const raw = rows[0]?.linked_purchase_ids;
+      let ids = [];
+      if (raw != null && String(raw).trim() !== "") {
+        try {
+          const parsed = JSON.parse(String(raw));
+          if (Array.isArray(parsed)) {
+            ids = parsed.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0);
+          }
+        } catch {
+          ids = String(raw)
+            .split(",")
+            .map((x) => Number(String(x).trim()))
+            .filter((x) => Number.isFinite(x) && x > 0);
+        }
+      }
+
+      const unique = [...new Set(ids)].sort((a, b) => a - b);
+      if (unique.length > 0 && !unique.includes(purchaseId)) {
+        return NextResponse.json(
+          { error: `Statement already linked to purchase #${unique[0]}` },
+          { status: 409 },
+        );
+      }
+      ids = [purchaseId];
+
+      await conn.execute(
+        "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ? WHERE id = ?",
+        [JSON.stringify(ids), "Settled", id],
+      );
+
+      return NextResponse.json({ success: true, linked_purchase_ids: ids });
+    } finally {
+      conn.release();
+    }
+  } catch (err) {
+    console.error("[statements-api] PATCH error:", err?.message || err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
