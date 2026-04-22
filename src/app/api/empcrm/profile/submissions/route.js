@@ -161,6 +161,50 @@ const toYyyyMmDd = (val) => {
   return s;
 };
 
+async function attachUserStatus(conn, rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.length === 0) return list;
+
+  const usernames = [...new Set(list
+    .map((r) => (r?.username != null ? String(r.username).trim() : ""))
+    .filter((u) => u !== "")
+  )];
+  if (usernames.length === 0) return list;
+
+  const lookupKeys = usernames.map((u) => u.toLowerCase());
+  const placeholders = usernames.map(() => "?").join(", ");
+  const [statusRows] = await conn.execute(
+    `SELECT LOWER(TRIM(username)) AS ukey, status, 1 AS srcprio
+     FROM rep_list
+     WHERE LOWER(TRIM(username)) IN (${placeholders})
+     UNION ALL
+     SELECT LOWER(TRIM(username)) AS ukey, status, 2 AS srcprio
+     FROM emplist
+     WHERE LOWER(TRIM(username)) IN (${placeholders})`,
+    [...lookupKeys, ...lookupKeys]
+  );
+
+  const statusMap = {};
+  for (const r of statusRows || []) {
+    const key = r?.ukey != null ? String(r.ukey).trim() : "";
+    if (!key) continue;
+    const srcprio = Number(r?.srcprio);
+    if (!Number.isFinite(srcprio)) continue;
+    if (!statusMap[key] || srcprio < statusMap[key].srcprio) {
+      statusMap[key] = { status: r?.status ?? null, srcprio };
+    }
+  }
+
+  return list.map((row) => {
+    const key = row?.username != null ? String(row.username).trim().toLowerCase() : "";
+    const raw = key ? statusMap[key]?.status : null;
+    const n = raw == null ? null : Number(raw);
+    const user_status = Number.isFinite(n) ? n : null;
+    const user_active = user_status === 1 ? true : user_status === 0 ? false : null;
+    return { ...row, user_status, user_active };
+  });
+}
+
 // GET: List submissions (admin/HR); ?mine=1 = logged-in employee's active revision request
 export async function GET(request) {
   try {
@@ -180,7 +224,8 @@ export async function GET(request) {
       }
       const sql = `SELECT * FROM employee_profile_submissions WHERE status IN ('reassign', 'revision_requested') AND ${owner.clause} ORDER BY submitted_at DESC LIMIT 1`;
       const [rows] = await conn.execute(sql, owner.params);
-      return NextResponse.json({ success: true, submissions: rows });
+      const enriched = await attachUserStatus(conn, rows);
+      return NextResponse.json({ success: true, submissions: enriched });
     }
 
     if (mine === "latest") {
@@ -190,7 +235,8 @@ export async function GET(request) {
       }
       const sql = `SELECT * FROM employee_profile_submissions WHERE ${owner.clause} ORDER BY submitted_at DESC LIMIT 1`;
       const [rows] = await conn.execute(sql, owner.params);
-      return NextResponse.json({ success: true, submissions: rows });
+      const enriched = await attachUserStatus(conn, rows);
+      return NextResponse.json({ success: true, submissions: enriched });
     }
 
     if (!isEmpcrmProfileAdmin(session)) {
@@ -209,7 +255,8 @@ export async function GET(request) {
       if (rows.length && isEmpcrmProfileAdmin(session)) {
         rows = [await maybeRepairBlankSubmissionStatus(conn, rows[0])];
       }
-      return NextResponse.json({ success: true, submissions: rows });
+      const enriched = await attachUserStatus(conn, rows);
+      return NextResponse.json({ success: true, submissions: enriched });
     }
 
     const status = (searchParams.get("status") || "pending").trim();
@@ -265,15 +312,17 @@ export async function GET(request) {
             roleMap[String(r.username || "").trim().toLowerCase()] = String(r.userRole || "").trim().toUpperCase();
           }
         }
-        const enriched = rows.map((row) => ({
+        const withReviewerRole = rows.map((row) => ({
           ...row,
           reviewer_role: roleMap[String(row.reviewed_by || "").trim().toLowerCase()] || null,
         }));
+        const enriched = await attachUserStatus(conn, withReviewerRole);
         return NextResponse.json({ success: true, submissions: enriched });
       }
 
       const [rows] = await conn.execute(sql, params);
-      return NextResponse.json({ success: true, submissions: rows });
+      const enriched = await attachUserStatus(conn, rows);
+      return NextResponse.json({ success: true, submissions: enriched });
     }
 
     let sql;
@@ -305,7 +354,8 @@ export async function GET(request) {
     sql += " ORDER BY submitted_at DESC";
 
     const [rows] = await conn.execute(sql, params);
-    return NextResponse.json({ success: true, submissions: rows });
+    const enriched = await attachUserStatus(conn, rows);
+    return NextResponse.json({ success: true, submissions: enriched });
   } catch (error) {
     console.error('[PROFILE][SUBMISSIONS][GET] error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
