@@ -9,7 +9,7 @@ import {
   getCheckoutStatus as checkoutStatusFromRules,
   getBreakStatus as breakStatusFromRules,
   isHalfDayByRules,
-  isLateDaySummary,
+  classifyAttendanceDay,
 } from "@/lib/attendanceRulesEngine";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
@@ -227,23 +227,29 @@ const AttendancePage = () => {
   allDates.reverse();
 
   // Calculate summary statistics
-  const summary = allDates.reduce(
-    (acc, log) => {
+  const { summary, dayKindByDateKey } = (() => {
+    const acc = { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0 };
+    const map = new Map();
+    let graceHalfDaysUsed = 0;
+    for (let i = allDates.length - 1; i >= 0; i--) {
+      const log = allDates[i];
+      const k = new Date(log.date).toLocaleDateString("en-CA");
+      map.set(k, log.type);
       if (log.type === "absent") acc.absents++;
       if (log.type === "leave") acc.leaves++;
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
         acc.present++;
-        if (isHalfDay(log)) acc.halfDays++;
-        if (isLateDaySummary(log, rules)) {
-          acc.lateDays++;
-        }
+        const cls = classifyAttendanceDay(log, rules, graceHalfDaysUsed);
+        graceHalfDaysUsed = cls.graceHalfDaysUsed;
+        map.set(k, cls.kind);
+        if (cls.kind === "halfDay") acc.halfDays++;
+        if (cls.kind === "lateDay") acc.lateDays++;
       }
-      return acc;
-    },
-    { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0 }
-  );
+    }
+    return { summary: acc, dayKindByDateKey: map };
+  })();
 
   // Filter the complete list of dates based on user selection
   const filteredLogs = allDates.filter((log) => {
@@ -252,26 +258,17 @@ const AttendancePage = () => {
     if (filterStatus === "all") {
       return true;
     } else if (filterStatus === "late") {
-      // Show only RED late status (09:46-09:59 or 18:14), NOT grace period or half day
-      const checkinStatus = getCheckinStatus(log.checkin_time);
-      const checkoutStatus = getCheckoutStatus(log.checkout_time);
-      return (
-        log.type === "present" &&
-        (checkinStatus === 'late' || checkoutStatus === 'late')
-      );
+      if (log.type !== "present") return false;
+      const k = new Date(log.date).toLocaleDateString("en-CA");
+      return dayKindByDateKey.get(k) === "lateDay";
     } else if (filterStatus === "onTime") {
-      // Show green on time AND orange grace period (NOT red late or yellow half day)
-      const checkinStatus = getCheckinStatus(log.checkin_time);
-      const checkoutStatus = getCheckoutStatus(log.checkout_time);
-      return (
-        log.type === "present" &&
-        checkinStatus !== 'late' &&
-        checkinStatus !== 'halfDay' &&
-        checkoutStatus !== 'late' &&
-        checkoutStatus !== 'halfDay'
-      );
+      if (log.type !== "present") return false;
+      const k = new Date(log.date).toLocaleDateString("en-CA");
+      return dayKindByDateKey.get(k) === "regular";
     } else if (filterStatus === "halfDay") {
-      return log.type === "present" && isHalfDay(log);
+      if (log.type !== "present") return false;
+      const k = new Date(log.date).toLocaleDateString("en-CA");
+      return dayKindByDateKey.get(k) === "halfDay";
     }
 
     return true;
@@ -334,7 +331,7 @@ const AttendancePage = () => {
           </div>
           <div className="bg-white p-4 rounded-lg shadow-md">
             <p className="text-2xl font-bold text-red-600">{summary.lateDays}</p>
-            <p className="text-sm text-gray-500">Late Days</p>
+            <p className="text-sm text-gray-500">LOP (Loss of Pay)</p>
           </div>
         </div>
 
@@ -361,7 +358,7 @@ const AttendancePage = () => {
               <p className="text-sm text-gray-700">Leave</p>
             </div>
             <div className="flex items-center">
-              <span className="inline-block w-4 h-4 rounded-full bg-purple-300 mr-2"></span>
+              <span className="inline-block w-4 h-4 rounded-full bg-purple-200 mr-2"></span>
               <p className="text-sm text-gray-700">Sunday</p>
             </div>
             <div className="flex items-center">
@@ -472,11 +469,16 @@ const AttendancePage = () => {
                       <span
                         className={`text-sm ${(() => {
                           const status = getCheckinStatus(log.checkin_time);
-                          if (status === 'halfDay') return 'text-yellow-600';
-                          if (status === 'late') return 'text-red-600';
-                          if (status === 'onTime') return 'text-green-600';
-                          if (status === 'grace') return 'text-yellow-600';
-                          return 'text-green-600';
+                          if (status === "halfDay") return "text-yellow-600";
+                          if (status === "late") return "text-red-600";
+                          if (status === "grace") {
+                            const k = new Date(log.date).toLocaleDateString("en-CA");
+                            const kind = dayKindByDateKey.get(k);
+                            return kind === "halfDay"
+                              ? "text-yellow-800 bg-yellow-100 px-1 rounded"
+                              : "text-red-600";
+                          }
+                          return "text-green-600";
                         })()
                           }`}
                       >
@@ -520,10 +522,10 @@ const AttendancePage = () => {
                       <span
                         className={`text-sm ${(() => {
                           const status = getCheckoutStatus(log.checkout_time);
-                          if (status === 'halfDay') return 'text-yellow-600';
-                          if (status === 'late') return 'text-red-600';
-                          if (status === 'grace') return 'text-orange-600';
-                          return 'text-green-600';
+                          if (status === "halfDay") return "text-yellow-300";
+                          if (status === "late") return "text-red-600";
+                          if (status === "grace") return "text-orange-600";
+                          return "text-green-600";
                         })()
                           }`}
                       >
@@ -621,11 +623,15 @@ const AttendancePage = () => {
                         <td
                           className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
                             const status = getCheckinStatus(log.checkin_time);
-                            if (status === 'halfDay') return 'bg-yellow-100';
-                            if (status === 'late') return 'bg-red-100';
-                            if (status === 'onTime') return 'bg-green-100';
-                            if (status === 'grace') return 'bg-yellow-100';
-                            return '';
+                            if (status === "halfDay") return "bg-yellow-50";
+                            if (status === "late") return "bg-red-100";
+                            if (status === "grace") {
+                              const k = new Date(log.date).toLocaleDateString("en-CA");
+                              const kind = dayKindByDateKey.get(k);
+                              return kind === "halfDay" ? "bg-yellow-100" : "bg-red-100";
+                            }
+                            if (status === "onTime") return "bg-green-100";
+                            return "";
                           })()
                             }`}
                         >
@@ -667,11 +673,11 @@ const AttendancePage = () => {
                         <td
                           className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 ${(() => {
                             const status = getCheckoutStatus(log.checkout_time);
-                            if (status === 'halfDay') return 'bg-yellow-100';
-                            if (status === 'late') return 'bg-red-100';
-                            if (status === 'grace') return 'bg-orange-100';
-                            if (status === 'onTime') return 'bg-green-100';
-                            return '';
+                            if (status === "halfDay") return "bg-yellow-100";
+                            if (status === "late") return "bg-yellow-100";
+                            if (status === "grace") return "bg-orange-100";
+                            if (status === "onTime") return "bg-green-100";
+                            return "";
                           })()
                             }`}
                         >
@@ -702,7 +708,9 @@ const AttendancePage = () => {
                           ? "bg-orange-50 text-orange-700"
                           : log.type === "leave"
                             ? "bg-blue-50 text-blue-700"
-                            : "bg-green-50 text-green-700"
+                            : log.type === "sunday"
+                              ? "bg-purple-50 text-purple-700"
+                              : "bg-indigo-50 text-indigo-700"
                           }`}
                       >
                         <p className="font-bold text-lg">

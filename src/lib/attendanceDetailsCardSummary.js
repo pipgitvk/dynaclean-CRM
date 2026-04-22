@@ -4,8 +4,7 @@
  * date keys use dateToYmdKey (stable for DB strings) like the rest of payroll.
  */
 import {
-  isHalfDayByRules,
-  isLateDaySummary,
+  classifyAttendanceDayForSalary,
 } from "@/lib/attendanceRulesEngine";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
 
@@ -70,6 +69,7 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     halfDays: 0,
     lateDays: 0,
   };
+  let freeGraceUsed = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, monthIndex, day);
@@ -84,8 +84,9 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
 
     if (existingLog) {
       summary.present++;
-      if (isHalfDayByRules(existingLog, rules)) summary.halfDays++;
-      if (isLateDaySummary(existingLog, rules)) summary.lateDays++;
+      const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
+      freeGraceUsed = cls.freeGraceUsed;
+      if (cls.kind === "lateDay") summary.lateDays++;
     } else if (isWeekend) {
       summary.sundays++;
     } else if (isHoliday) {

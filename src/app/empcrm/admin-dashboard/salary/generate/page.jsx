@@ -176,6 +176,7 @@ const GenerateSalaryPage = () => {
                         cards: empAtt.attendance_cards || null,
                         present: Number(empAtt.present_days) || 0,
                         halfDay: Number(empAtt.half_day_count) || 0,
+                        lateDay: Number(empAtt.late_day_count) || 0,
                         weekendOff: Number(empAtt.weekend_off_count) || 0,
                         holiday: Number(empAtt.holiday_count) || 0,
                         lop: Number(empAtt.lop_count) || 0,
@@ -195,6 +196,7 @@ const GenerateSalaryPage = () => {
                                       deductionDays: Number(empAtt.pay_deduction_days) || 0,
                                       salaryFullDays: Number(empAtt.present_days) || 0,
                                       salaryHalfDays: Number(empAtt.half_day_count) || 0,
+                                      salaryLateDays: Number(empAtt.late_day_count) || 0,
                                   }
                                 : null,
                     });
@@ -838,7 +840,7 @@ const GenerateSalaryPage = () => {
                                         </span>
                                     </li>
                                     <li>
-                                        Total attendance (salary rules) = full days + (half days ÷ 2) ={" "}
+                                        Total attendance (salary rules) = full days + (late days ÷ 2) ={" "}
                                         {formatPayCalcNumber(
                                             attendanceDisplayAllZero
                                                 ? 0
@@ -848,7 +850,8 @@ const GenerateSalaryPage = () => {
                                         {formatPayCalcNumber(
                                             attendanceDisplayAllZero
                                                 ? 0
-                                                : attendanceBreakdown.payCalc.salaryHalfDays
+                                                : (Number(attendanceBreakdown.payCalc.salaryHalfDays) || 0) +
+                                                  (Number(attendanceBreakdown.payCalc.salaryLateDays) || 0)
                                         )}{" "}
                                         ÷ 2) ={" "}
                                         <span className="font-semibold text-purple-800 tabular-nums">
@@ -860,7 +863,7 @@ const GenerateSalaryPage = () => {
                                         </span>
                                     </li>
                                     <li>
-                                        Deduction days = max(0, required − total attendance) ={" "}
+                                        Deduction days = (required − total attendance) ={" "}
                                         <span className="font-semibold tabular-nums">
                                             {formatPayCalcNumber(
                                                 attendanceDisplayAllZero
@@ -902,17 +905,13 @@ const GenerateSalaryPage = () => {
                             {(() => {
                                 const c = attendanceBreakdown.cards;
                                 if (c) {
-                                    const lateDaysAdjusted = attendanceDisplayAllZero
-                                        ? 0
-                                        : Math.max(
-                                              0,
-                                              (Number(c.lateDays) || 0) - (Number(c.halfDays) || 0)
-                                          );
                                     const presentRegular = attendanceDisplayAllZero
                                         ? 0
                                         : Math.max(
                                               0,
-                                              (Number(c.present) || 0) - (Number(c.halfDays) || 0)
+                                              (Number(c.present) || 0) -
+                                                  (Number(c.halfDays) || 0) -
+                                                  (Number(c.lateDays) || 0)
                                           );
                                     const z = (n) => (attendanceDisplayAllZero ? 0 : Number(n) || 0);
                                     return (
@@ -940,13 +939,10 @@ const GenerateSalaryPage = () => {
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between gap-2 text-slate-500">
-                                                        {/* <span>Late day</span> */}
-                                                        {/* <span
-                                                            className="tabular-nums font-medium text-red-600"
-                                                            title="Late days − half days (from attendance rules)"
-                                                        >
-                                                            {lateDaysAdjusted}
-                                                        </span> */}
+                                                        <span>LOP(Loss-of-pay)</span>
+                                                        <span className="tabular-nums font-medium text-red-600">
+                                                            {z(c.lateDays)}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -981,13 +977,12 @@ const GenerateSalaryPage = () => {
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                {/* <dt className="text-slate-600">Late Days</dt>
+                                                <dt className="text-slate-600">LOP(Loss-of-pay)</dt>
                                                 <dd
                                                     className="font-semibold text-red-600 tabular-nums"
-                                                    title="Late days − half days (from attendance rules)"
                                                 >
-                                                    {lateDaysAdjusted}
-                                                </dd> */}
+                                                    {z(c.lateDays)}
+                                                </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 pt-2 items-baseline">
                                                 <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>

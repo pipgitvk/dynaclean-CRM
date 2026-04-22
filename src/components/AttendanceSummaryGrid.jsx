@@ -25,7 +25,7 @@ const LEGEND = [
   { code: "S", label: "Sunday", swatch: "bg-purple-100 text-purple-900 ring-purple-200" },
   { code: "H", label: "Holiday", swatch: "bg-gray-200 text-gray-800 ring-gray-300" },
   { code: "PL", label: "Paid Leave", swatch: "bg-orange-100 text-orange-900 ring-orange-200" },
-  { code: "HD", label: "Half-day", swatch: "bg-yellow-100 text-yellow-900 ring-yellow-200" },
+  { code: "HD", label: "Half-day", swatch: "bg-yellow-50 text-yellow-900 ring-yellow-200" },
 ];
 
 function startOfDay(d) {

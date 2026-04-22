@@ -12,7 +12,7 @@
  *
  * - Days before date_of_joining are skipped (not LOP, not paid).
  */
-import { isHalfDayByRules } from "@/lib/attendanceRulesEngine";
+import { classifyAttendanceDayForSalary } from "@/lib/attendanceRulesEngine";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -94,13 +94,15 @@ export function computeSalaryPayDaysForUser(p) {
 
   let present = 0;
   let half_day = 0;
+  let late_days = 0;
   let sunday = 0;
   /** Sundays with no log (paid weekly off; not LOP). Saturday is not included. */
   let weekend_off = 0;
   let holiday = 0;
-  let lop = 0;
+  let lop = 0; 
   let paid_leave = 0;
   const sundayWorkedDates = [];
+  let freeGraceUsed = 0;
 
   /** Eligible days in month (same loop scope as pay-days formula). */
   let periodDays = 0;
@@ -132,11 +134,10 @@ export function computeSalaryPayDaysForUser(p) {
     }
 
     if (existingLog) {
-      if (isHalfDayByRules(existingLog, rules)) {
-        half_day++;
-      } else {
-        present++;
-      }
+      const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
+      freeGraceUsed = cls.freeGraceUsed;
+      if (cls.kind === "lateDay") late_days++;
+      else present++;
       if (isSunday) {
         sundayWorkedDates.push(dateString);
       }
@@ -158,13 +159,14 @@ export function computeSalaryPayDaysForUser(p) {
     lop++;
   }
 
-  const totalAttendance = present + 0.5 * half_day;
+  const totalAttendance = present + 0.5 * (half_day + late_days);
   const deductionDays = Math.max(0, requiredWorkingDays - totalAttendance);
   const payDays = periodDays - deductionDays;
 
   return {
     present,
     half_day,
+    late_days,
     sunday,
     weekend_off,
     holiday,
