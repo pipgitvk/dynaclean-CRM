@@ -33,6 +33,7 @@ export default function ProfileApprovalsAdminPage() {
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(true);
   const [tab, setTab] = useState("pending_admin");
+  const [activityFilter, setActivityFilter] = useState("active");
 
   const load = async () => {
     setLoading(true);
@@ -106,6 +107,29 @@ export default function ProfileApprovalsAdminPage() {
     rejected: "No submissions rejected by Super Admin yet.",
   };
 
+  const isUserActive = (row) => {
+    if (row?.user_active === true) return true;
+    if (row?.user_active === false) return false;
+    if (row?.user_status === 1) return true;
+    if (row?.user_status === 0) return false;
+    return null;
+  };
+
+  const filteredSubmissions = submissions.filter((s) => {
+    if (activityFilter === "all") return true;
+    const active = isUserActive(s);
+    if (activityFilter === "active") return active === true;
+    if (activityFilter === "inactive") return active === false;
+    return true;
+  });
+
+  const filterEmptyLabel =
+    activityFilter === "active"
+      ? "No active users found for this tab."
+      : activityFilter === "inactive"
+        ? "No inactive users found for this tab."
+        : "No submissions.";
+
   if (!allowed && !loading) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
@@ -126,13 +150,27 @@ export default function ProfileApprovalsAdminPage() {
             Pending publish (after HR). Approved / Rejected tabs show only actions taken by Super Admin (not HR).
           </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          className="px-3 py-2 bg-gray-100 rounded-md text-gray-700 hover:bg-gray-200 flex items-center gap-2 self-start"
-        >
-          <RefreshCcw className="w-4 h-4" /> Refresh
-        </button>
+        <div className="flex items-center gap-3 flex-wrap self-start">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Filter</span>
+            <select
+              value={activityFilter}
+              onChange={(e) => setActivityFilter(e.target.value)}
+              className="px-3 py-2 bg-white border border-gray-200 rounded-md text-gray-700"
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={load}
+            className="px-3 py-2 bg-gray-100 rounded-md text-gray-700 hover:bg-gray-200 flex items-center gap-2"
+          >
+            <RefreshCcw className="w-4 h-4" /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-3">
@@ -152,8 +190,8 @@ export default function ProfileApprovalsAdminPage() {
 
       {loading ? (
         <div className="text-gray-600">Loading...</div>
-      ) : submissions.length === 0 ? (
-        <div className="text-gray-600">{emptyMessage[tab] || "No submissions."}</div>
+      ) : filteredSubmissions.length === 0 ? (
+        <div className="text-gray-600">{submissions.length === 0 ? (emptyMessage[tab] || "No submissions.") : filterEmptyLabel}</div>
       ) : (
         <div className="bg-white rounded-lg shadow-md overflow-hidden overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -161,6 +199,7 @@ export default function ProfileApprovalsAdminPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EmpID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -175,10 +214,34 @@ export default function ProfileApprovalsAdminPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {submissions.map((s) => (
+              {filteredSubmissions.map((s) => (
                 <tr key={s.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{s.username}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{s.empId}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {(() => {
+                      const active = isUserActive(s);
+                      if (active === true) {
+                        return (
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
+                            Active
+                          </span>
+                        );
+                      }
+                      if (active === false) {
+                        return (
+                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-800">
+                            Inactive
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                          —
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {s.submitted_at ? new Date(s.submitted_at).toLocaleString() : "—"}
                   </td>
