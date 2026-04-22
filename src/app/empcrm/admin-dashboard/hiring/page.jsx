@@ -63,6 +63,21 @@ const HR_SCORE_RATING_LABELS = {
   "very-good": "Very good",
 };
 
+const FILTER_STORAGE_KEY = "empcrm-hiring-filters-v1";
+
+const readStoredFilters = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
 function formatInterviewAt(v) {
   if (!v) return "—";
   try {
@@ -147,6 +162,8 @@ export default function HiringPage() {
   const [currentLocation, setCurrentLocation] = useState("");
   const [note, setNote] = useState("");
 
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
+
   const [filterMode, setFilterMode] = useState("");
   const [filterDesignation, setFilterDesignation] = useState("");
   const [filterJoinFrom, setFilterJoinFrom] = useState("");
@@ -169,6 +186,36 @@ export default function HiringPage() {
 
   const [resumeUploadBusy, setResumeUploadBusy] = useState(false);
   const [resumeUploadError, setResumeUploadError] = useState(null);
+
+  const hasActiveFilters =
+    Boolean(filterCandidateName) ||
+    Boolean(filterStatus) ||
+    Boolean(filterNextFollowupFrom) ||
+    Boolean(filterNextFollowupTo) ||
+    Boolean(filterMode) ||
+    Boolean(filterDesignation) ||
+    Boolean(filterJoinFrom) ||
+    Boolean(filterJoinTo) ||
+    Boolean(filterInterviewFrom) ||
+    Boolean(filterInterviewTo);
+
+  const handleResetFilters = () => {
+    setFilterMode("");
+    setFilterDesignation("");
+    setFilterJoinFrom("");
+    setFilterJoinTo("");
+    setFilterInterviewFrom("");
+    setFilterInterviewTo("");
+    setFilterCandidateName("");
+    setFilterStatus("");
+    setFilterNextFollowupFrom("");
+    setFilterNextFollowupTo("");
+    try {
+      window.localStorage.removeItem(FILTER_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  };
 
   const handleResumeFile = useCallback(async (file, applyUrl) => {
     if (!file) return;
@@ -227,8 +274,66 @@ export default function HiringPage() {
   ]);
 
   useEffect(() => {
+    if (!filtersHydrated) return;
     load();
-  }, [load]);
+  }, [load, filtersHydrated]);
+
+  useEffect(() => {
+    const stored = readStoredFilters();
+    if (stored) {
+      setFilterCandidateName(stored.candidate_name || "");
+      setFilterStatus(stored.status || "");
+      setFilterNextFollowupFrom(stored.next_followup_from || "");
+      setFilterNextFollowupTo(stored.next_followup_to || "");
+      setFilterMode(stored.interview_mode || "");
+      setFilterDesignation(stored.designation || "");
+      setFilterJoinFrom(stored.join_from || "");
+      setFilterJoinTo(stored.join_to || "");
+      setFilterInterviewFrom(stored.interview_from || "");
+      setFilterInterviewTo(stored.interview_to || "");
+    }
+    setFiltersHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filtersHydrated || typeof window === "undefined") return;
+    try {
+      if (!hasActiveFilters) {
+        window.localStorage.removeItem(FILTER_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(
+          FILTER_STORAGE_KEY,
+          JSON.stringify({
+            candidate_name: filterCandidateName,
+            status: filterStatus,
+            next_followup_from: filterNextFollowupFrom,
+            next_followup_to: filterNextFollowupTo,
+            interview_mode: filterMode,
+            designation: filterDesignation,
+            join_from: filterJoinFrom,
+            join_to: filterJoinTo,
+            interview_from: filterInterviewFrom,
+            interview_to: filterInterviewTo,
+          }),
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }, [
+    filtersHydrated,
+    filterCandidateName,
+    filterStatus,
+    filterNextFollowupFrom,
+    filterNextFollowupTo,
+    filterMode,
+    filterDesignation,
+    filterJoinFrom,
+    filterJoinTo,
+    filterInterviewFrom,
+    filterInterviewTo,
+    hasActiveFilters,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -251,12 +356,10 @@ export default function HiringPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!filterDesignation || loadingDesignations) return;
-    const k = normalizeDesignationKey(filterDesignation);
-    const ok = designationOptions.some((d) => normalizeDesignationKey(d) === k);
-    if (!ok) setFilterDesignation("");
-  }, [designationOptions, filterDesignation, loadingDesignations]);
+  const filterDesignationOptions = useMemo(
+    () => mergeDesignationOptions(designationOptions, filterDesignation),
+    [designationOptions, filterDesignation],
+  );
 
   const addFormDesignations = useMemo(
     () => mergeDesignationOptions(designationOptions, designation),
@@ -388,11 +491,21 @@ export default function HiringPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm shadow-slate-200/40 sm:p-5">
-        <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
-            <Filter className="h-4 w-4" aria-hidden />
-          </span>
-          <h2 className="text-sm font-semibold text-slate-800">Filters</h2>
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
+              <Filter className="h-4 w-4" aria-hidden />
+            </span>
+            <h2 className="text-sm font-semibold text-slate-800">Filters</h2>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            disabled={!hasActiveFilters}
+            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Reset
+          </button>
         </div>
         <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-12">
           <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-2">
@@ -435,7 +548,7 @@ export default function HiringPage() {
               onChange={(e) => setFilterDesignation(e.target.value)}
             >
               <option value="">All designations</option>
-              {designationOptions.map((d) => (
+              {filterDesignationOptions.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
@@ -465,16 +578,6 @@ export default function HiringPage() {
                 className={`${fieldClass} min-h-[44px] w-full min-w-0 flex-1 sm:min-h-0`}
                 title="Joining to"
               />
-              {(filterJoinFrom || filterJoinTo) && (
-                <button
-                  type="button"
-                  onClick={() => { setFilterJoinFrom(""); setFilterJoinTo(""); }}
-                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  title="Clear"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
             </div>
           </div>
 
@@ -500,16 +603,6 @@ export default function HiringPage() {
                 className={`${fieldClass} flex-1 min-w-0`}
                 title="Interview to"
               />
-              {(filterInterviewFrom || filterInterviewTo) && (
-                <button
-                  type="button"
-                  onClick={() => { setFilterInterviewFrom(""); setFilterInterviewTo(""); }}
-                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  title="Clear"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
             </div>
           </div>
 
@@ -535,16 +628,6 @@ export default function HiringPage() {
                 className={`${fieldClass} flex-1 min-w-0`}
                 title="Next follow-up to"
               />
-              {(filterNextFollowupFrom || filterNextFollowupTo) && (
-                <button
-                  type="button"
-                  onClick={() => { setFilterNextFollowupFrom(""); setFilterNextFollowupTo(""); }}
-                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  title="Clear"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
             </div>
           </div>
         </div>

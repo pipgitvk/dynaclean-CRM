@@ -13,12 +13,29 @@ import {
   fieldClass,
 } from "./shared";
 
+const FILTER_STORAGE_KEY = "admin-hiring-process-filters-v1";
+
+const readStoredFilters = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(FILTER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
 export default function AdminHiringProcessPage() {
   const now = new Date();
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
+
   const [filterCandidateName, setFilterCandidateName] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterNextFollowupFrom, setFilterNextFollowupFrom] = useState("");
@@ -30,6 +47,30 @@ export default function AdminHiringProcessPage() {
   const [designationOptions, setDesignationOptions] = useState([]);
   const [hrUserOptions, setHrUserOptions] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
+
+  const hasActiveFilters =
+    Boolean(filterCandidateName) ||
+    Boolean(filterStatus) ||
+    Boolean(filterNextFollowupFrom) ||
+    Boolean(filterNextFollowupTo) ||
+    Boolean(filterMode) ||
+    Boolean(filterDesignation) ||
+    Boolean(filterHr);
+
+  const handleResetFilters = () => {
+    setFilterCandidateName("");
+    setFilterStatus("");
+    setFilterNextFollowupFrom("");
+    setFilterNextFollowupTo("");
+    setFilterMode("");
+    setFilterDesignation("");
+    setFilterHr("");
+    try {
+      window.localStorage.removeItem(FILTER_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,8 +110,57 @@ export default function AdminHiringProcessPage() {
   ]);
 
   useEffect(() => {
+    if (!filtersHydrated) return;
     load();
-  }, [load]);
+  }, [load, filtersHydrated]);
+
+  useEffect(() => {
+    const stored = readStoredFilters();
+    if (stored) {
+      setFilterCandidateName(stored.candidate_name || "");
+      setFilterStatus(stored.status || "");
+      setFilterNextFollowupFrom(stored.next_followup_from || "");
+      setFilterNextFollowupTo(stored.next_followup_to || "");
+      setFilterMode(stored.interview_mode || "");
+      setFilterDesignation(stored.designation || "");
+      setFilterHr(stored.created_by || "");
+    }
+    setFiltersHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filtersHydrated || typeof window === "undefined") return;
+    try {
+      if (!hasActiveFilters) {
+        window.localStorage.removeItem(FILTER_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(
+          FILTER_STORAGE_KEY,
+          JSON.stringify({
+            candidate_name: filterCandidateName,
+            status: filterStatus,
+            next_followup_from: filterNextFollowupFrom,
+            next_followup_to: filterNextFollowupTo,
+            interview_mode: filterMode,
+            designation: filterDesignation,
+            created_by: filterHr,
+          }),
+        );
+      }
+    } catch {
+      // ignore
+    }
+  }, [
+    filtersHydrated,
+    filterCandidateName,
+    filterStatus,
+    filterNextFollowupFrom,
+    filterNextFollowupTo,
+    filterMode,
+    filterDesignation,
+    filterHr,
+    hasActiveFilters,
+  ]);
 
   useEffect(() => {
     if (!filterDesignation || loading) return;
@@ -121,11 +211,21 @@ export default function AdminHiringProcessPage() {
       )}
 
       <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm shadow-slate-200/40 sm:p-5">
-        <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
-            <Filter className="h-4 w-4" aria-hidden />
-          </span>
-          <h2 className="text-sm font-semibold text-slate-800">Filters</h2>
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-700">
+              <Filter className="h-4 w-4" aria-hidden />
+            </span>
+            <h2 className="text-sm font-semibold text-slate-800">Filters</h2>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            disabled={!hasActiveFilters}
+            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Reset
+          </button>
         </div>
         <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-12">
           <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-2">
@@ -208,16 +308,6 @@ export default function AdminHiringProcessPage() {
                 className={`${fieldClass} flex-1 min-w-0`}
                 title="Next follow-up to"
               />
-              {(filterNextFollowupFrom || filterNextFollowupTo) && (
-                <button
-                  type="button"
-                  onClick={() => { setFilterNextFollowupFrom(""); setFilterNextFollowupTo(""); }}
-                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                  title="Clear"
-                >
-                  <span className="text-xs">Clear</span>
-                </button>
-              )}
             </div>
           </div>
         </div>
