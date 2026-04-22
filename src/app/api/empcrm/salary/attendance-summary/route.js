@@ -53,6 +53,7 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     attendance_cards,
     present_days: stats.present,
     half_day_count: stats.half_day,
+    late_day_count: stats.late_days,
     sunday_count: stats.sunday,
     weekend_off_count: stats.weekend_off,
     holiday_count: stats.holiday,

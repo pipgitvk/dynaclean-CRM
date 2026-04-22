@@ -135,6 +135,44 @@ export function getBreakStatus(startTime, endTime, breakType, rules) {
   return "red";
 }
 
+export function classifyAttendanceDay(log, rules, graceHalfDaysUsed) {
+  const r = rules || DEFAULT_ATTENDANCE_RULES;
+  const used = Number(graceHalfDaysUsed) || 0;
+  const inStatus = getCheckinStatus(log?.checkin_time, r);
+  const outStatus = getCheckoutStatus(log?.checkout_time, r);
+
+  if (outStatus === "late" || outStatus === "halfDay") {
+    return { kind: "lateDay", graceHalfDaysUsed: used };
+  }
+  if (inStatus === "grace") {
+    if (used < 3) return { kind: "halfDay", graceHalfDaysUsed: used + 1 };
+    return { kind: "lateDay", graceHalfDaysUsed: used };
+  }
+  if (inStatus === "late" || inStatus === "halfDay" || inStatus == null) {
+    return { kind: "lateDay", graceHalfDaysUsed: used };
+  }
+  return { kind: "regular", graceHalfDaysUsed: used };
+}
+
+export function classifyAttendanceDayForSalary(log, rules, freeGraceUsed) {
+  const r = rules || DEFAULT_ATTENDANCE_RULES;
+  const used = Number(freeGraceUsed) || 0;
+  const inStatus = getCheckinStatus(log?.checkin_time, r);
+  const outStatus = getCheckoutStatus(log?.checkout_time, r);
+
+  if (outStatus === "late" || outStatus === "halfDay") {
+    return { kind: "lateDay", freeGraceUsed: used };
+  }
+  if (inStatus === "grace") {
+    if (used < 3) return { kind: "regular", freeGraceUsed: used + 1 };
+    return { kind: "lateDay", freeGraceUsed: used };
+  }
+  if (inStatus === "late" || inStatus === "halfDay" || inStatus == null) {
+    return { kind: "lateDay", freeGraceUsed: used };
+  }
+  return { kind: "regular", freeGraceUsed: used };
+}
+
 export function isHalfDayByRules(log, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
   if (!log?.checkin_time) return false;
@@ -146,18 +184,18 @@ export function isHalfDayByRules(log, rules) {
   if (outM == null) return true;
   const halfInM = parseTimeToMinutes(r.halfDayCheckin);
   const halfOutM = parseTimeToMinutes(r.halfDayCheckout);
-  /* Matches former isLate(checkin, halfDayCheckin) || isEarly(checkout, halfDayCheckout) */
-  return inM > halfInM || outM < halfOutM;
+  if (outM < halfOutM) {
+    const inStatus = getCheckinStatus(log.checkin_time, r);
+    if (inStatus === "late") return false;
+    return true;
+  }
+  return inM > halfInM;
 }
 
 /** Same as former isLate(checkin) || isEarly(checkout) against standard times (summary “late days”). */
 export function isLateDaySummary(log, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
-  if (!log?.checkin_time || !log?.checkout_time) return false;
-  const inM = parseAttendanceClockMinutes(log.checkin_time);
-  const outM = parseAttendanceClockMinutes(log.checkout_time);
-  if (inM == null || outM == null) return false;
-  const standardIn = parseTimeToMinutes(r.checkin);
-  const standardOut = parseTimeToMinutes(r.checkout);
-  return inM > standardIn || outM < standardOut;
+  const inStatus = getCheckinStatus(log?.checkin_time, r);
+  const outStatus = getCheckoutStatus(log?.checkout_time, r);
+  return inStatus === "late" || outStatus === "late";
 }
