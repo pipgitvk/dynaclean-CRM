@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { HIRING_TAG_OPTIONS as TAG_OPTIONS, HR_SCORE_RATING_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
-import { mergeDesignationOptions } from "@/lib/designationDedupe";
+import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 import { canonicalHiringCityInList, mergeHiringCityOptions } from "@/lib/hiringCities";
 import {
   EXPERIENCE_OPTIONS,
@@ -38,14 +38,13 @@ export default function EmpcrmHiringEditPage() {
   const [resumeUploadError, setResumeUploadError] = useState(null);
   /** @type {null | Record<string, any>} */
   const [editing, setEditing] = useState(null);
-  const [designationOptions, setDesignationOptions] = useState([]);
-  const [loadingDesignations, setLoadingDesignations] = useState(true);
   const [citiesFromTargets, setCitiesFromTargets] = useState([]);
   const [loadingHiringCities, setLoadingHiringCities] = useState(false);
 
+  /** Same master list as Add employee on hiring + superadmin targets; keep legacy DB label if needed. */
   const editFormDesignations = useMemo(
-    () => mergeDesignationOptions(designationOptions, editing?.designation),
-    [designationOptions, editing?.designation]
+    () => mergeDesignationOptions(HR_TARGET_ALLOWED_DESIGNATIONS, editing?.designation),
+    [editing?.designation]
   );
 
   const editFormCities = useMemo(
@@ -92,27 +91,6 @@ export default function EmpcrmHiringEditPage() {
     };
   }, [editing?.designation, editing?.id]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoadingDesignations(true);
-      try {
-        const res = await fetch("/api/empcrm/hiring-designations", { cache: "no-store" });
-        const json = await res.json();
-        if (!cancelled && json.success) {
-          setDesignationOptions(Array.isArray(json.designations) ? json.designations : []);
-        }
-      } catch {
-        if (!cancelled) setDesignationOptions([]);
-      } finally {
-        if (!cancelled) setLoadingDesignations(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const handleResumeFile = useCallback(async (file, applyUrl) => {
     if (!file) return;
     setResumeUploadBusy(true);
@@ -157,7 +135,7 @@ export default function EmpcrmHiringEditPage() {
         creator_role: row.creator_role ?? "",
         candidate_name: row.candidate_name ?? "",
         emp_contact: row.emp_contact ?? "",
-        designation: row.designation ?? "",
+        designation: resolveCanonicalDesignation(row.designation ?? "", HR_TARGET_ALLOWED_DESIGNATIONS),
         marital_status: row.marital_status ?? "",
         experience_type: row.experience_type ?? "",
         interview_at: toDatetimeLocalValue(row.interview_at),
@@ -345,10 +323,9 @@ export default function EmpcrmHiringEditPage() {
                 required
                 value={editing.designation ?? ""}
                 onChange={(e) => updateEdit("designation", e.target.value)}
-                disabled={loadingDesignations}
                 className={formSelectClass}
               >
-                <option value="">{loadingDesignations ? "Loading designations…" : "— Select designation —"}</option>
+                <option value="">— Select designation —</option>
                 {editFormDesignations.map((d) => (
                   <option key={d} value={d}>
                     {d}

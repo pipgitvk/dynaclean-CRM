@@ -75,8 +75,6 @@ export default function HrDesignationTargetsPage() {
 
   const [hrUsers, setHrUsers] = useState([]);
   const [loadingHrUsers, setLoadingHrUsers] = useState(true);
-  const [designationOptions, setDesignationOptions] = useState([]);
-  const [loadingDesignations, setLoadingDesignations] = useState(true);
 
   const [addOpen, setAddOpen] = useState(false);
   const [viewRow, setViewRow] = useState(null);
@@ -136,25 +134,6 @@ export default function HrDesignationTargetsPage() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoadingDesignations(true);
-      try {
-        const res = await fetch("/api/admin/employee-designations", { cache: "no-store" });
-        const json = await res.json();
-        if (!cancelled && json.success) setDesignationOptions(Array.isArray(json.designations) ? json.designations : []);
-      } catch {
-        if (!cancelled) setDesignationOptions([]);
-      } finally {
-        if (!cancelled) setLoadingDesignations(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const suggestedDesignationForFormHr = useMemo(() => {
     const u = hrUsers.find((x) => x.username === formHr);
     return u?.suggested_designation?.trim() || "";
@@ -183,9 +162,10 @@ export default function HrDesignationTargetsPage() {
     []
   );
 
+  /** Same master list as Add target; keep extra labels only for legacy row values. */
   const editModalDesignations = useMemo(
-    () => mergeDesignationOptions(designationOptions, editRow?.designation, formDesignation),
-    [designationOptions, editRow?.designation, formDesignation]
+    () => mergeDesignationOptions(HR_TARGET_ALLOWED_DESIGNATIONS, editRow?.designation, formDesignation),
+    [editRow?.designation, formDesignation]
   );
 
   const openAdd = () => {
@@ -279,7 +259,7 @@ export default function HrDesignationTargetsPage() {
   };
 
   const openEdit = (row) => {
-    setFormDesignation(resolveCanonicalDesignation(row.designation, designationOptions));
+    setFormDesignation(resolveCanonicalDesignation(row.designation, HR_TARGET_ALLOWED_DESIGNATIONS));
     setFormHr(row.hr_username === "—" ? "" : row.hr_username || "");
     setFormCity(String(row.city || "").trim());
     setFormTarget(String(row.target_amount ?? ""));
@@ -787,10 +767,9 @@ export default function HrDesignationTargetsPage() {
                   required
                   value={formDesignation}
                   onChange={(e) => setFormDesignation(e.target.value)}
-                  disabled={loadingDesignations}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
                 >
-                  <option value="">{loadingDesignations ? "Loading designations…" : "— Select designation —"}</option>
+                  <option value="">— Select designation —</option>
                   {editModalDesignations.map((d) => (
                     <option key={d} value={d}>
                       {d}
