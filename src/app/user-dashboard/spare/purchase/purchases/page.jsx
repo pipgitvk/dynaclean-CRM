@@ -178,7 +178,7 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
   );
 }
 
-function LinkPaymentModal({ open, onClose, purchase }) {
+function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementId }) {
   const [loading, setLoading] = useState(false);
   const [statements, setStatements] = useState([]);
   const [search, setSearch] = useState("");
@@ -208,21 +208,35 @@ function LinkPaymentModal({ open, onClose, purchase }) {
     };
   }, [open]);
 
-  const getLinkedPurchaseIds = (stmt) => {
+  const getLinkedKeys = (stmt) => {
     const raw = stmt?.linked_purchase_ids;
     if (raw == null || String(raw).trim() === "") return [];
+    let arr = null;
     try {
       const parsed = JSON.parse(String(raw));
-      if (Array.isArray(parsed)) {
-        return parsed
-          .map((x) => Number(x))
-          .filter((x) => Number.isFinite(x) && x > 0);
+      if (Array.isArray(parsed)) arr = parsed;
+    } catch {
+      arr = String(raw).split(",");
+    }
+    const keys = [];
+    for (const v of arr) {
+      if (v == null) continue;
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+        keys.push(`PS${Math.trunc(v)}`);
+        continue;
       }
-    } catch {}
-    return String(raw)
-      .split(",")
-      .map((x) => Number(String(x).trim()))
-      .filter((x) => Number.isFinite(x) && x > 0);
+      const s = String(v).trim().toUpperCase();
+      if (!s) continue;
+      if (/^(PP|PS|SP)\d+$/.test(s)) {
+        keys.push(s.startsWith("PS") ? `PS${s.slice(2)}` : s);
+        continue;
+      }
+      if (/^\d+$/.test(s)) {
+        keys.push(`PS${s}`);
+        continue;
+      }
+    }
+    return keys;
   };
 
   const eligibleStatements = useMemo(() => {
@@ -234,9 +248,13 @@ function LinkPaymentModal({ open, onClose, purchase }) {
 
     const pid = Number(purchase?.id);
     let rows = statements.filter((s) => {
-      if (!isUnsettled(s) || !isDebit(s)) return false;
-      const linked = getLinkedPurchaseIds(s);
-      if (linked.length > 0 && (!Number.isFinite(pid) || !linked.includes(pid))) return false;
+      const currentIdNum = currentStatementId != null ? Number(currentStatementId) : null;
+      if (!isDebit(s)) return false;
+      if (currentIdNum != null && Number(s?.id) === currentIdNum) return true;
+      if (!isUnsettled(s)) return false;
+      const myKey = Number.isFinite(pid) && pid > 0 ? `PS${pid}` : "";
+      const linked = getLinkedKeys(s);
+      if (linked.length > 0 && (!myKey || !linked.includes(myKey))) return false;
       return true;
     });
 
@@ -251,15 +269,15 @@ function LinkPaymentModal({ open, onClose, purchase }) {
     }
 
     return rows;
-  }, [statements, search, purchase?.id]);
+  }, [statements, search, purchase?.id, currentStatementId]);
 
   const hasPurchaseId = (stmt) => {
     const pid = Number(purchase?.id);
     if (!Number.isFinite(pid) || pid <= 0) return false;
-    return getLinkedPurchaseIds(stmt).includes(pid);
+    return getLinkedKeys(stmt).includes(`PS${pid}`);
   };
 
-  async function linkToStatement(statementId) {
+  async function linkToStatement(statementId, transId) {
     try {
       if (!purchase?.id) return;
       setLinkingId(statementId);
@@ -267,11 +285,12 @@ function LinkPaymentModal({ open, onClose, purchase }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ purchase_id: purchase.id }),
+        body: JSON.stringify({ purchase_id: purchase.id, purchase_type: "PS" }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to link");
       toast.success("Payment linked");
+      onLinked?.(purchase.id, statementId, transId);
       onClose();
     } catch (e) {
       toast.error(e.message || "Link failed");
@@ -335,14 +354,17 @@ function LinkPaymentModal({ open, onClose, purchase }) {
               ) : (
                 eligibleStatements.map((s) => {
                   const already = hasPurchaseId(s);
-                  const linkedIds = getLinkedPurchaseIds(s);
-                  const linkedToOther =
-                    linkedIds.length > 0 && !linkedIds.includes(Number(purchase?.id));
-                  const disabled = already || linkedToOther || linkingId === s.id;
-                  const title = already
+                  const myKey = purchase?.id != null ? `PS${Number(purchase.id)}` : "";
+                  const linkedKeys = getLinkedKeys(s);
+                  const linkedToOther = linkedKeys.length > 0 && (!myKey || !linkedKeys.includes(myKey));
+                  const selected = currentStatementId != null && Number(s?.id) === Number(currentStatementId);
+                  const disabled = selected || already || linkedToOther || linkingId === s.id;
+                  const title = selected
+                    ? "Current payment"
+                    : already
                     ? "Already linked"
                     : linkedToOther
-                    ? `Already linked to purchase #${linkedIds[0]}`
+                    ? `Already linked to purchase #${linkedKeys[0]}`
                     : "Link this statement";
                   return (
                     <tr key={s.id} className="border-t hover:bg-gray-50">
@@ -354,12 +376,12 @@ function LinkPaymentModal({ open, onClose, purchase }) {
                       <td className="p-3">
                         <button
                           type="button"
-                          onClick={() => linkToStatement(s.id)}
+                          onClick={() => linkToStatement(s.id, s.trans_id || "")}
                           disabled={disabled}
                           className={`px-3 py-1.5 rounded text-sm text-white ${disabled ? "bg-gray-400" : "bg-emerald-600 hover:bg-emerald-700"} disabled:opacity-50`}
                           title={title}
                         >
-                          {already ? "Linked" : linkingId === s.id ? "Linking..." : "Select"}
+                          {selected ? "Selected" : already ? "Linked" : linkingId === s.id ? "Linking..." : "Select"}
                         </button>
                       </td>
                     </tr>
@@ -386,9 +408,13 @@ export default function SparePurchasesPage() {
   const [editRecord, setEditRecord] = useState(null);
   const [linkPaymentOpen, setLinkPaymentOpen] = useState(false);
   const [linkPurchase, setLinkPurchase] = useState(null);
+  const [linkedPurchaseIds, setLinkedPurchaseIds] = useState(() => new Set());
+  const [paymentTransByPurchaseId, setPaymentTransByPurchaseId] = useState(() => ({}));
+  const [paymentStatementByPurchaseId, setPaymentStatementByPurchaseId] = useState(() => ({}));
 
   useEffect(() => {
     loadPurchases();
+    loadLinkedPurchaseIds();
   }, []);
 
   const loadPurchases = async () => {
@@ -405,6 +431,82 @@ export default function SparePurchasesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const parseLinkedIds = (raw) => {
+    if (raw == null || String(raw).trim() === "") return [];
+    let arr = null;
+    try {
+      const parsed = JSON.parse(String(raw));
+      if (Array.isArray(parsed)) arr = parsed;
+    } catch {
+      arr = String(raw).split(",");
+    }
+    const ids = [];
+    for (const v of arr) {
+      if (v == null) continue;
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+        ids.push(Math.trunc(v));
+        continue;
+      }
+      const s = String(v).trim().toUpperCase();
+      if (!s) continue;
+      if (/^(PS|SP)\d+$/.test(s)) {
+        const n = Number(s.slice(2));
+        if (Number.isFinite(n) && n > 0) ids.push(n);
+        continue;
+      }
+      if (/^\d+$/.test(s)) {
+        const n = Number(s);
+        if (Number.isFinite(n) && n > 0) ids.push(n);
+        continue;
+      }
+    }
+    return ids;
+  };
+
+  const loadLinkedPurchaseIds = async () => {
+    try {
+      const res = await fetch("/api/statements", { credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      const rows = Array.isArray(data?.statements) ? data.statements : [];
+      const next = new Set();
+      const transMap = {};
+      const stmtMap = {};
+      for (const s of rows) {
+        const ids = parseLinkedIds(s?.linked_purchase_ids);
+        for (const id of ids) next.add(id);
+        if (ids.length > 0) {
+          const pid = Number(ids[0]);
+          if (Number.isFinite(pid) && pid > 0) {
+            transMap[pid] = s?.trans_id || "";
+            stmtMap[pid] = s?.id != null ? Number(s.id) : null;
+          }
+        }
+      }
+      setLinkedPurchaseIds(next);
+      setPaymentTransByPurchaseId(transMap);
+      setPaymentStatementByPurchaseId(stmtMap);
+    } catch {}
+  };
+
+  const markPurchaseLinked = (purchaseId, statementId, transId) => {
+    const pid = Number(purchaseId);
+    if (!Number.isFinite(pid) || pid <= 0) return;
+    setLinkedPurchaseIds((prev) => {
+      const next = new Set(prev);
+      next.add(pid);
+      return next;
+    });
+    setPaymentTransByPurchaseId((prev) => ({
+      ...prev,
+      [pid]: transId || prev?.[pid] || "",
+    }));
+    setPaymentStatementByPurchaseId((prev) => ({
+      ...prev,
+      [pid]: statementId != null ? Number(statementId) : prev?.[pid] ?? null,
+    }));
   };
 
   const filteredPurchases = useMemo(() => {
@@ -529,6 +631,7 @@ export default function SparePurchasesPage() {
                   <th className="p-3 border-b font-semibold">Created By</th>
                   <th className="p-3 border-b font-semibold">Created At</th>
                   <th className="p-3 border-b font-semibold">Image</th>
+                  <th className="p-3 border-b font-semibold">Payment Trans ID</th>
                   <th className="p-3 border-b font-semibold">Action</th>
                 </tr>
               </thead>
@@ -555,25 +658,36 @@ export default function SparePurchasesPage() {
                         <span className="text-gray-400">—</span>
                       )}
                     </td>
+                    <td className="p-3 font-mono text-xs">
+                      {paymentTransByPurchaseId?.[Number(purchase.id)] ? paymentTransByPurchaseId[Number(purchase.id)] : "—"}
+                    </td>
                     <td className="p-3">
+                      {linkedPurchaseIds.has(Number(purchase.id)) && (
+                        <button
+                          type="button"
+                          onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
+                          className="text-amber-700 hover:underline text-sm mb-1 block"
+                        >
+                          Edit Payment
+                        </button>
+                      )}
                       <button onClick={() => setDetailPurchase(purchase)} className="text-blue-600 hover:underline flex items-center gap-1">
                         <Eye className="w-4 h-4" /> View
                       </button>
-                    </td>
-                    <td className="p-3 space-x-2">
                       <button
                         onClick={() => { setEditRecord(purchase); setEditOpen(true); }}
-                        disabled={purchase.status !== 'requested'}
-                        className={`${purchase.status !== 'requested' ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600 hover:underline'} text-sm`}
+                        disabled={purchase.status !== 'requested' || linkedPurchaseIds.has(Number(purchase.id))}
+                        className={`${purchase.status !== 'requested' || linkedPurchaseIds.has(Number(purchase.id)) ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600 hover:underline'} ml-2 text-sm`}
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
-                        className="text-emerald-600 hover:underline text-sm"
+                        disabled={linkedPurchaseIds.has(Number(purchase.id))}
+                        className={`ml-2 text-sm ${linkedPurchaseIds.has(Number(purchase.id)) ? "text-gray-400 cursor-not-allowed" : "text-emerald-600 hover:underline"}`}
                       >
-                        Link Payment
+                        {linkedPurchaseIds.has(Number(purchase.id)) ? "Payment Linked" : "Link Payment"}
                       </button>
                     </td>
                   </tr>
@@ -592,6 +706,8 @@ export default function SparePurchasesPage() {
         open={linkPaymentOpen}
         onClose={() => { setLinkPaymentOpen(false); setLinkPurchase(null); }}
         purchase={linkPurchase}
+        onLinked={markPurchaseLinked}
+        currentStatementId={paymentStatementByPurchaseId?.[Number(linkPurchase?.id)]}
       />
 
       {detailPurchase && (

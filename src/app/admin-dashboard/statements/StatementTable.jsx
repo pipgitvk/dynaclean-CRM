@@ -52,6 +52,7 @@ export default function StatementTable({ rows }) {
   /** When search is numeric expense id: expense.transaction_id for trans_id match (unsettled rows). */
   const [expenseTxnForIdSearch, setExpenseTxnForIdSearch] = useState(null);
   const [expenseIdResolved, setExpenseIdResolved] = useState(null);
+  const [purchaseTypeByLegacyId, setPurchaseTypeByLegacyId] = useState({});
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -84,25 +85,43 @@ export default function StatementTable({ rows }) {
     };
   }, [searchQuery]);
 
-  const getLinkedPurchaseIds = (row) => {
+  const getLinkedPurchaseRefs = (row) => {
     const raw = row?.linked_purchase_ids;
     if (raw == null || String(raw).trim() === "") return [];
+    let arr = null;
     try {
       const parsed = JSON.parse(String(raw));
-      if (Array.isArray(parsed)) {
-        return parsed
-          .map((x) => Number(x))
-          .filter((x) => Number.isFinite(x) && x > 0);
+      if (Array.isArray(parsed)) arr = parsed;
+    } catch {
+      arr = String(raw).split(",");
+    }
+    const out = [];
+    for (const v of arr) {
+      if (v == null) continue;
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+        const id = Math.trunc(v);
+        out.push({ prefix: purchaseTypeByLegacyId[id] || "PP", id });
+        continue;
       }
-    } catch {}
-    return String(raw)
-      .split(",")
-      .map((x) => Number(String(x).trim()))
-      .filter((x) => Number.isFinite(x) && x > 0);
+      const s = String(v).trim().toUpperCase();
+      if (!s) continue;
+      if (/^(PP|PS|SP)\d+$/.test(s)) {
+        const prefix = s.startsWith("SP") ? "PS" : s.slice(0, 2);
+        const id = Number(s.slice(2));
+        if (Number.isFinite(id) && id > 0) out.push({ prefix, id });
+        continue;
+      }
+      if (/^\d+$/.test(s)) {
+        const id = Number(s);
+        if (Number.isFinite(id) && id > 0) out.push({ prefix: purchaseTypeByLegacyId[id] || "PP", id });
+        continue;
+      }
+    }
+    return out;
   };
 
   const isSettledRow = (row) => {
-    const linked = getLinkedPurchaseIds(row);
+    const linked = getLinkedPurchaseRefs(row);
     const inv = String(row?.invoice_status ?? "").trim();
     if (inv === "Settled") return true;
     if (row?.client_expense_id) return true;
@@ -111,12 +130,66 @@ export default function StatementTable({ rows }) {
   };
 
   const displayInvoiceStatus = (row) => {
-    const linked = getLinkedPurchaseIds(row);
+    const linked = getLinkedPurchaseRefs(row);
     const inv = row?.invoice_status != null ? String(row.invoice_status).trim() : "";
     if ((inv === "" || inv === "Unsettled") && linked.length > 0) return "Settled";
     if (inv) return inv;
     return row?.client_expense_id ? "Settled" : "Unsettled";
   };
+
+  useEffect(() => {
+    const legacy = new Set();
+    for (const row of rows || []) {
+      const raw = row?.linked_purchase_ids;
+      if (raw == null || String(raw).trim() === "") continue;
+      let arr = null;
+      try {
+        const parsed = JSON.parse(String(raw));
+        if (Array.isArray(parsed)) arr = parsed;
+      } catch {
+        arr = String(raw).split(",");
+      }
+      for (const v of arr) {
+        if (v == null) continue;
+        if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+          legacy.add(Math.trunc(v));
+          continue;
+        }
+        const s = String(v).trim().toUpperCase();
+        if (!s) continue;
+        if (/^(PP|PS|SP)\d+$/.test(s)) continue;
+        if (/^\d+$/.test(s)) legacy.add(Number(s));
+      }
+    }
+    if (legacy.size === 0) {
+      setPurchaseTypeByLegacyId({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [prodRes, spareRes] = await Promise.all([
+          fetch("/api/stock-request", { credentials: "include" }).catch(() => null),
+          fetch("/api/spare/stock-request", { credentials: "include" }).catch(() => null),
+        ]);
+        const prodData = prodRes && prodRes.ok ? await prodRes.json().catch(() => []) : [];
+        const spareData = spareRes && spareRes.ok ? await spareRes.json().catch(() => []) : [];
+        const prodIds = new Set((Array.isArray(prodData) ? prodData : []).map((p) => Number(p?.id)).filter((n) => Number.isFinite(n) && n > 0));
+        const spareIds = new Set((Array.isArray(spareData) ? spareData : []).map((p) => Number(p?.id)).filter((n) => Number.isFinite(n) && n > 0));
+        const map = {};
+        for (const id of legacy) {
+          if (spareIds.has(id) && !prodIds.has(id)) map[id] = "PS";
+          else map[id] = "PP";
+        }
+        if (!cancelled) setPurchaseTypeByLegacyId(map);
+      } catch {
+        if (!cancelled) setPurchaseTypeByLegacyId({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [rows]);
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -661,11 +734,11 @@ export default function StatementTable({ rows }) {
                   </td>
                   <td className="p-3">
                     {(() => {
-                      const ids = getLinkedPurchaseIds(row);
-                      if (!ids.length) return <span className="text-gray-300 text-xs">—</span>;
+                      const refs = getLinkedPurchaseRefs(row);
+                      if (!refs.length) return <span className="text-gray-300 text-xs">—</span>;
                       return (
                         <span className="text-xs font-mono text-slate-700">
-                          {ids.map((x) => `#${x}`).join(", ")}
+                          {refs.map((x) => `#${x.prefix}${x.id}`).join(", ")}
                         </span>
                       );
                     })()}
@@ -760,27 +833,11 @@ export default function StatementTable({ rows }) {
             <div>
               <strong>Purchase IDs:</strong>{" "}
               {(() => {
-                const raw = row.linked_purchase_ids;
-                let ids = [];
-                if (raw != null && String(raw).trim() !== "") {
-                  try {
-                    const parsed = JSON.parse(String(raw));
-                    if (Array.isArray(parsed)) {
-                      ids = parsed
-                        .map((x) => Number(x))
-                        .filter((x) => Number.isFinite(x) && x > 0);
-                    }
-                  } catch {
-                    ids = String(raw)
-                      .split(",")
-                      .map((x) => Number(String(x).trim()))
-                      .filter((x) => Number.isFinite(x) && x > 0);
-                  }
-                }
-                if (!ids.length) return <span className="text-gray-400">—</span>;
+                const refs = getLinkedPurchaseRefs(row);
+                if (!refs.length) return <span className="text-gray-400">—</span>;
                 return (
                   <span className="text-xs font-mono text-slate-700">
-                    {ids.map((x) => `#${x}`).join(", ")}
+                    {refs.map((x) => `#${x.prefix}${x.id}`).join(", ")}
                   </span>
                 );
               })()}

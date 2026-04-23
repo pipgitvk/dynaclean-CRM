@@ -298,9 +298,21 @@ export async function PATCH(req, { params }) {
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     const purchaseIdRaw = body?.purchase_id ?? body?.purchaseId;
+    const purchaseTypeRaw = body?.purchase_type ?? body?.purchaseType;
     const purchaseId = Number(purchaseIdRaw);
     if (!Number.isFinite(purchaseId) || purchaseId <= 0) {
       return NextResponse.json({ error: "purchase_id is required" }, { status: 400 });
+    }
+    const normalizePurchaseType = (val) => {
+      const s = String(val ?? "").trim().toLowerCase();
+      if (!s) return "PP";
+      if (s === "pp" || s === "product") return "PP";
+      if (s === "ps" || s === "sp" || s === "spare") return "PS";
+      return null;
+    };
+    const purchaseType = normalizePurchaseType(purchaseTypeRaw);
+    if (!purchaseType) {
+      return NextResponse.json({ error: "purchase_type must be PP or PS" }, { status: 400 });
     }
 
     const pool = await getDbConnection();
@@ -320,47 +332,88 @@ export async function PATCH(req, { params }) {
     }
 
     const conn = await pool.getConnection();
+    let committed = false;
     try {
+      await conn.beginTransaction();
       const [rows] = await conn.execute(
         "SELECT linked_purchase_ids FROM statements WHERE id = ?",
         [id],
       );
       if (!Array.isArray(rows) || rows.length === 0) {
+        await conn.rollback();
         return NextResponse.json({ error: "Statement not found" }, { status: 404 });
       }
 
-      const raw = rows[0]?.linked_purchase_ids;
-      let ids = [];
-      if (raw != null && String(raw).trim() !== "") {
+      const parseTokens = (rawVal) => {
+        if (rawVal == null || String(rawVal).trim() === "") return [];
+        let arr = null;
         try {
-          const parsed = JSON.parse(String(raw));
-          if (Array.isArray(parsed)) {
-            ids = parsed.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0);
-          }
+          const parsed = JSON.parse(String(rawVal));
+          if (Array.isArray(parsed)) arr = parsed;
         } catch {
-          ids = String(raw)
-            .split(",")
-            .map((x) => Number(String(x).trim()))
-            .filter((x) => Number.isFinite(x) && x > 0);
+          arr = String(rawVal).split(",");
         }
-      }
+        const out = [];
+        for (const v of arr) {
+          if (v == null) continue;
+          if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+            out.push(`PP${Math.trunc(v)}`);
+            continue;
+          }
+          const s = String(v).trim().toUpperCase();
+          if (!s) continue;
+          if (/^(PP|PS|SP)\d+$/.test(s)) {
+            out.push(s.startsWith("SP") ? `PS${s.slice(2)}` : s);
+            continue;
+          }
+          if (/^\d+$/.test(s)) {
+            out.push(`PP${s}`);
+            continue;
+          }
+        }
+        return out;
+      };
 
-      const unique = [...new Set(ids)].sort((a, b) => a - b);
-      if (unique.length > 0 && !unique.includes(purchaseId)) {
+      const currentTokens = parseTokens(rows[0]?.linked_purchase_ids);
+      const token = `${purchaseType}${purchaseId}`;
+      const unique = [...new Set(currentTokens)];
+      if (unique.length > 0 && !unique.includes(token)) {
+        await conn.rollback();
         return NextResponse.json(
           { error: `Statement already linked to purchase #${unique[0]}` },
           { status: 409 },
         );
       }
-      ids = [purchaseId];
+      const targetLinked = JSON.stringify([purchaseId]);
+      const targetLinkedTyped = JSON.stringify([token]);
+
+      const [oldRows] = await conn.execute(
+        "SELECT id FROM statements WHERE linked_purchase_ids = ? OR linked_purchase_ids = ? LIMIT 1",
+        [targetLinkedTyped, targetLinked],
+      );
+      const oldId = oldRows?.[0]?.id != null ? Number(oldRows[0].id) : null;
+      const newId = Number(id);
+      if (oldId && Number.isFinite(oldId) && oldId > 0 && oldId !== newId) {
+        await conn.execute(
+          "UPDATE statements SET linked_purchase_ids = NULL, invoice_status = CASE WHEN client_expense_id IS NOT NULL THEN 'Settled' ELSE 'Unsettled' END WHERE id = ?",
+          [oldId],
+        );
+      }
 
       await conn.execute(
         "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ? WHERE id = ?",
-        [JSON.stringify(ids), "Settled", id],
+        [targetLinkedTyped, "Settled", id],
       );
 
-      return NextResponse.json({ success: true, linked_purchase_ids: ids });
+      await conn.commit();
+      committed = true;
+      return NextResponse.json({ success: true, linked_purchase_ids: [token] });
     } finally {
+      if (!committed) {
+        try {
+          await conn.rollback();
+        } catch (_) {}
+      }
       conn.release();
     }
   } catch (err) {

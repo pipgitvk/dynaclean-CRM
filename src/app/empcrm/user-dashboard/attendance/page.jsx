@@ -159,7 +159,7 @@ const AttendancePage = () => {
   } else if (logs.length > 0) {
     startDate = new Date(logs[logs.length - 1].date);
   } else {
-    startDate = new Date();
+    startDate = new Date(); 
     startDate.setDate(endDate.getDate() - 30);
   }
   startDate.setHours(0, 0, 0, 0);
