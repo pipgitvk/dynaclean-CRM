@@ -103,7 +103,7 @@ export async function GET(req) {
       `SELECT ${selectCols}
        FROM hr_designation_monthly_targets
        WHERE year = ? AND month = ?
-       ORDER BY hr_username ASC, designation ASC`,
+       ORDER BY hr_username ASC, designation ASC${withCity ? ", city ASC" : ""}`,
       [year, month]
     );
 
@@ -139,9 +139,18 @@ export async function GET(req) {
     const listRows = [];
     for (const row of rows) {
       const hu = String(row.hr_username || "").trim();
+      const cityForScope =
+        withCity && String(row.city || "").trim() ? String(row.city).trim() : null;
       let achieved = 0;
       if (hu) {
-        achieved = await computeCompletedForDesignation(conn, hu, year, month, row.designation);
+        achieved = await computeCompletedForDesignation(
+          conn,
+          hu,
+          year,
+          month,
+          row.designation,
+          cityForScope
+        );
       }
       listRows.push({
         id: row.id,

@@ -161,6 +161,9 @@ export default function HiringPage() {
   const [expectedSalary, setExpectedSalary] = useState("");
   const [currentLocation, setCurrentLocation] = useState("");
   const [hiringCity, setHiringCity] = useState("");
+  /** Cities from `hr_designation_monthly_targets` for selected designation + logged-in HR */
+  const [hiringCitiesFromTargets, setHiringCitiesFromTargets] = useState([]);
+  const [loadingHiringCities, setLoadingHiringCities] = useState(false);
   const [note, setNote] = useState("");
 
   const [filtersHydrated, setFiltersHydrated] = useState(false);
@@ -337,6 +340,49 @@ export default function HiringPage() {
   ]);
 
   useEffect(() => {
+    const des = String(designation ?? "").trim();
+    if (!des) {
+      setHiringCitiesFromTargets([]);
+      setHiringCity("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingHiringCities(true);
+      try {
+        const res = await fetch(
+          `/api/empcrm/hiring-cities-for-designation?designation=${encodeURIComponent(des)}`,
+          { cache: "no-store" },
+        );
+        const json = await res.json();
+        if (cancelled) return;
+        const list = json.success && Array.isArray(json.cities) ? json.cities : [];
+        setHiringCitiesFromTargets(list);
+        if (list.length > 0) {
+          setHiringCity((prev) => {
+            if (!prev) return prev;
+            const k = prev.trim().toLowerCase();
+            const still = list.some((c) => String(c).trim().toLowerCase() === k);
+            return still ? prev : "";
+          });
+        } else {
+          setHiringCity("");
+        }
+      } catch {
+        if (!cancelled) {
+          setHiringCitiesFromTargets([]);
+          setHiringCity("");
+        }
+      } finally {
+        if (!cancelled) setLoadingHiringCities(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [designation]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoadingDesignations(true);
@@ -389,6 +435,8 @@ export default function HiringPage() {
     setCurrentSalary("");
     setExpectedSalary("");
     setCurrentLocation("");
+    setHiringCity("");
+    setHiringCitiesFromTargets([]);
     setNote("");
     setResumeUploadError(null);
   };
@@ -867,14 +915,36 @@ export default function HiringPage() {
 
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">City</label>
-                    <input
-                      type="text"
+                    <select
                       value={hiringCity}
                       onChange={(e) => setHiringCity(e.target.value)}
-                      placeholder="Enter city"
-                      maxLength={120}
-                      className={formFieldClass}
-                    />
+                      className={formSelectClass}
+                      disabled={
+                        loadingHiringCities ||
+                        !String(designation).trim() ||
+                        hiringCitiesFromTargets.length === 0
+                      }
+                    >
+                      <option value="">
+                        {loadingHiringCities
+                          ? "Loading cities…"
+                          : !String(designation).trim()
+                            ? "— Select designation first —"
+                            : hiringCitiesFromTargets.length === 0
+                              ? "— No cities in HR targets —"
+                              : "— Select city —"}
+                      </option>
+                      {hiringCitiesFromTargets.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    {!loadingHiringCities && String(designation).trim() && hiringCitiesFromTargets.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-800/90">
+                        No city found for this role. 
+                      </p>
+                    )}
                   </div>
 
                   {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { HIRING_TAG_OPTIONS as TAG_OPTIONS, HR_SCORE_RATING_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
 import { mergeDesignationOptions } from "@/lib/designationDedupe";
+import { canonicalHiringCityInList, mergeHiringCityOptions } from "@/lib/hiringCities";
 import {
   EXPERIENCE_OPTIONS,
   fieldClass,
@@ -39,11 +40,57 @@ export default function EmpcrmHiringEditPage() {
   const [editing, setEditing] = useState(null);
   const [designationOptions, setDesignationOptions] = useState([]);
   const [loadingDesignations, setLoadingDesignations] = useState(true);
+  const [citiesFromTargets, setCitiesFromTargets] = useState([]);
+  const [loadingHiringCities, setLoadingHiringCities] = useState(false);
 
   const editFormDesignations = useMemo(
     () => mergeDesignationOptions(designationOptions, editing?.designation),
     [designationOptions, editing?.designation]
   );
+
+  const editFormCities = useMemo(
+    () => mergeHiringCityOptions(citiesFromTargets, editing?.hiring_city),
+    [citiesFromTargets, editing?.hiring_city]
+  );
+
+  useEffect(() => {
+    if (!editing) return;
+    const des = String(editing.designation ?? "").trim();
+    if (!des) {
+      setCitiesFromTargets([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setLoadingHiringCities(true);
+      try {
+        const res = await fetch(
+          `/api/empcrm/hiring-cities-for-designation?designation=${encodeURIComponent(des)}`,
+          { cache: "no-store" }
+        );
+        const json = await res.json();
+        if (cancelled) return;
+        const list = json.success && Array.isArray(json.cities) ? json.cities : [];
+        setCitiesFromTargets(list);
+        if (list.length > 0) {
+          setEditing((prev) => {
+            if (!prev) return prev;
+            const hc = String(prev.hiring_city ?? "").trim();
+            if (!hc) return prev;
+            const still = list.some((c) => String(c).trim().toLowerCase() === hc.toLowerCase());
+            return still ? prev : { ...prev, hiring_city: "" };
+          });
+        }
+      } catch {
+        if (!cancelled) setCitiesFromTargets([]);
+      } finally {
+        if (!cancelled) setLoadingHiringCities(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editing?.designation, editing?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,14 +358,35 @@ export default function EmpcrmHiringEditPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">City</label>
-              <input
-                type="text"
-                value={editing.hiring_city ?? ""}
+              <select
+                value={canonicalHiringCityInList(editFormCities, editing.hiring_city ?? "")}
                 onChange={(e) => updateEdit("hiring_city", e.target.value)}
-                placeholder="Enter city"
-                maxLength={120}
-                className={formFieldClass}
-              />
+                className={formSelectClass}
+                disabled={loadingHiringCities}
+              >
+                <option value="">
+                  {loadingHiringCities
+                    ? "Loading cities…"
+                    : !String(editing.designation ?? "").trim()
+                      ? "— Select designation first —"
+                      : editFormCities.length === 0
+                        ? "— No cities in HR targets —"
+                        : "— Select city —"}
+                </option>
+                {editFormCities.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              {!loadingHiringCities &&
+                String(editing.designation ?? "").trim() &&
+                citiesFromTargets.length === 0 &&
+                !String(editing.hiring_city ?? "").trim() && (
+                  <p className="mt-1 text-xs text-amber-800/90">
+                    No city found for this role. 
+                  </p>
+                )}
             </div>
             {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
               <>

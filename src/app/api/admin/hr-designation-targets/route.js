@@ -62,7 +62,9 @@ export async function GET(req) {
       sql += ` AND month = ?`;
       params.push(parseInt(month, 10));
     }
-    sql += ` ORDER BY year DESC, month DESC, designation ASC`;
+    sql += withCity
+      ? ` ORDER BY year DESC, month DESC, designation ASC, city ASC`
+      : ` ORDER BY year DESC, month DESC, designation ASC`;
 
     const [rows] = await conn.execute(sql, params);
     return NextResponse.json({ success: true, targets: rows, hasHrUsernameColumn: withUser });
@@ -113,15 +115,18 @@ export async function POST(request) {
 
     const conn = await getDbConnection();
     const withUser = await hasHrUsernameColumn(conn);
-    const withCity = await (city ? ensureCityColumn(conn) : hasCityColumn(conn));
+    if (withUser) {
+      await ensureCityColumn(conn);
+    }
+    const withCity = withUser ? await hasCityColumn(conn) : await (city ? ensureCityColumn(conn) : hasCityColumn(conn));
 
     if (withUser) {
       await conn.execute(
         `INSERT INTO hr_designation_monthly_targets (designation, hr_username, ${withCity ? "city, " : ""}target_amount, month, year)
          VALUES (?, ?, ${withCity ? "?, " : ""}?, ?, ?)
-         ON DUPLICATE KEY UPDATE ${withCity ? "city = VALUES(city), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
+         ON DUPLICATE KEY UPDATE ${withCity ? "target_amount = VALUES(target_amount), " : ""}updated_at = CURRENT_TIMESTAMP`,
         withCity
-          ? [designation, hr_username, city || null, target_amount, month, year]
+          ? [designation, hr_username, city, target_amount, month, year]
           : [designation, hr_username, target_amount, month, year]
       );
     } else {
@@ -129,13 +134,24 @@ export async function POST(request) {
         `INSERT INTO hr_designation_monthly_targets (designation, ${withCity ? "city, " : ""}target_amount, month, year)
          VALUES (?, ${withCity ? "?, " : ""}?, ?, ?)
          ON DUPLICATE KEY UPDATE ${withCity ? "city = VALUES(city), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
-        withCity ? [designation, city || null, target_amount, month, year] : [designation, target_amount, month, year]
+        withCity ? [designation, city, target_amount, month, year] : [designation, target_amount, month, year]
       );
     }
 
     return NextResponse.json({ success: true, message: "Target saved" });
   } catch (error) {
     console.error("[admin/hr-designation-targets POST]", error);
+    const msg = String(error?.message || "");
+    if (msg.includes("Duplicate") || msg.includes("duplicate")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "A target already exists for this HR, role, month, year and the same city (or blank). Use a different city to add another row for the same role.",
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json({ success: false, error: error.message || "Server error" }, { status: 500 });
   }
 }
@@ -174,7 +190,10 @@ export async function PATCH(request) {
 
     const conn = await getDbConnection();
     const withUser = await hasHrUsernameColumn(conn);
-    const withCity = await (city ? ensureCityColumn(conn) : hasCityColumn(conn));
+    if (withUser) {
+      await ensureCityColumn(conn);
+    }
+    const withCity = withUser ? await hasCityColumn(conn) : await (city ? ensureCityColumn(conn) : hasCityColumn(conn));
 
     if (withUser) {
       if (!hr_username) {
@@ -185,7 +204,7 @@ export async function PATCH(request) {
          SET designation = ?, hr_username = ?, ${withCity ? "city = ?, " : ""}target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
         withCity
-          ? [designation, hr_username, city || null, target_amount, month, year, id]
+          ? [designation, hr_username, city, target_amount, month, year, id]
           : [designation, hr_username, target_amount, month, year, id]
       );
     } else {
@@ -193,7 +212,7 @@ export async function PATCH(request) {
         `UPDATE hr_designation_monthly_targets
          SET designation = ?, ${withCity ? "city = ?, " : ""}target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
-        withCity ? [designation, city || null, target_amount, month, year, id] : [designation, target_amount, month, year, id]
+        withCity ? [designation, city, target_amount, month, year, id] : [designation, target_amount, month, year, id]
       );
     }
 
@@ -203,7 +222,11 @@ export async function PATCH(request) {
     const msg = String(error?.message || "");
     if (msg.includes("Duplicate") || msg.includes("duplicate")) {
       return NextResponse.json(
-        { success: false, error: "A row already exists for this HR, designation, month and year." },
+        {
+          success: false,
+          error:
+            "A target already exists for this HR, role, month, year and the same city (or blank). Use a different city to add another row for the same role.",
+        },
         { status: 409 }
       );
     }

@@ -5,35 +5,55 @@ import { normalizeDesignationKey } from "@/lib/designationDedupe";
  * Used by /api/empcrm/hr-target-chart and Superadmin dashboard.
  */
 
-/** @param {import("mysql2/promise").Connection} conn */
-export async function computeCompletedForDesignation(conn, username, year, month, forCompletedDesignation) {
+/**
+ * @param {import("mysql2/promise").Connection} conn
+ * @param {string | null} [forTargetCity] When set, completed hires must match `candidates.hiring_city` (and order revenue is not counted).
+ */
+export async function computeCompletedForDesignation(
+  conn,
+  username,
+  year,
+  month,
+  forCompletedDesignation,
+  forTargetCity = null
+) {
   const d = (forCompletedDesignation || "").trim();
   if (!d) return 0;
   const targetKey = normalizeDesignationKey(d);
+  const targetCity = String(forTargetCity ?? "").trim();
 
   let orderCompleted = 0;
-  try {
-    const [nameRows] = await conn.execute(
-      `SELECT username FROM employee_profiles
-       WHERE LOWER(TRIM(COALESCE(designation, ''))) = LOWER(TRIM(?))`,
-      [d]
-    );
-    const names = (nameRows || []).map((r) => String(r.username || "").trim()).filter(Boolean);
-    if (names.length > 0) {
-      const ph = names.map(() => "?").join(", ");
-      const [sumRows] = await conn.execute(
-        `SELECT COALESCE(SUM(COALESCE(totalamt, 0)), 0) AS completed
-         FROM neworder
-         WHERE YEAR(created_at) = ? AND MONTH(created_at) = ?
-           AND LOWER(TRIM(COALESCE(created_by, ''))) IN (${ph})`,
-        [year, month, ...names.map((n) => n.toLowerCase())]
+  if (!targetCity) {
+    try {
+      const [nameRows] = await conn.execute(
+        `SELECT username FROM employee_profiles
+         WHERE LOWER(TRIM(COALESCE(designation, ''))) = LOWER(TRIM(?))`,
+        [d]
       );
-      orderCompleted = sumRows[0]?.completed != null ? Number(sumRows[0].completed) : 0;
+      const names = (nameRows || []).map((r) => String(r.username || "").trim()).filter(Boolean);
+      if (names.length > 0) {
+        const ph = names.map(() => "?").join(", ");
+        const [sumRows] = await conn.execute(
+          `SELECT COALESCE(SUM(COALESCE(totalamt, 0)), 0) AS completed
+           FROM neworder
+           WHERE YEAR(created_at) = ? AND MONTH(created_at) = ?
+             AND LOWER(TRIM(COALESCE(created_by, ''))) IN (${ph})`,
+          [year, month, ...names.map((n) => n.toLowerCase())]
+        );
+        orderCompleted = sumRows[0]?.completed != null ? Number(sumRows[0].completed) : 0;
+      }
+    } catch (sumErr) {
+      console.error("[hrTargetMonthlyCompleted] order completed skipped:", sumErr?.message || sumErr);
+      orderCompleted = 0;
     }
-  } catch (sumErr) {
-    console.error("[hrTargetMonthlyCompleted] order completed skipped:", sumErr?.message || sumErr);
-    orderCompleted = 0;
   }
+
+  const citySql = targetCity
+    ? ` AND LOWER(TRIM(COALESCE(c.hiring_city, ''))) = LOWER(TRIM(?)) `
+    : "";
+  const hireBaseParams = targetCity
+    ? [username, targetCity, year, month, year, month]
+    : [username, year, month, year, month];
 
   let hireCompleted = 0;
   try {
@@ -46,6 +66,7 @@ export async function computeCompletedForDesignation(conn, username, year, month
       `SELECT TRIM(c.designation) AS desig FROM candidates c
        WHERE LOWER(TRIM(c.created_by)) = LOWER(TRIM(?))
          AND LOWER(TRIM(COALESCE(c.status, ''))) = 'hired'
+         ${citySql}
          AND (
            EXISTS (
              SELECT 1 FROM candidates_followups f
@@ -62,7 +83,7 @@ export async function computeCompletedForDesignation(conn, username, year, month
              AND YEAR(c.hire_date) = ? AND MONTH(c.hire_date) = ?
            )
          )`,
-      [username, year, month, year, month]
+      hireBaseParams
     );
     hireCompleted = (hireRows || []).filter(
       (r) => normalizeDesignationKey(r.desig ?? "") === targetKey
@@ -71,13 +92,18 @@ export async function computeCompletedForDesignation(conn, username, year, month
     const msg = String(hireErr?.message || "");
     if (msg.includes("candidates_followups") && (msg.includes("doesn't exist") || msg.includes("Unknown table"))) {
       try {
+        const legCitySql = targetCity
+          ? ` AND LOWER(TRIM(COALESCE(hiring_city, ''))) = LOWER(TRIM(?)) `
+          : "";
+        const legParams = targetCity ? [username, targetCity, year, month] : [username, year, month];
         const [hireRowsLegacy] = await conn.execute(
           `SELECT TRIM(designation) AS desig FROM candidates
            WHERE LOWER(TRIM(created_by)) = LOWER(TRIM(?))
              AND LOWER(TRIM(COALESCE(status, ''))) = 'hired'
+             ${legCitySql}
              AND hire_date IS NOT NULL
              AND YEAR(hire_date) = ? AND MONTH(hire_date) = ?`,
-          [username, year, month]
+          legParams
         );
         hireCompleted = (hireRowsLegacy || []).filter(
           (r) => normalizeDesignationKey(r.desig ?? "") === targetKey
@@ -119,8 +145,10 @@ export async function buildItemsForHrUsername(conn, username, year, month) {
   for (const row of userRows) {
     const des = String(row.designation || "").trim();
     const tgt = row.target_amount != null ? Number(row.target_amount) : 0;
-    const completed = await computeCompletedForDesignation(conn, username, year, month, des);
-    const city = hasCity ? String(row.city || "").trim() : "";
+    const cityRaw = hasCity ? String(row.city || "").trim() : "";
+    const cityFilter = hasCity && cityRaw ? cityRaw : null;
+    const completed = await computeCompletedForDesignation(conn, username, year, month, des, cityFilter);
+    const city = hasCity ? cityRaw : "";
     items.push({ designation: des, target: tgt, completed, city });
   }
   return items;
