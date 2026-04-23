@@ -620,7 +620,7 @@ export default function HrDesignationTargetsPage() {
                   type="text"
                   value={formCity}
                   onChange={(e) => setFormCity(e.target.value)}
-                  placeholder="Optional — use different cities to add another row for the same role"
+                  placeholder="Enter City Name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                   maxLength={120}
                 />
