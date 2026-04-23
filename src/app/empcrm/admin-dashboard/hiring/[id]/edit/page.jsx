@@ -132,6 +132,7 @@ export default function EmpcrmHiringEditPage() {
         currentSalary: row.current_salary ?? "",
         expectedSalary: row.expected_salary ?? "",
         current_location: row.current_location ?? "",
+        hiring_city: row.hiring_city != null ? String(row.hiring_city) : "",
         note: row.note ?? "",
       });
     } catch (e) {
@@ -192,6 +193,7 @@ export default function EmpcrmHiringEditPage() {
           current_salary: editing.currentSalary?.trim() || null,
           expected_salary: editing.expectedSalary?.trim() || null,
           current_location: editing.current_location?.trim() || null,
+          hiring_city: editing.hiring_city?.trim() || null,
           note: editing.note,
         }),
       });
@@ -306,6 +308,17 @@ export default function EmpcrmHiringEditPage() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">City</label>
+              <input
+                type="text"
+                value={editing.hiring_city ?? ""}
+                onChange={(e) => updateEdit("hiring_city", e.target.value)}
+                placeholder="Enter city"
+                maxLength={120}
+                className={formFieldClass}
+              />
             </div>
             {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
               <>

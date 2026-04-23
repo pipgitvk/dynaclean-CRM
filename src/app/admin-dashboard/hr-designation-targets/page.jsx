@@ -13,7 +13,11 @@ import {
   YAxis,
 } from "recharts";
 import { ArrowLeft, Eye, Pencil, Plus, Search, X } from "lucide-react";
-import { mergeDesignationOptions, resolveCanonicalDesignation } from "@/lib/designationDedupe";
+import {
+  HR_TARGET_ALLOWED_DESIGNATIONS,
+  mergeDesignationOptions,
+  resolveCanonicalDesignation,
+} from "@/lib/designationDedupe";
 
 const MONTHS = [
   { value: 1, label: "January" },
@@ -80,6 +84,7 @@ export default function HrDesignationTargetsPage() {
 
   const [formDesignation, setFormDesignation] = useState("");
   const [formHr, setFormHr] = useState("");
+  const [formCity, setFormCity] = useState("");
   const [formTarget, setFormTarget] = useState("");
   const [formMonth, setFormMonth] = useState(now.getMonth() + 1);
   const [formYear, setFormYear] = useState(now.getFullYear());
@@ -155,9 +160,27 @@ export default function HrDesignationTargetsPage() {
     return u?.suggested_designation?.trim() || "";
   }, [hrUsers, formHr]);
 
+  const normalizeDesignationKey = useCallback((s) => String(s).trim().toLowerCase().replace(/\s+/g, " "), []);
+  const allowedDesignationKeyToLabel = useMemo(() => {
+    const m = new Map();
+    for (const d of HR_TARGET_ALLOWED_DESIGNATIONS) {
+      m.set(normalizeDesignationKey(d), d);
+    }
+    return m;
+  }, [normalizeDesignationKey]);
+
+  const toAllowedDesignationLabel = useCallback(
+    (raw) => {
+      const t = String(raw ?? "").trim();
+      if (!t) return "";
+      return allowedDesignationKeyToLabel.get(normalizeDesignationKey(t)) || "";
+    },
+    [allowedDesignationKeyToLabel, normalizeDesignationKey]
+  );
+
   const addModalDesignations = useMemo(
-    () => mergeDesignationOptions(designationOptions, suggestedDesignationForFormHr, formDesignation),
-    [designationOptions, suggestedDesignationForFormHr, formDesignation]
+    () => HR_TARGET_ALLOWED_DESIGNATIONS,
+    []
   );
 
   const editModalDesignations = useMemo(
@@ -170,6 +193,7 @@ export default function HrDesignationTargetsPage() {
     setFormYear(year);
     setFormDesignation("");
     setFormHr("");
+    setFormCity("");
     setFormTarget("");
     setAddOpen(true);
     setToast(null);
@@ -195,6 +219,7 @@ export default function HrDesignationTargetsPage() {
         body: JSON.stringify({
           designation: formDesignation.trim(),
           hr_username: formHr.trim(),
+          city: formCity.trim(),
           target_amount: Number(formTarget),
           month: formMonth,
           year: formYear,
@@ -232,6 +257,7 @@ export default function HrDesignationTargetsPage() {
           id: editRow.id,
           designation: formDesignation.trim(),
           hr_username: formHr.trim(),
+          city: formCity.trim(),
           target_amount: Number(formTarget),
           month: formMonth,
           year: formYear,
@@ -255,6 +281,7 @@ export default function HrDesignationTargetsPage() {
   const openEdit = (row) => {
     setFormDesignation(resolveCanonicalDesignation(row.designation, designationOptions));
     setFormHr(row.hr_username === "—" ? "" : row.hr_username || "");
+    setFormCity(String(row.city || "").trim());
     setFormTarget(String(row.target_amount ?? ""));
     setFormMonth(row.month);
     setFormYear(row.year);
@@ -295,7 +322,8 @@ export default function HrDesignationTargetsPage() {
     return rows.filter(
       (r) =>
         String(r.hr_username || "").toLowerCase().includes(q) ||
-        String(r.designation || "").toLowerCase().includes(q)
+        String(r.designation || "").toLowerCase().includes(q) ||
+        String(r.city || "").toLowerCase().includes(q)
     );
   }, [dashboard?.rows, q]);
 
@@ -446,6 +474,7 @@ export default function HrDesignationTargetsPage() {
                 <tr className="border-b border-gray-200 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-700 sm:text-xs">
                   <th className="whitespace-nowrap px-2 py-2.5 text-left sm:px-4 sm:py-3">Username</th>
                   <th className="min-w-[7rem] px-2 py-2.5 text-left sm:px-4 sm:py-3">Designation</th>
+                  <th className="min-w-[6rem] px-2 py-2.5 text-left sm:px-4 sm:py-3">City</th>
                   <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-4 sm:py-3">Target</th>
                   <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-4 sm:py-3">Achieved</th>
                   <th className="whitespace-nowrap px-2 py-2.5 text-center sm:px-4 sm:py-3">Start date</th>
@@ -457,13 +486,13 @@ export default function HrDesignationTargetsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
                       Loading…
                     </td>
                   </tr>
                 ) : filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
                       No rows for this month{q ? " (try clearing search)" : ""}.
                     </td>
                   </tr>
@@ -473,6 +502,9 @@ export default function HrDesignationTargetsPage() {
                       <td className="px-2 py-2.5 font-medium text-gray-900 sm:px-4 sm:py-3">{row.hr_username}</td>
                       <td className="max-w-[10rem] truncate px-2 py-2.5 text-gray-700 sm:max-w-none sm:px-4 sm:py-3" title={row.designation}>
                         {row.designation}
+                      </td>
+                      <td className="max-w-[9rem] truncate px-2 py-2.5 text-gray-700 sm:max-w-none sm:px-4 sm:py-3" title={row.city || ""}>
+                        {row.city || "—"}
                       </td>
                       <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-gray-900 sm:px-4 sm:py-3">
                         {formatTargetPlain(row.target_amount)}
@@ -551,7 +583,8 @@ export default function HrDesignationTargetsPage() {
                     setFormHr(v);
                     const u = hrUsers.find((x) => x.username === v);
                     const sug = u?.suggested_designation?.trim() || "";
-                    if (sug) setFormDesignation(resolveCanonicalDesignation(sug, designationOptions));
+                    const allowed = toAllowedDesignationLabel(sug);
+                    if (allowed) setFormDesignation(allowed);
                   }}
                   required
                   disabled={loadingHrUsers}
@@ -571,16 +604,26 @@ export default function HrDesignationTargetsPage() {
                   required
                   value={formDesignation}
                   onChange={(e) => setFormDesignation(e.target.value)}
-                  disabled={loadingDesignations}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
                 >
-                  <option value="">{loadingDesignations ? "Loading designations…" : "— Select designation —"}</option>
+                  <option value="">— Select designation —</option>
                   {addModalDesignations.map((d) => (
                     <option key={d} value={d}>
                       {d}
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input
+                  type="text"
+                  value={formCity}
+                  onChange={(e) => setFormCity(e.target.value)}
+                  placeholder="Enter city"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                  maxLength={120}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Target Hiring</label>
@@ -672,6 +715,10 @@ export default function HrDesignationTargetsPage() {
                 <span className="font-medium text-gray-900">{viewRow.designation}</span>
               </p>
               <p>
+                <span className="text-gray-500">City:</span>{" "}
+                <span className="font-medium text-gray-900">{viewRow.city || "—"}</span>
+              </p>
+              <p>
                 <span className="text-gray-500">Target:</span>{" "}
                 <span className="font-medium text-gray-900">{formatTargetPlain(viewRow.target_amount)}</span>
               </p>
@@ -750,6 +797,17 @@ export default function HrDesignationTargetsPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input
+                  type="text"
+                  value={formCity}
+                  onChange={(e) => setFormCity(e.target.value)}
+                  placeholder="Enter city"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
+                  maxLength={120}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Target amount *</label>

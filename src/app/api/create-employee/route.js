@@ -1,5 +1,8 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { HR_TARGET_ALLOWED_DESIGNATIONS } from "@/lib/designationDedupe";
+
+const ALLOWED_USER_ROLES = new Set(HR_TARGET_ALLOWED_DESIGNATIONS);
 
 export async function POST(request) {
   try {
@@ -10,12 +13,17 @@ export async function POST(request) {
       return NextResponse.json({ error: "Required fields are missing." }, { status: 400 });
     }
 
+    const roleStr = String(userRole ?? "").trim();
+    if (!roleStr || !ALLOWED_USER_ROLES.has(roleStr)) {
+      return NextResponse.json({ error: "Invalid user role." }, { status: 400 });
+    }
+
     const conn = await getDbConnection();
     const query = `
       INSERT INTO rep_list (username, email, gender, dob, password, number, userRole , status)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const values = [username, email, gender, dob, password, number, userRole, 1];
+    const values = [username, email, gender, dob, password, number, roleStr, 1];
     
     const [result] = await conn.execute(query, values);
         // await conn.end();

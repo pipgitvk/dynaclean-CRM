@@ -79,13 +79,20 @@ function DesignationBarGroup({ designation, target, completed }) {
 function ItemsChartBlock({ items }) {
   if (!items.length) return null;
 
+  const labelForRow = (row) => {
+    const d = String(row?.designation || "").trim();
+    const c = String(row?.city || "").trim();
+    if (!d) return "—";
+    return c ? `${d} (${c})` : d;
+  };
+
   return (
     <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
       <div className="flex overflow-x-auto pb-3 pt-1 justify-start">
         {items.map((row, idx) => (
           <DesignationBarGroup
             key={`${row.designation}-bar-${idx}`}
-            designation={row.designation}
+            designation={labelForRow(row)}
             target={row.target ?? 0}
             completed={row.completed ?? 0}
           />

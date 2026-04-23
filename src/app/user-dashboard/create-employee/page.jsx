@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { HR_TARGET_ALLOWED_DESIGNATIONS } from "@/lib/designationDedupe";
+
+const USER_ROLE_OPTIONS = HR_TARGET_ALLOWED_DESIGNATIONS;
 
 export default function CreateEmployeeForm() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -14,9 +15,8 @@ export default function CreateEmployeeForm() {
     password: "",
     number: "",
     profile_pic: "default.png",
-    userRole: "",
+    userRole: USER_ROLE_OPTIONS[0] ?? "",
   });
-  const [userRoles, setUserRoles] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -25,26 +25,6 @@ export default function CreateEmployeeForm() {
     phone: "",
     dob: "",
   });
-
-  useEffect(() => {
-    async function fetchUserRoles() {
-      try {
-        const response = await fetch("/api/get-user-roles");
-        if (response.ok) {
-          const roles = await response.json();
-          setUserRoles(roles);
-          if (roles.length > 0) {
-            setFormData((prev) => ({ ...prev, userRole: roles[0] }));
-          }
-        } else {
-          console.error("Failed to fetch user roles");
-        }
-      } catch (error) {
-        console.error("Network error fetching user roles:", error);
-      }
-    }
-    fetchUserRoles();
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -97,7 +77,7 @@ export default function CreateEmployeeForm() {
           password: "",
           number: "",
           profile_pic: "default.png",
-          userRole: userRoles[0] || "",
+          userRole: USER_ROLE_OPTIONS[0] || "",
         });
         // setTimeout(() => {
         //   router.push("/admin-dashboard/employees");
@@ -297,8 +277,8 @@ export default function CreateEmployeeForm() {
             required
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
           >
-            {userRoles.map((role, index) => (
-              <option key={index} value={role}>
+            {USER_ROLE_OPTIONS.map((role) => (
+              <option key={role} value={role}>
                 {role}
               </option>
             ))}
