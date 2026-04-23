@@ -266,7 +266,7 @@ export default function HrDesignationTargetsPage() {
     setFormMonth(row.month);
     setFormYear(row.year);
     setEditRow(row);
-    setToast(null);
+    setToast(null);   
   };
 
   const handleDelete = async (id) => {
