@@ -82,8 +82,8 @@ export default function AdminAttendanceRegularizationPage() {
   }, [load]);
 
   return (
-    <div className="p-4 md:p-6 max-w-[100vw] overflow-x-auto">
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="w-full min-w-0 max-w-full">
+      <div className="mb-6 flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
             Attendance regularization — all requests
@@ -104,14 +104,14 @@ export default function AdminAttendanceRegularizationPage() {
       {loading ? (
         <p className="text-gray-600 py-12 text-center">Loading…</p>
       ) : requests.length === 0 ? (
-        <p className="text-gray-600 rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-center">
+        <p className="w-full text-gray-600 rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-center">
           No regularization requests found. Ensure the database table exists and
           employees have submitted requests.
         </p>
       ) : (
-        <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+        <div className="w-full bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-full text-sm">
               <thead className="bg-gray-100 text-left text-gray-700">
                 <tr>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">ID</th>
@@ -156,7 +156,7 @@ export default function AdminAttendanceRegularizationPage() {
                         {req.status || "—"}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-gray-700 max-w-xs align-top break-words">
+                    <td className="px-3 py-2 min-w-0 text-gray-700 align-top break-words">
                       {req.reason || "—"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">

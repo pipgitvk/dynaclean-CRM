@@ -35,10 +35,14 @@ function LayoutContent({
         backButtonPath={backButtonPath}
         showBackToUserCrm={showBackToUserCrm}
       />
-      <div className="flex flex-col flex-1 transition-all duration-300 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden transition-all duration-300">
         <Navbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <UserProvider>
-          <main className={`p-3 sm:p-4 md:p-6 lg:p-8 overflow-auto min-w-0 ${theme.body.text}`}>{children}</main>
+          <main
+            className={`min-h-0 min-w-0 w-full flex-1 overflow-auto p-3 sm:p-4 md:p-6 lg:p-8 ${theme.body.text}`}
+          >
+            {children}
+          </main>
         </UserProvider>
       </div>
       <ThemeSwitcher />
