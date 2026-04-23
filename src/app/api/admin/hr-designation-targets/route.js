@@ -17,6 +17,23 @@ async function hasHrUsernameColumn(conn) {
   return rows.length > 0;
 }
 
+async function hasCityColumn(conn) {
+  const [rows] = await conn.execute(`SHOW COLUMNS FROM hr_designation_monthly_targets LIKE 'city'`);
+  return rows.length > 0;
+}
+
+async function ensureCityColumn(conn) {
+  const exists = await hasCityColumn(conn);
+  if (exists) return true;
+  try {
+    await conn.execute(
+      `ALTER TABLE hr_designation_monthly_targets ADD COLUMN city VARCHAR(120) NULL DEFAULT NULL`
+    );
+  } catch {
+  }
+  return hasCityColumn(conn);
+}
+
 /** GET: list targets (optional ?year= & ?month=) */
 export async function GET(req) {
   try {
@@ -30,9 +47,10 @@ export async function GET(req) {
 
     const conn = await getDbConnection();
     const withUser = await hasHrUsernameColumn(conn);
+    const withCity = await hasCityColumn(conn);
     const selectCols = withUser
-      ? `id, designation, hr_username, target_amount, month, year, created_at, updated_at`
-      : `id, designation, target_amount, month, year, created_at, updated_at`;
+      ? `id, designation, hr_username, ${withCity ? "city, " : ""}target_amount, month, year, created_at, updated_at`
+      : `id, designation, ${withCity ? "city, " : ""}target_amount, month, year, created_at, updated_at`;
 
     let sql = `SELECT ${selectCols} FROM hr_designation_monthly_targets WHERE 1=1`;
     const params = [];
@@ -75,6 +93,7 @@ export async function POST(request) {
     const body = await request.json();
     const designation = String(body.designation ?? "").trim();
     const hr_username = String(body.hr_username ?? "").trim();
+    const city = String(body.city ?? "").trim();
     const target_amount = Number(body.target_amount ?? body.target ?? NaN);
     const month = parseInt(body.month, 10);
     const year = parseInt(body.year, 10);
@@ -94,20 +113,23 @@ export async function POST(request) {
 
     const conn = await getDbConnection();
     const withUser = await hasHrUsernameColumn(conn);
+    const withCity = await (city ? ensureCityColumn(conn) : hasCityColumn(conn));
 
     if (withUser) {
       await conn.execute(
-        `INSERT INTO hr_designation_monthly_targets (designation, hr_username, target_amount, month, year)
-         VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
-        [designation, hr_username, target_amount, month, year]
+        `INSERT INTO hr_designation_monthly_targets (designation, hr_username, ${withCity ? "city, " : ""}target_amount, month, year)
+         VALUES (?, ?, ${withCity ? "?, " : ""}?, ?, ?)
+         ON DUPLICATE KEY UPDATE ${withCity ? "city = VALUES(city), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
+        withCity
+          ? [designation, hr_username, city || null, target_amount, month, year]
+          : [designation, hr_username, target_amount, month, year]
       );
     } else {
       await conn.execute(
-        `INSERT INTO hr_designation_monthly_targets (designation, target_amount, month, year)
-         VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
-        [designation, target_amount, month, year]
+        `INSERT INTO hr_designation_monthly_targets (designation, ${withCity ? "city, " : ""}target_amount, month, year)
+         VALUES (?, ${withCity ? "?, " : ""}?, ?, ?)
+         ON DUPLICATE KEY UPDATE ${withCity ? "city = VALUES(city), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
+        withCity ? [designation, city || null, target_amount, month, year] : [designation, target_amount, month, year]
       );
     }
 
@@ -129,6 +151,7 @@ export async function PATCH(request) {
     const id = parseInt(body.id, 10);
     const designation = String(body.designation ?? "").trim();
     const hr_username = String(body.hr_username ?? "").trim();
+    const city = String(body.city ?? "").trim();
     const target_amount = Number(body.target_amount ?? body.target ?? NaN);
     const month = parseInt(body.month, 10);
     const year = parseInt(body.year, 10);
@@ -151,6 +174,7 @@ export async function PATCH(request) {
 
     const conn = await getDbConnection();
     const withUser = await hasHrUsernameColumn(conn);
+    const withCity = await (city ? ensureCityColumn(conn) : hasCityColumn(conn));
 
     if (withUser) {
       if (!hr_username) {
@@ -158,16 +182,18 @@ export async function PATCH(request) {
       }
       await conn.execute(
         `UPDATE hr_designation_monthly_targets
-         SET designation = ?, hr_username = ?, target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
+         SET designation = ?, hr_username = ?, ${withCity ? "city = ?, " : ""}target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
-        [designation, hr_username, target_amount, month, year, id]
+        withCity
+          ? [designation, hr_username, city || null, target_amount, month, year, id]
+          : [designation, hr_username, target_amount, month, year, id]
       );
     } else {
       await conn.execute(
         `UPDATE hr_designation_monthly_targets
-         SET designation = ?, target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
+         SET designation = ?, ${withCity ? "city = ?, " : ""}target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
-        [designation, target_amount, month, year, id]
+        withCity ? [designation, city || null, target_amount, month, year, id] : [designation, target_amount, month, year, id]
       );
     }
 

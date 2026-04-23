@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eye, Filter, Loader2, Pencil, UserPlus, X } from "lucide-react";
 import { HR_SCORE_RATING_OPTIONS, HIRING_TAG_OPTIONS as TAG_OPTIONS, HAVE_NOT_TALKED_REASONS } from "@/lib/hiringPayload";
-import { mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
+import { HR_TARGET_ALLOWED_DESIGNATIONS, mergeDesignationOptions, normalizeDesignationKey, resolveCanonicalDesignation } from "@/lib/designationDedupe";
 
 /** Shared field styles */
 const fieldClass =
@@ -160,6 +160,7 @@ export default function HiringPage() {
   const [currentSalary, setCurrentSalary] = useState("");
   const [expectedSalary, setExpectedSalary] = useState("");
   const [currentLocation, setCurrentLocation] = useState("");
+  const [hiringCity, setHiringCity] = useState("");
   const [note, setNote] = useState("");
 
   const [filtersHydrated, setFiltersHydrated] = useState(false);
@@ -362,8 +363,8 @@ export default function HiringPage() {
   );
 
   const addFormDesignations = useMemo(
-    () => mergeDesignationOptions(designationOptions, designation),
-    [designationOptions, designation]
+    () => HR_TARGET_ALLOWED_DESIGNATIONS,
+    []
   );
 
   const resetForm = () => {
@@ -431,6 +432,7 @@ export default function HiringPage() {
           current_salary: currentSalary.trim() || null,
           expected_salary: expectedSalary.trim() || null,
           current_location: currentLocation.trim() || null,
+          hiring_city: hiringCity.trim() || null,
           note,
         }),
       });
@@ -646,7 +648,7 @@ export default function HiringPage() {
           </div>
         ) : (
           <div className="overflow-x-auto overscroll-x-contain [scrollbar-gutter:stable]">
-            <table className="min-w-[680px] w-full text-xs sm:text-sm">
+            <table className="min-w-[760px] w-full text-xs sm:text-sm">
               <thead className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-slate-100/90">
                 <tr>
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
@@ -657,6 +659,9 @@ export default function HiringPage() {
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
                     Designation
+                  </th>
+                  <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
+                    City
                   </th>
                   <th className="whitespace-nowrap px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-600 sm:px-4 sm:text-[11px]">
                     Contact
@@ -690,7 +695,7 @@ export default function HiringPage() {
               <tbody>
                 {entries.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="px-4 py-14 text-center">
+                    <td colSpan={14} className="px-4 py-14 text-center">
                       <p className="text-sm font-medium text-slate-600">No records for this filter.</p>
                       <p className="mt-1 text-xs text-slate-400">Try another year, month, or designation.</p>
                     </td>
@@ -708,6 +713,12 @@ export default function HiringPage() {
                         title={row.designation || ""}
                       >
                         {row.designation || "—"}
+                      </td>
+                      <td
+                        className="max-w-[8rem] truncate px-3 py-2.5 text-slate-700 sm:px-4"
+                        title={row.hiring_city || ""}
+                      >
+                        {row.hiring_city || "—"}
                       </td>
                       <td className="px-3 py-2.5 text-slate-600 sm:px-4">{row.emp_contact || "—"}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 sm:px-4">
@@ -843,18 +854,27 @@ export default function HiringPage() {
                       required
                       value={designation}
                       onChange={(e) => setDesignation(e.target.value)}
-                      disabled={loadingDesignations}
                       className={formSelectClass}
                     >
-                      <option value="">
-                        {loadingDesignations ? "Loading designations…" : "— Select designation —"}
-                      </option>
+                      <option value="">— Select designation —</option>
                       {addFormDesignations.map((d) => (
                         <option key={d} value={d}>
                           {d}
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">City</label>
+                    <input
+                      type="text"
+                      value={hiringCity}
+                      onChange={(e) => setHiringCity(e.target.value)}
+                      placeholder="Enter city"
+                      maxLength={120}
+                      className={formFieldClass}
+                    />
                   </div>
 
                   {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (

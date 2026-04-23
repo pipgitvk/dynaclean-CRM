@@ -7,6 +7,33 @@ export function normalizeDesignationKey(s) {
   return String(s).trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+export const HR_TARGET_ALLOWED_DESIGNATIONS = [
+  "HR Executive",
+  "Senior HR Executive",
+  "HR Manager",
+  "Team leader",
+  "Office Executive",
+  "Accountant",
+  "CA Accountant",
+  "Software Developer",
+  "Senior Software Developer",
+  "Office Boy",
+  "Painter",
+  "Helper",
+  "Welder",
+  "Telesales Executive",
+  "Sales Executive",
+  "Sales Manager",
+  "Branch Manager",
+  "Production Engineer",
+  "Mechanical Design Engineer",
+  "Electrical site Engineer",
+  "Service Support Executive",
+  "Digital Marketing Executive",
+  "GEM Tender Executive",
+  "Field Sales and Service Executive",
+];
+
 /**
  * Pick one display string from variants that share the same normalizeDesignationKey.
  * Prefers mixed/title case over ALL CAPS when both exist; then longer/more readable.

@@ -133,6 +133,7 @@ export function parseHiringPayload(body, options = {}) {
   const current_salary = String(body.current_salary ?? "").trim() || null;
   const expected_salary = String(body.expected_salary ?? "").trim() || null;
   const current_location = String(body.current_location ?? "").trim() || null;
+  const hiring_city = String(body.hiring_city ?? "").trim().slice(0, 120) || null;
 
   const hr_score_rating_raw = String(body.hr_score_rating ?? "").trim();
   const hr_score_rating = HR_SCORE_RATING_OPTIONS.includes(hr_score_rating_raw) ? hr_score_rating_raw : null;
@@ -203,6 +204,7 @@ export function parseHiringPayload(body, options = {}) {
       current_salary,
       expected_salary,
       current_location,
+      hiring_city,
       note,
     },
   };

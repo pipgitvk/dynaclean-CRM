@@ -98,8 +98,18 @@ export async function computeCompletedForDesignation(conn, username, year, month
 
 /** Targets + completed for one HR username (rows with hr_username set for that month). */
 export async function buildItemsForHrUsername(conn, username, year, month) {
+  let hasCity = false;
+  try {
+    const [cols] = await conn.execute(`SHOW COLUMNS FROM hr_designation_monthly_targets LIKE 'city'`);
+    hasCity = (cols || []).length > 0;
+  } catch {
+    hasCity = false;
+  }
+
+  const selectCols = hasCity ? "designation, target_amount, city" : "designation, target_amount";
+
   const [userRows] = await conn.execute(
-    `SELECT designation, target_amount FROM hr_designation_monthly_targets
+    `SELECT ${selectCols} FROM hr_designation_monthly_targets
      WHERE year = ? AND month = ? AND TRIM(hr_username) <> ''
        AND LOWER(TRIM(hr_username)) = LOWER(TRIM(?))
      ORDER BY designation ASC`,
@@ -110,7 +120,8 @@ export async function buildItemsForHrUsername(conn, username, year, month) {
     const des = String(row.designation || "").trim();
     const tgt = row.target_amount != null ? Number(row.target_amount) : 0;
     const completed = await computeCompletedForDesignation(conn, username, year, month, des);
-    items.push({ designation: des, target: tgt, completed });
+    const city = hasCity ? String(row.city || "").trim() : "";
+    items.push({ designation: des, target: tgt, completed, city });
   }
   return items;
 }
