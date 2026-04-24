@@ -88,10 +88,10 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
-  // Filter by employee (lead_source)
+  // Filter by employee (lead_source or assigned_to)
   if (employee) {
-    query += ` AND c.lead_source = ?`;
-    params.push(employee);
+    query += ` AND (c.lead_source = ? OR c.assigned_to = ?)`;
+    params.push(employee, employee);
   }
 
   // Filter by status
