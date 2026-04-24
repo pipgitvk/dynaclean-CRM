@@ -160,6 +160,7 @@ export default function TaskForm({ username }) {
             <option value="Service">Service</option>
             <option value="Complaint">Complaint</option>
             <option value="Other General Task">Other General Task</option>
+            <option value="Software Development">Software Development</option>
           </select>
         </div>
 
