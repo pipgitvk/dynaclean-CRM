@@ -15,7 +15,10 @@ const TL_TAG_OPTIONS = [
   "Strong FollowUp",
   "Service Issue",
   "Running Orders",
+  "Postponding/Declined",
   "Clear",
+  "order-recieved",
+  "cancel order",
 ];
 
 function parseFirstLine(firstLine) {
