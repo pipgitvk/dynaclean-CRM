@@ -5,16 +5,26 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import AssignToInput from "@/components/AssigneInput/AssignToInput";
 
+/** Default deadline: now + 2h, as local `datetime-local` (minute precision). */
+function defaultDatetimeLocal() {
+  const d = new Date();
+  d.setTime(d.getTime() + 2 * 60 * 60 * 1000);
+  const z = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;
+}
+
+const initialFormData = () => ({
+  taskname: "",
+  taskassignto: "",
+  next_followup_date: defaultDatetimeLocal(),
+  task_prior: "Medium",
+  task_catg: "Software Development",
+  notes: "",
+});
+
 export default function TaskForm({ username }) {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    taskname: "",
-    taskassignto: "",
-    next_followup_date: "",
-    task_prior: "",
-    task_catg: "",
-    notes: "",
-  });
+  const [formData, setFormData] = useState(initialFormData);
 
   const [attachments, setAttachments] = useState([]); // images/docs (multiple)
   const [taskVideo, setTaskVideo] = useState(null);
@@ -160,6 +170,7 @@ export default function TaskForm({ username }) {
             <option value="Service">Service</option>
             <option value="Complaint">Complaint</option>
             <option value="Other General Task">Other General Task</option>
+            <option value="Software Development">Software Development</option>
           </select>
         </div>
 
