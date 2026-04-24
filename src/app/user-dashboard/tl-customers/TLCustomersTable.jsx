@@ -291,6 +291,7 @@ export default function TLCustomersTable({
       if (selectedTag) params.set("tag", selectedTag);
       if (nextFromDate) params.set("nextFromDate", nextFromDate);
       if (nextToDate) params.set("nextToDate", nextToDate);
+      params.set("tlOnly", tlOnly ? "true" : "false");
       router.push(`${basePath}?${params.toString()}`);
     });
   };
