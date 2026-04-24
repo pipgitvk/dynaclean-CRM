@@ -104,8 +104,8 @@ export default function OrderTable({ orders, userRole }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
+  const [dateTo, setDateTo] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));
   const [createdByFilter, setCreatedByFilter] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["SUPERADMIN"].includes(userRole);
@@ -118,6 +118,15 @@ export default function OrderTable({ orders, userRole }) {
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setCreatedByFilter("");
+    setApprovalStatusFilter("");
   };
 
   // Filter orders based on search query, status filter, and date range
@@ -174,7 +183,6 @@ export default function OrderTable({ orders, userRole }) {
     return orders.reduce(
       (acc, o) => {
         if (!orderCreatedInDateRange(o, dateFrom, dateTo)) return acc;
-        if (!isDisplayedDispatchDone(o)) return acc;
         acc.gstTotal += Number(o.taxamt) || 0;
         acc.taxableTotal += orderTaxableTotal(o);
         return acc;
@@ -476,6 +484,12 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
+        <button
+          onClick={handleResetFilters}
+          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
+        >
+          Reset Filters
+        </button>
       </div>
 
       {/* 🧰 Filters */}
