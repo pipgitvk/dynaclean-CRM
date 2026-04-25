@@ -183,6 +183,7 @@ export default function EmpcrmHiringEditPage() {
     setError(null);
     try {
       const hired = editing.status === "Hired";
+      const joined = editing.status === "Joined";
       const rescheduled = editing.status === "Rescheduled";
       const nextFollowUp = editing.status === "next-follow-up";
       const hiredFollowUpTag = hired && editing.tag === "Follow-Up";
@@ -204,7 +205,7 @@ export default function EmpcrmHiringEditPage() {
           interview_mode: editing.interview_mode || null,
           status: editing.status,
           tag: hired ? editing.tag || null : editing.status === "Have not talked" ? editing.tag || null : null,
-          hire_date: hired ? editing.hire_date || null : null,
+          hire_date: (hired || joined) ? editing.hire_date || null : null,
           package: hired ? String(editing.offerPackage || "").trim() || null : null,
           probation_months:
             hired && editing.tag === "Probation" && editing.probationMonths !== ""
@@ -365,7 +366,7 @@ export default function EmpcrmHiringEditPage() {
                   </p>
                 )}
             </div>
-            {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
+            {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(editing.status) && (
               <>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -490,11 +491,16 @@ export default function EmpcrmHiringEditPage() {
                   setEditing((prev) => {
                     if (!prev) return prev;
                     const next = { ...prev, status: v };
-                    if (v !== "Hired") {
+                    const isHired = v === "Hired";
+                    const isJoined = v === "Joined";
+                    if (!isHired && !isJoined) {
                       next.tag = "";
-                    }
-                    if (v !== "Hired") {
                       next.hire_date = "";
+                      next.offerPackage = "";
+                      next.probationMonths = "";
+                    }
+                    if (isJoined) {
+                      next.tag = "";
                       next.offerPackage = "";
                       next.probationMonths = "";
                     }
@@ -526,12 +532,12 @@ export default function EmpcrmHiringEditPage() {
               </div>
             )}
 
-            {editing.status !== "Rejected" && editing.status !== "Reject" && (
+            {editing.status !== "Rejected" && editing.status !== "Reject" && editing.status !== "Joined" && editing.status !== "Attended Interview" && (
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Next follow-up date &amp; time *</label>
                 <input
                   type="datetime-local"
-                  required={editing.status !== "Rejected" && editing.status !== "Reject"}
+                  required={editing.status !== "Rejected" && editing.status !== "Reject" && editing.status !== "Joined" && editing.status !== "Attended Interview"}
                   value={editing.next_followup_at ?? ""}
                   onChange={(e) => updateEdit("next_followup_at", e.target.value)}
                   className={formFieldClass}
@@ -540,11 +546,11 @@ export default function EmpcrmHiringEditPage() {
             )}
 
             {editing.status === "Hired" && (
-              <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
-                <p className="text-sm font-semibold text-indigo-900">Hired — joining &amp; package</p>
+              <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 sm:col-span-2">
+                <p className="text-sm font-semibold text-emerald-900">Hiring — onboarding info</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Joining date *</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Joining Date *</label>
                     <input
                       type="date"
                       required={editing.status === "Hired"}
@@ -623,7 +629,39 @@ export default function EmpcrmHiringEditPage() {
               </div>
             )}
 
-            {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(editing.status) && (
+            {editing.status === "Joined" && (
+              <div className="space-y-4 rounded-xl border border-teal-200 bg-teal-50/40 p-4 sm:col-span-2">
+                <p className="text-sm font-semibold text-teal-900">Joined Info</p>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Joined Date *</label>
+                  <input
+                    type="date"
+                    required={editing.status === "Joined"}
+                    value={editing.hire_date}
+                    onChange={(e) => updateEdit("hire_date", e.target.value)}
+                    className={formFieldClass}
+                  />
+                </div>
+              </div>
+            )}
+
+            {editing.status === "Attended Interview" && (
+              <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:col-span-2">
+                <p className="text-sm font-semibold text-blue-900">Interview Info</p>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time *</label>
+                  <input
+                    type="datetime-local"
+                    required={editing.status === "Attended Interview"}
+                    value={editing.interview_at ?? ""}
+                    onChange={(e) => updateEdit("interview_at", e.target.value)}
+                    className={formFieldClass}
+                  />
+                </div>
+              </div>
+            )}
+
+            {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(editing.status) && (
               <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                 <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

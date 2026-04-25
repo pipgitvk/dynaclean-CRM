@@ -14,17 +14,18 @@ const formFieldClass = `w-full ${fieldClass}`;
 const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900`;
 
 const STATUS_OPTIONS = [
-  "Toggle",
   "Talked",
   "Didn't receive the call",
   "Cut the call",
   "Not reachable",
   "Shortlisted",
+  "Attended Interview",
   "Selected",
   "Negotiation",
   "Hold",
   "Backup",
   "Hired",
+  "Joined",
   "Rejected",
 ];
 
@@ -97,7 +98,6 @@ function formatInterviewAt(v) {
 }
 
 const STATUS_CHIP_STYLES = {
-  Toggle:        "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   Talked:        "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Follow-up":   "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Didn't receive the call": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
@@ -105,11 +105,13 @@ const STATUS_CHIP_STYLES = {
   "Not reachable": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   "Have not talked": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   Shortlisted:   "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
+  "Attended Interview": "bg-blue-50 text-blue-900 border-blue-200 ring-1 ring-blue-500/15",
   Selected:      "bg-indigo-50 text-indigo-900 border-indigo-200 ring-1 ring-indigo-500/15",
   Negotiation:   "bg-orange-50 text-orange-900 border-orange-200 ring-1 ring-orange-500/15",
   Hold:          "bg-yellow-50 text-yellow-900 border-yellow-200 ring-1 ring-yellow-500/15",
   Backup:        "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20",
   Hired:         "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
+  Joined:        "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/20",
   Rejected:      "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
   // Legacy — old rows still render with correct colours
   "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
@@ -148,7 +150,7 @@ export default function HiringPage() {
   const [rescheduled_at, setRescheduledAt] = useState("");
   const [next_followup_at, setNextFollowupAt] = useState("");
   const [interview_mode, setInterviewMode] = useState("");
-  const [status, setStatus] = useState("Toggle");
+  const [status, setStatus] = useState("Talked");
   const [tag, setTag] = useState("");
   const [hire_date, setHireDate] = useState("");
   const [offerPackage, setOfferPackage] = useState("");
@@ -423,7 +425,7 @@ export default function HiringPage() {
     setRescheduledAt("");
     setNextFollowupAt("");
     setInterviewMode("");
-    setStatus("Toggle");
+    setStatus("Talked");
     setTag("");
     setHireDate("");
     setOfferPackage("");
@@ -446,10 +448,8 @@ export default function HiringPage() {
     setSaving(true);
     setMessage(null);
     try {
-      const hired = status === "Hired";
+      const hiredOrJoined = status === "Hired" || status === "Joined";
       const rescheduled = status === "Rescheduled";
-      const nextFollowUp = status === "next-follow-up";
-      const hiredFollowUpTag = hired && tag === "Follow-Up";
       const res = await fetch("/api/empcrm/hiring", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -461,16 +461,16 @@ export default function HiringPage() {
           experience_type: experience_type || null,
           interview_at: interview_at || null,
           rescheduled_at: rescheduled ? rescheduled_at || null : null,
-          next_followup_at: (status !== "Rejected" && status !== "Reject")
+          next_followup_at: (status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview")
             ? next_followup_at || null
             : null,
           interview_mode: interview_mode || null,
           status,
-          tag: hired ? tag || null : null,
-          hire_date: hired ? hire_date || null : null,
-          package: hired ? offerPackage.trim() || null : null,
+          tag: status === "Hired" ? tag || null : null,
+          hire_date: hiredOrJoined ? hire_date || null : null,
+          package: status === "Hired" ? offerPackage.trim() || null : null,
           probation_months:
-            hired && tag === "Probation" && probationMonths !== ""
+            status === "Hired" && tag === "Probation" && probationMonths !== ""
               ? Number(probationMonths)
               : null,
           selected_resume: selectedResume.trim() || null,
@@ -947,7 +947,7 @@ export default function HiringPage() {
                     )}
                   </div>
 
-                  {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (
+                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(status) && (
                     <>
                       <div>
                         <label className="mb-1 block text-sm font-medium text-slate-700">HR Interview Score (1–10)</label>
@@ -1079,11 +1079,16 @@ export default function HiringPage() {
                       onChange={(e) => {
                         const v = e.target.value;
                         setStatus(v);
-                        if (v !== "Hired") {
+                        const isHired = v === "Hired";
+                        const isJoined = v === "Joined";
+                        if (!isHired && !isJoined) {
                           setTag("");
-                        }
-                        if (v !== "Hired") {
                           setHireDate("");
+                          setOfferPackage("");
+                          setProbationMonths("");
+                        }
+                        if (isJoined) {
+                          setTag("");
                           setOfferPackage("");
                           setProbationMonths("");
                         }
@@ -1115,14 +1120,14 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {status !== "Rejected" && status !== "Reject" && (
+                  {status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview" && (
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-sm font-medium text-slate-700">
                         Next follow-up date &amp; time *
                       </label>
                       <input
                         type="datetime-local"
-                        required={status !== "Rejected" && status !== "Reject"}
+                        required={status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview"}
                         value={next_followup_at}
                         onChange={(e) => setNextFollowupAt(e.target.value)}
                         className={formFieldClass}
@@ -1131,8 +1136,8 @@ export default function HiringPage() {
                   )}
 
                   {status === "Hired" && (
-                    <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
-                      <p className="text-sm font-semibold text-indigo-900">Hired — joining &amp; package</p>
+                    <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 sm:col-span-2">
+                      <p className="text-sm font-semibold text-emerald-900">Hiring — onboarding info</p>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                           <label className="mb-1 block text-sm font-medium text-slate-700">Joining date *</label>
@@ -1143,7 +1148,6 @@ export default function HiringPage() {
                             onChange={(e) => setHireDate(e.target.value)}
                             className={formFieldClass}
                           />
-                         
                         </div>
                         <div>
                           <label className="mb-1 block text-sm font-medium text-slate-700">Package *</label>
@@ -1209,7 +1213,39 @@ export default function HiringPage() {
                     </div>
                   )}
 
-                  {!["Toggle", "Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up"].includes(status) && (
+                  {status === "Joined" && (
+                    <div className="space-y-4 rounded-xl border border-teal-200 bg-teal-50/40 p-4 sm:col-span-2">
+                      <p className="text-sm font-semibold text-teal-900">Joined Info</p>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Joined date *</label>
+                        <input
+                          type="date"
+                          required={status === "Joined"}
+                          value={hire_date}
+                          onChange={(e) => setHireDate(e.target.value)}
+                          className={formFieldClass}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {status === "Attended Interview" && (
+                    <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:col-span-2">
+                      <p className="text-sm font-semibold text-blue-900">Interview Info</p>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time *</label>
+                        <input
+                          type="datetime-local"
+                          required={status === "Attended Interview"}
+                          value={interview_at}
+                          onChange={(e) => setInterviewAt(e.target.value)}
+                          className={formFieldClass}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {!["Talked", "Have not talked", "Didn't receive the call", "Cut the call", "Not reachable", "next-follow-up", "follow-up", "Joined", "Attended Interview"].includes(status) && (
                     <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
                       <p className="text-sm font-semibold text-indigo-900">Selected — resume &amp; score</p>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

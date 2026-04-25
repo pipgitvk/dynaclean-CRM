@@ -40,6 +40,8 @@ export default function OrderForm({ quotation, reset }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (submitting) return;
+
     const fd = new FormData();
     for (const key in formData) {
       if (formData[key] !== null) fd.append(key, formData[key]);

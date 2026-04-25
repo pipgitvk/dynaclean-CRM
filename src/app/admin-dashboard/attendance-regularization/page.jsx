@@ -120,16 +120,7 @@ export default function AdminAttendanceRegularizationPage() {
                   <th className="px-3 py-2 font-medium whitespace-nowrap">Status</th>
                   <th className="px-3 py-2 font-medium min-w-[140px]">Reason</th>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">
-                    Check-in (proposed)
-                  </th>
-                  <th className="px-3 py-2 font-medium whitespace-nowrap">
-                    Check-out (proposed)
-                  </th>
-                  <th className="px-3 py-2 font-medium whitespace-nowrap">
-                    Reviewed by
-                  </th>
-                  <th className="px-3 py-2 font-medium whitespace-nowrap">
-                    Created
+                    Timing & Log Details
                   </th>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">
                     Attachment
@@ -159,19 +150,26 @@ export default function AdminAttendanceRegularizationPage() {
                     <td className="px-3 py-2 min-w-0 text-gray-700 align-top break-words">
                       {req.reason || "—"}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {formatDt(req.proposed_checkin_time)}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {formatDt(req.proposed_checkout_time)}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-800">
-                      {req.reviewed_by || "—"}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-600 text-xs">
-                      {req.created_at
-                        ? new Date(req.created_at).toLocaleString()
-                        : "—"}
+                    <td className="px-3 py-2 whitespace-nowrap text-xs">
+                      <div className="flex flex-col gap-0.5">
+                        <div>
+                          <span className="text-gray-500">In:</span>{" "}
+                          {formatDt(req.proposed_checkin_time)}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Out:</span>{" "}
+                          {formatDt(req.proposed_checkout_time)}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">By:</span>{" "}
+                          {req.reviewed_by || "—"}
+                        </div>
+                        <div className="text-gray-400 mt-1 pt-1 border-t border-gray-50">
+                          {req.created_at
+                            ? new Date(req.created_at).toLocaleString()
+                            : "—"}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-3 py-2">
                       {req.attachment_url ? (

@@ -237,30 +237,40 @@ export async function POST(req) {
       INDEX idx_item_code (item_code)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
 
-    // 2) Get quotation items for this quote
-    const [quotationItems] = await conn.execute(
-      `SELECT item_name, item_code, quantity FROM quotation_items WHERE quote_number = ?`,
+    // 2) Check if dispatch rows already exist for this quote
+    const [existingDispatch] = await conn.execute(
+      `SELECT id FROM dispatch WHERE quote_number = ? LIMIT 1`,
       [quote_number],
     );
 
-    // 3) Insert dispatch rows for each item based on quantity
-    for (const item of quotationItems) {
-      const { item_name, item_code, quantity } = item;
-      const qty = Number(quantity) || 0;
+    if (existingDispatch.length === 0) {
+      // 3) Get quotation items for this quote
+      const [quotationItems] = await conn.execute(
+        `SELECT item_name, item_code, quantity FROM quotation_items WHERE quote_number = ?`,
+        [quote_number],
+      );
 
-      if (qty > 0) {
-        const placeholders = Array.from({ length: qty })
-          .map(() => "(?, ?, ?, NULL, NULL, NULL, NOW(), NULL)")
-          .join(",");
-        const params = [];
-        for (let i = 0; i < qty; i++) {
-          params.push(quote_number, item_name, item_code);
+      // 4) Insert dispatch rows for each item based on quantity
+      for (const item of quotationItems) {
+        const { item_name, item_code, quantity } = item;
+        const qty = Number(quantity) || 0;
+
+        if (qty > 0) {
+          const placeholders = Array.from({ length: qty })
+            .map(() => "(?, ?, ?, NULL, NULL, NULL, NOW(), NULL)")
+            .join(",");
+          const params = [];
+          for (let i = 0; i < qty; i++) {
+            params.push(quote_number, item_name, item_code);
+          }
+          await conn.execute(
+            `INSERT INTO dispatch (quote_number, item_name, item_code, serial_no, remarks, photos, created_at, updated_at) VALUES ${placeholders}`,
+            params,
+          );
         }
-        await conn.execute(
-          `INSERT INTO dispatch (quote_number, item_name, item_code, serial_no, remarks, photos, created_at, updated_at) VALUES ${placeholders}`,
-          params,
-        );
       }
+    } else {
+      console.log(`⚠️ Dispatch rows already exist for quote: ${quote_number}. Skipping seeding.`);
     }
 
     // conn.end();

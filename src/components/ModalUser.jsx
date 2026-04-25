@@ -6,7 +6,7 @@ export default function Modal({ isOpen, onClose, title, data }) {
   if (!isOpen) return null;
 
   const getFilteredColumns = () => {
-    if (data.length === 0) return [];
+    if (!data || data.length === 0) return [];
     // Get all keys from the first data object
     const allColumns = Object.keys(data[0]);
     // Filter out the machine and model columns
@@ -19,7 +19,7 @@ export default function Modal({ isOpen, onClose, title, data }) {
   };
 
   const columns = getFilteredColumns();
-  const showActionsColumn = data.length > 0;
+  const showActionsColumn = data && data.length > 0;
 
   // Determine the base path for the "View" link
   const getBasePath = () => {
@@ -50,7 +50,7 @@ export default function Modal({ isOpen, onClose, title, data }) {
           </button>
         </div>
         <div className="p-4 overflow-y-auto">
-          {data.length > 0 ? (
+          {data && data.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full table-auto text-sm">
                 <thead className="bg-gray-50 text-gray-600">

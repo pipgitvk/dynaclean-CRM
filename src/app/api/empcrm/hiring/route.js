@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { canAccessHiringModule } from "@/lib/hrTargetEligibleRoles";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { logHiringCreated, logHiringNoteUpdate, logHiringStatusChange } from "@/lib/hiringStatusHistory";
 import { parseHiringPayload, toMysqlDatetime } from "@/lib/hiringPayload";
 import { omitBlockedDesignations } from "@/lib/designationDedupe";
@@ -46,6 +47,9 @@ export async function GET(req) {
     const denied = assertHrRole(payload);
     if (denied) return denied;
 
+    const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
+    const isSuperadmin = role === "SUPERADMIN";
+
     const { searchParams } = new URL(req.url);
     const entryIdParam = searchParams.get("entryId");
     if (entryIdParam != null && String(entryIdParam).trim() !== "") {
@@ -63,8 +67,8 @@ export async function GET(req) {
          h.probation_months, h.selected_resume, h.mgmt_interview_score, h.hr_interview_score, h.hr_score_rating, h.current_salary, h.expected_salary, h.current_location, h.hiring_city, h.note, h.created_at
          FROM candidates h
          LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
-         WHERE h.id = ? AND LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))`,
-        [id, payload.username]
+         WHERE h.id = ?${isSuperadmin ? "" : " AND LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))"}`,
+        isSuperadmin ? [id] : [id, payload.username]
       );
       if (!rows.length) {
         return NextResponse.json({ success: false, error: "Record not found." }, { status: 404 });
@@ -82,6 +86,8 @@ export async function GET(req) {
     const interviewToParam = searchParams.get("interview_to");
     const nextFollowupFromParam = searchParams.get("next_followup_from");
     const nextFollowupToParam = searchParams.get("next_followup_to");
+    const createdFromParam = searchParams.get("created_from");
+    const createdToParam = searchParams.get("created_to");
     
     const designationTrimmed =
       designationParam != null && String(designationParam).trim() !== ""
@@ -106,15 +112,17 @@ export async function GET(req) {
     const interviewTo = isValidDate(interviewToParam) ? interviewToParam.trim() : null;
     const nextFollowupFrom = isValidDate(nextFollowupFromParam) ? nextFollowupFromParam.trim() : null;
     const nextFollowupTo = isValidDate(nextFollowupToParam) ? nextFollowupToParam.trim() : null;
+    const createdFrom = isValidDate(createdFromParam) ? createdFromParam.trim() : null;
+    const createdTo = isValidDate(createdToParam) ? createdToParam.trim() : null;
 
     const conn = await getDbConnection();
 
     const modeClause = modeFilter ? ` AND interview_mode = ?` : "";
 
     let distSql = `SELECT DISTINCT TRIM(designation) AS d FROM candidates
-      WHERE LOWER(TRIM(created_by)) = LOWER(TRIM(?))${modeClause}
+      WHERE 1=1${isSuperadmin ? "" : " AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))"}${modeClause}
       AND TRIM(COALESCE(designation, '')) != '' ORDER BY d`;
-    const distParams = [payload.username];
+    const distParams = isSuperadmin ? [] : [payload.username];
     if (modeFilter) distParams.push(modeFilter);
     const [distRows] = await conn.execute(distSql, distParams);
     const designations = omitBlockedDesignations(
@@ -129,8 +137,8 @@ export async function GET(req) {
          h.probation_months, h.selected_resume, h.mgmt_interview_score, h.hr_interview_score, h.hr_score_rating, h.current_salary, h.expected_salary, h.current_location, h.hiring_city, h.note, h.created_at
          FROM candidates h
          LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
-         WHERE LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))`;
-    const params = [payload.username];
+         WHERE 1=1${isSuperadmin ? "" : " AND LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))"}`;
+    const params = isSuperadmin ? [] : [payload.username];
     
     if (candidateNameTrimmed != null) {
       sql += ` AND h.candidate_name LIKE ?`;
@@ -177,6 +185,14 @@ export async function GET(req) {
       sql += ` AND DATE(h.next_followup_at) <= ?`;
       params.push(nextFollowupTo);
     }
+    if (createdFrom) {
+      sql += ` AND DATE(h.created_at) >= ?`;
+      params.push(createdFrom);
+    }
+    if (createdTo) {
+      sql += ` AND DATE(h.created_at) <= ?`;
+      params.push(createdTo);
+    }
     sql += ` ORDER BY COALESCE(h.hire_date, DATE(h.interview_at), DATE(h.created_at)) DESC, h.id DESC`;
 
     const [rows] = await conn.execute(sql, params);
@@ -215,6 +231,9 @@ export async function POST(request) {
     const payload = await getSessionPayload();
     const denied = assertHrRole(payload);
     if (denied) return denied;
+
+    const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
+    const isSuperadmin = role === "SUPERADMIN";
 
     const body = await request.json();
     const parsed = parseHiringPayload(body);
@@ -320,6 +339,9 @@ export async function PATCH(request) {
     const denied = assertHrRole(payload);
     if (denied) return denied;
 
+    const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
+    const isSuperadmin = role === "SUPERADMIN";
+
     const body = await request.json();
     const id = parseInt(body.id, 10);
     if (!Number.isFinite(id) || id < 1) {
@@ -338,8 +360,8 @@ export async function PATCH(request) {
     try {
       await conn.beginTransaction();
       const [rows] = await conn.execute(
-        `SELECT status, note FROM candidates WHERE id = ? AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))`,
-        [id, payload.username]
+        `SELECT status, note FROM candidates WHERE id = ?${isSuperadmin ? "" : " AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))"}`,
+        isSuperadmin ? [id] : [id, payload.username]
       );
       if (!rows.length) {
         await conn.rollback();
@@ -354,7 +376,7 @@ export async function PATCH(request) {
         experience_type = ?, interview_at = ?, rescheduled_at = ?, next_followup_at = ?, interview_mode = ?, status = ?, tag = ?,
         hire_date = ?, \`package\` = ?, probation_months = ?,
         selected_resume = ?, mgmt_interview_score = ?, hr_interview_score = ?, hr_score_rating = ?, current_salary = ?, expected_salary = ?, current_location = ?, hiring_city = ?, note = ?
-      WHERE id = ? AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))`,
+      WHERE id = ?${isSuperadmin ? "" : " AND LOWER(TRIM(created_by)) = LOWER(TRIM(?))"}`,
         [
           d.candidate_name,
           d.emp_contact,
@@ -380,7 +402,7 @@ export async function PATCH(request) {
           d.hiring_city,
           d.note,
           id,
-          payload.username,
+          ...(isSuperadmin ? [] : [payload.username]),
         ]
       );
       result = upd;
@@ -435,13 +457,40 @@ export async function PATCH(request) {
   }
 }
 
-/** DELETE disabled for HR — only Superadmin may delete (Admin → Hiring Process). */
-export async function DELETE() {
-  return NextResponse.json(
-    {
-      success: false,
-      error: "Hiring records can only be deleted by Superadmin (Admin → Hiring Process).",
-    },
-    { status: 403 }
-  );
+/** DELETE: only Superadmin may delete here. */
+export async function DELETE(req) {
+  try {
+    const payload = await getSessionPayload();
+    if (!payload?.username) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+    const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
+    if (role !== "SUPERADMIN") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Hiring records can only be deleted by Superadmin.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = parseInt(searchParams.get("id"), 10);
+    if (!Number.isFinite(id) || id < 1) {
+      return NextResponse.json({ success: false, error: "Valid id is required." }, { status: 400 });
+    }
+
+    const conn = await getDbConnection();
+    const [result] = await conn.execute(`DELETE FROM candidates WHERE id = ?`, [id]);
+
+    if (!result.affectedRows) {
+      return NextResponse.json({ success: false, error: "Record not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: "Record deleted." });
+  } catch (error) {
+    console.error("[empcrm/hiring DELETE]", error);
+    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+  }
 }

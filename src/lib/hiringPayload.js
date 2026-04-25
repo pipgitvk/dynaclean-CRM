@@ -1,16 +1,17 @@
 const HIRING_STATUS_OPTIONS = [
   // Current statuses
-  "Toggle",
   "Talked",
   "Didn't receive the call",
   "Cut the call",
   "Not reachable",
   "Shortlisted",
+  "Attended Interview",
   "Selected",
   "Negotiation",
   "Hold",
   "Backup",
   "Hired",
+  "Joined",
   "Rejected",
   // Legacy — kept so old DB rows can still be saved without being reset
   "Have not talked",
@@ -48,9 +49,9 @@ export const HR_SCORE_RATING_OPTIONS = ["average", "poor", "good", "very-good"];
 
 function normalizeStatus(v) {
   const s = String(v ?? "").trim();
-  if (!s) return "Toggle";
+  if (!s) return "Talked";
   if (HIRING_STATUS_OPTIONS.includes(s)) return s;
-  return "Toggle";
+  return "Talked";
 }
 
 function normalizeTag(v, isReason = false) {
@@ -88,19 +89,21 @@ export function parseHiringPayload(body, options = {}) {
   const note = String(body.note ?? "").trim();
   const status = normalizeStatus(body.status);
   const isHired = status === "Hired";
+  const isJoined = status === "Joined";
+  const isAttendedInterview = status === "Attended Interview";
   const isSelected = status === "Selected";
   const isRescheduled = status === "Rescheduled";
   const isHaveNotTalked = ["Didn't receive the call", "Cut the call", "Not reachable"].includes(status) || status === "Have not talked";
   /** Legacy slug — next slot is required. */
   const isNextFollowUpStrict = status === "next-follow-up";
   /** Current label — optional next slot if provided. */
-  const isFollowUpLabel = status === "Toggle";
+  const isFollowUpLabel = status === "Talked";
   const rescheduled_at_raw = String(body.rescheduled_at ?? "").trim();
   const next_followup_at_raw = String(body.next_followup_at ?? "").trim();
   const tagForHired = isHired ? normalizeTag(body.tag) : null;
   const isHiredFollowUpTag = isHired && tagForHired === "Follow-Up";
   const tagForHaveNotTalked = isHaveNotTalked ? normalizeTag(body.tag, true) : null;
-  const hire_date = isHired ? String(body.hire_date ?? "").trim() || null : null;
+  const hire_date = (isHired || isJoined) ? String(body.hire_date ?? "").trim() || null : null;
   const tag = isHired ? tagForHired : null;
   const packageStr = isHired ? String(body.package ?? "").trim() || null : null;
 
@@ -154,22 +157,22 @@ export function parseHiringPayload(body, options = {}) {
     return { error: "Note is required." };
   }
 
-  if (isHired && !hire_date) {
-    return { error: "Joining date is required when status is Hired." };
+  if ((isHired || isJoined) && !hire_date) {
+    return { error: "Joining date is required for this status." };
   }
   if (isHired && !tag) {
-    return { error: "Tag is required when status is Hired." };
+    return { error: "Tag is required for this status." };
   }
   if (isHaveNotTalked && status === "Have not talked" && !tagForHaveNotTalked) {
     return { error: "Reason is required when status is Have not talked." };
   }
   if (isHired && !packageStr) {
-    return { error: "Package is required when status is Hired." };
+    return { error: "Package is required for this status." };
   }
   if (isRescheduled && !rescheduled_at_raw) {
     return { error: "Rescheduled date and time is required when status is Rescheduled." };
   }
-  if (status !== "Rejected" && status !== "Reject" && !next_followup_at_raw) {
+  if (status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview" && !next_followup_at_raw) {
     return { error: "Next follow-up date and time is required for this status." };
   }
   if (isSelected && !skipSelectedResumeValidation && !selected_resume) {
@@ -179,7 +182,7 @@ export function parseHiringPayload(body, options = {}) {
     return { error: "Management interview score (1–10) is required when status is Selected." };
   }
 
-  const resolved_next_followup_at = (status !== "Rejected" && status !== "Reject") ? next_followup_at_raw : null;
+  const resolved_next_followup_at = (status !== "Rejected" && status !== "Reject" && status !== "Joined" && status !== "Attended Interview") ? next_followup_at_raw : null;
 
   return {
     data: {

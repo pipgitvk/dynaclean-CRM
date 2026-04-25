@@ -1,13 +1,4 @@
-/**
- * Full CRM module tree (parent → children).
- * Covers ALL roles (SUPERADMIN, ADMIN, ACCOUNTANT, SALES, HR, etc.)
- *
- * key   → stored in DB (module_access JSON array)
- * label → shown in Quick Edit UI
- *
- * Backward-compat rule:
- *   If module_access is NULL in DB → not configured yet → return ALL keys (backward compat).
- */
+
 export const MODULE_TREE = [
   {
     key: "dashboard",
@@ -15,6 +6,7 @@ export const MODULE_TREE = [
     children: [
       { key: "dashboard-home", label: "Dashboard Home" },
       { key: "daily-report", label: "Daily Report" },
+      { key: "hr-daily-report", label: "HR Daily Report" },
       { key: "lead-reports", label: "Lead Reports" },
       { key: "quotations-report", label: "Quotations Report" },
       { key: "order-report", label: "Order Report" },
@@ -193,6 +185,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     label: "Reports",
     children: [
       { kind: "leaf", key: "daily-report", label: "Daily Report" },
+      { kind: "leaf", key: "hr-daily-report", label: "HR Daily Report" },
       { kind: "leaf", key: "lead-reports", label: "Lead Reports" },
       { kind: "leaf", key: "quotations-report", label: "Quotations Report" },
       { kind: "leaf", key: "order-report", label: "Order Report" },

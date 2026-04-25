@@ -14,7 +14,8 @@ export function canViewHrTargetChart(role) {
   return normalizeRoleKey(role || "") === "SUPERADMIN";
 }
 
-/** Hiring page + /api/empcrm/hiring (HR roles only; not Superadmin). */
+/** Hiring page + /api/empcrm/hiring (HR roles + Superadmin). */
 export function canAccessHiringModule(role) {
-  return isHrTargetDashboardRole(role);
+  if (isHrTargetDashboardRole(role)) return true;
+  return normalizeRoleKey(role || "") === "SUPERADMIN";
 }
