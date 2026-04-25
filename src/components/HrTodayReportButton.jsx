@@ -4,35 +4,32 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ClipboardList } from "lucide-react";
 
-export default function HrTodayReportButton({ userRole }) {
-  const [allowed, setAllowed] = useState(false);
+/**
+ * Shown on user dashboard when Global Module Access includes "hr-daily-report"
+ * (same rule as Reports → HR Daily Report in the sidebar). Mirrors TodayReportButton.
+ */
+export default function HrTodayReportButton() {
+  const [allowed, setAllowed] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const check = async () => {
       try {
-        const isHr = String(userRole || "").trim() === "HR";
-        if (isHr) {
-          setAllowed(true);
-        } else {
-          // Check if user has access to hiring module via api if needed, 
-          // but usually userRole HR is enough as per DefaultDashboard.jsx logic
-          const res = await fetch("/api/my-modules");
-          if (res.ok) {
-            const { allowedModules } = await res.json();
-            if (allowedModules === null || allowedModules.includes("hiring")) {
-              setAllowed(true);
-            }
+        const res = await fetch("/api/my-modules");
+        if (res.ok) {
+          const { allowedModules } = await res.json();
+          if (allowedModules !== null && !allowedModules.includes("hr-daily-report")) {
+            setAllowed(false);
           }
         }
       } catch {
-        // fail closed for HR report
+        // on error, keep default (show) — same as TodayReportButton
       } finally {
         setLoading(false);
       }
     };
     check();
-  }, [userRole]);
+  }, []);
 
   if (loading || !allowed) return null;
 

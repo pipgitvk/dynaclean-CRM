@@ -11,11 +11,7 @@ export function normalizePhone(phone) {
   return cleaned;
 }
 
-/**
- * Check if phone exists in customers table - compares only LAST 10 digits.
- * Handles formats like 9890666272, 09890666272, 919890666272, 91 9890666272, etc.
- * Returns { duplicate: true, source: 'customers', customerId?: number } or { duplicate: false }
- */
+
 export async function checkPhoneDuplicate(phone) {
   const normalized = normalizePhone(phone);
   if (!normalized || normalized.length !== 10) return { duplicate: false };

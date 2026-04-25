@@ -1,8 +1,3 @@
-/**
- * Prospects Status: order payment vs commitment_date.
- * Prefer explicit prospects.order_id → neworder; else match client orders by total amount, then latest.
- */
-
 /** Normalize SQL DATE / ISO / string to YYYY-MM-DD (UTC calendar for Date objects). */
 export function commitmentValueToYmd(value) {
   if (value == null || value === "") return null;

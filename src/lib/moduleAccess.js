@@ -489,12 +489,6 @@ export function normalizeModuleAccessKeys(keys) {
       out.add("targets");
       continue;
     }
-    // Legacy: one "expenses" toggle used to gate both submit + view-all screens
-    if (key === "expenses") {
-      out.add("expenses");
-      out.add("view-expenses");
-      continue;
-    }
     // Legacy: installation-videos previously gated both list + manage pages
     if (key === "installation-videos") {
       out.add("installation-videos");
