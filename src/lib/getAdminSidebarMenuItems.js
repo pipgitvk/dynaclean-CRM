@@ -221,6 +221,12 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/user-dashboard/hr-today-report",
+        name: "HR Daily Report",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
         path: "/admin-dashboard/lead-reports",
         name: "Lead Reports",
         roles: ["SUPERADMIN"],

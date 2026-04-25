@@ -8,6 +8,7 @@ import HiringCandidatesFollowUpSection from "@/components/empcrm/hiring/HiringCa
 import { canAccessHiringModule, canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
+import HrTodayReportButton from "@/components/HrTodayReportButton";
 
 export default function DefaultDashboard({ user }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
@@ -33,7 +34,10 @@ export default function DefaultDashboard({ user }) {
               </h1>
               <p className="text-sm text-gray-500">Role: {user.userRole}</p>
             </div>
-            <TodayReportButton />
+            <div className="flex flex-col gap-2">
+              <TodayReportButton />
+              <HrTodayReportButton userRole={user?.userRole} />
+            </div>
           </div>
           <div className="mt-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fast Cards</p>

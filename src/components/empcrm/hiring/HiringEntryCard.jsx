@@ -10,8 +10,15 @@ export const STATUS_CHIP_STYLES = {
   "Waiting List": "bg-violet-400/20 text-violet-50 border-violet-200/25 ring-1 ring-violet-300/15",
   "next-follow-up": "bg-cyan-400/20 text-cyan-50 border-cyan-200/30 ring-1 ring-cyan-300/20",
   "follow-up": "bg-teal-400/20 text-teal-50 border-teal-200/30 ring-1 ring-teal-300/20",
+  Shortlisted: "bg-sky-400/25 text-sky-50 border-sky-200/30 ring-1 ring-sky-300/20",
+  "Attended Interview": "bg-blue-400/25 text-blue-50 border-blue-200/30 ring-1 ring-blue-300/20",
+  Selected: "bg-indigo-400/25 text-indigo-50 border-indigo-200/30 ring-1 ring-indigo-300/20",
+  Negotiation: "bg-orange-400/25 text-orange-50 border-orange-200/30 ring-1 ring-orange-300/20",
+  Hold: "bg-yellow-400/25 text-yellow-50 border-yellow-200/30 ring-1 ring-yellow-300/20",
+  Backup: "bg-slate-400/20 text-slate-50 border-slate-200/30 ring-1 ring-slate-300/20",
   Hired: "bg-emerald-400/25 text-emerald-50 border-emerald-200/30 ring-1 ring-emerald-300/20",
-  Reject: "bg-red-400/20 text-red-50 border-red-200/30 ring-1 ring-red-300/15",
+  Joined: "bg-teal-400/25 text-teal-50 border-teal-200/30 ring-1 ring-teal-300/20",
+  Rejected: "bg-red-400/20 text-red-50 border-red-200/30 ring-1 ring-red-300/15",
 };
 
 /** Table / light background — original pastel chips */
@@ -21,8 +28,15 @@ export const STATUS_CHIP_STYLES_LIGHT = {
   "Waiting List": "bg-violet-50 text-violet-900 border-violet-200 ring-1 ring-violet-500/15",
   "next-follow-up": "bg-cyan-50 text-cyan-900 border-cyan-200 ring-1 ring-cyan-500/15",
   "follow-up": "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/15",
+  Shortlisted: "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
+  "Attended Interview": "bg-blue-50 text-blue-900 border-blue-200 ring-1 ring-blue-500/15",
+  Selected: "bg-indigo-50 text-indigo-900 border-indigo-200 ring-1 ring-indigo-500/15",
+  Negotiation: "bg-orange-50 text-orange-900 border-orange-200 ring-1 ring-orange-500/15",
+  Hold: "bg-yellow-50 text-yellow-900 border-yellow-200 ring-1 ring-yellow-500/15",
+  Backup: "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20",
   Hired: "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
-  Reject: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
+  Joined: "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/20",
+  Rejected: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
 };
 
 export function formatInterviewAt(v) {
@@ -79,7 +93,7 @@ function cardBackground(row, colorScheme = "gradient") {
     }
   }
 
-  if (st === "Hired") {
+  if (st === "Hired" || st === "Joined") {
     return "linear-gradient(145deg, rgb(4, 84, 72) 0%, rgb(5, 150, 105) 42%, rgb(45, 212, 191) 100%)";
   }
   if (st === "Reject") {

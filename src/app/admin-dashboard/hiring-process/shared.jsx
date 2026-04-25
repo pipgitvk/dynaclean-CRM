@@ -10,7 +10,6 @@ export const formSelectClass = `w-full ${fieldClass} min-h-[44px] text-slate-900
 
 /** @type {Record<string, string>} */
 export const STATUS_CHIP_STYLES = {
-  Toggle: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   Talked: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Follow-up": "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
   "Didn't receive the call": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
@@ -18,11 +17,13 @@ export const STATUS_CHIP_STYLES = {
   "Not reachable": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   "Have not talked": "bg-gray-100 text-gray-700 border-gray-300 ring-1 ring-gray-400/20",
   Shortlisted: "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
+  "Attended Interview": "bg-blue-50 text-blue-900 border-blue-200 ring-1 ring-blue-500/15",
   Selected: "bg-indigo-50 text-indigo-900 border-indigo-200 ring-1 ring-indigo-500/15",
   Negotiation: "bg-orange-50 text-orange-900 border-orange-200 ring-1 ring-orange-500/15",
   Hold: "bg-yellow-50 text-yellow-900 border-yellow-200 ring-1 ring-yellow-500/15",
   Backup: "bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-400/20",
   Hired: "bg-emerald-50 text-emerald-900 border-emerald-200 ring-1 ring-emerald-500/20",
+  Joined: "bg-teal-50 text-teal-900 border-teal-200 ring-1 ring-teal-500/20",
   Rejected: "bg-red-50 text-red-900 border-red-200 ring-1 ring-red-500/15",
   "Shortlisted for interview": "bg-sky-50 text-sky-900 border-sky-200 ring-1 ring-sky-500/15",
   Rescheduled: "bg-amber-50 text-amber-900 border-amber-200 ring-1 ring-amber-500/15",
@@ -44,17 +45,18 @@ export const YEAR_FILTER_OPTIONS = (() => {
 })();
 
 export const STATUS_OPTIONS = [
-  "Toggle",
   "Talked",
   "Didn't receive the call",
   "Cut the call",
   "Not reachable",
   "Shortlisted",
+  "Attended Interview",
   "Selected",
   "Negotiation",
   "Hold",
   "Backup",
   "Hired",
+  "Joined",
   "Rejected",
 ];
 

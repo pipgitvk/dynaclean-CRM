@@ -129,10 +129,10 @@ export default function HiringProcessEditPage() {
     setEditSaving(true);
     setError(null);
     try {
-      const hired = editing.status === "Hired";
+      const hiredOrJoined = editing.status === "Hired" || editing.status === "Joined";
       const rescheduled = editing.status === "Rescheduled";
       const nextFollowUp = editing.status === "next-follow-up" || editing.status === "Follow-up";
-      const hiredFollowUpTag = hired && editing.tag === "Follow-Up";
+      const hiredFollowUpTag = editing.status === "Hired" && editing.tag === "Follow-Up";
       const res = await fetch("/api/admin/hiring-process", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -145,18 +145,16 @@ export default function HiringProcessEditPage() {
           experience_type: editing.experience_type,
           interview_at: editing.interview_at,
           rescheduled_at: rescheduled ? editing.rescheduled_at : "",
-          next_followup_at: nextFollowUp
-            ? editing.next_followup_at
-            : hiredFollowUpTag
-              ? editing.next_followup_at
-              : "",
+          next_followup_at: (editing.status !== "Rejected" && editing.status !== "Reject" && editing.status !== "Joined" && editing.status !== "Attended Interview")
+            ? (nextFollowUp || hiredFollowUpTag ? editing.next_followup_at : "")
+            : "",
           interview_mode: editing.interview_mode,
           status: editing.status,
-          tag: hired ? editing.tag : "",
-          hire_date: hired ? editing.hire_date : "",
-          package: hired ? editing.offerPackage : "",
+          tag: editing.status === "Hired" ? editing.tag : "",
+          hire_date: hiredOrJoined ? editing.hire_date : "",
+          package: editing.status === "Hired" ? editing.offerPackage : "",
           probation_months:
-            hired && editing.tag === "Probation" && editing.probationMonths !== ""
+            editing.status === "Hired" && editing.tag === "Probation" && editing.probationMonths !== ""
               ? Number(editing.probationMonths)
               : null,
           selected_resume: editing.selectedResume?.trim() || null,
@@ -391,14 +389,21 @@ export default function HiringProcessEditPage() {
                   setEditing((prev) => {
                     if (!prev) return prev;
                     const next = { ...prev, status: v };
-                    if (v !== "Hired") {
+                    const isHired = v === "Hired";
+                    const isJoined = v === "Joined";
+                    if (!isHired && !isJoined) {
                       next.tag = "";
                       next.hire_date = "";
                       next.offerPackage = "";
                       next.probationMonths = "";
                     }
+                    if (isJoined) {
+                      next.tag = "";
+                      next.offerPackage = "";
+                      next.probationMonths = "";
+                    }
                     if (v !== "Rescheduled") next.rescheduled_at = "";
-                    if (v !== "next-follow-up" && v !== "Follow-up" && v !== "Hired") next.next_followup_at = "";
+                    if (v !== "next-follow-up" && v !== "Follow-up" && !isHired && !isJoined && v !== "Attended Interview") next.next_followup_at = "";
                     if (v !== "Selected") {
                       next.selectedResume = "";
                       next.mgmtInterviewScore = "";
@@ -430,7 +435,7 @@ export default function HiringProcessEditPage() {
               </div>
             )}
 
-            {(editing.status === "next-follow-up" || editing.status === "Follow-up") && (
+            {editing.status !== "Rejected" && editing.status !== "Reject" && editing.status !== "Joined" && editing.status !== "Attended Interview" && (editing.status === "next-follow-up" || editing.status === "Follow-up") && (
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Next follow-up date &amp; time *</label>
                 <input
@@ -444,8 +449,8 @@ export default function HiringProcessEditPage() {
             )}
 
             {editing.status === "Hired" && (
-              <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:col-span-2">
-                <p className="text-sm font-semibold text-indigo-900">Hired — joining &amp; package</p>
+              <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 sm:col-span-2">
+                <p className="text-sm font-semibold text-emerald-900">Hiring — onboarding info</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">Joining date *</label>
@@ -480,13 +485,13 @@ export default function HiringProcessEditPage() {
                             ? {
                                 ...prev,
                                 tag: t,
-                                probationMonths: t !== "Probation" ? "" : prev.probationMonths,
-                                next_followup_at: t !== "Follow-Up" ? "" : prev.next_followup_at,
+                                next_followup_at: t === "Follow-Up" ? prev.next_followup_at : "",
+                                probationMonths: t === "Probation" ? prev.probationMonths : "",
                               }
                             : prev
                         );
                       }}
-                      className={`w-full max-w-full sm:max-w-md ${fieldClass} min-h-[44px]`}
+                      className={formSelectClass}
                     >
                       <option value="">— Select —</option>
                       {TAG_OPTIONS.map((t) => (
@@ -496,7 +501,7 @@ export default function HiringProcessEditPage() {
                       ))}
                     </select>
                   </div>
-                  {editing.status === "Hired" && editing.tag === "Follow-Up" && (
+                  {editing.tag === "Follow-Up" && (
                     <div className="sm:col-span-2">
                       <label className="mb-1 block text-sm font-medium text-slate-700">
                         Follow-up date &amp; time (optional)
@@ -520,9 +525,42 @@ export default function HiringProcessEditPage() {
                         value={editing.probationMonths}
                         onChange={(e) => updateEdit("probationMonths", e.target.value)}
                         className={`max-w-[200px] ${formFieldClass}`}
+                        placeholder="e.g. 3"
                       />
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {editing.status === "Joined" && (
+              <div className="space-y-4 rounded-xl border border-teal-200 bg-teal-50/40 p-4 sm:col-span-2">
+                <p className="text-sm font-semibold text-teal-900">Joined Info</p>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Joined date *</label>
+                  <input
+                    type="date"
+                    required={editing.status === "Joined"}
+                    value={editing.hire_date}
+                    onChange={(e) => updateEdit("hire_date", e.target.value)}
+                    className={formFieldClass}
+                  />
+                </div>
+              </div>
+            )}
+
+            {editing.status === "Attended Interview" && (
+              <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:col-span-2">
+                <p className="text-sm font-semibold text-blue-900">Interview Info</p>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Interview date &amp; time *</label>
+                  <input
+                    type="datetime-local"
+                    required={editing.status === "Attended Interview"}
+                    value={editing.interview_at}
+                    onChange={(e) => updateEdit("interview_at", e.target.value)}
+                    className={formFieldClass}
+                  />
                 </div>
               </div>
             )}
