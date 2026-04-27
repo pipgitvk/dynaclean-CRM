@@ -2,16 +2,45 @@
 
 import Link from "next/link";
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Eye, CreditCard, Pencil, Link2, Edit3 } from "lucide-react";
 import Modal from "./Model";
 import StatementLinkModal from "./StatementLinkModal";
 
 export default function ExpenseTable({ rows, role, activeEmployeesList }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
   const [selectedEmployee, setSelectedEmployee] = useState("");
+
+  // Function to update URL search params
+  const updateQueryParam = useCallback((name, value) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set(name, value);
+    } else {
+      params.delete(name);
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, pathname, router]);
+
+  // Sync with URL search params
+  useEffect(() => {
+    const userParam = searchParams.get("username");
+    if (userParam !== null) {
+      setSelectedEmployee(userParam);
+      // If we are coming from a link with a username, we might want to see all their expenses
+      // but only if it's the first time or explicitly intended. 
+      // For now, let's keep it simple: just sync the employee.
+    } else {
+      setSelectedEmployee("");
+    }
+  }, [searchParams]);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
@@ -142,6 +171,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   const handleReset = () => {
     setSearchQuery("");
     setSelectedEmployee("");
+    updateQueryParam("username", "");
     setSelectedStatus("");
     setFromDate(dayjs().startOf("month").format("YYYY-MM-DD"));
     setToDate(dayjs().endOf("month").format("YYYY-MM-DD"));
@@ -191,7 +221,11 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
         />
         <select
           value={selectedEmployee}
-          onChange={(e) => setSelectedEmployee(e.target.value)}
+          onChange={(e) => {
+            const val = e.target.value;
+            setSelectedEmployee(val);
+            updateQueryParam("username", val);
+          }}
           className="px-4 py-2 border rounded-lg w-full sm:w-auto"
         >
           <option value="">All Employees</option>
