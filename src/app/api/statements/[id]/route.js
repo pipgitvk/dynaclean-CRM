@@ -299,21 +299,19 @@ export async function PATCH(req, { params }) {
     const body = await req.json().catch(() => ({}));
     const purchaseIdRaw = body?.purchase_id ?? body?.purchaseId;
     const purchaseTypeRaw = body?.purchase_type ?? body?.purchaseType;
+    const action = body?.action || "link"; // "link" or "unlink"
     const purchaseId = Number(purchaseIdRaw);
     if (!Number.isFinite(purchaseId) || purchaseId <= 0) {
       return NextResponse.json({ error: "purchase_id is required" }, { status: 400 });
     }
     const normalizePurchaseType = (val) => {
-      const s = String(val ?? "").trim().toLowerCase();
+      const s = String(val ?? "").trim().toUpperCase();
       if (!s) return "PP";
-      if (s === "pp" || s === "product") return "PP";
-      if (s === "ps" || s === "sp" || s === "spare") return "PS";
-      return null;
+      if (s === "PP" || s === "PRODUCT") return "PP";
+      if (s === "PS" || s === "SP" || s === "SPARE") return "PS";
+      return "PP";
     };
     const purchaseType = normalizePurchaseType(purchaseTypeRaw);
-    if (!purchaseType) {
-      return NextResponse.json({ error: "purchase_type must be PP or PS" }, { status: 400 });
-    }
 
     const pool = await getDbConnection();
     try {
@@ -351,63 +349,44 @@ export async function PATCH(req, { params }) {
           const parsed = JSON.parse(String(rawVal));
           if (Array.isArray(parsed)) arr = parsed;
         } catch {
-          arr = String(rawVal).split(",");
+          arr = String(rawVal).split(",").map(s => s.trim()).filter(Boolean);
         }
         const out = [];
         for (const v of arr) {
           if (v == null) continue;
-          if (typeof v === "number" && Number.isFinite(v) && v > 0) {
-            out.push(`PP${Math.trunc(v)}`);
-            continue;
-          }
           const s = String(v).trim().toUpperCase();
           if (!s) continue;
           if (/^(PP|PS|SP)\d+$/.test(s)) {
             out.push(s.startsWith("SP") ? `PS${s.slice(2)}` : s);
-            continue;
-          }
-          if (/^\d+$/.test(s)) {
+          } else if (/^\d+$/.test(s)) {
             out.push(`PP${s}`);
-            continue;
           }
         }
         return out;
       };
 
-      const currentTokens = parseTokens(rows[0]?.linked_purchase_ids);
+      let currentTokens = parseTokens(rows[0]?.linked_purchase_ids);
       const token = `${purchaseType}${purchaseId}`;
-      const unique = [...new Set(currentTokens)];
-      if (unique.length > 0 && !unique.includes(token)) {
-        await conn.rollback();
-        return NextResponse.json(
-          { error: `Statement already linked to purchase #${unique[0]}` },
-          { status: 409 },
-        );
-      }
-      const targetLinked = JSON.stringify([purchaseId]);
-      const targetLinkedTyped = JSON.stringify([token]);
 
-      const [oldRows] = await conn.execute(
-        "SELECT id FROM statements WHERE linked_purchase_ids = ? OR linked_purchase_ids = ? LIMIT 1",
-        [targetLinkedTyped, targetLinked],
-      );
-      const oldId = oldRows?.[0]?.id != null ? Number(oldRows[0].id) : null;
-      const newId = Number(id);
-      if (oldId && Number.isFinite(oldId) && oldId > 0 && oldId !== newId) {
-        await conn.execute(
-          "UPDATE statements SET linked_purchase_ids = NULL, invoice_status = CASE WHEN client_expense_id IS NOT NULL THEN 'Settled' ELSE 'Unsettled' END WHERE id = ?",
-          [oldId],
-        );
+      if (action === "link") {
+        if (!currentTokens.includes(token)) {
+          currentTokens.push(token);
+        }
+      } else if (action === "unlink") {
+        currentTokens = currentTokens.filter((t) => t !== token);
       }
+
+      const nextLinkedIds = currentTokens.length > 0 ? JSON.stringify(currentTokens) : null;
+      const nextStatus = (currentTokens.length > 0) ? "Settled" : "Unsettled";
 
       await conn.execute(
         "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ? WHERE id = ?",
-        [targetLinkedTyped, "Settled", id],
+        [nextLinkedIds, nextStatus, id],
       );
 
       await conn.commit();
       committed = true;
-      return NextResponse.json({ success: true, linked_purchase_ids: [token] });
+      return NextResponse.json({ success: true, linked_purchase_ids: currentTokens });
     } finally {
       if (!committed) {
         try {

@@ -178,7 +178,7 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
   );
 }
 
-function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementId }) {
+function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementIds }) {
   const [loading, setLoading] = useState(false);
   const [statements, setStatements] = useState([]);
   const [search, setSearch] = useState("");
@@ -216,28 +216,33 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
       const parsed = JSON.parse(String(raw));
       if (Array.isArray(parsed)) arr = parsed;
     } catch {
-      arr = String(raw).split(",");
+      arr = String(raw).split(",").map(s => s.trim()).filter(Boolean);
     }
     const keys = [];
     for (const v of arr) {
       if (v == null) continue;
-      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
-        keys.push(`PP${Math.trunc(v)}`);
-        continue;
-      }
       const s = String(v).trim().toUpperCase();
       if (!s) continue;
       if (/^(PP|PS|SP)\d+$/.test(s)) {
         keys.push(s.startsWith("SP") ? `PS${s.slice(2)}` : s);
-        continue;
-      }
-      if (/^\d+$/.test(s)) {
+      } else if (/^\d+$/.test(s)) {
         keys.push(`PP${s}`);
-        continue;
       }
     }
     return keys;
   };
+
+  const { currentTotal, myKey } = useMemo(() => {
+    const pid = Number(purchase?.id);
+    const key = Number.isFinite(pid) && pid > 0 ? `PP${pid}` : "";
+    const total = statements.reduce((acc, s) => {
+      if (getLinkedKeys(s).includes(key)) {
+        return acc + Number(s.amount || 0);
+      }
+      return acc;
+    }, 0);
+    return { currentTotal: total, myKey: key };
+  }, [statements, purchase?.id]);
 
   const eligibleStatements = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -246,16 +251,17 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
       (!s.invoice_status && !s.client_expense_id);
     const isDebit = (s) => String(s.type || "").trim() === "Debit";
 
-    const pid = Number(purchase?.id);
-    const currentIdNum = currentStatementId != null ? Number(currentStatementId) : null;
-    const myKey = Number.isFinite(pid) && pid > 0 ? `PP${pid}` : "";
     let rows = statements.filter((s) => {
       if (!isDebit(s)) return false;
-      if (currentIdNum != null && Number(s?.id) === currentIdNum) return true;
-      if (!isUnsettled(s)) return false;
       const linked = getLinkedKeys(s);
-      if (linked.length > 0 && (!myKey || !linked.includes(myKey))) return false;
-      return true;
+      // Show if it's already linked to THIS purchase
+      if (linked.includes(myKey)) return true;
+      // Also show if it's unsettled (and not linked to anything else)
+      if (isUnsettled(s) && linked.length === 0) return true;
+      // Also show if it's explicitly passed in currentStatementIds
+      if (Array.isArray(currentStatementIds) && currentStatementIds.includes(Number(s?.id))) return true;
+
+      return false;
     });
 
     if (q) {
@@ -264,12 +270,14 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
         const transId = String(s.trans_id ?? "").toLowerCase();
         const desc = String(s.description ?? "").toLowerCase();
         const amount = String(s.amount ?? "").toLowerCase();
-        return id.includes(q) || transId.includes(q) || desc.includes(q) || amount.includes(q);
+        const linked = String(s.linked_purchase_ids ?? "").toLowerCase();
+        
+        return id.includes(q) || transId.includes(q) || desc.includes(q) || amount.includes(q) || linked.includes(q);
       });
     }
 
     return rows;
-  }, [statements, search, purchase?.id, currentStatementId]);
+  }, [statements, search, myKey, currentStatementIds]);
 
   const hasPurchaseId = (stmt) => {
     const pid = Number(purchase?.id);
@@ -277,23 +285,60 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
     return getLinkedKeys(stmt).includes(`PP${pid}`);
   };
 
-  async function linkToStatement(statementId, transId) {
+  async function toggleLink(statementId, transId, currentlyLinked) {
     try {
       if (!purchase?.id) return;
+      
+      const action = currentlyLinked ? "unlink" : "link";
+      const stmt = statements.find(s => s.id === statementId);
+      const stmtAmount = Number(stmt?.amount || 0);
+
+      if (action === "link") {
+        if (currentTotal + stmtAmount > Number(purchase.net_amount || 0)) {
+          toast.error(`Cannot link: Total payment (₹${(currentTotal + stmtAmount).toLocaleString()}) would exceed Net Amount (₹${Number(purchase.net_amount || 0).toLocaleString()})`);
+          return;
+        }
+      }
+
       setLinkingId(statementId);
       const res = await fetch(`/api/statements/${statementId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ purchase_id: purchase.id, purchase_type: "PP" }),
+        body: JSON.stringify({
+          purchase_id: purchase.id,
+          purchase_type: "PP",
+          action: action
+        }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to link");
-      toast.success("Payment linked");
-      onLinked?.(purchase.id, statementId, transId);
-      onClose();
+      if (!res.ok) throw new Error(data.error || `Failed to ${action}`);
+
+      toast.success(action === "link" ? "Payment linked" : "Payment unlinked");
+
+      // Update local state of statements so the UI updates immediately
+      setStatements(prev => prev.map(s => {
+        if (s.id === statementId) {
+          const pid = Number(purchase.id);
+          const token = `PP${pid}`;
+          let linked = getLinkedKeys(s);
+          if (action === "link") {
+            if (!linked.includes(token)) linked.push(token);
+          } else {
+            linked = linked.filter(t => t !== token);
+          }
+          return {
+            ...s,
+            linked_purchase_ids: JSON.stringify(linked),
+            invoice_status: linked.length > 0 ? "Settled" : "Unsettled"
+          };
+        }
+        return s;
+      }));
+
+      onLinked?.(purchase.id, statementId, transId, action);
     } catch (e) {
-      toast.error(e.message || "Link failed");
+      toast.error(e.message || "Operation failed");
     } finally {
       setLinkingId(null);
     }
@@ -307,11 +352,20 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-lg font-semibold">Link Payment</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Purchase #{purchase?.id} • Showing only Unsettled + Debit statements
-            </p>
+            <div className="flex flex-col gap-0.5 mt-0.5">
+              <p className="text-xs text-gray-500">
+                Purchase #{purchase?.id} • Multiple selection enabled
+              </p>
+              <p className="text-xs font-medium">
+                <span className="text-gray-600">Net Amount:</span> <span className="text-blue-700">₹{Number(purchase?.net_amount || 0).toLocaleString()}</span>
+                <span className="mx-2 text-gray-300">|</span>
+                <span className="text-gray-600">Total Linked:</span> <span className={`${currentTotal > Number(purchase?.net_amount || 0) ? 'text-red-600' : 'text-emerald-700'}`}>₹{currentTotal.toLocaleString()}</span>
+                <span className="mx-2 text-gray-300">|</span>
+                <span className="text-gray-600">Remaining:</span> <span className="text-gray-800">₹{Math.max(0, Number(purchase?.net_amount || 0) - currentTotal).toLocaleString()}</span>
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-gray-500">✕</button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -322,66 +376,68 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
               placeholder="Search statement..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-72"
+              className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-72 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
-          <div className="text-xs text-gray-600">
+          <div className="text-xs text-gray-600 font-medium">
             {loading ? "Loading..." : `Showing ${eligibleStatements.length} statement(s)`}
           </div>
         </div>
 
-        <div className="border rounded overflow-hidden">
+        <div className="border rounded-lg overflow-hidden shadow-sm">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100 text-left">
               <tr>
-                <th className="p-3 border-b font-semibold">ID</th>
-                <th className="p-3 border-b font-semibold">Trans ID</th>
-                <th className="p-3 border-b font-semibold">Date</th>
-                <th className="p-3 border-b font-semibold">Description</th>
-                <th className="p-3 border-b font-semibold">Amount</th>
-                <th className="p-3 border-b font-semibold">Action</th>
+                <th className="p-3 border-b font-semibold text-gray-700">ID</th>
+                <th className="p-3 border-b font-semibold text-gray-700">Trans ID</th>
+                <th className="p-3 border-b font-semibold text-gray-700">Date</th>
+                <th className="p-3 border-b font-semibold text-gray-700">Description</th>
+                <th className="p-3 border-b font-semibold text-gray-700">Amount</th>
+                <th className="p-3 border-b font-semibold text-gray-700">Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-500">Loading...</td>
+                  <td colSpan={6} className="p-10 text-center text-gray-500">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading statements...</span>
+                    </div>
+                  </td>
                 </tr>
               ) : eligibleStatements.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-500">No matching statements</td>
+                  <td colSpan={6} className="p-10 text-center text-gray-500">No matching unsettled statements found</td>
                 </tr>
               ) : (
                 eligibleStatements.map((s) => {
-                  const already = hasPurchaseId(s);
-                  const myKey = purchase?.id != null ? `PP${Number(purchase.id)}` : "";
+                  const alreadyLinkedToThis = hasPurchaseId(s);
                   const linkedKeys = getLinkedKeys(s);
-                  const linkedToOther = linkedKeys.length > 0 && (!myKey || !linkedKeys.includes(myKey));
-                  const selected = currentStatementId != null && Number(s?.id) === Number(currentStatementId);
-                  const disabled = selected || already || linkedToOther || linkingId === s.id;
-                  const title = selected
-                    ? "Current payment"
-                    : already
-                    ? "Already linked"
-                    : linkedToOther
-                    ? `Already linked to purchase #${linkedKeys[0]}`
-                    : "Link this statement";
+                  const myKey = purchase?.id != null ? `PP${Number(purchase.id)}` : "";
+                  const linkedToOther = linkedKeys.length > 0 && !linkedKeys.includes(myKey);
+                  const isLinking = linkingId === s.id;
+
+                  let btnClass = "px-4 py-1.5 rounded text-sm font-medium transition-colors ";
+                  if (isLinking) btnClass += "bg-gray-200 text-gray-500 cursor-wait";
+                  else if (alreadyLinkedToThis) btnClass += "bg-red-50 text-red-600 border border-red-200 hover:bg-red-100";
+                  else btnClass += "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm";
+
                   return (
-                    <tr key={s.id} className="border-t hover:bg-gray-50">
-                      <td className="p-3">#{s.id}</td>
-                      <td className="p-3 font-mono text-xs">{s.trans_id || "—"}</td>
-                      <td className="p-3">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
-                      <td className="p-3 max-w-[420px] truncate" title={s.description || ""}>{s.description || "—"}</td>
-                      <td className="p-3 font-semibold text-red-700">₹{Number(s.amount || 0).toFixed(2)}</td>
+                    <tr key={s.id} className={`hover:bg-gray-50 transition-colors ${alreadyLinkedToThis ? 'bg-emerald-50/30' : ''}`}>
+                      <td className="p-3 font-medium text-gray-600">#{s.id}</td>
+                      <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
+                      <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                      <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
+                      <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3">
                         <button
                           type="button"
-                          onClick={() => linkToStatement(s.id, s.trans_id || "")}
-                          disabled={disabled}
-                          className={`px-3 py-1.5 rounded text-sm text-white ${disabled ? "bg-gray-400" : "bg-emerald-600 hover:bg-emerald-700"} disabled:opacity-50`}
-                          title={title}
+                          onClick={() => toggleLink(s.id, s.trans_id || "", alreadyLinkedToThis)}
+                          disabled={isLinking}
+                          className={btnClass}
                         >
-                          {selected ? "Selected" : already ? "Linked" : linkingId === s.id ? "Linking..." : "Select"}
+                          {isLinking ? "Processing..." : alreadyLinkedToThis ? "Deselect" : "Select"}
                         </button>
                       </td>
                     </tr>
@@ -390,6 +446,14 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
               )}
             </tbody>
           </table>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 transition-colors font-medium shadow-sm"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>
@@ -476,37 +540,78 @@ export default function PurchasesPage() {
       const stmtMap = {};
       for (const s of rows) {
         const ids = parseLinkedPurchaseIds(s?.linked_purchase_ids);
-        for (const id of ids) next.add(id);
-        if (ids.length > 0) {
-          const pid = Number(ids[0]);
+        for (const id of ids) {
+          next.add(id);
+          const pid = Number(id);
           if (Number.isFinite(pid) && pid > 0) {
-            transMap[pid] = s?.trans_id || "";
-            stmtMap[pid] = s?.id != null ? Number(s.id) : null;
+            // Aggregate trans IDs
+            if (!transMap[pid]) transMap[pid] = [];
+            if (s.trans_id && !transMap[pid].includes(s.trans_id)) {
+              transMap[pid].push(s.trans_id);
+            }
+            // Aggregate statement IDs
+            if (!stmtMap[pid]) stmtMap[pid] = [];
+            if (s.id && !stmtMap[pid].includes(Number(s.id))) {
+              stmtMap[pid].push(Number(s.id));
+            }
           }
         }
       }
+      // Convert arrays to comma-separated strings for display
+      const transDisplayMap = {};
+      for (const pid in transMap) {
+        transDisplayMap[pid] = transMap[pid].join(", ");
+      }
+
       setLinkedPurchaseIds(next);
-      setPaymentTransByPurchaseId(transMap);
+      setPaymentTransByPurchaseId(transDisplayMap);
       setPaymentStatementByPurchaseId(stmtMap);
     } catch {}
   };
 
-  const markPurchaseLinked = (purchaseId, statementId, transId) => {
+  const markPurchaseLinked = (purchaseId, statementId, transId, action = "link") => {
     const pid = Number(purchaseId);
     if (!Number.isFinite(pid) || pid <= 0) return;
-    setLinkedPurchaseIds((prev) => {
-      const next = new Set(prev);
-      next.add(pid);
-      return next;
-    });
-    setPaymentTransByPurchaseId((prev) => ({
-      ...prev,
-      [pid]: transId || prev?.[pid] || "",
-    }));
-    setPaymentStatementByPurchaseId((prev) => ({
-      ...prev,
-      [pid]: statementId != null ? Number(statementId) : prev?.[pid] ?? null,
-    }));
+
+    if (action === "link") {
+      setLinkedPurchaseIds((prev) => {
+        const next = new Set(prev);
+        next.add(pid);
+        return next;
+      });
+      setPaymentTransByPurchaseId((prev) => {
+        const current = prev?.[pid] ? String(prev[pid]).split(", ").filter(Boolean) : [];
+        if (transId && !current.includes(transId)) {
+          current.push(transId);
+        }
+        return { ...prev, [pid]: current.join(", ") };
+      });
+      setPaymentStatementByPurchaseId((prev) => {
+        const current = Array.isArray(prev?.[pid]) ? [...prev[pid]] : [];
+        if (statementId != null && !current.includes(Number(statementId))) {
+          current.push(Number(statementId));
+        }
+        return { ...prev, [pid]: current };
+      });
+    } else {
+      // unlink
+      setPaymentStatementByPurchaseId((prev) => {
+        const current = Array.isArray(prev?.[pid]) ? prev[pid].filter(id => id !== Number(statementId)) : [];
+        if (current.length === 0) {
+          setLinkedPurchaseIds(p => {
+            const n = new Set(p);
+            n.delete(pid);
+            return n;
+          });
+        }
+        return { ...prev, [pid]: current };
+      });
+      setPaymentTransByPurchaseId((prev) => {
+        const current = prev?.[pid] ? String(prev[pid]).split(", ").filter(Boolean) : [];
+        const next = current.filter(t => t !== transId);
+        return { ...prev, [pid]: next.join(", ") };
+      });
+    }
   };
 
   const filteredPurchases = useMemo(() => {
@@ -519,11 +624,18 @@ export default function PurchasesPage() {
 
     // Search filter
     if (search) {
-      filtered = filtered.filter((p) =>
-        Object.values(p).some((val) =>
-          String(val).toLowerCase().includes(search.toLowerCase())
-        )
-      );
+      const q = search.toLowerCase();
+      filtered = filtered.filter((p) => {
+        // Check basic purchase fields
+        const basicMatch = Object.values(p).some((val) =>
+          String(val).toLowerCase().includes(q)
+        );
+        if (basicMatch) return true;
+
+        // Check linked Transaction IDs
+        const transIds = String(paymentTransByPurchaseId?.[Number(p.id)] || "").toLowerCase();
+        return transIds.includes(q);
+      });
     }
 
     return filtered;
@@ -786,36 +898,40 @@ export default function PurchasesPage() {
                       {paymentTransByPurchaseId?.[Number(purchase.id)] ? paymentTransByPurchaseId[Number(purchase.id)] : "—"}
                     </td>
                     <td className="p-3">
-                      {linkedPurchaseIds.has(Number(purchase.id)) && (
-                        <button
-                          type="button"
-                          onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
-                          className="text-amber-700 hover:underline text-sm mb-1 block"
-                        >
-                          Edit Payment
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setDetailPurchase(purchase)}
-                        className="text-blue-600 hover:underline flex items-center gap-1"
-                      >
-                        <Eye className="w-4 h-4" /> View
-                      </button>
-                      <button
-                        onClick={() => { setEditRecord(purchase); setEditOpen(true); }}
-                        disabled={purchase.status !== 'requested'}
-                        className={`ml-2 ${purchase.status !== 'requested' ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600 hover:underline'} text-sm`}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
-                        disabled={linkedPurchaseIds.has(Number(purchase.id))}
-                        className={`ml-2 text-sm ${linkedPurchaseIds.has(Number(purchase.id)) ? "text-gray-400 cursor-not-allowed" : "text-emerald-600 hover:underline"}`}
-                      >
-                        {linkedPurchaseIds.has(Number(purchase.id)) ? "Payment Linked" : "Link Payment"}
-                      </button>
+                      <div className="flex flex-col gap-1">
+                        {linkedPurchaseIds.has(Number(purchase.id)) ? (
+                          <button
+                            type="button"
+                            onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
+                            className="text-emerald-700 hover:text-emerald-800 font-medium text-sm flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" /> Edit/Add Payment
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
+                            className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" /> Link Payment
+                          </button>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <button
+                            onClick={() => setDetailPurchase(purchase)}
+                            className="text-gray-600 hover:text-gray-800 flex items-center gap-1 text-sm"
+                          >
+                            <Eye className="w-4 h-4" /> View
+                          </button>
+                          <button
+                            onClick={() => { setEditRecord(purchase); setEditOpen(true); }}
+                            disabled={purchase.status !== 'requested'}
+                            className={`flex items-center gap-1 text-sm ${purchase.status !== 'requested' ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600 hover:text-purple-700'}`}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -933,7 +1049,7 @@ export default function PurchasesPage() {
         onClose={() => { setLinkPaymentOpen(false); setLinkPurchase(null); }}
         purchase={linkPurchase}
         onLinked={markPurchaseLinked}
-        currentStatementId={paymentStatementByPurchaseId?.[Number(linkPurchase?.id)]}
+        currentStatementIds={paymentStatementByPurchaseId?.[Number(linkPurchase?.id)]}
       />
 
       {/* Preview Modal */}

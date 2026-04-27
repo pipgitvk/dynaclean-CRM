@@ -161,15 +161,18 @@ export default function ExpenseTable({ rows, role }) {
   // Reset all filters
   const handleReset = () => {
     setSearchQuery("");
-    setFromDate("");
-    setToDate("");
     setSelectedEmployee("");
     setSelectedStatus("");
+    const startOfMonth = dayjs().startOf("month").format("YYYY-MM-DD");
+    const endOfMonth = dayjs().endOf("month").format("YYYY-MM-DD");
+    setFromDate(startOfMonth);
+    setToDate(endOfMonth);
+
     localStorage.removeItem("searchQuery");
-    localStorage.removeItem("fromDate");
-    localStorage.removeItem("toDate");
     localStorage.removeItem("selectedEmployee");
     localStorage.removeItem("selectedStatus");
+    localStorage.setItem("fromDate", startOfMonth);
+    localStorage.setItem("toDate", endOfMonth);
   };
 
   const closeModal = () => {
@@ -287,6 +290,22 @@ export default function ExpenseTable({ rows, role }) {
 
   return (
     <div className="space-y-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total Amount</div>
+          <div className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved Amount</div>
+          <div className="text-2xl font-bold text-gray-800">₹{approvedAmount.toFixed(2)}</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending Amount</div>
+          <div className="text-2xl font-bold text-gray-800">₹{(totalAmount - approvedAmount).toFixed(2)}</div>
+        </div>
+      </div>
+
       {/* Filters and Controls */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4">
         <input

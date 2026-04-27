@@ -193,30 +193,38 @@ export default function StatementTable({ rows }) {
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
+      const qRaw = searchQuery.trim();
+      const q = qRaw.toLowerCase();
+      const isNumericSearch = /^\d+$/.test(qRaw);
+
+      // Special case: If searching for a numeric Purchase ID, show ALL matches bypassing date/status filters
+      if (isNumericSearch) {
+        const refs = getLinkedPurchaseRefs(row);
+        const isPurchaseMatch = refs.some((ref) => String(ref.id) === qRaw);
+        if (isPurchaseMatch) return true;
+      }
+
       if (statusFilter) {
         const settled = isSettledRow(row);
         if (statusFilter === "Settled" && !settled) return false;
         if (statusFilter === "Unsettled" && settled) return false;
       }
-      if (searchQuery.trim()) {
-        const qRaw = searchQuery.trim();
-        const q = qRaw.toLowerCase();
-        const isNumericExpenseSearch = /^\d+$/.test(qRaw);
+
+      if (qRaw) {
         const matchesExpenseLinked =
-          isNumericExpenseSearch &&
+          isNumericSearch &&
           row.client_expense_id != null &&
           String(row.client_expense_id) === qRaw;
         const rowTransNorm = String(row.trans_id || "").trim().toLowerCase();
         const expenseTxnNorm = expenseTxnForIdSearch ? expenseTxnForIdSearch.toLowerCase() : "";
         const matchesExpenseByTransId =
-          isNumericExpenseSearch &&
+          isNumericSearch &&
           expenseIdResolved === qRaw &&
           expenseTxnNorm !== "" &&
           rowTransNorm === expenseTxnNorm;
 
         // Digits-only = expense ID: only linked row OR statement.trans_id === that expense's transaction_id.
-        // (Do not use substring on Trans ID / amount — e.g. "2" must not match S69523907 or ₹2183.)
-        if (isNumericExpenseSearch) {
+        if (isNumericSearch) {
           if (!matchesExpenseLinked && !matchesExpenseByTransId) return false;
         } else {
           const transId = (row.trans_id || "").toLowerCase();
@@ -224,12 +232,14 @@ export default function StatementTable({ rows }) {
           const cheqNo = (row.cheq_no || "").toLowerCase();
           const amount = String(row.amount || "");
           const invoiceNo = (row.invoice_number || "").toLowerCase();
+          const linked = (row.linked_purchase_ids || "").toLowerCase();
           if (
             !transId.includes(q) &&
             !desc.includes(q) &&
             !cheqNo.includes(q) &&
             !amount.includes(q) &&
-            !invoiceNo.includes(q)
+            !invoiceNo.includes(q) &&
+            !linked.includes(q)
           ) {
             return false;
           }
