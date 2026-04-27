@@ -63,6 +63,8 @@ export default function StatementExpensePicker({
 }) {
   const [open, setOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [empSectionExpanded, setEmpSectionExpanded] = useState(false);
+  const [expandedEmpNames, setExpandedEmpNames] = useState(new Set());
   const [includeHead, setIncludeHead] = useState(true);
   const [selectedSubs, setSelectedSubs] = useState(() => new Set());
   const rootRef = useRef(null);
@@ -323,6 +325,125 @@ export default function StatementExpensePicker({
     setExpandedId((cur) => (cur === id ? null : id));
   };
 
+  const toggleEmpName = (name, ev) => {
+    ev.stopPropagation();
+    setExpandedEmpNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const grouped = useMemo(() => {
+    const clients = list.filter((e) => e.expense_type !== "employee");
+    const emps = list.filter((e) => e.expense_type === "employee");
+    const empGroups = {};
+    emps.forEach((e) => {
+      const name = e.client_name || "Unknown";
+      if (!empGroups[name]) empGroups[name] = [];
+      empGroups[name].push(e);
+    });
+    return { clients, empGroups };
+  }, [list]);
+
+  const renderExpenseRow = (e) => {
+    const { head, subStr } = headSubLines(e);
+    const parts = subParts(subStr);
+    const isExp = expandedId != null && String(expandedId) === String(e.id);
+    const hasCat = !!head || parts.length > 0;
+    const isSelected = value != null && String(value) === String(e.id);
+
+    return (
+      <div key={e.id} className={`border-b border-gray-100 last:border-0 ${isSelected ? "bg-blue-50/50" : ""}`}>
+        <div className="flex items-stretch gap-0">
+          <button
+            type="button"
+            disabled={disabled}
+            className="shrink-0 w-9 flex items-center justify-center text-gray-500 hover:bg-gray-50 text-xs disabled:opacity-50"
+            onClick={(ev) => toggleExpand(e.id, ev)}
+            title={isExp ? "Hide details" : "Show Head / Sub-head"}
+            aria-expanded={isExp}
+          >
+            {isExp ? "▾" : "▸"}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            title="Select this expense (Head/Sub ticks apply)"
+            className="flex-1 min-w-0 text-left px-2 py-2.5 text-sm text-gray-900 hover:bg-slate-50 disabled:opacity-50 flex items-center gap-2"
+            onClick={() => !disabled && confirmSelect(e)}
+          >
+            {isSelected && <span className="text-blue-600 font-bold">✓</span>}
+            <span className={isSelected ? "font-medium text-blue-700" : ""}>
+              {formatClientExpenseShort(e)}
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            className={`shrink-0 px-3 py-2 text-xs font-medium border-l border-gray-100 disabled:opacity-50 ${
+              isSelected ? "text-green-600 bg-green-50" : "text-blue-700 hover:bg-blue-50"
+            }`}
+            onClick={() => confirmSelect(e)}
+          >
+            {isSelected ? "Selected" : "Select"}
+          </button>
+        </div>
+        {isExp && (
+          <div className="pl-9 pr-3 pb-3 pt-1 text-xs bg-slate-50/90 border-t border-gray-100">
+            {!hasCat ? (
+              <p className="text-gray-500 py-1">No Head / Sub-head on this expense.</p>
+            ) : (
+              <>
+                <p className="text-gray-600 mb-2">
+                  Tick Head/Sub where this statement amount applies, then click the expense name or Select.
+                  Linked client expense stores only the ticked lines.
+                </p>
+                {head ? (
+                  <label className="flex items-start gap-2 py-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 w-4 h-4 accent-amber-600 rounded border-gray-300"
+                      checked={includeHead}
+                      disabled={disabled}
+                      onChange={() => setIncludeHead((v) => !v)}
+                    />
+                    <span>
+                      <span className="font-semibold text-gray-800">Head:</span> {head}
+                    </span>
+                  </label>
+                ) : (
+                  <p className="text-gray-400 py-0.5">Head: —</p>
+                )}
+                {parts.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    <span className="font-semibold text-gray-800">Sub:</span>
+                    {parts.map((sh) => (
+                      <label
+                        key={sh}
+                        className="flex items-center gap-2 pl-1 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 accent-amber-600 rounded border-gray-300"
+                          checked={selectedSubs.has(sh)}
+                          disabled={disabled}
+                          onChange={() => toggleSub(sh)}
+                        />
+                        <span>{sh}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="relative" ref={rootRef}>
       <label className="block text-sm font-medium text-gray-700 mb-1">Expense ID</label>
@@ -343,95 +464,73 @@ export default function StatementExpensePicker({
           {list.length === 0 ? (
             <p className="px-3 py-2 text-sm text-gray-500">No expenses loaded</p>
           ) : (
-            list.map((e) => {
-              const { head, subStr } = headSubLines(e);
-              const parts = subParts(subStr);
-              const isExp = expandedId != null && String(expandedId) === String(e.id);
-              const hasCat = !!head || parts.length > 0;
-              return (
-                <div key={e.id} className="border-b border-gray-100 last:border-0">
-                  <div className="flex items-stretch gap-0">
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      className="shrink-0 w-9 flex items-center justify-center text-gray-500 hover:bg-gray-50 text-xs disabled:opacity-50"
-                      onClick={(ev) => toggleExpand(e.id, ev)}
-                      title={isExp ? "Hide details" : "Show Head / Sub-head"}
-                      aria-expanded={isExp}
-                    >
-                      {isExp ? "▾" : "▸"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      title="Select this expense (Head/Sub ticks apply)"
-                      className="flex-1 min-w-0 text-left px-2 py-2.5 text-sm text-gray-900 hover:bg-slate-50 disabled:opacity-50"
-                      onClick={() => !disabled && confirmSelect(e)}
-                    >
-                      {formatClientExpenseShort(e)}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      className="shrink-0 px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 border-l border-gray-100 disabled:opacity-50"
-                      onClick={() => confirmSelect(e)}
-                    >
-                      Select
-                    </button>
-                  </div>
-                  {isExp && (
-                    <div className="pl-9 pr-3 pb-3 pt-1 text-xs bg-slate-50/90 border-t border-gray-100">
-                      {!hasCat ? (
-                        <p className="text-gray-500 py-1">No Head / Sub-head on this expense.</p>
-                      ) : (
-                        <>
-                          <p className="text-gray-600 mb-2">
-                            Tick Head/Sub where this statement amount applies, then click the expense name or Select.
-                            Linked client expense stores only the ticked lines.
-                          </p>
-                          {head ? (
-                            <label className="flex items-start gap-2 py-1 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                className="mt-0.5 w-4 h-4 accent-amber-600 rounded border-gray-300"
-                                checked={includeHead}
-                                disabled={disabled}
-                                onChange={() => setIncludeHead((v) => !v)}
-                              />
-                              <span>
-                                <span className="font-semibold text-gray-800">Head:</span> {head}
-                              </span>
-                            </label>
-                          ) : (
-                            <p className="text-gray-400 py-0.5">Head: —</p>
-                          )}
-                          {parts.length > 0 && (
-                            <div className="mt-2 space-y-1.5">
-                              <span className="font-semibold text-gray-800">Sub:</span>
-                              {parts.map((sh) => (
-                                <label
-                                  key={sh}
-                                  className="flex items-center gap-2 pl-1 cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    className="w-4 h-4 accent-amber-600 rounded border-gray-300"
-                                    checked={selectedSubs.has(sh)}
-                                    disabled={disabled}
-                                    onChange={() => toggleSub(sh)}
-                                  />
-                                  <span>{sh}</span>
-                                </label>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
+            <>
+              {/* Employee Expenses Card - Commented out as requested */}
+              {/* 
+              <div className="border-b border-gray-200 bg-gray-50/50">
+                <div 
+                  className="flex items-center p-2 cursor-pointer hover:bg-gray-100 select-none"
+                  onClick={() => setEmpSectionExpanded(!empSectionExpanded)}
+                >
+                  <span className="w-6 text-center text-gray-500">{empSectionExpanded ? "▾" : "▸"}</span>
+                  <span className="font-bold text-sm text-blue-700">Employee Expenses</span>
+                  <span className="ml-auto text-xs text-gray-400 bg-white px-1.5 rounded border border-gray-200">
+                    {Object.keys(grouped.empGroups).length} employees
+                  </span>
                 </div>
-              );
-            })
+                
+                {empSectionExpanded && (
+                  <div className="pl-4 pb-1">
+                    {Object.entries(grouped.empGroups).length === 0 ? (
+                      <p className="p-2 text-xs text-gray-400 italic">No employee expenses found</p>
+                    ) : (
+                      Object.entries(grouped.empGroups).map(([name, empExpenses]) => {
+                        const isEmpExpanded = expandedEmpNames.has(name);
+                        const hasSelectedInGroup = empExpenses.some(e => value != null && String(e.id) === String(value));
+                        
+                        return (
+                          <div key={name} className={`border-l-2 ml-1 ${hasSelectedInGroup ? "border-blue-500 bg-blue-50/30" : "border-blue-100"}`}>
+                            <div className="flex items-stretch">
+                              <div 
+                                className="flex-1 flex items-center p-2 cursor-pointer hover:bg-blue-50 select-none"
+                                onClick={(ev) => toggleEmpName(name, ev)}
+                              >
+                                <span className="w-5 text-center text-gray-400 text-[10px]">{isEmpExpanded ? "▼" : "▶"}</span>
+                                {hasSelectedInGroup && <span className="mr-1 text-blue-600 text-xs font-bold">✓</span>}
+                                <span className={`font-semibold text-xs ${hasSelectedInGroup ? "text-blue-700" : "text-gray-700"}`}>{name}</span>
+                                <span className="ml-2 text-[10px] text-gray-400">({empExpenses.length})</span>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={disabled || empExpenses.length === 0}
+                                className={`shrink-0 px-3 py-1 text-[10px] font-medium border-l border-blue-50 disabled:opacity-50 ${
+                                  hasSelectedInGroup ? "text-green-600 bg-green-50" : "text-blue-600 hover:bg-blue-100"
+                                }`}
+                                onClick={() => !disabled && empExpenses.length > 0 && confirmSelect(empExpenses[0])}
+                                title={hasSelectedInGroup ? "Selected in this group" : `Select latest expense for ${name}`}
+                              >
+                                {hasSelectedInGroup ? "Selected" : "Select"}
+                              </button>
+                            </div>
+                            {isEmpExpanded && (
+                              <div className="ml-2 bg-white border-t border-blue-50">
+                                {empExpenses.map(renderExpenseRow)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+              */}
+
+              {/* Client Expenses */}
+              <div className="mt-1">
+                {grouped.clients.map(renderExpenseRow)}
+              </div>
+            </>
           )}
         </div>
       )}

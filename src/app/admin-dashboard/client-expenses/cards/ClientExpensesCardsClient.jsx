@@ -191,6 +191,29 @@ export default function ClientExpensesCardsClient({ rows }) {
 
       {!isTxnSearchActive && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* Employee Expenses Card */}
+          <Link
+            href="/admin-dashboard/client-expenses/employee-cards"
+            className="group relative flex flex-col bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div className="p-3 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                <User className="w-6 h-6" />
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-indigo-600 transition-colors" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                Employee Expenses
+              </h3>
+              <p className="text-sm text-gray-500 line-clamp-1">View expenses by employee</p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-gray-50 flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Active Employees</span>
+              <span className="text-sm font-bold text-indigo-600">View All</span>
+            </div>
+          </Link>
+
           {summaryCards.map((card) => {
             const clientQs = encodeURIComponent(card.client_name);
             const groupQs = encodeURIComponent(card.group_name);

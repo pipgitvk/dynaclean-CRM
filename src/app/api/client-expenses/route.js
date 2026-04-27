@@ -57,7 +57,28 @@ export async function GET(req) {
            ORDER BY ce.id DESC`,
         );
 
-    return NextResponse.json({ clientExpenses: rows });
+    let finalRows = rows;
+    if (rootOnly) {
+      // Also fetch approved employee expenses to show in statement picker
+      const [empRows] = await conn.execute(`
+        SELECT 
+          ID as id, 
+          CONCAT('EMP: ', description) as expense_name, 
+          username as client_name, 
+          'Employee Expense' as group_name,
+          'employee' as expense_type,
+          TicketCost + HotelCost + MealsCost + OtherExpenses as amount,
+          timestamp as created_at
+        FROM expenses 
+        WHERE approval_status = 'Approved'
+        ORDER BY ID DESC
+      `);
+      // Add expense_type 'client' to client expenses
+      const clientWithTypes = rows.map(r => ({ ...r, expense_type: 'client' }));
+      finalRows = [...clientWithTypes, ...empRows];
+    }
+
+    return NextResponse.json({ clientExpenses: finalRows });
   } catch (err) {
     console.error("[client-expenses-api] GET error:", err?.message || err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
