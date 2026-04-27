@@ -13,6 +13,8 @@ export default function ExpenseTable({ rows, role }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -23,10 +25,14 @@ export default function ExpenseTable({ rows, role }) {
     const savedSearchQuery = localStorage.getItem("searchQuery");
     const savedFromDate = localStorage.getItem("fromDate");
     const savedToDate = localStorage.getItem("toDate");
+    const savedEmployee = localStorage.getItem("selectedEmployee");
+    const savedStatus = localStorage.getItem("selectedStatus");
 
     if (savedSearchQuery) setSearchQuery(savedSearchQuery);
     if (savedFromDate) setFromDate(savedFromDate);
     if (savedToDate) setToDate(savedToDate);
+    if (savedEmployee) setSelectedEmployee(savedEmployee);
+    if (savedStatus) setSelectedStatus(savedStatus);
   }, []);
 
   // Save filter values to localStorage whenever they change
@@ -34,9 +40,14 @@ export default function ExpenseTable({ rows, role }) {
     if (searchQuery) localStorage.setItem("searchQuery", searchQuery);
     if (fromDate) localStorage.setItem("fromDate", fromDate);
     if (toDate) localStorage.setItem("toDate", toDate);
-  }, [searchQuery, fromDate, toDate]);
+    if (selectedEmployee) localStorage.setItem("selectedEmployee", selectedEmployee);
+    if (selectedStatus) localStorage.setItem("selectedStatus", selectedStatus);
+  }, [searchQuery, fromDate, toDate, selectedEmployee, selectedStatus]);
 
-  // Filter rows based on the search query, from date, and to date
+  // Get unique employees for the filter
+  const employees = Array.from(new Set(rows.map((row) => row.username))).filter(Boolean).sort();
+
+  // Filter rows based on the search query, employee, date range, and status
   const filteredRows = rows.filter((row) => {
     const formattedDate = dayjs(row.TravelDate).format("DD MMM YYYY");
 
@@ -48,11 +59,15 @@ export default function ExpenseTable({ rows, role }) {
         .includes(searchQuery.toLowerCase()) ||
       formattedDate.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesDateRange =
-      (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate))) &&
-      (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate)));
+    const matchesEmployee = !selectedEmployee || row.username === selectedEmployee;
 
-    return matchesSearch && matchesDateRange;
+    const matchesStatus = !selectedStatus || row.approval_status === selectedStatus;
+
+    const matchesDateRange =
+      (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
+      (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate).add(1, "day")));
+
+    return matchesSearch && matchesEmployee && matchesStatus && matchesDateRange;
   });
 
   const getRowTotal = (row) =>
@@ -148,9 +163,13 @@ export default function ExpenseTable({ rows, role }) {
     setSearchQuery("");
     setFromDate("");
     setToDate("");
+    setSelectedEmployee("");
+    setSelectedStatus("");
     localStorage.removeItem("searchQuery");
     localStorage.removeItem("fromDate");
     localStorage.removeItem("toDate");
+    localStorage.removeItem("selectedEmployee");
+    localStorage.removeItem("selectedStatus");
   };
 
   const closeModal = () => {
@@ -269,7 +288,7 @@ export default function ExpenseTable({ rows, role }) {
   return (
     <div className="space-y-4">
       {/* Filters and Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4">
         <input
           type="text"
           placeholder="Search anything..."
@@ -277,18 +296,46 @@ export default function ExpenseTable({ rows, role }) {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
         />
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
+        <select
+          value={selectedEmployee}
+          onChange={(e) => setSelectedEmployee(e.target.value)}
           className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
-        />
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
+        >
+          <option value="">All Employees</option>
+          {employees.map((emp) => (
+            <option key={emp} value={emp}>
+              {emp}
+            </option>
+          ))}
+        </select>
+        <select
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value)}
           className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
-        />
+        >
+          <option value="">All Status</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-sm text-gray-500 hidden sm:inline">From:</span>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-sm text-gray-500 hidden sm:inline">To:</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="px-4 py-2 border rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
         <button
           onClick={handleReset}
           className="px-4 py-2 bg-gray-200 rounded-lg text-sm cursor-pointer w-full sm:w-auto hover:bg-gray-300 transition"
