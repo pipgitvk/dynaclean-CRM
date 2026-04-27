@@ -36,6 +36,14 @@ export default function AdminAttendanceRegularizationPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
 
+  // Filter states
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [employeeFilter, setEmployeeFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -81,6 +89,29 @@ export default function AdminAttendanceRegularizationPage() {
     load();
   }, [load]);
 
+  const uniqueEmployees = Array.from(
+    new Set(requests.map((r) => r.username).filter(Boolean))
+  ).sort();
+
+  const filteredRequests = requests.filter((req) => {
+    const matchesStatus =
+      statusFilter === "all" ||
+      req.status?.toLowerCase() === statusFilter.toLowerCase();
+    const matchesEmployee =
+      employeeFilter === "all" || req.username === employeeFilter;
+
+    let matchesDate = true;
+    if (monthFilter) {
+      const [year, month] = monthFilter.split("-");
+      const reqDate = new Date(req.log_date);
+      matchesDate =
+        reqDate.getFullYear() === parseInt(year) &&
+        reqDate.getMonth() + 1 === parseInt(month);
+    }
+
+    return matchesStatus && matchesEmployee && matchesDate;
+  });
+
   return (
     <div className="w-full min-w-0 max-w-full">
       <div className="mb-6 flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -101,12 +132,60 @@ export default function AdminAttendanceRegularizationPage() {
         </Link>
       </div>
 
+      {/* Filters section */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3 bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+            Status
+          </label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full rounded border-gray-300 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+            Employee
+          </label>
+          <select
+            value={employeeFilter}
+            onChange={(e) => setEmployeeFilter(e.target.value)}
+            className="w-full rounded border-gray-300 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="all">All Employees</option>
+            {uniqueEmployees.map((emp) => (
+              <option key={emp} value={emp}>
+                {emp}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 uppercase mb-1">
+            Month
+          </label>
+          <input
+            type="month"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="w-full rounded border-gray-300 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+      </div>
+
       {loading ? (
         <p className="text-gray-600 py-12 text-center">Loading…</p>
-      ) : requests.length === 0 ? (
+      ) : filteredRequests.length === 0 ? (
         <p className="w-full text-gray-600 rounded-lg border border-gray-200 bg-white p-8 shadow-sm text-center">
-          No regularization requests found. Ensure the database table exists and
-          employees have submitted requests.
+          No regularization requests found for the selected filters.
         </p>
       ) : (
         <div className="w-full bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
@@ -115,9 +194,15 @@ export default function AdminAttendanceRegularizationPage() {
               <thead className="bg-gray-100 text-left text-gray-700">
                 <tr>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">ID</th>
-                  <th className="px-3 py-2 font-medium whitespace-nowrap">Employee</th>
-                  <th className="px-3 py-2 font-medium whitespace-nowrap">Date</th>
-                  <th className="px-3 py-2 font-medium whitespace-nowrap">Status</th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">
+                    Employee
+                  </th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">
+                    Date
+                  </th>
+                  <th className="px-3 py-2 font-medium whitespace-nowrap">
+                    Status
+                  </th>
                   <th className="px-3 py-2 font-medium min-w-[140px]">Reason</th>
                   <th className="px-3 py-2 font-medium whitespace-nowrap">
                     Timing & Log Details
@@ -131,7 +216,7 @@ export default function AdminAttendanceRegularizationPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {requests.map((req) => (
+                {filteredRequests.map((req) => (
                   <tr key={req.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-gray-800">{req.id}</td>
                     <td className="px-3 py-2 font-medium text-gray-900">
