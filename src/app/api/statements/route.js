@@ -15,6 +15,8 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const expenseId = searchParams.get("expense_id");
+    const status = searchParams.get("status");
+    const currentExpenseId = searchParams.get("current_expense_id");
 
     const conn = await getDbConnection();
     try {
@@ -58,6 +60,15 @@ export async function GET(req) {
       } catch (__) {}
     }
 
+    // Ensure expenses table has linked_statement_ids column
+    try {
+      await conn.execute("SELECT linked_statement_ids FROM expenses LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE expenses ADD COLUMN linked_statement_ids TEXT NULL");
+      } catch (__) {}
+    }
+
     if (expenseId) {
       [rows] = await conn.execute(
         `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, created_at
@@ -66,6 +77,22 @@ export async function GET(req) {
          ORDER BY id DESC`,
         [expenseId]
       );
+    } else if (status === "unsettled") {
+      let query = `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, created_at
+         FROM statements
+         WHERE (invoice_status IS NULL OR invoice_status = 'Unsettled' OR invoice_status = '')
+         AND (client_expense_id IS NULL`;
+      
+      const params = [];
+      if (currentExpenseId) {
+        query += ` OR client_expense_id = ?)`;
+        params.push(currentExpenseId);
+      } else {
+        query += `)`;
+      }
+      
+      query += ` ORDER BY date DESC, id DESC`;
+      [rows] = await conn.execute(query, params);
     } else {
       [rows] = await conn.execute(
         `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, created_at

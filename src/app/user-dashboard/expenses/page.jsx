@@ -27,7 +27,7 @@ export default async function ExpensesPage() {
   // Direct query for all expenses (passing `username` as a parameter)
   const query = `SELECT ID, TravelDate, FromLocation, Tolocation,
             TicketCost, HotelCost, MealsCost, OtherExpenses,
-            approved_amount, payment_date, approval_status
+            approved_amount, payment_date, approval_status, linked_statement_ids
         FROM expenses
         WHERE username = ?
         ORDER BY TravelDate DESC;`;

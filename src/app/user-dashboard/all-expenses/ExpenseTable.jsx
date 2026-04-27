@@ -3,8 +3,9 @@
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useState, useEffect } from "react";
-import { Eye, CreditCard, Download, ExternalLink, Pencil } from "lucide-react";
+import { Eye, CreditCard, Download, ExternalLink, Pencil, Link2, Edit3 } from "lucide-react";
 import Modal from "../expenses/Model";
+import StatementLinkModal from "../../admin-dashboard/expenses/StatementLinkModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
@@ -16,7 +17,9 @@ export default function ExpenseTable({ rows, role }) {
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedRowForLink, setSelectedRowForLink] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
@@ -459,7 +462,7 @@ export default function ExpenseTable({ rows, role }) {
                             <Pencil size={16} />
                           </Link>
                         )}
-                        {(role === "ACCOUNTANT" || role === "ADMIN") && (
+                        {(role === "ACCOUNTANT" || role === "ADMIN" || role === "SUPERADMIN") && (
                           <button
                             onClick={() => handlePaymentClick(row)}
                             className="text-green-600 hover:text-green-800 cursor-pointer"
@@ -467,6 +470,33 @@ export default function ExpenseTable({ rows, role }) {
                           >
                             <CreditCard size={16} />
                           </button>
+                        )}
+
+                        {/* Payment Link / Edit Button - Available for all roles if Approved */}
+                        {row.approval_status === "Approved" && (
+                          !row.linked_statement_ids || JSON.parse(row.linked_statement_ids || "[]").length === 0 ? (
+                            <button
+                              onClick={() => {
+                                setSelectedRowForLink(row);
+                                setIsLinkModalOpen(true);
+                              }}
+                              className="text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                              title="Payment Link"
+                            >
+                              <Link2 size={16} />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSelectedRowForLink(row);
+                                setIsLinkModalOpen(true);
+                              }}
+                              className="text-blue-500 hover:text-blue-700 cursor-pointer"
+                              title="Edit Payment Link"
+                            >
+                              <Edit3 size={16} />
+                            </button>
+                          )
                         )}
                       </td>
                     </tr>
@@ -573,13 +603,38 @@ export default function ExpenseTable({ rows, role }) {
                         Edit <Pencil size={14} />
                       </Link>
                     )}
-                    {(role === "ACCOUNTANT" || role === "ADMIN") && (
+                    {(role === "ACCOUNTANT" || role === "ADMIN" || role === "SUPERADMIN") && (
                       <button
                         onClick={() => handlePaymentClick(row)}
                         className="text-green-600 hover:text-green-800 flex items-center gap-1 text-sm font-semibold"
                       >
                         Process Payment <CreditCard size={14} />
                       </button>
+                    )}
+
+                    {/* Payment Link / Edit Button - Mobile View */}
+                    {row.approval_status === "Approved" && (
+                      !row.linked_statement_ids || JSON.parse(row.linked_statement_ids || "[]").length === 0 ? (
+                        <button
+                          onClick={() => {
+                            setSelectedRowForLink(row);
+                            setIsLinkModalOpen(true);
+                          }}
+                          className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-sm font-semibold"
+                        >
+                          Link <Link2 size={14} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSelectedRowForLink(row);
+                            setIsLinkModalOpen(true);
+                          }}
+                          className="text-blue-500 hover:text-blue-700 flex items-center gap-1 text-sm font-semibold"
+                        >
+                          Edit Link <Edit3 size={14} />
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
@@ -611,6 +666,12 @@ export default function ExpenseTable({ rows, role }) {
         row={selectedRow}
         role={role}
         onPaymentSuccess={handlePaymentSuccess}
+      />
+
+      <StatementLinkModal
+        isOpen={isLinkModalOpen}
+        closeModal={() => setIsLinkModalOpen(false)}
+        row={selectedRowForLink}
       />
     </div>
   );

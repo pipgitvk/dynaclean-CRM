@@ -105,4 +105,47 @@ export async function PUT(req, { params }) {
   }
 }
 
+export async function PATCH(req, { params }) {
+  try {
+    const { expenseId } = await params;
+    const { linked_statement_ids } = await req.json();
+
+    const conn = await getDbConnection();
+    
+    // 1. Clear current links for this expense in statements table
+    await conn.execute(
+      "UPDATE statements SET client_expense_id = NULL WHERE client_expense_id = ?",
+      [expenseId]
+    );
+
+    // 2. Update expenses table with new statement IDs
+    const sql = `UPDATE expenses SET linked_statement_ids = ? WHERE ID = ?`;
+    const [result] = await conn.execute(sql, [
+      JSON.stringify(linked_statement_ids || []),
+      expenseId,
+    ]);
+
+    // 3. Update statements table with new expense ID
+    if (linked_statement_ids && linked_statement_ids.length > 0) {
+      // Create placeholders for the IN clause (?,?,?)
+      const placeholders = linked_statement_ids.map(() => "?").join(",");
+      await conn.execute(
+        `UPDATE statements SET client_expense_id = ? WHERE id IN (${placeholders})`,
+        [expenseId, ...linked_statement_ids]
+      );
+    }
+
+    return new Response(JSON.stringify({ ok: true, affectedRows: result.affectedRows }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    console.error(`[expense-link] ERROR expenseId=${expenseId}:`, e?.message || e);
+    return new Response(JSON.stringify({ ok: false, error: e.message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
 
