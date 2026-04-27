@@ -11,6 +11,7 @@ export default function ExpenseTable({ rows, role }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -18,7 +19,7 @@ export default function ExpenseTable({ rows, role }) {
   // Get unique employees for the filter
   const employees = Array.from(new Set(rows.map((row) => row.username))).filter(Boolean).sort();
 
-  // Filter rows based on the search query, employee, and date range
+  // Filter rows based on the search query, employee, date range, and status
   const filteredRows = rows.filter((row) => {
     const totalCost =
       Number(row.TicketCost || 0) +
@@ -38,11 +39,13 @@ export default function ExpenseTable({ rows, role }) {
 
     const matchesEmployee = !selectedEmployee || row.username === selectedEmployee;
 
+    const matchesStatus = !selectedStatus || row.approval_status === selectedStatus;
+
     const matchesDateRange =
       (!fromDate || dayjs(row.TravelDate).isAfter(dayjs(fromDate).subtract(1, "day"))) &&
       (!toDate || dayjs(row.TravelDate).isBefore(dayjs(toDate).add(1, "day")));
 
-    return matchesSearch && matchesEmployee && matchesDateRange;
+    return matchesSearch && matchesEmployee && matchesStatus && matchesDateRange;
   });
 
   const getRowTotal = (row) =>
@@ -111,6 +114,7 @@ export default function ExpenseTable({ rows, role }) {
   const handleReset = () => {
     setSearchQuery("");
     setSelectedEmployee("");
+    setSelectedStatus("");
     setFromDate("");
     setToDate("");
   };
@@ -148,6 +152,16 @@ export default function ExpenseTable({ rows, role }) {
               {emp}
             </option>
           ))}
+        </select>
+        <select
+          value={selectedStatus}
+          onChange={(e) => setSelectedStatus(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-auto"
+        >
+          <option value="">All Status</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
         </select>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <span className="text-sm text-gray-500 hidden sm:inline">From:</span>
