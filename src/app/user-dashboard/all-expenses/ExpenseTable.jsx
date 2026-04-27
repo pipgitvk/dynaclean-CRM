@@ -11,8 +11,8 @@ import ExcelJS from "exceljs";
 
 export default function ExpenseTable({ rows, role }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
+  const [toDate, setToDate] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
