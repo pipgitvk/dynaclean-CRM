@@ -225,7 +225,8 @@ export default function EditStatementPage() {
             name="type"
             value={form.type}
             onChange={handleChange}
-            className="w-full border p-2 rounded"
+            disabled
+            className="w-full border p-2 rounded bg-gray-50 cursor-not-allowed"
             required
           >
             <option value="Credit">Credit</option>

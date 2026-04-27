@@ -48,6 +48,28 @@ export default function ExpenseTable({ rows, role }) {
     return matchesSearch && matchesEmployee && matchesStatus && matchesDateRange;
   });
 
+  const calculateTotals = (data) => {
+    let totalAmount = 0;
+    let approvedAmount = 0;
+
+    data.forEach((row) => {
+      totalAmount +=
+        Number(row.TicketCost || 0) +
+        Number(row.HotelCost || 0) +
+        Number(row.MealsCost || 0) +
+        Number(row.OtherExpenses || 0);
+      const isRejected = row.approval_status === "Rejected";
+      const rowApproved = Number(row.approved_amount || 0);
+      if (!isRejected && rowApproved > 0) {
+        approvedAmount += rowApproved;
+      }
+    });
+
+    return { totalAmount, approvedAmount };
+  };
+
+  const { totalAmount, approvedAmount } = calculateTotals(filteredRows);
+
   const getRowTotal = (row) =>
     Number(row.TicketCost || 0) +
     Number(row.HotelCost || 0) +
@@ -113,8 +135,8 @@ export default function ExpenseTable({ rows, role }) {
   // Reset all filters
   const handleReset = () => {
     setSearchQuery("");
-    setFromDate("");
-    setToDate("");
+    setFromDate(dayjs().startOf("month").format("YYYY-MM-DD"));
+    setToDate(dayjs().endOf("month").format("YYYY-MM-DD"));
     setSelectedEmployee("");
     setSelectedStatus("");
   };
@@ -132,6 +154,22 @@ export default function ExpenseTable({ rows, role }) {
 
   return (
     <div className="space-y-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total Amount</div>
+          <div className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-green-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Approved Amount</div>
+          <div className="text-2xl font-bold text-gray-800">₹{approvedAmount.toFixed(2)}</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-600">
+          <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending Amount</div>
+          <div className="text-2xl font-bold text-gray-800">₹{(totalAmount - approvedAmount).toFixed(2)}</div>
+        </div>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4">
         <input
