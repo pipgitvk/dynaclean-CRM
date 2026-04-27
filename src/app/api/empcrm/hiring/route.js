@@ -88,7 +88,8 @@ export async function GET(req) {
     const nextFollowupToParam = searchParams.get("next_followup_to");
     const createdFromParam = searchParams.get("created_from");
     const createdToParam = searchParams.get("created_to");
-    
+    const createdByFilter = searchParams.get("created_by");
+
     const designationTrimmed =
       designationParam != null && String(designationParam).trim() !== ""
         ? String(designationParam).trim()
@@ -129,6 +130,19 @@ export async function GET(req) {
       distRows.map((r) => r.d).filter((x) => x != null && String(x).trim() !== "")
     );
 
+    // Fetch unique creators (HRs) for superadmin filter
+    let creators = [];
+    if (isSuperadmin) {
+      const [creatorRows] = await conn.execute(
+        `SELECT DISTINCT h.created_by AS username, COALESCE(ep.full_name, h.created_by) AS name
+         FROM candidates h
+         LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
+         WHERE TRIM(COALESCE(h.created_by, '')) != ''
+         ORDER BY name`
+      );
+      creators = creatorRows;
+    }
+
     let sql = `SELECT h.id, h.created_by,
          COALESCE(ep.full_name, h.created_by) AS creator_name,
          ep.designation AS creator_role,
@@ -139,7 +153,12 @@ export async function GET(req) {
          LEFT JOIN employee_profiles ep ON LOWER(TRIM(ep.username)) = LOWER(TRIM(h.created_by))
          WHERE 1=1${isSuperadmin ? "" : " AND LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))"}`;
     const params = isSuperadmin ? [] : [payload.username];
-    
+
+    if (isSuperadmin && createdByFilter) {
+      sql += ` AND LOWER(TRIM(h.created_by)) = LOWER(TRIM(?))`;
+      params.push(createdByFilter);
+    }
+
     if (candidateNameTrimmed != null) {
       sql += ` AND h.candidate_name LIKE ?`;
       params.push(`%${candidateNameTrimmed}%`);
@@ -205,7 +224,7 @@ export async function GET(req) {
     } catch {
       /* table missing handled below if needed */
     }
-    return NextResponse.json({ success: true, entries: rows, next_id, designations });
+    return NextResponse.json({ success: true, entries: rows, next_id, designations, creators });
   } catch (error) {
     console.error("[empcrm/hiring GET]", error);
     const msg = `${error?.message || ""} ${error?.sqlMessage || ""}`;

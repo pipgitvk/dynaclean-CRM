@@ -221,12 +221,6 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
-        path: "/user-dashboard/hr-today-report",
-        name: "HR Daily Report",
-        roles: ["SUPERADMIN"],
-        icon: "FileText",
-      },
-      {
         path: "/admin-dashboard/lead-reports",
         name: "Lead Reports",
         roles: ["SUPERADMIN"],
@@ -630,6 +624,13 @@ const allMenuItems = [
         accessKey: "salary-slips",
         roles: ["SUPERADMIN", "ACCOUNTANT"],
         icon: "Receipt",
+      },
+      {
+        path: "/user-dashboard/hr-today-report",
+        name: "HR Daily Report",
+        accessKey: "hr-daily-report",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
       },
     ],
   },
