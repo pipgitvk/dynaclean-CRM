@@ -83,13 +83,6 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
-        path: "/user-dashboard/hr-today-report",
-        name: "HR Daily Report",
-        moduleKey: "hr-daily-report",
-        roles: ["ALL"],
-        icon: "FileText",
-      },
-      {
         path: "/user-dashboard/lead-reports",
         name: "Lead Reports",
         moduleKey: "lead-reports",
@@ -640,6 +633,13 @@ const allMenuItems = [
         moduleKey: "salary-slips",
         roles: ["ALL"],
         icon: "Receipt",
+      },
+      {
+        path: "/user-dashboard/hr-today-report",
+        name: "HR Daily Report",
+        moduleKey: "hr-daily-report",
+        roles: ["ALL"],
+        icon: "FileText",
       },
     ],
   },

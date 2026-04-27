@@ -25,6 +25,8 @@ export default function HrTodayReportPage() {
   const [dateRange, setDateRange] = useState("today");
   const [customFromDate, setCustomFromDate] = useState("");
   const [customToDate, setCustomToDate] = useState("");
+  const [creators, setCreators] = useState([]);
+  const [selectedHr, setSelectedHr] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -60,12 +62,21 @@ export default function HrTodayReportPage() {
         created_from: startDate,
         created_to: endDate,
       });
+
+      if (selectedHr) {
+        params.append("created_by", selectedHr);
+      }
+
       const res = await fetch(`/api/empcrm/hiring?${params.toString()}`);
       if (!res.ok) {
         throw new Error("Failed to fetch hiring data");
       }
       const fetchedData = await res.json();
       const entries = fetchedData.entries || [];
+      
+      if (fetchedData.creators) {
+        setCreators(fetchedData.creators);
+      }
 
       const stats = {
         interviewAttended: entries.filter(e => e.status === "Attended Interview").length,
@@ -85,7 +96,7 @@ export default function HrTodayReportPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange, customFromDate, customToDate]);
+  }, [dateRange, customFromDate, customToDate, selectedHr]);
 
   useEffect(() => {
     fetchData();
@@ -120,6 +131,7 @@ export default function HrTodayReportPage() {
       "Designation": item.designation,
       "Status": item.status,
       "Interview Date": item.interview_at ? dayjs(item.interview_at).format("DD-MMM-YYYY HH:mm") : "—",
+      "Created By": item.creator_name || item.created_by,
       "Created At": dayjs(item.created_at).format("DD-MMM-YYYY HH:mm"),
     }));
 
@@ -197,6 +209,25 @@ export default function HrTodayReportPage() {
             </button>
           </div>
         </div>
+
+        {/* HR Filter (Superadmin only) */}
+        {creators.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Filter by HR:</span>
+            <select
+              value={selectedHr}
+              onChange={(e) => setSelectedHr(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-sky-500 focus:border-sky-500 min-w-[150px]"
+            >
+              <option value="">All HRs</option>
+              {creators.map((hr) => (
+                <option key={hr.username} value={hr.username}>
+                  {hr.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -257,6 +288,7 @@ export default function HrTodayReportPage() {
                 <th className="px-6 py-4 font-semibold border-b">Designation</th>
                 <th className="px-6 py-4 font-semibold border-b">Status</th>
                 <th className="px-6 py-4 font-semibold border-b">Interview Date</th>
+                {creators.length > 0 && <th className="px-6 py-4 font-semibold border-b">HR Name</th>}
                 <th className="px-6 py-4 font-semibold border-b">Created At</th>
               </tr>
             </thead>
@@ -264,7 +296,7 @@ export default function HrTodayReportPage() {
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    {[...Array(6)].map((_, j) => (
+                    {[...Array(creators.length > 0 ? 7 : 6)].map((_, j) => (
                       <td key={j} className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-full"></div></td>
                     ))}
                   </tr>
@@ -285,12 +317,13 @@ export default function HrTodayReportPage() {
                        </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{row["Interview Date"]}</td>
+                    {creators.length > 0 && <td className="px-6 py-4 text-sm text-gray-600">{row["Created By"]}</td>}
                     <td className="px-6 py-4 text-sm text-gray-600">{row["Created At"]}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={creators.length > 0 ? 7 : 6} className="px-6 py-10 text-center text-gray-500">
                     No calls found for the selected period.
                   </td>
                 </tr>

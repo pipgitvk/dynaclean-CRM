@@ -6,7 +6,6 @@ export const MODULE_TREE = [
     children: [
       { key: "dashboard-home", label: "Dashboard Home" },
       { key: "daily-report", label: "Daily Report" },
-      { key: "hr-daily-report", label: "HR Daily Report" },
       { key: "lead-reports", label: "Lead Reports" },
       { key: "quotations-report", label: "Quotations Report" },
       { key: "order-report", label: "Order Report" },
@@ -141,19 +140,14 @@ export const MODULE_TREE = [
     ],
   },
   {
-    key: "attendance-rules",
-    label: "Attendance Rules",
-    children: [],
-  },
-  {
-    key: "hiring-process",
-    label: "Hiring Process",
-    children: [],
-  },
-  {
-    key: "final-profile-approval",
-    label: "Final Profile Approval",
-    children: [],
+    key: "hr-operations",
+    label: "HR Operations",
+    children: [
+      { key: "attendance-rules", label: "Attendance Rules" },
+      { key: "hiring-process", label: "Hiring Process" },
+      { key: "final-profile-approval", label: "Final Profile Approval" },
+      { key: "hr-daily-report", label: "HR Daily Report" },
+    ],
   },
 ];
 
@@ -185,7 +179,6 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     label: "Reports",
     children: [
       { kind: "leaf", key: "daily-report", label: "Daily Report" },
-      { kind: "leaf", key: "hr-daily-report", label: "HR Daily Report" },
       { kind: "leaf", key: "lead-reports", label: "Lead Reports" },
       { kind: "leaf", key: "quotations-report", label: "Quotations Report" },
       { kind: "leaf", key: "order-report", label: "Order Report" },
@@ -327,6 +320,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "attendance-rules", label: "Attendance Rules" },
       { kind: "leaf", key: "hiring-process", label: "Hiring Process" },
       { kind: "leaf", key: "final-profile-approval", label: "Final Profile Approval" },
+      { kind: "leaf", key: "hr-daily-report", label: "HR Daily Report" },
       { kind: "leaf", key: "salary-slips", label: "Salary Slips" },
     ],
   },
