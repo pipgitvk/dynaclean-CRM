@@ -375,7 +375,7 @@ export default function StatementTable({ rows }) {
       startY: 22,
       theme: "plain",
       head: [
-        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Debit", "Credit", "Status", "Invoice No", "Balance"],
+        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Debit", "Credit", "Status", "Invoice No", "Purchase IDs", "Expense ID", "Balance"],
       ],
       body: sortedRows.map((row) => [
         String(row.id),
@@ -389,23 +389,27 @@ export default function StatementTable({ rows }) {
         row.type === "Credit" ? formatPdfAmount(row.amount) : "-",
         displayInvoiceStatus(row),
         row.invoice_number || "-",
+        getLinkedPurchaseRefs(row).map(x => `${x.prefix}${x.id}`).join(", ") || "-",
+        row.client_expense_id ? `EXP#${row.client_expense_id}` : "-",
         formatPdfAmount(displayBalance(row)),
       ]),
-      styles: { fontSize: 7 },
+      styles: { fontSize: 6 },
       headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
       columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 24 },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 20 },
-        5: { cellWidth: 18 },
-        6: { cellWidth: 32 },
-        7: { cellWidth: 16 },
-        8: { cellWidth: 16 },
-        9: { cellWidth: 18 },
-        10: { cellWidth: 26 },
+        0: { cellWidth: 8 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 18 },
+        3: { cellWidth: 18 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 15 },
+        6: { cellWidth: 28 },
+        7: { cellWidth: 14 },
+        8: { cellWidth: 14 },
+        9: { cellWidth: 15 },
+        10: { cellWidth: 22 },
         11: { cellWidth: 22 },
+        12: { cellWidth: 18 },
+        13: { cellWidth: 20 },
       },
       margin: { left: 14, right: 14 },
     });
@@ -679,6 +683,7 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
               <th className="p-3">Invoice No</th>
               <th className="p-3">Purchase IDs</th>
+              <th className="p-3">Expense ID</th>
               <th
                 onClick={() => handleSort("balance")}
                 className="p-3 cursor-pointer select-none"
@@ -753,6 +758,15 @@ export default function StatementTable({ rows }) {
                       );
                     })()}
                   </td>
+                  <td className="p-3">
+                    {row.client_expense_id ? (
+                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded whitespace-nowrap">
+                        EXP#{row.client_expense_id}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
+                  </td>
                   <td
                     className="p-3 font-medium"
                     title={
@@ -784,7 +798,7 @@ export default function StatementTable({ rows }) {
               ))
             ) : (
               <tr>
-                <td colSpan="14" className="p-4 text-center text-gray-500">
+                <td colSpan="15" className="p-4 text-center text-gray-500">
                   No entries found.
                 </td>
               </tr>
@@ -851,6 +865,16 @@ export default function StatementTable({ rows }) {
                   </span>
                 );
               })()}
+            </div>
+            <div>
+              <strong>Expense ID:</strong>{" "}
+              {row.client_expense_id ? (
+                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">
+                  EXP#{row.client_expense_id}
+                </span>
+              ) : (
+                <span className="text-gray-400">—</span>
+              )}
             </div>
             <div>
               <strong>Balance:</strong>{" "}

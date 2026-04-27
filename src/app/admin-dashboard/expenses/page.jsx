@@ -33,10 +33,19 @@ export default async function ExpensesPage() {
 
   const conn = await getDbConnection();
 
+  // Ensure linked_statement_ids column exists in expenses table
+  try {
+    await conn.execute("SELECT linked_statement_ids FROM expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE expenses ADD COLUMN linked_statement_ids TEXT NULL");
+    } catch (__) {}
+  }
+
   // Direct query for all expenses (passing `username` as a parameter)
   const query = `SELECT ID, TravelDate, FromLocation, Tolocation,
             TicketCost, HotelCost, MealsCost, OtherExpenses,
-            approved_amount, payment_date, approval_status
+            approved_amount, payment_date, approval_status, linked_statement_ids
         FROM expenses
         WHERE username = ?
         ORDER BY TravelDate DESC;`;

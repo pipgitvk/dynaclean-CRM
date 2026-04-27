@@ -46,6 +46,15 @@ export default async function ExpensesPage() {
     console.log("🛠️ Connecting to DB...");
     conn = await getDbConnection();
     console.log("✅ DB connection successful");
+    
+    // Ensure linked_statement_ids column exists in expenses table
+    try {
+      await conn.execute("SELECT linked_statement_ids FROM expenses LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE expenses ADD COLUMN linked_statement_ids TEXT NULL");
+      } catch (__) {}
+    }
   } catch (dbErr) {
     console.error("❌ DB connection failed:", dbErr);
     return <p className="text-red-600 p-4">Database connection error</p>;
@@ -55,18 +64,29 @@ export default async function ExpensesPage() {
   const query = `
     SELECT ID, TravelDate, FromLocation, Tolocation,
            TicketCost, HotelCost, MealsCost, OtherExpenses,
-           approved_amount, payment_date, approval_status, username
+           approved_amount, payment_date, approval_status, username, linked_statement_ids
     FROM expenses
     ORDER BY TravelDate DESC
   `;
 
+  // ✅ Fetch active employees
+  const activeEmployeesQuery = `
+    SELECT username FROM rep_list WHERE status = 1
+  `;
+
   let rows = [];
+  let activeEmployees = [];
 
   try {
     console.log("📦 Fetching expenses...");
     const [results] = await conn.execute(query);
     rows = results;
     console.log("✅ Expenses fetched:", rows.length);
+
+    console.log("👥 Fetching active employees...");
+    const [empResults] = await conn.execute(activeEmployeesQuery);
+    activeEmployees = empResults.map(emp => emp.username);
+    console.log("✅ Active employees fetched:", activeEmployees.length);
   } catch (queryErr) {
     console.error("❌ Query failed:", queryErr);
     return <p className="text-red-600 p-4">Query error</p>;
@@ -81,7 +101,7 @@ export default async function ExpensesPage() {
         <h1 className="text-2xl font-bold text-gray-700">Expense Entries</h1>
       </div>
 
-      <ExpenseTable rows={rows} role={role} />
+      <ExpenseTable rows={rows} role={role} activeEmployeesList={activeEmployees} />
     </div>
   );
 }

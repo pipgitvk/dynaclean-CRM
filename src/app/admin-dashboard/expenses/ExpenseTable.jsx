@@ -3,21 +3,27 @@
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useState } from "react";
-import { Eye, CreditCard, Pencil } from "lucide-react";
+import { Eye, CreditCard, Pencil, Link2, Edit3 } from "lucide-react";
 import Modal from "./Model";
+import StatementLinkModal from "./StatementLinkModal";
 
-export default function ExpenseTable({ rows, role }) {
+export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedRowForLink, setSelectedRowForLink] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
-  // Get unique employees for the filter
-  const employees = Array.from(new Set(rows.map((row) => row.username))).filter(Boolean).sort();
+  // Get unique employees for the filter - filter by active list if provided
+  const employees = Array.from(new Set(rows.map((row) => row.username)))
+    .filter(Boolean)
+    .filter(username => !activeEmployeesList || activeEmployeesList.includes(username))
+    .sort();
 
   // Filter rows based on the search query, employee, date range, and status
   const filteredRows = rows.filter((row) => {
@@ -150,6 +156,10 @@ export default function ExpenseTable({ rows, role }) {
     // You can update state or fetch the rows again to reflect the change in the table.
     // Example: setRows(updatedRows);
     closeModal(); // Close the modal
+  };
+
+  const handleLinkSuccess = () => {
+    // Optionally refresh data if needed, but router.refresh() inside modal might handle it
   };
 
   return (
@@ -303,9 +313,37 @@ export default function ExpenseTable({ rows, role }) {
                             setIsModalOpen(true); // Open the modal
                           }}
                           className="text-green-600 hover:text-green-800 cursor-pointer"
+                          title="Process Payment"
                         >
                           <CreditCard size={16} />
                         </button>
+                      )}
+
+                      {/* Payment Link / Edit Button - Available for all roles if Approved */}
+                      {row.approval_status === "Approved" && (
+                        !row.linked_statement_ids || JSON.parse(row.linked_statement_ids || "[]").length === 0 ? (
+                          <button
+                            onClick={() => {
+                              setSelectedRowForLink(row);
+                              setIsLinkModalOpen(true);
+                            }}
+                            className="text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                            title="Payment Link"
+                          >
+                            <Link2 size={16} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setSelectedRowForLink(row);
+                              setIsLinkModalOpen(true);
+                            }}
+                            className="text-blue-500 hover:text-blue-700 cursor-pointer"
+                            title="Edit Payment Link"
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                        )
                       )}
                     </td>
                   </tr>
@@ -400,9 +438,37 @@ export default function ExpenseTable({ rows, role }) {
                       setIsModalOpen(true); // Open the modal
                     }}
                     className="text-green-600 hover:text-green-800 cursor-pointer"
+                    title="Process Payment"
                   >
                     <CreditCard size={16} />
                   </button>
+                )}
+
+                {/* Payment Link / Edit Button - Available for all roles if Approved */}
+                {row.approval_status === "Approved" && (
+                  !row.linked_statement_ids || JSON.parse(row.linked_statement_ids || "[]").length === 0 ? (
+                    <button
+                      onClick={() => {
+                        setSelectedRowForLink(row);
+                        setIsLinkModalOpen(true);
+                      }}
+                      className="text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                      title="Payment Link"
+                    >
+                      <Link2 size={16} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSelectedRowForLink(row);
+                        setIsLinkModalOpen(true);
+                      }}
+                      className="text-blue-500 hover:text-blue-700 cursor-pointer"
+                      title="Edit Payment Link"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -416,6 +482,13 @@ export default function ExpenseTable({ rows, role }) {
         row={selectedRow}
         role={role}
         onPaymentSuccess={handlePaymentSuccess}
+      />
+
+      <StatementLinkModal
+        isOpen={isLinkModalOpen}
+        closeModal={() => setIsLinkModalOpen(false)}
+        row={selectedRowForLink}
+        onLinkSuccess={handleLinkSuccess}
       />
     </div>
   );

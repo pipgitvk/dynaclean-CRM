@@ -5,14 +5,6 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, User, IndianRupee, ListChecks, ChevronRight, Search, LayoutList } from "lucide-react";
 
-function parseIdTokens(raw) {
-  if (raw == null || raw === "") return [];
-  return String(raw)
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 function buildSummary(rows) {
   const summaryMap = {};
   for (const row of rows) {
@@ -26,9 +18,7 @@ function buildSummary(rows) {
         group_name: group,
         totalAmount: 0,
         hasSubHead: false,
-        expenseIdSet: new Set(),
         expenseNameSet: new Set(),
-        statementTransIdSet: new Set(),
       };
     }
     const card = summaryMap[key];
@@ -36,18 +26,12 @@ function buildSummary(rows) {
     if (row.sub_head && String(row.sub_head).trim() !== "") {
       card.hasSubHead = true;
     }
-    if (row.id != null) card.expenseIdSet.add(String(row.id));
     const en = row.expense_name != null ? String(row.expense_name).trim() : "";
     if (en) card.expenseNameSet.add(en);
-    for (const tid of parseIdTokens(row.statement_trans_ids)) {
-      card.statementTransIdSet.add(tid);
-    }
   }
   return Object.values(summaryMap)
     .map((c) => {
-      const expenseIds = [...c.expenseIdSet].sort((a, b) => Number(a) - Number(b));
       const expenseNames = [...c.expenseNameSet].sort((a, b) => a.localeCompare(b));
-      const statementTransIds = [...c.statementTransIdSet].sort((a, b) => a.localeCompare(b));
       return {
         key: c.key,
         client_name: c.client_name,
@@ -55,8 +39,6 @@ function buildSummary(rows) {
         totalAmount: c.totalAmount,
         hasSubHead: c.hasSubHead,
         expenseNamesLabel: expenseNames.length ? expenseNames.join(", ") : "—",
-        expenseIdsLabel: expenseIds.length ? expenseIds.join(", ") : "—",
-        statementTransIdsLabel: statementTransIds.length ? statementTransIds.join(", ") : "—",
       };
     })
     .sort(
@@ -160,9 +142,7 @@ export default function ClientExpensesCardsClient({ rows }) {
                 <table className="min-w-full text-sm text-left">
                   <thead className="bg-slate-800 text-white">
                     <tr>
-                      <th className="p-3 font-medium">ID</th>
                       <th className="p-3 font-medium">Expense ref</th>
-                      <th className="p-3 font-medium">Trans. ID</th>
                       <th className="p-3 font-medium">Expense name</th>
                       <th className="p-3 font-medium">Client</th>
                       <th className="p-3 font-medium">Group</th>
@@ -173,9 +153,7 @@ export default function ClientExpensesCardsClient({ rows }) {
                   <tbody className="divide-y divide-gray-100">
                     {filteredRows.map((r) => (
                       <tr key={r.id} className="hover:bg-blue-50/40">
-                        <td className="p-3 text-gray-600">{r.id}</td>
                         <td className="p-3 font-mono text-xs text-gray-800">{r.transaction_id || "—"}</td>
-                        <td className="p-3 font-mono text-xs text-gray-800">{r.statement_trans_ids || "—"}</td>
                         <td className="p-3 text-gray-800">{r.expense_name || "—"}</td>
                         <td className="p-3 font-medium text-gray-800">{r.client_name || "—"}</td>
                         <td className="p-3 text-gray-600">{r.group_name || "—"}</td>
@@ -265,18 +243,6 @@ export default function ClientExpensesCardsClient({ rows }) {
                     <span className="font-medium text-gray-500 shrink-0">Expense name:</span>
                     <span className="break-words font-semibold text-gray-800" title={card.expenseNamesLabel}>
                       {card.expenseNamesLabel}
-                    </span>
-                  </div>
-                  <div className="flex gap-1.5 min-w-0">
-                    <span className="font-medium text-gray-500 shrink-0">Expense ID:</span>
-                    <span className="font-mono break-all" title={card.expenseIdsLabel}>
-                      {card.expenseIdsLabel}
-                    </span>
-                  </div>
-                  <div className="flex gap-1.5 min-w-0">
-                    <span className="font-medium text-gray-500 shrink-0">Trans. ID:</span>
-                    <span className="font-mono break-all" title={card.statementTransIdsLabel}>
-                      {card.statementTransIdsLabel}
                     </span>
                   </div>
                 </div>

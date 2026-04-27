@@ -31,7 +31,7 @@ export default async function ExpensesPage() {
     const [results] = await conn.execute(
       `SELECT ID, TravelDate, FromLocation, Tolocation,
               TicketCost, HotelCost, MealsCost, OtherExpenses,
-              approved_amount, payment_date, approval_status, username
+              approved_amount, payment_date, approval_status, username, linked_statement_ids
        FROM expenses 
        ORDER BY TravelDate DESC`
     );
