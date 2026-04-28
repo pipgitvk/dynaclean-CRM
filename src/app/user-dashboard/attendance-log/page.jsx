@@ -1,7 +1,9 @@
+// app/user-dashboard/attendance-log/page.jsx — UI aligned with EMPCRM admin attendance
 "use client";
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { Loader2, Search, Info, Pencil } from "lucide-react";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -12,6 +14,40 @@ import {
   isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
+import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
+import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
+
+function attendanceDateYmd(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "string") {
+    const s = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  }
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-CA");
+}
+
+/** HH:mm for <input type="time"> from a DB datetime string. */
+function timeInputFromDbValue(value) {
+  if (value == null || value === "") return "";
+  const s = String(value).trim();
+  const m = s.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return "";
+  const h = String(parseInt(m[1], 10)).padStart(2, "0");
+  const min = String(parseInt(m[2], 10)).padStart(2, "0");
+  return `${h}:${min}`;
+}
+
+function combineDateAndTimeForDb(dateYmd, timeHHmm) {
+  if (!dateYmd || !timeHHmm || String(timeHHmm).trim() === "") return null;
+  const t = String(timeHHmm).trim();
+  if (!/^\d{1,2}:\d{2}$/.test(t)) return null;
+  const [h, m] = t.split(":");
+  const hh = String(parseInt(h, 10)).padStart(2, "0");
+  const mm = String(parseInt(m, 10)).padStart(2, "0");
+  return `${dateYmd} ${hh}:${mm}:00`;
+}
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -20,12 +56,40 @@ const AttendancePage = () => {
   const [toDate, setToDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedUser, setSelectedUser] = useState("all");
+  /** Set only after clicking Search; drives summary + table */
+  const [appliedUserSelection, setAppliedUserSelection] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [uniqueUsers, setUniqueUsers] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [isHolidayModalOpen, setHolidayModalOpen] = useState(false);
+  const [breakEditLog, setBreakEditLog] = useState(null);
+  const [breakEditForm, setBreakEditForm] = useState({
+    break_morning_start: "",
+    break_morning_end: "",
+    break_lunch_start: "",
+    break_lunch_end: "",
+    break_evening_start: "",
+    break_evening_end: "",
+  });
+  const [breakEditSaving, setBreakEditSaving] = useState(false);
   const [rules, setRules] = useState(DEFAULT_ATTENDANCE_RULES);
+  /** Merged company + per-employee rules from fetch-all (keyed by username) */
   const [rulesByUsername, setRulesByUsername] = useState({});
+  const [regModalOpen, setRegModalOpen] = useState(false);
+  const [regModalLog, setRegModalLog] = useState(null);
+  const [regModalDateKey, setRegModalDateKey] = useState("");
+  const [regForUsername, setRegForUsername] = useState("");
+
+  const logDateKeyForReg = (log) =>
+    log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
+
+  const openAbsentRegularizeModal = (log) => {
+    setRegModalLog({ ...log, type: "absent" });
+    setRegModalDateKey(logDateKeyForReg(log));
+    setRegForUsername(log.username || "");
+    setRegModalOpen(true);
+  };
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -56,7 +120,6 @@ const AttendancePage = () => {
       setLogs([]);
       setHolidays([]);
       setLeaves([]);
-      setRulesByUsername({});
     } finally {
       setLoading(false);
     }
@@ -75,7 +138,7 @@ const AttendancePage = () => {
         const data = await res.json();
         if (!cancelled && data.rules) setRules(data.rules);
       } catch (e) {
-        console.error("attendance/rules:", e);
+        console.error("attendance-rules:", e);
       }
     })();
     return () => {
@@ -119,6 +182,16 @@ const AttendancePage = () => {
   const getCheckoutStatus = (logTime, username) =>
     checkoutStatusFromRules(logTime, rulesFor(username));
 
+  const isCheckinLate = (logTime) => {
+    const status = getCheckinStatus(logTime);
+    return status === "late" || status === "halfDay";
+  };
+
+  const isCheckoutEarly = (logTime) => {
+    const status = getCheckoutStatus(logTime);
+    return status === "late" || status === "halfDay";
+  };
+
   const getBreakStatus = (startTime, endTime, breakType, username) =>
     breakStatusFromRules(startTime, endTime, breakType, rulesFor(username));
 
@@ -128,6 +201,88 @@ const AttendancePage = () => {
     setFilterStatus("all");
     setFromDate("");
     setToDate("");
+  };
+
+  const handleSearch = () => {
+    setSearchLoading(true);
+    setAppliedUserSelection(null);
+    setTimeout(() => {
+      setAppliedUserSelection(selectedUser);
+      setSearchLoading(false);
+    }, 120);
+  };
+
+  const openBreakEditModal = (log) => {
+    setBreakEditLog(log);
+    setBreakEditForm({
+      break_morning_start: timeInputFromDbValue(log.break_morning_start),
+      break_morning_end: timeInputFromDbValue(log.break_morning_end),
+      break_lunch_start: timeInputFromDbValue(log.break_lunch_start),
+      break_lunch_end: timeInputFromDbValue(log.break_lunch_end),
+      break_evening_start: timeInputFromDbValue(log.break_evening_start),
+      break_evening_end: timeInputFromDbValue(log.break_evening_end),
+    });
+  };
+
+  const closeBreakEditModal = () => {
+    setBreakEditLog(null);
+    setBreakEditSaving(false);
+  };
+
+  const saveBreakEdits = async () => {
+    if (!breakEditLog) return;
+    const dateYmd = attendanceDateYmd(breakEditLog.date);
+    if (!dateYmd || !breakEditLog.username) {
+      toast.error("Invalid row.");
+      return;
+    }
+    setBreakEditSaving(true);
+    try {
+      const payload = {
+        username: breakEditLog.username,
+        date: dateYmd,
+        break_morning_start: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_morning_start
+        ),
+        break_morning_end: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_morning_end
+        ),
+        break_lunch_start: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_lunch_start
+        ),
+        break_lunch_end: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_lunch_end
+        ),
+        break_evening_start: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_evening_start
+        ),
+        break_evening_end: combineDateAndTimeForDb(
+          dateYmd,
+          breakEditForm.break_evening_end
+        ),
+      };
+      const res = await fetch("/api/empcrm/attendance/admin-edit-breaks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to save");
+      }
+      toast.success("Break times updated.");
+      closeBreakEditModal();
+      await fetchAttendance();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBreakEditSaving(false);
+    }
   };
 
   const generateAttendanceTimeline = (userLogs, user) => {
@@ -166,7 +321,6 @@ const AttendancePage = () => {
     leaves.filter(leave => leave.username === user).forEach((leave) => {
       const fromDate = new Date(leave.from_date);
       const toDate = new Date(leave.to_date);
-      // Add all dates in the leave range
       for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
         leaveMap.set(d.toLocaleDateString("en-CA"), leave);
       }
@@ -189,7 +343,7 @@ const AttendancePage = () => {
             type: "sunday",
             username: user,
             holidayTitle: "Sunday",
-            holidayDescription: null
+            holdayDescription: null
           });
         } else if (isHoliday) {
           // Official holiday
@@ -222,9 +376,11 @@ const AttendancePage = () => {
     return allDates;
   };
 
-  // Generate the full attendance timeline based on the selected user
+  // Generate the full attendance timeline based on the last Search (applied selection)
   let fullTimeline = [];
-  if (selectedUser === "all") {
+  if (appliedUserSelection == null) {
+    fullTimeline = [];
+  } else if (appliedUserSelection === "all") {
     const allUsersAttendance = uniqueUsers
       .filter((user) => user !== "all")
       .flatMap((user) => {
@@ -235,8 +391,8 @@ const AttendancePage = () => {
       (a, b) => new Date(b.date) - new Date(a.date)
     );
   } else {
-    const userLogs = logs.filter((log) => log.username === selectedUser);
-    fullTimeline = generateAttendanceTimeline(userLogs, selectedUser).reverse();
+    const userLogs = logs.filter((log) => log.username === appliedUserSelection);
+    fullTimeline = generateAttendanceTimeline(userLogs, appliedUserSelection).reverse();
   }
 
   // Apply filters to the complete timeline
@@ -289,11 +445,15 @@ const AttendancePage = () => {
   );
 
   const handleDownload = async () => {
+    if (appliedUserSelection == null) {
+      toast.error("Please click Search to load data first.");
+      return;
+    }
     try {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Attendance Report");
 
-      // 1. Define Columns (Setting widths makes the Excel file look professional)
+      // Define columns to match your data structure
       worksheet.columns = [
         { header: "Date", key: "Date", width: 15 },
         { header: "User", key: "User", width: 20 },
@@ -307,7 +467,7 @@ const AttendancePage = () => {
         { header: "Checkout Address", key: "CheckoutAddress", width: 30 },
       ];
 
-      // 2. Map and Add Data Rows
+      // Map and add rows
       filteredLogs.forEach((log) => {
         worksheet.addRow({
           Date: new Date(log.date).toLocaleDateString(),
@@ -329,10 +489,10 @@ const AttendancePage = () => {
         });
       });
 
-      // 3. Optional: Style the header row (Make it bold)
+      // Style the header row to make it look professional
       worksheet.getRow(1).font = { bold: true };
 
-      // 4. Generate Buffer and Trigger Browser Download
+      // Generate the buffer and trigger download
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = window.URL.createObjectURL(blob);
@@ -344,7 +504,7 @@ const AttendancePage = () => {
 
       toast.success("Download successful!");
     } catch (error) {
-      console.error("Export Error:", error);
+      console.error("Export failed:", error);
       toast.error("Failed to generate Excel file.");
     }
   };
@@ -362,9 +522,60 @@ const AttendancePage = () => {
       <div className="container mx-auto p-4 md:p-8 max-w-7xl">
         <div className="bg-white shadow-md rounded-lg p-6 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-4 text-center">
-            Attendance Dashboard
+            Attendance details
           </h1>
 
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-center sm:gap-4">
+            <label className="flex flex-col gap-1 text-sm font-medium text-gray-700 sm:min-w-[200px]">
+              Employee
+              <select
+                value={selectedUser}
+                onChange={(e) => setSelectedUser(e.target.value)}
+                className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {uniqueUsers.map((user) => (
+                  <option key={user} value={user}>
+                    {user === "all" ? "All Users" : user}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={searchLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {searchLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              {searchLoading ? "Loading…" : "Search"}
+            </button>
+            <button
+              type="button"
+              onClick={openHolidayModal}
+              className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Holiday List
+            </button>
+            <AttendanceBulkImportPanel onComplete={fetchAttendance} />
+          </div>
+
+          {searchLoading ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-50/80 py-16 text-slate-600">
+              <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
+              <p className="mt-4 text-sm font-medium">Loading attendance…</p>
+              <p className="mt-1 text-xs text-slate-500">Preparing summary and records</p>
+            </div>
+          ) : appliedUserSelection === null ? (
+            <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12 text-center text-sm text-slate-600">
+              Default is <span className="font-medium">All Users</span>. Pick an employee if needed, then click{" "}
+              <span className="font-medium">Search</span> to load the summary and table.
+            </p>
+          ) : (
+            <>
           <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-green-600">
@@ -439,17 +650,6 @@ const AttendancePage = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="px-4 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {uniqueUsers.map((user) => (
-                  <option key={user} value={user}>
-                    {user === "all" ? "All Users" : user}
-                  </option>
-                ))}
-              </select>
               <button
                 onClick={handleShowAll}
                 className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all" && !fromDate && !toDate
@@ -506,16 +706,13 @@ const AttendancePage = () => {
               >
                 Download
               </button>
-              <button
-                onClick={openHolidayModal}
-                className="px-4 py-2 rounded-md font-medium text-sm bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                Holiday List
-              </button>
             </div>
           </div>
+            </>
+          )}
         </div>
 
+        {appliedUserSelection !== null && (
         <div className="h-[70vh] overflow-y-auto">
           {/* Card View for Mobile (md and below) */}
           <div className="grid grid-cols-1 gap-4 md:hidden">
@@ -623,13 +820,55 @@ const AttendancePage = () => {
                           {formatTime(log.checkout_time)}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-gray-900">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-gray-900 shrink-0">
                           Check-out Address:
                         </span>
-                        <span className="text-sm text-gray-700">
-                          {log.checkout_address}
+                        <span className="text-sm text-gray-700 flex items-center gap-1.5 justify-end text-right min-w-0">
+                          <span className="truncate">
+                            {log.checkout_address || "—"}
+                          </span>
+                          {log.regularization ? (
+                            <span className="relative inline-flex shrink-0 group/regm">
+                              <Info
+                                className="w-4 h-4 text-teal-600 cursor-help"
+                                aria-label="Regularization details"
+                              />
+                              <span className="absolute right-0 bottom-full mb-2 z-30 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-md shadow-lg opacity-0 invisible group-hover/regm:opacity-100 group-hover/regm:visible transition-all pointer-events-none">
+                                <div className="space-y-1.5 text-left whitespace-normal">
+                                  <p>
+                                    <span className="text-gray-400">
+                                      Username (created request):{" "}
+                                    </span>
+                                    {log.regularization.createdBy}
+                                  </p>
+                                  <p>
+                                    <span className="text-gray-400">
+                                      Reviewed by:{" "}
+                                    </span>
+                                    {log.regularization.approvedBy}
+                                  </p>
+                                  <p>
+                                    <span className="text-gray-400">
+                                      Reason:{" "}
+                                    </span>
+                                    {log.regularization.reason}
+                                  </p>
+                                </div>
+                              </span>
+                            </span>
+                          ) : null}
                         </span>
+                      </div>
+                      <div className="pt-2 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => openBreakEditModal(log)}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                        >
+                          <Pencil className="h-4 w-4" aria-hidden />
+                          Edit break times
+                        </button>
                       </div>
                     </>
                   ) : (
@@ -648,6 +887,17 @@ const AttendancePage = () => {
                       )}
                       {log.holidayDescription && (
                         <p className="text-xs text-gray-500 mt-1">{log.holidayDescription}</p>
+                      )}
+                      {log.type === "absent" && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => openAbsentRegularizeModal(log)}
+                            className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                          >
+                            Regularize
+                          </button>
+                        </div>
                       )}
                     </div>
                   )}
@@ -691,6 +941,9 @@ const AttendancePage = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check-out Address
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Edit breaks
                   </th>
                 </tr>
               </thead>
@@ -776,27 +1029,74 @@ const AttendancePage = () => {
                           >
                             {formatTime(log.checkout_time)}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-500 relative group">
-                            <span className="underline cursor-help">
-                              View Address
-                            </span>
-                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                              {log.checkout_address}
-                            </span>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="relative group/coaddr inline-block">
+                                <span className="underline cursor-help">
+                                  View Address
+                                </span>
+                                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md max-w-sm whitespace-normal opacity-0 group-hover/coaddr:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                  {log.checkout_address || "—"}
+                                </span>
+                              </span>
+                              {log.regularization ? (
+                                <span className="relative inline-flex group/coreg">
+                                  <Info
+                                    className="w-4 h-4 text-teal-600 cursor-help shrink-0"
+                                    aria-label="Regularization details"
+                                  />
+                                  <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-20 w-64 px-3 py-2 bg-gray-900 text-white text-xs rounded-md shadow-lg opacity-0 invisible group-hover/coreg:opacity-100 group-hover/coreg:visible transition-all pointer-events-none">
+                                    <div className="space-y-1.5 text-left whitespace-normal">
+                                      <p>
+                                        <span className="text-gray-400">
+                                          Username (created request):{" "}
+                                        </span>
+                                        {log.regularization.createdBy}
+                                      </p>
+                                      <p>
+                                        <span className="text-gray-400">
+                                          Reviewed by:{" "}
+                                        </span>
+                                        {log.regularization.approvedBy}
+                                      </p>
+                                      <p>
+                                        <span className="text-gray-400">
+                                          Reason:{" "}
+                                        </span>
+                                        {log.regularization.reason}
+                                      </p>
+                                    </div>
+                                  </span>
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <button
+                              type="button"
+                              onClick={() => openBreakEditModal(log)}
+                              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                              title="Edit morning, lunch, evening break times"
+                            >
+                              <Pencil className="h-3.5 w-3.5" aria-hidden />
+                              Edit
+                            </button>
                           </td>
                         </>
                       ) : (
                         <td
-                          colSpan="7"
+                          colSpan="8"
                           className={`px-6 py-4 text-center ${log.type === "absent"
                             ? "bg-orange-50 text-orange-700"
                             : log.type === "leave"
                               ? "bg-blue-50 text-blue-700"
-                              : "bg-green-50 text-green-700"
+                              : log.type === "sunday"
+                                ? "bg-purple-50 text-purple-700"
+                                : "bg-indigo-50 text-indigo-700"
                             }`}
                         >
                           <p className="font-bold text-lg">
-                            {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : "Holiday"}
+                            {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
                           </p>
                           {log.leaveType && (
                             <p className="text-sm mt-1 capitalize">{log.leaveType} Leave</p>
@@ -804,11 +1104,22 @@ const AttendancePage = () => {
                           {log.leaveReason && (
                             <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>
                           )}
-                          {log.holidayTitle && log.holidayTitle !== "Weekend" && (
+                          {log.holidayTitle && log.holidayTitle !== "Weekend" && log.holidayTitle !== "Sunday" && (
                             <p className="text-sm mt-1">{log.holidayTitle}</p>
                           )}
                           {log.holidayDescription && (
                             <p className="text-xs text-gray-500 mt-1">{log.holidayDescription}</p>
+                          )}
+                          {log.type === "absent" && (
+                            <div className="mt-3 flex justify-center">
+                              <button
+                                type="button"
+                                onClick={() => openAbsentRegularizeModal(log)}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                              >
+                                Regularize
+                              </button>
+                            </div>
                           )}
                         </td>
                       )}
@@ -817,7 +1128,7 @@ const AttendancePage = () => {
                 ) : (
                   <tr>
                     <td
-                      colSpan="9"
+                      colSpan="10"
                       className="px-6 py-4 text-center text-gray-500"
                     >
                       No attendance logs found for the selected filter.
@@ -828,7 +1139,104 @@ const AttendancePage = () => {
             </table>
           </div>
         </div>
+        )}
       </div>
+      {breakEditLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto p-4"
+            role="dialog"
+            aria-labelledby="break-edit-title"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 id="break-edit-title" className="text-lg font-semibold">
+                Edit break times
+              </h3>
+              <button
+                type="button"
+                onClick={closeBreakEditModal}
+                className="text-gray-500 hover:text-gray-800 text-xl leading-none"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              {breakEditLog.username} ·{" "}
+              {new Date(breakEditLog.date).toLocaleDateString()}
+            </p>
+            <p className="text-xs text-gray-500 mb-3">
+              Leave a field empty to clear that time. Times use the attendance
+              date (IST).
+            </p>
+            <div className="space-y-3">
+              {[
+                ["Morning break — start", "break_morning_start"],
+                ["Morning break — end", "break_morning_end"],
+                ["Lunch break — start", "break_lunch_start"],
+                ["Lunch break — end", "break_lunch_end"],
+                ["Evening break — start", "break_evening_start"],
+                ["Evening break — end", "break_evening_end"],
+              ].map(([label, key]) => (
+                <label
+                  key={key}
+                  className="flex flex-col gap-1 text-sm font-medium text-gray-700"
+                >
+                  {label}
+                  <input
+                    type="time"
+                    step={60}
+                    value={breakEditForm[key]}
+                    onChange={(e) =>
+                      setBreakEditForm((f) => ({
+                        ...f,
+                        [key]: e.target.value,
+                      }))
+                    }
+                    className="rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeBreakEditModal}
+                disabled={breakEditSaving}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveBreakEdits}
+                disabled={breakEditSaving}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-70"
+              >
+                {breakEditSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <AttendanceRegularizeModal
+        open={regModalOpen}
+        log={regModalLog}
+        logDateKey={regModalDateKey}
+        forUsername={regForUsername || undefined}
+        onClose={() => {
+          setRegModalOpen(false);
+          setRegModalLog(null);
+          setRegModalDateKey("");
+          setRegForUsername("");
+        }}
+        onSubmitted={() => {
+          fetchAttendance();
+        }}
+      />
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-4">

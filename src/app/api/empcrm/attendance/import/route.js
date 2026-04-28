@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseImportDateToYmd } from "@/lib/attendanceImportParse";
+import { canBulkImportAttendance } from "@/lib/attendanceBulkImportRoles";
 
 /**
  * Match rep_list.username, then employee_profiles.full_name (exact, case-insensitive).
@@ -44,8 +45,6 @@ async function resolveEmployeeUsername(conn, raw) {
   return { ok: false, message: `Unknown or inactive employee: ${q}` };
 }
 
-const HR_ATTENDANCE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
-
 const TIME_FIELDS = [
   "checkin_time",
   "checkout_time",
@@ -56,10 +55,6 @@ const TIME_FIELDS = [
   "break_evening_start",
   "break_evening_end",
 ];
-
-function isHrRole(role) {
-  return role != null && HR_ATTENDANCE_ROLES.includes(String(role));
-}
 
 function normalizeMysqlDatetime(s) {
   if (s == null || String(s).trim() === "") return null;
@@ -99,7 +94,7 @@ export async function POST(request) {
     if (!payload) {
       return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
     }
-    if (!isHrRole(payload.role)) {
+    if (!canBulkImportAttendance(payload.role)) {
       return NextResponse.json(
         { message: "Only HR / SUPERADMIN can import attendance." },
         { status: 403 }
