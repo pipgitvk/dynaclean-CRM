@@ -117,7 +117,7 @@ export default function AttendanceBulkImportPanel({
         {importLoading ? "Importing…" : "Import"}
       </button>
       <a
-        href="/attendance_import_template.csv"
+        href="/api/attendance/import-template"
         download="attendance_import_template.csv"
         className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
       >
