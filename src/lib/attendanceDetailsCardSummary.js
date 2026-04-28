@@ -6,7 +6,7 @@
 import {
   classifyAttendanceDayForSalary,
 } from "@/lib/attendanceRulesEngine";
-import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
+import { dateToYmdKey, weeklyOffSundayCountsAsPaid, isSalaryMonthFullyElapsed } from "@/lib/salaryPayDaysFromAttendance";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
 function startOfDay(d) {
@@ -38,14 +38,15 @@ function buildLeaveMapForUser(leaves, username) {
  * @param {Array} p.logs - attendance rows for the month
  * @param {Array} p.holidaysAll
  * @param {Array} p.leavesAll - approved leaves
- * @param {import("@/lib/attendanceRulesEngine").AttendanceRulesShape} p.rules
+ * @param {string|Date|null|undefined} [p.dateOfJoining]
  */
 export function computeAttendanceDetailsCardSummaryForMonth(p) {
-  const { monthStr, username, logs, holidaysAll, leavesAll, rules } = p;
+  const { monthStr, username, logs, holidaysAll, leavesAll, rules, dateOfJoining } = p;
   const [y, m] = monthStr.split("-").map(Number);
   const monthIndex = m - 1;
   const daysInMonth = new Date(y, monthIndex + 1, 0).getDate();
   const today = startOfDay(new Date());
+  const payrollMonthElapsed = isSalaryMonthFullyElapsed(monthStr, today);
 
   const holidayMap = new Map();
   for (const h of holidaysAll || []) {
@@ -61,6 +62,16 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
 
   const leaveMap = buildLeaveMapForUser(leavesAll, username);
 
+  let dojValid = false;
+  let doj = null;
+  if (dateOfJoining != null && String(dateOfJoining).trim() !== "") {
+    const parsed = startOfDay(new Date(dateOfJoining));
+    if (!Number.isNaN(parsed.getTime())) {
+      doj = parsed;
+      dojValid = true;
+    }
+  }
+
   const summary = {
     present: 0,
     absents: 0,
@@ -75,7 +86,8 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, monthIndex, day);
     const cellDate = startOfDay(d);
-    if (cellDate > today) continue;
+    if (!payrollMonthElapsed && cellDate > today) continue;
+    if (dojValid && cellDate < doj) continue;
 
     const dateString = `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const existingLog = dateMap.get(dateString);
@@ -85,14 +97,26 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
 
     const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
     if (existingLog && hasRealPunch) {
-      summary.present++;
+      // Match payroll (`computeSalaryPayDaysForUser`): only "regular" is a full credit day.
       const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
       freeGraceUsed = cls.freeGraceUsed;
       if (cls.kind === "lateDay") summary.lateDays++;
-    } else if (isWeekend) {
-      summary.sundays++;
+      else summary.present++;
     } else if (isHoliday) {
       summary.holidays++;
+    } else if (isWeekend) {
+      if (
+        weeklyOffSundayCountsAsPaid(dateString, {
+          holidayMap,
+          dateMap,
+          today,
+          dateOfJoining,
+        })
+      ) {
+        summary.sundays++;
+      } else {
+        summary.absents++;
+      }
     } else if (isOnLeave) {
       summary.leaves++;
     } else {

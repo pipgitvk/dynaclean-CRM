@@ -18,10 +18,12 @@ import {
   computeSpecialAllowanceFromGross,
   computeBasicHraFromGrossSalary,
   floorInr,
+  proRataMonthlyStructuralLine,
   getEffectiveGrossSalary,
   applyStatutoryDeductionsFromStructure,
   isHealthInsuranceDeductionRow,
 } from "@/lib/salaryGrossSpecialAllowance";
+import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
 
 function normalizeUserKey(value) {
   return String(value ?? "")
@@ -107,8 +109,12 @@ async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultS
     hra = structBasic > 0 ? floorInr((structHra / structBasic) * basicSalary) : 0;
   }
 
-  const transportAllowance = floorInr(structTransport);
-  const medicalAllowance = floorInr(structMedical);
+  const transportAllowance = hasGross
+    ? proRataMonthlyStructuralLine(structTransport, workingDays, presentDays)
+    : floorInr(structTransport);
+  const medicalAllowance = hasGross
+    ? proRataMonthlyStructuralLine(structMedical, workingDays, presentDays)
+    : floorInr(structMedical);
   const specialAllowance = computeSpecialAllowanceFromGross({
     grossSalary: hasGross ? effectiveGross : null,
     workingDays,
@@ -287,13 +293,18 @@ export async function GET(request) {
       "SELECT username FROM rep_list WHERE status = 1 ORDER BY username"
     );
 
+    const logRange = getPayrollAttendanceLogDateRange(salaryMonth);
+    if (!logRange) {
+      return NextResponse.json({ success: false, message: "Invalid salary month." }, { status: 400 });
+    }
+
     const [attendanceRows] = await db.query(
       `SELECT username, date, checkin_time, checkout_time,
         break_morning_start, break_morning_end,
         break_lunch_start, break_lunch_end,
         break_evening_start, break_evening_end
-      FROM attendance_logs WHERE date LIKE ?`,
-      [`${salaryMonth}%`]
+      FROM attendance_logs WHERE date >= ? AND date <= ?`,
+      [logRange.from, logRange.to]
     );
     const logsByUser = {};
     for (const row of attendanceRows) {

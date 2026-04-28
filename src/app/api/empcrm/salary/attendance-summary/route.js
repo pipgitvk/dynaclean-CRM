@@ -9,6 +9,7 @@ import {
 } from "@/lib/attendanceRulesDb";
 import { computeSalaryPayDaysForUser } from "@/lib/salaryPayDaysFromAttendance";
 import { computeAttendanceDetailsCardSummaryForMonth } from "@/lib/attendanceDetailsCardSummary";
+import { getPayrollAttendanceLogDateRange } from "@/lib/payrollLogDateRange";
 
 function normalizeUserKey(value) {
   return String(value ?? "")
@@ -45,6 +46,7 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     holidaysAll: holidays,
     leavesAll: leaves,
     rules,
+    dateOfJoining: emp.date_of_joining ?? null,
   });
 
   return {
@@ -52,6 +54,8 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     full_name: emp.full_name,
     attendance_cards,
     present_days: stats.present,
+    total_punched_days:
+      stats.total_punched_days != null ? Number(stats.total_punched_days) : stats.present + stats.late_days,
     half_day_count: stats.half_day,
     late_day_count: stats.late_days,
     sunday_count: stats.sunday,
@@ -73,6 +77,12 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
       stats.total_attendance != null ? Number(stats.total_attendance) : null,
     pay_deduction_days:
       stats.deduction_days != null ? Number(stats.deduction_days) : null,
+    pay_days_base:
+      stats.pay_days_base != null ? Number(stats.pay_days_base) : null,
+    pay_sundays_unpaid_whole_week_off:
+      stats.sundays_unpaid_whole_week_off != null
+        ? Number(stats.sundays_unpaid_whole_week_off)
+        : null,
     attendance_log_days: logs.length,
     dates_worked: logs.map((l) => l.date),
     sunday_worked_dates: stats.sunday_worked_dates,
@@ -92,6 +102,11 @@ export async function GET(request) {
 
     if (!month) {
       return NextResponse.json({ message: "Month is required." }, { status: 400 });
+    }
+
+    const logRange = getPayrollAttendanceLogDateRange(month);
+    if (!logRange) {
+      return NextResponse.json({ message: "Invalid month format." }, { status: 400 });
     }
 
     const db = await getDbConnection();
@@ -149,9 +164,10 @@ export async function GET(request) {
         FROM attendance_logs a
         INNER JOIN rep_list r
           ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
-        WHERE r.status = 1 AND r.username = ? AND a.date LIKE ?
+        WHERE r.status = 1 AND r.username = ?
+          AND a.date >= ? AND a.date <= ?
       `,
-        [emp.username, `${month}%`]
+        [emp.username, logRange.from, logRange.to]
       );
 
       const summary = mapOneEmployeeSummary(emp, attendance, holidays, leaves, globalRules, scheduleByUser);
@@ -184,9 +200,9 @@ export async function GET(request) {
       `
       SELECT ${ATT_SELECT}
       FROM attendance_logs 
-      WHERE date LIKE ? 
+      WHERE date >= ? AND date <= ?
     `,
-      [`${month}%`]
+      [logRange.from, logRange.to]
     );
 
     const logsByUser = {};

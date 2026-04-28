@@ -14,6 +14,7 @@ import {
   isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
+import { weeklyOffSundayCountsAsPaid } from "@/lib/salaryPayDaysFromAttendance";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
 import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
@@ -343,15 +344,7 @@ const AttendancePage = () => {
         const base = existingLog
           ? { ...existingLog, username: existingLog.username || user }
           : { username: user };
-        if (isWeekend) {
-          allDates.push({
-            ...base,
-            date: d.toISOString(),
-            type: "sunday",
-            holidayTitle: "Sunday",
-            holidayDescription: null,
-          });
-        } else if (isHoliday) {
+        if (isHoliday) {
           const holidayInfo = holidayMap.get(dateString);
           allDates.push({
             ...base,
@@ -360,6 +353,26 @@ const AttendancePage = () => {
             holidayTitle: holidayInfo?.title || "Holiday",
             holidayDescription: holidayInfo?.description || null,
           });
+        } else if (isWeekend) {
+          const paidWeeklyOff = weeklyOffSundayCountsAsPaid(dateString, {
+            holidayMap,
+            dateMap,
+          });
+          if (paidWeeklyOff) {
+            allDates.push({
+              ...base,
+              date: d.toISOString(),
+              type: "sunday",
+              holidayTitle: "Sunday",
+              holidayDescription: null,
+            });
+          } else {
+            allDates.push({
+              ...base,
+              date: d.toISOString(),
+              type: "absent",
+            });
+          }
         } else if (isOnLeave) {
           const leaveInfo = leaveMap.get(dateString);
           allDates.push({
