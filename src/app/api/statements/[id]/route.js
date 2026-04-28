@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getDbConnection } from "@/lib/db";
 import { jwtVerify } from "jose";
 import {
@@ -8,6 +9,10 @@ import {
 } from "@/lib/statementClientExpenseLink";
 import { revalidateClientExpensePages } from "@/lib/revalidateClientExpensePages";
 import { resetMysqlAutoIncrementIfEmpty } from "@/lib/resetMysqlAutoIncrementIfEmpty";
+import {
+  deriveStatementInvoiceStatus,
+  parseLinkedPurchaseTokens,
+} from "@/lib/statementLinkedPurchases";
 
 export async function GET(req, { params }) {
   try {
@@ -139,8 +144,22 @@ export async function PUT(req, { params }) {
 
     try {
       await conn.beginTransaction();
+      try {
+        await conn.execute("SELECT linked_purchase_ids FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await conn.execute("ALTER TABLE statements ADD COLUMN linked_purchase_ids TEXT NULL");
+        } catch (__) {}
+      }
+      try {
+        await conn.execute("SELECT invoice_status FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await conn.execute("ALTER TABLE statements ADD COLUMN invoice_status VARCHAR(50) NULL");
+        } catch (__) {}
+      }
       const [prevRows] = await conn.execute(
-        `SELECT client_expense_id, trans_id FROM statements WHERE id = ?`,
+        `SELECT client_expense_id, trans_id, linked_purchase_ids FROM statements WHERE id = ?`,
         [id],
       );
       const prev = prevRows?.[0];
@@ -161,10 +180,14 @@ export async function PUT(req, { params }) {
         formEid != null && prevEid != null && Number(formEid) === Number(prevEid);
 
       if (sameLink) {
+        const nextInvoiceStatus = deriveStatementInvoiceStatus(
+          prev?.linked_purchase_ids,
+          formEid,
+        );
         const [result] = await conn.execute(
           `UPDATE statements SET
         trans_id = ?, date = ?, txn_dated_deb = ?, txn_posted_date = ?, cheq_no = ?,
-        description = ?, type = ?, amount = ?, client_expense_id = ?, expense_allocation = ?
+        description = ?, type = ?, amount = ?, client_expense_id = ?, expense_allocation = ?, invoice_status = ?
        WHERE id = ?`,
           [
             trans_id,
@@ -177,6 +200,7 @@ export async function PUT(req, { params }) {
             newAmt,
             formEid,
             expenseAllocationJson,
+            nextInvoiceStatus,
             id,
           ],
         );
@@ -230,10 +254,14 @@ export async function PUT(req, { params }) {
           }
         }
 
+        const nextInvoiceStatus = deriveStatementInvoiceStatus(
+          prev?.linked_purchase_ids,
+          finalExpenseId,
+        );
         const [result] = await conn.execute(
           `UPDATE statements SET
         trans_id = ?, date = ?, txn_dated_deb = ?, txn_posted_date = ?, cheq_no = ?,
-        description = ?, type = ?, amount = ?, client_expense_id = ?, expense_allocation = ?
+        description = ?, type = ?, amount = ?, client_expense_id = ?, expense_allocation = ?, invoice_status = ?
        WHERE id = ?`,
           [
             trans_id,
@@ -246,6 +274,7 @@ export async function PUT(req, { params }) {
             newAmt,
             finalExpenseId,
             expenseAllocationJson,
+            nextInvoiceStatus,
             id,
           ],
         );
@@ -264,6 +293,9 @@ export async function PUT(req, { params }) {
     }
 
     revalidateClientExpensePages([...revalidateExpenseIds]);
+    try {
+      revalidatePath("/admin-dashboard/statements");
+    } catch (_) {}
 
     const poolAfter = await getDbConnection();
     const connReset = await poolAfter.getConnection();
@@ -342,30 +374,7 @@ export async function PATCH(req, { params }) {
         return NextResponse.json({ error: "Statement not found" }, { status: 404 });
       }
 
-      const parseTokens = (rawVal) => {
-        if (rawVal == null || String(rawVal).trim() === "") return [];
-        let arr = null;
-        try {
-          const parsed = JSON.parse(String(rawVal));
-          if (Array.isArray(parsed)) arr = parsed;
-        } catch {
-          arr = String(rawVal).split(",").map(s => s.trim()).filter(Boolean);
-        }
-        const out = [];
-        for (const v of arr) {
-          if (v == null) continue;
-          const s = String(v).trim().toUpperCase();
-          if (!s) continue;
-          if (/^(PP|PS|SP)\d+$/.test(s)) {
-            out.push(s.startsWith("SP") ? `PS${s.slice(2)}` : s);
-          } else if (/^\d+$/.test(s)) {
-            out.push(`PP${s}`);
-          }
-        }
-        return out;
-      };
-
-      let currentTokens = parseTokens(rows[0]?.linked_purchase_ids);
+      let currentTokens = parseLinkedPurchaseTokens(rows[0]?.linked_purchase_ids);
       const token = `${purchaseType}${purchaseId}`;
 
       if (action === "link") {

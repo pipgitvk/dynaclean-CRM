@@ -132,9 +132,10 @@ export default function StatementTable({ rows }) {
   const displayInvoiceStatus = (row) => {
     const linked = getLinkedPurchaseRefs(row);
     const inv = row?.invoice_status != null ? String(row.invoice_status).trim() : "";
-    if ((inv === "" || inv === "Unsettled") && linked.length > 0) return "Settled";
+    if (linked.length > 0) return "Settled";
+    if (row?.client_expense_id) return "Settled";
     if (inv) return inv;
-    return row?.client_expense_id ? "Settled" : "Unsettled";
+    return "Unsettled";
   };
 
   useEffect(() => {

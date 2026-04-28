@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { resetMysqlAutoIncrementIfEmpty } from "@/lib/resetMysqlAutoIncrementIfEmpty";
+import { revalidateClientExpensePages } from "@/lib/revalidateClientExpensePages";
+import { parseLinkedPurchaseTokens } from "@/lib/statementLinkedPurchases";
+import { revalidatePath } from "next/cache";
 import { jwtVerify } from "jose";
 
 export async function GET(req, { params }) {
@@ -152,17 +155,70 @@ export async function DELETE(req, { params }) {
     await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
     const { id } = await params;
-    const conn = await getDbConnection();
-
-    await conn.execute("UPDATE statements SET client_expense_id = NULL WHERE client_expense_id = ?", [id]);
-    await conn.execute("DELETE FROM client_expense_sub_heads WHERE client_expense_id = ?", [id]);
-    const [result] = await conn.execute("DELETE FROM client_expenses WHERE id = ?", [id]);
-
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: "Client expense not found" }, { status: 404 });
+    const expenseId = Number(id);
+    if (!Number.isFinite(expenseId) || expenseId < 1) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
-    await resetMysqlAutoIncrementIfEmpty(conn, "client_expenses");
+    const pool = await getDbConnection();
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      try {
+        await conn.execute("SELECT invoice_status FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await conn.execute("ALTER TABLE statements ADD COLUMN invoice_status VARCHAR(50) NULL");
+        } catch (__) {}
+      }
+      try {
+        await conn.execute("SELECT expense_allocation FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await conn.execute(
+            "ALTER TABLE statements ADD COLUMN expense_allocation TEXT NULL AFTER client_expense_id",
+          );
+        } catch (__) {}
+      }
+
+      const [stmtRows] = await conn.execute(
+        `SELECT id, linked_purchase_ids FROM statements WHERE client_expense_id = ?`,
+        [expenseId],
+      );
+
+      for (const row of stmtRows) {
+        const tokens = parseLinkedPurchaseTokens(row.linked_purchase_ids);
+        const nextStatus = tokens.length > 0 ? "Settled" : "Unsettled";
+        await conn.execute(
+          `UPDATE statements SET client_expense_id = NULL, expense_allocation = NULL, invoice_status = ? WHERE id = ?`,
+          [nextStatus, row.id],
+        );
+      }
+
+      await conn.execute("DELETE FROM client_expense_sub_heads WHERE client_expense_id = ?", [
+        expenseId,
+      ]);
+      const [result] = await conn.execute("DELETE FROM client_expenses WHERE id = ?", [expenseId]);
+
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        return NextResponse.json({ error: "Client expense not found" }, { status: 404 });
+      }
+
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
+
+    await resetMysqlAutoIncrementIfEmpty(pool, "client_expenses");
+    try {
+      revalidatePath("/admin-dashboard/statements");
+      revalidateClientExpensePages([expenseId]);
+    } catch (_) {}
 
     return NextResponse.json({ success: true });
   } catch (err) {
