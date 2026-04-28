@@ -13,6 +13,7 @@ import {
   computeSpecialAllowanceFromGross,
   computeBasicHraFromGrossSalary,
   floorInr,
+  proRataMonthlyStructuralLine,
   getEffectiveGrossSalary,
   applyStatutoryDeductionsFromStructure,
   isHealthInsuranceDeductionRow,
@@ -171,12 +172,19 @@ const GenerateSalaryPage = () => {
                             return date.getDay() === 0;
                         });
                     }
+                    const lateN = Number(empAtt.late_day_count) || 0;
+                    const presN = Number(empAtt.present_days) || 0;
+                    const totalPunched =
+                        empAtt.total_punched_days != null && empAtt.total_punched_days !== ""
+                            ? Number(empAtt.total_punched_days)
+                            : presN + lateN;
                     setAttendanceBreakdown({
                         month: selectedMonth,
                         cards: empAtt.attendance_cards || null,
-                        present: Number(empAtt.present_days) || 0,
+                        present: presN,
+                        totalPunchedDays: totalPunched,
                         halfDay: Number(empAtt.half_day_count) || 0,
-                        lateDay: Number(empAtt.late_day_count) || 0,
+                        lateDay: lateN,
                         weekendOff: Number(empAtt.weekend_off_count) || 0,
                         holiday: Number(empAtt.holiday_count) || 0,
                         lop: Number(empAtt.lop_count) || 0,
@@ -194,9 +202,20 @@ const GenerateSalaryPage = () => {
                                           Number(empAtt.pay_required_working_days) || 0,
                                       totalAttendance: Number(empAtt.pay_total_attendance) || 0,
                                       deductionDays: Number(empAtt.pay_deduction_days) || 0,
-                                      salaryFullDays: Number(empAtt.present_days) || 0,
+                                      payDaysBase:
+                                          empAtt.pay_days_base != null && empAtt.pay_days_base !== ""
+                                              ? Number(empAtt.pay_days_base)
+                                              : Number(empAtt.pay_period_days) -
+                                                (Number(empAtt.pay_deduction_days) || 0),
+                                      sundaysUnpaidWholeWeekOff:
+                                          empAtt.pay_sundays_unpaid_whole_week_off != null &&
+                                          empAtt.pay_sundays_unpaid_whole_week_off !== ""
+                                              ? Number(empAtt.pay_sundays_unpaid_whole_week_off)
+                                              : 0,
+                                      salaryFullDays: presN,
                                       salaryHalfDays: Number(empAtt.half_day_count) || 0,
-                                      salaryLateDays: Number(empAtt.late_day_count) || 0,
+                                      salaryLateDays: lateN,
+                                      totalPunchedDays: totalPunched,
                                   }
                                 : null,
                     });
@@ -315,8 +334,12 @@ const GenerateSalaryPage = () => {
               : 0;
         }
 
-        const transportAllowance = floorInr(structTransport);
-        const medicalAllowance = floorInr(structMedical);
+        const transportAllowance = hasGross
+          ? proRataMonthlyStructuralLine(structTransport, workingDays, presentDays)
+          : floorInr(structTransport);
+        const medicalAllowance = hasGross
+          ? proRataMonthlyStructuralLine(structMedical, workingDays, presentDays)
+          : floorInr(structMedical);
         const specialAllowance = computeSpecialAllowanceFromGross({
           grossSalary: hasGross ? effectiveGross : null,
           workingDays: workingDays,
@@ -706,9 +729,23 @@ const GenerateSalaryPage = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Present Days</label>
                                 <input
                                     type="number"
+                                    min={0}
+                                    step={1}
                                     value={formData.present_days}
-                                    disabled
-                                    className="w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
+                                    disabled={isLocked}
+                                    onChange={(e) => {
+                                        const raw = e.target.value;
+                                        const n =
+                                            raw === ""
+                                                ? 0
+                                                : Math.max(0, parseInt(raw, 10) || 0);
+                                        setFormData((prev) => ({ ...prev, present_days: n }));
+                                    }}
+                                    className={
+                                        isLocked
+                                            ? "w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
+                                            : "w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                                    }
                                 />
                             </div>
                             <div>
@@ -840,26 +877,36 @@ const GenerateSalaryPage = () => {
                                         </span>
                                     </li>
                                     <li>
-                                        Total attendance (salary rules) = full days + (late days ÷ 2) ={" "}
-                                        {formatPayCalcNumber(
-                                            attendanceDisplayAllZero
-                                                ? 0
-                                                : attendanceBreakdown.payCalc.salaryFullDays
-                                        )}{" "}
-                                        + (
-                                        {formatPayCalcNumber(
-                                            attendanceDisplayAllZero
-                                                ? 0
-                                                : (Number(attendanceBreakdown.payCalc.salaryHalfDays) || 0) +
-                                                  (Number(attendanceBreakdown.payCalc.salaryLateDays) || 0)
-                                        )}{" "}
-                                        ÷ 2) ={" "}
+                                        Total attendance (salary credits) =
+                                        Mon–Sat (non‑holiday) punched: 1 per day,
+                                        {" "}
+                                        0.5 only for structural half-day (e.g. no checkout via rules).
+                                        Raw sum ={" "}
                                         <span className="font-semibold text-purple-800 tabular-nums">
                                             {formatPayCalcNumber(
                                                 attendanceDisplayAllZero
                                                     ? 0
                                                     : attendanceBreakdown.payCalc.totalAttendance
                                             )}
+                                        </span>
+                                        <span className="block text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                            Rules split: regular {formatPayCalcNumber(
+                                                attendanceBreakdown.payCalc.salaryFullDays || 0,
+                                            )}
+                                            , late/other rule {formatPayCalcNumber(
+                                                attendanceBreakdown.payCalc.salaryLateDays || 0,
+                                            )}
+                                            → total days with punch{" "}
+                                            <span className="font-semibold text-slate-700">
+                                                {formatPayCalcNumber(
+                                                    attendanceBreakdown.payCalc.totalPunchedDays ?? 0,
+                                                )}
+                                            </span>{" "}
+                                            (Attendance log “Present” is this total when month & range
+                                            match). Half-day (structural) {formatPayCalcNumber(
+                                                attendanceBreakdown.payCalc.salaryHalfDays || 0,
+                                            )}
+                                            . Pay-days credit uses the weighted sum above — not “late ÷ 2”.
                                         </span>
                                     </li>
                                     <li>
@@ -872,24 +919,79 @@ const GenerateSalaryPage = () => {
                                             )}
                                         </span>
                                     </li>
+                                    <li>
+                                        Pay days (before weekly-off rule) = period − deduction ={" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.payDaysBase
+                                            )}
+                                        </span>
+                                    </li>
+                                    {(attendanceDisplayAllZero
+                                        ? 0
+                                        : Number(attendanceBreakdown.payCalc.sundaysUnpaidWholeWeekOff) ||
+                                          0) > 0 && (
+                                        <li>
+                                            Weekly-off Sundays unpaid (no Mon–Sat punch that week) ={" "}
+                                            <span className="font-semibold tabular-nums text-amber-800">
+                                                {formatPayCalcNumber(
+                                                    attendanceDisplayAllZero
+                                                        ? 0
+                                                        : attendanceBreakdown.payCalc
+                                                              .sundaysUnpaidWholeWeekOff
+                                                )}
+                                            </span>
+                                        </li>
+                                    )}
                                     <li className="pt-1 border-t border-purple-200/80 text-slate-800">
-                                        Pay days (for salary) = period − deduction ={" "}
-                                        <span className="font-semibold tabular-nums">
-                                            {formatPayCalcNumber(
-                                                attendanceDisplayAllZero
-                                                    ? 0
-                                                    : attendanceBreakdown.payCalc.periodDays
-                                            )}
-                                        </span>{" "}
-                                        −{" "}
-                                        <span className="font-semibold tabular-nums">
-                                            {formatPayCalcNumber(
-                                                attendanceDisplayAllZero
-                                                    ? 0
-                                                    : attendanceBreakdown.payCalc.deductionDays
-                                            )}
-                                        </span>{" "}
-                                        ={" "}
+                                        Pay days (for salary) ={" "}
+                                        {(attendanceDisplayAllZero
+                                            ? 0
+                                            : Number(attendanceBreakdown.payCalc.sundaysUnpaidWholeWeekOff) ||
+                                              0) > 0 ? (
+                                            <>
+                                                pay days before rule − weekly-off unpaid ={" "}
+                                                <span className="font-semibold tabular-nums">
+                                                    {formatPayCalcNumber(
+                                                        attendanceDisplayAllZero
+                                                            ? 0
+                                                            : attendanceBreakdown.payCalc.payDaysBase
+                                                    )}
+                                                </span>{" "}
+                                                −{" "}
+                                                <span className="font-semibold tabular-nums">
+                                                    {formatPayCalcNumber(
+                                                        attendanceDisplayAllZero
+                                                            ? 0
+                                                            : attendanceBreakdown.payCalc
+                                                                  .sundaysUnpaidWholeWeekOff
+                                                    )}
+                                                </span>{" "}
+                                                ={" "}
+                                            </>
+                                        ) : (
+                                            <>
+                                                period − deduction ={" "}
+                                                <span className="font-semibold tabular-nums">
+                                                    {formatPayCalcNumber(
+                                                        attendanceDisplayAllZero
+                                                            ? 0
+                                                            : attendanceBreakdown.payCalc.periodDays
+                                                    )}
+                                                </span>{" "}
+                                                −{" "}
+                                                <span className="font-semibold tabular-nums">
+                                                    {formatPayCalcNumber(
+                                                        attendanceDisplayAllZero
+                                                            ? 0
+                                                            : attendanceBreakdown.payCalc.deductionDays
+                                                    )}
+                                                </span>{" "}
+                                                ={" "}
+                                            </>
+                                        )}
                                         <span className="font-bold text-purple-800 tabular-nums">
                                             {formatPayCalcNumber(
                                                 attendanceDisplayAllZero
@@ -939,11 +1041,19 @@ const GenerateSalaryPage = () => {
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between gap-2 text-slate-500">
-                                                        <span>LOP(Loss-of-pay)</span>
+                                                        <span>Late (salary rules)</span>
                                                         <span className="tabular-nums font-medium text-red-600">
                                                             {z(c.lateDays)}
                                                         </span>
                                                     </div>
+                                                </div>
+                                                <div className="flex justify-between gap-2 mt-1.5 pt-1 border-t border-slate-100/80 text-slate-700">
+                                                    <span className="text-xs font-medium">Total days with punch (= regular + late rules)</span>
+                                                    <span className="tabular-nums font-semibold">
+                                                        {attendanceDisplayAllZero
+                                                            ? 0
+                                                            : z(c.present) + z(c.lateDays)}
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">

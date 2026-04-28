@@ -49,13 +49,20 @@ export default function AttendanceBulkImportPanel({
       const placeholderUsers = new Set([
         "replace_with_username",
         "your_username",
+        "replace_with_username_1",
+        "replace_with_username_2",
+        "replace_with_username_3",
+        // Legacy sample rows
+        "demo_user_one",
+        "demo_user_two",
+        "demo_user_three",
       ]);
       const rows = buildImportPayloadRows(parsed).filter(
         (r) => r.username && !placeholderUsers.has(r.username.toLowerCase())
       );
       if (rows.length === 0) {
         toast.error(
-          "No rows to import. In the sample CSV, replace YOUR_USERNAME with a real employee username (same value on all lines is fine)."
+          "No rows to import. Replace REPLACE_WITH_USERNAME_1 / _2 / _3 (or each username column) with real CRM login usernames — different rows can be different employees."
         );
         return;
       }
@@ -73,6 +80,7 @@ export default function AttendanceBulkImportPanel({
       const sk = data.skipped ?? 0;
       const sun = data.sunday_weekly_off ?? 0;
       const ok = ins + up;
+      const uniqueEmployees = new Set(rows.map((r) => String(r.username || "").trim().toLowerCase()).filter(Boolean)).size;
       const sunPart =
         sun > 0
           ? ` ${sun} Sunday row(s) treated as weekly off (no punch stored).`
@@ -80,7 +88,7 @@ export default function AttendanceBulkImportPanel({
       if (data.errors?.length) {
         const first = data.errors[0];
         toast.error(
-          `Applied ${ok} row(s) (${ins} new, ${up} updated), ${sk} skipped (already has check-in or check-out), ${data.failed} failed.${sunPart} Row ${first?.row}: ${first?.message}`,
+          `Applied ${ok} row(s) (${ins} new, ${up} updated, ${uniqueEmployees} employee${uniqueEmployees === 1 ? "" : "s"} in file), ${sk} skipped (already has check-in or check-out), ${data.failed} failed.${sunPart} Row ${first?.row}: ${first?.message}`,
           { duration: 8000 }
         );
       } else {
@@ -89,7 +97,7 @@ export default function AttendanceBulkImportPanel({
             ? `, ${sk} skipped (already has check-in or check-out)`
             : "";
         toast.success(
-          `Done: ${ins} inserted, ${up} updated${skipPart}.${sunPart}`
+          `Done: ${ins} inserted, ${up} updated (${uniqueEmployees} employee${uniqueEmployees === 1 ? "" : "s"})${skipPart}.${sunPart}`
         );
       }
       await onComplete?.();
@@ -141,14 +149,25 @@ export default function AttendanceBulkImportPanel({
           Bulk attendance import
         </h2>
         <p className="mt-1 text-xs text-gray-600">
-          Upload CSV or Excel (same columns as sample). New days are inserted.
-          If a row exists but has no check-in and no check-out, it is updated.
-          If check-in or check-out is already set, that row is skipped.
+          Upload CSV or Excel (same columns as sample).{" "}
+          <strong>Multiple employees in one file:</strong> each row has its own{" "}
+          <code className="rounded bg-white/80 px-1">username</code> — one import applies
+          attendance for everyone in the sheet. New days are inserted; empty punch rows are
+          updated; rows that already have check-in or check-out are skipped.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">{controls}</div>
       </div>
     );
   }
 
-  return <div className="flex flex-wrap items-center gap-2">{controls}</div>;
+  return (
+    <div className="flex flex-col gap-1 sm:items-start">
+      <div className="flex flex-wrap items-center gap-2">{controls}</div>
+      <p className="max-w-xs text-[11px] leading-snug text-gray-500 sm:max-w-md">
+        One file can import{" "}
+        <span className="font-medium text-gray-600">multiple employees</span> — each row uses that
+        person&apos;s CRM username.
+      </p>
+    </div>
+  );
 }

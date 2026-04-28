@@ -140,6 +140,31 @@ export function isHealthInsuranceDeductionRow(d) {
 }
 
 /**
+ * Structural line (transport, medical, etc.) for the earning period × working_days denominator.
+ * Matches floor((monthly_amount × present_days) / working_days) — full amount when present_days ≥ working_days.
+ */
+export function proRataMonthlyStructuralLine(amountInr, workingDays, presentDays) {
+  const a = floorInr(amountInr);
+  const wd = Math.max(1, Number(workingDays) || 0);
+  const pd = Math.max(0, Number(presentDays) || 0);
+  if (pd <= 0) return 0;
+  if (pd >= wd) return a;
+  return floorInr((a * pd) / wd);
+}
+
+/**
+ * Pro‑rated gross for partial attendance: round((gross × pay_days) / working_days).
+ * Avoids underpaying when using floor(gross/workingDays)×pay_days (e.g. ₹22,000 / 30 × 29 → ₹21,267 vs ₹21,257).
+ */
+export function payableGrossProRata(grossInt, workingDays, presentDays) {
+  const g = floorInr(grossInt);
+  const wd = Math.max(1, Number(workingDays) || 0);
+  const pd = Math.max(0, Number(presentDays) || 0);
+  if (pd >= wd) return g;
+  return Math.round((g * pd) / wd);
+}
+
+/**
  * When gross_salary (monthly salary total) is set:
  * - Gross is taken as whole rupees (no paise).
  * - Full-month Basic = floor(gross / 2) — e.g. 18676 → 9338 (not 9333 from round(0.5*G)).
@@ -167,9 +192,8 @@ export function computeBasicHraFromGrossSalary({
   const g = floorInr(G);
   const wd = Math.max(1, Number(workingDays) || 0);
   const pd = Math.max(0, Number(presentDays) || 0);
-  const perDayGross = Math.floor(g / wd);
-  // Full attendance should always pay full gross (avoid 20 rupee loss on 35000/30).
-  const payableGross = pd >= wd ? g : perDayGross * pd;
+  const payableGross = payableGrossProRata(g, wd, pd);
+  const perDayGross = wd > 0 ? Math.round(g / wd) : 0;
   const basicSalary = Math.floor(payableGross / 2);
   const hra = Math.floor(payableGross / 4);
   const fullBasic = Math.floor(g / 2);
@@ -178,8 +202,8 @@ export function computeBasicHraFromGrossSalary({
 }
 
 /**
- * When salary structure has gross_salary, special allowance is the remainder of gross
- * after pro‑rated basic+HRA and fixed transport+medical, minus LOP at per‑day gross rate.
+ * When salary structure has gross_salary, special allowance is the remainder of pro‑rated gross
+ * after pro‑rated basic+HRA+transport+medical (all use the same present_days / working_days logic when passed in).
  *
  * special = gross - (basic + hra + transport + medical) - absentDays * (gross / workingDays)
  *
@@ -216,12 +240,7 @@ export function computeSpecialAllowanceFromGross({
     floorInr(transportAllowance) +
     floorInr(medicalAllowance);
 
-  const perDayGross = Math.floor(g / wd);
-  // Lock payable gross to per-day method:
-  // payableGross = floor(gross / workingDays) * presentDays
-  // so 35000/30 => 1166 and 1166*16 => 18656.
-  // For full attendance, pay exact monthly gross.
-  const payableGross = pd >= wd ? g : perDayGross * pd;
+  const payableGross = payableGrossProRata(g, wd, pd);
   const raw = payableGross - totalAddition;
   return Math.max(0, floorInr(raw));
 }

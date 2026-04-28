@@ -6,6 +6,7 @@ import {
   computeSpecialAllowanceFromGross,
   computeBasicHraFromGrossSalary,
   floorInr,
+  proRataMonthlyStructuralLine,
   getEffectiveGrossSalary,
   applyStatutoryDeductionsFromStructure,
   isHealthInsuranceDeductionRow,
@@ -93,8 +94,12 @@ export async function POST(request) {
           : 0;
     }
 
-    const transportAllowance = floorInr(structTransport);
-    const medicalAllowance = floorInr(structMedical);
+    const transportAllowance = hasGross
+      ? proRataMonthlyStructuralLine(structTransport, workingDays, presentDays)
+      : floorInr(structTransport);
+    const medicalAllowance = hasGross
+      ? proRataMonthlyStructuralLine(structMedical, workingDays, presentDays)
+      : floorInr(structMedical);
     const specialAllowance = computeSpecialAllowanceFromGross({
       grossSalary: hasGross ? effectiveGross : null,
       workingDays,
