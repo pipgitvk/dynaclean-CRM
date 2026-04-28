@@ -13,6 +13,7 @@ import {
   isHalfDayByRules,
   isLateDaySummary,
 } from "@/lib/attendanceRulesEngine";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
 import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
@@ -333,42 +334,46 @@ const AttendancePage = () => {
       const isHoliday = holidayMap.has(dateString);
       const isOnLeave = leaveMap.has(dateString);
 
-      if (existingLog) {
+      const hasRealPunch =
+        existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
+
+      if (hasRealPunch) {
         allDates.push({ ...existingLog, type: "present" });
       } else {
+        const base = existingLog
+          ? { ...existingLog, username: existingLog.username || user }
+          : { username: user };
         if (isWeekend) {
-          // Sunday - separate from holidays
           allDates.push({
+            ...base,
             date: d.toISOString(),
             type: "sunday",
-            username: user,
             holidayTitle: "Sunday",
-            holdayDescription: null
+            holidayDescription: null,
           });
         } else if (isHoliday) {
-          // Official holiday
           const holidayInfo = holidayMap.get(dateString);
           allDates.push({
+            ...base,
             date: d.toISOString(),
             type: "holiday",
-            username: user,
             holidayTitle: holidayInfo?.title || "Holiday",
-            holidayDescription: holidayInfo?.description || null
+            holidayDescription: holidayInfo?.description || null,
           });
         } else if (isOnLeave) {
           const leaveInfo = leaveMap.get(dateString);
           allDates.push({
+            ...base,
             date: d.toISOString(),
             type: "leave",
-            username: user,
             leaveType: leaveInfo?.leave_type || "Leave",
-            leaveReason: leaveInfo?.reason || null
+            leaveReason: leaveInfo?.reason || null,
           });
         } else {
           allDates.push({
+            ...base,
             date: d.toISOString(),
             type: "absent",
-            username: user,
           });
         }
       }

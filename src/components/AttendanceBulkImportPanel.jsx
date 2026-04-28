@@ -71,11 +71,16 @@ export default function AttendanceBulkImportPanel({
       const ins = data.inserted ?? 0;
       const up = data.updated ?? 0;
       const sk = data.skipped ?? 0;
+      const sun = data.sunday_weekly_off ?? 0;
       const ok = ins + up;
+      const sunPart =
+        sun > 0
+          ? ` ${sun} Sunday row(s) treated as weekly off (no punch stored).`
+          : "";
       if (data.errors?.length) {
         const first = data.errors[0];
         toast.error(
-          `Applied ${ok} row(s) (${ins} new, ${up} updated), ${sk} skipped (already has check-in or check-out), ${data.failed} failed. Row ${first?.row}: ${first?.message}`,
+          `Applied ${ok} row(s) (${ins} new, ${up} updated), ${sk} skipped (already has check-in or check-out), ${data.failed} failed.${sunPart} Row ${first?.row}: ${first?.message}`,
           { duration: 8000 }
         );
       } else {
@@ -84,7 +89,7 @@ export default function AttendanceBulkImportPanel({
             ? `, ${sk} skipped (already has check-in or check-out)`
             : "";
         toast.success(
-          `Done: ${ins} inserted, ${up} updated${skipPart}.`
+          `Done: ${ins} inserted, ${up} updated${skipPart}.${sunPart}`
         );
       }
       await onComplete?.();

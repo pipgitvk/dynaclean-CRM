@@ -7,6 +7,7 @@ import {
   classifyAttendanceDayForSalary,
 } from "@/lib/attendanceRulesEngine";
 import { dateToYmdKey } from "@/lib/salaryPayDaysFromAttendance";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -82,7 +83,8 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveMap.has(dateString);
 
-    if (existingLog) {
+    const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
+    if (existingLog && hasRealPunch) {
       summary.present++;
       const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
       freeGraceUsed = cls.freeGraceUsed;

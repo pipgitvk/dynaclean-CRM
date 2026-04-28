@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
 import { isHalfDayByRules } from "@/lib/attendanceRulesEngine";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
 const MONTHS = [
   "January",
@@ -48,7 +49,7 @@ function cellCode(year, monthIndex, day, maps) {
   const isHoliday = maps.holidayMap.has(dateString);
   const isOnLeave = maps.leaveMap.has(dateString);
 
-  if (existingLog) {
+  if (existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog)) {
     if (maps.isHalfDay(existingLog)) return { code: "HD", kind: "hd" };
     return { code: "P", kind: "present" };
   }

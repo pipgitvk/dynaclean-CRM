@@ -13,6 +13,7 @@
  * - Days before date_of_joining are skipped (not LOP, not paid).
  */
 import { classifyAttendanceDayForSalary } from "@/lib/attendanceRulesEngine";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
 function startOfDay(d) {
   const x = new Date(d);
@@ -133,7 +134,8 @@ export function computeSalaryPayDaysForUser(p) {
       requiredWorkingDays++;
     }
 
-    if (existingLog) {
+    const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
+    if (existingLog && hasRealPunch) {
       const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
       freeGraceUsed = cls.freeGraceUsed;
       if (cls.kind === "lateDay") late_days++;
