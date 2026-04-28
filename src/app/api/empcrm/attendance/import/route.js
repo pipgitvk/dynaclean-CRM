@@ -82,9 +82,42 @@ function combineDateAndTimeForDb(dateYmd, timeVal) {
   return normalizeMysqlDatetime(`${dateYmd} ${hh}:${mm}:${ss}`);
 }
 
+/** MySQL / app placeholders are not real punches — allow UPDATE from import. */
+function isMeaningfulAttendancePunch(value) {
+  if (value == null) return false;
+  if (typeof Buffer !== "undefined" && Buffer.isBuffer?.(value)) {
+    return isMeaningfulAttendancePunch(value.toString("utf8"));
+  }
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return false;
+    const y = value.getFullYear();
+    if (y < 1970 || y > 2100) return false;
+    return true;
+  }
+  const s = String(value).trim();
+  if (!s) return false;
+  const low = s.toLowerCase();
+  if (low === "null" || low === "undefined") return false;
+  if (/^0000-00-00/i.test(s)) return false;
+  if (/^0{4}-0{2}-0{2}/.test(s)) return false;
+  if (/^\d{4}-\d{2}-\d{2}[T ]\s*00:00:00(\.\d+)?(Z)?$/i.test(s)) return false;
+  return true;
+}
+
+/** True if this log already has a real check-in or check-out punch (do not overwrite via import). */
+function rowHasCheckinOrCheckout(row) {
+  if (!row) return false;
+  return (
+    isMeaningfulAttendancePunch(row.checkin_time) ||
+    isMeaningfulAttendancePunch(row.checkout_time)
+  );
+}
+
 /**
- * POST — bulk insert attendance_logs from parsed rows (HR).
- * Rows for (username, date) that already have a log are skipped (not updated).
+ * POST — bulk upsert attendance_logs from parsed rows (HR).
+ * - No row: INSERT.
+ * - Row exists but no check-in and no check-out: UPDATE from file (absent / empty punch).
+ * - Row exists with check-in or check-out: skip.
  * Body: { rows: Array<{ username, date, checkin_time?, checkout_time?, breaks..., checkin_address?, checkout_address? }> }
  * Time values: "HH:mm" or "HH:mm:ss" or "YYYY-MM-DD HH:mm:ss" (IST wall clock).
  */
@@ -118,6 +151,7 @@ export async function POST(request) {
 
     const conn = await getDbConnection();
     let inserted = 0;
+    let updated = 0;
     let skipped = 0;
     const errors = [];
 
@@ -206,7 +240,76 @@ export async function POST(request) {
         const ex = existingRows[0] || null;
 
         if (ex) {
-          skipped++;
+          if (rowHasCheckinOrCheckout(ex)) {
+            skipped++;
+            continue;
+          }
+
+          const sets = [];
+          const params = [];
+          for (const col of TIME_FIELDS) {
+            if (times[col] === undefined) continue;
+            if (times[col] === null) {
+              sets.push(`${col} = NULL`);
+            } else {
+              sets.push(`${col} = ?`);
+              params.push(times[col]);
+            }
+          }
+
+          let cinLat = ex.checkin_latitude;
+          let cinLon = ex.checkin_longitude;
+          let cinAd = ex.checkin_address;
+          let coutLat = ex.checkout_latitude;
+          let coutLon = ex.checkout_longitude;
+          let coutAd = ex.checkout_address;
+
+          const newCheckin =
+            times.checkin_time !== undefined
+              ? times.checkin_time
+              : ex.checkin_time;
+          const newCheckout =
+            times.checkout_time !== undefined
+              ? times.checkout_time
+              : ex.checkout_time;
+
+          if (newCheckin != null && (cinLat == null || cinLon == null)) {
+            cinLat = cinLat ?? 0;
+            cinLon = cinLon ?? 0;
+            cinAd = cinAd || checkinAddr || "HR bulk import";
+          }
+          if (checkinAddr != null) {
+            cinAd = checkinAddr;
+          }
+
+          if (newCheckout != null && (coutLat == null || coutLon == null)) {
+            coutLat = coutLat ?? 0;
+            coutLon = coutLon ?? 0;
+            coutAd = coutAd || checkoutAddr || "HR bulk import";
+          }
+          if (checkoutAddr != null) {
+            coutAd = checkoutAddr;
+          }
+
+          sets.push("checkin_latitude = ?", "checkin_longitude = ?");
+          params.push(cinLat, cinLon);
+          if (cinAd != null) {
+            sets.push("checkin_address = ?");
+            params.push(cinAd);
+          }
+          sets.push("checkout_latitude = ?", "checkout_longitude = ?");
+          params.push(coutLat, coutLon);
+          if (coutAd != null) {
+            sets.push("checkout_address = ?");
+            params.push(coutAd);
+          }
+
+          params.push(username, dateStr);
+          await conn.execute(
+            `UPDATE attendance_logs SET ${sets.join(", ")} WHERE username = ? AND date = ?`,
+            params
+          );
+          updated++;
           continue;
         }
 
@@ -267,6 +370,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: errors.length === 0,
       inserted,
+      updated,
       skipped,
       failed: errors.length,
       errors,

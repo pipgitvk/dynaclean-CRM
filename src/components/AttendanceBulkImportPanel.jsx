@@ -69,20 +69,23 @@ export default function AttendanceBulkImportPanel({
         throw new Error(data.message || "Import failed");
       }
       const ins = data.inserted ?? 0;
+      const up = data.updated ?? 0;
       const sk = data.skipped ?? 0;
-      const ok = ins;
+      const ok = ins + up;
       if (data.errors?.length) {
         const first = data.errors[0];
         toast.error(
-          `Imported ${ok} row(s), ${sk} skipped (already had attendance), ${data.failed} failed. Row ${first?.row}: ${first?.message}`,
+          `Applied ${ok} row(s) (${ins} new, ${up} updated), ${sk} skipped (already has check-in or check-out), ${data.failed} failed. Row ${first?.row}: ${first?.message}`,
           { duration: 8000 }
         );
       } else {
         const skipPart =
           sk > 0
-            ? `, ${sk} skipped (attendance already existed for that date)`
+            ? `, ${sk} skipped (already has check-in or check-out)`
             : "";
-        toast.success(`Done: ${ins} inserted${skipPart}.`);
+        toast.success(
+          `Done: ${ins} inserted, ${up} updated${skipPart}.`
+        );
       }
       await onComplete?.();
     } catch (err) {
@@ -133,9 +136,9 @@ export default function AttendanceBulkImportPanel({
           Bulk attendance import
         </h2>
         <p className="mt-1 text-xs text-gray-600">
-          Upload CSV or Excel (same columns as sample). Only new dates are
-          inserted; if attendance already exists for that employee and date, the
-          row is skipped.
+          Upload CSV or Excel (same columns as sample). New days are inserted.
+          If a row exists but has no check-in and no check-out, it is updated.
+          If check-in or check-out is already set, that row is skipped.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">{controls}</div>
       </div>
