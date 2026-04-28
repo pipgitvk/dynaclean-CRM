@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import InvoiceItemsTable from "./new/invoice-table";
@@ -117,6 +117,7 @@ export default function InvoiceEditModal({
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
   const [showPaymentLinkModal, setShowPaymentLinkModal] = useState(false);
   const [linkedTransIds, setLinkedTransIds] = useState([]);
+  const originalLinkedTransIdsRef = useRef([]);
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
@@ -171,7 +172,9 @@ export default function InvoiceEditModal({
         // Order date is the editable business date.
         setInvoiceDate(dateInputValue(inv.created_at || inv.invoice_date) || "");
         setCreatedAtLocal(toDatetimeLocalValue(inv.created_at) || "");
-        setLinkedTransIds(parseLinkedTransIds(inv.linked_trans_ids));
+        const pTransIds = parseLinkedTransIds(inv.linked_trans_ids);
+        setLinkedTransIds(pTransIds);
+        originalLinkedTransIdsRef.current = pTransIds;
         setForm({
           customer_id: inv.customer_id != null ? String(inv.customer_id) : "",
           customer_name: inv.customer_name || "",
@@ -312,6 +315,8 @@ export default function InvoiceEditModal({
         linked_trans_ids: linkedTransIds,
       };
 
+      const removedTransIds = originalLinkedTransIdsRef.current.filter(tid => !linkedTransIds.includes(tid));
+      
       const res = await fetch(`/api/invoices/${invoiceId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -321,25 +326,48 @@ export default function InvoiceEditModal({
       if (!res.ok || !out.success) {
         throw new Error(out.error || "Save failed");
       }
-      if (linkedTransIds.length > 0 && invoiceNumber.trim()) {
+
+      // Handle Linked Statements Update
+      if (invoiceNumber.trim()) {
         const invoiceStatusForStmt =
           form.payment_status === "PAID"
             ? "Settled"
             : form.payment_status === "PARTIAL"
               ? "Partial Paid"
               : "Unsettled";
-        try {
-          await fetch("/api/statements", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              trans_ids: linkedTransIds,
-              invoice_number: invoiceNumber.trim(),
-              invoice_status: invoiceStatusForStmt,
-            }),
-          });
-        } catch (patchErr) {
-          console.error("Failed to link statements:", patchErr);
+
+        // Update currently linked statements
+        if (linkedTransIds.length > 0) {
+          try {
+            await fetch("/api/statements", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                trans_ids: linkedTransIds,
+                invoice_number: invoiceNumber.trim(),
+                invoice_status: invoiceStatusForStmt,
+              }),
+            });
+          } catch (patchErr) {
+            console.error("Failed to link statements:", patchErr);
+          }
+        }
+
+        // Handle unlinked statements: set to Unsettled and clear invoice number
+        if (removedTransIds.length > 0) {
+          try {
+            await fetch("/api/statements", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                trans_ids: removedTransIds,
+                invoice_number: "", // Sending empty string to clear it
+                invoice_status: "Unsettled",
+              }),
+            });
+          } catch (patchErr) {
+            console.error("Failed to unlink statements:", patchErr);
+          }
         }
       }
       toast.success("Invoice updated");
@@ -731,11 +759,9 @@ export default function InvoiceEditModal({
       defaultCustomerId={form.customer_id}
       defaultAmount={taxSummary.grandTotal}
       lockedTransIds={linkedTransIds}
+      currentInvoiceNumber={invoiceNumber}
       onApply={(transIds, paymentStatus, amountPaid) => {
-        setLinkedTransIds((prev) => [
-          ...prev,
-          ...transIds.filter((t) => !prev.includes(t)),
-        ]);
+        setLinkedTransIds(transIds);
         if (amountPaid > 0) {
           setForm((prev) => ({
             ...prev,
@@ -746,6 +772,12 @@ export default function InvoiceEditModal({
                 : paymentStatus === "Partial Paid"
                   ? "PARTIAL"
                   : prev.payment_status,
+          }));
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            amount_paid: 0,
+            payment_status: "UNPAID",
           }));
         }
       }}

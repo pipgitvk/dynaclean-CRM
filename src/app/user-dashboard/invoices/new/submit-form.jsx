@@ -954,25 +954,29 @@ const fetchQuotationAndFill = async () => {
       defaultCustomerId={form.customer_id}
       defaultAmount={taxSummary.grandTotal}
       lockedTransIds={linkedTransIds}
-          onApply={(transIds, paymentStatus, amountPaid) => {
-            setLinkedTransIds((prev) => [
-              ...prev,
-              ...transIds.filter((t) => !prev.includes(t)),
-            ]);
-            setInvoicePaymentStatus(paymentStatus || "Unsettled");
-            if (amountPaid > 0) {
-              setForm((prev) => ({
-                ...prev,
-                amount_paid: amountPaid,
-                payment_status:
-                  paymentStatus === "Settled"
-                    ? "PAID"
-                    : paymentStatus === "Partial Paid"
-                    ? "PARTIAL"
-                    : prev.payment_status,
-              }));
-            }
-          }}
+      currentInvoiceNumber={invoiceNumber}
+      onApply={(transIds, paymentStatus, amountPaid) => {
+        setLinkedTransIds(transIds);
+        setInvoicePaymentStatus(paymentStatus || "Unsettled");
+        if (amountPaid > 0) {
+          setForm((prev) => ({
+            ...prev,
+            amount_paid: amountPaid,
+            payment_status:
+              paymentStatus === "Settled"
+                ? "PAID"
+                : paymentStatus === "Partial Paid"
+                  ? "PARTIAL"
+                  : prev.payment_status,
+          }));
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            amount_paid: 0,
+            payment_status: "UNPAID",
+          }));
+        }
+      }}
     />
     </>
   );

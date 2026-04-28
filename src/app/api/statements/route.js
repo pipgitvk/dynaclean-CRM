@@ -255,7 +255,7 @@ export async function PATCH(req) {
 
     const { trans_ids, invoice_number, invoice_status } = await req.json();
 
-    if (!invoice_number || !Array.isArray(trans_ids) || trans_ids.length === 0) {
+    if (invoice_number === undefined || !Array.isArray(trans_ids) || trans_ids.length === 0) {
       return NextResponse.json(
         { error: "invoice_number and trans_ids array are required" },
         { status: 400 }
@@ -283,9 +283,11 @@ export async function PATCH(req) {
 
     const placeholders = trans_ids.map(() => "?").join(", ");
     const statusVal = invoice_status || "Unsettled";
+    const invNumVal = invoice_number && String(invoice_number).trim() !== "" ? invoice_number : null;
+
     await conn.execute(
       `UPDATE statements SET invoice_number = ?, invoice_status = ? WHERE trans_id IN (${placeholders})`,
-      [invoice_number, statusVal, ...trans_ids]
+      [invNumVal, statusVal, ...trans_ids]
     );
 
     return NextResponse.json({ success: true, updated: trans_ids.length });
