@@ -10,6 +10,7 @@ import { ClipboardList } from "lucide-react";
  */
 export default function HrTodayReportButton() {
   const [allowed, setAllowed] = useState(true);
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,7 +19,10 @@ export default function HrTodayReportButton() {
         const res = await fetch("/api/my-modules");
         if (res.ok) {
           const { allowedModules } = await res.json();
-          if (allowedModules !== null && !allowedModules.includes("hr-daily-report")) {
+          if (allowedModules === null) {
+            setIsSuperadmin(true);
+            setAllowed(true);
+          } else if (!allowedModules.includes("hr-daily-report")) {
             setAllowed(false);
           }
         }
@@ -35,11 +39,11 @@ export default function HrTodayReportButton() {
 
   return (
     <Link
-      href="/user-dashboard/hr-today-report"
+      href={isSuperadmin ? "/admin-dashboard/all-hr-report" : "/user-dashboard/hr-today-report"}
       className="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 transition-colors shrink-0"
     >
       <ClipboardList size={16} />
-      HR Today Report
+      {isSuperadmin ? "All HR Report" : "HR Today Report"}
     </Link>
   );
 }
