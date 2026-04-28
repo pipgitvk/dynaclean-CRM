@@ -1,9 +1,9 @@
 // app/empcrm/admin-dashboard/attendance/page.jsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Loader2, Search, Info, Pencil, Upload } from "lucide-react";
+import { Loader2, Search, Info, Pencil } from "lucide-react";
 import ExcelJS from "exceljs";
 import {
   DEFAULT_ATTENDANCE_RULES,
@@ -15,11 +15,7 @@ import {
 } from "@/lib/attendanceRulesEngine";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
-import {
-  normalizeImportHeaderCell,
-  disambiguatePairHeaders,
-  parseImportDateToYmd,
-} from "@/lib/attendanceImportParse";
+import AttendanceBulkImportPanel from "@/components/AttendanceBulkImportPanel";
 
 function attendanceDateYmd(value) {
   if (value == null || value === "") return "";
@@ -53,139 +49,6 @@ function combineDateAndTimeForDb(dateYmd, timeHHmm) {
   return `${dateYmd} ${hh}:${mm}:00`;
 }
 
-const IMPORT_TIME_FIELDS = [
-  "checkin_time",
-  "checkout_time",
-  "break_morning_start",
-  "break_morning_end",
-  "break_lunch_start",
-  "break_lunch_end",
-  "break_evening_start",
-  "break_evening_end",
-];
-
-function cellValueToImportString(cellValue, fieldKey) {
-  if (cellValue == null || cellValue === "") return "";
-  if (
-    fieldKey === "date" &&
-    typeof cellValue === "number" &&
-    Number.isFinite(cellValue) &&
-    cellValue > 20000 &&
-    cellValue < 100000
-  ) {
-    const base = new Date(1899, 11, 30);
-    const d = new Date(base.getTime() + cellValue * 86400000);
-    if (!Number.isNaN(d.getTime())) return d.toLocaleDateString("en-CA");
-  }
-  if (cellValue instanceof Date) {
-    if (fieldKey === "date") {
-      return cellValue.toLocaleDateString("en-CA");
-    }
-    return cellValue.toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  }
-  if (typeof cellValue === "object" && cellValue.text != null) {
-    return String(cellValue.text).trim();
-  }
-  if (typeof cellValue === "object" && cellValue.result != null) {
-    return cellValueToImportString(cellValue.result, fieldKey);
-  }
-  return String(cellValue).trim();
-}
-
-async function parseAttendanceImportFile(file) {
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".csv")) {
-    let text = await file.text();
-    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-    const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
-    if (lines.length < 2) {
-      throw new Error("CSV needs a header row and at least one data row.");
-    }
-    const headers = disambiguatePairHeaders(
-      lines[0].split(",").map((h) => normalizeImportHeaderCell(h.trim()))
-    );
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.trim().startsWith("#")) continue;
-      const parts = line.split(",");
-      if (parts.every((p) => !String(p).trim())) continue;
-      const obj = {};
-      headers.forEach((h, idx) => {
-        if (!h) return;
-        obj[h] = String(parts[idx] ?? "").trim();
-      });
-      rows.push(obj);
-    }
-    return rows;
-  }
-
-  const buf = await file.arrayBuffer();
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buf);
-  const sheet = wb.worksheets[0];
-  if (!sheet) throw new Error("No sheet found in workbook.");
-
-  const hRow = sheet.getRow(1);
-  const maxCol = hRow.cellCount;
-  const headers = [];
-  for (let c = 1; c <= maxCol; c++) {
-    const raw = hRow.getCell(c).value;
-    const text =
-      raw == null
-        ? ""
-        : typeof raw === "object" && raw.text != null
-          ? String(raw.text).trim()
-          : String(raw).trim();
-    headers.push(normalizeImportHeaderCell(text));
-  }
-
-  const headerKeys = disambiguatePairHeaders(headers);
-  const rows = [];
-  sheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return;
-    const col1 = cellValueToImportString(row.getCell(1).value, "username");
-    if (col1.trim().startsWith("#")) return;
-    const obj = {};
-    let hasAny = false;
-    for (let c = 1; c <= maxCol; c++) {
-      const key = headerKeys[c - 1];
-      if (!key) continue;
-      const v = cellValueToImportString(row.getCell(c).value, key);
-      if (v) hasAny = true;
-      obj[key] = v;
-    }
-    if (hasAny) rows.push(obj);
-  });
-  return rows;
-}
-
-function buildImportPayloadRows(parsed) {
-  return parsed.map((obj) => {
-    const row = {
-      username: String(obj.username ?? "").trim(),
-      date: parseImportDateToYmd(obj.date ?? ""),
-    };
-    for (const key of IMPORT_TIME_FIELDS) {
-      const v = obj[key];
-      if (v != null && String(v).trim() !== "") {
-        row[key] = String(v).trim();
-      }
-    }
-    if (obj.checkin_address != null && String(obj.checkin_address).trim() !== "") {
-      row.checkin_address = String(obj.checkin_address).trim();
-    }
-    if (obj.checkout_address != null && String(obj.checkout_address).trim() !== "") {
-      row.checkout_address = String(obj.checkout_address).trim();
-    }
-    return row;
-  });
-}
-
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -217,8 +80,6 @@ const AttendancePage = () => {
   const [regModalLog, setRegModalLog] = useState(null);
   const [regModalDateKey, setRegModalDateKey] = useState("");
   const [regForUsername, setRegForUsername] = useState("");
-  const [importLoading, setImportLoading] = useState(false);
-  const importFileInputRef = useRef(null);
 
   const logDateKeyForReg = (log) =>
     log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
@@ -297,59 +158,6 @@ const AttendancePage = () => {
       setHolidayModalOpen(true);
     } catch (e) {
       toast.error(e.message);
-    }
-  };
-
-  const handleAttendanceImport = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setImportLoading(true);
-    try {
-      const parsed = await parseAttendanceImportFile(file);
-      const placeholderUsers = new Set([
-        "replace_with_username",
-        "your_username",
-      ]);
-      const rows = buildImportPayloadRows(parsed).filter(
-        (r) => r.username && !placeholderUsers.has(r.username.toLowerCase())
-      );
-      if (rows.length === 0) {
-        toast.error(
-          "No rows to import. In the sample CSV, replace YOUR_USERNAME with a real employee username (same value on all lines is fine)."
-        );
-        return;
-      }
-      const res = await fetch("/api/empcrm/attendance/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.message || "Import failed");
-      }
-      const ins = data.inserted ?? 0;
-      const sk = data.skipped ?? 0;
-      const ok = ins;
-      if (data.errors?.length) {
-        const first = data.errors[0];
-        toast.error(
-          `Imported ${ok} row(s), ${sk} skipped (already had attendance), ${data.failed} failed. Row ${first?.row}: ${first?.message}`,
-          { duration: 8000 }
-        );
-      } else {
-        const skipPart =
-          sk > 0
-            ? `, ${sk} skipped (attendance already existed for that date)`
-            : "";
-        toast.success(`Done: ${ins} inserted${skipPart}.`);
-      }
-      await fetchAttendance();
-    } catch (err) {
-      toast.error(err.message || "Could not import file");
-    } finally {
-      setImportLoading(false);
     }
   };
 
@@ -752,33 +560,7 @@ const AttendancePage = () => {
             >
               Holiday List
             </button>
-            <input
-              ref={importFileInputRef}
-              type="file"
-              accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="hidden"
-              onChange={handleAttendanceImport}
-            />
-            <button
-              type="button"
-              onClick={() => importFileInputRef.current?.click()}
-              disabled={importLoading}
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 shadow-sm hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {importLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              {importLoading ? "Importing…" : "Import"}
-            </button>
-            <a
-              href="/attendance_import_template.csv"
-              download="attendance_import_template.csv"
-              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-            >
-              Sample file
-            </a>
+            <AttendanceBulkImportPanel onComplete={fetchAttendance} />
           </div>
 
           {searchLoading ? (
