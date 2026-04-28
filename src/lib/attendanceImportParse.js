@@ -66,12 +66,33 @@ export function disambiguatePairHeaders(headers) {
   return out;
 }
 
+/** Excel serial day → YYYY-MM-DD (UTC; matches typical xlsx day serials). */
+function excelSerialToYmd(serial) {
+  const n = Math.floor(Number(serial));
+  if (!Number.isFinite(n) || n < 1 || n > 10000000) return "";
+  const ms = (n - 25569) * 86400 * 1000;
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getUTCFullYear();
+  if (y < 1980 || y > 2110) return "";
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /**
  * @param {string|number|Date|null|undefined} value
  * @returns {string} YYYY-MM-DD or "" if invalid / empty
  */
+
 export function parseImportDateToYmd(value) {
   if (value == null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (value > 59 && value < 2000000) {
+      const ymd = excelSerialToYmd(value);
+      if (ymd) return ymd;
+    }
+  }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     const y = value.getFullYear();
     const m = String(value.getMonth() + 1).padStart(2, "0");
@@ -81,6 +102,10 @@ export function parseImportDateToYmd(value) {
   const t = String(value).trim();
   if (!t) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  if (/^\d+(\.\d+)?$/.test(t)) {
+    const ymd = excelSerialToYmd(parseFloat(t));
+    if (ymd) return ymd;
+  }
 
   const slash = t.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
   if (slash) {
