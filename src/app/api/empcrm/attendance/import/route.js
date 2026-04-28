@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { parseImportDateToYmd } from "@/lib/attendanceImportParse";
+import {
+  parseImportDateToYmd,
+  isSundayWeeklyOffIndia,
+} from "@/lib/attendanceImportParse";
 import { canBulkImportAttendance } from "@/lib/attendanceBulkImportRoles";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
 /**
  * Match rep_list.username, then employee_profiles.full_name (exact, case-insensitive).
@@ -82,35 +86,9 @@ function combineDateAndTimeForDb(dateYmd, timeVal) {
   return normalizeMysqlDatetime(`${dateYmd} ${hh}:${mm}:${ss}`);
 }
 
-/** MySQL / app placeholders are not real punches — allow UPDATE from import. */
-function isMeaningfulAttendancePunch(value) {
-  if (value == null) return false;
-  if (typeof Buffer !== "undefined" && Buffer.isBuffer?.(value)) {
-    return isMeaningfulAttendancePunch(value.toString("utf8"));
-  }
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) return false;
-    const y = value.getFullYear();
-    if (y < 1970 || y > 2100) return false;
-    return true;
-  }
-  const s = String(value).trim();
-  if (!s) return false;
-  const low = s.toLowerCase();
-  if (low === "null" || low === "undefined") return false;
-  if (/^0000-00-00/i.test(s)) return false;
-  if (/^0{4}-0{2}-0{2}/.test(s)) return false;
-  if (/^\d{4}-\d{2}-\d{2}[T ]\s*00:00:00(\.\d+)?(Z)?$/i.test(s)) return false;
-  return true;
-}
-
 /** True if this log already has a real check-in or check-out punch (do not overwrite via import). */
 function rowHasCheckinOrCheckout(row) {
-  if (!row) return false;
-  return (
-    isMeaningfulAttendancePunch(row.checkin_time) ||
-    isMeaningfulAttendancePunch(row.checkout_time)
-  );
+  return rowHasMeaningfulCheckinOrCheckout(row);
 }
 
 /**
@@ -118,6 +96,7 @@ function rowHasCheckinOrCheckout(row) {
  * - No row: INSERT.
  * - Row exists but no check-in and no check-out: UPDATE from file (absent / empty punch).
  * - Row exists with check-in or check-out: skip.
+ * - Date is Sunday (India calendar): Excel times are ignored — clears a placeholder row so Attendance shows weekly off; skips if real punch exists (worked Sunday).
  * Body: { rows: Array<{ username, date, checkin_time?, checkout_time?, breaks..., checkin_address?, checkout_address? }> }
  * Time values: "HH:mm" or "HH:mm:ss" or "YYYY-MM-DD HH:mm:ss" (IST wall clock).
  */
@@ -153,6 +132,8 @@ export async function POST(request) {
     let inserted = 0;
     let updated = 0;
     let skipped = 0;
+    /** Rows whose date was Sunday: no DB row existed (UI still shows Sunday from calendar). */
+    let sundayWeeklyOff = 0;
     const errors = [];
 
     for (let i = 0; i < rowsIn.length; i++) {
@@ -186,6 +167,42 @@ export async function POST(request) {
         username = resolved.username;
       } catch (e) {
         errors.push({ row: rowNum, message: e.message || "User lookup failed" });
+        continue;
+      }
+
+      if (isSundayWeeklyOffIndia(dateStr)) {
+        try {
+          const [existingRows] = await conn.execute(
+            `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
+            [username, dateStr]
+          );
+          const ex = existingRows[0] || null;
+          if (ex && rowHasCheckinOrCheckout(ex)) {
+            skipped++;
+            continue;
+          }
+          if (ex) {
+            await conn.execute(
+              `UPDATE attendance_logs SET
+                checkin_time = NULL, checkout_time = NULL,
+                break_morning_start = NULL, break_morning_end = NULL,
+                break_lunch_start = NULL, break_lunch_end = NULL,
+                break_evening_start = NULL, break_evening_end = NULL,
+                checkin_latitude = NULL, checkin_longitude = NULL, checkin_address = NULL,
+                checkout_latitude = NULL, checkout_longitude = NULL, checkout_address = NULL
+               WHERE username = ? AND date = ?`,
+              [username, dateStr]
+            );
+            updated++;
+          } else {
+            sundayWeeklyOff++;
+          }
+        } catch (err) {
+          errors.push({
+            row: rowNum,
+            message: err.message || "Database error",
+          });
+        }
         continue;
       }
 
@@ -372,6 +389,7 @@ export async function POST(request) {
       inserted,
       updated,
       skipped,
+      sunday_weekly_off: sundayWeeklyOff,
       failed: errors.length,
       errors,
     });

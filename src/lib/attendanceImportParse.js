@@ -130,3 +130,16 @@ export function parseImportDateToYmd(value) {
 
   return "";
 }
+
+/**
+ * True if `yyyy-mm-dd` is Sunday on the India (Asia/Kolkata) calendar.
+ * Uses noon IST so the weekday matches the wall date in the sheet.
+ */
+export function isSundayWeeklyOffIndia(ymd) {
+  const m = String(ymd ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const iso = `${m[1]}-${m[2]}-${m[3]}T12:00:00+05:30`;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getUTCDay() === 0;
+}

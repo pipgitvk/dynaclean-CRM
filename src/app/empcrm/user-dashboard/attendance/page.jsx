@@ -11,6 +11,7 @@ import {
   isHalfDayByRules,
   classifyAttendanceDay,
 } from "@/lib/attendanceRulesEngine";
+import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
 
@@ -191,36 +192,41 @@ const AttendancePage = () => {
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveMap.has(dateString);
 
-    if (existingLog) {
+    const hasRealPunch =
+      existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
+
+    if (hasRealPunch) {
       allDates.push({ ...existingLog, type: "present" });
     } else {
+      const base = existingLog ? { ...existingLog } : {};
       if (isWeekend) {
-        // Sunday - separate from holidays
         allDates.push({
+          ...base,
           date: d.toISOString(),
           type: "sunday",
           holidayTitle: "Sunday",
-          holidayDescription: null
+          holidayDescription: null,
         });
       } else if (isHoliday) {
-        // Official holiday
         const holidayInfo = holidayMap.get(dateString);
         allDates.push({
+          ...base,
           date: d.toISOString(),
           type: "holiday",
           holidayTitle: holidayInfo?.title || "Holiday",
-          holidayDescription: holidayInfo?.description || null
+          holidayDescription: holidayInfo?.description || null,
         });
       } else if (isOnLeave) {
         const leaveInfo = leaveMap.get(dateString);
         allDates.push({
+          ...base,
           date: d.toISOString(),
           type: "leave",
           leaveType: leaveInfo?.leave_type || "Leave",
-          leaveReason: leaveInfo?.reason || null
+          leaveReason: leaveInfo?.reason || null,
         });
       } else {
-        allDates.push({ date: d.toISOString(), type: "absent" });
+        allDates.push({ ...base, date: d.toISOString(), type: "absent" });
       }
     }
   }
