@@ -641,6 +641,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "FileText",
       },
+      {
+        path: "/admin-dashboard/all-hr-report",
+        name: "All HR Report",
+        moduleKey: "all-hr-report",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
     ],
   },
   {
