@@ -29,20 +29,30 @@ function normalizeTransId(t) {
   return t != null ? String(t).trim() : "";
 }
 
-/** Row cannot be newly selected: already on this invoice (chips) or linked in DB. */
-function isStatementRowLocked(statement, lockedTransIds) {
+/** Row cannot be newly selected: already on ANOTHER invoice or linked in DB to another invoice. */
+function isStatementRowLocked(statement, lockedTransIds, currentInvoiceNumber) {
   const tid = normalizeTransId(statement.trans_id);
+  
+  // If it's already in our locked list (meaning it's linked to THIS invoice in the parent state)
+  // it is NOT locked for unlinking.
   if (
     tid &&
     Array.isArray(lockedTransIds) &&
     lockedTransIds.some((x) => normalizeTransId(x) === tid)
   ) {
-    return true;
+    return false;
   }
+
   const inv =
     statement.invoice_number != null
       ? String(statement.invoice_number).trim()
       : "";
+  
+  // If it's linked to THIS invoice, it's NOT locked.
+  if (currentInvoiceNumber && inv === String(currentInvoiceNumber).trim()) {
+    return false;
+  }
+
   return inv.length > 0;
 }
 
@@ -53,6 +63,7 @@ export default function PaymentLinkModal({
   defaultAmount = 0,
   onApply,
   lockedTransIds = [],
+  currentInvoiceNumber = "",
 }) {
   const customerId = defaultCustomerId;
   const totalAmount = defaultAmount;
@@ -89,22 +100,41 @@ export default function PaymentLinkModal({
     if (!fetched) return;
     let result = statements.filter((s) => s.type?.toLowerCase() === "credit");
 
-    if (fromDate) {
+    // We MUST include statements that are already linked to this invoice, 
+    // even if they are outside the selected date range, so they can be unlinked.
+    const alreadyLinkedTids = new Set(lockedTransIds.map(normalizeTransId));
+    const currentInvTrim = String(currentInvoiceNumber || "").trim();
+
+    if (fromDate || toDate) {
       result = result.filter((s) => {
+        const tid = normalizeTransId(s.trans_id);
+        const inv = String(s.invoice_number || "").trim();
+        
+        // Keep if linked to this invoice or in lockedTransIds
+        if (tid && alreadyLinkedTids.has(tid)) return true;
+        if (currentInvTrim && inv === currentInvTrim) return true;
+
         const d = s.date || s.txn_dated_deb || s.txn_posted_date;
-        return d && d >= fromDate;
-      });
-    }
-    if (toDate) {
-      result = result.filter((s) => {
-        const d = s.date || s.txn_dated_deb || s.txn_posted_date;
-        return d && d <= toDate;
+        let ok = true;
+        if (fromDate && (!d || d < fromDate)) ok = false;
+        if (toDate && (!d || d > toDate)) ok = false;
+        return ok;
       });
     }
 
     setFilteredStatements(result);
-    setDeductedIds(new Set());
-  }, [statements, fromDate, toDate, fetched]);
+    
+    // Initialize deductedIds with already linked statements
+    const initialDeducted = new Set();
+    result.forEach(s => {
+      const tid = normalizeTransId(s.trans_id);
+      const inv = String(s.invoice_number || "").trim();
+      if ((tid && alreadyLinkedTids.has(tid)) || (currentInvTrim && inv === currentInvTrim)) {
+        initialDeducted.add(s.id);
+      }
+    });
+    setDeductedIds(initialDeducted);
+  }, [statements, fromDate, toDate, fetched, lockedTransIds, currentInvoiceNumber]);
 
   const handleApplyFilter = () => {
     if (!fetched) fetchStatements();
@@ -113,7 +143,7 @@ export default function PaymentLinkModal({
   const handleReset = () => {
     setFromDate("");
     setToDate("");
-    setDeductedIds(new Set());
+    // deductedIds will be reset by the useEffect above
   };
 
   const toggleDeduct = (id) => {
@@ -123,9 +153,9 @@ export default function PaymentLinkModal({
         next.delete(id);
       } else {
         const row = filteredStatements.find((s) => s.id === id);
-        if (row && isStatementRowLocked(row, lockedTransIds)) {
+        if (row && isStatementRowLocked(row, lockedTransIds, currentInvoiceNumber)) {
           toast.error(
-            "This statement is already linked to an invoice and cannot be selected again",
+            "This statement is already linked to another invoice and cannot be selected",
           );
           return prev;
         }
@@ -316,15 +346,20 @@ export default function PaymentLinkModal({
                     ) : (
                       filteredStatements.map((s, idx) => {
                         const isDeducted = deductedIds.has(s.id);
-                        const rowLocked = isStatementRowLocked(s, lockedTransIds);
+                        const rowLocked = isStatementRowLocked(s, lockedTransIds, currentInvoiceNumber);
                         const displayDate = s.date || s.txn_dated_deb || s.txn_posted_date || "-";
                         const invoiceNo = s.invoice_number || null;
+                        
+                        // If it's already linked to THIS invoice, we show a special badge
+                        const isLinkedToThis = (invoiceNo && currentInvoiceNumber && String(invoiceNo).trim() === String(currentInvoiceNumber).trim()) ||
+                                               (normalizeTransId(s.trans_id) && lockedTransIds.some(ltid => normalizeTransId(ltid) === normalizeTransId(s.trans_id)));
+
                         return (
                           <tr
                             key={s.id}
                             className={`border-t transition-colors ${
                               isDeducted
-                                ? "bg-green-50"
+                                ? isLinkedToThis ? "bg-blue-50" : "bg-green-50"
                                 : rowLocked
                                   ? "bg-gray-50/80 opacity-90"
                                   : "hover:bg-gray-50"
@@ -341,13 +376,17 @@ export default function PaymentLinkModal({
                               {s.description || "-"}
                             </td>
                             <td className="px-3 py-2">
-                              {invoiceNo ? (
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
+                              {isLinkedToThis ? (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded">
+                                  Current Invoice
+                                </span>
+                              ) : invoiceNo ? (
+                                <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-mono rounded">
                                   {invoiceNo}
                                 </span>
                               ) : isDeducted ? (
                                 <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">
-                                  This Invoice
+                                  Selected
                                 </span>
                               ) : (
                                 <span className="text-gray-300 text-xs">—</span>
@@ -365,22 +404,20 @@ export default function PaymentLinkModal({
                                 disabled={rowLocked && !isDeducted}
                                 title={
                                   rowLocked && !isDeducted
-                                    ? invoiceNo
-                                      ? `Already linked to invoice ${invoiceNo}`
-                                      : "Already added to this invoice"
+                                    ? `Already linked to invoice ${invoiceNo}`
                                     : isDeducted
-                                      ? "Undo selection"
+                                      ? isLinkedToThis ? "Unlink from invoice" : "Undo selection"
                                       : "Select this statement"
                                 }
                                 className={`w-7 h-7 rounded-full text-lg font-bold leading-none transition-all ${
                                   rowLocked && !isDeducted
                                     ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                                     : isDeducted
-                                      ? "bg-green-500 text-white hover:bg-red-400"
+                                      ? isLinkedToThis ? "bg-red-500 text-white hover:bg-red-600" : "bg-green-500 text-white hover:bg-red-400"
                                       : "bg-gray-200 text-gray-600 hover:bg-green-500 hover:text-white"
                                 }`}
                               >
-                                {isDeducted ? "✓" : rowLocked ? "—" : "+"}
+                                {isDeducted ? (isLinkedToThis ? "×" : "✓") : rowLocked ? "—" : "+"}
                               </button>
                             </td>
                           </tr>
@@ -434,7 +471,7 @@ export default function PaymentLinkModal({
             >
               {copied ? "Copied!" : "Copy Payment Link"}
             </button>
-            {onApply && deductedIds.size > 0 && (
+            {onApply && (
               <button
                 onClick={() => {
                   const selectedTransIds = filteredStatements
