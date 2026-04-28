@@ -559,21 +559,21 @@ const allMenuItems = [
   {
     name: "Main Expenses",
     moduleKey: "tally-payments",
-    roles: ["SUPERADMIN", "ACCOUNTANT"],
+    roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
     icon: "Receipt",
     children: [
       {
         path: "/admin-dashboard/client-expenses/cards",
         name: "Main Expenses",
         moduleKey: "client-expenses",
-        roles: ["SUPERADMIN", "ACCOUNTANT"],
+        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
         icon: "FileText",
       },
       {
         path: "/admin-dashboard/statements",
         name: "Statement",
         moduleKey: "statements",
-        roles: ["SUPERADMIN", "ACCOUNTANT"],
+        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
         icon: "Receipt",
       },
     ],
