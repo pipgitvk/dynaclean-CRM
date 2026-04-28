@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+import { normalizeRoleKey, isJwtAccountingRole } from "@/lib/roleKeyUtils";
 
 /** Attendance rules: SUPERADMIN + ADMIN + HR roles. */
 const ATTENDANCE_RULES_MIDDLEWARE_ROLES = [
@@ -75,20 +75,22 @@ export async function middleware(request) {
         }
       }
 
-      // Allow accountant-only admin pages before the global admin-dashboard redirect.
-      if (pathname.startsWith("/admin-dashboard/client-expenses")) {
-        if (role === "ACCOUNTANT" || role === "SUPERADMIN") {
-          return NextResponse.next();
-        }
-      }
-      if (pathname.startsWith("/admin-dashboard/statements")) {
-        if (role === "ACCOUNTANT" || role === "SUPERADMIN") {
+      // Allow accountant (+ variants e.g. Production Accountant) admin pages before global redirect.
+      const ACCOUNTANT_ADMIN_PREFIXES = [
+        "/admin-dashboard/client-expenses",
+        "/admin-dashboard/statements",
+        "/admin-dashboard/all-expenses",
+      ];
+      if (ACCOUNTANT_ADMIN_PREFIXES.some((p) => pathname.startsWith(p))) {
+        if (isJwtAccountingRole(role)) {
           return NextResponse.next();
         }
       }
 
       if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN") {
-        return NextResponse.redirect(new URL("/user-dashboard", request.url));
+        const dest = new URL("/user-dashboard", request.url);
+        dest.search = request.nextUrl.search;
+        return NextResponse.redirect(dest);
       }
 
       // SUPERADMIN-only modules (even if link is known)
