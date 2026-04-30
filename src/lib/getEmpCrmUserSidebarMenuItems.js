@@ -12,7 +12,7 @@ const empCrmUserMenuItems = [
   { path: "/empcrm/user-dashboard/leave-approvals", name: "Leave Approvals", roles: ["REPORTING_MANAGER"], icon: "CheckSquare" },
   { path: "/empcrm/user-dashboard/attendance-summary", name: "Attendance Summary", roles: ["ALL"], icon: "Grid3x3" },
   { path: "/empcrm/user-dashboard/attendance", name: "Attendance details", roles: ["ALL"], icon: "Clock" },
-  { path: "/empcrm/user-dashboard/attendance-regularization-approvals", name: "Regularization Approvals", roles: ["ALL"], icon: "ClipboardCheck" },
+  { path: "/empcrm/user-dashboard/overtime", name: "Overtime", roles: ["ALL"], icon: "ClipboardCheck" },
   { path: "/empcrm/user-dashboard/documents", name: "Documents", roles: ["ALL"], icon: "FileText" },
   { path: "/empcrm/user-dashboard/salary", name: "Salary", roles: ["ALL"], icon: "DollarSign" },
   { path: "/empcrm/user-dashboard/payslips", name: "Payslips", roles: ["ALL"], icon: "Receipt" },

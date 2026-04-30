@@ -17,27 +17,30 @@ function formatLogDate(v) {
   return new Date(v).toLocaleDateString();
 }
 
+function formatDateTime(v) {
+  if (v == null) return "";
+  return new Date(v).toLocaleString();
+}
+
 function proposedDiffersFromCurrent(original, proposed) {
   const cur = (formatTime(original) || "").trim();
   const next = (formatTime(proposed) || "").trim();
   return cur !== next;
 }
 
-export default function AttendanceRegularizationApprovalsPage() {
+export default function ApprovalHistoryPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actingId, setActingId] = useState(null);
-  const [commentById, setCommentById] = useState({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(
-        "/api/attendance/regularization?scope=pending-approvals"
+        "/api/attendance/regularization?scope=my-approvals"
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || "Failed to load requests");
+        throw new Error(data.error || "Failed to load approval history");
       }
       setRequests(data.requests || []);
     } catch (e) {
@@ -52,40 +55,10 @@ export default function AttendanceRegularizationApprovalsPage() {
     load();
   }, [load]);
 
-  const review = async (id, action) => {
-    setActingId(id);
-    try {
-      const res = await fetch("/api/attendance/regularization", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id,
-          action,
-          reviewer_comment: commentById[id] || null,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Action failed");
-      }
-      toast.success(data.message || "Done.");
-      setCommentById((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      load();
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setActingId(null);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[40vh]">
-        <p className="text-gray-600">Loading…</p>
+        <p className="text-gray-600">Loading approval history...</p>
       </div>
     );
   }
@@ -94,20 +67,27 @@ export default function AttendanceRegularizationApprovalsPage() {
     <div className="container mx-auto p-4 md:p-8 max-w-5xl">
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-          Attendance regularization — approvals
+          Approval History
         </h1>
-        <Link
-          href="/empcrm/user-dashboard/attendance"
-          className="text-sm font-medium text-teal-700 hover:text-teal-900 underline"
-        >
-          Back to attendance
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/empcrm/user-dashboard/overtime"
+            className="text-sm font-medium text-teal-700 hover:text-teal-900 underline"
+          >
+            Back to pending approvals
+          </Link>
+          <Link
+            href="/empcrm/user-dashboard/attendance"
+            className="text-sm font-medium text-teal-700 hover:text-teal-900 underline"
+          >
+            Back to attendance
+          </Link>
+        </div>
       </div>
 
       {requests.length === 0 ? (
         <p className="text-gray-600 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          No pending regularization requests from your reportees. If you are not
-          a reporting manager, this list stays empty.
+          No approval history found. You haven't approved or rejected any regularization requests yet.
         </p>
       ) : (
         <ul className="space-y-6">
@@ -123,14 +103,40 @@ export default function AttendanceRegularizationApprovalsPage() {
                     Date: {formatLogDate(req.log_date)}
                   </p>
                 </div>
-                <span className="text-xs font-medium uppercase tracking-wide text-amber-800 bg-amber-100 px-2 py-1 rounded">
-                  Pending
+                <span
+                  className={`text-xs font-medium uppercase tracking-wide px-2 py-1 rounded ${
+                    req.status === "approved"
+                      ? "text-green-800 bg-green-100"
+                      : "text-red-800 bg-red-100"
+                  }`}
+                >
+                  {req.status === "approved" ? "Approved" : "Rejected"}
                 </span>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Submitted on:</p>
+                  <p className="text-sm text-gray-700">{formatDateTime(req.created_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Reviewed on:</p>
+                  <p className="text-sm text-gray-700">{formatDateTime(req.reviewed_at)}</p>
+                </div>
+              </div>
+
               <p className="text-sm text-gray-700 mb-4">
                 <span className="font-medium">Reason:</span>{" "}
-                {req.reason || "—"}
+                {req.reason || "No reason provided"}
               </p>
+
+              {req.reviewer_comment && (
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Your remarks:</p>
+                  <p className="text-sm text-gray-700">{req.reviewer_comment}</p>
+                </div>
+              )}
+
               {req.attachment_url ? (
                 <p className="text-sm mb-4">
                   <a
@@ -143,13 +149,15 @@ export default function AttendanceRegularizationApprovalsPage() {
                   </a>
                 </p>
               ) : null}
+
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-gray-200 text-left text-gray-500">
                       <th className="py-2 pr-4 font-medium">Field</th>
                       <th className="py-2 pr-4 font-medium">Current</th>
-                      <th className="py-2 font-medium">Proposed</th>
+                      <th className="py-2 pr-4 font-medium">Requested</th>
+                      <th className="py-2 font-medium">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -161,51 +169,25 @@ export default function AttendanceRegularizationApprovalsPage() {
                         <tr key={key} className="border-b border-gray-100">
                           <td className="py-2 pr-4 text-gray-700">{label}</td>
                           <td className="py-2 pr-4 text-gray-600">
-                            {formatTime(orig) || "—"}
+                            {formatTime(orig) || "Absent"}
                           </td>
-                          <td className="py-2 font-medium text-teal-800">
-                            {changed ? formatTime(prop) || "—" : "—"}
+                          <td className="py-2 pr-4 font-medium text-teal-800">
+                            {changed ? formatTime(prop) || "Not specified" : "No change"}
+                          </td>
+                          <td className="py-2">
+                            {req.status === "approved" && changed ? (
+                              <span className="text-green-600 font-medium">Updated</span>
+                            ) : req.status === "rejected" && changed ? (
+                              <span className="text-red-600 font-medium">Rejected</span>
+                            ) : (
+                              <span className="text-gray-400">No change</span>
+                            )}
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-              </div>
-              <div className="mt-4">
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Comment (optional)
-                </label>
-                <textarea
-                  value={commentById[req.id] || ""}
-                  onChange={(e) =>
-                    setCommentById((prev) => ({
-                      ...prev,
-                      [req.id]: e.target.value,
-                    }))
-                  }
-                  rows={2}
-                  className="w-full max-w-xl px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  placeholder="Note for the employee (optional)"
-                />
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={actingId === req.id}
-                  onClick={() => review(req.id, "approve")}
-                  className="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                >
-                  {actingId === req.id ? "Working…" : "Approve & update log"}
-                </button>
-                <button
-                  type="button"
-                  disabled={actingId === req.id}
-                  onClick={() => review(req.id, "reject")}
-                  className="px-4 py-2 rounded-md text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
-                >
-                  Reject
-                </button>
               </div>
             </li>
           ))}
