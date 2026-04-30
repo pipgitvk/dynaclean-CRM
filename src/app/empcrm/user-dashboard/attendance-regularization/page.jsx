@@ -17,7 +17,6 @@ function formatLogDate(v) {
   return new Date(v).toLocaleDateString();
 }
 
-/** Proposed column only when employee actually changed this field vs current log */
 function proposedDiffersFromCurrent(original, proposed) {
   const cur = (formatTime(original) || "").trim();
   const next = (formatTime(proposed) || "").trim();
@@ -54,6 +53,13 @@ export default function AttendanceRegularizationApprovalsPage() {
   }, [load]);
 
   const review = async (id, action) => {
+    const remarks = commentById[id] || "";
+    
+    if (!remarks.trim()) {
+      toast.error("Remarks are mandatory. Please enter remarks before proceeding.");
+      return;
+    }
+    
     setActingId(id);
     try {
       const res = await fetch("/api/attendance/regularization", {
@@ -62,7 +68,7 @@ export default function AttendanceRegularizationApprovalsPage() {
         body: JSON.stringify({
           id,
           action,
-          reviewer_comment: commentById[id] || null,
+          reviewer_comment: remarks,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -97,12 +103,14 @@ export default function AttendanceRegularizationApprovalsPage() {
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
           Attendance regularization — approvals
         </h1>
-        <Link
-          href="/user-dashboard/attendance"
-          className="text-sm font-medium text-teal-700 hover:text-teal-900 underline"
-        >
-          Back to attendance
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/empcrm/user-dashboard/overtime/approval-history"
+            className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+          >
+            View approval history
+          </Link>
+                  </div>
       </div>
 
       {requests.length === 0 ? (
@@ -118,9 +126,7 @@ export default function AttendanceRegularizationApprovalsPage() {
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
                 <div>
-                  <p className="font-semibold text-gray-900">
-                    {req.username}
-                  </p>
+                  <p className="font-semibold text-gray-900">{req.username}</p>
                   {req.proxy_submitter_username ? (
                     <p className="text-sm text-teal-800">
                       Submitted by reporting manager:{" "}
@@ -137,7 +143,8 @@ export default function AttendanceRegularizationApprovalsPage() {
                 </span>
               </div>
               <p className="text-sm text-gray-700 mb-4">
-                <span className="font-medium">Reason:</span> {req.reason || "—"}
+                <span className="font-medium">Reason:</span>{" "}
+                {req.reason || "—"}
               </p>
               {req.attachment_url ? (
                 <p className="text-sm mb-4">
@@ -182,7 +189,7 @@ export default function AttendanceRegularizationApprovalsPage() {
               </div>
               <div className="mt-4">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Comment (optional)
+                  Remarks *
                 </label>
                 <textarea
                   value={commentById[req.id] || ""}
@@ -194,7 +201,8 @@ export default function AttendanceRegularizationApprovalsPage() {
                   }
                   rows={2}
                   className="w-full max-w-xl px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  placeholder="Note for the employee (optional)"
+                  placeholder="Enter remarks (mandatory)"
+                  required
                 />
               </div>
               <div className="mt-4 flex flex-wrap gap-2">

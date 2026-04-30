@@ -4,6 +4,7 @@
 CREATE TABLE IF NOT EXISTS attendance_regularization_requests (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(255) NOT NULL,
+  proxy_submitter_username VARCHAR(255) NULL DEFAULT NULL,
   log_date DATE NOT NULL,
   status VARCHAR(32) NOT NULL DEFAULT 'pending',
   reason TEXT NULL,

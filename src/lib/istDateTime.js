@@ -115,6 +115,16 @@ export function parseAttendanceClockMinutes(value) {
  */
 export function formatAttendanceTimeForDisplay(value) {
   if (value == null || value === "") return "";
+  // mysql2 returns JS Date for DATETIME; String(date) breaks naive parsing below
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    return value.toLocaleTimeString("en-IN", {
+      timeZone: IST_TIMEZONE,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
   const s = String(value).trim();
   const hasExplicitTz = /Z$/i.test(s) || /[+-]\d{2}:?\d{2}$/.test(s);
   if (!hasExplicitTz && !ATTENDANCE_DB_NAIVE_IS_UTC) {
