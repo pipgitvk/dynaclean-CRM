@@ -107,8 +107,7 @@ export default function AttendanceRegularizationApprovalsPage() {
 
       {requests.length === 0 ? (
         <p className="text-gray-600 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          No pending regularization requests from your reportees. If you are not
-          a reporting manager, this list stays empty.
+          No pending regularization requests.
         </p>
       ) : (
         <ul className="space-y-6">

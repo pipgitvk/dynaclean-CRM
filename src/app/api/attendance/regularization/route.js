@@ -119,6 +119,21 @@ export async function GET(request) {
       return NextResponse.json({ success: true, requests: rows });
     }
 
+    if (scope === "my-approvals") {
+      const reportees = await getReportees(session.username);
+      if (reportees.length === 0) {
+        return NextResponse.json({ success: true, requests: [] });
+      }
+      const ph = reportees.map(() => "?").join(", ");
+      const [rows] = await conn.execute(
+        `SELECT * FROM attendance_regularization_requests
+         WHERE reviewed_by = ? AND username IN (${ph})
+         ORDER BY reviewed_at DESC`,
+        [session.username, ...reportees]
+      );
+      return NextResponse.json({ success: true, requests: rows });
+    }
+
     return NextResponse.json({ success: false, error: "Invalid scope" }, { status: 400 });
   } catch (error) {
     console.error("attendance regularization GET:", error);

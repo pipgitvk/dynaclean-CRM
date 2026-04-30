@@ -732,20 +732,8 @@ const GenerateSalaryPage = () => {
                                     min={0}
                                     step={1}
                                     value={formData.present_days}
-                                    disabled={isLocked}
-                                    onChange={(e) => {
-                                        const raw = e.target.value;
-                                        const n =
-                                            raw === ""
-                                                ? 0
-                                                : Math.max(0, parseInt(raw, 10) || 0);
-                                        setFormData((prev) => ({ ...prev, present_days: n }));
-                                    }}
-                                    className={
-                                        isLocked
-                                            ? "w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
-                                            : "w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-2 focus:ring-purple-500 focus:outline-none"
-                                    }
+                                    disabled
+                                    className="w-full px-3 py-2 border rounded-md border-gray-200 bg-gray-100 text-gray-700 cursor-not-allowed"
                                 />
                             </div>
                             <div>
