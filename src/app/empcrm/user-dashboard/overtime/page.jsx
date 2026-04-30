@@ -106,23 +106,16 @@ export default function AttendanceRegularizationApprovalsPage() {
         <div className="flex gap-2">
           <Link
             href="/empcrm/user-dashboard/overtime/approval-history"
-            className="text-sm font-medium text-blue-700 hover:text-blue-900 underline"
+            className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
           >
             View approval history
           </Link>
-          <Link
-            href="/empcrm/user-dashboard/attendance"
-            className="text-sm font-medium text-teal-700 hover:text-teal-900 underline"
-          >
-            Back to attendance
-          </Link>
-        </div>
+                  </div>
       </div>
 
       {requests.length === 0 ? (
         <p className="text-gray-600 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          No pending regularization requests from your reportees. If you are not
-          a reporting manager, this list stays empty.
+          No pending regularization requests.
         </p>
       ) : (
         <ul className="space-y-6">

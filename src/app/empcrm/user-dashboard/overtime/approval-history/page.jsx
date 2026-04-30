@@ -31,6 +31,7 @@ function proposedDiffersFromCurrent(original, proposed) {
 export default function ApprovalHistoryPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [employeeFilter, setEmployeeFilter] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,6 +56,13 @@ export default function ApprovalHistoryPage() {
     load();
   }, [load]);
 
+  const uniqueEmployees = [...new Set(requests.map(req => req.username))].sort();
+  
+  const filteredRequests = requests.filter(req => 
+    employeeFilter === "" || 
+    req.username === employeeFilter
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[40vh]">
@@ -72,26 +80,45 @@ export default function ApprovalHistoryPage() {
         <div className="flex gap-2">
           <Link
             href="/empcrm/user-dashboard/overtime"
-            className="text-sm font-medium text-teal-700 hover:text-teal-900 underline"
+            className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
           >
             Back to pending approvals
-          </Link>
-          <Link
-            href="/empcrm/user-dashboard/attendance"
-            className="text-sm font-medium text-teal-700 hover:text-teal-900 underline"
-          >
-            Back to attendance
           </Link>
         </div>
       </div>
 
-      {requests.length === 0 ? (
+      {/* Employee Filter */}
+      <div className="mb-6">
+        <div className="max-w-md">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Filter by Employee Name
+          </label>
+          <select
+            value={employeeFilter}
+            onChange={(e) => setEmployeeFilter(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">All Employees</option>
+            {uniqueEmployees.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {filteredRequests.length === 0 && requests.length > 0 ? (
+        <p className="text-gray-600 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          No requests found matching "{employeeFilter}".
+        </p>
+      ) : requests.length === 0 ? (
         <p className="text-gray-600 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
           No approval history found. You haven't approved or rejected any regularization requests yet.
         </p>
       ) : (
         <ul className="space-y-6">
-          {requests.map((req) => (
+          {filteredRequests.map((req) => (
             <li
               key={req.id}
               className="rounded-lg border border-gray-200 bg-white p-4 md:p-6 shadow-sm"
