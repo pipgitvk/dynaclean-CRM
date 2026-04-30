@@ -32,6 +32,11 @@ const nextConfig = {
         source: "/expenses-attachments/:path*",
         destination: "/expense_attachments/:path*",
       },
+      // Serve uploaded files via API route
+      {
+        source: "/uploads/:path*",
+        destination: "/api/serve-file?path=/uploads/:path*",
+      },
     ];
   },
 };
