@@ -17,6 +17,15 @@ function formatDt(v) {
   return formatTime(v) || "—";
 }
 
+/** Prefer proposed times; if none on request, show snapshot from log at request time */
+function displayIn(req) {
+  return req.proposed_checkin_time ?? req.original_checkin_time ?? null;
+}
+
+function displayOut(req) {
+  return req.proposed_checkout_time ?? req.original_checkout_time ?? null;
+}
+
 function statusBadge(status) {
   const s = String(status || "").toLowerCase();
   if (s === "pending") {
@@ -120,8 +129,9 @@ export default function AdminAttendanceRegularizationPage() {
             Attendance regularization — all requests
           </h1>
           <p className="text-sm text-gray-600 mt-1">
-            Submissions from employees; reviewed by reporting managers. Admin
-            overview.
+            In/Out show requested times; if none were saved on the request, the
+            prior log snapshot is shown when available. New overtime requests
+            require both times.
           </p>
         </div>
         <Link
@@ -239,11 +249,11 @@ export default function AdminAttendanceRegularizationPage() {
                       <div className="flex flex-col gap-0.5">
                         <div>
                           <span className="text-gray-500">In:</span>{" "}
-                          {formatDt(req.proposed_checkin_time)}
+                          {formatDt(displayIn(req))}
                         </div>
                         <div>
                           <span className="text-gray-500">Out:</span>{" "}
-                          {formatDt(req.proposed_checkout_time)}
+                          {formatDt(displayOut(req))}
                         </div>
                         <div>
                           <span className="text-gray-500">By:</span>{" "}
