@@ -15,7 +15,7 @@ export default function AddClientExpenseForm({ initialClient = "", initialGroup 
   // Clean up '—' placeholder for group name
   const defaultGroup = (initialGroup === "—" || initialGroup === "-" || initialGroup === "–") ? "" : initialGroup;
 
-  const { register, handleSubmit, reset, control, setValue } = useForm({
+  const { register, handleSubmit, reset, control, setValue, formState: { errors } } = useForm({
     defaultValues: {
       client_name: initialClient,
       group_name: defaultGroup,
@@ -174,17 +174,30 @@ export default function AddClientExpenseForm({ initialClient = "", initialGroup 
         {showSubHead && (
           <div className="min-w-0">
             <label className="block text-sm font-medium mb-1">
-              Sub-head <span className="text-gray-500 font-normal">(one or more)</span>
+              Sub-head <span className="text-gray-500 font-normal">(one or more) *</span>
             </label>
             <Controller
               name="sub_heads"
               control={control}
-              render={({ field }) => (
-                <SubHeadMultiSelect
-                  options={subHeadOptions}
-                  value={field.value}
-                  onChange={field.onChange}
-                />
+              rules={{
+                validate: (value) => {
+                  if (showSubHead && (!value || value.length === 0)) {
+                    return "At least one sub-head must be selected";
+                  }
+                  return true;
+                }
+              }}
+              render={({ field, fieldState: { error } }) => (
+                <div>
+                  <SubHeadMultiSelect
+                    options={subHeadOptions}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                  {error && (
+                    <p className="text-red-500 text-sm mt-1">{error.message}</p>
+                  )}
+                </div>
               )}
             />
           </div>
