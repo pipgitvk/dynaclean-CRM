@@ -120,16 +120,11 @@ export async function GET(request) {
     }
 
     if (scope === "my-approvals") {
-      const reportees = await getReportees(session.username);
-      if (reportees.length === 0) {
-        return NextResponse.json({ success: true, requests: [] });
-      }
-      const ph = reportees.map(() => "?").join(", ");
       const [rows] = await conn.execute(
         `SELECT * FROM attendance_regularization_requests
-         WHERE reviewed_by = ? AND username IN (${ph})
+         WHERE reviewed_by = ?
          ORDER BY reviewed_at DESC`,
-        [session.username, ...reportees]
+        [session.username]
       );
       return NextResponse.json({ success: true, requests: rows });
     }
