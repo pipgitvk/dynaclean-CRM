@@ -31,6 +31,16 @@ function hasPendingRegularization(regularization) {
   return regularization && regularization.status === 'pending';
 }
 
+// Helper function to check if employee has approved regularization
+function hasApprovedRegularization(regularization) {
+  return regularization && regularization.status === 'approved';
+}
+
+// Helper function to check if employee has rejected regularization
+function hasRejectedRegularization(regularization) {
+  return regularization && regularization.status === 'rejected';
+}
+
 export default function OvertimeManagementPage() {
   const [employeesWithAttendance, setEmployeesWithAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +54,13 @@ export default function OvertimeManagementPage() {
     attachment: null
   });
   const [showForm, setShowForm] = useState(false);
+  const [showRemarksModal, setShowRemarksModal] = useState(false);
+  const [selectedRemarks, setSelectedRemarks] = useState("");
+
+  const showRemarks = (remarks) => {
+    setSelectedRemarks(remarks);
+    setShowRemarksModal(true);
+  };
 
   const fetchEmployeesWithAttendance = useCallback(async () => {
     setLoading(true);
@@ -260,25 +277,64 @@ export default function OvertimeManagementPage() {
                         }
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          hasPendingRegularization(employee.regularization)
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : employee.attendance 
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                        }`}>
-                          {hasPendingRegularization(employee.regularization)
-                            ? 'Pending'
-                            : employee.attendance 
-                              ? 'Present' 
-                              : 'Absent'
-                          }
-                        </span>
+                        {hasPendingRegularization(employee.regularization) ? (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            Pending
+                          </span>
+                        ) : hasApprovedRegularization(employee.regularization) ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                              Approved
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => showRemarks(employee.regularization.reviewer_comment)}
+                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                              title="View approval remarks"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : hasRejectedRegularization(employee.regularization) ? (
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                              Rejected
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => showRemarks(employee.regularization.reviewer_comment)}
+                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                              title="View rejection remarks"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        ) : employee.attendance ? (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                            Present
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                            Absent
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {hasPendingRegularization(employee.regularization) ? (
                           <span className="text-yellow-600 text-sm">
                             Regularization Pending
+                          </span>
+                        ) : hasApprovedRegularization(employee.regularization) ? (
+                          <span className="text-green-600 text-sm">
+                            Regularization Approved
+                          </span>
+                        ) : hasRejectedRegularization(employee.regularization) ? (
+                          <span className="text-red-600 text-sm">
+                            Regularization Rejected
                           </span>
                         ) : hasAttendanceIssues(employee.attendance) ? (
                           <button
@@ -405,6 +461,36 @@ export default function OvertimeManagementPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Remarks Modal */}
+        {showRemarksModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">Remarks</h3>
+                <button
+                  onClick={() => setShowRemarksModal(false)}
+                  className="text-gray-500 hover:text-gray-800"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-sm text-gray-800">
+                  {selectedRemarks || "No remarks provided."}
+                </p>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => setShowRemarksModal(false)}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
