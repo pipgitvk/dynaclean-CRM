@@ -35,6 +35,7 @@ export async function GET(req) {
     const status = searchParams.get("status");
     const employeeName = searchParams.get("employeeName");
     const stage = searchParams.get("stage");
+    const contactedTimeFilter = searchParams.get("contactedTimeFilter");
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
     const pageSizeRaw = parseInt(searchParams.get("pageSize") || "50", 10);
     const pageSize = Math.min(Math.max(pageSizeRaw || 50, 10), 200);
@@ -95,6 +96,7 @@ export async function GET(req) {
       params.push(employeeName, employeeName, employeeName);
     }
 
+    
     // search functionality (ID, phone, name, email - matches All Clients)
     const search = searchParams.get("search");
 
@@ -153,15 +155,57 @@ export async function GET(req) {
     const offset = (currentPage - 1) * pageSize;
 
     const dataSql =
-      "SELECT customer_id, date_created, lead_campaign, first_name, company, status, lead_source, stage from customers" +
+      "SELECT c.customer_id, c.date_created, c.lead_campaign, c.first_name, c.company, c.status, c.lead_source, c.stage, " +
+      "(SELECT MIN(cf.followed_date) FROM customers_followup cf WHERE cf.customer_id = c.customer_id) as contacted_time, " +
+      "(SELECT cf.next_followup_date FROM customers_followup cf WHERE cf.customer_id = c.customer_id AND cf.next_followup_date IS NOT NULL ORDER BY cf.followed_date ASC LIMIT 1) as next_followup_time, " +
+      "(SELECT COUNT(*) FROM customers_followup cf WHERE cf.customer_id = c.customer_id) as followup_count " +
+      "FROM customers c" +
       whereClause +
-      " ORDER BY date_created DESC LIMIT ? OFFSET ?";
+      " ORDER BY c.date_created DESC LIMIT ? OFFSET ?";
 
     const dataParams = [...params, pageSize, offset];
     const [customerRows] = await conn.execute(dataSql, dataParams);
 
+    // Apply contacted time filter in application layer
+    let filteredCustomers = customerRows;
+    if (contactedTimeFilter && contactedTimeFilter !== "all") {
+      const timeLimits = {
+        "1min": 1,
+        "2min": 2,
+        "3min": 3,
+        "4min": 4,
+        "5min": 5,
+        "10min": 10,
+        "15min": 15,
+        "20min": 20,
+        "30min": 30,
+        "1hour": 60,
+        "2hour": 120,
+        "3hour": 180,
+        "4hour": 240,
+        "5hour": 300
+      };
+      
+      if (contactedTimeFilter === "morethan5hour") {
+        filteredCustomers = customerRows.filter(customer => {
+          if (!customer.contacted_time || !customer.next_followup_time) return false;
+          const diffMs = new Date(customer.next_followup_time) - new Date(customer.contacted_time);
+          const diffMinutes = Math.floor(diffMs / (1000 * 60));
+          return diffMinutes > 300;
+        });
+      } else if (timeLimits[contactedTimeFilter]) {
+        const maxMinutes = timeLimits[contactedTimeFilter];
+        filteredCustomers = customerRows.filter(customer => {
+          if (!customer.contacted_time || !customer.next_followup_time) return false;
+          const diffMs = new Date(customer.next_followup_time) - new Date(customer.contacted_time);
+          const diffMinutes = Math.floor(diffMs / (1000 * 60));
+          return diffMinutes <= maxMinutes;
+        });
+      }
+    }
+
     return NextResponse.json({
-      customers: customerRows,
+      customers: filteredCustomers,
       employees,
       total,
       totalPages,
