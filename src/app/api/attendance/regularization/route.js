@@ -12,10 +12,6 @@ import {
   canProxyAttendanceRegularization,
   resolveRoleForAttendanceAdmin,
 } from "@/lib/adminAttendanceRulesAuth";
-import {
-  ensureProxySubmitterColumn,
-  pendingRegularizationWhereClause,
-} from "@/lib/attendanceRegularizationPending";
 
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_MIME = new Set([
@@ -78,11 +74,11 @@ export async function GET(request) {
       const isReportingManager = reportees.length > 0;
       let managerPendingCount = 0;
       if (isReportingManager) {
-        const useProxy = await ensureProxySubmitterColumn(conn);
-        const { sql, params } = pendingRegularizationWhereClause(reportees, useProxy);
+        const ph = reportees.map(() => "?").join(", ");
         const [r] = await conn.execute(
-          `SELECT COUNT(*) AS c FROM attendance_regularization_requests WHERE ${sql}`,
-          params
+          `SELECT COUNT(*) AS c FROM attendance_regularization_requests
+           WHERE status = 'pending' AND username IN (${ph})`,
+          reportees
         );
         managerPendingCount = Number(r[0]?.c) || 0;
       }
@@ -113,13 +109,12 @@ export async function GET(request) {
       if (reportees.length === 0) {
         return NextResponse.json({ success: true, requests: [] });
       }
-      const useProxy = await ensureProxySubmitterColumn(conn);
-      const { sql, params } = pendingRegularizationWhereClause(reportees, useProxy);
+      const ph = reportees.map(() => "?").join(", ");
       const [rows] = await conn.execute(
         `SELECT * FROM attendance_regularization_requests
-         WHERE ${sql}
+         WHERE status = 'pending' AND username IN (${ph})
          ORDER BY created_at ASC`,
-        params
+        reportees
       );
       return NextResponse.json({ success: true, requests: rows });
     }
@@ -406,14 +401,7 @@ export async function PATCH(request) {
       );
     }
 
-    const proxySubmitter =
-      reqRow.proxy_submitter_username != null &&
-      String(reqRow.proxy_submitter_username).trim() !== ""
-        ? String(reqRow.proxy_submitter_username).trim()
-        : null;
-    const allowed = proxySubmitter
-      ? await isReportingManagerOf(session.username, proxySubmitter)
-      : await isReportingManagerOf(session.username, reqRow.username);
+    const allowed = await isReportingManagerOf(session.username, reqRow.username);
     if (!allowed) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }

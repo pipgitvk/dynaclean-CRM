@@ -41,6 +41,12 @@ const SkeletonRows = () => (
         <td className="px-3 py-4">
           <div className="h-4 bg-gray-200 rounded w-1/3"></div>
         </td>
+        <td className="px-3 py-4">
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+        </td>
+        <td className="px-3 py-4">
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+        </td>
       </tr>
     ))}
   </>
@@ -129,18 +135,36 @@ export default function CustomerTable({ customers, isLoading }) {
       return;
     }
     const doc = new jsPDF();
-    const tableData = filteredCustomers.map((c, i) => [
-      i + 1,
-      dayjs.utc(c.date_created).format("DD-MMM-YYYY"),
-      c.lead_campaign,
-      c.first_name,
-      c.company,
-      c.status,
-      c.stage || "-",
-      c.lead_source,
-    ]);
+    const tableData = filteredCustomers.map((c, i) => {
+      let contactedValue = "-";
+      if (c.contacted_time && c.next_followup_time) {
+        const diff = dayjs.utc(c.next_followup_time).diff(dayjs.utc(c.contacted_time));
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        let result = '';
+        if (days > 0) result += `${days}d `;
+        if (hours > 0) result += `${hours}h `;
+        if (minutes > 0) result += `${minutes}m`;
+        if (result === '') result = '0m';
+        contactedValue = result.trim();
+      }
+      
+      return [
+        i + 1,
+        dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm"),
+        c.lead_campaign,
+        c.first_name,
+        c.company,
+        c.status,
+        c.stage || "-",
+        c.lead_source,
+        c.next_followup_time ? dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm") : "-",
+        contactedValue,
+      ];
+    });
     autoTable(doc, {
-      head: [["#", "Date", "Campaign", "Name", "Company", "Status", "Stage", "Source"]],
+      head: [["#", "Date", "Campaign", "Name", "Company", "Status", "Stage", "Source", "Next Followup", "Contacted"]],
       body: tableData,
       styles: { fontSize: 8 },
       headStyles: { fillColor: "#e5e7eb", textColor: 0, fontStyle: "bold" },
@@ -162,7 +186,10 @@ export default function CustomerTable({ customers, isLoading }) {
                 <th className="px-3 py-3 font-semibold text-left">Name</th>
                 <th className="px-3 py-3 font-semibold text-left">Company</th>
                 <th className="px-3 py-3 font-semibold text-left">Status</th>
+                <th className="px-3 py-3 font-semibold text-left">Stage</th>
                 <th className="px-3 py-3 font-semibold text-left">Source</th>
+                <th className="px-3 py-3 font-semibold text-left">Next Followup</th>
+                <th className="px-3 py-3 font-semibold text-left">Contacted</th>
                 <th className="px-3 py-3 font-semibold text-left">Actions</th>
               </tr>
             </thead>
@@ -221,6 +248,8 @@ export default function CustomerTable({ customers, isLoading }) {
               <th className="px-3 py-3 font-semibold text-left">Status</th>
               <th className="px-3 py-3 font-semibold text-left">Stage</th>
               <th className="px-3 py-3 font-semibold text-left">Source</th>
+              <th className="px-3 py-3 font-semibold text-left">Next Followup</th>
+              <th className="px-3 py-3 font-semibold text-left">Contacted</th>
               <th className="px-3 py-3 font-semibold text-left">Actions</th>
             </tr>
           </thead>
@@ -233,7 +262,7 @@ export default function CustomerTable({ customers, isLoading }) {
                 >
                   <td className="px-3 py-3">{i + 1}</td>
                   <td className="px-3 py-3 text-left">
-                    {dayjs.utc(c.date_created).format("DD-MMM-YYYY")}
+                    {dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm")}
                   </td>
                   <td className="px-3 py-3 text-left">{c.lead_campaign}</td>
                   <td className="px-3 py-3 text-left">{c.first_name}</td>
@@ -252,6 +281,35 @@ export default function CustomerTable({ customers, isLoading }) {
                   </td>
                   <td className="px-3 py-3 text-left">{c.lead_source}</td>
                   <td className="px-3 py-3 text-left">
+                    {c.next_followup_time ? (
+                      <span className="text-orange-600 font-medium">
+                        {dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm")}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-left">
+                    {c.contacted_time && c.next_followup_time ? (
+                      <span className="text-green-600 font-medium">
+                        {(() => {
+                          const diff = dayjs.utc(c.next_followup_time).diff(dayjs.utc(c.contacted_time));
+                          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                          const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                          let result = '';
+                          if (days > 0) result += `${days}d `;
+                          if (hours > 0) result += `${hours}h `;
+                          if (minutes > 0) result += `${minutes}m`;
+                          if (result === '') result = '0m';
+                          return result.trim();
+                        })()}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-left">
                     <Link
                       href={`/admin-dashboard/view-customer/${c.customer_id}`}
                       className="text-blue-600 hover:underline"
@@ -263,7 +321,7 @@ export default function CustomerTable({ customers, isLoading }) {
               ))
             ) : (
               <tr>
-                <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="10" className="px-6 py-4 text-center text-gray-500">
                   No customers found.
                 </td>
               </tr>
@@ -282,7 +340,7 @@ export default function CustomerTable({ customers, isLoading }) {
               <div className="flex justify-between items-center text-gray-500">
                 <span className="text-xs font-medium">#{i + 1}</span>
                 <span className="font-medium text-gray-800">
-                  {dayjs.utc(c.date_created).format("DD-MMM-YYYY")}
+                  {dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm")}
                 </span>
               </div>
               <div className="space-y-1">
@@ -303,6 +361,37 @@ export default function CustomerTable({ customers, isLoading }) {
                 </div>
                 <div>
                   <strong>Source:</strong> {c.lead_source}
+                </div>
+                <div>
+                  <strong>Next Followup:</strong> 
+                  {c.next_followup_time ? (
+                    <span className="text-orange-600 font-medium ml-1">
+                      {dayjs.utc(c.next_followup_time).format("DD-MMM-YYYY HH:mm")}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 ml-1">-</span>
+                  )}
+                </div>
+                <div>
+                  <strong>Contacted:</strong> 
+                  {c.contacted_time && c.next_followup_time ? (
+                    <span className="text-green-600 font-medium ml-1">
+                      {(() => {
+                        const diff = dayjs.utc(c.next_followup_time).diff(dayjs.utc(c.contacted_time));
+                        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                        let result = '';
+                        if (days > 0) result += `${days}d `;
+                        if (hours > 0) result += `${hours}h `;
+                        if (minutes > 0) result += `${minutes}m`;
+                        if (result === '') result = '0m';
+                        return result.trim();
+                      })()}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 ml-1">-</span>
+                  )}
                 </div>
                 <div>
                   <Link

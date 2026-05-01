@@ -2,10 +2,6 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getReportees } from "@/lib/reportingManager";
 import { getDbConnection } from "@/lib/db";
-import {
-  ensureProxySubmitterColumn,
-  pendingRegularizationWhereClause,
-} from "@/lib/attendanceRegularizationPending";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -32,11 +28,11 @@ async function getPendingOvertimeCount(username) {
     const reportees = await getReportees(username);
     if (reportees.length === 0) return 0;
     
-    const useProxy = await ensureProxySubmitterColumn(conn);
-    const { sql, params } = pendingRegularizationWhereClause(reportees, useProxy);
+    const ph = reportees.map(() => "?").join(", ");
     const [rows] = await conn.execute(
-      `SELECT COUNT(*) AS count FROM attendance_regularization_requests WHERE ${sql}`,
-      params
+      `SELECT COUNT(*) AS count FROM attendance_regularization_requests
+       WHERE status = 'pending' AND username IN (${ph})`,
+      reportees
     );
     return Number(rows[0]?.count) || 0;
   } catch (error) {
