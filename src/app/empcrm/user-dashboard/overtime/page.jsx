@@ -102,9 +102,7 @@ export default function OvertimeManagementPage() {
         throw new Error(data.error || "Failed to submit regularization request");
       }
       
-      toast.success(
-        "Regularization sent to your reporting manager for approval"
-      );
+      toast.success("Regularization request submitted for approval");
       setShowForm(false);
       setRegularizationForm({
         checkin_time: "",

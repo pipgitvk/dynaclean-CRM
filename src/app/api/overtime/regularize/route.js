@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { getReportees, getReportingManagerForEmployee } from "@/lib/reportingManager";
-import { ensureProxySubmitterColumn } from "@/lib/attendanceRegularizationPending";
+import { getReportees } from "@/lib/reportingManager";
 import fs from "fs/promises";
 import path from "path";
 
@@ -126,18 +125,6 @@ export async function POST(req) {
       };
     }
 
-    const submittersManager = await getReportingManagerForEmployee(session.username);
-    console.log("Submitter's reporting manager (must approve):", submittersManager);
-    if (!submittersManager) {
-      return NextResponse.json(
-        {
-          error:
-            "Your reporting manager must be assigned in Employees before you can submit regularization for your team.",
-        },
-        { status: 400 }
-      );
-    }
-
     // Handle file attachment
     let attachmentUrl = null;
     if (attachment && attachment.size > 0) {
@@ -162,41 +149,21 @@ export async function POST(req) {
     }
 
     console.log("Inserting regularization request...");
-    const useProxyColumn = await ensureProxySubmitterColumn(conn);
-    const insertCols = useProxyColumn
-      ? `(username, proxy_submitter_username, log_date, original_checkin_time, original_checkout_time,
-        proposed_checkin_time, proposed_checkout_time, reason, attachment_url, status)`
-      : `(username, log_date, original_checkin_time, original_checkout_time,
-        proposed_checkin_time, proposed_checkout_time, reason, attachment_url, status)`;
-    const insertVals = useProxyColumn
-      ? `(?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
-      : `(?, ?, ?, ?, ?, ?, ?, ?, 'pending')`;
-    const insertParams = useProxyColumn
-      ? [
-          employee,
-          session.username,
-          date,
-          currentAttendance.checkin_time,
-          currentAttendance.checkout_time,
-          proposedCheckinDt,
-          proposedCheckoutDt,
-          reason.trim(),
-          attachmentUrl,
-        ]
-      : [
-          employee,
-          date,
-          currentAttendance.checkin_time,
-          currentAttendance.checkout_time,
-          proposedCheckinDt,
-          proposedCheckoutDt,
-          reason.trim(),
-          attachmentUrl,
-        ];
-
     const [result] = await conn.execute(
-      `INSERT INTO attendance_regularization_requests ${insertCols} VALUES ${insertVals}`,
-      insertParams
+      `INSERT INTO attendance_regularization_requests 
+       (username, log_date, original_checkin_time, original_checkout_time,
+        proposed_checkin_time, proposed_checkout_time, reason, attachment_url, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+      [
+        employee,
+        date,
+        currentAttendance.checkin_time,
+        currentAttendance.checkout_time,
+        proposedCheckinDt,
+        proposedCheckoutDt,
+        reason.trim(),
+        attachmentUrl,
+      ]
     );
 
     console.log("Request inserted successfully:", result.insertId);

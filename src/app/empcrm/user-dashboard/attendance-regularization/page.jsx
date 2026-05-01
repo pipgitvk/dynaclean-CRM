@@ -127,13 +127,6 @@ export default function AttendanceRegularizationApprovalsPage() {
               <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
                 <div>
                   <p className="font-semibold text-gray-900">{req.username}</p>
-                  {req.proxy_submitter_username ? (
-                    <p className="text-sm text-teal-800">
-                      Submitted by reporting manager:{" "}
-                      <span className="font-medium">{req.proxy_submitter_username}</span>{" "}
-                      (for this employee&apos;s attendance)
-                    </p>
-                  ) : null}
                   <p className="text-sm text-gray-600">
                     Date: {formatLogDate(req.log_date)}
                   </p>
