@@ -31,6 +31,7 @@ const AttendancePage = () => {
   const [regModalDateKey, setRegModalDateKey] = useState("");
   const [showRemarksModal, setShowRemarksModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState("");
+  const [reportingManager, setReportingManager] = useState(null);
 
   const fetchAttendance = async () => {
     setLoading(true);
@@ -87,6 +88,10 @@ const AttendancePage = () => {
   useEffect(() => {
     if (!loading) refreshRegularization();
   }, [loading, refreshRegularization]);
+
+  useEffect(() => {
+    fetchReportingManager();
+  }, []);
 
   const logDateKeyForReg = (log) =>
     log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
@@ -151,9 +156,23 @@ const AttendancePage = () => {
     setShowRemarksModal(true);
   };
 
-  const showApprovalRemarks = (remarks) => {
+  const showRemarks = (remarks) => {
     setSelectedRemarks(remarks);
     setShowRemarksModal(true);
+  };
+
+  const fetchReportingManager = async () => {
+    try {
+      const res = await fetch("/api/user/reporting-manager");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setReportingManager(data.reportingManager);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching reporting manager:", error);
+    }
   };
 
   const openHolidayModal = async () => {
@@ -331,10 +350,27 @@ const AttendancePage = () => {
   return (
     <>
       <div className="container mx-auto p-4 md:p-8 max-w-7xl">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 text-center flex-1">
+        <div className="flex flex-col items-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 text-center mb-2">
             Attendance details
           </h1>
+                    
+          {reportingManager && (
+            <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-full">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>Reporting Manager: <strong>{reportingManager.name}</strong></span>
+            </div>
+          )}
+          
+          {!reportingManager && (
+            <div className="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
+              No reporting manager assigned
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end mb-6">
           <button
             onClick={() => setFilterStatus("regularize")}
             className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm bg-teal-600 text-white hover:bg-teal-700 transition-colors shadow-md shrink-0"
@@ -763,46 +799,44 @@ const AttendancePage = () => {
                         </td>
                         {filterStatus === "regularize" && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {rowNeedsRegularization(log) ? (
-                              pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                                <span className="text-amber-700 font-medium">Pending</span>
-                              ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-red-600 font-medium text-sm">Rejected</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                    title="View rejection remarks"
-                                  >
-                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-green-600 font-medium text-sm">Approved</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                    title="View approval remarks"
-                                  >
-                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              ) : (
+                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
+                              <span className="text-amber-700 font-medium">Pending</span>
+                            ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-red-600 font-medium text-sm">Rejected</span>
                                 <button
                                   type="button"
-                                  onClick={() => openRegularizeModal(log)}
-                                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                                  onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                  title="View rejection remarks"
                                 >
-                                  Regularize
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                  </svg>
                                 </button>
-                              )
+                              </div>
+                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-green-600 font-medium text-sm">Approved</span>
+                                <button
+                                  type="button"
+                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                  title="View approval remarks"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ) : rowNeedsRegularization(log) ? (
+                              <button
+                                type="button"
+                                onClick={() => openRegularizeModal(log)}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                              >
+                                Regularize
+                              </button>
                             ) : null}
                           </td>
                         )}
@@ -856,6 +890,65 @@ const AttendancePage = () => {
                                   </svg>
                                 </button>
                               </div>
+                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-green-600 font-medium text-sm">
+                                  Request Approved
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                  title="View approval remarks"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openRegularizeModal(log)}
+                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                              >
+                                Regularize
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {filterStatus === "regularize" && (
+                          <div className="mt-3 flex justify-center">
+                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
+                              <span className="text-amber-700 font-medium text-sm">Pending</span>
+                            ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-red-600 font-medium text-sm">Rejected</span>
+                                <button
+                                  type="button"
+                                  onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                  title="View rejection remarks"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-green-600 font-medium text-sm">Approved</span>
+                                <button
+                                  type="button"
+                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
+                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                  title="View approval remarks"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 type="button"
@@ -873,7 +966,7 @@ const AttendancePage = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={filterStatus === "regularize" ? 7 : 6} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={filterStatus === "regularize" ? 6 : 5} className="px-6 py-4 text-center text-gray-500">
                     No attendance logs found for the selected filter.
                   </td>
                 </tr>

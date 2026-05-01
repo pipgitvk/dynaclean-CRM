@@ -87,13 +87,14 @@ export async function GET(request) {
       });
     }
 
-    // Get pending regularization requests
+    // Get all regularization requests (pending, approved, rejected)
     const regularizationData = new Map();
     try {
       const [regularizationRows] = await conn.execute(
-        `SELECT username, status, proposed_checkin_time, proposed_checkout_time
+        `SELECT username, status, proposed_checkin_time, proposed_checkout_time, reviewer_comment
          FROM attendance_regularization_requests 
-         WHERE username IN (${ph}) AND DATE(log_date) = ? AND status = 'pending'`,
+         WHERE username IN (${ph}) AND DATE(log_date) = ? 
+         ORDER BY created_at DESC`,
         [...reportees, date]
       );
       
@@ -101,7 +102,8 @@ export async function GET(request) {
         regularizationData.set(row.username, {
           status: row.status,
           proposed_checkin_time: row.proposed_checkin_time,
-          proposed_checkout_time: row.proposed_checkout_time
+          proposed_checkout_time: row.proposed_checkout_time,
+          reviewer_comment: row.reviewer_comment
         });
       });
     } catch (error) {
