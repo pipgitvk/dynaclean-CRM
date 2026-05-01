@@ -126,6 +126,20 @@ const AttendancePage = () => {
     return m;
   }, [myRegRequests]);
 
+  const approvedRegByDate = useMemo(() => {
+    const m = new Map();
+    for (const r of myRegRequests) {
+      if (r.status !== "approved") continue;
+      let k = r.log_date;
+      if (k == null) continue;
+      if (typeof k === "string") k = k.slice(0, 10);
+      else if (k instanceof Date) k = k.toISOString().slice(0, 10);
+      else k = String(k).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) m.set(k, r);
+    }
+    return m;
+  }, [myRegRequests]);
+
   const openRegularizeModal = (log) => {
     setRegModalLog(log);
     setRegModalDateKey(logDateKeyForReg(log));
@@ -133,6 +147,11 @@ const AttendancePage = () => {
   };
 
   const showRejectionRemarks = (remarks) => {
+    setSelectedRemarks(remarks);
+    setShowRemarksModal(true);
+  };
+
+  const showApprovalRemarks = (remarks) => {
     setSelectedRemarks(remarks);
     setShowRemarksModal(true);
   };
@@ -599,6 +618,22 @@ const AttendancePage = () => {
                               </svg>
                             </button>
                           </div>
+                        ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-green-600 font-medium text-sm">
+                              Request Approved
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
+                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                              title="View approval remarks"
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
                         ) : (
                           <button
                             type="button"
@@ -745,6 +780,20 @@ const AttendancePage = () => {
                                     </svg>
                                   </button>
                                 </div>
+                              ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-green-600 font-medium text-sm">Approved</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
+                                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                    title="View approval remarks"
+                                  >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
                               ) : (
                                 <button
                                   type="button"
@@ -883,7 +932,7 @@ const AttendancePage = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold">Rejection Remarks</h3>
+              <h3 className="text-lg font-semibold">Remarks</h3>
               <button
                 onClick={() => setShowRemarksModal(false)}
                 className="text-gray-500 hover:text-gray-800"
@@ -891,8 +940,8 @@ const AttendancePage = () => {
                 ✕
               </button>
             </div>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-800">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <p className="text-sm text-gray-800">
                 {selectedRemarks || "No remarks provided."}
               </p>
             </div>
