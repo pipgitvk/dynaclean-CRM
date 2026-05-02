@@ -32,10 +32,11 @@ const nextConfig = {
         source: "/expenses-attachments/:path*",
         destination: "/expense_attachments/:path*",
       },
-      // Serve uploaded files via API route
+      // Serve uploaded files via catch-all API route (query-string rewrites do not
+      // reliably pass :path* into ?path=, which caused {"error":"File path required"}).
       {
         source: "/uploads/:path*",
-        destination: "/api/serve-file?path=/uploads/:path*",
+        destination: "/api/serve/:path*",
       },
     ];
   },
