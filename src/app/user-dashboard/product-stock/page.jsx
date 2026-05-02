@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
-import { Eye, Search, Pencil } from "lucide-react";
+import { Eye, Search, Pencil, ArrowRightLeft } from "lucide-react";
 import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
 
@@ -257,6 +257,12 @@ export default function ProductStockForm() {
   });
   const [savingLocation, setSavingLocation] = useState(false);
   const [userRole, setUserRole] = useState("");
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [transferQuantity, setTransferQuantity] = useState("");
+  const [fromGodown, setFromGodown] = useState("");
+  const [toGodown, setToGodown] = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -318,6 +324,73 @@ export default function ProductStockForm() {
     } finally {
       setSavingLocation(false);
     }
+  };
+
+  const handleStockTransfer = async () => {
+    if (!selectedProduct || !transferQuantity || !fromGodown || !toGodown) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    if (fromGodown === toGodown) {
+      alert("Source and destination godowns cannot be the same");
+      return;
+    }
+
+    const quantity = parseInt(transferQuantity);
+    const availableQuantity = fromGodown === "Delhi" ? selectedProduct.delhi : selectedProduct.south;
+    
+    if (quantity > availableQuantity) {
+      alert(`Insufficient stock in ${fromGodown}. Available: ${availableQuantity}`);
+      return;
+    }
+
+    try {
+      setTransferring(true);
+      const res = await fetch("/api/stock/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_code: selectedProduct.product_code,
+          from_godown: fromGodown,
+          to_godown: toGodown,
+          quantity: quantity
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Transfer failed");
+        return;
+      }
+      
+      // Update local state
+      setAvailableStockData(prev => 
+        prev.map(item => 
+          item.product_code === selectedProduct.product_code 
+            ? { ...item, delhi: data.newDelhi, south: data.newSouth }
+            : item
+        )
+      );
+      
+      alert(data.message);
+      setShowTransferModal(false);
+      setSelectedProduct(null);
+      setTransferQuantity("");
+      setFromGodown("");
+      setToGodown("");
+    } catch (error) {
+      console.error("Transfer error:", error);
+      alert("Transfer failed. Please try again.");
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const openTransferModal = (product) => {
+    setSelectedProduct(product);
+    setShowTransferModal(true);
   };
 
   function getFileType(url) {
@@ -637,6 +710,17 @@ export default function ProductStockForm() {
                             ? new Date(row.updated_at).toLocaleString()
                             : "--"}
                         </div>
+
+                        {/* Transfer Button */}
+                        <div className="mt-2">
+                          <button
+                            onClick={() => openTransferModal(row)}
+                            className="w-full px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center justify-center gap-2"
+                          >
+                            <ArrowRightLeft className="w-4 h-4" />
+                            Transfer Stock
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -671,13 +755,16 @@ export default function ProductStockForm() {
                         <th className="p-3 border-b font-semibold">
                           Updated At
                         </th>
+                        <th className="p-3 border-b font-semibold">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredAvailableStock.length === 0 ? (
                         <tr>
                           <td
-                            colSpan="7"
+                            colSpan="8"
                             className="p-4 text-center text-gray-500"
                           >
                             No stock data available
@@ -771,6 +858,15 @@ export default function ProductStockForm() {
                               {row.updated_at
                                 ? new Date(row.updated_at).toLocaleString()
                                 : ""}
+                            </td>
+                            <td className="p-2 sm:p-3">
+                              <button
+                                onClick={() => openTransferModal(row)}
+                                className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                              >
+                                <ArrowRightLeft className="w-4 h-4" />
+                                Transfer
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -1297,6 +1393,127 @@ export default function ProductStockForm() {
                 Cannot preview this file type.
               </p>
             )}
+          </div>
+        </div>
+      )}
+      {/* Stock Transfer Modal */}
+      {showTransferModal && selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Transfer Stock</h3>
+              <button 
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setSelectedProduct(null);
+                  setTransferQuantity("");
+                  setFromGodown("");
+                  setToGodown("");
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600">Product Code</p>
+                <p className="font-semibold">{selectedProduct.product_code}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Item Name</p>
+                <p className="font-medium">{selectedProduct.item_name}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Delhi Stock</p>
+                  <p className="font-semibold text-green-600">{selectedProduct.delhi}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">South Stock</p>
+                  <p className="font-semibold text-green-600">{selectedProduct.south}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  From Godown
+                </label>
+                <select
+                  value={fromGodown}
+                  onChange={(e) => {
+                    setFromGodown(e.target.value);
+                    if (e.target.value === toGodown) {
+                      setToGodown("");
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select source</option>
+                  <option value="Delhi">Delhi Godown</option>
+                  <option value="South">South Godown</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  To Godown
+                </label>
+                <select
+                  value={toGodown}
+                  onChange={(e) => {
+                    setToGodown(e.target.value);
+                    if (e.target.value === fromGodown) {
+                      setFromGodown("");
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select destination</option>
+                  <option value="Delhi">Delhi Godown</option>
+                  <option value="South">South Godown</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  value={transferQuantity}
+                  onChange={(e) => setTransferQuantity(e.target.value)}
+                  min="1"
+                  max={fromGodown === "Delhi" ? selectedProduct.delhi : fromGodown === "South" ? selectedProduct.south : ""}
+                  placeholder="Enter quantity"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleStockTransfer}
+                  disabled={transferring || !transferQuantity || !fromGodown || !toGodown}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {transferring ? "Transferring..." : "Transfer Stock"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTransferModal(false);
+                    setSelectedProduct(null);
+                    setTransferQuantity("");
+                    setFromGodown("");
+                    setToGodown("");
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

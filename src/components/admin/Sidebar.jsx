@@ -195,7 +195,7 @@ export default function Sidebar({
           >
             <div className="mb-1 flex justify-center px-1">
               <Image
-                src="/logo.png"
+                src="/DYNACLEAN-LOGO11.svg"
                 alt="DYNACLEAN"
                 width={220}
                 height={72}
