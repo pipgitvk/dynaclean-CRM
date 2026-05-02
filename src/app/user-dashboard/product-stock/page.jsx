@@ -1617,7 +1617,18 @@ export default function ProductStockForm() {
                     {transferHistoryData.map((record, idx) => (
                       <tr key={idx} className="border-t hover:bg-gray-50">
                         <td className="p-3">
-                          {record.added_date ? new Date(record.added_date).toLocaleString() : "--"}
+                          {record.added_date ? 
+                            new Date(record.added_date).toLocaleString('en-IN', {
+                              timeZone: 'Asia/Kolkata',
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            }) : "--"
+                          }
                         </td>
                         <td className="p-3 font-semibold">{record.quantity}</td>
                         <td className="p-3">{record.godown || "--"}</td>
