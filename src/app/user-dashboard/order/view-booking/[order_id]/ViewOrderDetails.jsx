@@ -179,32 +179,48 @@ export default function ViewOrderDetails({ data }) {
 
       {/* Files */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {files.map(({ label, key }) => (
-          <div key={key} className="p-4 border rounded-lg">
-            <h4 className="text-sm font-semibold mb-2">{label}</h4>
-            {orderDetails[key] ? (
-              <div className="flex gap-2">
-                <a
-                  href={orderDetails[key]}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline text-sm"
-                >
-                  View
-                </a>
-                <a
-                  href={orderDetails[key]}
-                  download
-                  className="text-green-600 hover:underline text-sm"
-                >
-                  Download
-                </a>
-              </div>
-            ) : (
-              <p className="text-gray-500 text-xs">Not uploaded</p>
-            )}
-          </div>
-        ))}
+        {files.map(({ label, key }) => {
+          const fileUrl = orderDetails[key];
+          let displayUrl = fileUrl;
+          
+          // Convert direct upload paths to API routes for proper file serving
+          if (fileUrl && fileUrl.startsWith('/uploads/')) {
+            const parts = fileUrl.split('/');
+            if (parts.length >= 3) {
+              // Extract folder and filename from /uploads/folder/filename
+              const folder = parts[2];
+              const filename = parts.slice(3).join('/');
+              displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
+            }
+          }
+          
+          return (
+            <div key={key} className="p-4 border rounded-lg">
+              <h4 className="text-sm font-semibold mb-2">{label}</h4>
+              {fileUrl ? (
+                <div className="flex gap-2">
+                  <a
+                    href={displayUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline text-sm"
+                  >
+                    View
+                  </a>
+                  <a
+                    href={displayUrl}
+                    download
+                    className="text-green-600 hover:underline text-sm"
+                  >
+                    Download
+                  </a>
+                </div>
+              ) : (
+                <p className="text-gray-500 text-xs">Not uploaded</p>
+              )}
+            </div>
+          );
+        })}
 
         {orderDetails.booking_url && (
           <div className="p-4 border rounded-lg">
