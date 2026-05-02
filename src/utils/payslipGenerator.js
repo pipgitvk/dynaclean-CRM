@@ -295,7 +295,7 @@ const getCompanyBlock = () => ({
   name: process.env.NEXT_PUBLIC_PAYSLIP_COMPANY_NAME || "Dynaclean Industries Pvt Ltd",
   line1:
     process.env.NEXT_PUBLIC_PAYSLIP_ADDRESS_LINE1 ||
-    "1st Floor, 13-B, Kattabomman Street, Gandhi Nagar",
+    "10, Gandhi Nagar Main Road, Ganapathy, Coimbatore, Coimbatore North, Tamil Nadu, India",
   line2: process.env.NEXT_PUBLIC_PAYSLIP_ADDRESS_LINE2 || "Coimbatore - 641006",
   email: process.env.NEXT_PUBLIC_PAYSLIP_EMAIL || "",
   phone: process.env.NEXT_PUBLIC_PAYSLIP_PHONE || "",
