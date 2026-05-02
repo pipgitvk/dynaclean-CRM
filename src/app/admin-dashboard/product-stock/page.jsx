@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
-import { Eye, Search, Pencil } from "lucide-react";
+import { Eye, Search, Pencil, ArrowRightLeft, History, X } from "lucide-react";
 import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
 
@@ -397,6 +397,16 @@ export default function ProductStockForm() {
   const [openSection, setOpenSection] = useState("list");
   const [editingLocation, setEditingLocation] = useState({ key: null, value: "" });
   const [savingLocation, setSavingLocation] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [transferQuantity, setTransferQuantity] = useState("");
+  const [fromGodown, setFromGodown] = useState("");
+  const [toGodown, setToGodown] = useState("");
+  const [transferring, setTransferring] = useState(false);
+  const [showTransferHistoryModal, setShowTransferHistoryModal] = useState(false);
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
+  const [transferHistoryData, setTransferHistoryData] = useState([]);
+  const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
 
 
 
@@ -462,6 +472,100 @@ export default function ProductStockForm() {
     if (ext === "pdf") return "pdf";
     return "unknown";
   }
+
+  const handleStockTransfer = async () => {
+    if (!selectedProduct || !transferQuantity || !fromGodown || !toGodown) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    if (fromGodown === toGodown) {
+      alert("Source and destination godowns cannot be the same");
+      return;
+    }
+
+    const quantity = parseInt(transferQuantity);
+    const availableQuantity = fromGodown === "Delhi" ? selectedProduct.delhi : selectedProduct.south;
+    
+    if (quantity > availableQuantity) {
+      alert(`Insufficient stock in ${fromGodown}. Available: ${availableQuantity}`);
+      return;
+    }
+
+    try {
+      setTransferring(true);
+      const res = await fetch("/api/stock/transfer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_code: selectedProduct.product_code,
+          from_godown: fromGodown,
+          to_godown: toGodown,
+          quantity: quantity
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok || data.success === false) {
+        alert(data.error || "Transfer failed");
+        return;
+      }
+      
+      // Update local state
+      setAvailableStockData(prev => 
+        prev.map(item => 
+          item.product_code === selectedProduct.product_code 
+            ? { ...item, delhi: data.newDelhi, south: data.newSouth }
+            : item
+        )
+      );
+      
+      alert(data.message);
+      setShowTransferModal(false);
+      setSelectedProduct(null);
+      setTransferQuantity("");
+      setFromGodown("");
+      setToGodown("");
+    } catch (error) {
+      console.error("Transfer error:", error);
+      alert("Transfer failed. Please try again.");
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const openTransferModal = (product) => {
+    setSelectedProduct(product);
+    setShowTransferModal(true);
+  };
+
+  const fetchTransferHistory = async (productCode) => {
+    try {
+      setLoadingTransferHistory(true);
+      const res = await fetch(`/api/stock/transfer-history?product_code=${productCode}`);
+      const data = await res.json();
+      
+      if (!res.ok || data.success === false) {
+        console.error("Failed to fetch transfer history", data.error);
+        alert("Failed to fetch transfer history");
+        return;
+      }
+      
+      setTransferHistoryData(data.data || []);
+    } catch (error) {
+      console.error("Error fetching transfer history:", error);
+      alert("Error fetching transfer history");
+    } finally {
+      setLoadingTransferHistory(false);
+    }
+  };
+
+  const openTransferHistoryModal = (product) => {
+    setSelectedProductForHistory(product);
+    setShowTransferHistoryModal(true);
+    fetchTransferHistory(product.product_code);
+  };
 
   // Filtered data for each section
   const filteredAvailableStock = useMemo(() => {
@@ -710,6 +814,24 @@ export default function ProductStockForm() {
                     <div className="mt-1 text-[11px] text-gray-500">
                       Updated: {row.updated_at ? new Date(row.updated_at).toLocaleString() : "--"}
                     </div>
+
+                    {/* Transfer Buttons */}
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => openTransferModal(row)}
+                        className="flex-1 px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center justify-center gap-2"
+                      >
+                        <ArrowRightLeft className="w-4 h-4" />
+                        Transfer Stock
+                      </button>
+                      <button
+                        onClick={() => openTransferHistoryModal(row)}
+                        className="flex-1 px-3 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center justify-center gap-2"
+                      >
+                        <History className="w-4 h-4" />
+                        Transfer History
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -728,12 +850,13 @@ export default function ProductStockForm() {
                     <th className="p-3 border-b font-semibold">South Godown</th>
                     <th className="p-3 border-b font-semibold">Storage Location</th>
                     <th className="p-3 border-b font-semibold">Updated At</th>
+                    <th className="p-3 border-b font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAvailableStock.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="p-4 text-center text-gray-500">
+                      <td colSpan="8" className="p-4 text-center text-gray-500">
                         No stock data available
                       </td>
                     </tr>
@@ -808,6 +931,24 @@ export default function ProductStockForm() {
                         </td>
                         <td className="p-2 sm:p-3 whitespace-nowrap">
                           {row.updated_at ? new Date(row.updated_at).toLocaleString() : ""}
+                        </td>
+                        <td className="p-2 sm:p-3">
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => openTransferModal(row)}
+                              className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                            >
+                              <ArrowRightLeft className="w-3 h-3" />
+                              Transfer
+                            </button>
+                            <button
+                              onClick={() => openTransferHistoryModal(row)}
+                              className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center gap-1"
+                            >
+                              <History className="w-3 h-3" />
+                              History
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1248,6 +1389,214 @@ export default function ProductStockForm() {
               <p className="text-red-500 text-center mt-4">
                 Cannot preview this file type.
               </p>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Stock Transfer Modal */}
+      {showTransferModal && selectedProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Transfer Stock</h3>
+              <button 
+                onClick={() => {
+                  setShowTransferModal(false);
+                  setSelectedProduct(null);
+                  setTransferQuantity("");
+                  setFromGodown("");
+                  setToGodown("");
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600">Product Code</p>
+                <p className="font-semibold">{selectedProduct.product_code}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Item Name</p>
+                <p className="font-medium">{selectedProduct.item_name}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Delhi Stock</p>
+                  <p className="font-semibold text-green-600">{selectedProduct.delhi}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">South Stock</p>
+                  <p className="font-semibold text-green-600">{selectedProduct.south}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  From Godown
+                </label>
+                <select
+                  value={fromGodown}
+                  onChange={(e) => {
+                    setFromGodown(e.target.value);
+                    if (e.target.value === toGodown) {
+                      setToGodown("");
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select source</option>
+                  <option value="Delhi">Delhi Godown</option>
+                  <option value="South">South Godown</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  To Godown
+                </label>
+                <select
+                  value={toGodown}
+                  onChange={(e) => {
+                    setToGodown(e.target.value);
+                    if (e.target.value === fromGodown) {
+                      setFromGodown("");
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select destination</option>
+                  <option value="Delhi">Delhi Godown</option>
+                  <option value="South">South Godown</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  value={transferQuantity}
+                  onChange={(e) => setTransferQuantity(e.target.value)}
+                  min="1"
+                  max={fromGodown === "Delhi" ? selectedProduct.delhi : fromGodown === "South" ? selectedProduct.south : ""}
+                  placeholder="Enter quantity"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleStockTransfer}
+                  disabled={transferring || !transferQuantity || !fromGodown || !toGodown}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {transferring ? "Transferring..." : "Transfer Stock"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTransferModal(false);
+                    setSelectedProduct(null);
+                    setTransferQuantity("");
+                    setFromGodown("");
+                    setToGodown("");
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Transfer History Modal */}
+      {showTransferHistoryModal && selectedProductForHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60">
+          <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Transfer History</h3>
+              <button 
+                onClick={() => {
+                  setShowTransferHistoryModal(false);
+                  setSelectedProductForHistory(null);
+                  setTransferHistoryData([]);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">Product Code</p>
+              <p className="font-semibold">{selectedProductForHistory.product_code}</p>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">Item Name</p>
+              <p className="font-medium">{selectedProductForHistory.item_name}</p>
+            </div>
+
+            {loadingTransferHistory ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">Loading transfer history...</p>
+              </div>
+            ) : transferHistoryData.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No transfer history found for this product.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200 rounded">
+                  <thead className="bg-gray-100 text-left">
+                    <tr>
+                      <th className="p-3 border-b font-semibold">Date</th>
+                      <th className="p-3 border-b font-semibold">Quantity</th>
+                      <th className="p-3 border-b font-semibold">From/To Godown</th>
+                      <th className="p-3 border-b font-semibold">Note</th>
+                      <th className="p-3 border-b font-semibold">Added By</th>
+                      <th className="p-3 border-b font-semibold">Stock After Transfer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transferHistoryData.map((record, idx) => (
+                      <tr key={idx} className="border-t hover:bg-gray-50">
+                        <td className="p-3">
+                          {record.added_date ? 
+                            new Date(record.added_date).toLocaleString('en-IN', {
+                              timeZone: 'Asia/Kolkata',
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit',
+                              hour12: false
+                            }) : "--"
+                          }
+                        </td>
+                        <td className="p-3 font-semibold">{record.quantity}</td>
+                        <td className="p-3">{record.godown || "--"}</td>
+                        <td className="p-3 max-w-xs truncate">{record.note || "--"}</td>
+                        <td className="p-3">{record.added_by || "--"}</td>
+                        <td className="p-3">
+                          <div className="text-xs">
+                            <div>Total: {record.total}</div>
+                            <div>Delhi: {record.delhi}</div>
+                            <div>South: {record.south}</div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
