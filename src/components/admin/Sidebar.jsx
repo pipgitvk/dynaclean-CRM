@@ -194,13 +194,15 @@ export default function Sidebar({
             className={`mb-4 border-b ${theme.sidebar.border} pb-3`}
           >
             <div className="mb-1 flex justify-center px-1">
-              <Image
-                src="/DYNACLEAN-LOGO11.svg"
+              <img
+                src="/logo.png"
                 alt="DYNACLEAN"
-                width={220}
-                height={72}
                 className="h-auto w-full max-w-[220px] object-contain"
-                priority
+                style={{ maxHeight: '72px' }}
+                onError={(e) => {
+                  console.error('Logo failed to load:', e);
+                  e.target.src = '/logo.jpg'; // fallback to jpg
+                }}
               />
             </div>
             {showBackToUserCrm && (
