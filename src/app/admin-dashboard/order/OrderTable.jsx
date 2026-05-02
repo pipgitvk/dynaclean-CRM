@@ -183,6 +183,7 @@ export default function OrderTable({ orders, userRole }) {
     return orders.reduce(
       (acc, o) => {
         if (!orderCreatedInDateRange(o, dateFrom, dateTo)) return acc;
+        if (o.approval_status !== "approved") return acc;
         acc.gstTotal += Number(o.taxamt) || 0;
         acc.taxableTotal += orderTaxableTotal(o);
         return acc;
@@ -558,11 +559,21 @@ export default function OrderTable({ orders, userRole }) {
                       </span>
                     </td>
                     <td className="px-3 py-3">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
-                      >
-                        {pay.text}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        {r.approval_status === "approved" && (
+                          <div className="font-semibold text-sm">
+                            ₹{amountWithoutGst(r).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </div>
+                        )}
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
+                        >
+                          {pay.text}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-center gap-1">
@@ -624,11 +635,21 @@ export default function OrderTable({ orders, userRole }) {
                     >
                       {status.text}
                     </span>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${pay.cls}`}
-                    >
-                      {pay.text}
-                    </span>
+                    <div className="flex flex-col items-center gap-1 shrink-0">
+                      {r.approval_status === "approved" && (
+                        <div className="font-semibold text-xs">
+                          ₹{amountWithoutGst(r).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </div>
+                      )}
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
+                      >
+                        {pay.text}
+                      </span>
+                    </div>
                     <span className="shrink-0">
                       <ActionButtons
                         r={r}
