@@ -85,6 +85,39 @@ export async function GET(req, { params }) {
       case ".csv":
         contentType = "text/csv";
         break;
+      case ".webp":
+        contentType = "image/webp";
+        break;
+      case ".bmp":
+        contentType = "image/bmp";
+        break;
+      case ".svg":
+        contentType = "image/svg+xml";
+        break;
+      case ".tif":
+      case ".tiff":
+        contentType = "image/tiff";
+        break;
+      case ".heic":
+      case ".heif":
+        contentType = "image/heic";
+        break;
+      case ".zip":
+        contentType = "application/zip";
+        break;
+      case ".mp4":
+        contentType = "video/mp4";
+        break;
+      case ".webm":
+        contentType = "video/webm";
+        break;
+      case ".ppt":
+        contentType = "application/vnd.ms-powerpoint";
+        break;
+      case ".pptx":
+        contentType =
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        break;
     }
 
     // Return the file with appropriate headers

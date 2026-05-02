@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
-import { Eye, Search, Pencil, ArrowRightLeft } from "lucide-react";
+import { Eye, Search, Pencil, ArrowRightLeft, History, X } from "lucide-react";
 import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
 
@@ -263,6 +263,10 @@ export default function ProductStockForm() {
   const [fromGodown, setFromGodown] = useState("");
   const [toGodown, setToGodown] = useState("");
   const [transferring, setTransferring] = useState(false);
+  const [showTransferHistoryModal, setShowTransferHistoryModal] = useState(false);
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
+  const [transferHistoryData, setTransferHistoryData] = useState([]);
+  const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -391,6 +395,33 @@ export default function ProductStockForm() {
   const openTransferModal = (product) => {
     setSelectedProduct(product);
     setShowTransferModal(true);
+  };
+
+  const fetchTransferHistory = async (productCode) => {
+    try {
+      setLoadingTransferHistory(true);
+      const res = await fetch(`/api/stock/transfer-history?product_code=${productCode}`);
+      const data = await res.json();
+      
+      if (!res.ok || data.success === false) {
+        console.error("Failed to fetch transfer history", data.error);
+        alert("Failed to fetch transfer history");
+        return;
+      }
+      
+      setTransferHistoryData(data.data || []);
+    } catch (error) {
+      console.error("Error fetching transfer history:", error);
+      alert("Error fetching transfer history");
+    } finally {
+      setLoadingTransferHistory(false);
+    }
+  };
+
+  const openTransferHistoryModal = (product) => {
+    setSelectedProductForHistory(product);
+    setShowTransferHistoryModal(true);
+    fetchTransferHistory(product.product_code);
   };
 
   function getFileType(url) {
@@ -712,13 +743,20 @@ export default function ProductStockForm() {
                         </div>
 
                         {/* Transfer Button */}
-                        <div className="mt-2">
+                        <div className="mt-2 flex gap-2">
                           <button
                             onClick={() => openTransferModal(row)}
-                            className="w-full px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center justify-center gap-2"
+                            className="flex-1 px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center justify-center gap-2"
                           >
                             <ArrowRightLeft className="w-4 h-4" />
                             Transfer Stock
+                          </button>
+                          <button
+                            onClick={() => openTransferHistoryModal(row)}
+                            className="flex-1 px-3 py-2 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center justify-center gap-2"
+                          >
+                            <History className="w-4 h-4" />
+                            Transfer History
                           </button>
                         </div>
                       </div>
@@ -860,13 +898,22 @@ export default function ProductStockForm() {
                                 : ""}
                             </td>
                             <td className="p-2 sm:p-3">
-                              <button
-                                onClick={() => openTransferModal(row)}
-                                className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
-                              >
-                                <ArrowRightLeft className="w-4 h-4" />
-                                Transfer
-                              </button>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => openTransferModal(row)}
+                                  className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                                >
+                                  <ArrowRightLeft className="w-3 h-3" />
+                                  Transfer
+                                </button>
+                                <button
+                                  onClick={() => openTransferHistoryModal(row)}
+                                  className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 flex items-center gap-1"
+                                >
+                                  <History className="w-3 h-3" />
+                                  History
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -1514,6 +1561,81 @@ export default function ProductStockForm() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Transfer History Modal */}
+      {showTransferHistoryModal && selectedProductForHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60">
+          <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Transfer History</h3>
+              <button 
+                onClick={() => {
+                  setShowTransferHistoryModal(false);
+                  setSelectedProductForHistory(null);
+                  setTransferHistoryData([]);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">Product Code</p>
+              <p className="font-semibold">{selectedProductForHistory.product_code}</p>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">Item Name</p>
+              <p className="font-medium">{selectedProductForHistory.item_name}</p>
+            </div>
+
+            {loadingTransferHistory ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">Loading transfer history...</p>
+              </div>
+            ) : transferHistoryData.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No transfer history found for this product.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200 rounded">
+                  <thead className="bg-gray-100 text-left">
+                    <tr>
+                      <th className="p-3 border-b font-semibold">Date</th>
+                      <th className="p-3 border-b font-semibold">Quantity</th>
+                      <th className="p-3 border-b font-semibold">From/To Godown</th>
+                      <th className="p-3 border-b font-semibold">Note</th>
+                      <th className="p-3 border-b font-semibold">Added By</th>
+                      <th className="p-3 border-b font-semibold">Stock After Transfer</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transferHistoryData.map((record, idx) => (
+                      <tr key={idx} className="border-t hover:bg-gray-50">
+                        <td className="p-3">
+                          {record.added_date ? new Date(record.added_date).toLocaleString() : "--"}
+                        </td>
+                        <td className="p-3 font-semibold">{record.quantity}</td>
+                        <td className="p-3">{record.godown || "--"}</td>
+                        <td className="p-3 max-w-xs truncate">{record.note || "--"}</td>
+                        <td className="p-3">{record.added_by || "--"}</td>
+                        <td className="p-3">
+                          <div className="text-xs">
+                            <div>Total: {record.total}</div>
+                            <div>Delhi: {record.delhi}</div>
+                            <div>South: {record.south}</div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
