@@ -52,7 +52,7 @@ function createImportCrmTransporter() {
   });
 }
 
-export async function sendImportCrmSmtpEmail({ to, subject, html, text }) {
+export async function sendImportCrmSmtpEmail({ to, subject, html, text, attachments }) {
   const user = (process.env.IMPORT_CRM_SMTP_USER || process.env.SMTP_USER)?.trim();
   const fromOverride = (process.env.IMPORT_CRM_SMTP_FROM || process.env.SMTP_FROM)?.trim();
   const from = fromOverride
@@ -66,6 +66,7 @@ export async function sendImportCrmSmtpEmail({ to, subject, html, text }) {
     subject,
     html,
     text: text || undefined,
+    attachments: attachments?.length ? attachments : undefined,
   });
 }
 
