@@ -10,7 +10,40 @@ import {
   Image,
 } from "@react-pdf/renderer";
 // import logo from "./logo1.jpg";
-import {numberToWords} from "@/utils/NumbertoWord"
+import { numberToWords } from "@/utils/NumbertoWord";
+
+/**
+ * @react-pdf/image resolves URLs in its own context. In the browser, relative `/file.jpg`
+ * paths usually fail — prefer `https://your-host/...`. For email PDF on the server, pass
+ * embedded `data:image/...;base64,...` URIs (see `invoiceCustomerEmailNotice.js`).
+ */
+function resolveInvoicePdfImageSrc(propSrc, fallbackPublicPath = "") {
+  const tryResolve = (s) => {
+    const raw = typeof s === "string" ? s.trim() : "";
+    if (!raw) return "";
+    if (/^data:/i.test(raw)) return raw;
+    if (/^https?:\/\//i.test(raw) || /^file:/i.test(raw)) return raw;
+    if (/^[a-zA-Z]:[\\/]/.test(raw)) return raw;
+    if (
+      typeof window !== "undefined" &&
+      raw.startsWith("/") &&
+      raw.length > 1
+    ) {
+      try {
+        return `${window.location.origin}${raw}`;
+      } catch {
+        return "";
+      }
+    }
+    return raw;
+  };
+  let out = tryResolve(propSrc);
+  if (out) return out;
+  out = tryResolve(fallbackPublicPath);
+  /** Node / SSR: bare "/public/path" fallback is unreadable — skip unless browser above. */
+  if (typeof window === "undefined" && out.startsWith("/")) return "";
+  return out;
+}
 
 // Register fonts - using Roboto from cdnjs (more reliable)
 Font.register({
@@ -189,9 +222,15 @@ const formatCurrency = (value) => {
   });
 };
 
+const formatInvoiceTaxRatePct = (raw) => {
+  const n = parseFloat(String(raw ?? "").replace(/,/g, ""));
+  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+};
+
 // Helper function to calculate tax rows
 const renderTaxRows = (data, itemTotals) => {
   const rows = [];
+  const trx = formatInvoiceTaxRatePct(data.taxRate);
 
   if (parseFloat(itemTotals.totalIGST) > 0) {
     rows.push(
@@ -202,7 +241,7 @@ const renderTaxRows = (data, itemTotals) => {
             { width: "83.33%", textAlign: "right", fontWeight: 700 },
           ]}
         >
-          Output IGST {data.taxRate}%
+          Output IGST {trx}%
         </Text>
         <Text
           style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}
@@ -221,7 +260,7 @@ const renderTaxRows = (data, itemTotals) => {
               { width: "83.33%", textAlign: "right", fontWeight: 700 },
             ]}
           >
-            Output CGST {data.taxRate}%
+            Output CGST {trx}%
           </Text>
           <Text
             style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}
@@ -241,7 +280,7 @@ const renderTaxRows = (data, itemTotals) => {
               { width: "83.33%", textAlign: "right", fontWeight: 700 },
             ]}
           >
-            Output SGST {data.taxRate}%
+            Output SGST {trx}%
           </Text>
           <Text
             style={[styles.tableCell, { width: "16.67%", textAlign: "right" }]}
@@ -285,7 +324,10 @@ const buildHSNSummary = (items, itemTotals) => {
 };
 
 // Main PDF Document Component
-const InvoicePDFDocument = ({ data }) => {
+/** logoSrc: absolute path on server for PDF. signatureSrc: stamp/signature image (e.g. public/s.png). */
+const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
+  const logoPdfSrc = resolveInvoicePdfImageSrc(logoSrc, "/logo1.jpg");
+  const signaturePdfSrc = resolveInvoicePdfImageSrc(signatureSrc, "/s.png");
   // Calculate item totals
   const calculateItemTotals = () => {
     const totals = {
@@ -326,219 +368,198 @@ const InvoicePDFDocument = ({ data }) => {
             <Text style={styles.headerTitle}>Tax Invoice</Text>
           </View>
 
-          {/* Company Details */}
-          <View style={styles.companyContainer}>
-            <View style={styles.logoContainer}>
-              {/* <Image
-                src="https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=120&h=60&fit=crop"
-                style={{
-                  width: 120,
-                  height: 60,
-                  objectFit: "contain",
-                }}
-              /> */}
-               <Image src="/logo1.jpg" style={{width: 80,height: 60,objectFit: "contain",}}/>
-            </View>
-            <View style={styles.companyDetails}>
-              <Text style={styles.companyName}>{data.company.name}</Text>
-              <Text style={styles.companyText}>{data.company.address}</Text>
-              <Text style={styles.companyText}>{data.company.phone}</Text>
-              <Text style={styles.companyText}>GST: {data.company.gstin}</Text>
-            </View>
-            <View style={styles.logoContainer}>
-              {/* Empty for alignment */}
-            </View>
-          </View>
-
-          {/* Invoice Info Table */}
-          <View style={styles.section}>
-            <View style={styles.table}>
-              {/* Row 1 */}
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.bold, { width: "33%" }]}>
-                  Invoice No.
-                </Text>
-                <Text style={[styles.tableCell, styles.bold, { width: "33%" }]}>
-                  Invoice Date
-                </Text>
-                <Text style={[styles.tableCell, styles.bold, { width: "34%" }]}>
-                  Due Date
-                </Text>
-              </View>
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: "33%" }]}>
-                  {data.invoice.number}
-                </Text>
-                <Text style={[styles.tableCell, { width: "33%" }]}>
-                  {data.invoice.invoiceDate}
-                </Text>
-                <Text style={[styles.tableCell, { width: "34%" }]}>
-                  {data.invoice.dueDate}
-                </Text>
-              </View>
-
-              {/* Row 2 */}
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.bold, { width: "33%" }]}>
-                  Reference No. & Date.
-                </Text>
-                <Text style={[styles.tableCell, styles.bold, { width: "33%" }]}>
-                  Buyer's Order No.
-                </Text>
-                <Text style={[styles.tableCell, styles.bold, { width: "34%" }]}>
-                  Dated
-                </Text>
-              </View>
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: "33%" }]}>
-                  {data.invoice.referenceNo}
-                </Text>
-                <Text style={[styles.tableCell, { width: "33%" }]}>
-                  {data.invoice.buyersOrderNo || ""}
-                </Text>
-                <Text style={[styles.tableCell, { width: "34%" }]}>
-                  {data.invoice.referenceDate}
-                </Text>
-              </View>
-
-              {/* Row 3 */}
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.bold, { width: "33%" }]}>
-                  e-Way Bill No.
-                </Text>
-                <Text style={[styles.tableCell, styles.bold, { width: "33%" }]}>
-                  Payment Status
-                </Text>
-                <Text style={[styles.tableCell, styles.bold, { width: "34%" }]}>
-                  Balance Amount
-                </Text>
-              </View>
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: "33%" }]}>
-                  {data.invoice.eWayBill}
-                </Text>
-                <Text style={[styles.tableCell, { width: "33%" }]}>
-                  {data.paymentInfo.status}
-                </Text>
-                <Text style={[styles.tableCell, { width: "34%" }]}>
-                  ₹{data.paymentInfo.balanceAmount}
-                </Text>
-              </View>
-
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.bold, { width: "100%" }]}>
-                  Delivery Challan No.
-                </Text>
-              </View>
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: "100%" }]}>
-                  {data.invoice.deliveryChallanNo || "-"}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Buyer and Consignee Details */}
-          {/* <View style={styles.section}>
+          {/* Logo + company (matches DesignInvoice: 25% / 75%) */}
+          <View style={styles.table}>
             <View style={styles.tableRow}>
-              <View style={[styles.tableCell, { width: "50%" }]}>
-                <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>
-                  Buyer (Bill to)
-                </Text>
-                <Text style={styles.bold}>{data.buyer.name}</Text>
-                <Text>{data.buyer.address}</Text>
-                <Text>GSTIN/UIN : {data.buyer.gstin}</Text>
-                <Text>State Name : {data.buyer.state}</Text>
-                <Text>Place of Supply : {data.buyer.placeOfSupply}</Text>
-                <Text>Contact person : {data.buyer.contactPerson}</Text>
-                <Text>Contact : {data.buyer.phone}</Text>
-                <Text>E-Mail : {data.buyer.email}</Text>
+              <View
+                style={[styles.tableCell, { width: "25%", padding: 8, justifyContent: "center" }]}
+              >
+                {logoPdfSrc ? (
+                  <Image
+                    src={logoPdfSrc}
+                    style={{ width: 110, height: 62, objectFit: "contain" }}
+                  />
+                ) : (
+                  <View style={{ width: 110, height: 62 }} />
+                )}
               </View>
-              <View style={[styles.tableCell, { width: "50%" }]}>
-                <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>
-                  Consignee (Ship to)
+              <View style={[styles.tableCell, { width: "75%", padding: 8 }]}>
+                <Text style={[styles.companyName, { textAlign: "center" }]}>
+                  {data.company.name}
                 </Text>
-                <Text style={styles.bold}>{data.consignee.name}</Text>
-                <Text>{data.consignee.address}</Text>
-                <Text>GSTIN/UIN : {data.consignee.gstin}</Text>
-                <Text>State Name : {data.consignee.state}</Text>
-                <Text>Contact person : {data.consignee.contactPerson}</Text>
-                <Text>Contact : {data.consignee.phone}</Text>
+                <Text style={[styles.companyText, { textAlign: "center" }]}>
+                  {data.company.address}
+                </Text>
+                <Text style={[styles.companyText, { textAlign: "center" }]}>
+                  Ph: {data.company.phone}
+                </Text>
+                <Text style={[styles.companyText, { textAlign: "center" }]}>
+                  GST: {data.company.gstin}
+                </Text>
               </View>
             </View>
-          </View> */}
 
-          <View style={styles.section}>
-  <View style={styles.tableRow}>
-    {/* Left Column: Buyer + Consignee */}
-    <View style={[styles.tableCell, { width: "40%" }]}>
-      {/* Buyer */}
-      <View style={{ marginBottom: 10 }}>
-        <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>
-          Buyer (Bill to)
-        </Text>
-        <Text style={styles.bold}>{data.buyer.name}</Text>
-        <Text>{data.buyer.address}</Text>
-        <Text>GSTIN/UIN : {data.buyer.gstin}</Text>
-        <Text>State Name : {data.buyer.state}</Text>
-        <Text>Place of Supply : {data.buyer.placeOfSupply}</Text>
-        <Text>Contact person : {data.buyer.contactPerson}</Text>
-        <Text>Contact : {data.buyer.phone}</Text>
-        <Text>E-Mail : {data.buyer.email}</Text>
-      </View>
+            {/* Invoice metadata — inline labels like print view */}
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>Invoice No. : </Text>
+                  <Text>{data.invoice.number || "-"}</Text>
+                </Text>
+              </View>
+              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>Invoice Date : </Text>
+                  <Text>{data.invoice.invoiceDate || "-"}</Text>
+                </Text>
+              </View>
+              <View style={[styles.tableCell, { width: "33.34%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>Due Date : </Text>
+                  <Text>{data.invoice.dueDate || "-"}</Text>
+                </Text>
+              </View>
+            </View>
 
-      {/* Consignee */}
-      <View>
-        <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>
-          Consignee (Ship to)
-        </Text>
-        <Text style={styles.bold}>{data.consignee.name}</Text>
-        <Text>{data.consignee.address}</Text>
-        <Text>GSTIN/UIN : {data.consignee.gstin}</Text>
-        <Text>State Name : {data.consignee.state}</Text>
-        <Text>Contact person : {data.consignee.contactPerson}</Text>
-        <Text>Contact : {data.consignee.phone}</Text>
-      </View>
-    </View>
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9, lineHeight: 1.35 }}>
+                  <Text style={styles.bold}>Reference No. : </Text>
+                  <Text>{data.invoice.referenceNo || "-"}</Text>
+                  {"\n"}
+                  <Text style={styles.bold}>Date : </Text>
+                  <Text>{data.invoice.referenceDate || "-"}</Text>
+                </Text>
+              </View>
+              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>Buyer&apos;s Order No. : </Text>
+                  <Text>{data.invoice.buyersOrderNo || "-"}</Text>
+                </Text>
+              </View>
+              <View style={[styles.tableCell, { width: "33.34%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>Order Date : </Text>
+                  <Text>{data.invoice.orderDate || "-"}</Text>
+                </Text>
+              </View>
+            </View>
 
-    {/* Right Column: Empty for future use */}
-    <View style={[styles.tableCell, { width: "60%" }]}>
-      {/* Empty space for future content */}
-    </View>
-  </View>
-</View>
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>e-Way Bill No. : </Text>
+                  <Text>{data.invoice.eWayBill || "-"}</Text>
+                </Text>
+              </View>
+              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>Payment Status : </Text>
+                  <Text>{data.paymentInfo.status || "-"}</Text>
+                </Text>
+              </View>
+              <View style={[styles.tableCell, { width: "33.34%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>Balance Amount : </Text>
+                  <Text>{data.paymentInfo.balanceAmount || "0.00"}</Text>
+                </Text>
+              </View>
+            </View>
 
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCell, { width: "100%", paddingVertical: 6 }]}>
+                <Text style={{ fontSize: 9 }}>
+                  <Text style={styles.bold}>Delivery Challan No. : </Text>
+                  <Text>{data.invoice.deliveryChallanNo || "-"}</Text>
+                </Text>
+              </View>
+            </View>
+          </View>
 
-          {/* Additional Info */}
+          {/* Buyer | Consignee — 50 / 50 like print view */}
           <View style={styles.section}>
             <View style={styles.table}>
               <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.bold, { width: "50%" }]}>
-                  State Code
-                </Text>
-                <Text style={[styles.tableCell, styles.bold, { width: "50%" }]}>
-                  Amount Paid
-                </Text>
+                <View style={[styles.tableCell, { width: "50%", padding: 8 }]}>
+                  <Text style={[styles.bold, { fontSize: 9, marginBottom: 4 }]}>
+                    Buyer (Bill To) : {data.buyer.name || "-"}
+                  </Text>
+                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>Address: </Text>
+                    <Text>{data.buyer.address || "-"}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>GSTIN: </Text>
+                    <Text>{data.buyer.gstin || "22AAAAA0000A1Z5"}</Text>
+                    <Text>   </Text>
+                    <Text style={styles.bold}>State: </Text>
+                    <Text>{data.buyer.state || "-"}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>Place of Supply: </Text>
+                    <Text>{data.buyer.placeOfSupply || "-"}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 9, marginBottom: 2, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>Contact: </Text>
+                    <Text>{data.buyer.contactPerson || "-"}</Text>
+                    <Text> ({data.buyer.phone || "-"})</Text>
+                  </Text>
+                  <Text style={{ fontSize: 9, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>Email: </Text>
+                    <Text>{data.buyer.email || "-"}</Text>
+                  </Text>
+                </View>
+
+                <View style={[styles.tableCell, { width: "50%", padding: 8 }]}>
+                  <Text style={[styles.bold, { fontSize: 9, marginBottom: 4 }]}>
+                    Consignee (Ship To) : {data.consignee.name || "-"}
+                  </Text>
+                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>Address: </Text>
+                    <Text>{data.consignee.address || "-"}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>GSTIN: </Text>
+                    <Text>{data.consignee.gstin || "22AAAAA0000A1Z5"}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>State: </Text>
+                    <Text>{data.consignee.state || "-"}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 9, lineHeight: 1.4 }}>
+                    <Text style={styles.bold}>Contact: </Text>
+                    <Text>{data.consignee.contactPerson || "-"}</Text>
+                    <Text> ({data.consignee.phone || "-"})</Text>
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* State code, amount paid, notes */}
+          <View style={styles.section}>
+            <View style={styles.table}>
+              <View style={styles.tableRow}>
+                <View style={[styles.tableCell, { width: "50%", paddingVertical: 6 }]}>
+                  <Text style={{ fontSize: 9 }}>
+                    <Text style={styles.bold}>State Code : </Text>
+                    <Text>{data.invoice.stateCode || ""}</Text>
+                  </Text>
+                </View>
+                <View style={[styles.tableCell, { width: "50%", paddingVertical: 6 }]}>
+                  <Text style={{ fontSize: 9 }}>
+                    <Text style={styles.bold}>Amount Paid : </Text>
+                    <Text>₹{data.paymentInfo.amountPaid || "0.00"}</Text>
+                  </Text>
+                </View>
               </View>
               <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: "50%" }]}>
-                  {data.invoice.stateCode || ""}
-                </Text>
-                <Text style={[styles.tableCell, { width: "50%" }]}>
-                  ₹{data.paymentInfo.amountPaid}
-                </Text>
-              </View>
-              <View style={styles.tableRow}>
-                <Text
-                  style={[styles.tableCell, styles.bold, { width: "100%" }]}
-                >
-                  Notes
-                </Text>
-              </View>
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableCell, { width: "100%" }]}>
-                  {data.notes}
-                </Text>
+                <View style={[styles.tableCell, { width: "100%", paddingVertical: 6 }]}>
+                  <Text style={{ fontSize: 9 }}>
+                    <Text style={styles.bold}>Notes : </Text>
+                    <Text>{data.notes || ""}</Text>
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -663,11 +684,14 @@ const InvoicePDFDocument = ({ data }) => {
 
           {/* Amount in Words */}
           <View style={[styles.section, { marginBottom: 10 }]}>
-            <Text>
-              <Text style={styles.bold}>Amount Chargeable (in words)</Text> E. &
-              O.E
+            <Text style={{ fontSize: 9, marginBottom: 4 }}>
+              <Text style={styles.bold}>
+                Amount Chargeable (in words) E. &amp; O.E
+              </Text>
             </Text>
-            <Text style={styles.bold}>INR: {numberToWords(data.total)}</Text>
+            <Text style={[styles.bold, { fontSize: 9 }]}>
+              INR- {numberToWords(data.total)}
+            </Text>
           </View>
 
           {/* Tax Summary Table */}
@@ -814,7 +838,7 @@ const InvoicePDFDocument = ({ data }) => {
                           { width: "10%", textAlign: "center" },
                         ]}
                       >
-                        {row.igstPercent}%
+                        {formatInvoiceTaxRatePct(row.igstPercent)}%
                       </Text>
                       <Text
                         style={[
@@ -849,7 +873,7 @@ const InvoicePDFDocument = ({ data }) => {
                           { width: "7%", textAlign: "center" },
                         ]}
                       >
-                        {row.cgstPercent}%
+                        {formatInvoiceTaxRatePct(row.cgstPercent)}%
                       </Text>
                       <Text
                         style={[
@@ -873,7 +897,7 @@ const InvoicePDFDocument = ({ data }) => {
                           { width: "7%", textAlign: "center" },
                         ]}
                       >
-                        {row.sgstPercent}%
+                        {formatInvoiceTaxRatePct(row.sgstPercent)}%
                       </Text>
                       <Text
                         style={[
@@ -976,11 +1000,27 @@ const InvoicePDFDocument = ({ data }) => {
             </View>
           </View>
 
-          {/* Tax Amount in Words */}
-          <View style={[styles.section, { marginBottom: 15 }]}>
-            <Text style={styles.bold}>
-              Tax Amount (in words) : INR: {numberToWords(data.taxAmount)}
+          {/* Tax Amount in Words + Round off (aligned like print view) */}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              marginBottom: 15,
+              width: "100%",
+            }}
+          >
+            <Text style={[styles.bold, { fontSize: 9, flex: 1, paddingRight: 8 }]}>
+              Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
             </Text>
+            {data.roundOff !== 0 && data.roundOff != null ? (
+              <Text style={[styles.bold, { fontSize: 9 }]}>
+                Round Off:{" "}
+                {data.roundOff > 0
+                  ? `+₹${Math.abs(Number(data.roundOff)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                  : `-₹${Math.abs(Number(data.roundOff)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+              </Text>
+            ) : null}
           </View>
 
           {/* Terms & Bank Details */}
@@ -1008,8 +1048,22 @@ const InvoicePDFDocument = ({ data }) => {
 
           {/* Signature */}
           <View style={styles.signature}>
-            <Text>for {data.company.name}</Text>
-            <Text style={[styles.bold, { marginTop: 60 }]}>
+            <Text style={{ fontSize: 9 }}>for {data.company.name}</Text>
+            <View style={{ alignItems: "flex-end", marginTop: 10 }}>
+              {signaturePdfSrc ? (
+                <Image
+                  src={signaturePdfSrc}
+                  style={{
+                    width: 120,
+                    height: 60,
+                    objectFit: "contain",
+                  }}
+                />
+              ) : (
+                <View style={{ width: 120, height: 60 }} />
+              )}
+            </View>
+            <Text style={[styles.bold, { marginTop: 8, fontSize: 9 }]}>
               Authorised Signatory
             </Text>
           </View>

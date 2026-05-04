@@ -1,6 +1,10 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
+import {
+  loadInvoiceWithItemsForPdf,
+  sendInvoicePaymentNoticeEmail,
+} from "@/lib/invoiceCustomerEmailNotice";
 
 export async function GET(_req, context) {
   try {
@@ -126,6 +130,7 @@ export async function PATCH(req, context) {
       created_at = null,
       customer_id: bodyCustomerId,
       linked_trans_ids: bodyLinkedTransIds,
+      send_customer_payment_notice = false,
     } = body;
 
     if (!invoice_number || !customer_name || !billing_address) {
@@ -385,7 +390,44 @@ export async function PATCH(req, context) {
     }
 
     await conn.commit();
-    return NextResponse.json({ success: true, invoiceId });
+
+    /** @type {{ sent?: boolean, skipped?: boolean, reason?: string, error?: string } | null} */
+    let customerEmailNotice = null;
+    const shouldNotifyCustomer =
+      send_customer_payment_notice === true ||
+      send_customer_payment_notice === "true";
+    if (shouldNotifyCustomer) {
+      try {
+        const emailTrim =
+          customer_email != null ? String(customer_email).trim() : "";
+        if (!emailTrim) {
+          customerEmailNotice = {
+            sent: false,
+            skipped: true,
+            reason: "missing_customer_email",
+          };
+        } else {
+          const invFull = await loadInvoiceWithItemsForPdf(pool, invoiceId);
+          if (invFull) {
+            customerEmailNotice =
+              await sendInvoicePaymentNoticeEmail(invFull);
+          } else {
+            customerEmailNotice = {
+              sent: false,
+              error: "invoice_reload_failed",
+            };
+          }
+        }
+      } catch (emailErr) {
+        console.error("Invoice PATCH customer email:", emailErr);
+        customerEmailNotice = {
+          sent: false,
+          error: emailErr?.message || String(emailErr),
+        };
+      }
+    }
+
+    return NextResponse.json({ success: true, invoiceId, customerEmailNotice });
   } catch (e) {
     console.error("Invoice PATCH error:", e);
     if (conn) {
