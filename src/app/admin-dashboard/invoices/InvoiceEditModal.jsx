@@ -313,6 +313,9 @@ export default function InvoiceEditModal({
         created_at: createdAtLocal || null,
         customer_id: String(form.customer_id || "").trim() || null,
         linked_trans_ids: linkedTransIds,
+        send_customer_payment_notice: Boolean(
+          String(form.customer_email || "").trim(),
+        ),
       };
 
       const removedTransIds = originalLinkedTransIdsRef.current.filter(tid => !linkedTransIds.includes(tid));
@@ -370,7 +373,20 @@ export default function InvoiceEditModal({
           }
         }
       }
-      toast.success("Invoice updated");
+      const mailed = !!String(form.customer_email || "").trim();
+      const n = out.customerEmailNotice;
+      if (mailed && n) {
+        if (n.sent) {
+          toast.success(
+            "Invoice updated. Customer ko invoice PDF aur payment summary mail ho gayi.",
+          );
+        } else {
+          toast.success("Invoice updated");
+          toast.error(n.error || "Customer mail send nahi ho payi.");
+        }
+      } else {
+        toast.success("Invoice updated");
+      }
       onSaved?.();
       onClose?.();
     } catch (err) {

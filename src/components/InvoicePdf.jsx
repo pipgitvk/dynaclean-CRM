@@ -285,7 +285,8 @@ const buildHSNSummary = (items, itemTotals) => {
 };
 
 // Main PDF Document Component
-const InvoicePDFDocument = ({ data }) => {
+/** logoSrc: use absolute filesystem path on server (/public logo won't resolve in Node PDF render). */
+const InvoicePDFDocument = ({ data, logoSrc }) => {
   // Calculate item totals
   const calculateItemTotals = () => {
     const totals = {
@@ -337,7 +338,7 @@ const InvoicePDFDocument = ({ data }) => {
                   objectFit: "contain",
                 }}
               /> */}
-               <Image src="/logo1.jpg" style={{width: 80,height: 60,objectFit: "contain",}}/>
+               <Image src={logoSrc || "/logo1.jpg"} style={{width: 80,height: 60,objectFit: "contain",}}/>
             </View>
             <View style={styles.companyDetails}>
               <Text style={styles.companyName}>{data.company.name}</Text>
