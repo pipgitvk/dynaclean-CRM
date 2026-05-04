@@ -378,7 +378,7 @@ export default function InvoiceEditModal({
       if (mailed && n) {
         if (n.sent) {
           toast.success(
-            "Invoice updated. Customer ko invoice PDF aur payment summary mail ho gayi.",
+            "Invoice updated. Invoice PDF and payment summary have been emailed to the customer.",
           );
         } else {
           toast.success("Invoice updated");
