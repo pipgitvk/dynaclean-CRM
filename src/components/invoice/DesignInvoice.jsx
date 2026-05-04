@@ -2253,9 +2253,15 @@ const NewInvoice = ({ invoice }) => {
 
   const hsnSummary = buildHSNSummary();
 
+  const formatInvoiceTaxRate = (raw) => {
+    const n = parseFloat(String(raw ?? "").replace(/,/g, ""));
+    return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+  };
+
   // Function to render tax rows based on available tax data
   const renderTaxRows = () => {
     const rows = [];
+    const trx = formatInvoiceTaxRate(data.taxRate);
 
     if (parseFloat(itemTotals.totalIGST) > 0) {
       rows.push(
@@ -2269,7 +2275,7 @@ const NewInvoice = ({ invoice }) => {
               fontWeight: "bold",
             }}
           >
-            Output IGST {data.taxRate}%
+            Output IGST {trx}%
           </td>
           <td
             style={{
@@ -2295,7 +2301,7 @@ const NewInvoice = ({ invoice }) => {
                 fontWeight: "bold",
               }}
             >
-              Output CGST {data.taxRate}%
+              Output CGST {trx}%
             </td>
             <td
               style={{
@@ -2322,7 +2328,7 @@ const NewInvoice = ({ invoice }) => {
                 fontWeight: "bold",
               }}
             >
-              Output SGST {data.taxRate}%
+              Output SGST {trx}%
             </td>
             <td
               style={{
@@ -2467,9 +2473,6 @@ const NewInvoice = ({ invoice }) => {
                   </div>
                 </div>
               </td>
-
-              {/* Right Empty */}
-              <td style={{ width: "25%" }}></td>
             </tr>
           </tbody>
         </table>
@@ -3318,7 +3321,7 @@ const NewInvoice = ({ invoice }) => {
                         textAlign: "center",
                       }}
                     >
-                      {row.igstPercent}%
+                      {formatInvoiceTaxRate(row.igstPercent)}%
                     </td>
                     <td
                       style={{
@@ -3352,7 +3355,7 @@ const NewInvoice = ({ invoice }) => {
                         borderRight: "0px",
                       }}
                     >
-                      {row.cgstPercent}%
+                      {formatInvoiceTaxRate(row.cgstPercent)}%
                     </td>
                     <td
                       style={{
@@ -3385,7 +3388,7 @@ const NewInvoice = ({ invoice }) => {
                         borderRight: "0px",
                       }}
                     >
-                      {row.sgstPercent}%
+                      {formatInvoiceTaxRate(row.sgstPercent)}%
                     </td>
                     <td
                       style={{

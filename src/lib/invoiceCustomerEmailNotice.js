@@ -337,18 +337,50 @@ export function buildInvoicePdfDocumentData(invoice) {
   };
 }
 
-function pickLogoAbsolutePath() {
-  const logoPath = path.join(process.cwd(), "public", "logo1.jpg");
-  if (fs.existsSync(logoPath)) return logoPath;
+function pickExistingPublicAsset(relativeNames) {
+  const base = path.join(process.cwd(), "public");
+  for (const n of relativeNames) {
+    const p = path.join(base, n);
+    if (fs.existsSync(p)) return p;
+  }
   return null;
+}
+
+function mimeForImagePath(p) {
+  const ext = path.extname(p).toLowerCase();
+  if (ext === ".png") return "image/png";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".gif") return "image/gif";
+  return "application/octet-stream";
+}
+
+/**
+ * react-pdf often cannot load file:// or HTTP from Node (serverless, workers).
+ * Data URIs embed bytes and match the on-screen invoice assets from /public.
+ */
+function publicAssetToDataUri(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return undefined;
+  try {
+    const buf = fs.readFileSync(filePath);
+    const mime = mimeForImagePath(filePath);
+    if (mime === "application/octet-stream") return undefined;
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function renderInvoicePdfBuffer(invWithItems) {
   const data = buildInvoicePdfDocumentData(invWithItems);
-  const logoAbsolute = pickLogoAbsolutePath();
+  const logoPath = pickExistingPublicAsset(["logo1.jpg", "logo.jpg", "logo.png"]);
+  const sigPath = pickExistingPublicAsset(["s.png"]);
+  const logoSrc = publicAssetToDataUri(logoPath);
+  const signatureSrc = publicAssetToDataUri(sigPath);
   const element = React.createElement(InvoicePDFDocument, {
     data,
-    logoSrc: logoAbsolute || "/logo1.jpg",
+    logoSrc,
+    signatureSrc,
   });
   return renderToBuffer(element);
 }
