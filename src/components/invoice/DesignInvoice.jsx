@@ -2386,12 +2386,18 @@ const NewInvoice = ({ invoice }) => {
         <div
           style={{
             textAlign: "center",
-            marginBottom: "6px",
+            marginBottom: "8px",
             paddingBottom: "2px",
           }}
         >
           <h1
-            style={{ margin: "0", fontSize: "15px", fontWeight: 700 }}
+            style={{
+              margin: "0",
+              fontSize: "15px",
+              fontWeight: 400,
+              letterSpacing: "0.02em",
+              color: "#000",
+            }}
           >
             Tax Invoice
           </h1>
@@ -2404,12 +2410,12 @@ const NewInvoice = ({ invoice }) => {
             border: "1px solid #000",
           }}
         >
-        {/* Company Details */}
+        {/* Logo flush left; company block left of row but lines centre-aligned within block */}
         <table
           style={{
             width: "100%",
             borderCollapse: "collapse",
-            tableLayout: "auto",
+            tableLayout: "fixed",
             border: "1px solid #000",
             borderBottom: "0px",
             overflow: "visible",
@@ -2417,76 +2423,78 @@ const NewInvoice = ({ invoice }) => {
         >
           <tbody>
             <tr>
-              {/* Left - Logo */}
               <td
+                colSpan={2}
                 style={{
-                  width: "25%",
                   verticalAlign: "top",
-                  padding: "8px 4px 8px 8px",
-                }}
-              >
-                {logoSrc ? (
-                  <img
-                    src={logoSrc}
-                    style={{
-                      width: 110,
-                      height: "auto",
-                      display: "block",
-                      marginTop: "22px",
-                      marginLeft: "32px",
-                    }}
-                    alt="logo"
-                    onError={handleLogoError}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: 110,
-                      minHeight: 48,
-                      border: "1px solid #ddd",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#c62828",
-                      fontWeight: 700,
-                      fontSize: 10,
-                      marginTop: "22px",
-                      marginLeft: "32px",
-                    }}
-                  >
-                    DYNACLEAN
-                  </div>
-                )}
-              </td>
-
-              {/* Company name + address block: centered block like letterhead sample */}
-              <td
-                style={{
-                  width: "75%",
-                  textAlign: "center",
-                  verticalAlign: "top",
-                  padding: "12px 16px 10px 8px",
+                  padding: "16px 24px 14px 4px",
+                  minHeight: "128px",
                   overflow: "visible",
+                  boxSizing: "border-box",
                 }}
               >
                 <div
                   style={{
-                    /* block + margin auto: html2canvas stable vs inline-block center */
-                    display: "block",
-                    maxWidth: "480px",
-                    marginLeft: "auto",
-                    marginRight: "auto",
-                    textAlign: "center",
-                    fontFamily: "Arial, Helvetica, sans-serif",
-                    overflow: "visible",
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "flex-start",
+                    gap: "44px",
+                    width: "100%",
+                    boxSizing: "border-box",
                   }}
                 >
+                  <div style={{ flexShrink: 0, width: 110, marginTop: "14px" }}>
+                    {logoSrc ? (
+                      <img
+                        src={logoSrc}
+                        style={{
+                          width: 110,
+                          height: "auto",
+                          display: "block",
+                        }}
+                        alt="logo"
+                        onError={handleLogoError}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 110,
+                          minHeight: 48,
+                          border: "1px solid #ddd",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#c62828",
+                          fontWeight: 700,
+                          fontSize: 10,
+                        }}
+                      >
+                        DYNACLEAN
+                      </div>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      display: "flex",
+                      justifyContent: "flex-start",
+                      fontFamily: "Arial, Helvetica, sans-serif",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "inline-block",
+                        textAlign: "center",
+                        maxWidth: "520px",
+                      }}
+                    >
                   <div
                     style={{
                       fontWeight: 700,
-                      fontSize: "18px",
-                      lineHeight: 1.25,
-                      marginBottom: "8px",
+                      fontSize: "17px",
+                      lineHeight: 1.3,
+                      marginBottom: "10px",
                       color: "#000",
                     }}
                   >
@@ -2494,9 +2502,9 @@ const NewInvoice = ({ invoice }) => {
                   </div>
                   <div
                     style={{
-                      fontSize: "11px",
-                      lineHeight: 1.5,
-                      marginBottom: "2px",
+                      fontSize: "10px",
+                      lineHeight: 1.45,
+                      marginBottom: "3px",
                       color: "#000",
                       fontWeight: 400,
                     }}
@@ -2505,9 +2513,9 @@ const NewInvoice = ({ invoice }) => {
                   </div>
                   <div
                     style={{
-                      fontSize: "11px",
-                      lineHeight: 1.5,
-                      marginBottom: "4px",
+                      fontSize: "10px",
+                      lineHeight: 1.45,
+                      marginBottom: "5px",
                       color: "#000",
                       fontWeight: 400,
                     }}
@@ -2516,8 +2524,8 @@ const NewInvoice = ({ invoice }) => {
                   </div>
                   <div
                     style={{
-                      fontSize: "11px",
-                      lineHeight: 1.5,
+                      fontSize: "10px",
+                      lineHeight: 1.45,
                       marginBottom: "3px",
                       color: "#000",
                       fontWeight: 400,
@@ -2527,13 +2535,15 @@ const NewInvoice = ({ invoice }) => {
                   </div>
                   <div
                     style={{
-                      fontSize: "11px",
-                      lineHeight: 1.5,
+                      fontSize: "10px",
+                      lineHeight: 1.45,
                       color: "#000",
                       fontWeight: 400,
                     }}
                   >
                     GST: {INVOICE_LETTERHEAD.gstin}
+                  </div>
+                    </div>
                   </div>
                 </div>
               </td>
@@ -2554,12 +2564,13 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   width: "33%",
                   fontWeight: "bold",
                   borderBottom: "0px",
                   borderRight: "0px",
+                  textAlign: "left",
+                  verticalAlign: "top",
                 }}
               >
                 Invoice No. : <span style={{
@@ -2569,12 +2580,13 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   width: "33%",
                   fontWeight: "bold",
                   borderBottom: "0px",
                   borderRight: "0px",
+                  textAlign: "left",
+                  verticalAlign: "top",
                 }}
               >
                 Invoice Date : <span style={{
@@ -2584,11 +2596,12 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   width: "34%",
                   fontWeight: "bold",
                   borderBottom: "0px",
+                  textAlign: "left",
+                  verticalAlign: "top",
                 }}
               >
                 Due Date : <span style={{
@@ -2601,12 +2614,12 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   width: "33%",
                   borderBottom: "0px",
                   borderRight: "0px",
                   verticalAlign: "top",
+                  textAlign: "left",
                 }}
               >
                 <div style={{ fontWeight: "bold", lineHeight: "1.3" }}>
@@ -2625,11 +2638,12 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   width: "33%",
                   borderBottom: "0px",
                   borderRight: "0px",
+                  verticalAlign: "top",
+                  textAlign: "left",
                 }}
               >
                 <b>Buyer's Order No. : <span style={{
@@ -2639,10 +2653,11 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   width: "34%",
                   borderBottom: "0px",
+                  verticalAlign: "top",
+                  textAlign: "left",
                 }}
               >
                 <b>Order Date : <span style={{
@@ -2655,10 +2670,11 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
+                  padding: "4px 8px 8px 8px",
                   borderBottom: "0px",
-                  paddingBottom: "7px",
                   borderRight: "0px",
+                  textAlign: "left",
+                  verticalAlign: "top",
                 }}
               >
                 <b>e-Way Bill No. : <span style={{
@@ -2668,10 +2684,11 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   borderBottom: "0px",
                   borderRight: "0px",
+                  textAlign: "left",
+                  verticalAlign: "top",
                 }}
               >
                 <b>Payment Status : <span style={{
@@ -2681,9 +2698,10 @@ const NewInvoice = ({ invoice }) => {
               <td
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   borderBottom: "0px",
+                  textAlign: "left",
+                  verticalAlign: "top",
                 }}
               >
                 <b>Balance Amount : <span style={{
@@ -2696,9 +2714,10 @@ const NewInvoice = ({ invoice }) => {
                 colSpan={3}
                 style={{
                   border: "1px solid #000",
-                  padding: "3px",
-                  paddingBottom: "7px",
+                  padding: "4px 8px 8px 8px",
                   borderBottom: "0px",
+                  textAlign: "left",
+                  verticalAlign: "top",
                 }}
               >
                 <b>Delivery Challan No. :{" "}
