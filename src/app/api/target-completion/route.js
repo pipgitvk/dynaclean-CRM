@@ -111,7 +111,7 @@ export async function GET(request) {
       }
     }
 
-    // Calculate total from quotation items (price_per_unit * quantity) for completed orders
+    // Sum quote line items for super-admin–approved orders in range (gate is approval, not invoice upload)
     let completed_amount = 0;
     if (orderStart <= orderEnd) {
       const [ordersRows] = await db.execute(
@@ -122,7 +122,7 @@ export async function GET(request) {
          JOIN quotation_items qi
            ON qr.quote_number = qi.quote_number
          WHERE qr.emp_name = ?
-           AND no.account_status = 1
+           AND no.approval_status = 'approved'
            AND DATE(no.created_at) >= ?
            AND DATE(no.created_at) <= ?`,
         [username, orderStart, orderEnd]
