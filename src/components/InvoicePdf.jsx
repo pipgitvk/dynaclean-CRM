@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 15,
-    fontWeight: 700,
+    fontWeight: 400,
     margin: 0,
   },
   // Company Details
@@ -114,9 +114,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   companyName: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 700,
-    marginBottom: 2,
+    marginBottom: 8,
   },
   companyText: {
     fontSize: 10,
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     lineHeight: 1.2,
   },
   companyDetailText: {
-    fontSize: 11,
+    fontSize: 10,
     marginBottom: 2,
     lineHeight: 1.45,
     fontWeight: 400,
@@ -146,6 +146,13 @@ const styles = StyleSheet.create({
     padding: "4px",
     border: "1px solid #000",
     fontSize: 9,
+  },
+  invoiceMetaCell: {
+    paddingTop: 5,
+    paddingBottom: 8,
+    paddingLeft: 8,
+    paddingRight: 8,
+    alignItems: "flex-start",
   },
   tableHeader: {
     backgroundColor: "#f0f0f0",
@@ -376,22 +383,17 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
             <View
               style={{
                 flexDirection: "row",
-                borderBottom: "1px solid #000",
                 alignItems: "flex-start",
+                borderBottom: "1px solid #000",
+                minHeight: 100,
+                paddingTop: 14,
+                paddingBottom: 12,
+                paddingLeft: 4,
+                paddingRight: 24,
                 flexShrink: 0,
               }}
             >
-              <View
-                style={[
-                  styles.tableCell,
-                  {
-                    width: "25%",
-                    padding: 8,
-                    paddingTop: 14,
-                    flexShrink: 0,
-                  },
-                ]}
-              >
+              <View style={{ width: 110, marginRight: 44, marginTop: 14, flexShrink: 0 }}>
                 {logoPdfSrc ? (
                   <Image
                     src={logoPdfSrc}
@@ -399,56 +401,65 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                       width: 110,
                       height: 62,
                       objectFit: "contain",
-                      marginLeft: 32,
                     }}
                   />
                 ) : (
-                  <View style={{ width: 110, height: 62, marginLeft: 32 }} />
+                  <View style={{ width: 110, height: 62 }} />
                 )}
               </View>
               <View
-                style={[
-                  styles.tableCell,
-                  {
-                    width: "75%",
-                    padding: 8,
-                    flexShrink: 0,
-                  },
-                ]}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  alignItems: "flex-start",
+                }}
               >
-                <Text style={[styles.companyName, { textAlign: "center" }]}>
-                  {data.company?.name || ""}
-                </Text>
-                <Text
-                  style={[styles.companyDetailText, { textAlign: "center" }]}
+                <View
+                  style={{
+                    width: 420,
+                    maxWidth: "100%",
+                    alignItems: "center",
+                  }}
                 >
-                  {[
-                    data.company?.addressLine1 ?? data.company?.address ?? "",
-                    data.company?.addressLine2 || "",
-                    `Ph: ${data.company?.phone || ""}`,
-                    `GST: ${data.company?.gstin || ""}`,
-                  ]
-                    .filter(Boolean)
-                    .join("\n")}
-                </Text>
+                  <Text
+                    style={[styles.companyName, { textAlign: "center", width: "100%" }]}
+                  >
+                    {data.company?.name || ""}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.companyDetailText,
+                      { textAlign: "center", width: "100%" },
+                    ]}
+                  >
+                    {[
+                      data.company?.addressLine1 ?? data.company?.address ?? "",
+                      data.company?.addressLine2 || "",
+                      `Ph: ${data.company?.phone || ""}`,
+                      `GST: ${data.company?.gstin || ""}`,
+                    ]
+                      .filter(Boolean)
+                      .join("\n")}
+                  </Text>
+                </View>
               </View>
             </View>
 
             {/* Invoice metadata — inline labels like print view */}
             <View style={styles.tableRow}>
-              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>Invoice No. : </Text>
                   <Text>{data.invoice.number || "-"}</Text>
                 </Text>
               </View>
-              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>Invoice Date : </Text>
                   <Text>{data.invoice.invoiceDate || "-"}</Text>
                 </Text>
               </View>
-              <View style={[styles.tableCell, { width: "33.34%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.34%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>Due Date : </Text>
                   <Text>{data.invoice.dueDate || "-"}</Text>
@@ -457,7 +468,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
             </View>
 
             <View style={styles.tableRow}>
-              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
                 <Text style={{ fontSize: 9, lineHeight: 1.35 }}>
                   <Text style={styles.bold}>Reference No. : </Text>
                   <Text>{data.invoice.referenceNo || "-"}</Text>
@@ -466,13 +477,13 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                   <Text>{data.invoice.referenceDate || "-"}</Text>
                 </Text>
               </View>
-              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>Buyer&apos;s Order No. : </Text>
                   <Text>{data.invoice.buyersOrderNo || "-"}</Text>
                 </Text>
               </View>
-              <View style={[styles.tableCell, { width: "33.34%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.34%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>Order Date : </Text>
                   <Text>{data.invoice.orderDate || "-"}</Text>
@@ -481,19 +492,19 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
             </View>
 
             <View style={styles.tableRow}>
-              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>e-Way Bill No. : </Text>
                   <Text>{data.invoice.eWayBill || "-"}</Text>
                 </Text>
               </View>
-              <View style={[styles.tableCell, { width: "33.33%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>Payment Status : </Text>
                   <Text>{data.paymentInfo.status || "-"}</Text>
                 </Text>
               </View>
-              <View style={[styles.tableCell, { width: "33.34%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.34%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>Balance Amount : </Text>
                   <Text>{data.paymentInfo.balanceAmount || "0.00"}</Text>
@@ -502,7 +513,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
             </View>
 
             <View style={styles.tableRow}>
-              <View style={[styles.tableCell, { width: "100%", paddingVertical: 6 }]}>
+              <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "100%" }]}>
                 <Text style={{ fontSize: 9 }}>
                   <Text style={styles.bold}>Delivery Challan No. : </Text>
                   <Text>{data.invoice.deliveryChallanNo || "-"}</Text>
