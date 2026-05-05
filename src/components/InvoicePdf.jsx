@@ -83,7 +83,6 @@ const styles = StyleSheet.create({
     border: "1px solid #000",
     padding: 10,
     width: "100%",
-    minHeight: "100%",
   },
   invoiceTitleOutside: {
     width: "100%",
@@ -124,11 +123,19 @@ const styles = StyleSheet.create({
     marginBottom: 1,
     lineHeight: 1.2,
   },
+  companyDetailText: {
+    fontSize: 11,
+    marginBottom: 2,
+    lineHeight: 1.45,
+    fontWeight: 400,
+  },
   // Tables
   table: {
     width: "100%",
     borderCollapse: "collapse",
     marginBottom: 10,
+    flexDirection: "column",
+    flexShrink: 0,
   },
   tableRow: {
     flexDirection: "row",
@@ -366,24 +373,37 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
         <View style={styles.container}>
           {/* Logo + company (matches DesignInvoice: 25% / 75%) */}
           <View style={styles.table}>
-            <View style={styles.tableRow}>
+            <View
+              style={{
+                flexDirection: "row",
+                borderBottom: "1px solid #000",
+                alignItems: "flex-start",
+                flexShrink: 0,
+              }}
+            >
               <View
                 style={[
                   styles.tableCell,
                   {
                     width: "25%",
                     padding: 8,
-                    paddingTop: 22,
+                    paddingTop: 14,
+                    flexShrink: 0,
                   },
                 ]}
               >
                 {logoPdfSrc ? (
                   <Image
                     src={logoPdfSrc}
-                    style={{ width: 110, height: 62, objectFit: "contain" }}
+                    style={{
+                      width: 110,
+                      height: 62,
+                      objectFit: "contain",
+                      marginLeft: 32,
+                    }}
                   />
                 ) : (
-                  <View style={{ width: 110, height: 62 }} />
+                  <View style={{ width: 110, height: 62, marginLeft: 32 }} />
                 )}
               </View>
               <View
@@ -392,35 +412,25 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                   {
                     width: "75%",
                     padding: 8,
-                    alignItems: "flex-start",
+                    flexShrink: 0,
                   },
                 ]}
               >
-                <View
-                  style={{
-                    maxWidth: 520,
-                    width: 440,
-                    alignItems: "center",
-                  }}
+                <Text style={[styles.companyName, { textAlign: "center" }]}>
+                  {data.company?.name || ""}
+                </Text>
+                <Text
+                  style={[styles.companyDetailText, { textAlign: "center" }]}
                 >
-                  <Text style={[styles.companyName, { textAlign: "center", width: "100%" }]}>
-                    {data.company.name}
-                  </Text>
-                  <Text style={[styles.companyText, { textAlign: "center", width: "100%" }]}>
-                    {data.company.addressLine1 ?? data.company.address}
-                  </Text>
-                  {data.company.addressLine2 ? (
-                    <Text style={[styles.companyText, { textAlign: "center", width: "100%" }]}>
-                      {data.company.addressLine2}
-                    </Text>
-                  ) : null}
-                  <Text style={[styles.companyText, { textAlign: "center", width: "100%" }]}>
-                    Ph: {data.company.phone}
-                  </Text>
-                  <Text style={[styles.companyText, { textAlign: "center", width: "100%" }]}>
-                    GST: {data.company.gstin}
-                  </Text>
-                </View>
+                  {[
+                    data.company?.addressLine1 ?? data.company?.address ?? "",
+                    data.company?.addressLine2 || "",
+                    `Ph: ${data.company?.phone || ""}`,
+                    `GST: ${data.company?.gstin || ""}`,
+                  ]
+                    .filter(Boolean)
+                    .join("\n")}
+                </Text>
               </View>
             </View>
 

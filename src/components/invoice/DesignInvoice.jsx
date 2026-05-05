@@ -2075,7 +2075,8 @@ const NewInvoice = ({ invoice }) => {
       styleTag = document.createElement("style");
       styleTag.setAttribute("data-pdf-override", "true");
       styleTag.innerHTML = `
-      * {
+      [data-pdf-capture-root],
+      [data-pdf-capture-root] * {
         color: rgb(0, 0, 0) !important;
         background-color: rgb(255, 255, 255) !important;
         border-color: rgb(0, 0, 0) !important;
@@ -2084,19 +2085,22 @@ const NewInvoice = ({ invoice }) => {
         text-shadow: none !important;
       }
 
-      *::before,
-      *::after {
+      [data-pdf-capture-root] *::before,
+      [data-pdf-capture-root] *::after {
         color: rgb(0, 0, 0) !important;
         background-color: rgb(255, 255, 255) !important;
         border-color: rgb(0, 0, 0) !important;
       }
 
-      table {
+      [data-pdf-capture-root] table {
         border-collapse: collapse !important;
       }
 
-      td, th {
+      [data-pdf-capture-root] td,
+      [data-pdf-capture-root] th {
         page-break-inside: avoid !important;
+        overflow: visible !important;
+        vertical-align: top !important;
       }
     `;
       document.head.appendChild(styleTag);
@@ -2109,21 +2113,21 @@ const NewInvoice = ({ invoice }) => {
         allowTaint: false,
         foreignObjectRendering: false,
         backgroundColor: "#ffffff",
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
         logging: false,
         imageTimeout: 15000,
         onclone: (clonedDoc) => {
-          const clonedEl =
-            clonedDoc.body.querySelector("[ref]") ||
-            clonedDoc.body.firstElementChild;
-          if (clonedEl) {
-            clonedEl.style.width = "794px";
-            clonedEl.style.maxWidth = "794px";
+          const root = clonedDoc.querySelector(
+            '[data-pdf-capture-root="true"]',
+          );
+          if (root) {
+            root.style.width = "794px";
+            root.style.maxWidth = "794px";
+            root.style.boxSizing = "border-box";
+            root.style.overflow = "visible";
+            const h = Math.max(root.scrollHeight, root.offsetHeight);
+            root.style.minHeight = `${Math.ceil(h + 4)}px`;
 
-            // Force RGB colors in cloned document
-            const allElements = clonedEl.querySelectorAll("*");
-            allElements.forEach((elem) => {
+            root.querySelectorAll("*").forEach((elem) => {
               elem.style.color = "rgb(0, 0, 0)";
               elem.style.backgroundColor = "rgb(255, 255, 255)";
               elem.style.borderColor = "rgb(0, 0, 0)";
@@ -2367,6 +2371,7 @@ const NewInvoice = ({ invoice }) => {
       </div>
       <div
         ref={containerRef}
+        data-pdf-capture-root="true"
         style={{
           fontFamily: "Arial, sans-serif",
           fontSize: "11px",
@@ -2404,13 +2409,14 @@ const NewInvoice = ({ invoice }) => {
           style={{
             width: "100%",
             borderCollapse: "collapse",
-            tableLayout: "fixed",
+            tableLayout: "auto",
             border: "1px solid #000",
             borderBottom: "0px",
+            overflow: "visible",
           }}
         >
           <tbody>
-            <tr style={{ minHeight: "110px" }}>
+            <tr>
               {/* Left - Logo */}
               <td
                 style={{
@@ -2427,6 +2433,7 @@ const NewInvoice = ({ invoice }) => {
                       height: "auto",
                       display: "block",
                       marginTop: "22px",
+                      marginLeft: "32px",
                     }}
                     alt="logo"
                     onError={handleLogoError}
@@ -2444,6 +2451,7 @@ const NewInvoice = ({ invoice }) => {
                       fontWeight: 700,
                       fontSize: 10,
                       marginTop: "22px",
+                      marginLeft: "32px",
                     }}
                   >
                     DYNACLEAN
@@ -2451,20 +2459,26 @@ const NewInvoice = ({ invoice }) => {
                 )}
               </td>
 
-              {/* Company block: left-aligned in cell (closer to logo); lines stay centered inside block */}
+              {/* Company name + address block: centered block like letterhead sample */}
               <td
                 style={{
                   width: "75%",
-                  textAlign: "left",
-                  verticalAlign: "middle",
-                  padding: "10px 24px 10px 2px",
+                  textAlign: "center",
+                  verticalAlign: "top",
+                  padding: "12px 16px 10px 8px",
+                  overflow: "visible",
                 }}
               >
                 <div
                   style={{
-                    display: "inline-block",
+                    /* block + margin auto: html2canvas stable vs inline-block center */
+                    display: "block",
+                    maxWidth: "480px",
+                    marginLeft: "auto",
+                    marginRight: "auto",
                     textAlign: "center",
-                    maxWidth: "520px",
+                    fontFamily: "Arial, Helvetica, sans-serif",
+                    overflow: "visible",
                   }}
                 >
                   <div
@@ -2472,7 +2486,7 @@ const NewInvoice = ({ invoice }) => {
                       fontWeight: 700,
                       fontSize: "18px",
                       lineHeight: 1.25,
-                      marginBottom: "6px",
+                      marginBottom: "8px",
                       color: "#000",
                     }}
                   >
@@ -2480,39 +2494,43 @@ const NewInvoice = ({ invoice }) => {
                   </div>
                   <div
                     style={{
-                      fontSize: "10px",
-                      lineHeight: 1.35,
+                      fontSize: "11px",
+                      lineHeight: 1.5,
                       marginBottom: "2px",
                       color: "#000",
+                      fontWeight: 400,
                     }}
                   >
                     {INVOICE_LETTERHEAD.addressLine1}
                   </div>
                   <div
                     style={{
-                      fontSize: "10px",
-                      lineHeight: 1.35,
-                      marginBottom: "5px",
+                      fontSize: "11px",
+                      lineHeight: 1.5,
+                      marginBottom: "4px",
                       color: "#000",
+                      fontWeight: 400,
                     }}
                   >
                     {INVOICE_LETTERHEAD.addressLine2}
                   </div>
                   <div
                     style={{
-                      fontSize: "10px",
-                      lineHeight: 1.35,
-                      marginBottom: "4px",
+                      fontSize: "11px",
+                      lineHeight: 1.5,
+                      marginBottom: "3px",
                       color: "#000",
+                      fontWeight: 400,
                     }}
                   >
                     Ph: {INVOICE_LETTERHEAD.phone}
                   </div>
                   <div
                     style={{
-                      fontSize: "10px",
-                      lineHeight: 1.35,
+                      fontSize: "11px",
+                      lineHeight: 1.5,
                       color: "#000",
+                      fontWeight: 400,
                     }}
                   >
                     GST: {INVOICE_LETTERHEAD.gstin}
