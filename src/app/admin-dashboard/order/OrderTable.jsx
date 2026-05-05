@@ -192,6 +192,18 @@ export default function OrderTable({ orders, userRole }) {
     );
   }, [orders, dateFrom, dateTo]);
 
+  const filteredTaxableTotals = useMemo(() => {
+    if (!filteredOrders?.length) return { taxableTotal: 0 };
+    return filteredOrders.reduce(
+      (acc, o) => {
+        if (o.approval_status !== "approved") return acc;
+        acc.taxableTotal += orderTaxableTotal(o);
+        return acc;
+      },
+      { taxableTotal: 0 }
+    );
+  }, [filteredOrders]);
+
   const getStatusText = (order) => {
     if (order.approval_status === "pending") {
       return {
@@ -334,7 +346,7 @@ export default function OrderTable({ orders, userRole }) {
 
   return (
     <div className="space-y-6">
-      <div className="w-full max-w-sm space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <div
           onClick={() => {
             if (userRole !== "SUPERADMIN") return;
@@ -347,39 +359,46 @@ export default function OrderTable({ orders, userRole }) {
           }}
           className={`w-full rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* <div>
+          <div className="flex items-start justify-between">
+            <div>
               <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
-                GST total
+                Taxable
+              </p>
+              <p className="text-[10px] text-violet-600/90 mb-1 leading-tight">
+                Total amount without GST
               </p>
               <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
                 ₹
-                {dispatchDoneTotals.gstTotal.toLocaleString("en-IN", {
+                {dispatchDoneTotals.taxableTotal.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </p>
-            </div> */}
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
-                  Taxable
-                </p>
-                <p className="text-[10px] text-violet-600/90 mb-1 leading-tight">
-                  Total amount without GST
-                </p>
-                <p className="text-xl sm:text-2xl font-bold text-violet-950 tabular-nums">
-                  ₹
-                  {dispatchDoneTotals.taxableTotal.toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
             </div>
           </div>
         </div>
 
+        <div
+          className={`w-full rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}
+        >
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs text-blue-700 mb-0.5 font-semibold uppercase tracking-wide">
+                Filtered Taxable
+              </p>
+              <p className="text-[10px] text-blue-600/90 mb-1 leading-tight">
+                {createdByFilter ? `By ${createdByFilter}` : "All Users"}
+              </p>
+              <p className="text-xl sm:text-2xl font-bold text-blue-950 tabular-nums">
+                ₹
+                {filteredTaxableTotals.taxableTotal.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 🔍 Search and Quick Status Filter */}
