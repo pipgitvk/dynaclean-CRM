@@ -46,7 +46,7 @@ export async function GET(request) {
 
     const target = parseFloat(targetRows[0].target);
 
-    // Calculate total from quotation items (price_per_unit * quantity) for completed orders
+    // Sum quote line items for super-admin–approved orders (same totals as before; gate is approval not invoice)
     const [ordersRows] = await db.execute(
       `SELECT IFNULL(SUM(qi.price_per_unit * qi.quantity), 0) AS total_completed_amount
          FROM neworder no
@@ -55,7 +55,7 @@ export async function GET(request) {
          JOIN quotation_items qi
            ON qr.quote_number = qi.quote_number
         WHERE qr.emp_name = ?
-          AND no.account_status = 1
+          AND no.approval_status = 'approved'
           AND MONTH(no.created_at) = ?
           AND YEAR(no.created_at) = ?`,
       [username, month, year]
