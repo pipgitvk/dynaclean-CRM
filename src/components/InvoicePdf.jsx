@@ -85,12 +85,10 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: "100%",
   },
-  // Header
-  header: {
+  invoiceTitleOutside: {
+    width: "100%",
     textAlign: "center",
-    borderBottom: "2px solid #000",
-    paddingBottom: 5,
-    marginBottom: 5,
+    marginBottom: 6,
   },
   headerTitle: {
     fontSize: 15,
@@ -362,17 +360,22 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        <View style={styles.invoiceTitleOutside}>
+          <Text style={styles.headerTitle}>Tax Invoice</Text>
+        </View>
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Tax Invoice</Text>
-          </View>
-
           {/* Logo + company (matches DesignInvoice: 25% / 75%) */}
           <View style={styles.table}>
             <View style={styles.tableRow}>
               <View
-                style={[styles.tableCell, { width: "25%", padding: 8, justifyContent: "center" }]}
+                style={[
+                  styles.tableCell,
+                  {
+                    width: "25%",
+                    padding: 8,
+                    paddingTop: 22,
+                  },
+                ]}
               >
                 {logoPdfSrc ? (
                   <Image
@@ -384,18 +387,31 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                 )}
               </View>
               <View style={[styles.tableCell, { width: "75%", padding: 8 }]}>
-                <Text style={[styles.companyName, { textAlign: "center" }]}>
-                  {data.company.name}
-                </Text>
-                <Text style={[styles.companyText, { textAlign: "center" }]}>
-                  {data.company.address}
-                </Text>
-                <Text style={[styles.companyText, { textAlign: "center" }]}>
-                  Ph: {data.company.phone}
-                </Text>
-                <Text style={[styles.companyText, { textAlign: "center" }]}>
-                  GST: {data.company.gstin}
-                </Text>
+                <View
+                  style={{
+                    width: "100%",
+                    alignItems: "center",
+                    transform: "translateX(-8px)",
+                  }}
+                >
+                  <Text style={[styles.companyName, { textAlign: "center" }]}>
+                    {data.company.name}
+                  </Text>
+                  <Text style={[styles.companyText, { textAlign: "center" }]}>
+                    {data.company.addressLine1 ?? data.company.address}
+                  </Text>
+                  {data.company.addressLine2 ? (
+                    <Text style={[styles.companyText, { textAlign: "center" }]}>
+                      {data.company.addressLine2}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.companyText, { textAlign: "center" }]}>
+                    Ph: {data.company.phone}
+                  </Text>
+                  <Text style={[styles.companyText, { textAlign: "center" }]}>
+                    GST: {data.company.gstin}
+                  </Text>
+                </View>
               </View>
             </View>
 

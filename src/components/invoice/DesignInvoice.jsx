@@ -1731,8 +1731,8 @@ import html2canvas from "html2canvas";
 import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
 import InvoicePDFPreview from "../Preview";
 import { numberToWords } from "@/utils/NumbertoWord";
+import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 console.log(signImg);
-
 
 const NewInvoice = ({ invoice }) => {
   // Calculate tax rate from the invoice data
@@ -1843,14 +1843,7 @@ const NewInvoice = ({ invoice }) => {
   const itemsArray = createItemsArray();
 
   const data = {
-    company: {
-      name: "Dynaclean Industries Pvt Ltd",
-      address:
-        "1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road, Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu - 641006",
-      phone: "011-45143666, +91-7982456944",
-      email: "sales@dynacleanindustries.com",
-      gstin: "07AAKCD6495M1ZV",
-    },
+    company: { ...INVOICE_LETTERHEAD },
     buyer: {
       name: invoice.customer_name || "",
       address: invoice.billing_address || "",
@@ -2379,24 +2372,33 @@ const NewInvoice = ({ invoice }) => {
           fontSize: "11px",
           maxWidth: "210mm",
           margin: "0 auto",
-          padding: "6mm",
+          padding: "0",
           background: "#fff",
           backgroundColor: "#fff",
-          border: "1px solid #000",
         }}
       >
-        {/* Header */}
+        {/* Title outside invoice border (matches printed tax invoice layout) */}
         <div
           style={{
             textAlign: "center",
-            marginBottom: "3px",
-            paddingBottom: "3px",
+            marginBottom: "6px",
+            paddingBottom: "2px",
           }}
         >
-          <h1 style={{ margin: "0", fontSize: "15px", fontWeight: "semibold" }}>
+          <h1
+            style={{ margin: "0", fontSize: "15px", fontWeight: 700 }}
+          >
             Tax Invoice
           </h1>
         </div>
+        <div
+          style={{
+            padding: "6mm",
+            background: "#fff",
+            backgroundColor: "#fff",
+            border: "1px solid #000",
+          }}
+        >
         {/* Company Details */}
         <table
           style={{
@@ -2408,13 +2410,24 @@ const NewInvoice = ({ invoice }) => {
           }}
         >
           <tbody>
-            <tr style={{ height: "110px" }}>
+            <tr style={{ minHeight: "110px" }}>
               {/* Left - Logo */}
-              <td style={{ width: "25%" }}>
+              <td
+                style={{
+                  width: "25%",
+                  verticalAlign: "top",
+                  padding: "8px 4px 8px 8px",
+                }}
+              >
                 {logoSrc ? (
                   <img
                     src={logoSrc}
-                    style={{ width: 110, height: "auto", display: "block" }}
+                    style={{
+                      width: 110,
+                      height: "auto",
+                      display: "block",
+                      marginTop: "22px",
+                    }}
                     alt="logo"
                     onError={handleLogoError}
                   />
@@ -2430,6 +2443,7 @@ const NewInvoice = ({ invoice }) => {
                       color: "#c62828",
                       fontWeight: 700,
                       fontSize: 10,
+                      marginTop: "14px",
                     }}
                   >
                     DYNACLEAN
@@ -2437,39 +2451,72 @@ const NewInvoice = ({ invoice }) => {
                 )}
               </td>
 
-              {/* Center - Company Details */}
-              <td style={{ width: "75%" }}>
+              {/* Company block: centered text, nudged slightly left */}
+              <td
+                style={{
+                  width: "75%",
+                  textAlign: "center",
+                  verticalAlign: "middle",
+                  padding: "10px 12px 10px 8px",
+                }}
+              >
                 <div
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "110px",
+                    display: "inline-block",
                     textAlign: "center",
+                    maxWidth: "520px",
+                    transform: "translateX(-10px)",
                   }}
                 >
                   <div
                     style={{
-                      fontWeight: "bold",
-                      fontSize: "20px",
-                      marginBottom: "4px",
-                      marginTop: "4px",
+                      fontWeight: 700,
+                      fontSize: "18px",
+                      lineHeight: 1.25,
+                      marginBottom: "6px",
+                      color: "#000",
                     }}
                   >
-                    {data.company.name}
+                    {INVOICE_LETTERHEAD.name}
                   </div>
-
-                  <div style={{ fontSize: "10px", marginBottom: "4px" }}>
-                    {data.company.address}
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      lineHeight: 1.35,
+                      marginBottom: "2px",
+                      color: "#000",
+                    }}
+                  >
+                    {INVOICE_LETTERHEAD.addressLine1}
                   </div>
-
-                  <div style={{ fontSize: "10px", marginBottom: "3px" }}>
-                    Ph: {data.company.phone}
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      lineHeight: 1.35,
+                      marginBottom: "5px",
+                      color: "#000",
+                    }}
+                  >
+                    {INVOICE_LETTERHEAD.addressLine2}
                   </div>
-
-                  <div style={{ fontSize: "10px", marginBottom: "6px" }}>
-                    GST: {data.company.gstin}
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      lineHeight: 1.35,
+                      marginBottom: "4px",
+                      color: "#000",
+                    }}
+                  >
+                    Ph: {INVOICE_LETTERHEAD.phone}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      lineHeight: 1.35,
+                      color: "#000",
+                    }}
+                  >
+                    GST: {INVOICE_LETTERHEAD.gstin}
                   </div>
                 </div>
               </td>
@@ -3621,6 +3668,7 @@ const NewInvoice = ({ invoice }) => {
           }}
         >
           This is a Computer Generated Invoice
+        </div>
         </div>
       </div>
       {/* <div style={{ width: "80%", marginTop: "20px" }}>
