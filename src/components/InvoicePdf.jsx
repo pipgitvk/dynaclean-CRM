@@ -386,29 +386,38 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                   <View style={{ width: 110, height: 62 }} />
                 )}
               </View>
-              <View style={[styles.tableCell, { width: "75%", padding: 8 }]}>
+              <View
+                style={[
+                  styles.tableCell,
+                  {
+                    width: "75%",
+                    padding: 8,
+                    alignItems: "flex-start",
+                  },
+                ]}
+              >
                 <View
                   style={{
-                    width: "100%",
+                    maxWidth: 520,
+                    width: 440,
                     alignItems: "center",
-                    transform: "translateX(-8px)",
                   }}
                 >
-                  <Text style={[styles.companyName, { textAlign: "center" }]}>
+                  <Text style={[styles.companyName, { textAlign: "center", width: "100%" }]}>
                     {data.company.name}
                   </Text>
-                  <Text style={[styles.companyText, { textAlign: "center" }]}>
+                  <Text style={[styles.companyText, { textAlign: "center", width: "100%" }]}>
                     {data.company.addressLine1 ?? data.company.address}
                   </Text>
                   {data.company.addressLine2 ? (
-                    <Text style={[styles.companyText, { textAlign: "center" }]}>
+                    <Text style={[styles.companyText, { textAlign: "center", width: "100%" }]}>
                       {data.company.addressLine2}
                     </Text>
                   ) : null}
-                  <Text style={[styles.companyText, { textAlign: "center" }]}>
+                  <Text style={[styles.companyText, { textAlign: "center", width: "100%" }]}>
                     Ph: {data.company.phone}
                   </Text>
-                  <Text style={[styles.companyText, { textAlign: "center" }]}>
+                  <Text style={[styles.companyText, { textAlign: "center", width: "100%" }]}>
                     GST: {data.company.gstin}
                   </Text>
                 </View>

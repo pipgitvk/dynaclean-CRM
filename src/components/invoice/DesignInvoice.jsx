@@ -2443,7 +2443,7 @@ const NewInvoice = ({ invoice }) => {
                       color: "#c62828",
                       fontWeight: 700,
                       fontSize: 10,
-                      marginTop: "14px",
+                      marginTop: "22px",
                     }}
                   >
                     DYNACLEAN
@@ -2451,13 +2451,13 @@ const NewInvoice = ({ invoice }) => {
                 )}
               </td>
 
-              {/* Company block: centered text, nudged slightly left */}
+              {/* Company block: left-aligned in cell (closer to logo); lines stay centered inside block */}
               <td
                 style={{
                   width: "75%",
-                  textAlign: "center",
+                  textAlign: "left",
                   verticalAlign: "middle",
-                  padding: "10px 12px 10px 8px",
+                  padding: "10px 24px 10px 2px",
                 }}
               >
                 <div
@@ -2465,7 +2465,6 @@ const NewInvoice = ({ invoice }) => {
                     display: "inline-block",
                     textAlign: "center",
                     maxWidth: "520px",
-                    transform: "translateX(-10px)",
                   }}
                 >
                   <div
