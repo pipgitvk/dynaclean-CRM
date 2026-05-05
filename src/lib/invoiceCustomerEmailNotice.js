@@ -9,6 +9,7 @@ import fs from "fs";
 import { renderToBuffer } from "@react-pdf/renderer";
 import InvoicePDFDocument from "@/components/InvoicePdf";
 import { sendImportCrmSmtpEmail } from "@/lib/importCrmEmail";
+import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 
 function formatMoneyInr(n) {
   const num = typeof n === "number" ? n : Number(n) || 0;
@@ -197,14 +198,7 @@ export function buildInvoicePdfDocumentData(invoice) {
     paymentRaw === "PAID" ? "PAID" : paymentRaw === "PARTIAL" ? "PARTIAL" : "UNPAID";
 
   return {
-    company: {
-      name: "Dynaclean Industries Pvt Ltd",
-      address:
-        "1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road, Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu - 641006",
-      phone: "011-45143666, +91-7982456944",
-      email: "sales@dynacleanindustries.com",
-      gstin: "07AAKCD6495M1ZV",
-    },
+    company: { ...INVOICE_LETTERHEAD },
     buyer: {
       name: invo.customer_name || "",
       address: invo.billing_address || "",

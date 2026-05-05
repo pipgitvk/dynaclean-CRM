@@ -1731,8 +1731,8 @@ import html2canvas from "html2canvas";
 import DownloadPDFButton from "@/app/admin-dashboard/invoices/DownloadButton";
 import InvoicePDFPreview from "../Preview";
 import { numberToWords } from "@/utils/NumbertoWord";
+import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 console.log(signImg);
-
 
 const NewInvoice = ({ invoice }) => {
   // Calculate tax rate from the invoice data
@@ -1843,14 +1843,7 @@ const NewInvoice = ({ invoice }) => {
   const itemsArray = createItemsArray();
 
   const data = {
-    company: {
-      name: "Dynaclean Industries Pvt Ltd",
-      address:
-        "1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road, Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu - 641006",
-      phone: "011-45143666, +91-7982456944",
-      email: "sales@dynacleanindustries.com",
-      gstin: "07AAKCD6495M1ZV",
-    },
+    company: { ...INVOICE_LETTERHEAD },
     buyer: {
       name: invoice.customer_name || "",
       address: invoice.billing_address || "",
@@ -2082,7 +2075,8 @@ const NewInvoice = ({ invoice }) => {
       styleTag = document.createElement("style");
       styleTag.setAttribute("data-pdf-override", "true");
       styleTag.innerHTML = `
-      * {
+      [data-pdf-capture-root],
+      [data-pdf-capture-root] * {
         color: rgb(0, 0, 0) !important;
         background-color: rgb(255, 255, 255) !important;
         border-color: rgb(0, 0, 0) !important;
@@ -2091,19 +2085,22 @@ const NewInvoice = ({ invoice }) => {
         text-shadow: none !important;
       }
 
-      *::before,
-      *::after {
+      [data-pdf-capture-root] *::before,
+      [data-pdf-capture-root] *::after {
         color: rgb(0, 0, 0) !important;
         background-color: rgb(255, 255, 255) !important;
         border-color: rgb(0, 0, 0) !important;
       }
 
-      table {
+      [data-pdf-capture-root] table {
         border-collapse: collapse !important;
       }
 
-      td, th {
+      [data-pdf-capture-root] td,
+      [data-pdf-capture-root] th {
         page-break-inside: avoid !important;
+        overflow: visible !important;
+        vertical-align: top !important;
       }
     `;
       document.head.appendChild(styleTag);
@@ -2116,21 +2113,21 @@ const NewInvoice = ({ invoice }) => {
         allowTaint: false,
         foreignObjectRendering: false,
         backgroundColor: "#ffffff",
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
         logging: false,
         imageTimeout: 15000,
         onclone: (clonedDoc) => {
-          const clonedEl =
-            clonedDoc.body.querySelector("[ref]") ||
-            clonedDoc.body.firstElementChild;
-          if (clonedEl) {
-            clonedEl.style.width = "794px";
-            clonedEl.style.maxWidth = "794px";
+          const root = clonedDoc.querySelector(
+            '[data-pdf-capture-root="true"]',
+          );
+          if (root) {
+            root.style.width = "794px";
+            root.style.maxWidth = "794px";
+            root.style.boxSizing = "border-box";
+            root.style.overflow = "visible";
+            const h = Math.max(root.scrollHeight, root.offsetHeight);
+            root.style.minHeight = `${Math.ceil(h + 4)}px`;
 
-            // Force RGB colors in cloned document
-            const allElements = clonedEl.querySelectorAll("*");
-            allElements.forEach((elem) => {
+            root.querySelectorAll("*").forEach((elem) => {
               elem.style.color = "rgb(0, 0, 0)";
               elem.style.backgroundColor = "rgb(255, 255, 255)";
               elem.style.borderColor = "rgb(0, 0, 0)";
@@ -2374,47 +2371,70 @@ const NewInvoice = ({ invoice }) => {
       </div>
       <div
         ref={containerRef}
+        data-pdf-capture-root="true"
         style={{
           fontFamily: "Arial, sans-serif",
           fontSize: "11px",
           maxWidth: "210mm",
           margin: "0 auto",
-          padding: "6mm",
+          padding: "0",
           background: "#fff",
           backgroundColor: "#fff",
-          border: "1px solid #000",
         }}
       >
-        {/* Header */}
+        {/* Title outside invoice border (matches printed tax invoice layout) */}
         <div
           style={{
             textAlign: "center",
-            marginBottom: "3px",
-            paddingBottom: "3px",
+            marginBottom: "6px",
+            paddingBottom: "2px",
           }}
         >
-          <h1 style={{ margin: "0", fontSize: "15px", fontWeight: "semibold" }}>
+          <h1
+            style={{ margin: "0", fontSize: "15px", fontWeight: 700 }}
+          >
             Tax Invoice
           </h1>
         </div>
+        <div
+          style={{
+            padding: "6mm",
+            background: "#fff",
+            backgroundColor: "#fff",
+            border: "1px solid #000",
+          }}
+        >
         {/* Company Details */}
         <table
           style={{
             width: "100%",
             borderCollapse: "collapse",
-            tableLayout: "fixed",
+            tableLayout: "auto",
             border: "1px solid #000",
             borderBottom: "0px",
+            overflow: "visible",
           }}
         >
           <tbody>
-            <tr style={{ height: "110px" }}>
+            <tr>
               {/* Left - Logo */}
-              <td style={{ width: "25%" }}>
+              <td
+                style={{
+                  width: "25%",
+                  verticalAlign: "top",
+                  padding: "8px 4px 8px 8px",
+                }}
+              >
                 {logoSrc ? (
                   <img
                     src={logoSrc}
-                    style={{ width: 110, height: "auto", display: "block" }}
+                    style={{
+                      width: 110,
+                      height: "auto",
+                      display: "block",
+                      marginTop: "22px",
+                      marginLeft: "32px",
+                    }}
                     alt="logo"
                     onError={handleLogoError}
                   />
@@ -2430,6 +2450,8 @@ const NewInvoice = ({ invoice }) => {
                       color: "#c62828",
                       fontWeight: 700,
                       fontSize: 10,
+                      marginTop: "22px",
+                      marginLeft: "32px",
                     }}
                   >
                     DYNACLEAN
@@ -2437,39 +2459,81 @@ const NewInvoice = ({ invoice }) => {
                 )}
               </td>
 
-              {/* Center - Company Details */}
-              <td style={{ width: "75%" }}>
+              {/* Company name + address block: centered block like letterhead sample */}
+              <td
+                style={{
+                  width: "75%",
+                  textAlign: "center",
+                  verticalAlign: "top",
+                  padding: "12px 16px 10px 8px",
+                  overflow: "visible",
+                }}
+              >
                 <div
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    height: "110px",
+                    /* block + margin auto: html2canvas stable vs inline-block center */
+                    display: "block",
+                    maxWidth: "480px",
+                    marginLeft: "auto",
+                    marginRight: "auto",
                     textAlign: "center",
+                    fontFamily: "Arial, Helvetica, sans-serif",
+                    overflow: "visible",
                   }}
                 >
                   <div
                     style={{
-                      fontWeight: "bold",
-                      fontSize: "20px",
-                      marginBottom: "4px",
-                      marginTop: "4px",
+                      fontWeight: 700,
+                      fontSize: "18px",
+                      lineHeight: 1.25,
+                      marginBottom: "8px",
+                      color: "#000",
                     }}
                   >
-                    {data.company.name}
+                    {INVOICE_LETTERHEAD.name}
                   </div>
-
-                  <div style={{ fontSize: "10px", marginBottom: "4px" }}>
-                    {data.company.address}
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      lineHeight: 1.5,
+                      marginBottom: "2px",
+                      color: "#000",
+                      fontWeight: 400,
+                    }}
+                  >
+                    {INVOICE_LETTERHEAD.addressLine1}
                   </div>
-
-                  <div style={{ fontSize: "10px", marginBottom: "3px" }}>
-                    Ph: {data.company.phone}
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      lineHeight: 1.5,
+                      marginBottom: "4px",
+                      color: "#000",
+                      fontWeight: 400,
+                    }}
+                  >
+                    {INVOICE_LETTERHEAD.addressLine2}
                   </div>
-
-                  <div style={{ fontSize: "10px", marginBottom: "6px" }}>
-                    GST: {data.company.gstin}
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      lineHeight: 1.5,
+                      marginBottom: "3px",
+                      color: "#000",
+                      fontWeight: 400,
+                    }}
+                  >
+                    Ph: {INVOICE_LETTERHEAD.phone}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      lineHeight: 1.5,
+                      color: "#000",
+                      fontWeight: 400,
+                    }}
+                  >
+                    GST: {INVOICE_LETTERHEAD.gstin}
                   </div>
                 </div>
               </td>
@@ -3621,6 +3685,7 @@ const NewInvoice = ({ invoice }) => {
           }}
         >
           This is a Computer Generated Invoice
+        </div>
         </div>
       </div>
       {/* <div style={{ width: "80%", marginTop: "20px" }}>

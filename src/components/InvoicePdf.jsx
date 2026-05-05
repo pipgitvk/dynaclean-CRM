@@ -83,14 +83,11 @@ const styles = StyleSheet.create({
     border: "1px solid #000",
     padding: 10,
     width: "100%",
-    minHeight: "100%",
   },
-  // Header
-  header: {
+  invoiceTitleOutside: {
+    width: "100%",
     textAlign: "center",
-    borderBottom: "2px solid #000",
-    paddingBottom: 5,
-    marginBottom: 5,
+    marginBottom: 6,
   },
   headerTitle: {
     fontSize: 15,
@@ -126,11 +123,19 @@ const styles = StyleSheet.create({
     marginBottom: 1,
     lineHeight: 1.2,
   },
+  companyDetailText: {
+    fontSize: 11,
+    marginBottom: 2,
+    lineHeight: 1.45,
+    fontWeight: 400,
+  },
   // Tables
   table: {
     width: "100%",
     borderCollapse: "collapse",
     marginBottom: 10,
+    flexDirection: "column",
+    flexShrink: 0,
   },
   tableRow: {
     flexDirection: "row",
@@ -362,39 +367,69 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        <View style={styles.invoiceTitleOutside}>
+          <Text style={styles.headerTitle}>Tax Invoice</Text>
+        </View>
         <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Tax Invoice</Text>
-          </View>
-
           {/* Logo + company (matches DesignInvoice: 25% / 75%) */}
           <View style={styles.table}>
-            <View style={styles.tableRow}>
+            <View
+              style={{
+                flexDirection: "row",
+                borderBottom: "1px solid #000",
+                alignItems: "flex-start",
+                flexShrink: 0,
+              }}
+            >
               <View
-                style={[styles.tableCell, { width: "25%", padding: 8, justifyContent: "center" }]}
+                style={[
+                  styles.tableCell,
+                  {
+                    width: "25%",
+                    padding: 8,
+                    paddingTop: 14,
+                    flexShrink: 0,
+                  },
+                ]}
               >
                 {logoPdfSrc ? (
                   <Image
                     src={logoPdfSrc}
-                    style={{ width: 110, height: 62, objectFit: "contain" }}
+                    style={{
+                      width: 110,
+                      height: 62,
+                      objectFit: "contain",
+                      marginLeft: 32,
+                    }}
                   />
                 ) : (
-                  <View style={{ width: 110, height: 62 }} />
+                  <View style={{ width: 110, height: 62, marginLeft: 32 }} />
                 )}
               </View>
-              <View style={[styles.tableCell, { width: "75%", padding: 8 }]}>
+              <View
+                style={[
+                  styles.tableCell,
+                  {
+                    width: "75%",
+                    padding: 8,
+                    flexShrink: 0,
+                  },
+                ]}
+              >
                 <Text style={[styles.companyName, { textAlign: "center" }]}>
-                  {data.company.name}
+                  {data.company?.name || ""}
                 </Text>
-                <Text style={[styles.companyText, { textAlign: "center" }]}>
-                  {data.company.address}
-                </Text>
-                <Text style={[styles.companyText, { textAlign: "center" }]}>
-                  Ph: {data.company.phone}
-                </Text>
-                <Text style={[styles.companyText, { textAlign: "center" }]}>
-                  GST: {data.company.gstin}
+                <Text
+                  style={[styles.companyDetailText, { textAlign: "center" }]}
+                >
+                  {[
+                    data.company?.addressLine1 ?? data.company?.address ?? "",
+                    data.company?.addressLine2 || "",
+                    `Ph: ${data.company?.phone || ""}`,
+                    `GST: ${data.company?.gstin || ""}`,
+                  ]
+                    .filter(Boolean)
+                    .join("\n")}
                 </Text>
               </View>
             </View>
