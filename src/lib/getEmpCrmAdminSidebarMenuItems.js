@@ -40,7 +40,7 @@ const empCrmMenuItems = [
   { path: "/empcrm/admin-dashboard/attendance", name: "Attendance details", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "Clock" },
   { path: "/empcrm/admin-dashboard/documents", name: "Employee Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "FileText" },
   { path: "/empcrm/admin-dashboard/hiring", name: "Hiring", roles: ["HR HEAD", "HR", "HR Executive"], icon: "UserPlus" },
-  { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"], icon: "DollarSign" },
+  { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"], icon: "DollarSign" },
   { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"], icon: "Receipt" },
 ];
 

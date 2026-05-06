@@ -118,11 +118,12 @@ export async function middleware(request) {
         const isHrEmpCrm = hrEmpCrmRoles.some(
           (r) => normalizeRoleKey(r) === roleKey,
         );
-        // Accountant: Salary slips only (see getEmpCrmAdminSidebarMenuItems)
-        const isAccountantSalarySlips =
+        // Accountant: Salary management and salary slips (see getEmpCrmAdminSidebarMenuItems)
+        const isAccountantSalaryAccess =
           roleKey === "ACCOUNTANT" &&
-          pathname.startsWith("/empcrm/admin-dashboard/salary-slips");
-        if (!isHrEmpCrm && !isAccountantSalarySlips) {
+          (pathname.startsWith("/empcrm/admin-dashboard/salary") ||
+           pathname.startsWith("/empcrm/admin-dashboard/salary-slips"));
+        if (!isHrEmpCrm && !isAccountantSalaryAccess) {
           return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
         }
       }

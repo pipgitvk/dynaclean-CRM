@@ -350,7 +350,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
       totalSGST: 0,
       totalIGST: 0,
       totalQuantity: 0,
-    };
+    };  
 
     data.items.forEach((item) => {
       totals.subtotal += parseFloat(item.amount || 0);
