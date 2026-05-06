@@ -3612,21 +3612,29 @@ const NewInvoice = ({ invoice }) => {
               <div>No terms and conditions specified.</div>
             )}
           </div>
-          <div style={{ width: "250px", fontSize: "9px" }}>
-            <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
-              Company's Bank Details
-            </div>
-            <div style={{ fontSize: "10px", marginBottom: "2px" }}>
-              A/C Holder Name : {data.bank.accountHolderName}
-            </div>
-            <div style={{ fontSize: "10px", marginBottom: "2px" }}>
-              Bank Name : {data.bank.name}
-            </div>
-            <div style={{ fontSize: "10px", marginBottom: "2px" }}>
-              A/c No. : {data.bank.accountNo}
-            </div>
-            <div style={{ fontSize: "10px", marginBottom: "2px" }}>
-              Branch & IFS Code: {data.bank.IFSC}
+          <div
+            style={{
+              width: "250px",
+              display: "flex",
+              justifyContent: "flex-end",
+            }}
+          >
+            <div style={{ width: "100%", fontSize: "9px" }}>
+              <div style={{ fontWeight: "bold", marginBottom: "5px" }}>
+                Company's Bank Details
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                A/C Holder Name : {data.bank.accountHolderName}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                Bank Name : {data.bank.name}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                A/c No. : {data.bank.accountNo}
+              </div>
+              <div style={{ fontSize: "10px", marginBottom: "2px" }}>
+                Branch & IFS Code: {data.bank.IFSC}
+              </div>
             </div>
           </div>
         </div>
