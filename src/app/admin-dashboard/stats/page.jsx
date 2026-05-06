@@ -348,8 +348,8 @@ export default function AdminStatsDashboard() {
                         subtitle={
                             (stats?.sales?.totalBaseAmount != null || stats?.sales?.totalTaxGst != null)
                                 ? (() => {
-                                    const base = parseFloat(stats?.sales?.totalTaxGst) || 0;
-                                    const tax = parseFloat(stats?.sales?.totalBaseAmount) || 0;
+                                    const base = parseFloat(stats?.sales?.totalBaseAmount) || 0;
+                                    const tax = parseFloat(stats?.sales?.totalTaxGst) || 0;
                                     return `Base ${formatCurrency(base)} | Tax ${formatCurrency(tax)}`;
                                 })()
                                 : "Order total (totalamt)"
