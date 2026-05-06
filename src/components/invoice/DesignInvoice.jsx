@@ -2148,38 +2148,20 @@ const NewInvoice = ({ invoice }) => {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       const imgProps = pdf.getImageProperties(imgData);
-      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(
-        imgData,
-        "PNG",
-        0,
-        position,
-        pdfWidth,
-        imgHeight,
-        undefined,
-        "FAST",
+      /**
+       * Single-page export: scale the captured image to fit in one A4 page.
+       * This avoids tiny overflow triggering an extra mostly-blank page.
+       */
+      const scale = Math.min(
+        pdfWidth / imgProps.width,
+        pdfHeight / imgProps.height,
       );
-      heightLeft -= pdfHeight;
+      const drawW = imgProps.width * scale;
+      const drawH = imgProps.height * scale;
+      const x = (pdfWidth - drawW) / 2;
+      const y = (pdfHeight - drawH) / 2;
 
-      while (heightLeft > 0) {
-        position -= pdfHeight;
-        pdf.addPage();
-        pdf.addImage(
-          imgData,
-          "PNG",
-          0,
-          position,
-          pdfWidth,
-          imgHeight,
-          undefined,
-          "FAST",
-        );
-        heightLeft -= pdfHeight;
-      }
+      pdf.addImage(imgData, "PNG", x, y, drawW, drawH, undefined, "FAST");
 
       pdf.save(`Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`);
 
