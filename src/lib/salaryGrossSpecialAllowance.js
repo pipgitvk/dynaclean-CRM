@@ -82,7 +82,7 @@ export function applyStatutoryDeductionsFromStructure({
     basicSalary,
     totalEarnings,
   );
-  const pf = structPfN > 0 ? rawPf : 0;
+  const pf = structPfN > 0 ? Math.min(rawPf, 1800) : 0;
   let esi = 0;
   if (lowGrossPfRule) {
     esi =
@@ -117,13 +117,13 @@ export function syncStatutoryFormFieldsFromStructureInput(form) {
   const basic = floorInr(form.basic_salary);
   if (isLowGrossPfMonthly(eff)) {
     return {
-      pf: String(floorInr(0.12 * basic)),
+      pf: String(Math.min(floorInr(0.12 * basic), 1800)),
       esi: String(floorInr(LOW_GROSS_PF_RATE * eff)),
       health_insurance: "0",
     };
   }
   return {
-    pf: String(floorInr(0.12 * basic)),
+    pf: String(Math.min(floorInr(0.12 * basic), 1800)),
     esi: "0",
     health_insurance: String(FIXED_HEALTH_INSURANCE_INR),
   };
