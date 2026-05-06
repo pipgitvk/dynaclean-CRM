@@ -873,9 +873,10 @@ export default function QuotationForm() {
           {/* Bank Details */}
           <div className="lg:col-span-1 border p-4 rounded bg-gray-50 text-sm">
             <h4 className="font-semibold mb-2">Bank Details</h4>
-            <p>ICICI Bank</p>
-            <p>Account: 343405500379</p>
-            <p>IFSC: ICIC0003434</p>
+            <p>A/C Holder Name : Dynaclean Industries Private Limited</p>
+            <p>Bank Name : ICICI Bank</p>
+            <p>A/c no. : 343405500379</p>
+            <p>Branch & IFS Code: ICIC0003434</p>
           </div>
 
           {/* Signatory */}
