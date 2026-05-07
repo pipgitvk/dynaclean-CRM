@@ -1006,43 +1006,13 @@ const GenerateSalaryPage = () => {
                                     const z = (n) => (attendanceDisplayAllZero ? 0 : Number(n) || 0);
                                     return (
                                         <>
-                                            <div className="border-b border-slate-100 py-1.5">
-                                               
-                                                <div className="flex justify-between gap-2">
-                                                
-                                                    <dt className="text-slate-600">Present</dt>
-                                                    <dd className="font-semibold text-green-600 tabular-nums">
-                                                        {z(c.present)}
-                                                    </dd>
-                                                </div>
-                                                <div className="mt-1.5 space-y-1 pl-4 text-xs">
-                                                    <div className="flex justify-between gap-2 text-slate-500">
-                                                        <span>Regular </span>
-                                                        <span className="tabular-nums font-medium text-slate-700">
-                                                            {presentRegular}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between gap-2 text-slate-500">
-                                                        <span>Half day</span>
-                                                        <span className="tabular-nums font-medium text-yellow-600">
-                                                            {z(c.halfDays)}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between gap-2 text-slate-500">
-                                                        <span>Late (salary rules)</span>
-                                                        <span className="tabular-nums font-medium text-red-600">
-                                                            {z(c.lateDays)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex justify-between gap-2 mt-1.5 pt-1 border-t border-slate-100/80 text-slate-700">
-                                                    <span className="text-xs font-medium">Total days with punch (= regular + late rules)</span>
-                                                    <span className="tabular-nums font-semibold">
-                                                        {attendanceDisplayAllZero
-                                                            ? 0
-                                                            : z(c.present) + z(c.lateDays)}
-                                                    </span>
-                                                </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">Present days</dt>
+                                                <dd className="font-semibold text-green-600 tabular-nums">
+                                                    {attendanceDisplayAllZero
+                                                        ? 0
+                                                        : z(c.present) + z(c.lateDays)}
+                                                </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Absent</dt>
@@ -1076,18 +1046,6 @@ const GenerateSalaryPage = () => {
                                                         : attendanceBreakdown.cards
                                                         ? attendanceBreakdown.cards.halfDays
                                                         : attendanceBreakdown.halfDay}
-                                                </dd>
-                                            </div>
-                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                                <dt className="text-slate-600">LOP(Loss-of-pay)</dt>
-                                                <dd
-                                                    className="font-semibold text-red-600 tabular-nums"
-                                                >
-                                                    {attendanceDisplayAllZero
-                                                        ? 0
-                                                        : attendanceBreakdown.cards
-                                                        ? attendanceBreakdown.cards.lateDays
-                                                        : attendanceBreakdown.lateDay}
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 pt-2 items-baseline">
@@ -1139,12 +1097,6 @@ const GenerateSalaryPage = () => {
                                             <dt className="text-slate-600">Paid leave (approved)</dt>
                                             <dd className="font-semibold text-blue-700 tabular-nums">
                                                 {fz(v.paidLeaveN)}
-                                            </dd>
-                                        </div>
-                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
-                                            <dt className="text-slate-600">LOP / unpaid absent</dt>
-                                            <dd className="font-semibold text-red-700 tabular-nums">
-                                                {fz(v.lopN)}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 pt-2 items-baseline">
