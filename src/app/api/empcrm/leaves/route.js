@@ -157,7 +157,7 @@ export async function POST(request) {
     }
 
     // Calculate accrued leaves based on date of joining or custom accrual start date
-    const calculateAccruedLeaves = (joiningDate, accrualStartDate, maxAllowed, employmentStatus) => {
+    const calculateAccruedLeaves = (joiningDate, accrualStartDate, maxAllowed, employmentStatus, leaveType) => {
       // Use custom accrual start date if provided, otherwise use date of joining
       const effectiveDate = accrualStartDate || joiningDate;
       
@@ -166,15 +166,18 @@ export async function POST(request) {
       const doj = new Date(effectiveDate);
       const today = new Date();
       
-      // If on probation, no paid leave accrual
+      // No accrual during probation
       if (employmentStatus === 'probation') {
         return 0;
       }
       
-      // Calculate complete months since effective date
-      const monthsDiff = (today.getFullYear() - doj.getFullYear()) * 12 + (today.getMonth() - doj.getMonth());
+      // Sick leave shows full amount immediately (no monthly accrual)
+      if (leaveType === 'sick') {
+        return maxAllowed;
+      }
       
-      // Accrue 1 day per month, capped at maxAllowed
+      // Paid leave accrues monthly
+      const monthsDiff = (today.getFullYear() - doj.getFullYear()) * 12 + (today.getMonth() - doj.getMonth());
       const accrued = Math.min(monthsDiff, maxAllowed);
       
       return Math.max(0, accrued);
@@ -237,7 +240,8 @@ export async function POST(request) {
         profile.date_of_joining,
         leavePolicy.accrual_start_date,
         maxAllowed,
-        profile.employment_status
+        profile.employment_status,
+        leave_type
       );
 
       // Check if requesting leave exceeds available balance

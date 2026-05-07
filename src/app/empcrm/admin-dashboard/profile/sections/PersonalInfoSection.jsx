@@ -18,7 +18,24 @@ export default function PersonalInfoSection({
   const handleChange = (e) => {
     if (ro) return;
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    
+    // Auto-populate leave defaults when status changes to permanent
+    if (name === 'employment_status' && value === 'permanent') {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+        leave_policy: {
+          ...prev.leave_policy,
+          sick_enabled: true,
+          sick_allowed: 7,
+          paid_enabled: true,
+          paid_allowed: 12,
+          accrual_start_date: new Date().toISOString().split('T')[0]
+        }
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const inputClass =
