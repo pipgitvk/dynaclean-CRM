@@ -387,6 +387,11 @@ const GenerateSalaryPage = () => {
             const isESI = code === 'ESI' || name === 'ESI' || name.includes('ESI');
             const isIT = code === 'IT' || name === 'IT' || name.includes('Income Tax');
             const isPT = code === 'PT' || name === 'PT' || name.includes('Professional Tax');
+            const isUnpaidLeave = code === 'UNPAID_LEAVE' || name.toLowerCase().includes('unpaid leave');
+
+            if (isUnpaidLeave) {
+                return { ...deduction, calculatedAmount: 0 };
+            }
 
             if (isPF) {
                 return { ...deduction, calculatedAmount: 0 };
@@ -423,7 +428,10 @@ const GenerateSalaryPage = () => {
 
             if (structEsi > 0 && isESI) amount = 0;
 
-            totalDeductions += amount;
+            // Don't add unpaid leave to total deductions
+            if (!isUnpaidLeave) {
+                totalDeductions += amount;
+            }
             return { ...deduction, calculatedAmount: amount };
         });
 
@@ -1190,10 +1198,14 @@ const GenerateSalaryPage = () => {
                                             </div>
                                         ))}
                                         {calculation.processedDeductions.filter(
-                                            (d) => Number(d.calculatedAmount) > 0
+                                            (d) => Number(d.calculatedAmount) > 0 &&
+                                                  !d.deduction_code?.includes('UNPAID_LEAVE') &&
+                                                  !d.deduction_name?.toLowerCase().includes('unpaid leave')
                                         ).length > 0
                                             ? calculation.processedDeductions
-                                                  .filter((d) => Number(d.calculatedAmount) > 0)
+                                                  .filter((d) => Number(d.calculatedAmount) > 0 &&
+                                                          !d.deduction_code?.includes('UNPAID_LEAVE') &&
+                                                          !d.deduction_name?.toLowerCase().includes('unpaid leave'))
                                                   .map((d, i) => (
                                                       <div key={i} className="flex justify-between">
                                                           <span>{d.deduction_name}</span>
