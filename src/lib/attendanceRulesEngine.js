@@ -141,13 +141,20 @@ export function classifyAttendanceDay(log, rules, graceHalfDaysUsed) {
   const inStatus = getCheckinStatus(log?.checkin_time, r);
   const outStatus = getCheckoutStatus(log?.checkout_time, r);
 
-  if (outStatus === "late" || outStatus === "halfDay") {
+  // Early checkout should result in half-day, not late-day
+  if (outStatus === "halfDay") {
+    return { kind: "halfDay", graceHalfDaysUsed: used };
+  }
+  // Late checkout (after grace period) results in late-day
+  if (outStatus === "late") {
     return { kind: "lateDay", graceHalfDaysUsed: used };
   }
+  // Grace period check-ins: first 3 are regular, after that late-day
   if (inStatus === "grace") {
-    if (used < 3) return { kind: "halfDay", graceHalfDaysUsed: used + 1 };
+    if (used < 3) return { kind: "regular", graceHalfDaysUsed: used + 1 };
     return { kind: "lateDay", graceHalfDaysUsed: used };
   }
+  // Late check-in results in late-day
   if (inStatus === "late" || inStatus === "halfDay" || inStatus == null) {
     return { kind: "lateDay", graceHalfDaysUsed: used };
   }
@@ -160,13 +167,20 @@ export function classifyAttendanceDayForSalary(log, rules, freeGraceUsed) {
   const inStatus = getCheckinStatus(log?.checkin_time, r);
   const outStatus = getCheckoutStatus(log?.checkout_time, r);
 
-  if (outStatus === "late" || outStatus === "halfDay") {
+  // Early checkout should result in half-day, not late-day
+  if (outStatus === "halfDay") {
+    return { kind: "halfDay", freeGraceUsed: used };
+  }
+  // Late checkout (after grace period) results in late-day
+  if (outStatus === "late") {
     return { kind: "lateDay", freeGraceUsed: used };
   }
+  // Grace period check-ins: first 3 are regular, after that late-day
   if (inStatus === "grace") {
     if (used < 3) return { kind: "regular", freeGraceUsed: used + 1 };
     return { kind: "lateDay", freeGraceUsed: used };
   }
+  // Late check-in results in late-day
   if (inStatus === "late" || inStatus === "halfDay" || inStatus == null) {
     return { kind: "lateDay", freeGraceUsed: used };
   }
@@ -184,18 +198,62 @@ export function isHalfDayByRules(log, rules) {
   if (outM == null) return true;
   const halfInM = parseTimeToMinutes(r.halfDayCheckin);
   const halfOutM = parseTimeToMinutes(r.halfDayCheckout);
+  // Early checkout always counts as half-day (even if check-in is late)
   if (outM < halfOutM) {
-    const inStatus = getCheckinStatus(log.checkin_time, r);
-    if (inStatus === "late") return false;
     return true;
   }
+  // Late check-in also counts as half-day
   return inM > halfInM;
 }
 
-/** Same as former isLate(checkin) || isEarly(checkout) against standard times (summary “late days”). */
+/** Late days summary: only counts grace period check-ins (15 min late), not early checkout */
 export function isLateDaySummary(log, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
   const inStatus = getCheckinStatus(log?.checkin_time, r);
-  const outStatus = getCheckoutStatus(log?.checkout_time, r);
-  return inStatus === "late" || outStatus === "late";
+  // Only count grace period check-ins as late days (early checkout is half-day, not late)
+  return inStatus === "late";
+}
+
+/**
+ * Check if a day is half-day considering grace period (15 min lateness).
+ * First 3 grace period days are NOT half-days, after that they are half-days.
+ * Missing checkout or early checkout always counts as half-day (even if check-in is late).
+ * @param {Object} log - attendance log
+ * @param {Object} rules - attendance rules
+ * @param {number} graceUsed - number of grace period days already used
+ * @returns {Object} { isHalfDay: boolean, graceUsed: number }
+ */
+export function isHalfDayWithGrace(log, rules, graceUsed = 0) {
+  const r = rules || DEFAULT_ATTENDANCE_RULES;
+  if (!log?.checkin_time) return { isHalfDay: false, graceUsed };
+  const inM = parseAttendanceClockMinutes(log.checkin_time);
+  if (inM == null) return { isHalfDay: false, graceUsed };
+
+  // Check-in but no check-out → half day (regardless of check-in time)
+  if (isMissingCheckoutTime(log)) return { isHalfDay: true, graceUsed };
+
+  const outM = parseAttendanceClockMinutes(log.checkout_time);
+  if (outM == null) return { isHalfDay: true, graceUsed };
+
+  const halfInM = parseTimeToMinutes(r.halfDayCheckin);
+  const halfOutM = parseTimeToMinutes(r.halfDayCheckout);
+  const inStatus = getCheckinStatus(log.checkin_time, r);
+
+  // Early checkout (before half-day checkout time) → half day (always, regardless of grace period)
+  if (outM < halfOutM) {
+    return { isHalfDay: true, graceUsed };
+  }
+
+  // Check if it's a grace period arrival (within 15 minutes of standard time)
+  if (inStatus === "grace") {
+    // First 3 grace period days are NOT half-days
+    if (graceUsed < 3) {
+      return { isHalfDay: false, graceUsed: graceUsed + 1 };
+    }
+    // After 3 grace period days, it becomes half-day
+    return { isHalfDay: true, graceUsed: graceUsed + 1 };
+  }
+
+  // Late check-in (after half-day check-in time) → half day
+  return { isHalfDay: inM > halfInM, graceUsed };
 }

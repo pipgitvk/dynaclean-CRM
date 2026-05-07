@@ -22,6 +22,7 @@
 import {
   classifyAttendanceDayForSalary,
   isHalfDayByRules,
+  isHalfDayWithGrace,
 } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
@@ -182,12 +183,14 @@ export function computeSalaryPayDaysForUser(p) {
   /** Sundays with no log (paid weekly off; not LOP). Saturday is not included. */
   let weekend_off = 0;
   let holiday = 0;
-  let lop = 0; 
+  let lop = 0;
   let paid_leave = 0;
   const sundayWorkedDates = [];
   /** Paid weekly-off Sundays in period (must align with week rule below). */
   const weeklyOffSundayDates = [];
   let freeGraceUsed = 0;
+  /** Grace counter for half-day calculation (first 3 grace period days not counted as half-days) */
+  let halfDayGraceUsed = 0;
 
   /** Eligible days in month (same loop scope as pay-days formula). */
   let periodDays = 0;
@@ -227,10 +230,15 @@ export function computeSalaryPayDaysForUser(p) {
       freeGraceUsed = cls.freeGraceUsed;
       if (cls.kind === "lateDay") late_days++;
       else present++;
-      if (!isSunday && !isHoliday) {
-        const structuralHalf = isHalfDayByRules(existingLog, rules);
-        if (structuralHalf) half_day++;
-        weekdayPayCredits += structuralHalf ? 0.5 : 1;
+      // Count half-days for all present days using grace period logic (matching attendance page behavior)
+      const { isHalfDay, graceUsed } = isHalfDayWithGrace(existingLog, rules, halfDayGraceUsed);
+      halfDayGraceUsed = graceUsed;
+      if (isHalfDay) half_day++;
+      // Apply half-day credit reduction (0.5) for ALL half-days, regardless of day type
+      if (isHalfDay) {
+        weekdayPayCredits += 0.5;
+      } else if (!isSunday && !isHoliday) {
+        weekdayPayCredits += 1;
       }
       if (isSunday) {
         sundayWorkedDates.push(dateString);
