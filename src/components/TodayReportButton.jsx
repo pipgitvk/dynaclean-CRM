@@ -33,10 +33,11 @@ export default function TodayReportButton() {
   return (
     <Link
       href="/user-dashboard/today-reports"
-      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shrink-0"
+      className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 sm:gap-2 bg-blue-600 text-white text-[10px] sm:text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors shrink-0 whitespace-nowrap"
     >
-      <FileText size={16} />
-      Today Report
+      <FileText size={14} className="sm:w-4 sm:h-4" />
+      <span className="hidden sm:inline">Today Report</span>
+      <span className="sm:hidden">Report</span>
     </Link>
   );
 }

@@ -15,9 +15,9 @@ export default function WarehouseInchargeDashboard({ user, counts }) {
 
       {/* Fast Cards + Today Report */}
       <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fast Cards</p>
-          <div className="flex gap-2">
+          <div className="flex flex-row gap-2">
             <TodayReportButton />
             <LeaveApprovalButton />
           </div>
