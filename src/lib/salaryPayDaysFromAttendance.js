@@ -249,6 +249,7 @@ export function computeSalaryPayDaysForUser(p) {
     }
     if (isOnLeave) {
       paid_leave++;
+      weekdayPayCredits += 1;
       continue;
     }
     lop++;

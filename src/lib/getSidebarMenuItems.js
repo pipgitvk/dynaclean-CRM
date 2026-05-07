@@ -628,6 +628,13 @@ const allMenuItems = [
         icon: "UserCircle",
       },
       {
+        path: "/empcrm/admin-dashboard/salary",
+        name: "Salary Management",
+        moduleKey: "salary-management",
+        roles: ["ALL"],
+        icon: "DollarSign",
+      },
+      {
         path: "/empcrm/admin-dashboard/salary-slips",
         name: "Salary slips",
         moduleKey: "salary-slips",
