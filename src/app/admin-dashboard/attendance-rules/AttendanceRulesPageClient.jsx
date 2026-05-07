@@ -57,7 +57,11 @@ export default function AttendanceRulesPageClient() {
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || "Failed to load");
-      setRows(data.employees || []);
+      // Filter out SUPERADMIN from the table
+      const filteredEmployees = (data.employees || []).filter(
+        (e) => e.userRole !== "SUPERADMIN"
+      );
+      setRows(filteredEmployees);
     } catch (e) {
       setTableError(e.message || "Load failed");
       setRows([]);
