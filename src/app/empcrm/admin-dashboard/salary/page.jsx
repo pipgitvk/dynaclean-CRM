@@ -15,6 +15,9 @@ import {
   Play,
   ChevronDown,
   ChevronUp,
+  History,
+  X,
+  TrendingUp,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -76,6 +79,11 @@ const SalaryManagementPage = () => {
   const [editingDeduction, setEditingDeduction] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
+
+  // Salary history state
+  const [showSalaryHistory, setShowSalaryHistory] = useState(false);
+  const [salaryHistory, setSalaryHistory] = useState([]);
+  const [salaryHistoryLoading, setSalaryHistoryLoading] = useState(false);
 
   // Auto payroll settings state
   const [showAutoSettings, setShowAutoSettings] = useState(false);
@@ -190,6 +198,28 @@ const SalaryManagementPage = () => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(x);
+  };
+
+  const fetchSalaryHistory = async (username) => {
+    setSalaryHistoryLoading(true);
+    try {
+      const response = await fetch(`/api/empcrm/salary/history?username=${username}`);
+      const data = await response.json();
+      if (data.success) {
+        setSalaryHistory(data.history);
+      }
+    } catch (error) {
+      console.error("Error fetching salary history:", error);
+    } finally {
+      setSalaryHistoryLoading(false);
+    }
+  };
+
+  const handleSalaryHistoryClick = () => {
+    if (selectedEmployee) {
+      setShowSalaryHistory(true);
+      fetchSalaryHistory(selectedEmployee);
+    }
   };
 
   useEffect(() => {
@@ -516,8 +546,21 @@ const SalaryManagementPage = () => {
   return (
     <div className="container mx-auto p-4 md:p-8 max-w-7xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Salary Management</h1>
-        <p className="text-gray-600">Manage employee salary structures and deductions</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Salary Management</h1>
+            <p className="text-gray-600">Manage employee salary structures and deductions</p>
+          </div>
+          {selectedEmployee && (
+            <button
+              onClick={handleSalaryHistoryClick}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-2"
+            >
+              <History className="w-4 h-4" />
+              Salary History
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Auto Payroll Settings Panel */}
@@ -1303,6 +1346,92 @@ const SalaryManagementPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Salary History Modal */}
+      {showSalaryHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                Salary History - {selectedEmployee}
+              </h2>
+              <button
+                onClick={() => setShowSalaryHistory(false)}
+                className="p-2 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+              {salaryHistoryLoading ? (
+                <div className="text-center py-8">Loading salary history...</div>
+              ) : salaryHistory.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No salary history found for this employee.</div>
+              ) : (
+                <div className="space-y-4">
+                  {salaryHistory.map((record, index) => (
+                    <div key={record.id} className={`border rounded-lg p-4 ${record.is_active ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm text-gray-600">
+                          <span className="font-medium">Effective From:</span> {new Date(record.effective_from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {record.is_active && (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Active</span>
+                          )}
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Changed By:</span> {record.changed_by_name || record.created_by}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <div className="text-gray-500 mb-1">Gross Salary</div>
+                          <div className="font-semibold text-blue-700">₹{record.gross_salary || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Basic Salary</div>
+                          <div className="font-semibold">₹{record.basic_salary || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">HRA</div>
+                          <div className="font-semibold">₹{record.hra || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Special Allowance</div>
+                          <div className="font-semibold">₹{record.special_allowance || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Transport</div>
+                          <div className="font-semibold">₹{record.transport_allowance || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Medical</div>
+                          <div className="font-semibold">₹{record.medical_allowance || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Bonus</div>
+                          <div className="font-semibold">₹{record.bonus || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Created At</div>
+                          <div className="font-semibold">{new Date(record.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                        </div>
+                      </div>
+                      {record.effective_to && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 text-sm">
+                          <span className="font-medium">Effective To:</span> {new Date(record.effective_to).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

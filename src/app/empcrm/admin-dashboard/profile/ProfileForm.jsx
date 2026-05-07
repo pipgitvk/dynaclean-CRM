@@ -218,12 +218,26 @@ export default function ProfileForm({
   };
 
   const validateMandatoryDocumentsAndPhotos = () => {
+    const DOCUMENT_NAMES = {
+      doc_pan_card: "PAN Card",
+      doc_aadhaar_card: "Aadhaar Card",
+      doc_electricity_bill: "Electricity Bill",
+      doc_10th_certificate: "10th Certificate",
+      doc_12th_certificate: "12th Certificate",
+      doc_employment_confirmation_letter: "Employment Confirmation Letter",
+      doc_appt_letter_prev: "Appointment Letter (Previous)",
+      doc_exp_letter: "Experience Letter",
+      doc_relieving_letter: "Relieving Letter",
+      doc_salary_slips: "Salary Slips",
+    };
+
     const MANDATORY_KEYS = [
       "doc_pan_card",
       "doc_aadhaar_card",
       "doc_electricity_bill",
       "doc_10th_certificate",
       "doc_12th_certificate",
+      "doc_employment_confirmation_letter",
     ];
 
     if (effectiveExperiencedForEmployeeReassignUi(isExperienced, reassignFieldKeys)) {
@@ -235,9 +249,13 @@ export default function ProfileForm({
       );
     }
 
-    const missingDocs = MANDATORY_KEYS.filter((key) => !documents[key]);
+    const missingDocs = MANDATORY_KEYS.filter((key) => {
+      // Check if document exists in either files (new upload) or documents (existing), or fileUrls (uploaded)
+      return !(files[key] || documents[key] || formData.fileUrls?.[key]);
+    });
     if (missingDocs.length > 0) {
-      toast.error(`Missing mandatory documents: ${missingDocs.length} required documents not selected.`);
+      const missingDocNames = missingDocs.map(key => DOCUMENT_NAMES[key] || key);
+      toast.error(`Missing mandatory documents: ${missingDocNames.join(", ")}`);
       return false;
     }
 
@@ -768,6 +786,8 @@ export default function ProfileForm({
             reviewMode={reviewMode}
             reassignFieldKeys={fieldVisibilityKeys}
             documentsSlot={documentsSectionEl}
+            files={files}
+            setFiles={setFiles}
           />
         )}
 

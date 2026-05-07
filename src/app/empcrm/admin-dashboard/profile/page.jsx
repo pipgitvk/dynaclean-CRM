@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Search, FileText } from "lucide-react";
+import { Search, FileText, History, X, TrendingUp } from "lucide-react";
 import ProfileForm from "./ProfileForm";
 
 export default function ProfileManagement() {
@@ -15,6 +15,9 @@ export default function ProfileManagement() {
   const [entryMode, setEntryMode] = useState("manual");
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showSalaryHistory, setShowSalaryHistory] = useState(false);
+  const [salaryHistory, setSalaryHistory] = useState([]);
+  const [salaryHistoryLoading, setSalaryHistoryLoading] = useState(false);
 
   useEffect(() => {
     fetchEmployees();
@@ -70,6 +73,28 @@ export default function ProfileManagement() {
     emp.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const fetchSalaryHistory = async (username) => {
+    setSalaryHistoryLoading(true);
+    try {
+      const response = await fetch(`/api/empcrm/salary/history?username=${username}`);
+      const data = await response.json();
+      if (data.success) {
+        setSalaryHistory(data.history);
+      }
+    } catch (error) {
+      console.error("Error fetching salary history:", error);
+    } finally {
+      setSalaryHistoryLoading(false);
+    }
+  };
+
+  const handleSalaryHistoryClick = () => {
+    if (selectedUsername) {
+      setShowSalaryHistory(true);
+      fetchSalaryHistory(selectedUsername);
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
@@ -78,9 +103,20 @@ export default function ProfileManagement() {
             <h1 className="text-3xl font-bold text-gray-800">Profile Management</h1>
             <p className="text-gray-600 mt-2">Create and manage employee profiles</p>
           </div>
-          <a href="/empcrm/admin-dashboard/profile/approvals" className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-            Go to Approvals
-          </a>
+          <div className="flex gap-3">
+            {selectedUsername && (
+              <button
+                onClick={handleSalaryHistoryClick}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-2"
+              >
+                <History className="w-4 h-4" />
+                Salary History
+              </button>
+            )}
+            <a href="/empcrm/admin-dashboard/profile/approvals" className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+              Go to Approvals
+            </a>
+          </div>
         </div>
       </div>
 
@@ -136,6 +172,92 @@ export default function ProfileManagement() {
             setSelectedEmployee(null);
           }}
         />
+      )}
+
+      {/* Salary History Modal */}
+      {showSalaryHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                Salary History - {selectedUsername}
+              </h2>
+              <button
+                onClick={() => setShowSalaryHistory(false)}
+                className="p-2 hover:bg-gray-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+              {salaryHistoryLoading ? (
+                <div className="text-center py-8">Loading salary history...</div>
+              ) : salaryHistory.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No salary history found for this employee.</div>
+              ) : (
+                <div className="space-y-4">
+                  {salaryHistory.map((record, index) => (
+                    <div key={record.id} className={`border rounded-lg p-4 ${record.is_active ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm text-gray-600">
+                          <span className="font-medium">Effective From:</span> {new Date(record.effective_from).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {record.is_active && (
+                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">Active</span>
+                          )}
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Changed By:</span> {record.changed_by_name || record.created_by}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <div className="text-gray-500 mb-1">Gross Salary</div>
+                          <div className="font-semibold text-blue-700">₹{record.gross_salary || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Basic Salary</div>
+                          <div className="font-semibold">₹{record.basic_salary || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">HRA</div>
+                          <div className="font-semibold">₹{record.hra || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Special Allowance</div>
+                          <div className="font-semibold">₹{record.special_allowance || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Transport</div>
+                          <div className="font-semibold">₹{record.transport_allowance || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Medical</div>
+                          <div className="font-semibold">₹{record.medical_allowance || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Bonus</div>
+                          <div className="font-semibold">₹{record.bonus || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500 mb-1">Created At</div>
+                          <div className="font-semibold">{new Date(record.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                        </div>
+                      </div>
+                      {record.effective_to && (
+                        <div className="mt-3 pt-3 border-t border-gray-200 text-sm">
+                          <span className="font-medium">Effective To:</span> {new Date(record.effective_to).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
