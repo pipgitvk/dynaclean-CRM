@@ -371,13 +371,14 @@ export async function PATCH(request) {
       );
     }
 
-    // Only reporting managers can approve - HR can only view
+    // Check if user is SUPERADMIN or Reporting Manager
+    const isSuperAdmin = session.role === "SUPERADMIN";
     const reportees = await getReportees(session.username);
     const isReportingManager = reportees.length > 0;
 
-    if (!isReportingManager) {
+    if (!isSuperAdmin && !isReportingManager) {
       return NextResponse.json(
-        { success: false, error: "Access denied. Only Reporting Manager can approve/reject leaves." },
+        { success: false, error: "Access denied. Only SUPERADMIN or Reporting Manager can approve/reject leaves." },
         { status: 403 }
       );
     }
@@ -414,8 +415,8 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, error: "Leave not found" }, { status: 404 });
     }
 
-    // Reporting manager can only approve their reportees' leaves
-    if (!reportees.includes(leave.username)) {
+    // Reporting manager can only approve their reportees' leaves, but SUPERADMIN can approve any
+    if (!isSuperAdmin && !reportees.includes(leave.username)) {
       return NextResponse.json(
         { success: false, error: "Access denied. You can only approve leaves of your reportees." },
         { status: 403 }
