@@ -7,6 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
 import { loadGlobalAttendanceRulesRow } from "@/lib/ensureAttendanceRulesTable";
 import { ensureEmployeeAttendanceScheduleTable } from "@/lib/ensureEmployeeAttendanceScheduleTable";
 import {
@@ -238,6 +239,8 @@ async function generateForEmployee({ db, emp, salaryMonth, workingDays, defaultS
   return { success: true, netSalary };
 }
 
+const SALARY_GENERATE_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"];
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -246,11 +249,21 @@ export async function GET(request) {
     const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
     const cronSecret = process.env.CRON_SECRET;
 
-    // Allow HR trigger from UI (no secret needed) via POST, or cron with secret
+    // Allow HR/Accountant trigger from UI (no secret needed) via manual=1, or cron with secret
     const isManual = searchParams.get("manual") === "1";
     if (!isManual) {
       if (cronSecret && secret !== cronSecret && bearerToken !== cronSecret) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    } else {
+      // Manual trigger: verify user role
+      const payload = await getSessionPayload();
+      if (!payload) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const role = (payload?.role ?? payload?.userRole) || "";
+      if (!SALARY_GENERATE_ROLES.includes(role)) {
+        return NextResponse.json({ error: "Unauthorized access. Only HR and Accountant roles can generate salary." }, { status: 403 });
       }
     }
 
