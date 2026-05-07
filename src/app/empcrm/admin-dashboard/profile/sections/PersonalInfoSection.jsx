@@ -1,4 +1,5 @@
 import { shouldShowField, isReassignFieldMode } from "@/lib/reassignFieldVisibility";
+import { Eye, Upload } from "lucide-react";
 
 export default function PersonalInfoSection({
   formData,
@@ -9,6 +10,8 @@ export default function PersonalInfoSection({
   reviewMode = false,
   reassignFieldKeys = null,
   documentsSlot = null,
+  files = {},
+  setFiles = () => {},
 }) {
   const ro = reviewMode;
   const rf = reassignFieldKeys;
@@ -250,8 +253,157 @@ export default function PersonalInfoSection({
           </select>
         </div>
         )}
+
+        {show("doc_employment_confirmation_letter") && formData.employment_status === "permanent" && (
+        <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg bg-white">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={!!(files.doc_employment_confirmation_letter || formData.fileUrls?.doc_employment_confirmation_letter)}
+              onChange={() => {
+                if (ro) return;
+                // Toggle is handled by file upload
+              }}
+              disabled={ro}
+              className="w-4 h-4 text-blue-600 rounded border-gray-300"
+            />
+            <div>
+              <label className="text-sm font-medium text-gray-700">Employment Confirmation Letter *</label>
+              {(files.doc_employment_confirmation_letter || formData.fileUrls?.doc_employment_confirmation_letter) && (
+                <p className="text-xs text-green-600">Selected</p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className={`cursor-pointer ${ro ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <input
+                type="file"
+                name="doc_employment_confirmation_letter"
+                accept="image/*"
+                onChange={(e) => {
+                  if (ro) return;
+                  const file = e.target.files[0];
+                  if (file) {
+                    setFiles((prev) => ({ ...prev, doc_employment_confirmation_letter: file }));
+                  }
+                }}
+                disabled={ro}
+                className="hidden"
+                required={!rf || show("doc_employment_confirmation_letter")}
+              />
+              <Upload className="w-5 h-5 text-blue-600 hover:text-blue-800" />
+            </label>
+            {(formData.fileUrls?.doc_employment_confirmation_letter || files.doc_employment_confirmation_letter) && (
+              <a
+                href={formData.fileUrls?.doc_employment_confirmation_letter || URL.createObjectURL(files.doc_employment_confirmation_letter)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cursor-pointer"
+              >
+                <Eye className="w-5 h-5 text-blue-600 hover:text-blue-800" />
+              </a>
+            )}
+          </div>
+        </div>
+        )}
       </div>
       </div>
+
+      {isPrivilegedEditor && !ro && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/85 p-5 md:p-6 space-y-4 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-800 pb-2 border-b border-emerald-200/80">
+              Leave Policy Configuration
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Sick Leave Enabled</label>
+                <select
+                  name="leave_policy_sick_enabled"
+                  value={formData.leave_policy?.sick_enabled ? "true" : "false"}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      sick_enabled: e.target.value === "true"
+                    }
+                  }))}
+                  className={inputClass}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Sick Leave Allowed</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="leave_policy_sick_allowed"
+                  value={formData.leave_policy?.sick_allowed ?? 0}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      sick_allowed: Number(e.target.value || 0)
+                    }
+                  }))}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Paid Leave Enabled</label>
+                <select
+                  name="leave_policy_paid_enabled"
+                  value={formData.leave_policy?.paid_enabled ? "true" : "false"}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      paid_enabled: e.target.value === "true"
+                    }
+                  }))}
+                  className={inputClass}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>Paid Leave Allowed</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="leave_policy_paid_allowed"
+                  value={formData.leave_policy?.paid_allowed ?? 0}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      paid_allowed: Number(e.target.value || 0)
+                    }
+                  }))}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Leave Accrual Start Date</label>
+                <input
+                  type="date"
+                  name="leave_policy_accrual_start_date"
+                  value={formData.leave_policy?.accrual_start_date || ""}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      accrual_start_date: e.target.value
+                    }
+                  }))}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+      )}
 
       {hasPersonalDetailsContent && (
       <div className="rounded-xl border border-violet-200 bg-violet-50/85 p-5 md:p-6 space-y-4 shadow-sm">
@@ -471,97 +623,6 @@ export default function PersonalInfoSection({
 
         {documentsSlot}
       </div>
-      )}
-
-      {isPrivilegedEditor && !ro && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-              <div>
-                <label className={labelClass}>Sick Leave Enabled</label>
-                <select
-                  name="leave_policy_sick_enabled"
-                  value={formData.leave_policy?.sick_enabled ? "true" : "false"}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    leave_policy: {
-                      ...prev.leave_policy,
-                      sick_enabled: e.target.value === "true"
-                    }
-                  }))}
-                  className={inputClass}
-                >
-                  <option value="false">No</option>
-                  <option value="true">Yes</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Sick Leave Allowed</label>
-                <input
-                  type="number"
-                  min="0"
-                  name="leave_policy_sick_allowed"
-                  value={formData.leave_policy?.sick_allowed ?? 0}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    leave_policy: {
-                      ...prev.leave_policy,
-                      sick_allowed: Number(e.target.value || 0)
-                    }
-                  }))}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Paid Leave Enabled</label>
-                <select
-                  name="leave_policy_paid_enabled"
-                  value={formData.leave_policy?.paid_enabled ? "true" : "false"}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    leave_policy: {
-                      ...prev.leave_policy,
-                      paid_enabled: e.target.value === "true"
-                    }
-                  }))}
-                  className={inputClass}
-                >
-                  <option value="false">No</option>
-                  <option value="true">Yes</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Paid Leave Allowed</label>
-                <input
-                  type="number"
-                  min="0"
-                  name="leave_policy_paid_allowed"
-                  value={formData.leave_policy?.paid_allowed ?? 0}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    leave_policy: {
-                      ...prev.leave_policy,
-                      paid_allowed: Number(e.target.value || 0)
-                    }
-                  }))}
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Leave Accrual Start Date</label>
-                <input
-                  type="date"
-                  name="leave_policy_accrual_start_date"
-                  value={formData.leave_policy?.accrual_start_date || ""}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    leave_policy: {
-                      ...prev.leave_policy,
-                      accrual_start_date: e.target.value
-                    }
-                  }))}
-                  className={inputClass}
-                />
-              </div>
-            </div>
       )}
     </div>
   );

@@ -224,6 +224,7 @@ export default function ProfileForm({
       "doc_electricity_bill",
       "doc_10th_certificate",
       "doc_12th_certificate",
+      "doc_employment_confirmation_letter",
     ];
 
     if (effectiveExperiencedForEmployeeReassignUi(isExperienced, reassignFieldKeys)) {
@@ -768,6 +769,8 @@ export default function ProfileForm({
             reviewMode={reviewMode}
             reassignFieldKeys={fieldVisibilityKeys}
             documentsSlot={documentsSectionEl}
+            files={files}
+            setFiles={setFiles}
           />
         )}
 
