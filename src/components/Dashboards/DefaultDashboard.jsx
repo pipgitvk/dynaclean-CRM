@@ -9,6 +9,7 @@ import { canAccessHiringModule, canViewHrTargetChart } from "@/lib/hrTargetEligi
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import HrTodayReportButton from "@/components/HrTodayReportButton";
+import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 
 export default function DefaultDashboard({ user }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
@@ -18,25 +19,20 @@ export default function DefaultDashboard({ user }) {
 
   return (
     <div className="space-y-4 md:space-y-6">
-
-      {/* Welcome + Attendance (Target vs completed moved below, like Candidates follow-up) */}
-      <div
-        className={`grid grid-cols-1 gap-4 md:gap-6 ${showHrTargetChart ? "lg:grid-cols-2" : "lg:grid-cols-3"}`}
-      >
-        <div
-          className={`bg-white rounded-xl shadow-md p-4 md:p-6 min-w-0 ${showHrTargetChart ? "" : "lg:col-span-2"}`}
-        >
+      {/* Welcome, Attendance & Fast Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-4 md:p-6">
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
             <ProfilePicUploader user={user} />
-            <div className="flex-1">
+            <div className="space-y-2 flex-1">
               <h1 className="text-3xl font-semibold">
                 Welcome, <span className={welcomeNameClass}>{user.username}</span>
               </h1>
-              <p className="text-sm text-gray-500">Role: {user.userRole}</p>
+              <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
               <TodayReportButton />
-              <HrTodayReportButton />
+              <LeaveApprovalButton />
             </div>
           </div>
           <div className="mt-4">

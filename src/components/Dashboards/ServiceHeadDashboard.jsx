@@ -6,6 +6,7 @@ import UpcomingTasks from "@/components/task/UpcomingTasks";
 import InfoBox from "@/components/InfoBox";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
+import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 
 export default function ServiceHeadDashboard({ user, counts }) {
   return (
@@ -21,7 +22,10 @@ export default function ServiceHeadDashboard({ user, counts }) {
               </h1>
               <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
             </div>
-            <TodayReportButton />
+            <div className="flex gap-2">
+              <TodayReportButton />
+              <LeaveApprovalButton />
+            </div>
           </div>
           <div className="mt-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fast Cards</p>

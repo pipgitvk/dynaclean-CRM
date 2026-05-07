@@ -5,6 +5,7 @@ import Link from "next/link";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
+import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 
 export default function WarehouseInchargeDashboard({ user, counts }) {
   return (
@@ -16,7 +17,10 @@ export default function WarehouseInchargeDashboard({ user, counts }) {
       <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Fast Cards</p>
-          <TodayReportButton />
+          <div className="flex gap-2">
+            <TodayReportButton />
+            <LeaveApprovalButton />
+          </div>
         </div>
         <FastCardsWidget />
       </div>
