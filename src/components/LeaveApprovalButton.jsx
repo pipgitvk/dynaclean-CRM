@@ -38,12 +38,13 @@ export default function LeaveApprovalButton() {
   }
 
   return (
-    <Link href="/empcrm/user-dashboard/leave-approvals" className="relative inline-block">
-      <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">
-        Leave Approval
+    <Link href="/empcrm/user-dashboard/leave-approvals" className="relative inline-block flex-shrink-0">
+      <button className="px-2 py-1.5 sm:px-3 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-[10px] sm:text-xs font-medium whitespace-nowrap">
+        <span className="hidden sm:inline">Leave Approval</span>
+        <span className="sm:hidden">Leaves</span>
       </button>
       {pendingLeavesCount > 0 && (
-        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white">
+        <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center border-2 border-white">
           {pendingLeavesCount}
         </span>
       )}
