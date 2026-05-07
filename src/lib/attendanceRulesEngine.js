@@ -101,7 +101,9 @@ export function getCheckinStatus(logTime, rules) {
 
   if (logM <= standardM) return "onTime";
   if (logM <= graceEndM) return "grace";
-  if (halfDayM > graceEndM && logM >= halfDayM) return "halfDay";
+  // After grace period until half-day threshold is also half-day
+  if (logM < halfDayM) return "halfDay";
+  if (logM >= halfDayM) return "halfDay";
   return "late";
 }
 
@@ -116,8 +118,8 @@ export function getCheckoutStatus(logTime, rules) {
   const graceStartM = standardM - r.gracePeriodMinutes;
   const halfDayM = parseTimeToMinutes(r.halfDayCheckout);
   if (logM < halfDayM) return "halfDay";
-  if (logM < graceStartM) return "late";
-  if (logM < standardM) return "grace";
+  // Grace period checkout also counts as half-day
+  if (logM < standardM) return "halfDay";
   return "onTime";
 }
 
@@ -143,6 +145,10 @@ export function classifyAttendanceDay(log, rules, graceHalfDaysUsed) {
 
   // Early checkout should result in half-day, not late-day
   if (outStatus === "halfDay") {
+    // If both check-in is late/late-day AND checkout is early (half-day), count as only 1 half-day
+    if (inStatus === "halfDay" || inStatus === "late") {
+      return { kind: "halfDay", graceHalfDaysUsed: used };
+    }
     return { kind: "halfDay", graceHalfDaysUsed: used };
   }
   // Late checkout (after grace period) results in late-day
@@ -206,12 +212,12 @@ export function isHalfDayByRules(log, rules) {
   return inM > halfInM;
 }
 
-/** Late days summary: only counts grace period check-ins (15 min late), not early checkout */
+/** Late days summary: counts grace period check-ins + half-day check-ins as total late days */
 export function isLateDaySummary(log, rules) {
   const r = rules || DEFAULT_ATTENDANCE_RULES;
   const inStatus = getCheckinStatus(log?.checkin_time, r);
-  // Only count grace period check-ins as late days (early checkout is half-day, not late)
-  return inStatus === "late";
+  // Count both grace period and half-day check-ins as late days
+  return inStatus === "late" || inStatus === "halfDay" || inStatus === "grace";
 }
 
 /**
