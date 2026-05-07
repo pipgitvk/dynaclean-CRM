@@ -5,6 +5,8 @@
  */
 import {
   classifyAttendanceDayForSalary,
+  isHalfDayByRules,
+  isHalfDayWithGrace,
 } from "@/lib/attendanceRulesEngine";
 import { dateToYmdKey, weeklyOffSundayCountsAsPaid, isSalaryMonthFullyElapsed } from "@/lib/salaryPayDaysFromAttendance";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
@@ -82,6 +84,8 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     lateDays: 0,
   };
   let freeGraceUsed = 0;
+  /** Grace counter for half-day calculation (first 3 grace period days not counted as half-days) */
+  let halfDayGraceUsed = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, monthIndex, day);
@@ -102,6 +106,10 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
       freeGraceUsed = cls.freeGraceUsed;
       if (cls.kind === "lateDay") summary.lateDays++;
       else summary.present++;
+      // Count half-days for all present days using grace period logic (matching attendance page behavior)
+      const { isHalfDay, graceUsed } = isHalfDayWithGrace(existingLog, rules, halfDayGraceUsed);
+      halfDayGraceUsed = graceUsed;
+      if (isHalfDay) summary.halfDays++;
     } else if (isHoliday) {
       summary.holidays++;
     } else if (isWeekend) {

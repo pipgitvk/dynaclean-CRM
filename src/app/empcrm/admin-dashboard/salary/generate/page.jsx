@@ -1071,7 +1071,11 @@ const GenerateSalaryPage = () => {
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Half-Days</dt>
                                                 <dd className="font-semibold text-yellow-500 tabular-nums">
-                                                    {z(c.halfDays)}
+                                                    {attendanceDisplayAllZero
+                                                        ? 0
+                                                        : attendanceBreakdown.cards
+                                                        ? attendanceBreakdown.cards.halfDays
+                                                        : attendanceBreakdown.halfDay}
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
@@ -1079,7 +1083,11 @@ const GenerateSalaryPage = () => {
                                                 <dd
                                                     className="font-semibold text-red-600 tabular-nums"
                                                 >
-                                                    {z(c.lateDays)}
+                                                    {attendanceDisplayAllZero
+                                                        ? 0
+                                                        : attendanceBreakdown.cards
+                                                        ? attendanceBreakdown.cards.lateDays
+                                                        : attendanceBreakdown.lateDay}
                                                 </dd>
                                             </div>
                                             <div className="flex justify-between gap-2 pt-2 items-baseline">

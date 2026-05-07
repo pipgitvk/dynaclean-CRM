@@ -12,6 +12,7 @@ import {
   getBreakStatus as breakStatusFromRules,
   isHalfDayByRules,
   isLateDaySummary,
+  isHalfDayWithGrace,
 } from "@/lib/attendanceRulesEngine";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { weeklyOffSundayCountsAsPaid } from "@/lib/salaryPayDaysFromAttendance";
@@ -436,6 +437,7 @@ const AttendancePage = () => {
         checkoutStatus !== 'late' &&
         checkoutStatus !== 'halfDay';
     } else if (filterStatus === "halfDay") {
+      // Show half-days considering grace period logic (first 3 grace days not counted)
       matchesFilter = log.type === "present" && isHalfDay(log);
     } else if (filterStatus === "all") {
       matchesFilter = true;
@@ -444,7 +446,12 @@ const AttendancePage = () => {
     return matchesFilter;
   });
 
-  const summary = filteredLogs.reduce(
+  // Sort filteredLogs chronologically for grace counter to work correctly
+  const chronologicallySortedLogs = [...filteredLogs].sort(
+    (a, b) => new Date(a.date) - new Date(b.date)
+  );
+
+  const summary = chronologicallySortedLogs.reduce(
     (acc, log) => {
       if (log.type === "absent") acc.absents++;
       if (log.type === "leave") acc.leaves++;
@@ -452,14 +459,21 @@ const AttendancePage = () => {
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
         acc.present++;
-        if (isHalfDay(log)) acc.halfDays++;
+        // Use grace period logic: first 3 grace period days (15 min late) are NOT half-days
+        const username = log.username;
+        if (!acc.graceCounters[username]) {
+          acc.graceCounters[username] = 0;
+        }
+        const { isHalfDay, graceUsed } = isHalfDayWithGrace(log, rulesFor(username), acc.graceCounters[username]);
+        acc.graceCounters[username] = graceUsed;
+        if (isHalfDay) acc.halfDays++;
         if (isLateDaySummary(log, rulesFor(log.username))) {
           acc.lateDays++;
         }
       }
       return acc;
     },
-    { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0 }
+    { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0, graceCounters: {} }
   );
 
   const handleDownload = async () => {
@@ -828,7 +842,9 @@ const AttendancePage = () => {
                         <span
                           className={`text-sm ${(() => {
                             const status = getCheckoutStatus(log.checkout_time, log.username);
-                            if (status === 'halfDay') return 'text-yellow-600';
+                            // Early checkout or missing checkout always shows as half-day for display
+                            const isHalfDayStatus = isHalfDay(log);
+                            if (isHalfDayStatus) return 'text-yellow-600';
                             if (status === 'late') return 'text-red-600';
                             if (status === 'grace') return 'text-orange-600';
                             return 'text-green-600';
