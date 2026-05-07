@@ -283,6 +283,14 @@ const fmtInr = (n) =>
     maximumFractionDigits: 0,
   }).format(Number(n) || 0);
 
+const fmtDays = (n) => {
+  if (n === null || n === undefined || n === "") return "-";
+  const num = Number(n);
+  if (Number.isNaN(num)) return "-";
+  // Remove trailing zeros: 29.50 -> 29.5, 30.00 -> 30
+  return parseFloat(num.toFixed(2)).toString();
+};
+
 const getMonthYearLabel = (monthStr) => {
   if (!monthStr) return "";
   const [y, m] = monthStr.split("-");
@@ -445,12 +453,12 @@ export const buildTemplatePayslipHTML = (opts) => {
       <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">PAN No.</td>
       <td style="padding:4px 6px;border:1px solid #333;">${pan || "-"}</td>
       <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Working Days</td>
-      <td style="padding:4px 6px;border:1px solid #333;">${workingDays ?? "-"}</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${fmtDays(workingDays)}</td>
     </tr>
     <tr>
       <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Present Days</td>
-      <td style="padding:4px 6px;border:1px solid #333;">${presentDays ?? "-"}</td>
-      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight:bold;">Overtime Hours</td>
+      <td style="padding:4px 6px;border:1px solid #333;">${fmtDays(presentDays)}</td>
+      <td style="padding:4px 6px;border:1px solid #333;background:#e8f4fc;font-weight-bold;">Overtime Hours</td>
       <td style="padding:4px 6px;border:1px solid #333;">${overtimeHours ?? "-"}</td>
     </tr>
   </table>
