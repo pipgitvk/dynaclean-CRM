@@ -100,13 +100,29 @@ export async function GET(request) {
     `, [targetUsername]);
 
     // Fetch active deductions
-    const [deductions] = await db.query(`
+    // For leave deductions (UNPAID_LEAVE, PAID_LEAVE), only apply if the deduction month matches the salary month
+    // For other deductions, use the original logic
+    let deductionsQuery = `
       SELECT esd.*, sdt.deduction_name, sdt.deduction_code, sdt.calculation_type
       FROM employee_salary_deductions esd
       JOIN salary_deduction_types sdt ON esd.deduction_type_id = sdt.id
       WHERE esd.username = ? AND esd.is_active = 1
-      ORDER BY esd.effective_from DESC
-    `, [targetUsername]);
+    `;
+    let deductionsParams = [targetUsername];
+
+    if (month) {
+      deductionsQuery += ` AND (
+        (sdt.deduction_code IN ('UNPAID_LEAVE', 'PAID_LEAVE') AND DATE_FORMAT(esd.effective_from, '%Y-%m') = ?)
+        OR
+        (sdt.deduction_code NOT IN ('UNPAID_LEAVE', 'PAID_LEAVE'))
+      )`;
+      deductionsParams.push(month);
+    }
+
+    const [deductions] = await db.query(
+      deductionsQuery + ` ORDER BY esd.effective_from DESC`,
+      deductionsParams
+    );
 
     return NextResponse.json({
       success: true,
