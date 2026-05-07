@@ -71,10 +71,23 @@ export async function GET(request) {
         return maxAllowed;
       }
       
-      // Paid leave accrues monthly
+      // Paid leave accrues monthly based on the day of the accrual start date
+      const accrualDay = doj.getDate();
+      const currentDay = today.getDate();
+
+      // Calculate full months difference
       const monthsDiff = (today.getFullYear() - doj.getFullYear()) * 12 + (today.getMonth() - doj.getMonth());
-      const accrued = Math.min(monthsDiff, maxAllowed);
-      
+
+      let accrued = monthsDiff;
+
+      // Add 1 if current day is on or after the accrual day (first month counts if day reached)
+      if (currentDay >= accrualDay) {
+        accrued += 1;
+      }
+
+      // Cap at max allowed
+      accrued = Math.min(accrued, maxAllowed);
+
       return Math.max(0, accrued);
     };
 

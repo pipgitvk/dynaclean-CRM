@@ -289,7 +289,6 @@ export default function PersonalInfoSection({
                 }}
                 disabled={ro}
                 className="hidden"
-                required={!rf || show("doc_employment_confirmation_letter")}
               />
               <Upload className="w-5 h-5 text-blue-600 hover:text-blue-800" />
             </label>
