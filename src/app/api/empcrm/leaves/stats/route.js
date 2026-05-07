@@ -138,6 +138,7 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       employment_status: profile.employment_status,
+      accrual_start_date: leavePolicy.accrual_start_date || null,
       leaveSummary,
       unpaidLeaves,
       totalApprovedDays: stats.reduce((sum, s) => sum + (s.taken || 0), 0),

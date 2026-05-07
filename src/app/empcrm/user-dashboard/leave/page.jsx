@@ -237,13 +237,18 @@ export default function UserLeaveManagement() {
       ) : stats && (
         <div>
           {/* Employment Status */}
-          <div className="mb-4">
+          <div className="mb-4 flex flex-wrap gap-2">
             <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${stats.employment_status === 'permanent'
               ? 'bg-blue-100 text-blue-800'
               : 'bg-yellow-100 text-yellow-800'
               }`}>
               Employment Status: {stats.employment_status === 'permanent' ? 'Permanent' : 'Probation'}
             </span>
+            {stats.employment_status === 'permanent' && stats.accrual_start_date && (
+              <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                Leave Accrual Start Date: {stats.accrual_start_date}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
