@@ -6,6 +6,7 @@ import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
+import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 
 export default function SalesDashboard({ user }) {
   return (
@@ -24,7 +25,10 @@ export default function SalesDashboard({ user }) {
                 </h1>
                 <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
               </div>
-              <TodayReportButton />
+              <div className="flex gap-2">
+                <TodayReportButton />
+                <LeaveApprovalButton />
+              </div>
             </div>
 
             {/* Fast Cards inline */}

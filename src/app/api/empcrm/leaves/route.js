@@ -124,9 +124,9 @@ export async function POST(request) {
 
     const conn = await getDbConnection();
 
-    // Fetch user's profile to get leave policy and empId
+    // Fetch user's profile to get leave policy, date of joining, and empId
     const [profiles] = await conn.execute(
-      `SELECT id, empId, full_name, employment_status, leave_policy FROM employee_profiles WHERE username = ?`,
+      `SELECT id, empId, full_name, employment_status, leave_policy, date_of_joining FROM employee_profiles WHERE username = ?`,
       [session.username]
     );
 
@@ -156,6 +156,30 @@ export async function POST(request) {
       leavePolicy = {};
     }
 
+    // Calculate accrued leaves based on date of joining or custom accrual start date
+    const calculateAccruedLeaves = (joiningDate, accrualStartDate, maxAllowed, employmentStatus) => {
+      // Use custom accrual start date if provided, otherwise use date of joining
+      const effectiveDate = accrualStartDate || joiningDate;
+      
+      if (!effectiveDate) return maxAllowed;
+      
+      const doj = new Date(effectiveDate);
+      const today = new Date();
+      
+      // If on probation, no paid leave accrual
+      if (employmentStatus === 'probation') {
+        return 0;
+      }
+      
+      // Calculate complete months since effective date
+      const monthsDiff = (today.getFullYear() - doj.getFullYear()) * 12 + (today.getMonth() - doj.getMonth());
+      
+      // Accrue 1 day per month, capped at maxAllowed
+      const accrued = Math.min(monthsDiff, maxAllowed);
+      
+      return Math.max(0, accrued);
+    };
+
     // Calculate total days
     const fromDate = new Date(from_date);
     const toDate = new Date(to_date);
@@ -182,6 +206,17 @@ export async function POST(request) {
         );
       }
 
+      // Check if on probation and trying to apply for paid or sick leave
+      if ((leave_type === 'paid' || leave_type === 'sick') && profile.employment_status === 'probation') {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `${leave_type} leave is not available during probation period. Please use unpaid leave or contact HR.`
+          },
+          { status: 400 }
+        );
+      }
+
       // Calculate already taken leaves of this type
       const [takenLeaves] = await conn.execute(
         `SELECT COALESCE(SUM(total_days), 0) as taken 
@@ -195,14 +230,22 @@ export async function POST(request) {
 
       const takenCount = takenLeaves[0].taken || 0;
       const allowedKey = `${leave_type}_allowed`;
-      const allowedCount = leavePolicy[allowedKey] || 0;
+      const maxAllowed = leavePolicy[allowedKey] || 0;
+      
+      // Calculate accrued leaves based on custom accrual start date, date of joining, and employment status
+      const accruedAllowed = calculateAccruedLeaves(
+        profile.date_of_joining,
+        leavePolicy.accrual_start_date,
+        maxAllowed,
+        profile.employment_status
+      );
 
       // Check if requesting leave exceeds available balance
-      if (takenCount + totalDays > allowedCount) {
+      if (takenCount + totalDays > accruedAllowed) {
         return NextResponse.json(
           {
             success: false,
-            error: `Insufficient ${leave_type} leave balance. Available: ${allowedCount - takenCount} days, Requested: ${totalDays} days`
+            error: `Insufficient ${leave_type} leave balance. Available: ${accruedAllowed - takenCount} days, Requested: ${totalDays} days`
           },
           { status: 400 }
         );
@@ -328,13 +371,14 @@ export async function PATCH(request) {
       );
     }
 
-    // Only reporting managers can approve - HR can only view
+    // Check if user is SUPERADMIN or Reporting Manager
+    const isSuperAdmin = session.role === "SUPERADMIN";
     const reportees = await getReportees(session.username);
     const isReportingManager = reportees.length > 0;
 
-    if (!isReportingManager) {
+    if (!isSuperAdmin && !isReportingManager) {
       return NextResponse.json(
-        { success: false, error: "Access denied. Only Reporting Manager can approve/reject leaves." },
+        { success: false, error: "Access denied. Only SUPERADMIN or Reporting Manager can approve/reject leaves." },
         { status: 403 }
       );
     }
@@ -371,8 +415,8 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, error: "Leave not found" }, { status: 404 });
     }
 
-    // Reporting manager can only approve their reportees' leaves
-    if (!reportees.includes(leave.username)) {
+    // Reporting manager can only approve their reportees' leaves, but SUPERADMIN can approve any
+    if (!isSuperAdmin && !reportees.includes(leave.username)) {
       return NextResponse.json(
         { success: false, error: "Access denied. You can only approve leaves of your reportees." },
         { status: 403 }

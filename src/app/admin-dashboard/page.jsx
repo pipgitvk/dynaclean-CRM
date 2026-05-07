@@ -262,6 +262,17 @@ export default async function UserDashboardPage() {
       console.warn("attendance regularization counts:", e.message);
     }
 
+    // Fetch pending leave approvals count
+    let pendingLeaveCount = 0;
+    try {
+      const [pendingLeaveRows] = await connection.execute(
+        `SELECT COUNT(*) AS c FROM employee_leaves WHERE status = 'pending'`,
+      );
+      pendingLeaveCount = Number(pendingLeaveRows[0]?.c ?? 0);
+    } catch (e) {
+      console.warn("pending leave approvals count:", e.message);
+    }
+
     if (!user) {
       return <p className="text-red-600">User not found</p>;
     }
@@ -407,6 +418,37 @@ export default async function UserDashboardPage() {
                   className="px-4 py-2 bg-white text-orange-700 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
                 >
                   View all requests →
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Leave Approvals */}
+          <div className="bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
+            <div className="flex flex-col h-full justify-between min-h-[160px]">
+              <div>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
+                    🏖️
+                  </span>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                    <span className="block">Leave</span>
+                    <span className="block">Approvals</span>
+                  </h2>
+                </div>
+                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+                  {pendingLeaveCount}
+                </p>
+                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
+                  Pending approvals
+                </p>
+              </div>
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
+                <a
+                  href="/empcrm/admin-dashboard/leave"
+                  className="px-4 py-2 bg-white text-indigo-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
+                >
+                  Review Leaves →
                 </a>
               </div>
             </div>

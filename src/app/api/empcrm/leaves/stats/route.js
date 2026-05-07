@@ -29,9 +29,9 @@ export async function GET(request) {
       );
     }
     
-    // Fetch user's profile to get leave policy
+    // Fetch user's profile to get leave policy and date of joining
     const [profiles] = await conn.execute(
-      `SELECT employment_status, leave_policy FROM employee_profiles WHERE username = ?`,
+      `SELECT employment_status, leave_policy, date_of_joining FROM employee_profiles WHERE username = ?`,
       [username]
     );
 
@@ -50,6 +50,30 @@ export async function GET(request) {
     } catch {
       leavePolicy = {};
     }
+
+    // Calculate accrued leaves based on date of joining or custom accrual start date
+    const calculateAccruedLeaves = (joiningDate, accrualStartDate, maxAllowed, employmentStatus) => {
+      // Use custom accrual start date if provided, otherwise use date of joining
+      const effectiveDate = accrualStartDate || joiningDate;
+      
+      if (!effectiveDate) return maxAllowed;
+      
+      const doj = new Date(effectiveDate);
+      const today = new Date();
+      
+      // If on probation, no paid leave accrual
+      if (employmentStatus === 'probation') {
+        return 0;
+      }
+      
+      // Calculate complete months since effective date
+      const monthsDiff = (today.getFullYear() - doj.getFullYear()) * 12 + (today.getMonth() - doj.getMonth());
+      
+      // Accrue 1 day per month, capped at maxAllowed
+      const accrued = Math.min(monthsDiff, maxAllowed);
+      
+      return Math.max(0, accrued);
+    };
 
     // Fetch leave statistics for current year
     const [stats] = await conn.execute(
@@ -70,19 +94,30 @@ export async function GET(request) {
     const leaveSummary = leaveTypes.map(type => {
       const allowedKey = `${type}_allowed`;
       const enabledKey = `${type}_enabled`;
-      const allowed = leavePolicy[allowedKey] || 0;
+      const maxAllowed = leavePolicy[allowedKey] || 0;
       const enabled = leavePolicy[enabledKey] || false;
+      
+      // Calculate accrued leaves based on custom accrual start date, date of joining, and employment status
+      const accruedAllowed = calculateAccruedLeaves(
+        profile.date_of_joining,
+        leavePolicy.accrual_start_date,
+        maxAllowed,
+        profile.employment_status
+      );
       
       const statRecord = stats.find(s => s.leave_type === type);
       const taken = statRecord ? statRecord.taken : 0;
       const pending = statRecord ? statRecord.pending : 0;
       const rejected = statRecord ? statRecord.rejected : 0;
-      const available = Math.max(0, allowed - taken);
+      const available = Math.max(0, accruedAllowed - taken);
+      
+      // Disable paid and sick leave during probation
+      const isDisabledDueToProbation = (type === 'paid' || type === 'sick') && profile.employment_status === 'probation';
       
       return {
         type,
-        enabled,
-        allowed,
+        enabled: enabled && !isDisabledDueToProbation,
+        allowed: accruedAllowed,
         taken,
         pending,
         rejected,
