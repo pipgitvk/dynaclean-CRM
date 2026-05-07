@@ -528,6 +528,22 @@ export default function PersonalInfoSection({
                   className={inputClass}
                 />
               </div>
+              <div>
+                <label className={labelClass}>Leave Accrual Start Date</label>
+                <input
+                  type="date"
+                  name="leave_policy_accrual_start_date"
+                  value={formData.leave_policy?.accrual_start_date || ""}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      accrual_start_date: e.target.value
+                    }
+                  }))}
+                  className={inputClass}
+                />
+              </div>
             </div>
       )}
     </div>
