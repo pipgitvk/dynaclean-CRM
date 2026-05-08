@@ -565,6 +565,12 @@ const allMenuItems = [
         icon: "Receipt",
       },
       {
+        path: "/admin-dashboard/delivery-challan",
+        name: "Delivery Challan",
+        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        icon: "Receipt",
+      },
+      {
         path: "/admin-dashboard/statements",
         name: "Statements",
         roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
