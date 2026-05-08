@@ -21,7 +21,22 @@ export async function POST(req) {
     const containsAlphabets = /[a-zA-Z]/.test(item_code);
 
     if (containsAlphabets) {
-      // Case 1: Products
+      // First, get the correct product_code from products_list
+      // The dispatch might have full name like "Electric Road Sweeper DRS-3000EV"
+      // but products_list might have just "DRS-3000EV"
+      let actualProductCode = item_code;
+
+      const [productCheck] = await conn.execute(
+        `SELECT item_code, item_name FROM products_list WHERE item_code = ? OR item_name = ?`,
+        [item_code, item_code]
+      );
+
+      if (productCheck.length > 0) {
+        actualProductCode = productCheck[0].item_code;
+      }
+
+      console.log("Original item_code:", item_code, "Actual product_code:", actualProductCode, "locationColumn:", locationColumn);
+
       const query = `
         SELECT
           T1.${locationColumn} AS stock_count,
@@ -31,7 +46,9 @@ export async function POST(req) {
         LEFT JOIN products_list AS T2 ON T1.product_code = T2.item_code
         WHERE T1.product_code = ?`;
 
-      const [summary] = await conn.execute(query, [item_code]);
+      console.log("Executing query with actualProductCode:", actualProductCode);
+
+      const [summary] = await conn.execute(query, [actualProductCode]);
 
       console.log("Product stock query result:", summary);
 
