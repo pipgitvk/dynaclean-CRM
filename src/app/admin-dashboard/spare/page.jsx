@@ -67,6 +67,15 @@ function ProductAndSpareLists({ type }) {
     );
   }, [rows, q]);
 
+  const totals = useMemo(() => {
+    return view.reduce((acc, r) => {
+      acc.totalMinQty += Number(r.min_qty) || 0;
+      const price = type === 'product' ? (Number(r.price_per_unit) || 0) : (Number(r.price) || 0);
+      acc.totalPrice += price;
+      return acc;
+    }, { totalMinQty: 0, totalPrice: 0 });
+  }, [view, type]);
+
   return (
     <div className="border rounded-lg">
 
@@ -80,6 +89,18 @@ function ProductAndSpareLists({ type }) {
             placeholder="Search..."
             className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-full"
           />
+        </div>
+      </div>
+
+      {/* TOTALS DISPLAY */}
+      <div className="flex flex-wrap gap-4 p-3 bg-blue-50 border-b">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-700">Total Min Qty:</span>
+          <span className="text-xs font-bold text-blue-700">{totals.totalMinQty.toLocaleString()}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-700">Total Price:</span>
+          <span className="text-xs font-bold text-green-700">₹{totals.totalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
       </div>
 
