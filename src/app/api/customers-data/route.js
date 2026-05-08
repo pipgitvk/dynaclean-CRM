@@ -11,7 +11,7 @@ import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 function isHrPrivilegedCustomersRole(role) {
   const r = normalizeRoleKey(role || "");
-  return r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE";
+  return r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE" || r === "TEAM LEADER";
 }
 
 export async function GET(req) {
