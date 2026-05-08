@@ -1,0 +1,85 @@
+import { cookies } from "next/headers";
+import { jwtVerify } from "jose";
+import { getDbConnection } from "@/lib/db";
+import ClientTaskTable from "@/components/task/ClientTaskTableAdmin";
+
+const JWT_SECRET = process.env.JWT_SECRET;
+export const dynamic = "force-dynamic";
+
+async function getUsernameFromToken() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(
+      token,
+      new TextEncoder().encode(JWT_SECRET),
+    );
+    return payload.username;
+  } catch (e) {
+    console.error("JWT Error:", e);
+    return null;
+  }
+}
+
+async function getAllTasks() {
+  const conn = await getDbConnection();
+
+  const query = `
+    SELECT 
+      t.task_id, 
+      t.taskname, 
+      t.createdby, 
+      t.taskassignto, 
+      (
+        SELECT tf.reassign 
+        FROM task_followup tf 
+        WHERE tf.task_id = t.task_id 
+        ORDER BY tf.id DESC 
+        LIMIT 1
+      ) AS reassign,
+      (
+        SELECT tf.taskassignto 
+        FROM task_followup tf 
+        WHERE tf.task_id = t.task_id 
+        ORDER BY tf.id ASC 
+        LIMIT 1
+      ) AS first_assignto,
+      t.followed_date, 
+      t.next_followup_date, 
+      t.status, 
+      t.task_completion_date
+    FROM 
+      task t
+    ORDER BY 
+      t.task_id DESC
+  `;
+
+  const [rows] = await conn.execute(query);
+  return rows;
+}
+
+export default async function DirectorAllTasksPage() {
+  const username = await getUsernameFromToken();
+  if (!username) {
+    return <p className="text-red-600 p-4">❌ Unauthorized</p>;
+  }
+
+  const tasks = await getAllTasks();
+
+  return (
+    <div className="p-6 mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">📋 All Tasks</h1>
+
+        <a href="/director-dashboard/task-manager" passHref>
+          <button className="px-4 py-2 bg-blue-500 text-white rounded-md cursor-pointer hover:bg-blue-600 transition">
+            My Tasks
+          </button>
+        </a>
+      </div>
+      <ClientTaskTable initialTasks={tasks} currentUser={username} />
+    </div>
+  );
+}

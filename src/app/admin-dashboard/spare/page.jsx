@@ -5,15 +5,15 @@ import { Eye, Search, Pencil } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-function ProductAndSpareLists({ type }) {
+function SpareList() {
   const [rows, setRows] = useState([]);
+  const [stockTotals, setStockTotals] = useState({ totalQty: 0, totalValue: 0 });
   const [q, setQ] = useState("");
   const [editingPrice, setEditingPrice] = useState({ key: null, field: null, value: "" });
   const [savingPrice, setSavingPrice] = useState(false);
 
   const handleSavePrice = async (row, field) => {
-    const code = type === 'product' ? row.item_code : row.id;
-    if (!code || savingPrice) return;
+    const code = row.id;
 
     try {
       setSavingPrice(true);
@@ -21,7 +21,7 @@ function ProductAndSpareLists({ type }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type,
+          type: 'spare',
           code,
           price: editingPrice.value,
           field
@@ -35,9 +35,9 @@ function ProductAndSpareLists({ type }) {
       }
 
       setRows(prev => prev.map(r => {
-        const key = type === 'product' ? r.item_code : r.id;
+        const key = r.id;
         if (key === code) {
-          const targetField = field === 'price' ? (type === 'product' ? 'price_per_unit' : 'price') : 'last_negotiation_price';
+          const targetField = field === 'price' ? 'price' : 'last_negotiation_price';
           return { ...r, [targetField]: editingPrice.value };
         }
         return r;
@@ -52,12 +52,17 @@ function ProductAndSpareLists({ type }) {
   };
 
   useEffect(() => {
-    const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
-    fetch(url)
+    fetch('/api/spare/list')
       .then(r => r.json())
       .then(d => setRows(Array.isArray(d) ? d : []))
       .catch(() => setRows([]));
-  }, [type]);
+
+    // Fetch actual stock totals
+    fetch('/api/spare/total-value')
+      .then(r => r.json())
+      .then(d => setStockTotals({ totalQty: d.totalQty || 0, totalValue: d.totalValue || 0 }))
+      .catch(() => setStockTotals({ totalQty: 0, totalValue: 0 }));
+  }, []);
 
   const view = useMemo(() => {
     const qt = q.trim().toLowerCase();
@@ -68,16 +73,23 @@ function ProductAndSpareLists({ type }) {
   }, [rows, q]);
 
   const totals = useMemo(() => {
-    return view.reduce((acc, r) => {
-      acc.totalMinQty += Number(r.min_qty) || 0;
-      const price = type === 'product' ? (Number(r.price_per_unit) || 0) : (Number(r.price) || 0);
-      acc.totalPrice += price;
-      return acc;
-    }, { totalMinQty: 0, totalPrice: 0 });
-  }, [view, type]);
+    return { totalMinQty: stockTotals.totalQty, totalPrice: stockTotals.totalValue };
+  }, [stockTotals]);
 
   return (
     <div className="border rounded-lg">
+
+      {/* SUMMARY CARDS */}
+      <div className="grid grid-cols-2 gap-4 p-4 border-b bg-gray-50">
+        <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <div className="text-sm font-medium text-blue-600">Total Stock Qty</div>
+          <div className="text-2xl font-bold text-blue-800">{totals.totalMinQty.toLocaleString()}</div>
+        </div>
+        <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+          <div className="text-sm font-medium text-green-600">Total Stock Value</div>
+          <div className="text-2xl font-bold text-green-800">₹{totals.totalPrice.toLocaleString()}</div>
+        </div>
+      </div>
 
       {/* SEARCH */}
       <div className="p-2 flex items-center gap-2 border-b bg-gray-50">
@@ -92,52 +104,25 @@ function ProductAndSpareLists({ type }) {
         </div>
       </div>
 
-      {/* TOTALS DISPLAY */}
-      <div className="flex flex-wrap gap-4 p-3 bg-blue-50 border-b">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-700">Total Min Qty:</span>
-          <span className="text-xs font-bold text-blue-700">{totals.totalMinQty.toLocaleString()}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-700">Total Price:</span>
-          <span className="text-xs font-bold text-green-700">₹{totals.totalPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-        </div>
-      </div>
-
       {/* DESKTOP TABLE VIEW */}
       <div className="overflow-auto hidden sm:block">
         <table className="w-full text-xs">
           <thead className="bg-gray-100">
             <tr>
-              {type === 'product' ? (
-                <>
-                  <th className="p-2 text-left">Image</th>
-                  <th className="p-2 text-left">Code</th>
-                  <th className="p-2 text-left">Name</th>
-                  <th className="p-2 text-left">Product No</th>
-                  <th className="p-2 text-left">Min Qty</th>
-                  <th className="p-2 text-left">Price</th>
-                  <th className="p-2 text-left">Last Neg. Price</th>
-                  <th className="p-2 text-left">Specification</th>
-                </>
-              ) : (
-                <>
-                  <th className="p-2 text-left">Image</th>
-                  <th className="p-2 text-left">Spare No</th>
-                  <th className="p-2 text-left">Name</th>
-                  <th className="p-2 text-left">Min Qty</th>
-                  <th className="p-2 text-left">Price</th>
-                  <th className="p-2 text-left">Last Neg. Price</th>
-                  <th className="p-2 text-left">Specification</th>
-                </>
-              )}
+              <th className="p-2 text-left">Image</th>
+              <th className="p-2 text-left">Spare No</th>
+              <th className="p-2 text-left">Name</th>
+              <th className="p-2 text-left">Min Qty</th>
+              <th className="p-2 text-left">Price</th>
+              <th className="p-2 text-left">Last Neg. Price</th>
+              <th className="p-2 text-left">Specification</th>
             </tr>
           </thead>
 
           <tbody>
             {view.map((r, idx) => {
-              const key = (r.item_code || r.spare_number || r.item_name || "row") + "_" + idx;
-              const imageUrl = type === "product" ? (r.image_path || r.product_image) : r.image;
+              const key = (r.spare_number || r.item_name || "row") + "_" + idx;
+              const imageUrl = r.image;
 
               return (
                 <tr key={key} className="border-t">
@@ -149,103 +134,48 @@ function ProductAndSpareLists({ type }) {
                         <span className="text-gray-400">No image</span>
                       )}
                     </td>
-
-                    {type === "product" ? (
-                      <>
-                        <td className="p-2">{r.item_code}</td>
-                        <td className="p-2">{r.item_name}</td>
-                        <td className="p-2">{r.product_number}</td>
-                        <td className="p-2">{r.min_qty}</td>
-                        <td className="p-2">
-                          {editingPrice.key === r.item_code && editingPrice.field === 'price' ? (
-                            <div className="flex gap-1 items-center">
-                              <input
-                                type="number"
-                                className="w-20 border rounded px-1 text-xs"
-                                value={editingPrice.value}
-                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                              />
-                              <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
-                              <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 group">
-                              <span>{r.price_per_unit || 0}</span>
-                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'price', value: r.price_per_unit || 0 })} />
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-2">
-                          <td className="p-2">
-                            {editingPrice.key === r.item_code && editingPrice.field === 'last_negotiation_price' ? (
-                              <div className="flex gap-1 items-center">
-                                <input
-                                  type="number"
-                                  className="w-20 border rounded px-1 text-xs"
-                                  value={editingPrice.value}
-                                  onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                                />
-                                <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
-                                <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 group">
-                                <span>{r.last_negotiation_price || 0}</span>
-                                <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
-                              </div>
-                            )}
-                          </td>
-                        </td>
-                        <td className="p-2">{r.specification}</td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="p-2">{r.spare_number}</td>
-                        <td className="p-2">{r.item_name}</td>
-                        <td className="p-2">{r.min_qty}</td>
-                        <td className="p-2">
-                          {editingPrice.key === r.id && editingPrice.field === 'price' ? (
-                            <div className="flex gap-1 items-center">
-                              <input
-                                type="number"
-                                className="w-20 border rounded px-1 text-xs"
-                                value={editingPrice.value}
-                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                              />
-                              <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
-                              <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 group">
-                              <span>{r.price || 0}</span>
-                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'price', value: r.price || 0 })} />
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-2">
-                          <td className="p-2">
-                            {editingPrice.key === r.id && editingPrice.field === 'last_negotiation_price' ? (
-                              <div className="flex gap-1 items-center">
-                                <input
-                                  type="number"
-                                  className="w-20 border rounded px-1 text-xs"
-                                  value={editingPrice.value}
-                                  onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                                />
-                                <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
-                                <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 group">
-                                <span>{r.last_negotiation_price || 0}</span>
-                                <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
-                              </div>
-                            )}
-                          </td>
-                        </td>
-                        <td className="p-2">{r.specification}</td>
-                      </>
-                    )}
+                    <td className="p-2">{r.spare_number}</td>
+                    <td className="p-2">{r.item_name}</td>
+                    <td className="p-2">{r.min_qty}</td>
+                    <td className="p-2">
+                      {editingPrice.key === r.id && editingPrice.field === 'price' ? (
+                        <div className="flex gap-1 items-center">
+                          <input
+                            type="number"
+                            className="w-20 border rounded px-1 text-xs"
+                            value={editingPrice.value}
+                            onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                          />
+                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
+                          <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          <span>{r.price || 0}</span>
+                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'price', value: r.price || 0 })} />
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      {editingPrice.key === r.id && editingPrice.field === 'last_negotiation_price' ? (
+                        <div className="flex gap-1 items-center">
+                          <input
+                            type="number"
+                            className="w-20 border rounded px-1 text-xs"
+                            value={editingPrice.value}
+                            onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                          />
+                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
+                          <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          <span>{r.last_negotiation_price || 0}</span>
+                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-2">{r.specification}</td>
                   </>
                 </tr>
               );
@@ -253,7 +183,7 @@ function ProductAndSpareLists({ type }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={type === "product" ? 6 : 5}>
+                <td className="p-2 text-gray-500" colSpan={7}>
                   No data
                 </td>
               </tr>
@@ -269,10 +199,8 @@ function ProductAndSpareLists({ type }) {
         )}
 
         {view.map((r, idx) => {
-          const key = (r.item_code || r.spare_number || r.item_name) + "_" + idx;
-          const imageUrl = type === "product"
-            ? (r.image_path || r.product_image)
-            : r.image;
+          const key = (r.spare_number || r.item_name) + "_" + idx;
+          const imageUrl = r.image;
 
           return (
             <div key={key} className="border rounded-lg p-3 shadow-sm bg-white">
@@ -294,101 +222,49 @@ function ProductAndSpareLists({ type }) {
 
               {/* DETAILS */}
               <div className="mt-2 text-xs text-gray-700 space-y-1">
-                {type === "product" ? (
-                  <>
-                    <p><span className="font-semibold">Code:</span> {r.item_code}</p>
-                    <p><span className="font-semibold">Product No:</span> {r.product_number}</p>
-                    <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Price:</span>
-                      {editingPrice.key === r.item_code && editingPrice.field === 'price' ? (
-                        <div className="flex gap-1 items-center">
-                          <input
-                            type="number"
-                            className="w-20 border rounded px-1 text-xs"
-                            value={editingPrice.value}
-                            onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                          />
-                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
-                          <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>{r.price_per_unit || 0}</span>
-                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer" onClick={() => setEditingPrice({ key: r.item_code, field: 'price', value: r.price_per_unit || 0 })} />
-                        </div>
-                      )}
+                <p><span className="font-semibold">Spare No:</span> {r.spare_number}</p>
+                <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">Price:</span>
+                  {editingPrice.key === r.id && editingPrice.field === 'price' ? (
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="number"
+                        className="w-20 border rounded px-1 text-xs"
+                        value={editingPrice.value}
+                        onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                      />
+                      <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
+                      <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
                     </div>
-                    {/* Mobile Edit for Last Neg Price */}
+                  ) : (
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">Last Neg. Price:</span>
-                      {editingPrice.key === r.item_code && editingPrice.field === 'last_negotiation_price' ? (
-                        <div className="flex gap-1 items-center">
-                          <input
-                            type="number"
-                            className="w-20 border rounded px-1 text-xs"
-                            value={editingPrice.value}
-                            onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                          />
-                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
-                          <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>{r.last_negotiation_price || 0}</span>
-                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer" onClick={() => setEditingPrice({ key: r.item_code, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
-                        </div>
-                      )}
+                      <span>{r.price || 0}</span>
+                      <Pencil className="w-3 h-3 text-gray-400 cursor-pointer" onClick={() => setEditingPrice({ key: r.id, field: 'price', value: r.price || 0 })} />
                     </div>
-                    <p><span className="font-semibold">Specification:</span> {r.specification}</p>
-                  </>
-                ) : (
-                  <>
-                    <p><span className="font-semibold">Spare No:</span> {r.spare_number}</p>
-                    <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">Last Neg. Price:</span>
+                  {editingPrice.key === r.id && editingPrice.field === 'last_negotiation_price' ? (
+                    <div className="flex gap-1 items-center">
+                      <input
+                        type="number"
+                        className="w-20 border rounded px-1 text-xs"
+                        value={editingPrice.value}
+                        onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                      />
+                      <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
+                      <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">Price:</span>
-                      {editingPrice.key === r.id && editingPrice.field === 'price' ? (
-                        <div className="flex gap-1 items-center">
-                          <input
-                            type="number"
-                            className="w-20 border rounded px-1 text-xs"
-                            value={editingPrice.value}
-                            onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                          />
-                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
-                          <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>{r.price || 0}</span>
-                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer" onClick={() => setEditingPrice({ key: r.id, field: 'price', value: r.price || 0 })} />
-                        </div>
-                      )}
+                      <span>{r.last_negotiation_price || 0}</span>
+                      <Pencil className="w-3 h-3 text-gray-400 cursor-pointer" onClick={() => setEditingPrice({ key: r.id, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Last Neg. Price:</span>
-                      {editingPrice.key === r.id && editingPrice.field === 'last_negotiation_price' ? (
-                        <div className="flex gap-1 items-center">
-                          <input
-                            type="number"
-                            className="w-20 border rounded px-1 text-xs"
-                            value={editingPrice.value}
-                            onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                          />
-                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
-                          <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>{r.last_negotiation_price || 0}</span>
-                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer" onClick={() => setEditingPrice({ key: r.id, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
-                        </div>
-                      )}
-                    </div>
-                    <p><span className="font-semibold">Specification:</span> {r.specification}</p>
-                  </>
-                )}
+                  )}
+                </div>
+                <p><span className="font-semibold">Specification:</span> {r.specification}</p>
               </div>
             </div>
           );
@@ -509,7 +385,7 @@ export default function SpareStockPage() {
         </div>
         {openSection === "list" && (
           <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
-            <ProductAndSpareLists type="spare" />
+            <SpareList />
           </div>
         )}
       </div>
@@ -578,7 +454,7 @@ export default function SpareStockPage() {
                       {editingLocation.key === row.spare_id ? (
                         <div className="flex items-center gap-2">
                           <input
-                            type="text"
+                  type="text"
                             value={editingLocation.value}
                             onChange={(e) =>
                               setEditingLocation((prev) => ({

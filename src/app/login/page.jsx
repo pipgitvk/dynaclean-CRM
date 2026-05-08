@@ -55,6 +55,8 @@ const LoginPage = () => {
 
       if (data.role === "SUPERADMIN") {
         router.push("/admin-dashboard");
+      } else if (roleNorm === "DIRECTOR") {
+        router.push("/director-dashboard");
       } else {
         router.push("/user-dashboard");
       }
