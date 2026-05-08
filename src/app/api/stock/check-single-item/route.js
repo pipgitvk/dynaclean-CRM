@@ -13,6 +13,8 @@ export async function POST(req) {
 
     const locationColumn = godown === "Delhi - Mundka" ? "Delhi" : "South";
 
+    console.log("Stock check - godown:", godown, "locationColumn:", locationColumn, "item_code:", item_code);
+
     let stockResults = [];
 
     // Check if item_code contains alphabets
@@ -30,6 +32,8 @@ export async function POST(req) {
         WHERE T1.product_code = ?`;
 
       const [summary] = await conn.execute(query, [item_code]);
+
+      console.log("Product stock query result:", summary);
 
       if (summary.length > 0) {
         const result = summary[0];
