@@ -47,5 +47,33 @@ export async function getDbConnection() {
     console.log("✅ [DB] Connection pool created");
   }
 
+  // Check if pool is closed and recreate if needed
+  try {
+    const connection = await g.__mysqlPool.getConnection();
+    connection.release();
+  } catch (error) {
+    if (error.message.includes('Pool is closed') || error.code === 'POOL_CLOSED') {
+      console.log("⚠️ [DB] Pool was closed, recreating...");
+      delete g.__mysqlPool;
+      const host = await resolveDbHost();
+
+      g.__mysqlPool = mysql.createPool({
+        host,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+        connectTimeout: 10000,
+        dateStrings: true,
+      });
+
+      console.log("✅ [DB] Connection pool recreated");
+    } else {
+      throw error;
+    }
+  }
+
   return g.__mysqlPool;
 }

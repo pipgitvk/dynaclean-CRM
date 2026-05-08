@@ -30,9 +30,12 @@ export async function middleware(request) {
     try {
       const { payload } = await jwtVerify(token, secret);
       const role = payload.role;
+      const roleNorm = String(role ?? "").trim().toUpperCase();
 
       if (role === "SUPERADMIN") {
         return NextResponse.redirect(new URL("/admin-dashboard", request.url));
+      } else if (roleNorm === "DIRECTOR") {
+        return NextResponse.redirect(new URL("/director-dashboard", request.url));
       } else {
         return NextResponse.redirect(new URL("/user-dashboard", request.url));
       }
@@ -45,6 +48,7 @@ export async function middleware(request) {
   if (
     pathname.startsWith("/admin-dashboard") ||
     pathname.startsWith("/user-dashboard") ||
+    pathname.startsWith("/director-dashboard") ||
     pathname.startsWith("/empcrm")
   ) {
     if (!token) {
@@ -152,6 +156,7 @@ export async function middleware(request) {
 export const config = {
   matcher: [
     "/",
+    "/director-dashboard/:path*",
     "/login",
     "/admin-dashboard/:path*",
     "/user-dashboard/:path*",

@@ -5,6 +5,7 @@ import GemPortalDashboard from "./GemPortalDashboard";
 import TeamLeaderDashboard from "./TeamLeaderDashboard";
 import DefaultDashboard from "./DefaultDashboard";
 import ServiceHeadDashboard from "./ServiceHeadDashboard";
+import DirectorDashboard from "./DirectorDashboard";
 
 export const DASHBOARD_MAP = {
   "WAREHOUSE INCHARGE": WarehouseInchargeDashboard,
@@ -13,5 +14,6 @@ export const DASHBOARD_MAP = {
   "GEM PORTAL": GemPortalDashboard,
   "TEAM LEADER": TeamLeaderDashboard,
   "SERVICE HEAD": ServiceHeadDashboard,
+  "DIRECTOR": DirectorDashboard,
   DEFAULT: DefaultDashboard
 };

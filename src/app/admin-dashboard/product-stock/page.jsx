@@ -9,6 +9,7 @@ import { pickProductImageUrl } from "@/lib/productImageUrl";
 
 function ProductAndSpareLists({ type }) {
   const [rows, setRows] = useState([]);
+  const [stockTotals, setStockTotals] = useState({ totalQty: 0, totalValue: 0 });
   const [q, setQ] = useState("");
   const [editingPrice, setEditingPrice] = useState({ key: null, field: null, value: "" });
   const [savingPrice, setSavingPrice] = useState(false);
@@ -59,6 +60,19 @@ function ProductAndSpareLists({ type }) {
       .then(r => r.json())
       .then(d => setRows(Array.isArray(d) ? d : []))
       .catch(() => setRows([]));
+
+    // Fetch actual stock totals
+    if (type === 'product') {
+      fetch('/api/stock/total-value')
+        .then(r => r.json())
+        .then(d => setStockTotals({ totalQty: d.totalQty || 0, totalValue: d.totalValue || 0 }))
+        .catch(() => setStockTotals({ totalQty: 0, totalValue: 0 }));
+    } else {
+      fetch('/api/spare/total-value')
+        .then(r => r.json())
+        .then(d => setStockTotals({ totalQty: d.totalQty || 0, totalValue: d.totalValue || 0 }))
+        .catch(() => setStockTotals({ totalQty: 0, totalValue: 0 }));
+    }
   }, [type]);
 
   const view = useMemo(() => {
@@ -69,8 +83,23 @@ function ProductAndSpareLists({ type }) {
     );
   }, [rows, q]);
 
+  const totalMinQty = rows.reduce((sum, row) => sum + (row.min_qty || 0), 0);
+  const totalPrice = rows.reduce((sum, row) => sum + ((row.min_qty || 0) * (row.price_per_unit || row.price || 0)), 0);
+
   return (
     <div className="border rounded-lg">
+
+      {/* SUMMARY CARDS */}
+      <div className="grid grid-cols-2 gap-4 p-4 border-b bg-gray-50">
+        <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+          <div className="text-sm font-medium text-blue-600">Total Stock Qty</div>
+          <div className="text-2xl font-bold text-blue-800">{totalMinQty.toLocaleString()}</div>
+        </div>
+        <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+          <div className="text-sm font-medium text-green-600">Total Stock Value</div>
+          <div className="text-2xl font-bold text-green-800">₹{totalPrice.toLocaleString()}</div>
+        </div>
+      </div>
 
       {/* SEARCH */}
       <div className="p-2 flex items-center gap-2 border-b bg-gray-50">
