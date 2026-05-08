@@ -464,6 +464,10 @@ export default function PurchasesPage() {
   const [purchases, setPurchases] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [sortColumn, setSortColumn] = useState("created_at");
+  const [sortDirection, setSortDirection] = useState("desc");
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -638,8 +642,56 @@ export default function PurchasesPage() {
       });
     }
 
+    // Date filter
+    if (startDate) {
+      filtered = filtered.filter((p) => new Date(p.created_at) >= new Date(startDate));
+    }
+    if (endDate) {
+      filtered = filtered.filter((p) => new Date(p.created_at) <= new Date(endDate + 'T23:59:59'));
+    }
+
+    // Sorting
+    filtered = [...filtered].sort((a, b) => {
+      let aVal = a[sortColumn];
+      let bVal = b[sortColumn];
+      
+      // Handle numeric fields
+      if (['quantity', 'price_per_unit', 'net_amount', 'id'].includes(sortColumn)) {
+        aVal = Number(aVal) || 0;
+        bVal = Number(bVal) || 0;
+      }
+      
+      // Handle date fields
+      if (['created_at'].includes(sortColumn)) {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
     return filtered;
-  }, [purchases, search, statusFilter]);
+  }, [purchases, search, statusFilter, paymentTransByPurchaseId, startDate, endDate, sortColumn, sortDirection]);
+
+  const totals = useMemo(() => {
+    return filteredPurchases.reduce((acc, p) => {
+      acc.totalQty += Number(p.quantity) || 0;
+      acc.totalAmount += Number(p.net_amount) || 0;
+      acc.totalPricePerUnit += Number(p.price_per_unit) || 0;
+      return acc;
+    }, { totalQty: 0, totalAmount: 0, totalPricePerUnit: 0 });
+  }, [filteredPurchases]);
+
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
 
   const getStatusBadge = (status) => {
     const styles = {
@@ -744,7 +796,7 @@ export default function PurchasesPage() {
 
       {/* Filters and Search */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm mb-6">
-        <div className="flex flex-wrap justify-between items-center gap-3">
+        <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
           <div className="flex flex-wrap gap-2 items-center">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -756,7 +808,28 @@ export default function PurchasesPage() {
                 className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-64"
               />
             </div>
-
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => { setStartDate(""); setEndDate(""); }}
+                  className="px-3 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
+                >
+                  Clear Dates
+                </button>
+              )}
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setStatusFilter("all")}
@@ -832,6 +905,22 @@ export default function PurchasesPage() {
             Showing {filteredPurchases.length} of {purchases.length} requests
           </div>
         </div>
+        
+        {/* Totals Display */}
+        <div className="flex flex-wrap gap-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Total Quantity:</span>
+            <span className="text-sm font-bold text-blue-700">{totals.totalQty.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Total Price/Unit:</span>
+            <span className="text-sm font-bold text-purple-700">₹{totals.totalPricePerUnit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Total Amount:</span>
+            <span className="text-sm font-bold text-green-700">₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+        </div>
       </div>
 
       {/* Table */}
@@ -847,17 +936,17 @@ export default function PurchasesPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-100 text-left">
                 <tr>
-                  <th className="p-3 border-b font-semibold">ID</th>
-                  <th className="p-3 border-b font-semibold">Product Code</th>
-                  <th className="p-3 border-b font-semibold">Product Name</th>
-                  <th className="p-3 border-b font-semibold">Qty</th>
-                  <th className="p-3 border-b font-semibold">Price/Unit</th>
-                  <th className="p-3 border-b font-semibold">Net Amount</th>
-                  <th className="p-3 border-b font-semibold">From Company</th>
-                  <th className="p-3 border-b font-semibold">Transport</th>
-                  <th className="p-3 border-b font-semibold">Status</th>
-                  <th className="p-3 border-b font-semibold">Created By</th>
-                  <th className="p-3 border-b font-semibold">Created At</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('id')}>ID {sortColumn === 'id' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_code')}>Product Code {sortColumn === 'product_code' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_name')}>Product Name {sortColumn === 'product_name' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('quantity')}>Qty {sortColumn === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('price_per_unit')}>Price/Unit {sortColumn === 'price_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('net_amount')}>Net Amount {sortColumn === 'net_amount' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('from_company')}>From Company {sortColumn === 'from_company' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('mode_of_transport')}>Transport {sortColumn === 'mode_of_transport' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('status')}>Status {sortColumn === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('created_by')}>Created By {sortColumn === 'created_by' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('created_at')}>Created At {sortColumn === 'created_at' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold">Image</th>
                   <th className="p-3 border-b font-semibold">Payment Trans ID</th>
                   <th className="p-3 border-b font-semibold">Action</th>
