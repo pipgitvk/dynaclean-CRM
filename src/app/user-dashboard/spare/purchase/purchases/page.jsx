@@ -689,8 +689,9 @@ export default function SparePurchasesPage() {
     return filteredPurchases.reduce((acc, p) => {
       acc.totalQty += Number(p.quantity) || 0;
       acc.totalAmount += Number(p.net_amount) || 0;
+      acc.totalPricePerUnit += Number(p.price_per_unit) || 0;
       return acc;
-    }, { totalQty: 0, totalAmount: 0 });
+    }, { totalQty: 0, totalAmount: 0, totalPricePerUnit: 0 });
   }, [filteredPurchases]);
 
   const handleSort = (column) => {
@@ -817,6 +818,10 @@ export default function SparePurchasesPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-700">Total Quantity:</span>
             <span className="text-sm font-bold text-blue-700">{totals.totalQty.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Total Price/Unit:</span>
+            <span className="text-sm font-bold text-purple-700">₹{totals.totalPricePerUnit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-700">Total Amount:</span>
