@@ -145,6 +145,23 @@ export default function Navbar({ onToggleSidebar }) {
     router.push(newTaskRoute);
   };
 
+  const normalizeRoleKey = (role) => {
+    if (!role) return "";
+    return role.toUpperCase().trim();
+  };
+
+  const shouldShowSearch = () => {
+    const r = normalizeRoleKey(userRole);
+    return (
+      r === "TEAM LEADER" ||
+      r === "HR" ||
+      r === "HR HEAD" ||
+      r === "HR EXECUTIVE" ||
+      r === "SUPERADMIN" ||
+      r === "ADMIN"
+    );
+  };
+
   const searchDropdown =
     typeof window !== "undefined" &&
     showDropdown &&
@@ -246,25 +263,27 @@ export default function Navbar({ onToggleSidebar }) {
       </div>
 
       <div className="flex flex-1 min-w-0 flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-end min-[1100px]:gap-4 min-[1100px]:overflow-visible overflow-x-auto">
-        <div
-          ref={searchRef}
-          className="relative flex-1 min-w-0 w-full min-[1100px]:w-72 min-[1100px]:flex-none min-[1100px]:flex-shrink-0"
-        >
-          <div className="flex items-center gap-1 min-[1100px]:gap-2 border rounded-lg px-2 min-[1100px]:px-3 py-2 min-[1100px]:py-2.5 w-full bg-white min-h-[44px] min-[1100px]:min-h-0 min-[1100px]:h-10">
-            <input
-              type="text"
-              placeholder="Search customer..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => {
-                if (showDropdown) updateDropdownPosition();
-              }}
-              className="flex-1 min-w-0 outline-none text-sm"
-            />
-            <Search size={18} className="text-gray-600 flex-shrink-0" aria-hidden />
+        {shouldShowSearch() && (
+          <div
+            ref={searchRef}
+            className="relative flex-1 min-w-0 w-full min-[1100px]:w-72 min-[1100px]:flex-none min-[1100px]:flex-shrink-0"
+          >
+            <div className="flex items-center gap-1 min-[1100px]:gap-2 border rounded-lg px-2 min-[1100px]:px-3 py-2 min-[1100px]:py-2.5 w-full bg-white min-h-[44px] min-[1100px]:min-h-0 min-[1100px]:h-10">
+              <input
+                type="text"
+                placeholder="Search customer..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => {
+                  if (showDropdown) updateDropdownPosition();
+                }}
+                className="flex-1 min-w-0 outline-none text-sm"
+              />
+              <Search size={18} className="text-gray-600 flex-shrink-0" aria-hidden />
+            </div>
+            {searchDropdown}
           </div>
-          {searchDropdown}
-        </div>
+        )}
 
         <div className="flex items-center justify-end gap-2 md:gap-4 flex-shrink-0">
           <Link
