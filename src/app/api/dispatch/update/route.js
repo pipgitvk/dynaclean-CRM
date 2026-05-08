@@ -169,41 +169,34 @@ export async function POST(req) {
       quoteMetaRows && quoteMetaRows[0] ? quoteMetaRows[0].gstin : null;
 
     const locationColumn = godown === "Delhi - Mundka" ? "Delhi" : "South";
+    const locationColumnLower = godown === "Delhi - Mundka" ? "delhi" : "south";
 
     // Reduce stock now based on whether item is product or spare
     const isProduct = /[a-zA-Z]/.test(itemCode);
 
     if (isProduct) {
       const [rows] = await conn.execute(
-        `SELECT total, delhi, south FROM product_stock 
-         WHERE product_code = ? 
-         ORDER BY created_at DESC 
-         LIMIT 1`,
+        `SELECT total_quantity, ${locationColumn} FROM product_stock_summary
+         WHERE product_code = ?`,
         [itemCode]
       );
 
       let totalDB = 0;
-      let delhiDB = 0;
-      let southDB = 0;
+      let locationDB = 0;
       if (rows.length > 0) {
-        totalDB = rows[0].total;
-        delhiDB = rows[0].delhi;
-        southDB = rows[0].south;
+        totalDB = rows[0].total_quantity;
+        locationDB = rows[0][locationColumn];
       }
 
-      let delhiD = delhiDB;
-      let southD = southDB;
-      if (godown === "Delhi - Mundka") {
-        delhiD = delhiDB - quantity;
-        southD = southDB;
-      } else {
-        southD = southDB - quantity;
-        delhiD = delhiDB;
-      }
+      let newLocationStock = locationDB - quantity;
       const totalD = totalDB - quantity;
 
+      // Calculate both delhi and south for the INSERT (lowercase for product_stock table)
+      let delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
+      let southD = locationColumnLower === "south" ? newLocationStock : locationDB;
+
       await conn.execute(
-        `INSERT INTO product_stock 
+        `INSERT INTO product_stock
           (product_code, quantity, amount_per_unit, net_amount, note, location, stock_status, gst, hs_code, to_company, delivery_address, quotation_id, order_id, added_by, godown, total, delhi, south)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
@@ -246,32 +239,24 @@ export async function POST(req) {
       }
     } else {
       const [rows] = await conn.execute(
-        `SELECT total, delhi, south FROM stock_list
-         WHERE spare_id = ? 
-         ORDER BY created_at DESC 
-         LIMIT 1`,
+        `SELECT total_quantity, ${locationColumn} FROM stock_summary
+         WHERE spare_id = ?`,
         [itemCode]
       );
 
       let totalDB = 0;
-      let delhiDB = 0;
-      let southDB = 0;
+      let locationDB = 0;
       if (rows.length > 0) {
-        totalDB = rows[0].total;
-        delhiDB = rows[0].delhi;
-        southDB = rows[0].south;
+        totalDB = rows[0].total_quantity;
+        locationDB = rows[0][locationColumn];
       }
 
-      let delhiD = delhiDB;
-      let southD = southDB;
-      if (godown === "Delhi - Mundka") {
-        delhiD = delhiDB - quantity;
-        southD = southDB;
-      } else {
-        southD = southDB - quantity;
-        delhiD = delhiDB;
-      }
+      let newLocationStock = locationDB - quantity;
       const totalD = totalDB - quantity;
+
+      // Calculate both delhi and south for the INSERT (lowercase for stock_list table)
+      let delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
+      let southD = locationColumnLower === "south" ? newLocationStock : locationDB;
 
       await conn.execute(
         `INSERT INTO stock_list
