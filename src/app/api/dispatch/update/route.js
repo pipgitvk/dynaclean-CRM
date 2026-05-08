@@ -94,7 +94,19 @@ export async function POST(req) {
 
     const dispatchRow = dispatchRows[0];
     const quoteNumber = dispatchRow.quote_number;
-    const itemCode = dispatchRow.item_code;
+    let itemCode = dispatchRow.item_code;
+
+    // Get the correct product_code from products_list
+    // The dispatch might have full name like "Electric Road Sweeper DRS-3000EV"
+    // but products_list might have just "DRS-3000EV"
+    const [productCheck] = await conn.execute(
+      `SELECT item_code, item_name FROM products_list WHERE item_code = ? OR item_name = ?`,
+      [itemCode, itemCode]
+    );
+    if (productCheck.length > 0) {
+      itemCode = productCheck[0].item_code;
+      console.log("Dispatch stock deduction - Original:", dispatchRow.item_code, "Actual:", itemCode);
+    }
 
     const [orderRows] = await conn.execute(
       `SELECT id, order_id FROM neworder WHERE quote_number = ? LIMIT 1`,
