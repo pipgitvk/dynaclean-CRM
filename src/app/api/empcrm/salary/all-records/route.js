@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 
-const HR_SALARY_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"];
+const HR_SALARY_ROLES = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "ACCOUNTANT"];
 const DELETE_ALLOWED_ROLES = ["SUPERADMIN", "ADMIN"];
 
 const DEFAULT_LIMIT = 200;
