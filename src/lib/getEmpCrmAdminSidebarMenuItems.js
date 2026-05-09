@@ -38,6 +38,7 @@ const empCrmMenuItems = [
 
   { path: "/empcrm/admin-dashboard/attendance-summary", name: "Attendance Summary", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "LayoutGrid" },
   { path: "/empcrm/admin-dashboard/attendance", name: "Attendance details", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "Clock" },
+  { path: "/empcrm/admin-dashboard/attendance-rules", name: "Attendance Rules", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "Settings" },
   { path: "/empcrm/admin-dashboard/documents", name: "Employee Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "FileText" },
   { path: "/empcrm/admin-dashboard/hiring", name: "Hiring", roles: ["HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "UserPlus" },
   { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "ACCOUNTANT"], icon: "DollarSign" },
