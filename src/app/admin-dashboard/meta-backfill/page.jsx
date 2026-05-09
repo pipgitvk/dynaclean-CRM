@@ -18,12 +18,12 @@ const ASSIGNED_BY_FIXED_USERNAME = "harsh_M";
 
 /** Map customers.lead_campaign to summary bucket (Campaign column) */
 function campaignLeadBucket(raw) {
-  if (raw == null || String(raw).trim() === "") return null;
+  if (raw == null || String(raw).trim() === "") return "other";
   const s = String(raw).trim().toLowerCase().replace(/\s+/g, "_");
   if (s === "social_media" || s === "socialmedia") return "social_media";
   if (s === "google" || s === "google_ads" || s === "googleads") return "google";
   if (s === "indiamart" || s === "india_mart" || s === "india-mart") return "indiamart";
-  return null;
+  return "other";
 }
 
 /** Avoid `Unexpected token '<'` when nginx returns HTML 504/502 instead of JSON */
@@ -192,7 +192,7 @@ export default function MetaBackfillPage() {
     if (!selectedCampaignBreakdown || !assignerDetailName) return [];
     const filteredLeads = assignerDetailLeads.filter((lead) => {
       const bucket = campaignLeadBucket(lead.lead_campaign);
-      return bucket === selectedCampaignBreakdown;
+      return bucket && bucket.toLowerCase() === selectedCampaignBreakdown.toLowerCase();
     });
     const breakdown = {};
     filteredLeads.forEach((lead) => {
