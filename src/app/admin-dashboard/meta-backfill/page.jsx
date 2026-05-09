@@ -1303,6 +1303,7 @@ export default function MetaBackfillPage() {
                         <th className="px-2 py-2 text-left border-b">Stage</th>
                         <th className="px-2 py-2 text-left border-b">Campaign</th>
                         <th className="px-2 py-2 text-left border-b">assigned_to</th>
+                        <th className="px-2 py-2 text-left border-b">sales_representative</th>
                         <th className="px-2 py-2 text-left border-b">Created</th>
                       </tr>
                     </thead>
@@ -1326,6 +1327,7 @@ export default function MetaBackfillPage() {
                             <td className="px-2 py-2">{lead.stage || "—"}</td>
                             <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
                             <td className="px-2 py-2 whitespace-nowrap">{lead.assigned_to || "—"}</td>
+                            <td className="px-2 py-2 whitespace-nowrap">{lead.sales_representative || "—"}</td>
                             <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
                           </tr>
                         );
