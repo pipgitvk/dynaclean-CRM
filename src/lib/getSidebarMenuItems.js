@@ -832,7 +832,7 @@ const allMenuItems = [
     path: "/user-dashboard/attendance-log/",
     name: "All Attendance details",
     moduleKey: "attendance-log",
-    roles: ["ADMIN", "ACCOUNTANT", "HR", "TEAM LEADER"],
+    roles: ["ADMIN", "ACCOUNTANT", "HR", "HR HEAD", "HR EXECUTIVE", "JUNIOR HR EXECUTIVE", "TEAM LEADER"],
     icon: "ListOrdered",
   },
 ];
