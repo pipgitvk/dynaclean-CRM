@@ -158,7 +158,10 @@ export default function Navbar({ onToggleSidebar }) {
       r === "HR HEAD" ||
       r === "HR EXECUTIVE" ||
       r === "SUPERADMIN" ||
-      r === "ADMIN"
+      r === "ADMIN" ||
+      r === "SALES" ||
+      r === "SALES EXECUTIVE" ||
+      r === "SALES REPRESENTATIVE"
     );
   };
 
