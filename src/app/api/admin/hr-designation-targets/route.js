@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+import { isHrTargetDashboardRole } from "@/lib/hrTargetEligibleRoles";
 
-function assertSuperadmin(payload) {
+function assertSuperadminOrHr(payload) {
   if (!payload?.username) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   const roleKey = normalizeRoleKey(payload.role ?? payload.userRole);
-  if (roleKey !== "SUPERADMIN") {
+  if (roleKey !== "SUPERADMIN" && !isHrTargetDashboardRole(roleKey)) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
   return null;
@@ -38,7 +39,7 @@ async function ensureCityColumn(conn) {
 export async function GET(req) {
   try {
     const payload = await getSessionPayload();
-    const denied = assertSuperadmin(payload);
+    const denied = assertSuperadminOrHr(payload);
     if (denied) return denied;
 
     const { searchParams } = new URL(req.url);
@@ -89,7 +90,7 @@ export async function GET(req) {
 export async function POST(request) {
   try {
     const payload = await getSessionPayload();
-    const denied = assertSuperadmin(payload);
+    const denied = assertSuperadminOrHr(payload);
     if (denied) return denied;
 
     const body = await request.json();
@@ -160,7 +161,7 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     const payload = await getSessionPayload();
-    const denied = assertSuperadmin(payload);
+    const denied = assertSuperadminOrHr(payload);
     if (denied) return denied;
 
     const body = await request.json();
@@ -238,7 +239,7 @@ export async function PATCH(request) {
 export async function DELETE(req) {
   try {
     const payload = await getSessionPayload();
-    const denied = assertSuperadmin(payload);
+    const denied = assertSuperadminOrHr(payload);
     if (denied) return denied;
 
     const { searchParams } = new URL(req.url);

@@ -5,7 +5,7 @@ import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import { isHrTargetDashboardRole } from "@/lib/hrTargetEligibleRoles";
 
 /**
- * GET: list active rep_list users whose role is HR / HR HEAD / HR Executive — for Superadmin target dropdown.
+ * GET: list active rep_list users whose role is HR / HR HEAD / HR Executive — for Superadmin/HR target dropdown.
  */
 export async function GET() {
   try {
@@ -13,7 +13,8 @@ export async function GET() {
     if (!payload?.username) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
-    if (normalizeRoleKey(payload.role ?? payload.userRole) !== "SUPERADMIN") {
+    const roleKey = normalizeRoleKey(payload.role ?? payload.userRole);
+    if (roleKey !== "SUPERADMIN" && !isHrTargetDashboardRole(roleKey)) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 

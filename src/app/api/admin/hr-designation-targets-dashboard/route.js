@@ -6,11 +6,12 @@ import {
   buildItemsForHrUsername,
   computeCompletedForDesignation,
 } from "@/lib/hrTargetMonthlyCompleted";
+import { isHrTargetDashboardRole } from "@/lib/hrTargetEligibleRoles";
 
-function assertSuperadmin(payload) {
+function assertSuperadminOrHr(payload) {
   if (!payload?.username) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   const roleKey = normalizeRoleKey(payload.role ?? payload.userRole);
-  if (roleKey !== "SUPERADMIN") {
+  if (roleKey !== "SUPERADMIN" && !isHrTargetDashboardRole(roleKey)) {
     return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
   return null;
@@ -68,7 +69,7 @@ async function loadDisplayByLower(conn, canonicalUsernames) {
 export async function GET(req) {
   try {
     const payload = await getSessionPayload();
-    const denied = assertSuperadmin(payload);
+    const denied = assertSuperadminOrHr(payload);
     if (denied) return denied;
 
     const { searchParams } = new URL(req.url);
