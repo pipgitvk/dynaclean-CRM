@@ -1057,7 +1057,7 @@ export default function MetaBackfillPage() {
               className="border px-2 py-1 rounded"
             />
           </label>
-          <button
+          {/* <button
             type="submit"
             disabled={loading}
             className="px-3 py-1 rounded bg-blue-600 text-white text-sm disabled:opacity-50"
@@ -1078,7 +1078,7 @@ export default function MetaBackfillPage() {
             className="px-3 py-1 rounded bg-teal-700 text-white text-sm hover:bg-teal-800"
           >
             Tamil leads
-          </button>
+          </button> */}
           <button
             type="button"
             onClick={handleLeadsReport}
