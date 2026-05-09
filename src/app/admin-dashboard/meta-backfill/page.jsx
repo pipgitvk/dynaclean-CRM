@@ -150,6 +150,7 @@ export default function MetaBackfillPage() {
   const [assignerDetailLeads, setAssignerDetailLeads] = useState([]);
   const [assignerDetailLoading, setAssignerDetailLoading] = useState(false);
   const [assignerDetailError, setAssignerDetailError] = useState("");
+  const [selectedCampaignBreakdown, setSelectedCampaignBreakdown] = useState(null);
   const [tamilModalOpen, setTamilModalOpen] = useState(false);
   /** Date range used for Tamil modal list + import (set when opening modal) */
   const [tamilModalRange, setTamilModalRange] = useState({ since: "", until: "" });
@@ -185,6 +186,23 @@ export default function MetaBackfillPage() {
     }
     return map;
   }, [leadsReport?.byCampaignAndAssigner]);
+
+  /** Sales representative breakdown for selected campaign */
+  const campaignSalesRepBreakdown = useMemo(() => {
+    if (!selectedCampaignBreakdown || !assignerDetailName) return [];
+    const filteredLeads = assignerDetailLeads.filter((lead) => {
+      const bucket = campaignLeadBucket(lead.lead_campaign);
+      return bucket === selectedCampaignBreakdown;
+    });
+    const breakdown = {};
+    filteredLeads.forEach((lead) => {
+      const rep = lead.sales_representative || "Unassigned";
+      breakdown[rep] = (breakdown[rep] || 0) + 1;
+    });
+    return Object.entries(breakdown)
+      .map(([rep, count]) => ({ rep, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [selectedCampaignBreakdown, assignerDetailName, assignerDetailLeads]);
 
   const assignedByCampaignTotals = useMemo(() => {
     const totals = { social_media: 0, indiamart: 0, google: 0 };
@@ -1231,7 +1249,7 @@ export default function MetaBackfillPage() {
             <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
               <div>
                 <h3 id="assigner-detail-title" className="text-lg font-semibold text-gray-900">
-                  assigned_to — {assignerDetailName}
+                  Created_by — {assignerDetailName}
                 </h3>
                 {since && until && (
                   <p className="text-sm text-gray-600 mt-0.5">
@@ -1262,15 +1280,54 @@ export default function MetaBackfillPage() {
                       };
                     return (
                       <>
-                        <span>
-                          Social media: <strong className="tabular-nums">{d.social_media}</strong>
-                        </span>
-                        <span>
-                          Google: <strong className="tabular-nums">{d.google}</strong>
-                        </span>
-                        <span>
-                          Indiamart: <strong className="tabular-nums">{d.indiamart}</strong>
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span>
+                            Social media: <strong className="tabular-nums">{d.social_media}</strong>
+                          </span>
+                          {d.social_media > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCampaignBreakdown(
+                                selectedCampaignBreakdown === "social_media" ? null : "social_media"
+                              )}
+                              className="px-2 py-0.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                            >
+                              {selectedCampaignBreakdown === "social_media" ? "Hide" : "View Reps"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span>
+                            Google: <strong className="tabular-nums">{d.google}</strong>
+                          </span>
+                          {d.google > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCampaignBreakdown(
+                                selectedCampaignBreakdown === "google" ? null : "google"
+                              )}
+                              className="px-2 py-0.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                            >
+                              {selectedCampaignBreakdown === "google" ? "Hide" : "View Reps"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span>
+                            Indiamart: <strong className="tabular-nums">{d.indiamart}</strong>
+                          </span>
+                          {d.indiamart > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCampaignBreakdown(
+                                selectedCampaignBreakdown === "indiamart" ? null : "indiamart"
+                              )}
+                              className="px-2 py-0.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                            >
+                              {selectedCampaignBreakdown === "indiamart" ? "Hide" : "View Reps"}
+                            </button>
+                          )}
+                        </div>
                         {d.other > 0 && (
                           <span>
                             Other: <strong className="tabular-nums">{d.other}</strong>
@@ -1279,6 +1336,30 @@ export default function MetaBackfillPage() {
                       </>
                     );
                   })()}
+                </div>
+              )}
+
+              {selectedCampaignBreakdown && campaignSalesRepBreakdown.length > 0 && (
+                <div className="mb-4 text-sm border border-blue-100 rounded-lg bg-blue-50/50 p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-blue-900">
+                      Sales Representatives ({selectedCampaignBreakdown}):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCampaignBreakdown(null)}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {campaignSalesRepBreakdown.map(({ rep, count }) => (
+                      <span key={rep} className="bg-white px-2 py-1 rounded border border-blue-200">
+                        <strong>{rep}</strong>: <span className="tabular-nums">{count}</span>
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
               {assignerDetailLoading && (
