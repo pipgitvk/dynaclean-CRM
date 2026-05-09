@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { normalizeRoleKey, isJwtAccountingRole } from "@/lib/roleKeyUtils";
-import { getDbConnection } from "@/lib/db";
-import { parseModuleAccess } from "@/lib/moduleAccess";
 
 /** Attendance rules: SUPERADMIN + ADMIN + HR roles. */
 const ATTENDANCE_RULES_MIDDLEWARE_ROLES = [
@@ -14,58 +12,6 @@ const ATTENDANCE_RULES_MIDDLEWARE_ROLES = [
 ];
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-
-/**
- * Route to module key mapping for middleware module access checks
- */
-const ROUTE_TO_MODULE_KEY = {
-  "/admin-dashboard": "dashboard-home",
-  "/admin-dashboard/attendance-rules": "attendance-rules",
-  "/admin-dashboard/prospects": "prospects-new",
-  "/admin-dashboard/client-expenses": "client-expenses",
-  "/admin-dashboard/statements": "statements",
-  "/admin-dashboard/all-expenses": "all-expenses",
-  "/admin-dashboard/hiring-process": "hiring-process",
-  "/empcrm/admin-dashboard/hiring": "hiring",
-  "/empcrm/admin-dashboard/salary": "salary-management",
-  "/empcrm/admin-dashboard/salary-slips": "salary-slips",
-};
-
-/**
- * Fetch module access for user from database
- */
-async function getUserModuleAccess(username) {
-  if (!username) return null;
-  try {
-    const conn = await getDbConnection();
-    const [rows] = await conn.execute(
-      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
-      [username],
-    );
-    if (!rows.length) return null;
-    return parseModuleAccess(rows[0].module_access ?? null);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Check if user has access to a route based on module access
- */
-async function hasModuleAccessForRoute(username, pathname) {
-  const moduleAccess = await getUserModuleAccess(username);
-  if (moduleAccess === null) return null; // Not configured, defer to role-based logic
-  if (Array.isArray(moduleAccess) && moduleAccess.length === 0) return false; // Explicitly no access
-
-  // Find matching module key for the route
-  for (const [route, moduleKey] of Object.entries(ROUTE_TO_MODULE_KEY)) {
-    if (pathname === route || pathname.startsWith(route + "/")) {
-      return moduleAccess.includes(moduleKey);
-    }
-  }
-
-  return null; // No mapping, defer to role-based logic
-}
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
@@ -118,18 +64,6 @@ export async function middleware(request) {
       // Same roles as getAdminSidebarMenuItems "Attendance rules" — must not block here,
       // otherwise ADMIN/HR see the link but middleware sends them to /user-dashboard.
       if (pathname.startsWith("/admin-dashboard/attendance-rules")) {
-        // Check module access first
-        const hasAccess = await hasModuleAccessForRoute(payload.username, pathname);
-        if (hasAccess === true) {
-          return NextResponse.next();
-        }
-        // If module access is configured and user doesn't have access, redirect
-        if (hasAccess === false) {
-          const dest = new URL("/user-dashboard", request.url);
-          dest.search = request.nextUrl.search;
-          return NextResponse.redirect(dest);
-        }
-        // Module access not configured, fall back to role-based logic
         const canAttendanceRules = ATTENDANCE_RULES_MIDDLEWARE_ROLES.some(
           (r) => normalizeRoleKey(r) === roleKey,
         );
@@ -158,18 +92,6 @@ export async function middleware(request) {
       }
 
       if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN") {
-        // Check module access first
-        const hasAccess = await hasModuleAccessForRoute(payload.username, pathname);
-        if (hasAccess === true) {
-          return NextResponse.next();
-        }
-        // If module access is configured and user doesn't have access, redirect
-        if (hasAccess === false) {
-          const dest = new URL("/user-dashboard", request.url);
-          dest.search = request.nextUrl.search;
-          return NextResponse.redirect(dest);
-        }
-        // Module access not configured, fall back to role-based logic
         const dest = new URL("/user-dashboard", request.url);
         dest.search = request.nextUrl.search;
         return NextResponse.redirect(dest);
@@ -195,18 +117,8 @@ export async function middleware(request) {
       }
 
       if (pathname.startsWith("/empcrm/admin-dashboard")) {
-        // Check module access first
-        const hasAccess = await hasModuleAccessForRoute(payload.username, pathname);
-        if (hasAccess === true) {
-          return NextResponse.next();
-        }
-        // If module access is configured and user doesn't have access, redirect
-        if (hasAccess === false) {
-          return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
-        }
-        // Module access not configured, fall back to role-based logic
         const roleKey = normalizeRoleKey(role || "");
-        const hrEmpCrmRoles = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE"];
+        const hrEmpCrmRoles = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
         const isHrEmpCrm = hrEmpCrmRoles.some(
           (r) => normalizeRoleKey(r) === roleKey,
         );
@@ -215,12 +127,7 @@ export async function middleware(request) {
           roleKey === "ACCOUNTANT" &&
           (pathname.startsWith("/empcrm/admin-dashboard/salary") ||
            pathname.startsWith("/empcrm/admin-dashboard/salary-slips"));
-        // HR roles also have access to salary and salary-slips
-        const isHrSalaryAccess =
-          isHrEmpCrm &&
-          (pathname.startsWith("/empcrm/admin-dashboard/salary") ||
-           pathname.startsWith("/empcrm/admin-dashboard/salary-slips"));
-        if (!isHrEmpCrm && !isAccountantSalaryAccess && !isHrSalaryAccess) {
+        if (!isHrEmpCrm && !isAccountantSalaryAccess) {
           return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));
         }
       }
