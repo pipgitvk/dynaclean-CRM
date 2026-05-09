@@ -1,7 +1,7 @@
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 /** Roles that see their own HR target chart row (not Superadmin). */
-export const HR_TARGET_DASHBOARD_ROLES = ["HR", "HR HEAD", "HR Executive"];
+export const HR_TARGET_DASHBOARD_ROLES = ["HR", "HR HEAD", "HR Executive", "JUNIOR HR EXECUTIVE"];
 
 export function isHrTargetDashboardRole(role) {
   const k = normalizeRoleKey(role || "");
