@@ -1302,7 +1302,7 @@ export default function MetaBackfillPage() {
                         <th className="px-2 py-2 text-left border-b">Status</th>
                         <th className="px-2 py-2 text-left border-b">Stage</th>
                         <th className="px-2 py-2 text-left border-b">Campaign</th>
-                        <th className="px-2 py-2 text-left border-b">assigned_to</th>
+                        <th className="px-2 py-2 text-left border-b">Created_by</th>
                         <th className="px-2 py-2 text-left border-b">sales_representative</th>
                         <th className="px-2 py-2 text-left border-b">Created</th>
                       </tr>
