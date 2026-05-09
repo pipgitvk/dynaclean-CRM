@@ -118,8 +118,8 @@ export default function CreateEmployeeForm() {
   };
 
   const validatePassword = (password) => {
-    if (!/^(?=.*\d).{6,10}$/.test(password)) {
-      return "Password must be 6-10 characters and contain at least one number.";
+    if (!/^(?=.*\d).{6,15}$/.test(password)) {
+      return "Password must be 6-15 characters and contain at least one number.";
     }
     return "";
   };
