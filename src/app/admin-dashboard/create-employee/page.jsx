@@ -3,9 +3,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { HR_TARGET_ALLOWED_DESIGNATIONS } from "@/lib/designationDedupe";
 
-const USER_ROLE_OPTIONS = HR_TARGET_ALLOWED_DESIGNATIONS;
+const USER_ROLE_OPTIONS = [
+  "DIRECTOR",
+  "ACCOUNTANT",
+  "TEAM LEADER",
+  "SALES",
+  "SALES HEAD",
+  "DIGITAL MARKETER",
+  "ADMIN",
+  "HR",
+  "HR HEAD",
+  "JUNIOR HR EXECUTIVE",
+  "HR EXECUTIVE",
+  "GRAPHIC DESIGNER",
+  "DESIGN ENGINEER",
+  "DEVELOPER",
+  "SERVICE ENGINEER",
+  "SERVICE TECHNICIAN",
+  "SERVICE HEAD",
+  "WELDER",
+  "WELDER HELPER",
+  "WAREHOUSE INCHARGE",
+];
 
 export default function CreateEmployeeForm() {
   const router = useRouter();
