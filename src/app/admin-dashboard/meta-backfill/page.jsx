@@ -1329,9 +1329,20 @@ export default function MetaBackfillPage() {
                           )}
                         </div>
                         {d.other > 0 && (
-                          <span>
-                            Other: <strong className="tabular-nums">{d.other}</strong>
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span>
+                              Other: <strong className="tabular-nums">{d.other}</strong>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCampaignBreakdown(
+                                selectedCampaignBreakdown === "other" ? null : "other"
+                              )}
+                              className="px-2 py-0.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                            >
+                              {selectedCampaignBreakdown === "other" ? "Hide" : "View Reps"}
+                            </button>
+                          </div>
                         )}
                       </>
                     );
