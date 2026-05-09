@@ -9,6 +9,7 @@ export function normalizeDesignationKey(s) {
 
 export const HR_TARGET_ALLOWED_DESIGNATIONS = [
   "Director",
+  "Junior HR Executive",
   "HR Executive",
   "Senior HR Executive",
   "HR Manager",

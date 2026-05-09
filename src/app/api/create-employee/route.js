@@ -2,7 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { HR_TARGET_ALLOWED_DESIGNATIONS } from "@/lib/designationDedupe";
 
-const ALLOWED_USER_ROLES = new Set(HR_TARGET_ALLOWED_DESIGNATIONS);
+const ALLOWED_USER_ROLES = new Set([...HR_TARGET_ALLOWED_DESIGNATIONS, "DIRECTOR"]);
 
 export async function POST(request) {
   try {
@@ -35,6 +35,7 @@ export async function POST(request) {
     return NextResponse.json({ message: "Employee created successfully.", empId: result.insertId }, { status: 201 });
   } catch (error) {
     console.error("Employee creation error:", error);
+    console.error("Error details:", error.message);
     return NextResponse.json({ error: "Failed to create employee." }, { status: 500 });
   }
 }

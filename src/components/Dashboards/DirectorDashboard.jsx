@@ -22,7 +22,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  DollarSign
+  DollarSign,
+  FileText
 } from "lucide-react";
 import { 
   BarChart, 
@@ -70,74 +71,95 @@ const expenseBreakdownData = [
   { name: "Miscellaneous", value: 15000, color: "#06b6d4" },
 ];
 
-const KPICard = ({ title, value, icon: Icon, subtext, gradient, buttonText, onClick, isMultiValue, multiValues, buttonOnSide, multiValueColors }) => (
-  <div 
-    className={clsx(
-      "rounded-2xl shadow-lg p-6 flex flex-col gap-4 transition-all hover:scale-[1.02] cursor-pointer text-white h-[220px]",
-      gradient
-    )}
-    onClick={onClick}
-  >
-    <div className="flex items-center gap-2">
-      <div className="bg-white/20 p-2 rounded-lg">
-        {Icon && <Icon size={20} className="text-white" />}
-      </div>
-      <h3 className="font-bold text-lg tracking-tight">{title}</h3>
-    </div>
-    
-    <div className="flex-1 flex flex-col justify-center">
-      {isMultiValue ? (
-        <div className="grid grid-cols-2 gap-2">
-          {multiValues.slice(0, 2).map((item, idx) => (
-            <div key={idx} className="flex flex-col items-center justify-center bg-white/10 rounded-xl px-2 py-2 border border-white/5">
-              <span className="text-[10px] font-bold text-white/90 uppercase tracking-wider">{item.label}</span>
-              <span className={`text-xl font-black ${multiValueColors?.[idx] || 'text-white'}`}>{item.value}</span>
-            </div>
-          ))}
+const KPICard = ({ title, value, icon: Icon, subtext, gradient, buttonText, onClick, isMultiValue, multiValues, buttonOnSide, multiValueColors, trend, trendValue }) => {
+  return (
+    <div 
+      className="relative overflow-hidden rounded-[2rem] p-6 flex flex-col gap-4 transition-all duration-300 hover:shadow-xl cursor-pointer bg-white border border-slate-100 group h-[240px]"
+      onClick={onClick}
+    >
+      {/* Subtle Background Accent */}
+      <div className={clsx("absolute top-0 right-0 w-32 h-32 opacity-[0.03] transition-transform duration-700 group-hover:scale-110 group-hover:rotate-12", gradient)}></div>
+
+      {/* Header */}
+      <div className="relative z-10 flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className={clsx("p-2.5 rounded-xl shadow-sm border border-white/20 transition-all duration-300 group-hover:shadow-md text-white", gradient)}>
+            {Icon && <Icon size={20} className="drop-shadow-sm" />}
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-800 tracking-tight text-sm uppercase opacity-80">{title}</h3>
+            {trendValue && (
+              <div className={clsx(
+                "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 border",
+                trend === 'up' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"
+              )}>
+                {trend === 'up' ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                {trendValue}%
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <>
-          <p className="text-4xl font-black tracking-tight">{value}</p>
-          {subtext && <p className="text-sm font-medium text-white/80 mt-1">{subtext}</p>}
-        </>
-      )}
-      {isMultiValue && multiValues[2] && (
-        buttonOnSide ? (
-          <div className="mt-2 flex items-center gap-2">
-            <div className="flex-1 flex flex-col items-center justify-center bg-white/10 rounded-xl px-3 py-2 border border-white/5">
-              <span className="text-[10px] font-bold text-white/90 uppercase tracking-wider">{multiValues[2].label}</span>
-              <span className={`text-xl font-black ${multiValueColors?.[2] || 'text-white'}`}>{multiValues[2].value}</span>
-            </div>
-            <div className="inline-flex items-center bg-white text-slate-800 px-4 py-2 rounded-xl text-xs font-extrabold shadow-sm hover:bg-slate-50 transition-colors group/btn">
-              {buttonText || "View Details"}
-              <span className="ml-1.5 transform group-hover/btn:translate-x-1 transition-transform">→</span>
-            </div>
+        <div className="text-slate-300 group-hover:text-slate-400 transition-colors">
+          <ArrowUpRight size={18} />
+        </div>
+      </div>
+      
+      {/* Content Area */}
+      <div className="relative z-10 flex-1 flex flex-col justify-center">
+        {isMultiValue ? (
+          <div className="grid grid-cols-2 gap-3">
+            {multiValues.slice(0, 2).map((item, idx) => (
+              <div key={idx} className="flex flex-col bg-slate-50/80 rounded-2xl px-3 py-3 border border-slate-100/50 transition-all group-hover:bg-white group-hover:shadow-sm">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{item.label}</span>
+                <span className="text-xl font-black text-slate-800">{item.value}</span>
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="mt-2 flex flex-col items-center justify-center bg-white/10 rounded-xl px-3 py-2 border border-white/5">
-            <span className="text-[10px] font-bold text-white/90 uppercase tracking-wider">{multiValues[2].label}</span>
-            <span className={`text-xl font-black ${multiValueColors?.[2] || 'text-white'}`}>{multiValues[2].value}</span>
+          <div className="flex flex-col">
+            <p className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight group-hover:scale-[1.02] transition-transform origin-left duration-300">{value}</p>
+            {subtext && (
+              <p className="text-[11px] font-bold text-slate-400 mt-2 flex items-center gap-2">
+                <span className="w-4 h-[1px] bg-slate-200"></span>
+                {subtext}
+              </p>
+            )}
           </div>
-        )
+        )}
+        
+        {isMultiValue && multiValues[2] && (
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex-1 flex flex-col bg-slate-50/80 rounded-2xl px-4 py-2 border border-slate-100/50">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{multiValues[2].label}</span>
+              <span className="text-lg font-black text-slate-800">{multiValues[2].value}</span>
+            </div>
+            {buttonOnSide && (
+              <div className={clsx("h-full px-4 py-3 flex items-center justify-center rounded-xl text-[10px] font-black shadow-sm transition-all active:scale-95 uppercase tracking-widest text-white hover:shadow-md", gradient)}>
+                {buttonText || "GO"}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {!buttonOnSide && (
+        <div className="relative z-10 mt-auto pt-2 border-t border-slate-50">
+          <div className="flex items-center justify-between text-slate-400 hover:text-slate-600 transition-colors">
+            <span className="text-[10px] font-black uppercase tracking-widest">{buttonText || "VIEW DETAILS"}</span>
+            <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
       )}
     </div>
-    
-    {!buttonOnSide && (
-      <div className="mt-auto pt-2">
-        <div className="inline-flex items-center bg-white text-slate-800 px-5 py-2 rounded-xl text-sm font-extrabold shadow-sm hover:bg-slate-50 transition-colors group/btn">
-          {buttonText || "View Details"}
-          <span className="ml-2 transform group-hover/btn:translate-x-1 transition-transform">→</span>
-        </div>
-      </div>
-    )}
-  </div>
-);
+  );
+};
 
 export default function DirectorDashboard({ user }) {
   const router = useRouter();
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 7) + "-01");
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
+  const [greeting, setGreeting] = useState("Day");
   const [kpiData, setKpiData] = useState({
     taskPending: 0,
     stockValue: 0,
@@ -154,6 +176,11 @@ export default function DirectorDashboard({ user }) {
 
   useEffect(() => {
     fetchKpiData();
+    
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting("Morning");
+    else if (hour < 17) setGreeting("Afternoon");
+    else setGreeting("Evening");
   }, [dateFrom, dateTo]);
 
   const fetchKpiData = async () => {
@@ -175,18 +202,25 @@ export default function DirectorDashboard({ user }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="relative">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-100 border-t-blue-600"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Director Dashboard</h1>
-          <p className="text-slate-500 text-sm font-medium">Business Overview & Key Metrics</p>
+    <div className="space-y-8 pb-12 animate-in fade-in duration-700">
+      {/* Professional Executive Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+            Good {greeting}, <span className="text-blue-600">{user?.username || "Director"}</span>
+          </h1>
+          <div className="flex items-center gap-2 text-slate-400 font-semibold text-xs">
+            <Calendar size={14} />
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
         </div>
       </div>
 
@@ -196,84 +230,99 @@ export default function DirectorDashboard({ user }) {
           title="Pending Tasks" 
           value={kpiData.taskPending} 
           icon={ClipboardList} 
-          gradient="bg-gradient-to-br from-purple-600 to-blue-500"
-          buttonText="View Tasks"
+          gradient="bg-blue-600"
+          buttonText="VIEW TASKS"
+          trend="up"
+          trendValue="12"
           onClick={() => router.push("/director-dashboard/task-manager")}
         />
         <KPICard 
           title="Stock Value" 
           value={`₹${Number(kpiData.stockValue || 0).toLocaleString('en-IN')}`} 
           icon={Box} 
-          gradient="bg-gradient-to-br from-blue-500 to-purple-600"
-          buttonText="View Stock"
-          subtext="Total inventory value"
+          gradient="bg-slate-800"
+          buttonText="INVENTORY"
+          subtext="Net Asset Value"
+          trend="down"
+          trendValue="3.2"
           onClick={() => router.push("/director-dashboard/product-stock")}
         />
         <KPICard 
           title="Spare Value" 
           value={`₹${Number(kpiData.spareValue || 0).toLocaleString('en-IN')}`} 
           icon={Wrench} 
-          gradient="bg-gradient-to-br from-emerald-500 to-teal-500"
-          buttonText="View Spares"
-          subtext="Total spares inventory"
+          gradient="bg-emerald-600"
+          buttonText="SPARES"
+          subtext="Available Inventory"
+          trend="up"
+          trendValue="8.5"
           onClick={() => router.push("/director-dashboard/spare")}
         />
         <KPICard 
           title="Employee Expenses" 
           value={`₹${Number(kpiData.totalExpensesAll || 0).toLocaleString('en-IN')}`} 
           icon={Users} 
-          gradient="bg-gradient-to-br from-blue-600 to-blue-400"
-          buttonText="Review Expenses"
-          subtext="Pending approvals"
+          gradient="bg-indigo-600"
+          buttonText="AUDIT"
+          subtext="Pending Approvals"
+          trend="up"
+          trendValue="5.1"
           onClick={() => router.push("/director-dashboard/all-expenses")}
         />
         <KPICard 
           title="Stock Purchase" 
           value={`₹${Number(kpiData.totalStockPurchaseAll || 0).toLocaleString('en-IN')}`} 
           icon={ShoppingCart} 
-          gradient="bg-gradient-to-br from-teal-500 to-emerald-400"
-          buttonText="View Purchases"
-          subtext="Monthly stock inward"
+          gradient="bg-teal-600"
+          buttonText="PROCUREMENT"
+          subtext="Monthly Inflow"
+          trend="up"
+          trendValue="15.4"
           onClick={() => router.push("/director-dashboard/purchase/purchases")}
         />
         <KPICard 
           title="Spare Purchase" 
           value={`₹${Number(kpiData.totalSparePurchaseAll || 0).toLocaleString('en-IN')}`} 
           icon={Settings} 
-          gradient="bg-gradient-to-br from-indigo-500 to-purple-500"
-          buttonText="View Purchases"
-          subtext="Monthly spare inward"
+          gradient="bg-purple-600"
+          buttonText="LOGS"
+          subtext="Monthly Inflow"
+          trend="down"
+          trendValue="1.8"
           onClick={() => router.push("/director-dashboard/spare/purchase/purchases")}
         />
         <KPICard 
-          title="Total Sale" 
+          title="Total Revenue" 
           value={`₹${Number(kpiData.totalSale || 0).toLocaleString('en-IN')}`} 
           icon={DollarSign} 
-          gradient="bg-gradient-to-br from-green-500 to-emerald-500"
-          buttonText="View Details"
-          subtext="Monthly revenue"
+          gradient="bg-green-600"
+          buttonText="FINANCIALS"
+          subtext="Gross Monthly"
+          trend="up"
+          trendValue="22.7"
           onClick={() => router.push("/director-dashboard/purchase/purchases")}
         />
         <KPICard 
-          title="Total Profit" 
+          title="Net Profit" 
           value={`₹${Number(kpiData.totalProfit || 0).toLocaleString('en-IN')}`} 
           icon={TrendingUp} 
-          gradient="bg-gradient-to-br from-blue-500 to-cyan-400"
-          buttonText="Review Profit"
-          subtext="Net earnings"
+          gradient="bg-rose-600"
+          buttonText="ANALYTICS"
+          subtext="Net Earnings"
+          trend="up"
+          trendValue="18.3"
         />
         <KPICard 
-          title="Service Overview" 
+          title="Service Operations" 
           isMultiValue={true}
           multiValues={[
-            { label: "Completed", value: kpiData.serviceCompleted },
-            { label: "Pending", value: kpiData.servicePending },
-            { label: "Pending Spares", value: kpiData.servicePendingSpares }
+            { label: "DONE", value: kpiData.serviceCompleted },
+            { label: "WAIT", value: kpiData.servicePending },
+            { label: "SPARES", value: kpiData.servicePendingSpares }
           ]}
-          multiValueColors={["text-white", "text-white", "text-white"]}
           icon={Wrench} 
-          gradient="bg-gradient-to-br from-green-500 to-emerald-600"
-          buttonText="View Records"
+          gradient="bg-amber-600"
+          buttonText="REPORTS"
           buttonOnSide={true}
           onClick={() => router.push("/director-dashboard/view_service_reports")}
         />

@@ -2,12 +2,13 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getReportees } from "@/lib/reportingManager";
 import { getDbConnection } from "@/lib/db";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 const empCrmUserMenuItems = [
   { path: "/empcrm/user-dashboard", name: "EMPCRM Dashboard", roles: ["ALL"], icon: "Home" },
-  { path: "/empcrm/admin-dashboard", name: "Go to Admin Panel", roles: ["HR", "SUPERADMIN"], icon: "LayoutGrid" },
+  { path: "/empcrm/admin-dashboard", name: "Go to Admin Panel", roles: ["HR", "HR HEAD", "Junior HR Executive", "SUPERADMIN"], icon: "LayoutGrid" },
   { path: "/empcrm/user-dashboard/profile", name: "My Profile", roles: ["ALL"], icon: "UserCircle" },
   { path: "/empcrm/user-dashboard/leave", name: "Leave", roles: ["ALL"], icon: "Calendar" },
   { path: "/empcrm/user-dashboard/leave-approvals", name: "Leave Approvals", roles: ["REPORTING_MANAGER"], icon: "CheckSquare" },
@@ -63,12 +64,14 @@ export default async function getEmpCrmUserSidebarMenuItems() {
     }
   }
 
+  const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
+
   // Get pending overtime count
   const pendingOvertimeCount = await getPendingOvertimeCount(username);
 
   const filteredItems = empCrmUserMenuItems.filter((item) => {
     if (item.roles.includes("ALL")) return true;
-    if (item.roles.includes(role)) return true;
+    if (item.roles.some((r) => normalizeRoleKey(r) === roleKey)) return true;
     if (item.roles.includes("REPORTING_MANAGER") && hasReportees) return true;
     return false;
   });
