@@ -118,7 +118,7 @@ export async function middleware(request) {
 
       if (pathname.startsWith("/empcrm/admin-dashboard")) {
         const roleKey = normalizeRoleKey(role || "");
-        const hrEmpCrmRoles = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"];
+        const hrEmpCrmRoles = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE"];
         const isHrEmpCrm = hrEmpCrmRoles.some(
           (r) => normalizeRoleKey(r) === roleKey,
         );
