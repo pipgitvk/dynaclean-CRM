@@ -36,7 +36,7 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
   const [files, setFiles] = useState({ quotation_upload: null, payment_proof_upload: null, invoice_upload: null, eway_bill: null });
   function onFileChange(e, key) { setFiles((f) => ({ ...f, [key]: e.target.files?.[0] || null })); }
   if (!open) return null;
-  const disabled = record?.status !== 'requested';
+  const disabled = false;
   async function save() {
     try {
       const fd = new FormData();
@@ -69,7 +69,6 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
           <h3 className="text-lg font-semibold">Edit Transport (Req #{record?.id})</h3>
           <button onClick={onClose} className="text-gray-500">✕</button>
         </div>
-        {disabled && <p className="text-sm text-red-600 mb-2">Can only edit while status is "requested".</p>}
         <div className="space-y-3">
           <div>
             <label className="block mb-1">Mode of Transport</label>
@@ -1014,8 +1013,7 @@ export default function PurchasesPage() {
                           </button>
                           <button
                             onClick={() => { setEditRecord(purchase); setEditOpen(true); }}
-                            disabled={purchase.status !== 'requested'}
-                            className={`flex items-center gap-1 text-sm ${purchase.status !== 'requested' ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600 hover:text-purple-700'}`}
+                            className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
                           >
                             Edit
                           </button>
