@@ -36,6 +36,16 @@ export async function middleware(request) {
         return NextResponse.redirect(new URL("/admin-dashboard", request.url));
       } else if (roleNorm === "DIRECTOR") {
         return NextResponse.redirect(new URL("/director-dashboard", request.url));
+      } else if (roleNorm.includes("SALES")) {
+        return NextResponse.redirect(new URL("/sales-dashboard", request.url));
+      } else if (roleNorm.includes("SERVICE") && roleNorm.includes("HEAD")) {
+        return NextResponse.redirect(new URL("/service-head-dashboard", request.url));
+      } else if (roleNorm.includes("HR")) {
+        return NextResponse.redirect(new URL("/hr-dashboard", request.url));
+      } else if (roleNorm.includes("DIGITAL") || roleNorm.includes("MARKETER")) {
+        return NextResponse.redirect(new URL("/digital-marketing-dashboard", request.url));
+      } else if (roleNorm.includes("ACCOUNTANT")) {
+        return NextResponse.redirect(new URL("/accounts-dashboard", request.url));
       } else {
         return NextResponse.redirect(new URL("/user-dashboard", request.url));
       }
@@ -49,7 +59,12 @@ export async function middleware(request) {
     pathname.startsWith("/admin-dashboard") ||
     pathname.startsWith("/user-dashboard") ||
     pathname.startsWith("/director-dashboard") ||
-    pathname.startsWith("/empcrm")
+    pathname.startsWith("/empcrm") ||
+    pathname.startsWith("/sales-dashboard") ||
+    pathname.startsWith("/service-head-dashboard") ||
+    pathname.startsWith("/hr-dashboard") ||
+    pathname.startsWith("/digital-marketing-dashboard") ||
+    pathname.startsWith("/accounts-dashboard")
   ) {
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url));
@@ -161,5 +176,10 @@ export const config = {
     "/admin-dashboard/:path*",
     "/user-dashboard/:path*",
     "/empcrm/:path*",
+    "/sales-dashboard/:path*",
+    "/service-head-dashboard/:path*",
+    "/hr-dashboard/:path*",
+    "/digital-marketing-dashboard/:path*",
+    "/accounts-dashboard/:path*",
   ],
 };
