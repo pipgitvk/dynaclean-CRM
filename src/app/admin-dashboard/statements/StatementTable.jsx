@@ -37,10 +37,7 @@ export default function StatementTable({ rows }) {
   const [dateTo, setDateTo] = useState(
     () => persisted?.dateTo ?? defaultMonthEnd()
   );
-  const [invoiceNoFilter, setInvoiceNoFilter] = useState("");
-  const [purchaseIdsFilter, setPurchaseIdsFilter] = useState("");
-  const [ddIdFilter, setDdIdFilter] = useState("");
-  const [expenseIdFilter, setExpenseIdFilter] = useState("");
+  const [linkedTypeFilter, setLinkedTypeFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [modalId, setModalId] = useState(null);
   const [expense, setExpense] = useState(null);
@@ -256,32 +253,21 @@ export default function StatementTable({ rows }) {
         if (dateTo && rowDate > dayjs(dateTo).endOf("day").valueOf()) return false;
       }
 
-      // Invoice No filter
-      if (invoiceNoFilter) {
-        const rowInvoiceNo = (row.invoice_number || "").toLowerCase();
-        if (!rowInvoiceNo.includes(invoiceNoFilter.toLowerCase())) return false;
-      }
-
-      // Purchase IDs filter
-      if (purchaseIdsFilter) {
-        const refs = getLinkedPurchaseRefs(row);
-        const purchaseMatch = refs.some(ref => String(ref.id).includes(purchaseIdsFilter));
-        if (!purchaseMatch) return false;
-      }
-
-      // DD ID filter
-      if (ddIdFilter) {
-        if (!row.dd_id || !String(row.dd_id).includes(ddIdFilter)) return false;
-      }
-
-      // Expense ID filter
-      if (expenseIdFilter) {
-        if (!row.client_expense_id || !String(row.client_expense_id).includes(expenseIdFilter)) return false;
+      // Linked type filter
+      if (linkedTypeFilter) {
+        const hasInvoice = !!String(row.invoice_number || "").trim();
+        const hasPurchases = getLinkedPurchaseRefs(row).length > 0;
+        const hasDD = row.dd_id != null && String(row.dd_id).trim() !== "";
+        const hasExpense = row.client_expense_id != null && String(row.client_expense_id).trim() !== "";
+        if (linkedTypeFilter === "Invoice" && !hasInvoice) return false;
+        if (linkedTypeFilter === "Purchases" && !hasPurchases) return false;
+        if (linkedTypeFilter === "DD" && !hasDD) return false;
+        if (linkedTypeFilter === "Expense" && !hasExpense) return false;
       }
 
       return true;
     });
-  }, [rows, statusFilter, searchQuery, dateFrom, dateTo, invoiceNoFilter, purchaseIdsFilter, ddIdFilter, expenseIdFilter, expenseTxnForIdSearch, expenseIdResolved]);
+  }, [rows, statusFilter, searchQuery, dateFrom, dateTo, linkedTypeFilter, expenseTxnForIdSearch, expenseIdResolved]);
 
   // Compute running balance (chronological order: date ASC, id ASC)
   const balanceMap = {};
@@ -386,6 +372,7 @@ export default function StatementTable({ rows }) {
   const handleReset = () => {
     setStatusFilter("");
     setSearchQuery("");
+    setLinkedTypeFilter("");
     setDateFrom(defaultMonthStart());
     setDateTo(defaultMonthEnd());
   };
@@ -608,15 +595,15 @@ export default function StatementTable({ rows }) {
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-wrap">
         <div className="relative w-full sm:w-auto sm:min-w-[min(100%,20rem)] md:min-w-[24rem] lg:min-w-[28rem] sm:max-w-xl">
           <label htmlFor="statements-search" className="sr-only">
-            Search statements by Trans ID, expense ID, description, cheque number, or amount
+            Search anything in statements table
           </label>
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 pointer-events-none" />
           <input
             id="statements-search"
             type="search"
             enterKeyHint="search"
-            placeholder="Trans ID, Invoice No, description, amount…"
-            title="Search by Trans ID, Invoice Number, description, cheque no, or amount. Digits only = expense ID."
+            placeholder="Search across all statement fields..."
+            title="Search anything from the statements table"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg w-full text-sm focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 outline-none"
@@ -645,34 +632,18 @@ export default function StatementTable({ rows }) {
           <option value="Settled">Settled</option>
           <option value="Unsettled">Unsettled</option>
         </select>
-        <input
-          type="text"
-          placeholder="Invoice No"
-          value={invoiceNoFilter}
-          onChange={(e) => setInvoiceNoFilter(e.target.value)}
-          className="px-4 py-2 border rounded-lg w-full sm:w-32 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Purchase IDs"
-          value={purchaseIdsFilter}
-          onChange={(e) => setPurchaseIdsFilter(e.target.value)}
-          className="px-4 py-2 border rounded-lg w-full sm:w-32 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="DD ID"
-          value={ddIdFilter}
-          onChange={(e) => setDdIdFilter(e.target.value)}
-          className="px-4 py-2 border rounded-lg w-full sm:w-32 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Expense ID"
-          value={expenseIdFilter}
-          onChange={(e) => setExpenseIdFilter(e.target.value)}
-          className="px-4 py-2 border rounded-lg w-full sm:w-32 text-sm"
-        />
+        <select
+          value={linkedTypeFilter}
+          onChange={(e) => setLinkedTypeFilter(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-44 text-sm"
+          title="Filter by linked type"
+        >
+          <option value="">All Types</option>
+          <option value="Invoice">Invoice</option>
+          <option value="Purchases">Purchases</option>
+          <option value="DD">DD</option>
+          <option value="Expense">Expense</option>
+        </select>
         <button
           onClick={handleReset}
           className="px-4 py-2 bg-gray-300 rounded-lg text-sm cursor-pointer w-full sm:w-auto"
