@@ -1189,6 +1189,7 @@ export default function DDManagementPage() {
                                                 <option value="Filled">Filled</option>
                                                 <option value="Issued">Issued</option>
                                                 <option value="Sent to Client">Sent to Client</option>
+                                                <option value="Claimed">Claimed</option>
                                             </select>
                                         </div>
                                     </div>

@@ -47,7 +47,7 @@ export async function GET(req) {
 export async function POST(req) {
     try {
         const body = await req.json();
-        const { type = "DD", dd_location, party_name, amount, assign_date, beneficiary_name, beneficiary_address, expiry_date, claim_expiry_date, bg_format_upload } = body;
+        const { type = "DD", dd_location, party_name, amount, assign_date, beneficiary_name, beneficiary_address, expiry_date, claim_expiry_date, bg_format_upload, mode_of_payment } = body;
         let { assigned_by } = body;
 
         // Fallback to session if assigned_by is missing
@@ -63,9 +63,9 @@ export async function POST(req) {
                 return NextResponse.json({ error: "Missing required fields for BG assignment" }, { status: 400 });
             }
             const [result] = await pool.execute(
-                `INSERT INTO dd_records (type, beneficiary_name, beneficiary_address, amount, expiry_date, claim_expiry_date, bg_format_upload, assign_date, assigned_by, status) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Assigned')`,
-                [type, beneficiary_name, beneficiary_address, amount, expiry_date, claim_expiry_date, bg_format_upload, assign_date, assigned_by]
+                `INSERT INTO dd_records (type, beneficiary_name, beneficiary_address, amount, expiry_date, claim_expiry_date, bg_format_upload, assign_date, assigned_by, status, mode_of_payment) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Assigned', ?)`,
+                [type, beneficiary_name, beneficiary_address, amount, expiry_date, claim_expiry_date, bg_format_upload, assign_date, assigned_by, mode_of_payment || 'BG']
             );
             return NextResponse.json({ success: true, data: { id: result.insertId } });
         } else {
@@ -73,9 +73,9 @@ export async function POST(req) {
                 return NextResponse.json({ error: "Missing required fields for DD assignment" }, { status: 400 });
             }
             const [result] = await pool.execute(
-                `INSERT INTO dd_records (type, dd_location, party_name, amount, assign_date, assigned_by, status) 
-         VALUES (?, ?, ?, ?, ?, ?, 'Assigned')`,
-                [type || 'DD', dd_location, party_name, amount, assign_date, assigned_by]
+                `INSERT INTO dd_records (type, dd_location, party_name, amount, assign_date, assigned_by, status, mode_of_payment) 
+         VALUES (?, ?, ?, ?, ?, ?, 'Assigned', ?)`,
+                [type || 'DD', dd_location, party_name, amount, assign_date, assigned_by, mode_of_payment || 'DD']
             );
             return NextResponse.json({ success: true, data: { id: result.insertId } });
         }

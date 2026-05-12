@@ -24,14 +24,17 @@ import dayjs from "dayjs";
 const StatusBadge = ({ status }) => {
     const styles = {
         Assigned: "text-[12px] bg-blue-100 text-blue-700 border-blue-200",
+        Created: "text-[12px] bg-blue-100 text-blue-700 border-blue-200",
         Filled: "text-[12px] bg-yellow-100 text-yellow-700 border-yellow-200",
         Issued: "text-[12px] bg-green-100 text-green-700 border-green-200",
         "Sent to Client": "text-[12px] bg-purple-100 text-purple-700 border-purple-200",
     };
 
+    const displayStatus = status === "Assigned" ? "Created" : status;
+
     return (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${styles[status] || "bg-gray-100 text-gray-700 border-gray-200"}`}>
-            {status}
+            {displayStatus}
         </span>
     );
 };
@@ -49,9 +52,15 @@ export default function DDManagementPage() {
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [statements, setStatements] = useState([]);
     const [loadingStatements, setLoadingStatements] = useState(false);
+    const [paymentSearch, setPaymentSearch] = useState("");
+    const [paymentDateFrom, setPaymentDateFrom] = useState("");
+    const [paymentDateTo, setPaymentDateTo] = useState("");
     const [creditModalOpen, setCreditModalOpen] = useState(false);
     const [creditStatements, setCreditStatements] = useState([]);
     const [loadingCreditStatements, setLoadingCreditStatements] = useState(false);
+    const [creditSearch, setCreditSearch] = useState("");
+    const [creditDateFrom, setCreditDateFrom] = useState("");
+    const [creditDateTo, setCreditDateTo] = useState("");
 
     const isAuthorized = ["ADMIN", "SUPERADMIN", "ACCOUNTANT"].includes(userRole.toUpperCase());
 
@@ -63,6 +72,7 @@ export default function DDManagementPage() {
         amount: "",
         assign_date: dayjs().format("YYYY-MM-DD"),
         assigned_by: "",
+        mode_of_payment: "DD",
 
         // BG Specific Step 1
         beneficiary_name: "",
@@ -89,6 +99,30 @@ export default function DDManagementPage() {
         dd_upload: null,
         dd_number: "",
         issued_by: "",
+
+        // NEFT/RTGS/IMPS fields
+        reference_no: "",
+        payment_amount: "",
+        payment_proof: null,
+        receipt: null,
+        from_bank_account_no: "",
+
+        // DD-specific fields
+        dd_no: "",
+        dd_date: "",
+        dd_beneficiary_name: "",
+        expiry_bank: "",
+        issuing_branch: "",
+        dd_scan_copy: null,
+        dd_receipt: null,
+
+        // BG-specific fields
+        bg_date: "",
+        bg_amount: "",
+        bg_number_field: "",
+        vaclient_tracking_id: "",
+        delivery_proof: null,
+        delivery_date: "",
 
         status: "Assigned",
         original_dd_location: "Self",
@@ -172,6 +206,9 @@ export default function DDManagementPage() {
         if (formData.bg_format_upload instanceof File) { fileData.append("bg_format_upload", formData.bg_format_upload); hasFiles = true; }
         if (formData.original_bg_upload instanceof File) { fileData.append("original_bg_upload", formData.original_bg_upload); hasFiles = true; }
         if (formData.docs_upload instanceof File) { fileData.append("docs_upload", formData.docs_upload); hasFiles = true; }
+        if (formData.bg_scan_copy instanceof File) { fileData.append("bg_scan_copy", formData.bg_scan_copy); hasFiles = true; }
+        if (formData.payment_proof instanceof File) { fileData.append("payment_proof", formData.payment_proof); hasFiles = true; }
+        if (formData.receipt instanceof File) { fileData.append("receipt", formData.receipt); hasFiles = true; }
 
         if (!hasFiles) return {};
 
@@ -224,6 +261,15 @@ export default function DDManagementPage() {
 
     const linkPayment = async (statementId, type, action = 'link') => {
         const isUnlink = action === 'unlink';
+        const selectedStatement = (type === 'debit' ? statements : creditStatements).find((s) => Number(s.id) === Number(statementId));
+        const ddAmount = Number(selectedDD?.amount || 0);
+        const statementAmount = Math.abs(Number(selectedStatement?.amount || 0));
+
+        if (!isUnlink && ddAmount !== statementAmount) {
+            toast.error(`Amount mismatch: DD net amount ₹${ddAmount.toLocaleString('en-IN')} and statement amount ₹${statementAmount.toLocaleString('en-IN')} must match`);
+            return;
+        }
+
         try {
             const res = await fetch(`/api/statements/${statementId}`, {
                 method: 'PATCH',
@@ -237,6 +283,23 @@ export default function DDManagementPage() {
             });
             if (res.ok) {
                 toast.success(isUnlink ? 'Payment unlinked successfully' : 'Payment linked successfully');
+                
+                // Auto-set claim_from_bank and status only from Payment Link
+                if (selectedDD?.id && type === 'credit') {
+                    try {
+                        await fetch(`/api/dd-management/${selectedDD.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                claim_from_bank: !isUnlink,
+                                status: !isUnlink ? "Claimed" : "Unclaimed"
+                            })
+                        });
+                    } catch (error) {
+                        console.error("Failed to auto-set claim_from_bank and status", error);
+                    }
+                }
+                
                 if (type === 'debit') {
                     const res = await fetch("/api/statements", { credentials: "include" });
                     const result = await res.json();
@@ -246,6 +309,7 @@ export default function DDManagementPage() {
                     const result = await res.json();
                     if (res.ok) setCreditStatements(result.statements || []);
                 }
+                fetchData();
             } else {
                 const result = await res.json();
                 toast.error(result.error || (isUnlink ? 'Failed to unlink payment' : 'Failed to link payment'));
@@ -264,6 +328,12 @@ export default function DDManagementPage() {
             if (payload.cheque_upload instanceof File) delete payload.cheque_upload;
             if (payload.signature_upload instanceof File) delete payload.signature_upload;
             if (payload.dd_upload instanceof File) delete payload.dd_upload;
+            if (payload.bg_format_upload instanceof File) delete payload.bg_format_upload;
+            if (payload.original_bg_upload instanceof File) delete payload.original_bg_upload;
+            if (payload.docs_upload instanceof File) delete payload.docs_upload;
+            if (payload.bg_scan_copy instanceof File) delete payload.bg_scan_copy;
+            if (payload.payment_proof instanceof File) delete payload.payment_proof;
+            if (payload.receipt instanceof File) delete payload.receipt;
 
             // Automation: Update status based on the step being saved if it's currently at an earlier stage
             if (step === 1) {
@@ -283,6 +353,15 @@ export default function DDManagementPage() {
                 if (payload.status === "Filled") payload.status = "Issued";
                 if (!payload.issued_by) payload.issued_by = payload.bank_name || "";
             }
+
+            console.log("After step automation - status:", payload.status, "claim_from_bank:", payload.claim_from_bank);
+
+            // Automation: Set status to Claimed when claim_from_bank is true
+            if (payload.claim_from_bank === true || payload.claim_from_bank === 1) {
+                payload.status = "Claimed";
+            }
+
+            console.log("After claim_from_bank automation - status:", payload.status);
 
             const method = selectedDD ? "PUT" : "POST";
             const url = selectedDD ? `/api/dd-management/${selectedDD.id}` : "/api/dd-management";
@@ -326,6 +405,7 @@ export default function DDManagementPage() {
 
     const openStepModal = (dd, step) => {
         if (!dd && step === 1) {
+            resetForm();
             setActiveModal(0); // Show selection first for new records
             return;
         }
@@ -333,6 +413,7 @@ export default function DDManagementPage() {
         if (dd) {
             setFormData({
                 ...dd,
+                status: dd.status || "Assigned",
                 filled_by: (step === 2 && !dd.filled_by) ? currentUserName : dd.filled_by,
                 assign_date: dd.assign_date ? dayjs(dd.assign_date).format("YYYY-MM-DD") : "",
                 filled_date: dd.filled_date ? dayjs(dd.filled_date).format("YYYY-MM-DD") : "",
@@ -340,12 +421,24 @@ export default function DDManagementPage() {
                 expiry_date: dd.expiry_date ? dayjs(dd.expiry_date).format("YYYY-MM-DD") : "",
                 claim_expiry_date: dd.claim_expiry_date ? dayjs(dd.claim_expiry_date).format("YYYY-MM-DD") : "",
                 claim_from_bank: !!dd.claim_from_bank,
+                payment_date: dd.payment_date ? dayjs(dd.payment_date).format("YYYY-MM-DD") : "",
+                dd_date: dd.dd_date ? dayjs(dd.dd_date).format("YYYY-MM-DD") : "",
                 cheque_upload: dd.cheque_upload,
                 signature_upload: dd.signature_upload,
                 dd_upload: dd.dd_upload,
                 bg_format_upload: dd.bg_format_upload,
                 original_bg_upload: dd.original_bg_upload,
-                docs_upload: dd.docs_upload
+                docs_upload: dd.docs_upload,
+                payment_proof: dd.payment_proof,
+                receipt: dd.receipt,
+                dd_scan_copy: dd.dd_scan_copy,
+                dd_receipt: dd.dd_receipt,
+                bg_date: dd.bg_date ? dayjs(dd.bg_date).format("YYYY-MM-DD") : "",
+                validity_upto: dd.validity_upto ? dayjs(dd.validity_upto).format("YYYY-MM-DD") : "",
+                bg_scan_copy: dd.bg_scan_copy,
+                reference_no: dd.reference_no || "",
+                payment_amount: dd.payment_amount || "",
+                from_bank_account_no: dd.from_bank_account_no || ""
             });
         } else {
             resetForm();
@@ -353,16 +446,14 @@ export default function DDManagementPage() {
         setActiveModal(step);
     };
 
-    const resetForm = () => {
-        setSelectedDD(null);
-        setActiveModal(null);
-        setFormData({
-            type: "DD",
+    const getBlankFormData = (type = "DD") => ({
+            type,
             dd_location: "",
             party_name: "",
             amount: "",
             assign_date: dayjs().format("YYYY-MM-DD"),
-            assigned_by: "",
+            assigned_by: currentUserName || "",
+            mode_of_payment: type,
             beneficiary_name: "",
             beneficiary_address: "",
             expiry_date: "",
@@ -383,16 +474,49 @@ export default function DDManagementPage() {
             dd_upload: null,
             dd_number: "",
             issued_by: "",
+            reference_no: "",
+            payment_amount: "",
+            payment_date: "",
+            payment_proof: null,
+            receipt: null,
+            from_bank_account_no: "",
+            dd_no: "",
+            dd_date: "",
+            dd_beneficiary_name: "",
+            expiry_bank: "",
+            issuing_branch: "",
+            dd_scan_copy: null,
+            dd_receipt: null,
+            bg_date: "",
+            bg_amount: "",
+            bg_number_field: "",
+            validity_upto: "",
+            client_name: "",
+            bg_scan_copy: null,
             status: "Assigned",
             original_dd_location: "Self",
             sent_to_client_date: "",
             claim_from_bank: false
         });
+
+    const resetForm = () => {
+        setSelectedDD(null);
+        setActiveModal(null);
+        setFormData(getBlankFormData());
         fetchUser(); // Refresh pre-fill from session
     };
     const handleViewFile = (filePath) => {
         if (!filePath) return;
         window.open(filePath, "_blank");
+    };
+
+    const handleClaimFromBankChange = (e) => {
+        const { checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            claim_from_bank: checked,
+            status: checked ? "Claimed" : prev.status
+        }));
     };
 
     return (
@@ -520,35 +644,15 @@ export default function DDManagementPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <StatusBadge status={dd.status} />
-                                            <div className="text-[12px] text-gray-400 mt-1 capitalize">
-                                                Loc: {dd.original_dd_location}
+                                            <div className="text-[12px] text-gray-400 mt-1">
+                                                By: {dd.assigned_by}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex justify-center items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    disabled={!!dd.claim_from_bank}
-                                                    checked={!!dd.claim_from_bank}
-                                                    onChange={async (e) => {
-                                                        const newVal = e.target.checked;
-                                                        try {
-                                                            const res = await fetch(`/api/dd-management/${dd.id}`, {
-                                                                method: 'PUT',
-                                                                headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ claim_from_bank: newVal })
-                                                            });
-                                                            if (res.ok) {
-                                                                toast.success("Claim status updated and locked");
-                                                                fetchData();
-                                                            }
-                                                        } catch (error) {
-                                                            toast.error("Failed to update claim status");
-                                                        }
-                                                    }}
-                                                    className={`w-4 h-4 text-blue-600 rounded focus:ring-blue-500 ${dd.claim_from_bank ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
-                                                />
-                                                <span className={`text-xs font-medium ${dd.claim_from_bank ? "text-blue-700" : "text-gray-600"}`}>{dd.claim_from_bank ? "Yes" : "No"}</span>
+                                                <span className={`text-xs font-bold px-2 py-1 rounded ${dd.claim_from_bank ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                                                    {dd.claim_from_bank ? "Yes" : "No"}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
@@ -569,15 +673,6 @@ export default function DDManagementPage() {
                                                         >
                                                             Step 2
                                                         </button>
-                                                        {dd.type === 'DD' && (
-                                                            <button
-                                                                onClick={() => openStepModal(dd, 3)}
-                                                                className="p-1 px-2 text-green-600 hover:bg-green-50 rounded border border-green-100 transition-colors text-[10px] font-bold"
-                                                                title="Step 3: Issuance"
-                                                            >
-                                                                Step 3
-                                                            </button>
-                                                        )}
                                                         <button
                                                             onClick={() => openPaymentModal(dd)}
                                                             className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
@@ -617,14 +712,14 @@ export default function DDManagementPage() {
                         <div className="p-8 space-y-4">
                             <p className="text-gray-500 text-center mb-6">What type of record would you like to create?</p>
                             <button
-                                onClick={() => { setFormData(prev => ({ ...prev, type: "DD" })); setActiveModal(1); }}
+                                onClick={() => { setSelectedDD(null); setFormData(getBlankFormData("DD")); setActiveModal(1); }}
                                 className="w-full py-4 bg-blue-50 text-blue-700 border-2 border-blue-200 rounded-xl font-bold hover:bg-blue-100 transition-all flex flex-col items-center gap-2"
                             >
                                 <FileText size={32} />
                                 Demand Draft (DD)
                             </button>
                             <button
-                                onClick={() => { setFormData(prev => ({ ...prev, type: "BG" })); setActiveModal(1); }}
+                                onClick={() => { setSelectedDD(null); setFormData(getBlankFormData("BG")); setActiveModal(1); }}
                                 className="w-full py-4 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-xl font-bold hover:bg-purple-100 transition-all flex flex-col items-center gap-2"
                             >
                                 <CheckCircle size={32} />
@@ -681,6 +776,16 @@ export default function DDManagementPage() {
                                         </div>
                                     </div>
                                     <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mode of Payment</label>
+                                        <select disabled={selectedDD?.mode_of_payment} name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                            <option value="NEFT">NEFT</option>
+                                            <option value="IMPS">IMPS</option>
+                                            <option value="DD">DD</option>
+                                            <option value="RTGS">RTGS</option>
+                                            <option value="BG">BG</option>
+                                        </select>
+                                    </div>
+                                    <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload BG Format</label>
                                         <div className="flex items-center gap-2">
                                             <input disabled={!isAuthorized} type="file" name="bg_format_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 disabled:opacity-50" />
@@ -713,6 +818,16 @@ export default function DDManagementPage() {
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assign Date</label>
                                             <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mode of Payment</label>
+                                        <select disabled={selectedDD?.mode_of_payment} name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                            <option value="NEFT">NEFT</option>
+                                            <option value="IMPS">IMPS</option>
+                                            <option value="DD">DD</option>
+                                            <option value="RTGS">RTGS</option>
+                                            <option value="BG">BG</option>
+                                        </select>
                                     </div>
                                 </>
                             )}
@@ -780,6 +895,16 @@ export default function DDManagementPage() {
                         <div className="p-8 space-y-4 max-h-[70vh] overflow-y-auto">
                             {formData.type === "BG" ? (
                                 <>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mode of Payment</label>
+                                        <select name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+                                            <option value="NEFT">NEFT</option>
+                                            <option value="IMPS">IMPS</option>
+                                            <option value="DD">DD</option>
+                                            <option value="RTGS">RTGS</option>
+                                            <option value="BG">BG</option>
+                                        </select>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">FD Number</label>
@@ -806,6 +931,101 @@ export default function DDManagementPage() {
                                             <input disabled={selectedDD?.branch} name="branch" value={formData.branch} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" placeholder="Branch Name" />
                                         </div>
                                     </div>
+                                    {["NEFT", "RTGS", "IMPS"].includes(formData.mode_of_payment) && (
+                                        <>
+                                            <div className="pt-4 border-t">
+                                                <h3 className="text-sm font-bold text-gray-700 mb-3">Payment Details</h3>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Reference No</label>
+                                                    <input disabled={selectedDD?.reference_no} name="reference_no" value={formData.reference_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" placeholder="Enter reference number" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
+                                                    <input disabled={selectedDD?.payment_amount} type="number" name="payment_amount" value={formData.payment_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" placeholder="0.00" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                                    <input disabled={selectedDD?.payment_date} type="date" name="payment_date" value={formData.payment_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">From Bank Account No</label>
+                                                    <input disabled={selectedDD?.from_bank_account_no} name="from_bank_account_no" value={formData.from_bank_account_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" placeholder="Enter account number" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Payment Proof <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="file" name="payment_proof" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700" />
+                                                        {formData.payment_proof && typeof formData.payment_proof === "string" && (
+                                                            <button onClick={() => handleViewFile(formData.payment_proof)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="View Payment Proof">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Receipt <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="file" name="receipt" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700" />
+                                                        {formData.receipt && typeof formData.receipt === "string" && (
+                                                            <button onClick={() => handleViewFile(formData.receipt)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="View Receipt">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                    {formData.mode_of_payment === "BG" && (
+                                        <>
+                                            <div className="pt-4 border-t">
+                                                <h3 className="text-sm font-bold text-gray-700 mb-3">BG Details</h3>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                                    <input disabled={selectedDD?.bg_date} type="date" name="bg_date" value={formData.bg_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
+                                                    <input disabled={selectedDD?.bg_amount} type="number" name="bg_amount" value={formData.bg_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" placeholder="0.00" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">BG No</label>
+                                                    <input disabled={selectedDD?.bg_number_field} name="bg_number_field" value={formData.bg_number_field} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" placeholder="Enter BG number" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Validity Upto</label>
+                                                    <input disabled={selectedDD?.validity_upto} type="date" name="validity_upto" value={formData.validity_upto} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Client Name</label>
+                                                    <input disabled={selectedDD?.client_name} name="client_name" value={formData.client_name} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100" placeholder="Enter client name" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Scan Copy <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="file" name="bg_scan_copy" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700" />
+                                                        {formData.bg_scan_copy && typeof formData.bg_scan_copy === "string" && (
+                                                            <button onClick={() => handleViewFile(formData.bg_scan_copy)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="View Scan Copy">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Original BG Upload</label>
@@ -861,6 +1081,17 @@ export default function DDManagementPage() {
                                 </>
                             ) : (
                                 <>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mode of Payment</label>
+                                        <select name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                            <option value="NEFT">NEFT</option>
+                                            <option value="IMPS">IMPS</option>
+                                            <option value="DD">DD</option>
+                                            <option value="RTGS">RTGS</option>
+                                            <option value="BG">BG</option>
+                                        </select>
+                                    </div>
+                                    {/* Commented out bank fields
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Cheque Number</label>
@@ -894,17 +1125,237 @@ export default function DDManagementPage() {
                                             <input disabled={selectedDD?.branch} name="branch" value={formData.branch} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Branch location" />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    */}
+                                    {["NEFT", "RTGS", "IMPS"].includes(formData.mode_of_payment) && (
+                                        <>
+                                            <div className="pt-4 border-t">
+                                                <h3 className="text-sm font-bold text-gray-700 mb-3">Payment Details</h3>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Reference No</label>
+                                                    <input disabled={selectedDD?.reference_no} name="reference_no" value={formData.reference_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter reference number" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
+                                                    <input disabled={selectedDD?.payment_amount} type="number" name="payment_amount" value={formData.payment_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="0.00" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                                    <input disabled={selectedDD?.payment_date} type="date" name="payment_date" value={formData.payment_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">From Bank Account No</label>
+                                                    <input disabled={selectedDD?.from_bank_account_no} name="from_bank_account_no" value={formData.from_bank_account_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter account number" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Payment Proof <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="file" name="payment_proof" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        {formData.payment_proof && typeof formData.payment_proof === "string" && (
+                                                            <button onClick={() => handleViewFile(formData.payment_proof)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Payment Proof">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Receipt <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="file" name="receipt" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        {formData.receipt && typeof formData.receipt === "string" && (
+                                                            <button onClick={() => handleViewFile(formData.receipt)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Receipt">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                    {formData.mode_of_payment === "DD" && (
+                                        <>
+                                            <div className="pt-4 border-t">
+                                                <h3 className="text-sm font-bold text-gray-700 mb-3">DD Details</h3>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD No</label>
+                                                    <input disabled={selectedDD?.dd_no} name="dd_no" value={formData.dd_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter DD number" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD Date</label>
+                                                    <input disabled={selectedDD?.dd_date} type="date" name="dd_date" value={formData.dd_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
+                                                    <input disabled={selectedDD?.payment_amount} type="number" name="payment_amount" value={formData.payment_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="0.00" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Beneficiary Name</label>
+                                                    <input disabled={selectedDD?.dd_beneficiary_name} name="dd_beneficiary_name" value={formData.dd_beneficiary_name} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter beneficiary name" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Expiry Bank Date</label>
+                                                    <input disabled={selectedDD?.expiry_bank} type="date" name="expiry_bank" value={formData.expiry_bank} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Issuing Branch</label>
+                                                    <input disabled={selectedDD?.issuing_branch} name="issuing_branch" value={formData.issuing_branch} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter issuing branch" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Scan Copy <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="file" name="dd_scan_copy" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        {formData.dd_scan_copy && typeof formData.dd_scan_copy === "string" && (
+                                                            <button onClick={() => handleViewFile(formData.dd_scan_copy)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Scan Copy">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Receipt <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="file" name="dd_receipt" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        {formData.dd_receipt && typeof formData.dd_receipt === "string" && (
+                                                            <button onClick={() => handleViewFile(formData.dd_receipt)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Receipt">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                    {formData.mode_of_payment === "BG" && (
+                                        <>
+                                            <div className="pt-4 border-t">
+                                                <h3 className="text-sm font-bold text-gray-700 mb-3">BG Details</h3>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
+                                                    <input disabled={selectedDD?.bg_date} type="date" name="bg_date" value={formData.bg_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
+                                                    <input disabled={selectedDD?.bg_amount} type="number" name="bg_amount" value={formData.bg_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="0.00" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">BG No</label>
+                                                    <input disabled={selectedDD?.bg_number_field} name="bg_number_field" value={formData.bg_number_field} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter BG number" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Validity Upto</label>
+                                                    <input disabled={selectedDD?.validity_upto} type="date" name="validity_upto" value={formData.validity_upto} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Client Name</label>
+                                                    <input disabled={selectedDD?.client_name} name="client_name" value={formData.client_name} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter client name" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Scan Copy <span className="text-red-500">*</span></label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input type="file" name="bg_scan_copy" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        {formData.bg_scan_copy && typeof formData.bg_scan_copy === "string" && (
+                                                            <button onClick={() => handleViewFile(formData.bg_scan_copy)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Scan Copy">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className={`bg-gray-50 p-4 rounded-lg space-y-4 ${formData.mode_of_payment === "DD" || formData.mode_of_payment === "BG" ? "" : "hidden"}`}>
+                                        <h3 className="text-sm font-bold text-gray-700 mb-3">DD Issuance Details</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD Number (Unique)</label>
+                                                <input disabled={!isAuthorized || selectedDD?.dd_number} name="dd_number" value={formData.dd_number} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="DD123456" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Issued By</label>
+                                                <input disabled={!isAuthorized} name="issued_by" value={formData.issued_by || formData.bank_name} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Bank Name from Step 2" />
+                                            </div>
+                                        </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Signature Upload</label>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload Issued DD Copy</label>
                                             <div className="flex items-center gap-2">
-                                                <input disabled={!isAuthorized} type="file" name="signature_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 disabled:opacity-50" />
-                                                {formData.signature_upload && typeof formData.signature_upload === "string" && (
-                                                    <button onClick={() => handleViewFile(formData.signature_upload)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1 text-xs font-bold" title="View Signature">
+                                                <input disabled={!isAuthorized} type="file" name="dd_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 disabled:opacity-50" />
+                                                {formData.dd_upload && typeof formData.dd_upload === "string" && (
+                                                    <button onClick={() => handleViewFile(formData.dd_upload)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1 text-xs font-bold" title="View Final DD">
                                                         <Eye size={16} /> View
                                                     </button>
                                                 )}
                                             </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-6 pt-4 border-t">
+                                            <div className="space-y-4">
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tracking</label>
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[10px] font-bold text-gray-400 uppercase">Original DD Location</label>
+                                                    <select disabled={!isAuthorized} name="original_dd_location" value={formData.original_dd_location} onChange={handleInputChange} className="p-2.5 border rounded-lg text-sm bg-gray-50 disabled:opacity-50">
+                                                        <option value="Self">Self (At Office)</option>
+                                                        <option value="Client">Client (Sent)</option>
+                                                    </select>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <input disabled={!isAuthorized} type="checkbox" id="claim_from_bank" name="claim_from_bank" checked={formData.claim_from_bank} onChange={handleClaimFromBankChange} className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
+                                                    <label htmlFor="claim_from_bank" className="text-sm font-medium text-gray-700">Claim from bank?</label>
+                                                </div>
+                                                {formData.original_dd_location === "Client" && (
+                                                    <div className="space-y-4 pt-4 border-t">
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Client Tracking ID</label>
+                                                            <input disabled={!isAuthorized} name="client_tracking_id" value={formData.client_tracking_id || ""} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter tracking ID" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Delivery Proof</label>
+                                                            <div className="flex items-center gap-2">
+                                                                <input disabled={!isAuthorized} type="file" name="delivery_proof" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 disabled:opacity-50" />
+                                                                {formData.delivery_proof && typeof formData.delivery_proof === "string" && (
+                                                                    <button onClick={() => handleViewFile(formData.delivery_proof)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Delivery Proof">
+                                                                        <Eye size={16} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Delivery Date</label>
+                                                            <input disabled={!isAuthorized} type="date" name="delivery_date" value={formData.delivery_date || ""} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Status Update</label>
+                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                            <label className="text-[10px] font-bold text-blue-400 uppercase">Workflow Status</label>
+                                            <select disabled={!isAuthorized} name="status" value={formData.status} onChange={handleInputChange} className="w-full mt-2 p-2.5 border-blue-200 border rounded-lg text-sm bg-white font-bold text-blue-900 disabled:opacity-50">
+                                                <option value="Assigned">Assigned</option>
+                                                <option value="Filled">Filled</option>
+                                                <option value="Issued">Issued</option>
+                                                <option value="Sent to Client">Sent to Client</option>
+                                                <option value="Claimed">Claimed</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 pt-4 border-t">
@@ -926,24 +1377,11 @@ export default function DDManagementPage() {
                                 <button onClick={() => setActiveModal(null)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
                                 <button
                                     onClick={() => {
-                                        if (formData.type === "DD") {
-                                            if (!formData.cheque_no || !formData.bank_name || !formData.account_number) {
-                                                toast.error("Required: Cheque No, Bank, Account"); return;
-                                            }
-                                        } else {
-                                            if (!formData.bg_number || !formData.bank_name || !formData.fd_number) {
-                                                toast.error("Required: BG No, Bank, FD No"); return;
-                                            }
-                                        }
-                                        handleSubmit(2, formData.type === "BG"); // For BG, step 2 is final
+                                        handleSubmit(2, true); // Step 2 is now final for all types
                                     }}
                                     className={`flex items-center gap-2 ${formData.type === "BG" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"} text-white px-8 py-2.5 rounded-lg font-bold transition-all shadow-md`}
                                 >
-                                    {formData.type === "BG" ? (
-                                        <><CheckCircle size={20} /> Complete BG</>
-                                    ) : (
-                                        <>Save & Next <ChevronRight size={20} /></>
-                                    )}
+                                    <><CheckCircle size={20} /> Save & Complete</>
                                 </button>
                             </div>
                         </div>
@@ -951,7 +1389,8 @@ export default function DDManagementPage() {
                 </div>
             )}
 
-            {activeModal === 3 && (
+            {/* Step 3 commented out - functionality moved to Step 2 */}
+            {/* {activeModal === 3 && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
                         <div className="bg-green-600 p-6 text-white flex justify-between items-center">
@@ -970,7 +1409,7 @@ export default function DDManagementPage() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Issued By</label>
-                                    <input disabled name="issued_by" value={formData.issued_by || (activeModal === 3 ? formData.bank_name : "")} className="w-full p-2.5 border rounded-lg bg-gray-100 cursor-not-allowed outline-none" placeholder="Bank Name from Step 2" />
+                                    <input disabled={!isAuthorized} name="issued_by" value={formData.issued_by || (activeModal === 3 ? formData.bank_name : "")} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Bank Name from Step 2" />
                                 </div>
                             </div>
                             <div>
@@ -1008,6 +1447,7 @@ export default function DDManagementPage() {
                                             <option value="Filled">Filled</option>
                                             <option value="Issued">Issued</option>
                                             <option value="Sent to Client">Sent to Client</option>
+                                            <option value="Claimed">Claimed</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1026,7 +1466,7 @@ export default function DDManagementPage() {
                         </div>
                     </div>
                 </div>
-            )}
+            )} */}
 
             {/* Payment Modal */}
             {paymentModalOpen && (
@@ -1040,6 +1480,52 @@ export default function DDManagementPage() {
                             <button onClick={() => setPaymentModalOpen(false)} className="p-2 hover:bg-emerald-500 rounded-full transition-colors"><X size={24} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
+                            <div className="mb-4 bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <span className="text-xs font-medium text-emerald-600 uppercase">Net Amount:</span>
+                                        <div className="text-lg font-bold text-emerald-900">₹{Number(selectedDD?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-medium text-emerald-600 uppercase">Total Linked:</span>
+                                        <div className="text-lg font-bold text-emerald-900">₹{statements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-medium text-emerald-600 uppercase">Remaining:</span>
+                                        <div className="text-lg font-bold text-emerald-900">₹{(Number(selectedDD?.amount || 0) - statements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Search</label>
+                                    <input
+                                        type="text"
+                                        value={paymentSearch}
+                                        onChange={(e) => setPaymentSearch(e.target.value)}
+                                        placeholder="Search by ID, Trans ID, or Description..."
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">From Date</label>
+                                    <input
+                                        type="date"
+                                        value={paymentDateFrom}
+                                        onChange={(e) => setPaymentDateFrom(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">To Date</label>
+                                    <input
+                                        type="date"
+                                        value={paymentDateTo}
+                                        onChange={(e) => setPaymentDateTo(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                    />
+                                </div>
+                            </div>
                             {loadingStatements ? (
                                 <div className="flex items-center justify-center py-10">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
@@ -1059,12 +1545,36 @@ export default function DDManagementPage() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200">
-                                            {statements.filter(s => s.type === "Debit" && (!s.dd_id || Number(s.dd_id) === Number(selectedDD?.id)) && String(s.invoice_status || "").trim() !== "Settled" && !s.client_expense_id).length === 0 ? (
+                                            {statements.filter(s => {
+                                                const matchesType = s.type === "Debit";
+                                                const matchesDD = !s.dd_id || Number(s.dd_id) === Number(selectedDD?.id);
+                                                const matchesStatus = String(s.invoice_status || "").trim() !== "Settled";
+                                                const matchesClientExpense = !s.client_expense_id;
+                                                const matchesSearch = !paymentSearch || 
+                                                    String(s.id).toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                                                    (s.trans_id && s.trans_id.toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                                                    (s.description && s.description.toLowerCase().includes(paymentSearch.toLowerCase()));
+                                                const matchesDateFrom = !paymentDateFrom || (s.date && new Date(s.date) >= new Date(paymentDateFrom));
+                                                const matchesDateTo = !paymentDateTo || (s.date && new Date(s.date) <= new Date(paymentDateTo));
+                                                return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
+                                            }).length === 0 ? (
                                                 <tr>
                                                     <td colSpan={7} className="p-10 text-center text-gray-500">No debit statements available</td>
                                                 </tr>
                                             ) : (
-                                                statements.filter(s => s.type === "Debit" && (!s.dd_id || Number(s.dd_id) === Number(selectedDD?.id)) && String(s.invoice_status || "").trim() !== "Settled" && !s.client_expense_id).map((s) => (
+                                                statements.filter(s => {
+                                                    const matchesType = s.type === "Debit";
+                                                    const matchesDD = !s.dd_id || Number(s.dd_id) === Number(selectedDD?.id);
+                                                    const matchesStatus = String(s.invoice_status || "").trim() !== "Settled";
+                                                    const matchesClientExpense = !s.client_expense_id;
+                                                    const matchesSearch = !paymentSearch || 
+                                                        String(s.id).toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                                                        (s.trans_id && s.trans_id.toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                                                        (s.description && s.description.toLowerCase().includes(paymentSearch.toLowerCase()));
+                                                    const matchesDateFrom = !paymentDateFrom || (s.date && new Date(s.date) >= new Date(paymentDateFrom));
+                                                    const matchesDateTo = !paymentDateTo || (s.date && new Date(s.date) <= new Date(paymentDateTo));
+                                                    return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
+                                                }).map((s) => (
                                                     <tr key={s.id} className="hover:bg-gray-50">
                                                         <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                                                         <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
@@ -1083,12 +1593,19 @@ export default function DDManagementPage() {
                                                                     Unlinked
                                                                 </button>
                                                             ) : (
-                                                                <button
-                                                                    onClick={() => linkPayment(s.id, 'debit')}
-                                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition-colors"
-                                                                >
-                                                                    Link Payment
-                                                                </button>
+                                                                (() => {
+                                                                    const hasLinkedPayment = statements.some(st => Number(st.dd_id) === Number(selectedDD?.id));
+                                                                    return (
+                                                                        <button
+                                                                            onClick={() => linkPayment(s.id, 'debit')}
+                                                                            disabled={hasLinkedPayment}
+                                                                            className={`px-3 py-1.5 text-white text-xs font-semibold rounded transition-colors ${hasLinkedPayment ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                                                                            title={hasLinkedPayment ? 'Only one payment can be linked' : ''}
+                                                                        >
+                                                                            Link Payment
+                                                                        </button>
+                                                                    );
+                                                                })()
                                                             )}
                                                         </td>
                                                     </tr>
@@ -1123,6 +1640,52 @@ export default function DDManagementPage() {
                             <button onClick={() => setCreditModalOpen(false)} className="p-2 hover:bg-blue-500 rounded-full transition-colors"><X size={24} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
+                            <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <span className="text-xs font-medium text-blue-600 uppercase">Net Amount:</span>
+                                        <div className="text-lg font-bold text-blue-900">₹{Number(selectedDD?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-medium text-blue-600 uppercase">Total Linked:</span>
+                                        <div className="text-lg font-bold text-blue-900">₹{creditStatements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-medium text-blue-600 uppercase">Remaining:</span>
+                                        <div className="text-lg font-bold text-blue-900">₹{(Number(selectedDD?.amount || 0) - creditStatements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Search</label>
+                                    <input
+                                        type="text"
+                                        value={creditSearch}
+                                        onChange={(e) => setCreditSearch(e.target.value)}
+                                        placeholder="Search by ID, Trans ID, or Description..."
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">From Date</label>
+                                    <input
+                                        type="date"
+                                        value={creditDateFrom}
+                                        onChange={(e) => setCreditDateFrom(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1">To Date</label>
+                                    <input
+                                        type="date"
+                                        value={creditDateTo}
+                                        onChange={(e) => setCreditDateTo(e.target.value)}
+                                        className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                            </div>
                             {loadingCreditStatements ? (
                                 <div className="flex items-center justify-center py-10">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -1142,12 +1705,36 @@ export default function DDManagementPage() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200">
-                                            {creditStatements.filter(s => s.type === "Credit" && (!s.dd_id || Number(s.dd_id) === Number(selectedDD?.id)) && String(s.invoice_status || "").trim() !== "Settled" && !s.client_expense_id).length === 0 ? (
+                                            {creditStatements.filter(s => {
+                                                const matchesType = s.type === "Credit";
+                                                const matchesDD = !s.dd_id || Number(s.dd_id) === Number(selectedDD?.id);
+                                                const matchesStatus = String(s.invoice_status || "").trim() !== "Settled";
+                                                const matchesClientExpense = !s.client_expense_id;
+                                                const matchesSearch = !creditSearch || 
+                                                    String(s.id).toLowerCase().includes(creditSearch.toLowerCase()) ||
+                                                    (s.trans_id && s.trans_id.toLowerCase().includes(creditSearch.toLowerCase())) ||
+                                                    (s.description && s.description.toLowerCase().includes(creditSearch.toLowerCase()));
+                                                const matchesDateFrom = !creditDateFrom || (s.date && new Date(s.date) >= new Date(creditDateFrom));
+                                                const matchesDateTo = !creditDateTo || (s.date && new Date(s.date) <= new Date(creditDateTo));
+                                                return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
+                                            }).length === 0 ? (
                                                 <tr>
                                                     <td colSpan={7} className="p-10 text-center text-gray-500">No credit statements available</td>
                                                 </tr>
                                             ) : (
-                                                creditStatements.filter(s => s.type === "Credit" && (!s.dd_id || Number(s.dd_id) === Number(selectedDD?.id)) && String(s.invoice_status || "").trim() !== "Settled" && !s.client_expense_id).map((s) => (
+                                                creditStatements.filter(s => {
+                                                    const matchesType = s.type === "Credit";
+                                                    const matchesDD = !s.dd_id || Number(s.dd_id) === Number(selectedDD?.id);
+                                                    const matchesStatus = String(s.invoice_status || "").trim() !== "Settled";
+                                                    const matchesClientExpense = !s.client_expense_id;
+                                                    const matchesSearch = !creditSearch || 
+                                                        String(s.id).toLowerCase().includes(creditSearch.toLowerCase()) ||
+                                                        (s.trans_id && s.trans_id.toLowerCase().includes(creditSearch.toLowerCase())) ||
+                                                        (s.description && s.description.toLowerCase().includes(creditSearch.toLowerCase()));
+                                                    const matchesDateFrom = !creditDateFrom || (s.date && new Date(s.date) >= new Date(creditDateFrom));
+                                                    const matchesDateTo = !creditDateTo || (s.date && new Date(s.date) <= new Date(creditDateTo));
+                                                    return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
+                                                }).map((s) => (
                                                     <tr key={s.id} className="hover:bg-gray-50">
                                                         <td className="p-3 font-medium text-gray-600">#{s.id}</td>
                                                         <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
@@ -1166,12 +1753,19 @@ export default function DDManagementPage() {
                                                                     Unlinked
                                                                 </button>
                                                             ) : (
-                                                                <button
-                                                                    onClick={() => linkPayment(s.id, 'credit')}
-                                                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded transition-colors"
-                                                                >
-                                                                    Link Payment
-                                                                </button>
+                                                                (() => {
+                                                                    const hasLinkedPayment = creditStatements.some(st => Number(st.dd_id) === Number(selectedDD?.id));
+                                                                    return (
+                                                                        <button
+                                                                            onClick={() => linkPayment(s.id, 'credit')}
+                                                                            disabled={hasLinkedPayment}
+                                                                            className={`px-3 py-1.5 text-white text-xs font-semibold rounded transition-colors ${hasLinkedPayment ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                                                            title={hasLinkedPayment ? 'Only one payment can be linked' : ''}
+                                                                        >
+                                                                            Link Payment
+                                                                        </button>
+                                                                    );
+                                                                })()
                                                             )}
                                                         </td>
                                                     </tr>

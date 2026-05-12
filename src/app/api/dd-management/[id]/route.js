@@ -15,6 +15,7 @@ export async function PUT(req, { params }) {
             expiry_date,
             claim_expiry_date,
             bg_format_upload,
+            mode_of_payment,
 
             // Step 2 (DD & BG shared/specific)
             cheque_no,
@@ -31,11 +32,25 @@ export async function PUT(req, { params }) {
             original_bg_upload,
             bg_number,
             docs_upload,
+            bg_date,
+            bg_amount,
+            bg_number_field,
+            validity_upto,
+            client_name,
+            bg_scan_copy,
 
             // Step 3 (DD Specific)
             dd_upload,
             dd_number,
             issued_by,
+
+            // NEFT/RTGS/IMPS Payment Details
+            reference_no,
+            payment_amount,
+            payment_date,
+            payment_proof,
+            receipt,
+            from_bank_account_no,
 
             // Metadata
             status,
@@ -58,6 +73,7 @@ export async function PUT(req, { params }) {
         if (expiry_date !== undefined) { fields.push("expiry_date = ?"); updateParams.push(expiry_date); }
         if (claim_expiry_date !== undefined) { fields.push("claim_expiry_date = ?"); updateParams.push(claim_expiry_date); }
         if (bg_format_upload !== undefined) { fields.push("bg_format_upload = ?"); updateParams.push(bg_format_upload); }
+        if (mode_of_payment !== undefined) { fields.push("mode_of_payment = ?"); updateParams.push(mode_of_payment); }
 
         // Step 2 fields (DD & shared)
         if (cheque_no !== undefined) { fields.push("cheque_no = ?"); updateParams.push(cheque_no); }
@@ -74,17 +90,35 @@ export async function PUT(req, { params }) {
         if (original_bg_upload !== undefined) { fields.push("original_bg_upload = ?"); updateParams.push(original_bg_upload); }
         if (bg_number !== undefined) { fields.push("bg_number = ?"); updateParams.push(bg_number); }
         if (docs_upload !== undefined) { fields.push("docs_upload = ?"); updateParams.push(docs_upload); }
+        if (bg_date !== undefined) { fields.push("bg_date = ?"); updateParams.push(bg_date); }
+
+        if (bg_amount !== undefined) { fields.push("bg_amount = ?"); updateParams.push(bg_amount); }
+        if (bg_number_field !== undefined) { fields.push("bg_number_field = ?"); updateParams.push(bg_number_field); }
+        if (validity_upto !== undefined) { fields.push("validity_upto = ?"); updateParams.push(validity_upto); }
+        if (client_name !== undefined) { fields.push("client_name = ?"); updateParams.push(client_name); }
+        if (bg_scan_copy !== undefined) { fields.push("bg_scan_copy = ?"); updateParams.push(bg_scan_copy); }
 
         // Step 3 fields (DD)
         if (dd_upload !== undefined) { fields.push("dd_upload = ?"); updateParams.push(dd_upload); }
-        if (dd_number !== undefined) { fields.push("dd_number = ?"); updateParams.push(dd_number); }
+        if (dd_number !== undefined && dd_number !== "") { fields.push("dd_number = ?"); updateParams.push(dd_number); }
         if (issued_by !== undefined) { fields.push("issued_by = ?"); updateParams.push(issued_by); }
 
         // Metadata
-        if (status !== undefined) { fields.push("status = ?"); updateParams.push(status); }
+        if (status !== undefined) {
+            fields.push("status = ?");
+            updateParams.push(status);
+        }
         if (original_dd_location !== undefined) { fields.push("original_dd_location = ?"); updateParams.push(original_dd_location); }
         if (sent_to_client_date !== undefined) { fields.push("sent_to_client_date = ?"); updateParams.push(sent_to_client_date); }
         if (claim_from_bank !== undefined) { fields.push("claim_from_bank = ?"); updateParams.push(claim_from_bank ? 1 : 0); }
+
+        // NEFT/RTGS/IMPS Payment Details
+        if (reference_no !== undefined) { fields.push("reference_no = ?"); updateParams.push(reference_no); }
+        if (payment_amount !== undefined) { fields.push("payment_amount = ?"); updateParams.push(payment_amount); }
+        if (payment_date !== undefined) { fields.push("payment_date = ?"); updateParams.push(payment_date); }
+        if (payment_proof !== undefined) { fields.push("payment_proof = ?"); updateParams.push(payment_proof); }
+        if (receipt !== undefined) { fields.push("receipt = ?"); updateParams.push(receipt); }
+        if (from_bank_account_no !== undefined) { fields.push("from_bank_account_no = ?"); updateParams.push(from_bank_account_no); }
 
         if (fields.length === 0) {
             return NextResponse.json({ error: "No fields to update" }, { status: 400 });
@@ -99,9 +133,15 @@ export async function PUT(req, { params }) {
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("❌ Update DD Error:", error);
+        console.error("Error details:", {
+            message: error.message,
+            code: error.code,
+            sql: error.sql,
+            sqlMessage: error.sqlMessage
+        });
         if (error.code === 'ER_DUP_ENTRY') {
             return NextResponse.json({ error: "DD Number already exists" }, { status: 400 });
         }
-        return NextResponse.json({ error: error.message || "Failed to update record" }, { status: 500 });
+        return NextResponse.json({ error: error.message || error.sqlMessage || "Failed to update record" }, { status: 500 });
     }
 }

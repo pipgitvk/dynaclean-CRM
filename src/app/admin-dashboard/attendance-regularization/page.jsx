@@ -247,13 +247,23 @@ export default function AdminAttendanceRegularizationPage() {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-xs">
                       <div className="flex flex-col gap-0.5">
+                        <div className="text-gray-600 font-medium">Original:</div>
                         <div>
                           <span className="text-gray-500">In:</span>{" "}
-                          {formatDt(displayIn(req))}
+                          {formatDt(req.original_checkin_time)}
                         </div>
                         <div>
                           <span className="text-gray-500">Out:</span>{" "}
-                          {formatDt(displayOut(req))}
+                          {formatDt(req.original_checkout_time)}
+                        </div>
+                        <div className="text-gray-600 font-medium mt-1">Filled:</div>
+                        <div>
+                          <span className="text-gray-500">In:</span>{" "}
+                          {formatDt(req.proposed_checkin_time)}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Out:</span>{" "}
+                          {formatDt(req.proposed_checkout_time)}
                         </div>
                         <div>
                           <span className="text-gray-500">By:</span>{" "}

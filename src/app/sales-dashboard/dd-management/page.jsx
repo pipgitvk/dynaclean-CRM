@@ -63,6 +63,7 @@ export default function DDManagementPage() {
         amount: "",
         assign_date: dayjs().format("YYYY-MM-DD"),
         assigned_by: "",
+        mode_of_payment: "DD",
 
         // BG Specific Step 1
         beneficiary_name: "",
@@ -236,14 +237,7 @@ export default function DDManagementPage() {
                     setSelectedDD(nextDD);
                 }
 
-                if (shouldClose) {
-                    setActiveModal(null);
-                } else if (isAuthorized && step < 3) {
-                    // Transition to next modal
-                    setActiveModal(step + 1);
-                } else {
-                    setActiveModal(null);
-                }
+                setActiveModal(null);
 
                 fetchData();
                 return true;
@@ -259,6 +253,7 @@ export default function DDManagementPage() {
 
     const openStepModal = (dd, step) => {
         if (!dd && step === 1) {
+            resetForm();
             setActiveModal(0); // Show selection first for new records
             return;
         }
@@ -296,6 +291,7 @@ export default function DDManagementPage() {
             amount: "",
             assign_date: dayjs().format("YYYY-MM-DD"),
             assigned_by: "",
+            mode_of_payment: "DD",
             beneficiary_name: "",
             beneficiary_address: "",
             expiry_date: "",
@@ -533,30 +529,10 @@ export default function DDManagementPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    disabled={!!dd.claim_from_bank}
-                                                    checked={!!dd.claim_from_bank}
-                                                    onChange={async (e) => {
-                                                        const newVal = e.target.checked;
-                                                        try {
-                                                            const res = await fetch(`/api/dd-management/${dd.id}`, {
-                                                                method: 'PUT',
-                                                                headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ claim_from_bank: newVal })
-                                                            });
-                                                            if (res.ok) {
-                                                                toast.success("Claim status updated and locked");
-                                                                fetchData();
-                                                            }
-                                                        } catch (error) {
-                                                            toast.error("Failed to update claim status");
-                                                        }
-                                                    }}
-                                                    className={`w-4 h-4 text-blue-600 rounded focus:ring-blue-500 ${dd.claim_from_bank ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
-                                                />
-                                                <span className={`text-xs font-medium ${dd.claim_from_bank ? "text-blue-700" : "text-gray-600"}`}>{dd.claim_from_bank ? "Yes" : "No"}</span>
+                                            <div className="flex justify-center items-center gap-2">
+                                                <span className={`text-xs font-bold px-2 py-1 rounded ${dd.claim_from_bank ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                                                    {dd.claim_from_bank ? "Yes" : "No"}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
@@ -568,40 +544,6 @@ export default function DDManagementPage() {
                                                 >
                                                     Step 1
                                                 </button>
-                                                <button
-                                                    onClick={() => openPaymentModal(dd)}
-                                                    className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
-                                                    title="Add Payment"
-                                                >
-                                                    Add Payment
-                                                </button>
-                                                {isAuthorized && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => openStepModal(dd, 2)}
-                                                            className="p-1 px-2 text-yellow-600 hover:bg-yellow-50 rounded border border-yellow-100 transition-colors text-[10px] font-bold"
-                                                            title="Step 2: Bank Info"
-                                                        >
-                                                            Step 2
-                                                        </button>
-                                                        <button
-                                                            onClick={() => openCreditModal(dd)}
-                                                            className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
-                                                            title="Link Payment"
-                                                        >
-                                                            Payment Link
-                                                        </button>
-                                                        {dd.type === 'DD' && (
-                                                            <button
-                                                                onClick={() => openStepModal(dd, 3)}
-                                                                className="p-1 px-2 text-green-600 hover:bg-green-50 rounded border border-green-100 transition-colors text-[10px] font-bold"
-                                                                title="Step 3: Issuance"
-                                                            >
-                                                                Step 3
-                                                            </button>
-                                                        )}
-                                                    </>
-                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -626,14 +568,14 @@ export default function DDManagementPage() {
                             <div className="p-8 space-y-4">
                                 <p className="text-gray-500 text-center mb-6">What type of record would you like to create?</p>
                                 <button
-                                    onClick={() => { setFormData(prev => ({ ...prev, type: "DD" })); setActiveModal(1); }}
+                                    onClick={() => { setSelectedDD(null); setFormData(prev => ({ ...prev, type: "DD", mode_of_payment: "DD" })); setActiveModal(1); }}
                                     className="w-full py-4 bg-blue-50 text-blue-700 border-2 border-blue-200 rounded-xl font-bold hover:bg-blue-100 transition-all flex flex-col items-center gap-2"
                                 >
                                     <FileText size={32} />
                                     Demand Draft (DD)
                                 </button>
                                 <button
-                                    onClick={() => { setFormData(prev => ({ ...prev, type: "BG" })); setActiveModal(1); }}
+                                    onClick={() => { setSelectedDD(null); setFormData(prev => ({ ...prev, type: "BG", mode_of_payment: "BG" })); setActiveModal(1); }}
                                     className="w-full py-4 bg-purple-50 text-purple-700 border-2 border-purple-200 rounded-xl font-bold hover:bg-purple-100 transition-all flex flex-col items-center gap-2"
                                 >
                                     <CheckCircle size={32} />
@@ -692,9 +634,19 @@ export default function DDManagementPage() {
                                             </div>
                                         </div>
                                         <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mode of Payment</label>
+                                            <select disabled={selectedDD?.mode_of_payment} name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                                <option value="NEFT">NEFT</option>
+                                                <option value="IMPS">IMPS</option>
+                                                <option value="DD">DD</option>
+                                                <option value="RTGS">RTGS</option>
+                                                <option value="BG">BG</option>
+                                            </select>
+                                        </div>
+                                        <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload BG Format</label>
                                             <div className="flex items-center gap-2">
-                                                <input type="file" name="bg_format_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 disabled:opacity-50" />
+                                                <input disabled={!isAuthorized} type="file" name="bg_format_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 disabled:opacity-50" />
                                                 {formData.bg_format_upload && typeof formData.bg_format_upload === "string" && (
                                                     <button onClick={() => handleViewFile(formData.bg_format_upload)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center gap-1 text-xs font-bold" title="View BG Format">
                                                         <Eye size={16} /> View
@@ -725,6 +677,16 @@ export default function DDManagementPage() {
                                                 <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
                                             </div>
                                         </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mode of Payment</label>
+                                            <select disabled={selectedDD?.mode_of_payment} name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                                <option value="NEFT">NEFT</option>
+                                                <option value="IMPS">IMPS</option>
+                                                <option value="DD">DD</option>
+                                                <option value="RTGS">RTGS</option>
+                                                <option value="BG">BG</option>
+                                            </select>
+                                        </div>
                                     </>
                                 )}
                                 <div>
@@ -734,43 +696,23 @@ export default function DDManagementPage() {
                             </div>
                             <div className="p-6 bg-gray-50 border-t flex justify-end gap-3">
                                 <button onClick={() => setActiveModal(null)} className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                                {isAuthorized ? (
-                                    <button
-                                        onClick={() => {
-                                            if (formData.type === "BG") {
-                                                if (!formData.beneficiary_name || !formData.amount || !formData.expiry_date) {
-                                                    toast.error("Required: Beneficiary, Amount, Expiry Date"); return;
-                                                }
-                                            } else {
-                                                if (!formData.party_name || !formData.amount || !formData.dd_location || !formData.assign_date) {
-                                                    toast.error("Required: Party, Amount, Location, Date"); return;
-                                                }
+                                <button
+                                    onClick={() => {
+                                        if (formData.type === "BG") {
+                                            if (!formData.beneficiary_name || !formData.amount || !formData.expiry_date) {
+                                                toast.error("Required: Beneficiary, Amount, Expiry Date"); return;
                                             }
-                                            handleSubmit(1, false);
-                                        }}
-                                        className={`flex items-center gap-2 ${formData.type === "BG" ? "bg-purple-600 hover:bg-purple-700" : "bg-blue-600 hover:bg-blue-700"} text-white px-8 py-2.5 rounded-lg font-bold transition-all shadow-md`}
-                                    >
-                                        Save & Next <ChevronRight size={20} />
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={() => {
-                                            if (formData.type === "BG") {
-                                                if (!formData.beneficiary_name || !formData.amount || !formData.expiry_date) {
-                                                    toast.error("Required: Beneficiary, Amount, Expiry Date"); return;
-                                                }
-                                            } else {
-                                                if (!formData.party_name || !formData.amount || !formData.dd_location || !formData.assign_date) {
-                                                    toast.error("Required: Party, Amount, Location, Date"); return;
-                                                }
+                                        } else {
+                                            if (!formData.party_name || !formData.amount || !formData.dd_location || !formData.assign_date) {
+                                                toast.error("Required: Party, Amount, Location, Date"); return;
                                             }
-                                            handleSubmit(1, true);
-                                        }}
-                                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-8 py-2.5 rounded-lg font-bold transition-all shadow-md"
-                                    >
-                                        <CheckCircle size={20} /> {selectedDD ? "Save Changes" : "Create Assignment"}
-                                    </button>
-                                )}
+                                        }
+                                        handleSubmit(1, true);
+                                    }}
+                                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-8 py-2.5 rounded-lg font-bold transition-all shadow-md"
+                                >
+                                    <CheckCircle size={20} /> {selectedDD ? "Save Changes" : "Create Assignment"}
+                                </button>
                             </div>
                         </div>
                     </div>

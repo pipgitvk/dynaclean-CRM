@@ -37,6 +37,10 @@ export default function StatementTable({ rows }) {
   const [dateTo, setDateTo] = useState(
     () => persisted?.dateTo ?? defaultMonthEnd()
   );
+  const [invoiceNoFilter, setInvoiceNoFilter] = useState("");
+  const [purchaseIdsFilter, setPurchaseIdsFilter] = useState("");
+  const [ddIdFilter, setDdIdFilter] = useState("");
+  const [expenseIdFilter, setExpenseIdFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [modalId, setModalId] = useState(null);
   const [expense, setExpense] = useState(null);
@@ -251,9 +255,33 @@ export default function StatementTable({ rows }) {
         if (dateFrom && rowDate < dayjs(dateFrom).startOf("day").valueOf()) return false;
         if (dateTo && rowDate > dayjs(dateTo).endOf("day").valueOf()) return false;
       }
+
+      // Invoice No filter
+      if (invoiceNoFilter) {
+        const rowInvoiceNo = (row.invoice_number || "").toLowerCase();
+        if (!rowInvoiceNo.includes(invoiceNoFilter.toLowerCase())) return false;
+      }
+
+      // Purchase IDs filter
+      if (purchaseIdsFilter) {
+        const refs = getLinkedPurchaseRefs(row);
+        const purchaseMatch = refs.some(ref => String(ref.id).includes(purchaseIdsFilter));
+        if (!purchaseMatch) return false;
+      }
+
+      // DD ID filter
+      if (ddIdFilter) {
+        if (!row.dd_id || !String(row.dd_id).includes(ddIdFilter)) return false;
+      }
+
+      // Expense ID filter
+      if (expenseIdFilter) {
+        if (!row.client_expense_id || !String(row.client_expense_id).includes(expenseIdFilter)) return false;
+      }
+
       return true;
     });
-  }, [rows, statusFilter, searchQuery, dateFrom, dateTo, expenseTxnForIdSearch, expenseIdResolved]);
+  }, [rows, statusFilter, searchQuery, dateFrom, dateTo, invoiceNoFilter, purchaseIdsFilter, ddIdFilter, expenseIdFilter, expenseTxnForIdSearch, expenseIdResolved]);
 
   // Compute running balance (chronological order: date ASC, id ASC)
   const balanceMap = {};
@@ -617,6 +645,34 @@ export default function StatementTable({ rows }) {
           <option value="Settled">Settled</option>
           <option value="Unsettled">Unsettled</option>
         </select>
+        <input
+          type="text"
+          placeholder="Invoice No"
+          value={invoiceNoFilter}
+          onChange={(e) => setInvoiceNoFilter(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-32 text-sm"
+        />
+        <input
+          type="text"
+          placeholder="Purchase IDs"
+          value={purchaseIdsFilter}
+          onChange={(e) => setPurchaseIdsFilter(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-32 text-sm"
+        />
+        <input
+          type="text"
+          placeholder="DD ID"
+          value={ddIdFilter}
+          onChange={(e) => setDdIdFilter(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-32 text-sm"
+        />
+        <input
+          type="text"
+          placeholder="Expense ID"
+          value={expenseIdFilter}
+          onChange={(e) => setExpenseIdFilter(e.target.value)}
+          className="px-4 py-2 border rounded-lg w-full sm:w-32 text-sm"
+        />
         <button
           onClick={handleReset}
           className="px-4 py-2 bg-gray-300 rounded-lg text-sm cursor-pointer w-full sm:w-auto"
@@ -684,10 +740,7 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("debit")} className="p-3 cursor-pointer select-none">Debit<SortIcon column="debit" /></th>
               <th onClick={() => handleSort("credit")} className="p-3 cursor-pointer select-none">Credit<SortIcon column="credit" /></th>
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
-              <th className="p-3">Invoice No</th>
-              <th className="p-3">Purchase IDs</th>
-              <th className="p-3">DD ID</th>
-              <th className="p-3">Expense ID</th>
+              <th className="p-3">Invoice, Purchases, DD, Expense</th>
               <th
                 onClick={() => handleSort("balance")}
                 className="p-3 cursor-pointer select-none"
@@ -743,42 +796,45 @@ export default function StatementTable({ rows }) {
                     )}
                   </td>
                   <td className="p-3">
-                    {row.invoice_number ? (
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded whitespace-nowrap">
-                        {row.invoice_number}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {(() => {
-                      const refs = getLinkedPurchaseRefs(row);
-                      if (!refs.length) return <span className="text-gray-300 text-xs">—</span>;
-                      return (
-                        <span className="text-xs font-mono text-slate-700">
-                          {refs.map((x) => `#${x.prefix}${x.id}`).join(", ")}
-                        </span>
-                      );
-                    })()}
-                  </td>
-                  <td className="p-3">
-                    {row.dd_id ? (
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded whitespace-nowrap">
-                        DD#{row.dd_id}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {row.client_expense_id ? (
-                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded whitespace-nowrap">
-                        EXP#{row.client_expense_id}
-                      </span>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
+                    <div className="space-y-1">
+                      {row.invoice_number && (
+                        <div>
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
+                            INV{row.invoice_number}
+                          </span>
+                        </div>
+                      )}
+                      {(() => {
+                        const refs = getLinkedPurchaseRefs(row);
+                        if (refs.length > 0) {
+                          return (
+                            <div>
+                              <span className="text-xs font-mono text-slate-700">
+                                {refs.map((x) => `P${x.id}`).join(", ")}
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      {row.dd_id && (
+                        <div>
+                          <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded">
+                            DD{row.dd_id}
+                          </span>
+                        </div>
+                      )}
+                      {row.client_expense_id && (
+                        <div>
+                          <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">
+                            EXP{row.client_expense_id}
+                          </span>
+                        </div>
+                      )}
+                      {!row.invoice_number && !getLinkedPurchaseRefs(row).length && !row.dd_id && !row.client_expense_id && (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </div>
                   </td>
                   <td
                     className="p-3 font-medium"
