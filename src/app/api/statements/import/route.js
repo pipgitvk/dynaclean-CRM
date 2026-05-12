@@ -27,23 +27,33 @@ const MONTH_MAP = {
 
 function parseDate(val) {
   const raw = normalizeCellValue(val);
+  console.log("[DEBUG] parseDate input:", val, "raw:", raw, "type:", typeof raw);
   if (raw == null || raw === "") return null;
-  // Excel serial date (number of days since 1899-12-30)
-  if (typeof raw === "number" && raw > 0) {
-    const d = new Date((raw - 25569) * 86400 * 1000);
-    if (!isNaN(d.getTime())) {
-      const y = d.getUTCFullYear();
-      const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-      const day = String(d.getUTCDate()).padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    }
-  }
-  // Date object from ExcelJS — calendar date in local timezone
+  // Excel Date object from ExcelJS - preserve exactly as Excel shows it
   if (raw instanceof Date && !isNaN(raw.getTime())) {
+    console.log("[DEBUG] Using Excel Date object path, raw:", raw);
+    // Use local date components to match Excel's display
     const y = raw.getFullYear();
     const m = String(raw.getMonth() + 1).padStart(2, "0");
     const day = String(raw.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    const result = `${y}-${m}-${day}`;
+    console.log("[DEBUG] Excel Date result:", result);
+    return result;
+  }
+  // Excel serial date (number of days since 1899-12-30)
+  if (typeof raw === "number" && raw > 0) {
+    console.log("[DEBUG] Using Excel serial path, raw:", raw);
+    const d = new Date((raw - 25569) * 86400 * 1000);
+    console.log("[DEBUG] Created Date object:", d);
+    if (!isNaN(d.getTime())) {
+      // Use local date to match Excel's display
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const result = `${y}-${m}-${day}`;
+      console.log("[DEBUG] Excel serial result:", result);
+      return result;
+    }
   }
   const s = String(raw).trim();
   if (!s || s === "-" || s.toLowerCase() === "null") return null;
@@ -74,16 +84,19 @@ function parseDate(val) {
       }
     }
   }
-  // DD/MM/YYYY or DD-MM-YYYY (numeric month)
-  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) {
-    const [, day, month, year] = dmy;
+  // DD/MM/YYYY or DD-MM-YYYY (numeric month) - Handle time part too
+  const dmyWithTime = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(\s+.*)?$/);
+  if (dmyWithTime) {
+    const [, day, month, year] = dmyWithTime;
+    console.log("[DEBUG] DD/MM/YYYY with time:", { day, month, year, original: s });
     const d = new Date(Number(year), Number(month) - 1, Number(day));
     if (!isNaN(d.getTime())) {
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, "0");
       const dd = String(d.getDate()).padStart(2, "0");
-      return `${y}-${m}-${dd}`;
+      const result = `${y}-${m}-${dd}`;
+      console.log("[DEBUG] DD/MM/YYYY result:", result);
+      return result;
     }
   }
   const d = new Date(s);

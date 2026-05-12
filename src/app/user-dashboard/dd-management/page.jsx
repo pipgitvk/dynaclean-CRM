@@ -44,8 +44,14 @@ export default function DDManagementPage() {
     const [userRole, setUserRole] = useState("GUEST");
     const [currentUserName, setCurrentUserName] = useState("");
 
-    const [activeModal, setActiveModal] = useState(null); // null, 0 (selection), 1, 2, or 3
+    const [activeModal, setActiveModal] = useState(null); // null, 0 (selection), 1, 2, 3, or 'payment'
     const [selectedDD, setSelectedDD] = useState(null);
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [statements, setStatements] = useState([]);
+    const [loadingStatements, setLoadingStatements] = useState(false);
+    const [creditModalOpen, setCreditModalOpen] = useState(false);
+    const [creditStatements, setCreditStatements] = useState([]);
+    const [loadingCreditStatements, setLoadingCreditStatements] = useState(false);
 
     const isAuthorized = ["ADMIN", "SUPERADMIN", "ACCOUNTANT"].includes(userRole.toUpperCase());
 
@@ -322,6 +328,77 @@ export default function DDManagementPage() {
         window.open(filePath, "_blank");
     };
 
+    const openPaymentModal = async (dd) => {
+        setSelectedDD(dd);
+        setPaymentModalOpen(true);
+        setLoadingStatements(true);
+        try {
+            const res = await fetch("/api/statements", { credentials: "include" });
+            const result = await res.json();
+            if (res.ok) {
+                setStatements(result.statements || []);
+            } else {
+                toast.error(result.error || "Failed to load statements");
+            }
+        } catch (err) {
+            toast.error("Network error loading statements");
+        } finally {
+            setLoadingStatements(false);
+        }
+    };
+
+    const openCreditModal = async (dd) => {
+        setSelectedDD(dd);
+        setCreditModalOpen(true);
+        setLoadingCreditStatements(true);
+        try {
+            const res = await fetch("/api/statements", { credentials: "include" });
+            const result = await res.json();
+            if (res.ok) {
+                setCreditStatements(result.statements || []);
+            } else {
+                toast.error(result.error || "Failed to load statements");
+            }
+        } catch (err) {
+            toast.error("Network error loading statements");
+        } finally {
+            setLoadingCreditStatements(false);
+        }
+    };
+
+    const linkPayment = async (statementId, type, action = 'link') => {
+        const isUnlink = action === 'unlink';
+        try {
+            const res = await fetch(`/api/statements/${statementId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    invoice_status: isUnlink ? 'Unsettled' : 'Linked to DD',
+                    purchase_id: selectedDD?.id,
+                    dd_id: isUnlink ? null : selectedDD?.id,
+                    dd_action: action
+                })
+            });
+            if (res.ok) {
+                toast.success(isUnlink ? 'Payment unlinked successfully' : 'Payment linked successfully');
+                if (type === 'debit') {
+                    const res = await fetch("/api/statements", { credentials: "include" });
+                    const result = await res.json();
+                    if (res.ok) setStatements(result.statements || []);
+                } else {
+                    const res = await fetch("/api/statements", { credentials: "include" });
+                    const result = await res.json();
+                    if (res.ok) setCreditStatements(result.statements || []);
+                }
+            } else {
+                const result = await res.json();
+                toast.error(result.error || (isUnlink ? 'Failed to unlink payment' : 'Failed to link payment'));
+            }
+        } catch (err) {
+            toast.error(isUnlink ? 'Network error unlinking payment' : 'Network error linking payment');
+        }
+    };
+
     return (
         <div className="container mx-auto p-4 md:p-6 space-y-6 bg-gray-50 min-h-screen">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6 bg-white p-6 rounded-xl shadow-sm">
@@ -371,6 +448,7 @@ export default function DDManagementPage() {
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 border-b border-gray-100">
                             <tr>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">ID</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Item Details</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Assignment</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Bank Info & Files</th>
@@ -382,10 +460,13 @@ export default function DDManagementPage() {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {isLoading ? (
-                                <tr><td colSpan="6" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
+                                <tr><td colSpan="8" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
                             ) : data.length > 0 ? (
                                 data.map((dd) => (
                                     <tr key={dd.id} className="hover:bg-gray-50/80 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="text-xs font-bold text-gray-600">#{dd.id}</div>
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className={`w-10 h-10 rounded-xl ${dd.type === 'BG' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'} flex items-center justify-center font-bold shadow-sm group-hover:scale-110 transition-transform`}>
@@ -487,6 +568,13 @@ export default function DDManagementPage() {
                                                 >
                                                     Step 1
                                                 </button>
+                                                <button
+                                                    onClick={() => openPaymentModal(dd)}
+                                                    className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
+                                                    title="Add Payment"
+                                                >
+                                                    Add Payment
+                                                </button>
                                                 {isAuthorized && (
                                                     <>
                                                         <button
@@ -495,6 +583,13 @@ export default function DDManagementPage() {
                                                             title="Step 2: Bank Info"
                                                         >
                                                             Step 2
+                                                        </button>
+                                                        <button
+                                                            onClick={() => openCreditModal(dd)}
+                                                            className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
+                                                            title="Link Payment"
+                                                        >
+                                                            Payment Link
                                                         </button>
                                                         {dd.type === 'DD' && (
                                                             <button
@@ -512,7 +607,7 @@ export default function DDManagementPage() {
                                     </tr>
                                 ))
                             ) : (
-                                <tr><td colSpan="7" className="px-6 py-10 text-center text-gray-400">No records found matching your filters.</td></tr>
+                                <tr><td colSpan="8" className="px-6 py-10 text-center text-gray-400">No records found matching your filters.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -869,6 +964,172 @@ export default function DDManagementPage() {
                     </div>
                 )
             }
+
+            {/* Payment Modal */}
+            {paymentModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="bg-emerald-600 p-6 text-white flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold">Link Payment to DD #{selectedDD?.id}</h2>
+                                <p className="text-xs opacity-80 mt-1">Select a debit statement to link</p>
+                            </div>
+                            <button onClick={() => setPaymentModalOpen(false)} className="p-2 hover:bg-emerald-500 rounded-full transition-colors"><X size={24} /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {loadingStatements ? (
+                                <div className="flex items-center justify-center py-10">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                                </div>
+                            ) : (
+                                <div className="border rounded-lg overflow-hidden">
+                                    <table className="min-w-full text-sm">
+                                        <thead className="bg-gray-100 text-left">
+                                            <tr>
+                                                <th className="p-3 border-b font-semibold text-gray-700">ID</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Trans ID</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Date</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Description</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Amount</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Type</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {statements.filter(s => s.type === "Debit" && (!s.dd_id || Number(s.dd_id) === Number(selectedDD?.id)) && String(s.invoice_status || "").trim() !== "Settled" && !s.client_expense_id).length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="p-10 text-center text-gray-500">No debit statements available</td>
+                                                </tr>
+                                            ) : (
+                                                statements.filter(s => s.type === "Debit" && (!s.dd_id || Number(s.dd_id) === Number(selectedDD?.id)) && String(s.invoice_status || "").trim() !== "Settled" && !s.client_expense_id).map((s) => (
+                                                    <tr key={s.id} className="hover:bg-gray-50">
+                                                        <td className="p-3 font-medium text-gray-600">#{s.id}</td>
+                                                        <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
+                                                        <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                                                        <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
+                                                        <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                                        <td className="p-3">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${s.type === 'Debit' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{s.type}</span>
+                                                        </td>
+                                                        <td className="p-3">
+                                                            {Number(s.dd_id) === Number(selectedDD?.id) ? (
+                                                                <button
+                                                                    onClick={() => linkPayment(s.id, 'debit', 'unlink')}
+                                                                    className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-xs font-semibold rounded transition-colors"
+                                                                >
+                                                                    Unlinked
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => linkPayment(s.id, 'debit')}
+                                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition-colors"
+                                                                >
+                                                                    Link Payment
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-gray-50 border-t flex justify-end">
+                            <button
+                                onClick={() => setPaymentModalOpen(false)}
+                                className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Credit Modal */}
+            {creditModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="bg-blue-600 p-6 text-white flex justify-between items-center">
+                            <div>
+                                <h2 className="text-xl font-bold">Link Credit Payment to DD #{selectedDD?.id}</h2>
+                                <p className="text-xs opacity-80 mt-1">Select an unsettled credit statement to link</p>
+                            </div>
+                            <button onClick={() => setCreditModalOpen(false)} className="p-2 hover:bg-blue-500 rounded-full transition-colors"><X size={24} /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {loadingCreditStatements ? (
+                                <div className="flex items-center justify-center py-10">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                </div>
+                            ) : (
+                                <div className="border rounded-lg overflow-hidden">
+                                    <table className="min-w-full text-sm">
+                                        <thead className="bg-gray-100 text-left">
+                                            <tr>
+                                                <th className="p-3 border-b font-semibold text-gray-700">ID</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Trans ID</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Date</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Description</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Amount</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Type</th>
+                                                <th className="p-3 border-b font-semibold text-gray-700">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {creditStatements.filter(s => s.type === "Credit" && (!s.dd_id || Number(s.dd_id) === Number(selectedDD?.id)) && String(s.invoice_status || "").trim() !== "Settled" && !s.client_expense_id).length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="p-10 text-center text-gray-500">No credit statements available</td>
+                                                </tr>
+                                            ) : (
+                                                creditStatements.filter(s => s.type === "Credit" && (!s.dd_id || Number(s.dd_id) === Number(selectedDD?.id)) && String(s.invoice_status || "").trim() !== "Settled" && !s.client_expense_id).map((s) => (
+                                                    <tr key={s.id} className="hover:bg-gray-50">
+                                                        <td className="p-3 font-medium text-gray-600">#{s.id}</td>
+                                                        <td className="p-3 font-mono text-xs text-gray-500">{s.trans_id || "—"}</td>
+                                                        <td className="p-3 text-gray-600">{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                                                        <td className="p-3 max-w-[400px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
+                                                        <td className="p-3 font-bold text-green-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                                        <td className="p-3">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${s.type === 'Debit' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{s.type}</span>
+                                                        </td>
+                                                        <td className="p-3">
+                                                            {Number(s.dd_id) === Number(selectedDD?.id) ? (
+                                                                <button
+                                                                    onClick={() => linkPayment(s.id, 'credit', 'unlink')}
+                                                                    className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white text-xs font-semibold rounded transition-colors"
+                                                                >
+                                                                    Unlinked
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => linkPayment(s.id, 'credit')}
+                                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded transition-colors"
+                                                                >
+                                                                    Link Payment
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-gray-50 border-t flex justify-end">
+                            <button
+                                onClick={() => setCreditModalOpen(false)}
+                                className="px-6 py-2.5 text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {
                 activeModal === 3 && (

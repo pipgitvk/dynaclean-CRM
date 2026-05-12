@@ -329,6 +329,50 @@ export async function PATCH(req, { params }) {
 
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
+    
+    // Check if this is a DD linking request
+    const ddId = body?.dd_id;
+    const invoiceStatus = body?.invoice_status;
+    const ddAction = body?.dd_action;
+    
+    if (ddId != null || invoiceStatus === 'Linked to DD' || ddAction === 'unlink') {
+      // Handle DD linking
+      const pool = await getDbConnection();
+      try {
+        await pool.execute("SELECT dd_id FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await pool.execute("ALTER TABLE statements ADD COLUMN dd_id INT NULL");
+        } catch (__) {}
+      }
+      try {
+        await pool.execute("SELECT invoice_status FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await pool.execute("ALTER TABLE statements ADD COLUMN invoice_status VARCHAR(50) NULL");
+        } catch (__) {}
+      }
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        
+        await conn.execute(
+          "UPDATE statements SET dd_id = ?, invoice_status = ? WHERE id = ?",
+          [ddId || null, invoiceStatus || null, id]
+        );
+        
+        await conn.commit();
+        return NextResponse.json({ success: true });
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      } finally {
+        conn.release();
+      }
+    }
+    
+    // Original purchase linking logic
     const purchaseIdRaw = body?.purchase_id ?? body?.purchaseId;
     const purchaseTypeRaw = body?.purchase_type ?? body?.purchaseType;
     const action = body?.action || "link"; // "link" or "unlink"

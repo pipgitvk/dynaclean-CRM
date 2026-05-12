@@ -32,7 +32,7 @@ function formatAmount(n) {
 }
 
 /** One designation: target column is always full height (the bar *is* the goal); done scales vs that row's target. */
-function DesignationBarGroup({ designation, target, completed }) {
+function DesignationBarGroup({ designation, target, completed, priority }) {
   const t = Number(target);
   const hasTarget = Number.isFinite(t) && t > 0;
   const targetH = hasTarget ? 100 : 0;
@@ -70,7 +70,14 @@ function DesignationBarGroup({ designation, target, completed }) {
           <span className="text-[10px] uppercase tracking-wide text-gray-500">Done</span>
         </div>
       </div>
-      <p className="text-xs font-semibold text-center text-gray-800 leading-tight px-1">{designation || "—"}</p>
+      <p className="text-xs font-semibold text-center text-gray-800 leading-tight px-1">
+        {designation || "—"}
+        {priority != null && (
+          <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-800 text-white text-[10px] font-bold">
+            {priority}
+          </span>
+        )}
+      </p>
     </div>
   );
 }
@@ -95,6 +102,7 @@ function ItemsChartBlock({ items }) {
             designation={labelForRow(row)}
             target={row.target ?? 0}
             completed={row.completed ?? 0}
+            priority={row.priority ?? null}
           />
         ))}
       </div>

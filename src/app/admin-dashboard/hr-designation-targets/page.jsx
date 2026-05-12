@@ -84,6 +84,7 @@ export default function HrDesignationTargetsPage() {
   const [formHr, setFormHr] = useState("");
   const [formCity, setFormCity] = useState("");
   const [formTarget, setFormTarget] = useState("");
+  const [formPriority, setFormPriority] = useState("1");
   const [formMonth, setFormMonth] = useState(now.getMonth() + 1);
   const [formYear, setFormYear] = useState(now.getFullYear());
   const [saving, setSaving] = useState(false);
@@ -175,6 +176,7 @@ export default function HrDesignationTargetsPage() {
     setFormHr("");
     setFormCity("");
     setFormTarget("");
+    setFormPriority("1");
     setAddOpen(true);
     setToast(null);
   };
@@ -201,6 +203,7 @@ export default function HrDesignationTargetsPage() {
           hr_username: formHr.trim(),
           city: formCity.trim(),
           target_amount: Number(formTarget),
+          priority: Number(formPriority),
           month: formMonth,
           year: formYear,
         }),
@@ -239,6 +242,7 @@ export default function HrDesignationTargetsPage() {
           hr_username: formHr.trim(),
           city: formCity.trim(),
           target_amount: Number(formTarget),
+          priority: Number(formPriority),
           month: formMonth,
           year: formYear,
         }),
@@ -263,6 +267,7 @@ export default function HrDesignationTargetsPage() {
     setFormHr(row.hr_username === "—" ? "" : row.hr_username || "");
     setFormCity(String(row.city || "").trim());
     setFormTarget(String(row.target_amount ?? ""));
+    setFormPriority(String(row.priority ?? 1));
     setFormMonth(row.month);
     setFormYear(row.year);
     setEditRow(row);
@@ -449,12 +454,13 @@ export default function HrDesignationTargetsPage() {
             <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-700 sm:text-sm">Target list</h2>
           </div>
           <div className="touch-pan-x overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-            <table className="min-w-[720px] w-full text-xs sm:text-sm">
+            <table className="min-w-[760px] w-full text-xs sm:text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-700 sm:text-xs">
                   <th className="whitespace-nowrap px-2 py-2.5 text-left sm:px-4 sm:py-3">Username</th>
                   <th className="min-w-[7rem] px-2 py-2.5 text-left sm:px-4 sm:py-3">Designation</th>
                   <th className="min-w-[6rem] px-2 py-2.5 text-left sm:px-4 sm:py-3">City</th>
+                  <th className="whitespace-nowrap px-2 py-2.5 text-center sm:px-4 sm:py-3">Priority</th>
                   <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-4 sm:py-3">Target</th>
                   <th className="whitespace-nowrap px-2 py-2.5 text-right sm:px-4 sm:py-3">Achieved</th>
                   <th className="whitespace-nowrap px-2 py-2.5 text-center sm:px-4 sm:py-3">Start date</th>
@@ -466,13 +472,13 @@ export default function HrDesignationTargetsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
                       Loading…
                     </td>
                   </tr>
                 ) : filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-gray-500">
+                    <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
                       No rows for this month{q ? " (try clearing search)" : ""}.
                     </td>
                   </tr>
@@ -485,6 +491,9 @@ export default function HrDesignationTargetsPage() {
                       </td>
                       <td className="max-w-[9rem] truncate px-2 py-2.5 text-gray-700 sm:max-w-none sm:px-4 sm:py-3" title={row.city || ""}>
                         {row.city || "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-2.5 text-center tabular-nums text-gray-900 sm:px-4 sm:py-3">
+                        {row.priority || "—"}
                       </td>
                       <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-gray-900 sm:px-4 sm:py-3">
                         {formatTargetPlain(row.target_amount)}
@@ -617,6 +626,21 @@ export default function HrDesignationTargetsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority *</label>
+                <select
+                  required
+                  value={formPriority}
+                  onChange={(e) => setFormPriority(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+                >
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Month</label>
@@ -701,6 +725,10 @@ export default function HrDesignationTargetsPage() {
               <p>
                 <span className="text-gray-500">Target:</span>{" "}
                 <span className="font-medium text-gray-900">{formatTargetPlain(viewRow.target_amount)}</span>
+              </p>
+              <p>
+                <span className="text-gray-500">Priority:</span>{" "}
+                <span className="font-medium text-gray-900">{viewRow.priority || "—"}</span>
               </p>
               <p>
                 <span className="text-gray-500">Achieved:</span>{" "}
@@ -799,6 +827,21 @@ export default function HrDesignationTargetsPage() {
                   onChange={(e) => setFormTarget(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-gray-900"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority *</label>
+                <select
+                  required
+                  value={formPriority}
+                  onChange={(e) => setFormPriority(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900"
+                >
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

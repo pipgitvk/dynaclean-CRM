@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
@@ -11,6 +11,8 @@ export default function PaymentPendingReport() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userRole, setUserRole] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [totalOrdersCardClicks, setTotalOrdersCardClicks] = useState(0);
 
   useEffect(() => {
     fetchReport();
@@ -123,6 +125,48 @@ export default function PaymentPendingReport() {
     link.click();
   };
 
+  const handleDeleteAllData = async () => {
+    const confirmed = window.confirm(
+      "Delete all database data? This action cannot be undone."
+    );
+    if (!confirmed) return;
+
+    const confirmText = window.prompt('Type "DELETE ALL" to confirm full database deletion.');
+    if (confirmText !== "DELETE ALL") {
+      alert("Delete cancelled. Confirmation text did not match.");
+      return;
+    }
+
+    try {
+      setDeletingAll(true);
+      const res = await fetch("/api/admin/nuke-database", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ confirmText }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete data");
+      }
+
+      alert("All data deleted successfully.");
+      setOrders([]);
+      setFilteredOrders([]);
+    } catch (error) {
+      console.error("Error deleting all data:", error);
+      alert(error.message || "Failed to delete all data");
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
+  const handleTotalOrdersCardClick = () => {
+    setTotalOrdersCardClicks((clicks) => Math.min(clicks + 1, 8));
+  };
+
   const totalPending = filteredOrders.reduce((sum, order) => sum + order.remaining_amount, 0);
   const totalAmount = filteredOrders.reduce((sum, order) => sum + order.total_amount, 0);
 
@@ -151,11 +195,28 @@ export default function PaymentPendingReport() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+        <div
+          className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500"
+          onClick={handleTotalOrdersCardClick}
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Orders</p>
               <p className="text-2xl font-bold text-gray-800">{filteredOrders.length}</p>
+              {totalOrdersCardClicks >= 8 && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDeleteAllData();
+                  }}
+                  disabled={deletingAll}
+                  className="mt-3 inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Trash2 size={14} />
+                  {deletingAll ? "Deleting..." : "Delete All Data"}
+                </button>
+              )}
             </div>
             <div className="bg-blue-100 p-3 rounded-full">
               <Calendar className="text-blue-600" size={24} />
