@@ -10,6 +10,45 @@ import {
 } from "@/lib/moduleAccess";
 import { getDbConnection } from "@/lib/db";
 
+// Role to dashboard prefix mapping
+function getDashboardPrefix(roleKey) {
+  const role = String(roleKey || "").toUpperCase();
+  if (role.includes("SALES")) return "/sales-dashboard";
+  if (role.includes("SERVICE") && role.includes("HEAD")) return "/service-head-dashboard";
+  if (role.includes("HR")) return "/hr-dashboard";
+  if (role.includes("DIGITAL") || role.includes("MARKETER")) return "/digital-marketing-dashboard";
+  if (role.includes("ACCOUNTANT")) return "/accounts-dashboard";
+  return "/user-dashboard"; // Default for other roles
+}
+
+// Transform menu item paths based on role
+function transformMenuItemPaths(item, roleKey) {
+  const dashboardPrefix = getDashboardPrefix(roleKey);
+  
+  // Don't transform admin-dashboard or empcrm paths
+  if (item.path?.startsWith("/admin-dashboard") || item.path?.startsWith("/empcrm")) {
+    return item;
+  }
+  
+  // Transform user-dashboard paths to role-specific dashboard
+  if (item.path?.startsWith("/user-dashboard")) {
+    return {
+      ...item,
+      path: item.path.replace("/user-dashboard", dashboardPrefix),
+    };
+  }
+  
+  // Transform children recursively
+  if (item.children?.length) {
+    return {
+      ...item,
+      children: item.children.map(child => transformMenuItemPaths(child, roleKey)),
+    };
+  }
+  
+  return item;
+}
+
 function stripSuperadminOnlyMenuItems(items, roleKey) {
   if (roleKey === "SUPERADMIN") return items;
   return (items || [])
@@ -908,6 +947,9 @@ export default async function getSidebarMenuItems() {
       items = filterByModuleAccess(items);
     }
   }
+
+  // Transform paths based on role-specific dashboard
+  items = items.map(item => transformMenuItemPaths(item, roleKey));
 
   return items;
 }

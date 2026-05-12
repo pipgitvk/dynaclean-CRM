@@ -67,6 +67,7 @@ export default function StatementExpensePicker({
   const [expandedEmpNames, setExpandedEmpNames] = useState(new Set());
   const [includeHead, setIncludeHead] = useState(true);
   const [selectedSubs, setSelectedSubs] = useState(() => new Set());
+  const [searchQuery, setSearchQuery] = useState("");
   const rootRef = useRef(null);
   /** In-session ticks before "Select", keyed by expense id (survives close/reopen). */
   const draftAllocationRef = useRef(new Map());
@@ -112,6 +113,22 @@ export default function StatementExpensePicker({
       return String(e?.transaction_id ?? "").trim() === tx;
     });
   }, [rawList, tx]);
+  const filteredList = useMemo(() => {
+    if (!searchQuery.trim()) return list;
+    const query = searchQuery.toLowerCase();
+    return list.filter((e) => {
+      const expenseName = (e?.expense_name || "").toLowerCase();
+      const clientName = (e?.client_name || "").toLowerCase();
+      const groupName = (e?.group_name || "").toLowerCase();
+      const id = String(e?.id || "");
+      return (
+        expenseName.includes(query) ||
+        clientName.includes(query) ||
+        groupName.includes(query) ||
+        id.includes(query)
+      );
+    });
+  }, [list, searchQuery]);
   const selected = list.find((e) => String(e.id) === String(value));
   const normAlloc = useMemo(() => normalizeStatementExpenseAllocation(allocation), [allocation]);
 
@@ -336,8 +353,8 @@ export default function StatementExpensePicker({
   };
 
   const grouped = useMemo(() => {
-    const clients = list.filter((e) => e.expense_type !== "employee");
-    const emps = list.filter((e) => e.expense_type === "employee");
+    const clients = filteredList.filter((e) => e.expense_type !== "employee");
+    const emps = filteredList.filter((e) => e.expense_type === "employee");
     const empGroups = {};
     emps.forEach((e) => {
       const name = e.client_name || "Unknown";
@@ -345,7 +362,7 @@ export default function StatementExpensePicker({
       empGroups[name].push(e);
     });
     return { clients, empGroups };
-  }, [list]);
+  }, [filteredList]);
 
   const renderExpenseRow = (e) => {
     const { head, subStr } = headSubLines(e);
@@ -460,11 +477,21 @@ export default function StatementExpensePicker({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full border border-gray-200 rounded-md bg-white shadow-lg max-h-96 overflow-y-auto py-1">
-          {list.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-gray-500">No expenses loaded</p>
-          ) : (
-            <>
+        <div className="absolute z-50 mt-1 w-full border border-gray-200 rounded-md bg-white shadow-lg max-h-96 overflow-y-auto">
+          <div className="p-2 border-b border-gray-200 bg-gray-50">
+            <input
+              type="text"
+              placeholder="Search expenses..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="py-1">
+            {filteredList.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-gray-500">No expenses found</p>
+            ) : (
+              <>
               {/* Employee Expenses Card - Commented out as requested */}
               {/* 
               <div className="border-b border-gray-200 bg-gray-50/50">
@@ -531,7 +558,8 @@ export default function StatementExpensePicker({
                 {grouped.clients.map(renderExpenseRow)}
               </div>
             </>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>

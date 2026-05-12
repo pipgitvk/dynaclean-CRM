@@ -355,9 +355,9 @@ export default function OrderFollowups() {
             {loading ? (
               <SkeletonRows />
             ) : data && data.length > 0 ? (
-              filteredData.map((row) => (
+              filteredData.map((row, index) => (
                 <tr
-                  key={row.order_id}
+                  key={`${row.order_id}-${row.booking_id || index}`}
                   className="border-t border-gray-200 hover:bg-gray-50"
                 >
                   <td className="p-4">{row.order_id}</td>

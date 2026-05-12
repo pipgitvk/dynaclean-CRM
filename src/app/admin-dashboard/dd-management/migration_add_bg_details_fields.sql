@@ -1,0 +1,7 @@
+ALTER TABLE dd_records
+ADD COLUMN bg_date DATE NULL,
+ADD COLUMN bg_amount DECIMAL(15,2) NULL,
+ADD COLUMN bg_number_field VARCHAR(255) NULL,
+ADD COLUMN validity_upto DATE NULL,
+ADD COLUMN client_name VARCHAR(255) NULL,
+ADD COLUMN bg_scan_copy TEXT NULL;
