@@ -19,6 +19,7 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
     truck_number: record?.truck_number || "",
     driver_name: record?.driver_name || "",
     driver_number: record?.driver_number || "",
+    net_amount: record?.net_amount || "",
   });
   useEffect(() => {
     setMode(record?.mode_of_transport || "");
@@ -31,17 +32,19 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
       truck_number: record?.truck_number || "",
       driver_name: record?.driver_name || "",
       driver_number: record?.driver_number || "",
+      net_amount: record?.net_amount || "",
     });
   }, [record]);
   const [files, setFiles] = useState({ quotation_upload: null, payment_proof_upload: null, invoice_upload: null, eway_bill: null });
   function onFileChange(e, key) { setFiles((f) => ({ ...f, [key]: e.target.files?.[0] || null })); }
   if (!open) return null;
-  const disabled = record?.status !== 'requested';
+  const disabled = false;
   async function save() {
     try {
       const fd = new FormData();
       fd.append('id', String(record.id));
       fd.append('mode_of_transport', mode);
+      fd.append('net_amount', form.net_amount);
       if (mode === 'Self') fd.append('self_name', form.self_name);
       if (mode === 'Courier') { fd.append('courier_tracking_id', form.courier_tracking_id); fd.append('courier_company', form.courier_company); }
       if (mode === 'Porter') { fd.append('porter_tracking_id', form.porter_tracking_id); fd.append('porter_contact', form.porter_contact); }
@@ -69,8 +72,17 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
           <h3 className="text-lg font-semibold">Edit Transport (Req #{record?.id})</h3>
           <button onClick={onClose} className="text-gray-500">✕</button>
         </div>
-        {disabled && <p className="text-sm text-red-600 mb-2">Can only edit while status is "requested".</p>}
         <div className="space-y-3">
+          <div>
+            <label className="block mb-1">Net Amount</label>
+            <input
+              type="number"
+              className="w-full border p-2 rounded"
+              value={form.net_amount}
+              onChange={(e) => setForm({ ...form, net_amount: e.target.value })}
+              disabled={disabled}
+            />
+          </div>
           <div>
             <label className="block mb-1">Mode of Transport</label>
             <select value={mode} onChange={(e) => setMode(e.target.value)} className="w-full border p-2 rounded" disabled={disabled}>
@@ -1014,8 +1026,7 @@ export default function PurchasesPage() {
                           </button>
                           <button
                             onClick={() => { setEditRecord(purchase); setEditOpen(true); }}
-                            disabled={purchase.status !== 'requested'}
-                            className={`flex items-center gap-1 text-sm ${purchase.status !== 'requested' ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600 hover:text-purple-700'}`}
+                            className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
                           >
                             Edit
                           </button>

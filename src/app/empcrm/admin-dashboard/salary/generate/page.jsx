@@ -41,6 +41,9 @@ function payrollAttendanceFallbackRows(b) {
 const GenerateSalaryPage = () => {
     const router = useRouter();
 
+    // User Role State
+    const [userRole, setUserRole] = useState("");
+
     // Selection State
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [selectedEmployee, setSelectedEmployee] = useState("");
@@ -74,8 +77,21 @@ const GenerateSalaryPage = () => {
     /** Same opts as PDF — drives WYSIWYG preview */
     const [payslipPreviewOpts, setPayslipPreviewOpts] = useState(null);
 
-    // Fetch Employees on Mount
+    // Fetch User Role on Mount
     useEffect(() => {
+        const fetchUserRole = async () => {
+            try {
+                const res = await fetch("/api/me");
+                if (res.ok) {
+                    const data = await res.json();
+                    setUserRole(data.role || "");
+                    console.log("[DEBUG] User Role:", data.role);
+                }
+            } catch (err) {
+                console.error("Failed to fetch user role:", err);
+            }
+        };
+        fetchUserRole();
         fetchEmployees();
     }, []);
 

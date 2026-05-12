@@ -23,6 +23,11 @@ async function hasCityColumn(conn) {
   return rows.length > 0;
 }
 
+async function hasPriorityColumn(conn) {
+  const [rows] = await conn.execute(`SHOW COLUMNS FROM hr_designation_monthly_targets LIKE 'priority'`);
+  return rows.length > 0;
+}
+
 async function ensureCityColumn(conn) {
   const exists = await hasCityColumn(conn);
   if (exists) return true;
@@ -33,6 +38,18 @@ async function ensureCityColumn(conn) {
   } catch {
   }
   return hasCityColumn(conn);
+}
+
+async function ensurePriorityColumn(conn) {
+  const exists = await hasPriorityColumn(conn);
+  if (exists) return true;
+  try {
+    await conn.execute(
+      `ALTER TABLE hr_designation_monthly_targets ADD COLUMN priority TINYINT NULL DEFAULT NULL`
+    );
+  } catch {
+  }
+  return hasPriorityColumn(conn);
 }
 
 /** GET: list targets (optional ?year= & ?month=) */
@@ -49,9 +66,10 @@ export async function GET(req) {
     const conn = await getDbConnection();
     const withUser = await hasHrUsernameColumn(conn);
     const withCity = await hasCityColumn(conn);
+    const withPriority = await hasPriorityColumn(conn);
     const selectCols = withUser
-      ? `id, designation, hr_username, ${withCity ? "city, " : ""}target_amount, month, year, created_at, updated_at`
-      : `id, designation, ${withCity ? "city, " : ""}target_amount, month, year, created_at, updated_at`;
+      ? `id, designation, hr_username, ${withCity ? "city, " : ""}${withPriority ? "priority, " : ""}target_amount, month, year, created_at, updated_at`
+      : `id, designation, ${withCity ? "city, " : ""}${withPriority ? "priority, " : ""}target_amount, month, year, created_at, updated_at`;
 
     let sql = `SELECT ${selectCols} FROM hr_designation_monthly_targets WHERE 1=1`;
     const params = [];
@@ -98,6 +116,7 @@ export async function POST(request) {
     const hr_username = String(body.hr_username ?? "").trim();
     const city = String(body.city ?? "").trim();
     const target_amount = Number(body.target_amount ?? body.target ?? NaN);
+    const priority = parseInt(body.priority, 10);
     const month = parseInt(body.month, 10);
     const year = parseInt(body.year, 10);
 
@@ -106,6 +125,9 @@ export async function POST(request) {
     }
     if (!Number.isFinite(target_amount) || target_amount < 0) {
       return NextResponse.json({ success: false, error: "Valid target amount is required" }, { status: 400 });
+    }
+    if (Number.isNaN(priority) || priority < 1 || priority > 5) {
+      return NextResponse.json({ success: false, error: "Priority must be 1–5" }, { status: 400 });
     }
     if (Number.isNaN(month) || month < 1 || month > 12) {
       return NextResponse.json({ success: false, error: "Month must be 1–12" }, { status: 400 });
@@ -119,23 +141,26 @@ export async function POST(request) {
     if (withUser) {
       await ensureCityColumn(conn);
     }
+    const withPriority = await ensurePriorityColumn(conn);
     const withCity = withUser ? await hasCityColumn(conn) : await (city ? ensureCityColumn(conn) : hasCityColumn(conn));
 
     if (withUser) {
       await conn.execute(
-        `INSERT INTO hr_designation_monthly_targets (designation, hr_username, ${withCity ? "city, " : ""}target_amount, month, year)
-         VALUES (?, ?, ${withCity ? "?, " : ""}?, ?, ?)
-         ON DUPLICATE KEY UPDATE ${withCity ? "target_amount = VALUES(target_amount), " : ""}updated_at = CURRENT_TIMESTAMP`,
+        `INSERT INTO hr_designation_monthly_targets (designation, hr_username, ${withCity ? "city, " : ""}${withPriority ? "priority, " : ""}target_amount, month, year)
+         VALUES (?, ?, ${withCity ? "?, " : ""}${withPriority ? "?, " : ""}?, ?, ?)
+         ON DUPLICATE KEY UPDATE ${withCity ? "" : ""}${withPriority ? "priority = VALUES(priority), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
         withCity
-          ? [designation, hr_username, city, target_amount, month, year]
-          : [designation, hr_username, target_amount, month, year]
+          ? [designation, hr_username, city, ...(withPriority ? [priority] : []), target_amount, month, year]
+          : [designation, hr_username, ...(withPriority ? [priority] : []), target_amount, month, year]
       );
     } else {
       await conn.execute(
-        `INSERT INTO hr_designation_monthly_targets (designation, ${withCity ? "city, " : ""}target_amount, month, year)
-         VALUES (?, ${withCity ? "?, " : ""}?, ?, ?)
-         ON DUPLICATE KEY UPDATE ${withCity ? "city = VALUES(city), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
-        withCity ? [designation, city, target_amount, month, year] : [designation, target_amount, month, year]
+        `INSERT INTO hr_designation_monthly_targets (designation, ${withCity ? "city, " : ""}${withPriority ? "priority, " : ""}target_amount, month, year)
+         VALUES (?, ${withCity ? "?, " : ""}${withPriority ? "?, " : ""}?, ?, ?)
+         ON DUPLICATE KEY UPDATE ${withCity ? "city = VALUES(city), " : ""}${withPriority ? "priority = VALUES(priority), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
+        withCity
+          ? [designation, city, ...(withPriority ? [priority] : []), target_amount, month, year]
+          : [designation, ...(withPriority ? [priority] : []), target_amount, month, year]
       );
     }
 
@@ -170,6 +195,7 @@ export async function PATCH(request) {
     const hr_username = String(body.hr_username ?? "").trim();
     const city = String(body.city ?? "").trim();
     const target_amount = Number(body.target_amount ?? body.target ?? NaN);
+    const priority = parseInt(body.priority, 10);
     const month = parseInt(body.month, 10);
     const year = parseInt(body.year, 10);
 
@@ -181,6 +207,9 @@ export async function PATCH(request) {
     }
     if (!Number.isFinite(target_amount) || target_amount < 0) {
       return NextResponse.json({ success: false, error: "Valid target amount is required" }, { status: 400 });
+    }
+    if (Number.isNaN(priority) || priority < 1 || priority > 5) {
+      return NextResponse.json({ success: false, error: "Priority must be 1–5" }, { status: 400 });
     }
     if (Number.isNaN(month) || month < 1 || month > 12) {
       return NextResponse.json({ success: false, error: "Month must be 1–12" }, { status: 400 });
@@ -194,6 +223,7 @@ export async function PATCH(request) {
     if (withUser) {
       await ensureCityColumn(conn);
     }
+    const withPriority = await ensurePriorityColumn(conn);
     const withCity = withUser ? await hasCityColumn(conn) : await (city ? ensureCityColumn(conn) : hasCityColumn(conn));
 
     if (withUser) {
@@ -202,18 +232,20 @@ export async function PATCH(request) {
       }
       await conn.execute(
         `UPDATE hr_designation_monthly_targets
-         SET designation = ?, hr_username = ?, ${withCity ? "city = ?, " : ""}target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
+         SET designation = ?, hr_username = ?, ${withCity ? "city = ?, " : ""}${withPriority ? "priority = ?, " : ""}target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
         withCity
-          ? [designation, hr_username, city, target_amount, month, year, id]
-          : [designation, hr_username, target_amount, month, year, id]
+          ? [designation, hr_username, city, ...(withPriority ? [priority] : []), target_amount, month, year, id]
+          : [designation, hr_username, ...(withPriority ? [priority] : []), target_amount, month, year, id]
       );
     } else {
       await conn.execute(
         `UPDATE hr_designation_monthly_targets
-         SET designation = ?, ${withCity ? "city = ?, " : ""}target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
+         SET designation = ?, ${withCity ? "city = ?, " : ""}${withPriority ? "priority = ?, " : ""}target_amount = ?, month = ?, year = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`,
-        withCity ? [designation, city, target_amount, month, year, id] : [designation, target_amount, month, year, id]
+        withCity
+          ? [designation, city, ...(withPriority ? [priority] : []), target_amount, month, year, id]
+          : [designation, ...(withPriority ? [priority] : []), target_amount, month, year, id]
       );
     }
 

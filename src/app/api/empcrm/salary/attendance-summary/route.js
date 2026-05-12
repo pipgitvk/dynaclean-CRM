@@ -92,7 +92,7 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
 export async function GET(request) {
   try {
     const payload = await getSessionPayload();
-    if (!payload || !["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"].includes(payload.role)) {
+    if (!payload || !["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"].includes(payload.role)) {
       return NextResponse.json({ message: "Unauthorized access." }, { status: 401 });
     }
 

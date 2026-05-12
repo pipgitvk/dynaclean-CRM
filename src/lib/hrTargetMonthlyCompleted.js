@@ -132,13 +132,21 @@ export async function buildItemsForHrUsername(conn, username, year, month) {
     hasCity = false;
   }
 
-  const selectCols = hasCity ? "designation, target_amount, city" : "designation, target_amount";
+  let hasPriority = false;
+  try {
+    const [cols] = await conn.execute(`SHOW COLUMNS FROM hr_designation_monthly_targets LIKE 'priority'`);
+    hasPriority = (cols || []).length > 0;
+  } catch {
+    hasPriority = false;
+  }
+
+  const selectCols = `designation, target_amount${hasCity ? ", city" : ""}${hasPriority ? ", priority" : ""}`;
 
   const [userRows] = await conn.execute(
     `SELECT ${selectCols} FROM hr_designation_monthly_targets
      WHERE year = ? AND month = ? AND TRIM(hr_username) <> ''
        AND LOWER(TRIM(hr_username)) = LOWER(TRIM(?))
-     ORDER BY designation ASC`,
+     ORDER BY ${hasPriority ? "priority ASC, " : ""}designation ASC`,
     [year, month, username]
   );
   const items = [];
@@ -149,7 +157,8 @@ export async function buildItemsForHrUsername(conn, username, year, month) {
     const cityFilter = hasCity && cityRaw ? cityRaw : null;
     const completed = await computeCompletedForDesignation(conn, username, year, month, des, cityFilter);
     const city = hasCity ? cityRaw : "";
-    items.push({ designation: des, target: tgt, completed, city });
+    const priority = hasPriority ? row.priority : null;
+    items.push({ designation: des, target: tgt, completed, city, priority });
   }
   return items;
 }

@@ -59,6 +59,13 @@ export async function GET(req) {
         await conn.execute("ALTER TABLE statements ADD COLUMN linked_purchase_ids TEXT NULL");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT dd_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN dd_id INT NULL");
+      } catch (__) {}
+    }
 
     // Ensure expenses table has linked_statement_ids column
     try {
@@ -71,14 +78,14 @@ export async function GET(req) {
 
     if (expenseId) {
       [rows] = await conn.execute(
-        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, created_at
+        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, created_at
          FROM statements
          WHERE client_expense_id = ?
          ORDER BY id DESC`,
         [expenseId]
       );
     } else if (status === "unsettled") {
-      let query = `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, created_at
+      let query = `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, created_at
          FROM statements
          WHERE (invoice_status IS NULL OR invoice_status = 'Unsettled' OR invoice_status = '')
          AND (client_expense_id IS NULL`;
@@ -95,7 +102,7 @@ export async function GET(req) {
       [rows] = await conn.execute(query, params);
     } else {
       [rows] = await conn.execute(
-        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, created_at
+        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, created_at
          FROM statements
          ORDER BY date DESC, id DESC`
       );

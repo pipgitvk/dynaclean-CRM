@@ -376,7 +376,7 @@ export default function StatementTable({ rows }) {
       startY: 22,
       theme: "plain",
       head: [
-        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Debit", "Credit", "Status", "Invoice No", "Purchase IDs", "Expense ID", "Balance"],
+        ["ID", "Trans ID", "Date", "Txn Dated Deb", "Txn Posted Date", "Cheq No", "Description", "Debit", "Credit", "Status", "Invoice No", "Purchase IDs", "DD ID", "Expense ID", "Balance"],
       ],
       body: sortedRows.map((row) => [
         String(row.id),
@@ -391,6 +391,7 @@ export default function StatementTable({ rows }) {
         displayInvoiceStatus(row),
         row.invoice_number || "-",
         getLinkedPurchaseRefs(row).map(x => `${x.prefix}${x.id}`).join(", ") || "-",
+        row.dd_id ? `DD#${row.dd_id}` : "-",
         row.client_expense_id ? `EXP#${row.client_expense_id}` : "-",
         formatPdfAmount(displayBalance(row)),
       ]),
@@ -409,8 +410,9 @@ export default function StatementTable({ rows }) {
         9: { cellWidth: 15 },
         10: { cellWidth: 22 },
         11: { cellWidth: 22 },
-        12: { cellWidth: 18 },
-        13: { cellWidth: 20 },
+        12: { cellWidth: 15 },
+        13: { cellWidth: 18 },
+        14: { cellWidth: 20 },
       },
       margin: { left: 14, right: 14 },
     });
@@ -655,7 +657,7 @@ export default function StatementTable({ rows }) {
             <FileSpreadsheet size={16} />
             Demo (.xlsx)
           </button>
-          {/* <button
+          <button
             type="button"
             onClick={handleDeleteAll}
             disabled={deletingAll || rows.length === 0}
@@ -664,7 +666,7 @@ export default function StatementTable({ rows }) {
           >
             <Trash2 size={16} />
             {deletingAll ? "Deleting..." : "Delete All"}
-          </button> */}
+          </button>
         </div>
       </div>
 
@@ -684,6 +686,7 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
               <th className="p-3">Invoice No</th>
               <th className="p-3">Purchase IDs</th>
+              <th className="p-3">DD ID</th>
               <th className="p-3">Expense ID</th>
               <th
                 onClick={() => handleSort("balance")}
@@ -758,6 +761,15 @@ export default function StatementTable({ rows }) {
                         </span>
                       );
                     })()}
+                  </td>
+                  <td className="p-3">
+                    {row.dd_id ? (
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded whitespace-nowrap">
+                        DD#{row.dd_id}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
                   </td>
                   <td className="p-3">
                     {row.client_expense_id ? (

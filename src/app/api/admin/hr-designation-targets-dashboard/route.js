@@ -27,6 +27,11 @@ async function hasCityColumn(conn) {
   return rows.length > 0;
 }
 
+async function hasPriorityColumn(conn) {
+  const [rows] = await conn.execute(`SHOW COLUMNS FROM hr_designation_monthly_targets LIKE 'priority'`);
+  return rows.length > 0;
+}
+
 function periodLabels(year, month) {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 0);
@@ -82,6 +87,7 @@ export async function GET(req) {
     const conn = await getDbConnection();
     const withUser = await hasHrUsernameColumn(conn);
     const withCity = withUser ? await hasCityColumn(conn) : false;
+    const withPriority = withUser ? await hasPriorityColumn(conn) : false;
     const { start_date, end_date } = periodLabels(year, month);
 
     if (!withUser) {
@@ -97,14 +103,14 @@ export async function GET(req) {
     }
 
     const selectCols = withCity
-      ? `id, designation, hr_username, city, target_amount, month, year, created_at, updated_at`
-      : `id, designation, hr_username, target_amount, month, year, created_at, updated_at`;
+      ? `id, designation, hr_username, city, ${withPriority ? "priority, " : ""}target_amount, month, year, created_at, updated_at`
+      : `id, designation, hr_username, ${withPriority ? "priority, " : ""}target_amount, month, year, created_at, updated_at`;
 
     const [targetsRows] = await conn.execute(
       `SELECT ${selectCols}
        FROM hr_designation_monthly_targets
        WHERE year = ? AND month = ?
-       ORDER BY hr_username ASC, designation ASC${withCity ? ", city ASC" : ""}`,
+       ORDER BY ${withPriority ? "priority ASC, " : ""}hr_username ASC, designation ASC${withCity ? ", city ASC" : ""}`,
       [year, month]
     );
 
@@ -158,6 +164,7 @@ export async function GET(req) {
         designation: row.designation,
         hr_username: hu || "—",
         city: withCity ? String(row.city || "").trim() : "",
+        priority: withPriority ? row.priority : null,
         target_amount: row.target_amount != null ? Number(row.target_amount) : 0,
         month: row.month,
         year: row.year,
