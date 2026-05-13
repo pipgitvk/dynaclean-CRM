@@ -26,8 +26,9 @@ const StatusBadge = ({ status }) => {
         Assigned: "text-[12px] bg-blue-100 text-blue-700 border-blue-200",
         Created: "text-[12px] bg-blue-100 text-blue-700 border-blue-200",
         Filled: "text-[12px] bg-yellow-100 text-yellow-700 border-yellow-200",
-        Issued: "text-[12px] bg-green-100 text-green-700 border-green-200",
+        Issued: "text-[12px] bg-red-100 text-red-700 border-red-200",
         "Sent to Client": "text-[12px] bg-purple-100 text-purple-700 border-purple-200",
+        Claimed: "text-[12px] bg-green-100 text-green-700 border-green-200",
     };
 
     const displayStatus = status === "Assigned" ? "Created" : status;
@@ -73,6 +74,10 @@ export default function DDManagementPage() {
         assign_date: dayjs().format("YYYY-MM-DD"),
         assigned_by: "",
         mode_of_payment: "DD",
+        contract_no: "",
+        security_type: "",
+        bid_document: null,
+        remark: "",
 
         // BG Specific Step 1
         beneficiary_name: "",
@@ -209,6 +214,7 @@ export default function DDManagementPage() {
         if (formData.bg_scan_copy instanceof File) { fileData.append("bg_scan_copy", formData.bg_scan_copy); hasFiles = true; }
         if (formData.payment_proof instanceof File) { fileData.append("payment_proof", formData.payment_proof); hasFiles = true; }
         if (formData.receipt instanceof File) { fileData.append("receipt", formData.receipt); hasFiles = true; }
+        if (formData.bid_document instanceof File) { fileData.append("bid_document", formData.bid_document); hasFiles = true; }
 
         if (!hasFiles) return {};
 
@@ -334,6 +340,7 @@ export default function DDManagementPage() {
             if (payload.bg_scan_copy instanceof File) delete payload.bg_scan_copy;
             if (payload.payment_proof instanceof File) delete payload.payment_proof;
             if (payload.receipt instanceof File) delete payload.receipt;
+            if (payload.bid_document instanceof File) delete payload.bid_document;
 
             // Automation: Update status based on the step being saved if it's currently at an earlier stage
             if (step === 1) {
@@ -453,7 +460,11 @@ export default function DDManagementPage() {
             amount: "",
             assign_date: dayjs().format("YYYY-MM-DD"),
             assigned_by: currentUserName || "",
-            mode_of_payment: type,
+            mode_of_payment: type === "EPAYMENT" ? "EPAYMENT" : type,
+            contract_no: "",
+            security_type: "",
+            bid_document: null,
+            remark: "",
             beneficiary_name: "",
             beneficiary_address: "",
             expiry_date: "",
@@ -585,8 +596,8 @@ export default function DDManagementPage() {
                                     <tr key={dd.id} className="hover:bg-gray-50/80 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 rounded-xl ${dd.type === 'BG' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'} flex items-center justify-center font-bold shadow-sm group-hover:scale-110 transition-transform`}>
-                                                    {dd.type === 'BG' ? 'BG' : 'DD'}
+                                                <div className={`w-10 h-10 rounded-xl ${dd.type === 'BG' ? 'bg-purple-100 text-purple-600' : dd.type === 'EPAYMENT' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'} flex items-center justify-center font-bold shadow-sm group-hover:scale-110 transition-transform`}>
+                                                    {dd.type === 'BG' ? 'BG' : dd.type === 'EPAYMENT' ? 'EP' : 'DD'}
                                                 </div>
                                                 <div className="text-xs">
                                                     <div className="font-bold text-gray-800">{dd.type === 'BG' ? dd.beneficiary_name : dd.party_name}</div>
@@ -725,6 +736,13 @@ export default function DDManagementPage() {
                                 <CheckCircle size={32} />
                                 Bank Guarantee (BG)
                             </button>
+                            <button
+                                onClick={() => { setSelectedDD(null); setFormData(getBlankFormData("EPAYMENT")); setActiveModal(1); }}
+                                className="w-full py-4 bg-emerald-50 text-emerald-700 border-2 border-emerald-200 rounded-xl font-bold hover:bg-emerald-100 transition-all flex flex-col items-center gap-2"
+                            >
+                                <DollarSign size={32} />
+                                E-payment
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -733,7 +751,7 @@ export default function DDManagementPage() {
             {activeModal === 1 && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
-                        <div className={`${formData.type === "BG" ? "bg-purple-600" : "bg-blue-600"} p-6 text-white flex justify-between items-center`}>
+                        <div className={`${formData.type === "BG" ? "bg-purple-600" : formData.type === "EPAYMENT" ? "bg-emerald-600" : "bg-blue-600"} p-6 text-white flex justify-between items-center`}>
                             <div>
                                 <h2 className="text-xl font-bold">
                                     {selectedDD ? `Edit ${formData.type} (Step 1)` : `New ${formData.type} Assignment`}
@@ -742,7 +760,7 @@ export default function DDManagementPage() {
                             </div>
                             <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-black/20 rounded-full transition-colors"><X size={24} /></button>
                         </div>
-                        <div className="p-8 space-y-4">
+                        <div className="p-8 space-y-4 max-h-[70vh] overflow-y-auto">
                             {formData.type === "BG" ? (
                                 <>
                                     <div className="grid grid-cols-2 gap-4">
@@ -785,6 +803,20 @@ export default function DDManagementPage() {
                                             <option value="BG">BG</option>
                                         </select>
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contract No</label>
+                                            <input disabled={selectedDD?.contract_no} name="contract_no" value={formData.contract_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Enter contract number" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">For</label>
+                                            <select disabled={selectedDD?.security_type} name="security_type" value={formData.security_type} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                                <option value="">Select Security Type</option>
+                                                <option value="EMD">EMD</option>
+                                                <option value="BG">BG</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload BG Format</label>
                                         <div className="flex items-center gap-2">
@@ -796,38 +828,82 @@ export default function DDManagementPage() {
                                             )}
                                         </div>
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Bid Document</label>
+                                        <div className="flex items-center gap-2">
+                                            <input disabled={!isAuthorized} type="file" name="bid_document" onChange={handleFileChange} accept="image/*" className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 disabled:opacity-50" />
+                                            {formData.bid_document && typeof formData.bid_document === "string" && (
+                                                <button onClick={() => handleViewFile(formData.bid_document)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center gap-1 text-xs font-bold" title="View Bid Document">
+                                                    <Eye size={16} /> View
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark</label>
+                                        <textarea disabled={selectedDD?.remark} name="remark" value={formData.remark} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed min-h-[80px]" placeholder="Enter any remarks" />
+                                    </div>
                                 </>
                             ) : (
                                 <>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="col-span-2 md:col-span-1">
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD Location</label>
-                                            <input disabled={selectedDD?.dd_location} name="dd_location" value={formData.dd_location} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="e.g. Mumbai Main Branch" />
+                                            <input disabled={selectedDD?.dd_location} name="dd_location" value={formData.dd_location} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="e.g. Mumbai Main Branch" />
                                         </div>
                                         <div className="col-span-2 md:col-span-1">
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Party Name (Favour)</label>
-                                            <input disabled={selectedDD?.party_name} name="party_name" value={formData.party_name} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Enter party name" />
+                                            <input disabled={selectedDD?.party_name} name="party_name" value={formData.party_name} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter party name" />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
-                                            <input disabled={selectedDD?.amount} type="number" name="amount" value={formData.amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="0.00" />
+                                            <input disabled={selectedDD?.amount} type="number" name="amount" value={formData.amount} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="0.00" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Assign Date</label>
-                                            <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                                            <input disabled={selectedDD?.assign_date} type="date" name="assign_date" value={formData.assign_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                         </div>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mode of Payment</label>
-                                        <select disabled={selectedDD?.mode_of_payment} name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed">
+                                        <select disabled={selectedDD?.mode_of_payment} name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}>
                                             <option value="NEFT">NEFT</option>
                                             <option value="IMPS">IMPS</option>
                                             <option value="DD">DD</option>
                                             <option value="RTGS">RTGS</option>
                                             <option value="BG">BG</option>
                                         </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contract No</label>
+                                            <input disabled={selectedDD?.contract_no} name="contract_no" value={formData.contract_no} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter contract number" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">For</label>
+                                            <select disabled={selectedDD?.security_type} name="security_type" value={formData.security_type} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}>
+                                                <option value="">Select Security Type</option>
+                                                <option value="EMD">EMD</option>
+                                                <option value="BG">BG</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Bid Document</label>
+                                        <div className="flex items-center gap-2">
+                                            <input disabled={!isAuthorized} type="file" name="bid_document" onChange={handleFileChange} accept="image/*" className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"} disabled:opacity-50`} />
+                                            {formData.bid_document && typeof formData.bid_document === "string" && (
+                                                <button onClick={() => handleViewFile(formData.bid_document)} className={`p-2 rounded-lg ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Bid Document">
+                                                    <Eye size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark</label>
+                                        <textarea disabled={selectedDD?.remark} name="remark" value={formData.remark} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed min-h-[80px] ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter any remarks" />
                                     </div>
                                 </>
                             )}
@@ -852,7 +928,7 @@ export default function DDManagementPage() {
                                         }
                                         handleSubmit(1, false);
                                     }}
-                                    className={`flex items-center gap-2 ${formData.type === "BG" ? "bg-purple-600 hover:bg-purple-700" : "bg-blue-600 hover:bg-blue-700"} text-white px-8 py-2.5 rounded-lg font-bold transition-all shadow-md`}
+                                    className={`flex items-center gap-2 ${formData.type === "BG" ? "bg-purple-600 hover:bg-purple-700" : formData.type === "EPAYMENT" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"} text-white px-8 py-2.5 rounded-lg font-bold transition-all shadow-md`}
                                 >
                                     Save & Next <ChevronRight size={20} />
                                 </button>
@@ -883,7 +959,7 @@ export default function DDManagementPage() {
             {activeModal === 2 && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
-                        <div className={`${formData.type === "BG" ? "bg-purple-600" : "bg-blue-600"} p-6 text-white flex justify-between items-center`}>
+                        <div className={`${formData.type === "BG" ? "bg-purple-600" : formData.type === "EPAYMENT" ? "bg-emerald-600" : "bg-blue-600"} p-6 text-white flex justify-between items-center`}>
                             <div>
                                 <h2 className="text-xl font-bold">Process {formData.type} (Step 2)</h2>
                                 <p className="text-xs opacity-80 mt-1">
@@ -1083,7 +1159,7 @@ export default function DDManagementPage() {
                                 <>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Mode of Payment</label>
-                                        <select name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <select name="mode_of_payment" value={formData.mode_of_payment} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`}>
                                             <option value="NEFT">NEFT</option>
                                             <option value="IMPS">IMPS</option>
                                             <option value="DD">DD</option>
@@ -1095,14 +1171,14 @@ export default function DDManagementPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Cheque Number</label>
-                                            <input disabled={selectedDD?.cheque_no} name="cheque_no" value={formData.cheque_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="6-digit number" />
+                                            <input disabled={selectedDD?.cheque_no} name="cheque_no" value={formData.cheque_no} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="6-digit number" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload Cheque Copy</label>
                                             <div className="flex items-center gap-2">
-                                                <input disabled={!isAuthorized} type="file" name="cheque_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 disabled:opacity-50" />
+                                                <input disabled={!isAuthorized} type="file" name="cheque_upload" onChange={handleFileChange} className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"} disabled:opacity-50`} />
                                                 {formData.cheque_upload && typeof formData.cheque_upload === "string" && (
-                                                    <button onClick={() => handleViewFile(formData.cheque_upload)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1 text-xs font-bold" title="View Cheque">
+                                                    <button onClick={() => handleViewFile(formData.cheque_upload)} className={`p-2 rounded-lg flex items-center gap-1 text-xs font-bold ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Cheque">
                                                         <Eye size={16} /> View
                                                     </button>
                                                 )}
@@ -1112,17 +1188,17 @@ export default function DDManagementPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Bank Name</label>
-                                            <input disabled={selectedDD?.bank_name} name="bank_name" value={formData.bank_name} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="e.g. SBI, HDFC" />
+                                            <input disabled={selectedDD?.bank_name} name="bank_name" value={formData.bank_name} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="e.g. SBI, HDFC" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Account Number</label>
-                                            <input disabled={selectedDD?.account_number} name="account_number" value={formData.account_number} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Full account number" />
+                                            <input disabled={selectedDD?.account_number} name="account_number" value={formData.account_number} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Full account number" />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="col-span-2">
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Branch</label>
-                                            <input disabled={selectedDD?.branch} name="branch" value={formData.branch} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Branch location" />
+                                            <input disabled={selectedDD?.branch} name="branch" value={formData.branch} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Branch location" />
                                         </div>
                                     </div>
                                     */}
@@ -1134,30 +1210,30 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Reference No</label>
-                                                    <input disabled={selectedDD?.reference_no} name="reference_no" value={formData.reference_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter reference number" />
+                                                    <input disabled={selectedDD?.reference_no} name="reference_no" value={formData.reference_no} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter reference number" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
-                                                    <input disabled={selectedDD?.payment_amount} type="number" name="payment_amount" value={formData.payment_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="0.00" />
+                                                    <input disabled={selectedDD?.payment_amount} type="number" name="payment_amount" value={formData.payment_amount} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="0.00" />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Date</label>
-                                                    <input disabled={selectedDD?.payment_date} type="date" name="payment_date" value={formData.payment_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                    <input disabled={selectedDD?.payment_date} type="date" name="payment_date" value={formData.payment_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">From Bank Account No</label>
-                                                    <input disabled={selectedDD?.from_bank_account_no} name="from_bank_account_no" value={formData.from_bank_account_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter account number" />
+                                                    <input disabled={selectedDD?.from_bank_account_no} name="from_bank_account_no" value={formData.from_bank_account_no} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter account number" />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Payment Proof <span className="text-red-500">*</span></label>
                                                     <div className="flex items-center gap-2">
-                                                        <input type="file" name="payment_proof" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        <input type="file" name="payment_proof" onChange={handleFileChange} className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"}`} />
                                                         {formData.payment_proof && typeof formData.payment_proof === "string" && (
-                                                            <button onClick={() => handleViewFile(formData.payment_proof)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Payment Proof">
+                                                            <button onClick={() => handleViewFile(formData.payment_proof)} className={`p-2 rounded-lg ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Payment Proof">
                                                                 <Eye size={16} />
                                                             </button>
                                                         )}
@@ -1166,9 +1242,9 @@ export default function DDManagementPage() {
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Receipt <span className="text-red-500">*</span></label>
                                                     <div className="flex items-center gap-2">
-                                                        <input type="file" name="receipt" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        <input type="file" name="receipt" onChange={handleFileChange} className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"}`} />
                                                         {formData.receipt && typeof formData.receipt === "string" && (
-                                                            <button onClick={() => handleViewFile(formData.receipt)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Receipt">
+                                                            <button onClick={() => handleViewFile(formData.receipt)} className={`p-2 rounded-lg ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Receipt">
                                                                 <Eye size={16} />
                                                             </button>
                                                         )}
@@ -1185,40 +1261,40 @@ export default function DDManagementPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD No</label>
-                                                    <input disabled={selectedDD?.dd_no} name="dd_no" value={formData.dd_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter DD number" />
+                                                    <input disabled={selectedDD?.dd_no} name="dd_no" value={formData.dd_no} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter DD number" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD Date</label>
-                                                    <input disabled={selectedDD?.dd_date} type="date" name="dd_date" value={formData.dd_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                    <input disabled={selectedDD?.dd_date} type="date" name="dd_date" value={formData.dd_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Amount</label>
-                                                    <input disabled={selectedDD?.payment_amount} type="number" name="payment_amount" value={formData.payment_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="0.00" />
+                                                    <input disabled={selectedDD?.payment_amount} type="number" name="payment_amount" value={formData.payment_amount} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="0.00" />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Beneficiary Name</label>
-                                                    <input disabled={selectedDD?.dd_beneficiary_name} name="dd_beneficiary_name" value={formData.dd_beneficiary_name} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter beneficiary name" />
+                                                    <input disabled={selectedDD?.dd_beneficiary_name} name="dd_beneficiary_name" value={formData.dd_beneficiary_name} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter beneficiary name" />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Expiry Bank Date</label>
-                                                    <input disabled={selectedDD?.expiry_bank} type="date" name="expiry_bank" value={formData.expiry_bank} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                    <input disabled={selectedDD?.expiry_bank} type="date" name="expiry_bank" value={formData.expiry_bank} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                                 </div>
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Issuing Branch</label>
-                                                    <input disabled={selectedDD?.issuing_branch} name="issuing_branch" value={formData.issuing_branch} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter issuing branch" />
+                                                    <input disabled={selectedDD?.issuing_branch} name="issuing_branch" value={formData.issuing_branch} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter issuing branch" />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Scan Copy <span className="text-red-500">*</span></label>
                                                     <div className="flex items-center gap-2">
-                                                        <input type="file" name="dd_scan_copy" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        <input type="file" name="dd_scan_copy" onChange={handleFileChange} className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"}`} />
                                                         {formData.dd_scan_copy && typeof formData.dd_scan_copy === "string" && (
-                                                            <button onClick={() => handleViewFile(formData.dd_scan_copy)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Scan Copy">
+                                                            <button onClick={() => handleViewFile(formData.dd_scan_copy)} className={`p-2 rounded-lg ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Scan Copy">
                                                                 <Eye size={16} />
                                                             </button>
                                                         )}
@@ -1227,9 +1303,9 @@ export default function DDManagementPage() {
                                                 <div>
                                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Receipt <span className="text-red-500">*</span></label>
                                                     <div className="flex items-center gap-2">
-                                                        <input type="file" name="dd_receipt" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700" />
+                                                        <input type="file" name="dd_receipt" onChange={handleFileChange} className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"}`} />
                                                         {formData.dd_receipt && typeof formData.dd_receipt === "string" && (
-                                                            <button onClick={() => handleViewFile(formData.dd_receipt)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Receipt">
+                                                            <button onClick={() => handleViewFile(formData.dd_receipt)} className={`p-2 rounded-lg ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Receipt">
                                                                 <Eye size={16} />
                                                             </button>
                                                         )}
@@ -1287,19 +1363,19 @@ export default function DDManagementPage() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">DD Number (Unique)</label>
-                                                <input disabled={!isAuthorized || selectedDD?.dd_number} name="dd_number" value={formData.dd_number} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="DD123456" />
+                                                <input disabled={!isAuthorized || selectedDD?.dd_number} name="dd_number" value={formData.dd_number} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none font-mono disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="DD123456" />
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Issued By</label>
-                                                <input disabled={!isAuthorized} name="issued_by" value={formData.issued_by || formData.bank_name} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Bank Name from Step 2" />
+                                                <input disabled={!isAuthorized} name="issued_by" value={formData.issued_by || formData.bank_name} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Bank Name from Step 2" />
                                             </div>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload Issued DD Copy</label>
                                             <div className="flex items-center gap-2">
-                                                <input disabled={!isAuthorized} type="file" name="dd_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 disabled:opacity-50" />
+                                                <input disabled={!isAuthorized} type="file" name="dd_upload" onChange={handleFileChange} className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"} disabled:opacity-50`} />
                                                 {formData.dd_upload && typeof formData.dd_upload === "string" && (
-                                                    <button onClick={() => handleViewFile(formData.dd_upload)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1 text-xs font-bold" title="View Final DD">
+                                                    <button onClick={() => handleViewFile(formData.dd_upload)} className={`p-2 rounded-lg flex items-center gap-1 text-xs font-bold ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Final DD">
                                                         <Eye size={16} /> View
                                                     </button>
                                                 )}
@@ -1323,14 +1399,14 @@ export default function DDManagementPage() {
                                                     <div className="space-y-4 pt-4 border-t">
                                                         <div>
                                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Client Tracking ID</label>
-                                                            <input disabled={!isAuthorized} name="client_tracking_id" value={formData.client_tracking_id || ""} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" placeholder="Enter tracking ID" />
+                                                            <input disabled={!isAuthorized} name="client_tracking_id" value={formData.client_tracking_id || ""} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter tracking ID" />
                                                         </div>
                                                         <div>
                                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Delivery Proof</label>
                                                             <div className="flex items-center gap-2">
-                                                                <input disabled={!isAuthorized} type="file" name="delivery_proof" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 disabled:opacity-50" />
+                                                                <input disabled={!isAuthorized} type="file" name="delivery_proof" onChange={handleFileChange} className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"} disabled:opacity-50`} />
                                                                 {formData.delivery_proof && typeof formData.delivery_proof === "string" && (
-                                                                    <button onClick={() => handleViewFile(formData.delivery_proof)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="View Delivery Proof">
+                                                                    <button onClick={() => handleViewFile(formData.delivery_proof)} className={`p-2 rounded-lg ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Delivery Proof">
                                                                         <Eye size={16} />
                                                                     </button>
                                                                 )}
@@ -1338,7 +1414,7 @@ export default function DDManagementPage() {
                                                         </div>
                                                         <div>
                                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Delivery Date</label>
-                                                            <input disabled={!isAuthorized} type="date" name="delivery_date" value={formData.delivery_date || ""} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                                            <input disabled={!isAuthorized} type="date" name="delivery_date" value={formData.delivery_date || ""} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                                         </div>
                                                     </div>
                                                 )}
@@ -1365,7 +1441,7 @@ export default function DDManagementPage() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Filled Date</label>
-                                            <input disabled={selectedDD?.filled_date} type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" />
+                                            <input disabled={selectedDD?.filled_date} type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                         </div>
                                     </div>
                                 </>
@@ -1379,7 +1455,7 @@ export default function DDManagementPage() {
                                     onClick={() => {
                                         handleSubmit(2, true); // Step 2 is now final for all types
                                     }}
-                                    className={`flex items-center gap-2 ${formData.type === "BG" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"} text-white px-8 py-2.5 rounded-lg font-bold transition-all shadow-md`}
+                                    className={`flex items-center gap-2 ${formData.type === "BG" ? "bg-green-600 hover:bg-green-700" : formData.type === "EPAYMENT" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-blue-600 hover:bg-blue-700"} text-white px-8 py-2.5 rounded-lg font-bold transition-all shadow-md`}
                                 >
                                     <><CheckCircle size={20} /> Save & Complete</>
                                 </button>
