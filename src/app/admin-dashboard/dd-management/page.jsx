@@ -172,9 +172,22 @@ export default function DDManagementPage() {
         }
     };
 
+    const fetchCreditStatements = async () => {
+        try {
+            const res = await fetch("/api/statements", { credentials: "include" });
+            const result = await res.json();
+            if (res.ok) {
+                setCreditStatements(result.statements || []);
+            }
+        } catch (err) {
+            console.error("Failed to fetch linked payment statements");
+        }
+    };
+
     useEffect(() => {
         fetchUser();
         fetchData();
+        fetchCreditStatements();
     }, [statusFilter, search]);
 
     const handleInputChange = (e) => {
@@ -281,7 +294,7 @@ export default function DDManagementPage() {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    invoice_status: isUnlink ? 'Unsettled' : 'Linked to DD',
+                    invoice_status: isUnlink ? 'Unsettled' : 'DD Management Linked',
                     purchase_id: selectedDD?.id,
                     dd_id: isUnlink ? null : selectedDD?.id,
                     dd_action: action
@@ -684,24 +697,20 @@ export default function DDManagementPage() {
                                                         >
                                                             Step 2
                                                         </button>
-                                                        {dd.reference_no && dd.payment_amount && dd.payment_date ? (
-                                                            <div className="flex flex-col items-start gap-1 text-[10px] text-emerald-700">
-                                                                <span className="font-semibold">TransID: {dd.reference_no}</span>
-                                                                <span className="font-semibold">Amount: {dd.payment_amount}</span>
-                                                                <span className="font-semibold">Date: {dayjs(dd.payment_date).format('DD-MM-YYYY')}</span>
-                                                            </div>
-                                                        ) : (
-                                                            <button
-                                                                onClick={() => openPaymentModal(dd)}
-                                                                className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
-                                                                title="Add Payment"
-                                                            >
-                                                                Add Payment
-                                                            </button>
-                                                        )}
                                                         {(() => {
-                                                            const linkedPayment = creditStatements.find(s => Number(s.dd_id) === Number(dd.id));
-                                                            if (linkedPayment) {
+                                                            const linkedPayment = creditStatements.find(s => Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
+                                                            const hasDirectPayment = dd.reference_no && dd.payment_amount && dd.payment_date;
+                                                            const hasLinkedPayment = linkedPayment && linkedPayment.trans_id;
+                                                            
+                                                            if (hasDirectPayment) {
+                                                                return (
+                                                                    <div className="flex flex-col items-start gap-1 text-[10px] text-emerald-700">
+                                                                        <span className="font-semibold">TransID: {dd.reference_no}</span>
+                                                                        <span className="font-semibold">Amount: {dd.payment_amount}</span>
+                                                                        <span className="font-semibold">Date: {dayjs(dd.payment_date).format('DD-MM-YYYY')}</span>
+                                                                    </div>
+                                                                );
+                                                            } else if (hasLinkedPayment) {
                                                                 return (
                                                                     <div className="flex flex-col items-start gap-1 text-[10px] text-blue-700">
                                                                         <span className="font-semibold">TransID: {linkedPayment.trans_id}</span>
@@ -709,17 +718,27 @@ export default function DDManagementPage() {
                                                                         <span className="font-semibold">Date: {linkedPayment.date ? dayjs(linkedPayment.date).format('DD-MM-YYYY') : 'N/A'}</span>
                                                                     </div>
                                                                 );
+                                                            } else {
+                                                                return (
+                                                                    <button
+                                                                        onClick={() => openPaymentModal(dd)}
+                                                                        className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
+                                                                        title="Add Payment"
+                                                                    >
+                                                                        Add Payment
+                                                                    </button>
+                                                                );
                                                             }
-                                                            return (
-                                                                <button
-                                                                    onClick={() => openCreditModal(dd)}
-                                                                    className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
-                                                                    title="Link Payment"
-                                                                >
-                                                                    Payment Link
-                                                                </button>
-                                                            );
                                                         })()}
+                                                        {!creditStatements.some(s => Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked") && (
+                                                            <button
+                                                                onClick={() => openCreditModal(dd)}
+                                                                className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
+                                                                title="Link Payment"
+                                                            >
+                                                                Payment Link
+                                                            </button>
+                                                        )}
                                                     </>
                                                 )}
                                             </div>

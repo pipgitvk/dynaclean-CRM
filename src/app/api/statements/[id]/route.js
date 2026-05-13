@@ -335,7 +335,7 @@ export async function PATCH(req, { params }) {
     const invoiceStatus = body?.invoice_status;
     const ddAction = body?.dd_action;
     
-    if (ddId != null || invoiceStatus === 'Linked to DD' || ddAction === 'unlink') {
+    if (ddId != null || invoiceStatus === 'Linked to DD' || invoiceStatus === 'DD Management Linked' || ddAction === 'unlink') {
       // Handle DD linking
       const pool = await getDbConnection();
       try {
