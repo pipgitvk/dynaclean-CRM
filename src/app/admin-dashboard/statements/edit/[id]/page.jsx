@@ -161,8 +161,7 @@ export default function EditStatementPage() {
 
   const isSettled =
     String(form.invoice_status || "").trim().toLowerCase() === "settled";
-  const isLinkedToDD =
-    String(form.invoice_status || "").trim() === "Linked to DD";
+  const isLinkedToDD = ["Linked to DD", "DD Management Linked"].includes(form.invoice_status);
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow">
