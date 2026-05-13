@@ -1,0 +1,230 @@
+import { NextResponse } from "next/server";
+import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
+
+export async function GET(req) {
+  try {
+    const payload = await getSessionPayload();
+    if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    
+    const role = payload.role;
+    if (!["SUPERADMIN", "GEM"].includes(role)) {
+      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
+    }
+    const currentEmpId = payload.empId || payload.id || null;
+    if (role === "GEM" && !currentEmpId) {
+      return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
+    }
+    const bidWhere = role === "GEM" ? "WHERE assigned_employee_id = ?" : "";
+    const bidAnd = role === "GEM" ? "AND assigned_employee_id = ?" : "";
+    const bidParams = role === "GEM" ? [currentEmpId] : [];
+
+    const conn = await getDbConnection();
+
+    // Get basic counts
+    const [totalBids] = await conn.execute(
+      `SELECT COUNT(*) as count FROM bids ${bidWhere}`,
+      bidParams
+    );
+
+    const [statusCounts] = await conn.execute(`
+      SELECT 
+        bid_status,
+        COUNT(*) as count
+      FROM bids
+      ${bidWhere}
+      GROUP BY bid_status
+    `, bidParams);
+
+    const [technicalStatusCounts] = await conn.execute(`
+      SELECT 
+        technical_status,
+        COUNT(*) as count
+      FROM bids
+      ${bidWhere}
+      GROUP BY technical_status
+    `, bidParams);
+
+    const [financialStatusCounts] = await conn.execute(`
+      SELECT 
+        financial_status,
+        COUNT(*) as count
+      FROM bids
+      ${bidWhere}
+      GROUP BY financial_status
+    `, bidParams);
+
+    // Get total bid value
+    const [totalValue] = await conn.execute(
+      `SELECT COALESCE(SUM(estimated_bid_value), 0) as total FROM bids ${bidWhere}`,
+      bidParams
+    );
+
+    // Get won bids total value
+    const [wonValue] = await conn.execute(
+      `SELECT COALESCE(SUM(estimated_bid_value), 0) as total FROM bids WHERE bid_status = 'won' ${bidAnd}`,
+      bidParams
+    );
+
+    // Get orders created from bids (safe query - handle if bid_id column doesn't exist)
+    let orderStats = [{ order_count: 0, order_amount: 0 }];
+    try {
+      const [orderResult] = await conn.execute(`
+        SELECT 
+          COUNT(*) as order_count,
+          COALESCE(SUM(total_amount), 0) as order_amount
+        FROM neworder n
+        ${role === "GEM" ? "INNER JOIN bids b ON n.bid_id = b.bid_id" : ""}
+        WHERE n.bid_id IS NOT NULL ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
+      `, bidParams);
+      orderStats = orderResult;
+    } catch (e) {
+      console.log("Order stats query failed (bid_id column may not exist):", e.message);
+    }
+
+    // Get active EMD count (linked to bids) - safe query
+    let emdStats = [{ active_emd_count: 0, total_emd_amount: 0 }];
+    try {
+      const [emdResult] = await conn.execute(`
+        SELECT 
+          COUNT(*) as active_emd_count,
+          COALESCE(SUM(dd.amount), 0) as total_emd_amount
+        FROM dd_management dd
+        INNER JOIN bids b ON dd.id = b.dd_id
+        WHERE dd.status IN ('Assigned', 'Filled', 'Issued')
+        ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
+      `, bidParams);
+      emdStats = emdResult;
+    } catch (e) {
+      console.log("EMD stats query failed:", e.message);
+    }
+
+    // Get active BG count (linked to bids) - safe query
+    let bgStats = [{ active_bg_count: 0, total_bg_amount: 0 }];
+    try {
+      const [bgResult] = await conn.execute(`
+        SELECT 
+          COUNT(*) as active_bg_count,
+          COALESCE(SUM(dd.amount), 0) as total_bg_amount
+        FROM dd_management dd
+        INNER JOIN bids b ON dd.id = b.dd_id
+        WHERE dd.type = 'BG' AND dd.status IN ('Assigned', 'Filled', 'Issued')
+        ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
+      `, bidParams);
+      bgStats = bgResult;
+    } catch (e) {
+      console.log("BG stats query failed:", e.message);
+    }
+
+    // Get monthly bids for chart
+    const [monthlyBids] = await conn.execute(`
+      SELECT 
+        DATE_FORMAT(created_at, '%Y-%m') as month,
+        COUNT(*) as count,
+        COALESCE(SUM(estimated_bid_value), 0) as value
+      FROM bids
+      WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) ${bidAnd}
+      GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+      ORDER BY month ASC
+    `, bidParams);
+
+    // Get platform-wise bids
+    const [platformBids] = await conn.execute(`
+      SELECT 
+        COALESCE(bidding_platform, 'Other') as platform,
+        COUNT(*) as count,
+        COALESCE(SUM(estimated_bid_value), 0) as value
+      FROM bids
+      ${bidWhere}
+      GROUP BY bidding_platform
+      ORDER BY count DESC
+    `, bidParams);
+
+    // Get win/loss ratio
+    const [winLoss] = await conn.execute(`
+      SELECT 
+        SUM(CASE WHEN bid_status = 'won' THEN 1 ELSE 0 END) as won,
+        SUM(CASE WHEN bid_status = 'lost' THEN 1 ELSE 0 END) as lost,
+        SUM(CASE WHEN bid_status IN ('won', 'lost') THEN 1 ELSE 0 END) as total
+      FROM bids
+      ${bidWhere}
+    `, bidParams);
+
+    // Get employee-wise bid counts (safe query)
+    let employeeBids = [];
+    try {
+      const [employeeResult] = await conn.execute(`
+        SELECT 
+          e.username as employee_name,
+          COUNT(*) as bid_count,
+          COALESCE(SUM(b.estimated_bid_value), 0) as total_value,
+          SUM(CASE WHEN b.bid_status = 'won' THEN 1 ELSE 0 END) as won_count
+        FROM bids b
+        LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+        WHERE b.assigned_employee_id IS NOT NULL ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
+        GROUP BY b.assigned_employee_id, e.username
+        ORDER BY bid_count DESC
+        LIMIT 10
+      `, bidParams);
+      employeeBids = employeeResult;
+    } catch (e) {
+      console.log("Employee stats query failed:", e.message);
+    }
+
+    await conn.end();
+
+    // Format status counts into object
+    const statusMap = {};
+    statusCounts.forEach(row => {
+      statusMap[row.bid_status] = row.count;
+    });
+
+    const technicalStatusMap = {};
+    technicalStatusCounts.forEach(row => {
+      technicalStatusMap[row.technical_status] = row.count;
+    });
+
+    const financialStatusMap = {};
+    financialStatusCounts.forEach(row => {
+      financialStatusMap[row.financial_status] = row.count;
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        totalBids: totalBids[0].count,
+        statusCounts: statusMap,
+        technicalStatusCounts: technicalStatusMap,
+        financialStatusCounts: financialStatusMap,
+        totalBidValue: parseFloat(totalValue[0].total) || 0,
+        wonBidValue: parseFloat(wonValue[0].total) || 0,
+        participated: statusMap['submitted'] || 0 + statusMap['technical_qualified'] || 0 + statusMap['ra_participated'] || 0,
+        won: statusMap['won'] || 0,
+        lost: statusMap['lost'] || 0,
+        cancelled: statusMap['cancelled'] || 0,
+        disqualified: (technicalStatusMap['disqualified'] || 0) + (financialStatusMap['disqualified'] || 0),
+        orderCount: orderStats[0].order_count || 0,
+        orderAmount: parseFloat(orderStats[0].order_amount) || 0,
+        activeEmdCount: emdStats[0].active_emd_count || 0,
+        activeBgCount: bgStats[0].active_bg_count || 0,
+        winLossRatio: {
+          won: winLoss[0].won || 0,
+          lost: winLoss[0].lost || 0,
+          total: winLoss[0].total || 0,
+          winRate: winLoss[0].total > 0 
+            ? ((winLoss[0].won / winLoss[0].total) * 100).toFixed(2) 
+            : 0,
+        },
+        monthlyBids,
+        platformBids,
+        employeeBids,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+    return NextResponse.json(
+      { error: error.message, success: false },
+      { status: 500 }
+    );
+  }
+}

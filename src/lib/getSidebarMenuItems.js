@@ -78,7 +78,7 @@ function filterByRole(list, roleKey) {
   return (list || [])
     .map((item) => {
       const children = item?.children?.length ? filterByRole(item.children, roleKey) : [];
-      const keepSelf = roleMatches(item?.roles, roleKey);
+      const keepSelf = item?.moduleKey ? true : roleMatches(item?.roles, roleKey);
       if (children.length > 0) return { ...item, children };
       return keepSelf ? item : null;
     })
@@ -873,6 +873,35 @@ const allMenuItems = [
     moduleKey: "attendance-log",
     roles: ["ADMIN", "ACCOUNTANT", "HR", "HR HEAD", "HR EXECUTIVE", "JUNIOR HR EXECUTIVE", "TEAM LEADER"],
     icon: "ListOrdered",
+  },
+  {
+    name: "GEM CRM",
+    moduleKey: "gem-crm",
+    roles: ["ALL"],
+    icon: "Gavel",
+    children: [
+      {
+        path: "/gem-dashboard/gem-crm/dashboard",
+        name: "Dashboard",
+        moduleKey: "gem-crm-dashboard",
+        roles: ["ALL"],
+        icon: "LayoutDashboard",
+      },
+      {
+        path: "/gem-dashboard/gem-crm/bids",
+        name: "Bids",
+        moduleKey: "gem-crm-bids",
+        roles: ["ALL"],
+        icon: "FileText",
+      },
+      {
+        path: "/gem-dashboard/gem-crm/reports",
+        name: "Reports",
+        moduleKey: "gem-crm-reports",
+        roles: ["ALL"],
+        icon: "BarChart3",
+      },
+    ],
   },
 ];
 

@@ -140,6 +140,15 @@ export const MODULE_TREE = [
     ],
   },
   {
+    key: "gem-crm",
+    label: "GEM CRM",
+    children: [
+      { key: "gem-crm-dashboard", label: "Dashboard" },
+      { key: "gem-crm-bids", label: "Bids" },
+      { key: "gem-crm-reports", label: "Reports" },
+    ],
+  },
+  {
     key: "hr-operations",
     label: "HR Operations",
     children: [
@@ -346,6 +355,16 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "import-agents", label: "Agents" },
       { kind: "leaf", key: "import-quote-submissions", label: "Quote Submissions" },
       { kind: "leaf", key: "import-award-followups", label: "Award Follow-ups" },
+    ],
+  },
+  {
+    kind: "group",
+    id: "gem-crm",
+    label: "GEM CRM",
+    children: [
+      { kind: "leaf", key: "gem-crm-dashboard", label: "Dashboard" },
+      { kind: "leaf", key: "gem-crm-bids", label: "Bids" },
+      { kind: "leaf", key: "gem-crm-reports", label: "Reports" },
     ],
   },
   {
