@@ -1597,6 +1597,11 @@ export default function DDManagementPage() {
                             <button onClick={() => setPaymentModalOpen(false)} className="p-2 hover:bg-emerald-500 rounded-full transition-colors"><X size={24} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
+                            {statements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).map((s) => (
+                                <div key={s.id} className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                                    <span className="font-bold">Linked Trans ID:</span> {s.trans_id || "-"}
+                                </div>
+                            ))}
                             <div className="mb-4 bg-emerald-50 p-4 rounded-lg border border-emerald-200">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
@@ -1763,6 +1768,11 @@ export default function DDManagementPage() {
                             <button onClick={() => setCreditModalOpen(false)} className="p-2 hover:bg-blue-500 rounded-full transition-colors"><X size={24} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
+                            {creditStatements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).map((s) => (
+                                <div key={s.id} className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+                                    <span className="font-bold">Linked Trans ID:</span> {s.trans_id || "-"}
+                                </div>
+                            ))}
                             <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
