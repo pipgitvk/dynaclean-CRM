@@ -101,6 +101,18 @@ export async function POST(req) {
         "bid-documents"
       );
     }
+    if (files.dd_scan_copy) {
+      uploadedPaths.dd_scan_copy = await uploadToCloudinary(
+        getFile(files.dd_scan_copy),
+        "dd-scan-copies"
+      );
+    }
+    if (files.dd_receipt) {
+      uploadedPaths.dd_receipt = await uploadToCloudinary(
+        getFile(files.dd_receipt),
+        "dd-receipts"
+      );
+    }
 
     return NextResponse.json({ success: true, paths: uploadedPaths });
   } catch (error) {

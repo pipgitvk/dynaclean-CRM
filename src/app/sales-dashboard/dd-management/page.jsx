@@ -666,7 +666,7 @@ export default function DDManagementPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contract No</label>
-                                            <input disabled={selectedDD?.contract_no} name="contract_no" value={formData.contract_no} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Enter contract number" />
+                                            <input disabled={selectedDD?.contract_no} name="contract_no" value={formData.contract_no || ""} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed" placeholder="Enter contract number" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">For</label>
@@ -680,7 +680,7 @@ export default function DDManagementPage() {
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload BG Format</label>
                                         <div className="flex items-center gap-2">
-                                            <input disabled={!isAuthorized} type="file" name="bg_format_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 disabled:opacity-50" />
+                                            <input type="file" name="bg_format_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 disabled:opacity-50" />
                                             {formData.bg_format_upload && typeof formData.bg_format_upload === "string" && (
                                                 <button onClick={() => handleViewFile(formData.bg_format_upload)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center gap-1 text-xs font-bold" title="View BG Format">
                                                     <Eye size={16} /> View
@@ -691,7 +691,7 @@ export default function DDManagementPage() {
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Bid Document</label>
                                         <div className="flex items-center gap-2">
-                                            <input type="file" name="bid_document" onChange={handleFileChange} accept="image/*" className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700" />
+                                            <input type="file" name="bid_document" onChange={handleFileChange} accept="image/*" className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 disabled:opacity-50" />
                                             {formData.bid_document && typeof formData.bid_document === "string" && (
                                                 <button onClick={() => handleViewFile(formData.bid_document)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg flex items-center gap-1 text-xs font-bold" title="View Bid Document">
                                                     <Eye size={16} /> View
@@ -739,7 +739,7 @@ export default function DDManagementPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Contract No</label>
-                                            <input disabled={selectedDD?.contract_no} name="contract_no" value={formData.contract_no} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter contract number" />
+                                            <input disabled={selectedDD?.contract_no} name="contract_no" value={formData.contract_no || ""} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter contract number" />
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">For</label>
@@ -753,7 +753,7 @@ export default function DDManagementPage() {
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Bid Document</label>
                                         <div className="flex items-center gap-2">
-                                            <input type="file" name="bid_document" onChange={handleFileChange} accept="image/*" className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"}`} />
+                                            <input type="file" name="bid_document" onChange={handleFileChange} accept="image/*" className={`w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold ${formData.type === "EPAYMENT" ? "file:bg-emerald-50 file:text-emerald-700" : "file:bg-blue-50 file:text-blue-700"} disabled:opacity-50`} />
                                             {formData.bid_document && typeof formData.bid_document === "string" && (
                                                 <button onClick={() => handleViewFile(formData.bid_document)} className={`p-2 rounded-lg ${formData.type === "EPAYMENT" ? "text-emerald-600 hover:bg-emerald-50" : "text-blue-600 hover:bg-blue-50"}`} title="View Bid Document">
                                                     <Eye size={16} />
