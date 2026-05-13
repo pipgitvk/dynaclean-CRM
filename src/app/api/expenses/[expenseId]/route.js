@@ -54,6 +54,25 @@ export async function PUT(req, { params }) {
     console.log(`[expense-edit] finalAttachments="${finalAttachments}"`);
 
     const conn = await getDbConnection();
+    const [expenseRows] = await conn.execute(
+      "SELECT approval_status FROM expenses WHERE ID = ?",
+      [expenseId],
+    );
+
+    if (!expenseRows.length) {
+      return new Response(JSON.stringify({ ok: false, error: "Expense not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (expenseRows[0].approval_status === "Approved" || expenseRows[0].approval_status === "Rejected") {
+      return new Response(JSON.stringify({ ok: false, error: "Approved or rejected expenses cannot be edited" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const sql = `UPDATE expenses SET
       TravelDate = ?,
       FromLocation = ?,
