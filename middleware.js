@@ -125,6 +125,12 @@ export async function middleware(request) {
         }
       }
 
+      if (pathname.startsWith("/admin-dashboard/gem-crm")) {
+        if (role !== "SUPERADMIN") {
+          return NextResponse.redirect(new URL("/admin-dashboard", request.url));
+        }
+      }
+
       if (pathname.startsWith("/empcrm/admin-dashboard/profile/approvals-admin")) {
         if (role !== "SUPERADMIN") {
           return NextResponse.redirect(new URL("/empcrm/user-dashboard", request.url));

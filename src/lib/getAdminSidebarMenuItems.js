@@ -759,6 +759,32 @@ const allMenuItems = [
       },
     ],
   },
+  {
+    name: "GEM CRM",
+    moduleKey: "gem-crm",
+    roles: ["SUPERADMIN"],
+    icon: "Gavel",
+    children: [
+      {
+        path: "/admin-dashboard/gem-crm/dashboard",
+        name: "Dashboard",
+        roles: ["SUPERADMIN"],
+        icon: "LayoutDashboard",
+      },
+      {
+        path: "/admin-dashboard/gem-crm/bids",
+        name: "Bids",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
+      {
+        path: "/admin-dashboard/gem-crm/reports",
+        name: "Reports",
+        roles: ["SUPERADMIN"],
+        icon: "BarChart3",
+      },
+    ],
+  },
 ];
 
 function filterMenuItemsByRole(items, roleKeyNormalized) {
@@ -855,12 +881,12 @@ function filterMenuItemDeep(item, allowedModules) {
     if (children.length === 0) return null;
     return { ...item, children };
   }
-  const sectionOk =
-    !item.moduleKey || isSectionAllowed(item.moduleKey, allowedModules);
-  if (!sectionOk) return null;
   if (item.accessKey) {
     return allowedModules.includes(item.accessKey) ? item : null;
   }
+  const sectionOk =
+    !item.moduleKey || isSectionAllowed(item.moduleKey, allowedModules);
+  if (!sectionOk) return null;
   return item;
 }
 
