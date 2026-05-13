@@ -699,13 +699,27 @@ export default function DDManagementPage() {
                                                                 Add Payment
                                                             </button>
                                                         )}
-                                                        <button
-                                                            onClick={() => openCreditModal(dd)}
-                                                            className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
-                                                            title="Link Payment"
-                                                        >
-                                                            Payment Link
-                                                        </button>
+                                                        {(() => {
+                                                            const linkedPayment = creditStatements.find(s => Number(s.dd_id) === Number(dd.id));
+                                                            if (linkedPayment) {
+                                                                return (
+                                                                    <div className="flex flex-col items-start gap-1 text-[10px] text-blue-700">
+                                                                        <span className="font-semibold">TransID: {linkedPayment.trans_id}</span>
+                                                                        <span className="font-semibold">Amount: {linkedPayment.amount}</span>
+                                                                        <span className="font-semibold">Date: {linkedPayment.date ? dayjs(linkedPayment.date).format('DD-MM-YYYY') : 'N/A'}</span>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <button
+                                                                    onClick={() => openCreditModal(dd)}
+                                                                    className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
+                                                                    title="Link Payment"
+                                                                >
+                                                                    Payment Link
+                                                                </button>
+                                                            );
+                                                        })()}
                                                     </>
                                                 )}
                                             </div>
