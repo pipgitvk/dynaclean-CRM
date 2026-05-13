@@ -104,8 +104,6 @@ export async function GET(req) {
         data = await getDateWiseReport(conn, whereClause, params);
     }
 
-    await conn.end();
-
     // Export to Excel if requested
     if (exportFormat === "excel") {
       return await exportToExcel(data, fileName);
@@ -149,8 +147,8 @@ async function getEmployeeWiseReport(conn, whereClause, params) {
   try {
     const [result] = await conn.execute(`
       SELECT 
-        e.username as employee_name,
-        e.empId,
+        COALESCE(r.username, e.username, CONCAT('Employee #', b.assigned_employee_id)) as employee_name,
+        b.assigned_employee_id as empId,
         COUNT(*) as total_bids,
         SUM(CASE WHEN b.bid_status = 'won' THEN 1 ELSE 0 END) as won,
         SUM(CASE WHEN b.bid_status = 'lost' THEN 1 ELSE 0 END) as lost,
@@ -159,8 +157,9 @@ async function getEmployeeWiseReport(conn, whereClause, params) {
         COALESCE(SUM(CASE WHEN b.bid_status = 'won' THEN b.estimated_bid_value ELSE 0 END), 0) as won_value
       FROM bids b
       LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+      LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
       ${whereClause}
-      GROUP BY b.assigned_employee_id, e.username, e.empId
+      GROUP BY b.assigned_employee_id, r.username, e.username
       ORDER BY total_bids DESC
     `, params);
     rows = result;
@@ -168,7 +167,8 @@ async function getEmployeeWiseReport(conn, whereClause, params) {
     console.log("Employee-wise report query failed, trying without emplist:", e.message);
     const [result] = await conn.execute(`
       SELECT 
-        b.assigned_employee_id,
+        COALESCE(CONCAT('Employee #', b.assigned_employee_id), '-') as employee_name,
+        b.assigned_employee_id as empId,
         COUNT(*) as total_bids,
         SUM(CASE WHEN b.bid_status = 'won' THEN 1 ELSE 0 END) as won,
         SUM(CASE WHEN b.bid_status = 'lost' THEN 1 ELSE 0 END) as lost,

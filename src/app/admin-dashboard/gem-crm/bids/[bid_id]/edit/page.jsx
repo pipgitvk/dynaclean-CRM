@@ -127,7 +127,7 @@ export default function EditBidPage({ params }) {
 
   const fetchEmployees = async () => {
     try {
-      const res = await fetch("/api/employees");
+      const res = await fetch("/api/gem-crm/employees");
       const result = await res.json();
       if (result.success) {
         setEmployees(result.data || []);

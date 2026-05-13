@@ -133,13 +133,14 @@ export async function GET(req) {
     try {
       const [bidsResult] = await conn.execute(
         `SELECT b.*, 
-          e.username as assigned_employee_name,
-          e.empId as assigned_employee_empid,
+          COALESCE(r.username, e.username, CONCAT('Employee #', b.assigned_employee_id)) as assigned_employee_name,
+          b.assigned_employee_id as assigned_employee_empid,
           dd.party_name as dd_party_name,
           dd.amount as dd_amount,
           dd.status as dd_status
         FROM bids b
         LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+        LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
         LEFT JOIN dd_management dd ON b.dd_id = dd.id
         ${whereClause}
         ORDER BY b.created_at DESC
@@ -152,10 +153,11 @@ export async function GET(req) {
       // Fallback query without dd_management
       const [bidsResult] = await conn.execute(
         `SELECT b.*, 
-          e.username as assigned_employee_name,
-          e.empId as assigned_employee_empid
+          COALESCE(r.username, e.username, CONCAT('Employee #', b.assigned_employee_id)) as assigned_employee_name,
+          b.assigned_employee_id as assigned_employee_empid
         FROM bids b
         LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+        LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
         ${whereClause}
         ORDER BY b.created_at DESC
         LIMIT ? OFFSET ?`,

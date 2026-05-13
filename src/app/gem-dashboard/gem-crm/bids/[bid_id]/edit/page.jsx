@@ -18,6 +18,7 @@ export default function EditBidPage({ params }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [employees, setEmployees] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [bidId, setBidId] = useState(null);
   const [formData, setFormData] = useState({
     bidding_platform: "",
@@ -68,7 +69,7 @@ export default function EditBidPage({ params }) {
   useEffect(() => {
     if (bidId) {
       fetchBidDetails();
-      fetchEmployees();
+      fetchCurrentUser();
     }
   }, [bidId]);
 
@@ -125,15 +126,21 @@ export default function EditBidPage({ params }) {
     }
   };
 
-  const fetchEmployees = async () => {
+  const fetchCurrentUser = async () => {
     try {
-      const res = await fetch("/api/employees");
-      const result = await res.json();
-      if (result.success) {
-        setEmployees(result.data || []);
+      const res = await fetch("/api/me");
+      if (!res.ok) return;
+      const user = await res.json();
+      setCurrentUser(user);
+      if (user?.empId) {
+        setEmployees([user]);
+        setFormData((prev) => ({
+          ...prev,
+          assigned_employee_id: String(user.empId),
+        }));
       }
     } catch (error) {
-      console.error("Error fetching employees:", error);
+      console.error("Error fetching current user:", error);
     }
   };
 
@@ -557,19 +564,12 @@ export default function EditBidPage({ params }) {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Assigned Employee
                 </label>
-                <select
-                  name="assigned_employee_id"
-                  value={formData.assigned_employee_id}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map((emp) => (
-                    <option key={emp.empId} value={emp.empId}>
-                      {emp.username}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="text"
+                  value={currentUser?.username || employees[0]?.username || ""}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                  disabled
+                />
               </div>
 
               <div>

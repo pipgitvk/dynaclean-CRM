@@ -21,14 +21,31 @@ export default function GemCrmReportsPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [employeeId, setEmployeeId] = useState("");
+  const [assignedEmployees, setAssignedEmployees] = useState([]);
   const [organisationId, setOrganisationId] = useState("");
   const [platform, setPlatform] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
+    fetchAssignedEmployees();
+  }, []);
+
+  useEffect(() => {
     // Don't set default date range - show all data by default
     fetchReport();
   }, [reportType, employeeId, organisationId, platform]);
+
+  const fetchAssignedEmployees = async () => {
+    try {
+      const res = await fetch("/api/gem-crm/assigned-employees");
+      const result = await res.json();
+      if (result.success) {
+        setAssignedEmployees(result.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching assigned employees:", error);
+    }
+  };
 
   const fetchReport = async () => {
     try {
@@ -241,15 +258,20 @@ export default function GemCrmReportsPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Employee ID
+                Employee
               </label>
-              <input
-                type="number"
+              <select
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter Employee ID"
-              />
+              >
+                <option value="">All Employees</option>
+                {assignedEmployees.map((emp) => (
+                  <option key={emp.empId} value={emp.empId}>
+                    {emp.username || emp.empId}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

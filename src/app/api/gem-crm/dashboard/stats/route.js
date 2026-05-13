@@ -155,14 +155,15 @@ export async function GET(req) {
     try {
       const [employeeResult] = await conn.execute(`
         SELECT 
-          e.username as employee_name,
+          COALESCE(r.username, e.username, CONCAT('Employee #', b.assigned_employee_id)) as employee_name,
           COUNT(*) as bid_count,
           COALESCE(SUM(b.estimated_bid_value), 0) as total_value,
           SUM(CASE WHEN b.bid_status = 'won' THEN 1 ELSE 0 END) as won_count
         FROM bids b
         LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+        LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
         WHERE b.assigned_employee_id IS NOT NULL ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
-        GROUP BY b.assigned_employee_id, e.username
+        GROUP BY b.assigned_employee_id, r.username, e.username
         ORDER BY bid_count DESC
         LIMIT 10
       `, bidParams);
