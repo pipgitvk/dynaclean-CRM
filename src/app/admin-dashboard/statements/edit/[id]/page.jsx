@@ -161,6 +161,8 @@ export default function EditStatementPage() {
 
   const isSettled =
     String(form.invoice_status || "").trim().toLowerCase() === "settled";
+  const isLinkedToDD =
+    String(form.invoice_status || "").trim() === "Linked to DD";
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow">
@@ -252,7 +254,7 @@ export default function EditStatementPage() {
             value={form.client_expense_id}
             allocation={expenseAllocation}
             statementTransId={form.trans_id}
-            disabled={isSettled || saving}
+            disabled={isSettled || isLinkedToDD || saving}
             onChange={(cid, alloc) => {
               setForm((p) => ({ ...p, client_expense_id: cid || "" }));
               setExpenseAllocation(alloc ?? null);
@@ -261,6 +263,11 @@ export default function EditStatementPage() {
           {isSettled && (
             <p className="text-xs text-gray-500 mt-1">
               Expense ID is locked because this statement is Settled.
+            </p>
+          )}
+          {isLinkedToDD && (
+            <p className="text-xs text-gray-500 mt-1">
+              Expense ID is locked because this statement is Linked to DD.
             </p>
           )}
         </div>
