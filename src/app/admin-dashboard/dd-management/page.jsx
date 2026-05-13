@@ -698,9 +698,8 @@ export default function DDManagementPage() {
                                                             Step 2
                                                         </button>
                                                         {(() => {
-                                                            const linkedPayment = creditStatements.find(s => Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
                                                             const hasDirectPayment = dd.reference_no && dd.payment_amount && dd.payment_date;
-                                                            const hasLinkedPayment = linkedPayment && linkedPayment.trans_id;
+                                                            const linkedDebitPayment = creditStatements.find(s => s.type === "Debit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
                                                             
                                                             if (hasDirectPayment) {
                                                                 return (
@@ -710,12 +709,12 @@ export default function DDManagementPage() {
                                                                         <span className="font-semibold">Date: {dayjs(dd.payment_date).format('DD-MM-YYYY')}</span>
                                                                     </div>
                                                                 );
-                                                            } else if (hasLinkedPayment) {
+                                                            } else if (linkedDebitPayment) {
                                                                 return (
-                                                                    <div className="flex flex-col items-start gap-1 text-[10px] text-blue-700">
-                                                                        <span className="font-semibold">TransID: {linkedPayment.trans_id}</span>
-                                                                        <span className="font-semibold">Amount: {linkedPayment.amount}</span>
-                                                                        <span className="font-semibold">Date: {linkedPayment.date ? dayjs(linkedPayment.date).format('DD-MM-YYYY') : 'N/A'}</span>
+                                                                    <div className="flex flex-col items-start gap-1 text-[10px] text-emerald-700">
+                                                                        <span className="font-semibold">TransID: {linkedDebitPayment.trans_id}</span>
+                                                                        <span className="font-semibold">Amount: {linkedDebitPayment.amount}</span>
+                                                                        <span className="font-semibold">Date: {linkedDebitPayment.date ? dayjs(linkedDebitPayment.date).format('DD-MM-YYYY') : 'N/A'}</span>
                                                                     </div>
                                                                 );
                                                             } else {
@@ -730,15 +729,31 @@ export default function DDManagementPage() {
                                                                 );
                                                             }
                                                         })()}
-                                                        {!creditStatements.some(s => Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked") && (
-                                                            <button
-                                                                onClick={() => openCreditModal(dd)}
-                                                                className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
-                                                                title="Link Payment"
-                                                            >
-                                                                Payment Link
-                                                            </button>
-                                                        )}
+                                                        {(() => {
+                                                            const linkedPayment = creditStatements.find(s => s.type === "Credit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
+                                                            const hasDirectPayment = dd.reference_no && dd.payment_amount && dd.payment_date;
+                                                            const hasDebitPayment = creditStatements.some(s => s.type === "Debit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
+                                                            const canLinkPayment = hasDirectPayment || hasDebitPayment;
+                                                            if (linkedPayment) {
+                                                                return (
+                                                                    <div className="flex flex-col items-start gap-1 text-[10px] text-blue-700">
+                                                                        <span className="font-semibold">TransID: {linkedPayment.trans_id}</span>
+                                                                        <span className="font-semibold">Amount: {linkedPayment.amount}</span>
+                                                                        <span className="font-semibold">Date: {linkedPayment.date ? dayjs(linkedPayment.date).format('DD-MM-YYYY') : 'N/A'}</span>
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            return (
+                                                                <button
+                                                                    onClick={() => openCreditModal(dd)}
+                                                                    disabled={!canLinkPayment}
+                                                                    className={`p-1 px-2 rounded border transition-colors text-[10px] font-bold ${canLinkPayment ? "text-emerald-600 hover:bg-emerald-50 border-emerald-100" : "text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed"}`}
+                                                                    title="Link Payment"
+                                                                >
+                                                                    Payment Link
+                                                                </button>
+                                                            );
+                                                        })()}
                                                     </>
                                                 )}
                                             </div>
@@ -1597,7 +1612,7 @@ export default function DDManagementPage() {
                             <button onClick={() => setPaymentModalOpen(false)} className="p-2 hover:bg-emerald-500 rounded-full transition-colors"><X size={24} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
-                            {statements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).map((s) => (
+                            {statements.filter(s => s.type === "Debit" && Number(s.dd_id) === Number(selectedDD?.id)).map((s) => (
                                 <div key={s.id} className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
                                     <span className="font-bold">Linked Trans ID:</span> {s.trans_id || "-"}
                                 </div>
@@ -1610,15 +1625,15 @@ export default function DDManagementPage() {
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-emerald-600 uppercase">Total Linked:</span>
-                                        <div className="text-lg font-bold text-emerald-900">₹{statements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-emerald-900">₹{statements.filter(s => s.type === "Debit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-emerald-600 uppercase">Remaining:</span>
-                                        <div className="text-lg font-bold text-emerald-900">₹{(Number(selectedDD?.amount || 0) - statements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-emerald-900">₹{(Number(selectedDD?.amount || 0) - statements.filter(s => s.type === "Debit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Search</label>
                                     <input
@@ -1646,6 +1661,19 @@ export default function DDManagementPage() {
                                         onChange={(e) => setPaymentDateTo(e.target.value)}
                                         className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                     />
+                                </div>
+                                <div className="flex items-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPaymentSearch("");
+                                            setPaymentDateFrom("");
+                                            setPaymentDateTo("");
+                                        }}
+                                        className="w-full px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-semibold transition-colors"
+                                    >
+                                        Reset
+                                    </button>
                                 </div>
                             </div>
                             {loadingStatements ? (
@@ -1722,7 +1750,7 @@ export default function DDManagementPage() {
                                                                 </button>
                                                             ) : (
                                                                 (() => {
-                                                                    const hasLinkedPayment = statements.some(st => Number(st.dd_id) === Number(selectedDD?.id));
+                                                                    const hasLinkedPayment = statements.some(st => st.type === "Debit" && Number(st.dd_id) === Number(selectedDD?.id));
                                                                     return (
                                                                         <button
                                                                             onClick={() => linkPayment(s.id, 'debit')}
@@ -1768,7 +1796,7 @@ export default function DDManagementPage() {
                             <button onClick={() => setCreditModalOpen(false)} className="p-2 hover:bg-blue-500 rounded-full transition-colors"><X size={24} /></button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1">
-                            {creditStatements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).map((s) => (
+                            {creditStatements.filter(s => s.type === "Credit" && Number(s.dd_id) === Number(selectedDD?.id)).map((s) => (
                                 <div key={s.id} className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
                                     <span className="font-bold">Linked Trans ID:</span> {s.trans_id || "-"}
                                 </div>
@@ -1781,15 +1809,15 @@ export default function DDManagementPage() {
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-blue-600 uppercase">Total Linked:</span>
-                                        <div className="text-lg font-bold text-blue-900">₹{creditStatements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-blue-900">₹{creditStatements.filter(s => s.type === "Credit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-blue-600 uppercase">Remaining:</span>
-                                        <div className="text-lg font-bold text-blue-900">₹{(Number(selectedDD?.amount || 0) - creditStatements.filter(s => Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-blue-900">₹{(Number(selectedDD?.amount || 0) - creditStatements.filter(s => s.type === "Credit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 uppercase mb-1">Search</label>
                                     <input
@@ -1817,6 +1845,19 @@ export default function DDManagementPage() {
                                         onChange={(e) => setCreditDateTo(e.target.value)}
                                         className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
+                                </div>
+                                <div className="flex items-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCreditSearch("");
+                                            setCreditDateFrom("");
+                                            setCreditDateTo("");
+                                        }}
+                                        className="w-full px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-semibold transition-colors"
+                                    >
+                                        Reset
+                                    </button>
                                 </div>
                             </div>
                             {loadingCreditStatements ? (
@@ -1850,8 +1891,9 @@ export default function DDManagementPage() {
                                                     (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                     (s.type && s.type.toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                     (s.invoice_status && s.invoice_status.toLowerCase().includes(creditSearch.toLowerCase()));
-                                                const matchesDateFrom = !creditDateFrom || (s.date && new Date(s.date) >= new Date(creditDateFrom));
-                                                const matchesDateTo = !creditDateTo || (s.date && new Date(s.date) <= new Date(creditDateTo));
+                                                const statementDate = s.date ? dayjs(s.date).startOf("day") : null;
+                                                const matchesDateFrom = !creditDateFrom || (statementDate && !statementDate.isBefore(dayjs(creditDateFrom).startOf("day")));
+                                                const matchesDateTo = !creditDateTo || (statementDate && !statementDate.isAfter(dayjs(creditDateTo).endOf("day")));
                                                 return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
                                             }).length === 0 ? (
                                                 <tr>
@@ -1870,8 +1912,9 @@ export default function DDManagementPage() {
                                                         (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                         (s.type && s.type.toLowerCase().includes(creditSearch.toLowerCase())) ||
                                                         (s.invoice_status && s.invoice_status.toLowerCase().includes(creditSearch.toLowerCase()));
-                                                    const matchesDateFrom = !creditDateFrom || (s.date && new Date(s.date) >= new Date(creditDateFrom));
-                                                    const matchesDateTo = !creditDateTo || (s.date && new Date(s.date) <= new Date(creditDateTo));
+                                                    const statementDate = s.date ? dayjs(s.date).startOf("day") : null;
+                                                    const matchesDateFrom = !creditDateFrom || (statementDate && !statementDate.isBefore(dayjs(creditDateFrom).startOf("day")));
+                                                    const matchesDateTo = !creditDateTo || (statementDate && !statementDate.isAfter(dayjs(creditDateTo).endOf("day")));
                                                     return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
                                                 }).map((s) => (
                                                     <tr key={s.id} className="hover:bg-gray-50">
@@ -1893,7 +1936,7 @@ export default function DDManagementPage() {
                                                                 </button>
                                                             ) : (
                                                                 (() => {
-                                                                    const hasLinkedPayment = creditStatements.some(st => Number(st.dd_id) === Number(selectedDD?.id));
+                                                                    const hasLinkedPayment = creditStatements.some(st => st.type === "Credit" && Number(st.dd_id) === Number(selectedDD?.id));
                                                                     return (
                                                                         <button
                                                                             onClick={() => linkPayment(s.id, 'credit')}
