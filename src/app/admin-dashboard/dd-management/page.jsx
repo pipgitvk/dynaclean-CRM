@@ -684,13 +684,21 @@ export default function DDManagementPage() {
                                                         >
                                                             Step 2
                                                         </button>
-                                                        <button
-                                                            onClick={() => openPaymentModal(dd)}
-                                                            className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
-                                                            title="Add Payment"
-                                                        >
-                                                            Add Payment
-                                                        </button>
+                                                        {dd.reference_no && dd.payment_amount && dd.payment_date ? (
+                                                            <div className="flex flex-col items-start gap-1 text-[10px] text-emerald-700">
+                                                                <span className="font-semibold">TransID: {dd.reference_no}</span>
+                                                                <span className="font-semibold">Amount: {dd.payment_amount}</span>
+                                                                <span className="font-semibold">Date: {dayjs(dd.payment_date).format('DD-MM-YYYY')}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => openPaymentModal(dd)}
+                                                                className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
+                                                                title="Add Payment"
+                                                            >
+                                                                Add Payment
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => openCreditModal(dd)}
                                                             className="p-1 px-2 text-emerald-600 hover:bg-emerald-50 rounded border border-emerald-100 transition-colors text-[10px] font-bold"
