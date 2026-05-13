@@ -1216,6 +1216,20 @@ export default function DDManagementPage() {
                                             ))}
                                         </div>
                                     </div>
+                                    <div className="space-y-4 pt-4 border-t">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Status Update</label>
+                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                            <label className="text-[10px] font-bold text-blue-400 uppercase">Workflow Status</label>
+                                            <select name="status" value={formData.status} onChange={handleInputChange} className="w-full mt-2 p-2.5 border-blue-200 border rounded-lg text-sm bg-white font-bold text-blue-900">
+                                                <option value="Assigned">Assigned</option>
+                                                <option value="Filled">Filled</option>
+                                                <option value="Process">Process</option>
+                                                <option value="Issue">Issue</option>
+                                                <option value="Issued">Issued</option>
+                                                <option value="Rejected">Rejected</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </>
                             ) : (
                                 <>
