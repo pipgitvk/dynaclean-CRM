@@ -95,6 +95,12 @@ export async function POST(req) {
         "receipts"
       );
     }
+    if (files.bid_document) {
+      uploadedPaths.bid_document = await uploadToCloudinary(
+        getFile(files.bid_document),
+        "bid-documents"
+      );
+    }
 
     return NextResponse.json({ success: true, paths: uploadedPaths });
   } catch (error) {

@@ -16,6 +16,10 @@ export async function PUT(req, { params }) {
             claim_expiry_date,
             bg_format_upload,
             mode_of_payment,
+            bid_document,
+            remark,
+            contract_no,
+            security_type,
 
             // Step 2 (DD & BG shared/specific)
             cheque_no,
@@ -74,6 +78,10 @@ export async function PUT(req, { params }) {
         if (claim_expiry_date !== undefined) { fields.push("claim_expiry_date = ?"); updateParams.push(claim_expiry_date); }
         if (bg_format_upload !== undefined) { fields.push("bg_format_upload = ?"); updateParams.push(bg_format_upload); }
         if (mode_of_payment !== undefined) { fields.push("mode_of_payment = ?"); updateParams.push(mode_of_payment); }
+        if (bid_document !== undefined) { fields.push("bid_document = ?"); updateParams.push(bid_document || null); }
+        if (remark !== undefined) { fields.push("remark = ?"); updateParams.push(remark || null); }
+        if (contract_no !== undefined) { fields.push("contract_no = ?"); updateParams.push(contract_no || null); }
+        if (security_type !== undefined) { fields.push("security_type = ?"); updateParams.push(security_type || null); }
 
         // Step 2 fields (DD & shared)
         if (cheque_no !== undefined) { fields.push("cheque_no = ?"); updateParams.push(cheque_no); }
