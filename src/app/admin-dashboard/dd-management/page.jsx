@@ -1503,7 +1503,7 @@ export default function DDManagementPage() {
                                         type="text"
                                         value={paymentSearch}
                                         onChange={(e) => setPaymentSearch(e.target.value)}
-                                        placeholder="Search by ID, Trans ID, or Description..."
+                                        placeholder="Search by ID, Trans ID, Amount, or Type..."
                                         className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
                                     />
                                 </div>
@@ -1551,9 +1551,12 @@ export default function DDManagementPage() {
                                                 const matchesStatus = String(s.invoice_status || "").trim() !== "Settled";
                                                 const matchesClientExpense = !s.client_expense_id;
                                                 const matchesSearch = !paymentSearch || 
-                                                    String(s.id).toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                                                    String(s.id) === paymentSearch ||
                                                     (s.trans_id && s.trans_id.toLowerCase().includes(paymentSearch.toLowerCase())) ||
-                                                    (s.description && s.description.toLowerCase().includes(paymentSearch.toLowerCase()));
+                                                    String(s.amount || 0).includes(paymentSearch) ||
+                                                    (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                                                    (s.type && s.type.toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                                                    (s.invoice_status && s.invoice_status.toLowerCase().includes(paymentSearch.toLowerCase()));
                                                 const matchesDateFrom = !paymentDateFrom || (s.date && new Date(s.date) >= new Date(paymentDateFrom));
                                                 const matchesDateTo = !paymentDateTo || (s.date && new Date(s.date) <= new Date(paymentDateTo));
                                                 return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
@@ -1568,9 +1571,12 @@ export default function DDManagementPage() {
                                                     const matchesStatus = String(s.invoice_status || "").trim() !== "Settled";
                                                     const matchesClientExpense = !s.client_expense_id;
                                                     const matchesSearch = !paymentSearch || 
-                                                        String(s.id).toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                                                        String(s.id) === paymentSearch ||
                                                         (s.trans_id && s.trans_id.toLowerCase().includes(paymentSearch.toLowerCase())) ||
-                                                        (s.description && s.description.toLowerCase().includes(paymentSearch.toLowerCase()));
+                                                        String(s.amount || 0).includes(paymentSearch) ||
+                                                        (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                                                        (s.type && s.type.toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                                                        (s.invoice_status && s.invoice_status.toLowerCase().includes(paymentSearch.toLowerCase()));
                                                     const matchesDateFrom = !paymentDateFrom || (s.date && new Date(s.date) >= new Date(paymentDateFrom));
                                                     const matchesDateTo = !paymentDateTo || (s.date && new Date(s.date) <= new Date(paymentDateTo));
                                                     return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
@@ -1663,7 +1669,7 @@ export default function DDManagementPage() {
                                         type="text"
                                         value={creditSearch}
                                         onChange={(e) => setCreditSearch(e.target.value)}
-                                        placeholder="Search by ID, Trans ID, or Description..."
+                                        placeholder="Search by ID, Trans ID, Description, or Amount..."
                                         className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
                                 </div>
@@ -1711,9 +1717,12 @@ export default function DDManagementPage() {
                                                 const matchesStatus = String(s.invoice_status || "").trim() !== "Settled";
                                                 const matchesClientExpense = !s.client_expense_id;
                                                 const matchesSearch = !creditSearch || 
-                                                    String(s.id).toLowerCase().includes(creditSearch.toLowerCase()) ||
+                                                    String(s.id) === creditSearch ||
                                                     (s.trans_id && s.trans_id.toLowerCase().includes(creditSearch.toLowerCase())) ||
-                                                    (s.description && s.description.toLowerCase().includes(creditSearch.toLowerCase()));
+                                                    String(s.amount || 0).includes(creditSearch) ||
+                                                    (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(creditSearch.toLowerCase())) ||
+                                                    (s.type && s.type.toLowerCase().includes(creditSearch.toLowerCase())) ||
+                                                    (s.invoice_status && s.invoice_status.toLowerCase().includes(creditSearch.toLowerCase()));
                                                 const matchesDateFrom = !creditDateFrom || (s.date && new Date(s.date) >= new Date(creditDateFrom));
                                                 const matchesDateTo = !creditDateTo || (s.date && new Date(s.date) <= new Date(creditDateTo));
                                                 return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
@@ -1728,9 +1737,12 @@ export default function DDManagementPage() {
                                                     const matchesStatus = String(s.invoice_status || "").trim() !== "Settled";
                                                     const matchesClientExpense = !s.client_expense_id;
                                                     const matchesSearch = !creditSearch || 
-                                                        String(s.id).toLowerCase().includes(creditSearch.toLowerCase()) ||
+                                                        String(s.id) === creditSearch ||
                                                         (s.trans_id && s.trans_id.toLowerCase().includes(creditSearch.toLowerCase())) ||
-                                                        (s.description && s.description.toLowerCase().includes(creditSearch.toLowerCase()));
+                                                        String(s.amount || 0).includes(creditSearch) ||
+                                                        (s.date && new Date(s.date).toLocaleDateString().toLowerCase().includes(creditSearch.toLowerCase())) ||
+                                                        (s.type && s.type.toLowerCase().includes(creditSearch.toLowerCase())) ||
+                                                        (s.invoice_status && s.invoice_status.toLowerCase().includes(creditSearch.toLowerCase()));
                                                     const matchesDateFrom = !creditDateFrom || (s.date && new Date(s.date) >= new Date(creditDateFrom));
                                                     const matchesDateTo = !creditDateTo || (s.date && new Date(s.date) <= new Date(creditDateTo));
                                                     return matchesType && matchesDD && matchesStatus && matchesClientExpense && matchesSearch && matchesDateFrom && matchesDateTo;
@@ -1790,3 +1802,4 @@ export default function DDManagementPage() {
         </div>
     );
 }
+        
