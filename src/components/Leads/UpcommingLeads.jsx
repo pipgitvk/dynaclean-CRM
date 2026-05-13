@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import TaskTable from "./TaskTable";
 import UpcomingLeadsCards from "./UpcomingLeadsCards";
 import { Suspense } from "react";
+import Link from "next/link";
 
 export default async function UpcomingLeads({ leadSource }) {
   const connection = await getDbConnection();
@@ -24,6 +25,18 @@ export default async function UpcomingLeads({ leadSource }) {
 
   console.log("Fetching table rows for leadSource:", leadSource);
   console.log("Calculated 'sixHoursAhead':", sixHoursAhead);
+
+  const [newStatusRows] = await connection.execute(
+    `
+    SELECT COUNT(*) as count
+    FROM customers c
+    WHERE (c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)
+      AND TRIM(LOWER(c.status)) = 'new'
+    `,
+    [leadSource, leadSource, leadSource]
+  );
+
+  const newStatusCount = newStatusRows[0]?.count || 0;
 
   const [Tablerows] = await connection.execute(
     `
@@ -49,9 +62,17 @@ export default async function UpcomingLeads({ leadSource }) {
       className="bg-white lg:p-6 rounded-xl shadow-md mx-auto mt-2 "
     >
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <h2 className="text-2xl sm:text-3xl font-semibold text-gray-700">
-          Upcoming Enquiry
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-gray-700">
+            Upcoming Enquiry
+          </h2>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold text-gray-600">New Leads</span>
+            <Link href="/sales-dashboard/customers?status=New" className="inline-flex h-10 min-w-10 items-center justify-center rounded-full bg-red-500 px-3 text-base font-bold text-white shadow transition hover:bg-red-600">
+              {newStatusCount}
+            </Link>
+          </div>
+        </div>
       </div>
 
 
