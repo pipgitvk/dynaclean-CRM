@@ -1,6 +1,41 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 
+async function ensureDDRecordsColumns(pool) {
+    try {
+        await pool.execute("ALTER TABLE dd_records ADD COLUMN bid_document VARCHAR(500) NULL");
+    } catch (error) {
+        if (error.code !== "ER_DUP_FIELDNAME") {
+            console.warn("Could not add bid_document column:", error.message);
+        }
+    }
+    const ddColumns = [
+        ["dd_no", "VARCHAR(255) NULL"],
+        ["dd_date", "DATE NULL"],
+        ["dd_beneficiary_name", "VARCHAR(255) NULL"],
+        ["expiry_bank", "DATE NULL"],
+        ["issuing_branch", "VARCHAR(255) NULL"],
+        ["dd_scan_copy", "VARCHAR(500) NULL"],
+        ["dd_receipt", "VARCHAR(500) NULL"]
+    ];
+    for (const [column, definition] of ddColumns) {
+        try {
+            await pool.execute(`ALTER TABLE dd_records ADD COLUMN ${column} ${definition}`);
+        } catch (error) {
+            if (error.code !== "ER_DUP_FIELDNAME") {
+                console.warn(`Could not add ${column} column:`, error.message);
+            }
+        }
+    }
+}
+
+function toDbValue(value) {
+    if (value === undefined || value === "") return null;
+    if (value instanceof Date) return value;
+    if (value && typeof value === "object") return null;
+    return value;
+}
+
 export async function PUT(req, { params }) {
     try {
         const { id } = await params;
@@ -47,6 +82,13 @@ export async function PUT(req, { params }) {
             dd_upload,
             dd_number,
             issued_by,
+            dd_no,
+            dd_date,
+            dd_beneficiary_name,
+            expiry_bank,
+            issuing_branch,
+            dd_scan_copy,
+            dd_receipt,
 
             // NEFT/RTGS/IMPS Payment Details
             reference_no,
@@ -64,6 +106,7 @@ export async function PUT(req, { params }) {
         } = body;
 
         const pool = await getDbConnection();
+        await ensureDDRecordsColumns(pool);
 
         // Build dynamic update query
         let query = "UPDATE dd_records SET ";
@@ -110,6 +153,13 @@ export async function PUT(req, { params }) {
         if (dd_upload !== undefined) { fields.push("dd_upload = ?"); updateParams.push(dd_upload); }
         if (dd_number !== undefined && dd_number !== "") { fields.push("dd_number = ?"); updateParams.push(dd_number); }
         if (issued_by !== undefined) { fields.push("issued_by = ?"); updateParams.push(issued_by); }
+        if (dd_no !== undefined) { fields.push("dd_no = ?"); updateParams.push(dd_no || null); }
+        if (dd_date !== undefined) { fields.push("dd_date = ?"); updateParams.push(dd_date || null); }
+        if (dd_beneficiary_name !== undefined) { fields.push("dd_beneficiary_name = ?"); updateParams.push(dd_beneficiary_name || null); }
+        if (expiry_bank !== undefined) { fields.push("expiry_bank = ?"); updateParams.push(expiry_bank || null); }
+        if (issuing_branch !== undefined) { fields.push("issuing_branch = ?"); updateParams.push(issuing_branch || null); }
+        if (dd_scan_copy !== undefined) { fields.push("dd_scan_copy = ?"); updateParams.push(dd_scan_copy || null); }
+        if (dd_receipt !== undefined) { fields.push("dd_receipt = ?"); updateParams.push(dd_receipt || null); }
 
         // Metadata
         if (status !== undefined) {
@@ -135,8 +185,9 @@ export async function PUT(req, { params }) {
         query += fields.join(", ");
         query += " WHERE id = ?";
         updateParams.push(id);
+        const safeUpdateParams = updateParams.map(toDbValue);
 
-        await pool.execute(query, updateParams);
+        await pool.execute(query, safeUpdateParams);
 
         return NextResponse.json({ success: true });
     } catch (error) {
