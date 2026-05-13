@@ -172,12 +172,14 @@ export default async function ExpenseDetailPage({ params }) {
           Back
         </Link>
 
-        <Link
-          href={`/user-dashboard/expenses/edit/${expenseId}`}
-          className="inline-block px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-center"
-        >
-          Edit
-        </Link>
+        {expense.approval_status !== "Approved" && expense.approval_status !== "Rejected" && (
+          <Link
+            href={`/user-dashboard/expenses/edit/${expenseId}`}
+            className="inline-block px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-center"
+          >
+            Edit
+          </Link>
+        )}
 
         {(role === "ACCOUNTANT" || role === "ADMIN" || role === "HR_MANAGER") &&
           (!expense.approval_status ||
