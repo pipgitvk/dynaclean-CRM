@@ -14,8 +14,24 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
 
   // ---------------------------------------------------------
   // ⭐ SERVICE HEAD → SEE ALL SERVICE TEAM QUOTATIONS
+  // ⭐ DIRECTOR → SEE ALL QUOTATIONS
   // ---------------------------------------------------------
-  if (role === "SERVICE HEAD") {
+  const roleUpper = String(role).toUpperCase();
+  if (roleUpper === "DIRECTOR") {
+    query = `
+      SELECT
+        qr.quote_number,
+        qr.quote_date,
+        qr.company_name,
+        qr.grand_total,
+        qr.emp_name AS created_by,
+        c.first_name AS client_name,
+        c.email,
+        c.phone
+      FROM quotations_records qr
+      LEFT JOIN customers c ON c.customer_id = qr.customer_id
+    `;
+  } else if (role === "SERVICE HEAD") {
     query = `
       SELECT 
         qr.quote_number,

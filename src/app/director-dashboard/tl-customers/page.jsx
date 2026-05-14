@@ -39,12 +39,6 @@ export default async function TLCustomersPage({ searchParams }) {
 
   const conn = await getDbConnection();
 
-  // Fetch TL followups
-  // const [tlFollowups] = await conn.execute(
-  //   `SELECT * FROM TL_followups WHERE customer_id = ? ORDER BY created_at DESC`,
-  //   [customerId],
-  // );
-
   // Build query to fetch customers with their latest followup info
   let query = `
     SELECT
@@ -95,8 +89,11 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   // For non-admin users: only show their leads (manual + automatic)
+  // Directors should see all data
   const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR"];
-  if (!privilegedRoles.includes(String(payload?.role || "").toUpperCase())) {
+  const roleUpper = String(payload?.role || "").trim().toUpperCase();
+  const isPrivileged = privilegedRoles.includes(roleUpper);
+  if (!isPrivileged) {
     query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
     params.push(payload?.username || "", payload?.username || "");
   }
@@ -223,7 +220,7 @@ export default async function TLCustomersPage({ searchParams }) {
     kpiParams.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
-  if (!privilegedRoles.includes(payload?.role || "")) {
+  if (!isPrivileged) {
     kpiQuery += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
     kpiParams.push(payload?.username || "", payload?.username || "");
   }

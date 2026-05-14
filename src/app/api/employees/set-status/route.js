@@ -18,7 +18,7 @@ export async function PATCH(request) {
       new TextEncoder().encode(JWT_SECRET)
     );
     const role = payload?.role || "";
-    if (role !== "SUPERADMIN") {
+    if (!["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase())) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
