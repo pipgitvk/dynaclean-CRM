@@ -35,6 +35,7 @@ export async function GET(request) {
       );
     }
     
+    const version = parts[versionIndex];
     const publicIdWithFolder = parts.slice(versionIndex + 1).join('/');
     
     // Get resource type from URL (image, video, raw, etc.)
@@ -54,7 +55,8 @@ export async function GET(request) {
         sign_url: true,
         resource_type: resourceType,
         type: 'upload',
-        secure: true
+        secure: true,
+        version: Number(version.slice(1))
       });
       console.log('[cloudinary-proxy] Trying signed URL:', signedUrl);
       response = await fetch(signedUrl);
@@ -79,7 +81,8 @@ export async function GET(request) {
         sign_url: true,
         resource_type: "image",
         type: 'upload',
-        secure: true
+        secure: true,
+        version: Number(version.slice(1))
       });
       response = await fetch(signedUrl);
     }
