@@ -26,6 +26,7 @@ export async function PATCH(req) {
       const formData = await req.formData();
       const id = formData.get('id');
       const mode_of_transport = formData.get('mode_of_transport');
+      const net_amount = formData.get('net_amount');
       const fields = {
         self_name: formData.get('self_name'),
         courier_tracking_id: formData.get('courier_tracking_id'),
@@ -81,17 +82,18 @@ export async function PATCH(req) {
         upd.driver_name,
         upd.driver_number,
       ];
+      if (net_amount !== null && net_amount !== '') { setParts.push('net_amount = ?'); values.push(net_amount); }
       if (quotation_upload) { setParts.push('quotation_upload = ?'); values.push(quotation_upload); }
       if (payment_proof_upload) { setParts.push('payment_proof_upload = ?'); values.push(payment_proof_upload); }
       if (invoice_upload) { setParts.push('invoice_upload = ?'); values.push(invoice_upload); }
       if (eway_bill) { setParts.push('eway_bill = ?'); values.push(eway_bill); }
       values.push(id);
       const [result] = await db.execute(
-        `UPDATE product_stock_request SET ${setParts.join(', ')} WHERE id = ? AND status = 'requested'`,
+        `UPDATE product_stock_request SET ${setParts.join(', ')} WHERE id = ?`,
         values
       );
       if (result.affectedRows === 0) {
-        return NextResponse.json({ error: "Cannot edit; status is not 'requested'" }, { status: 400 });
+        return NextResponse.json({ error: "Record not found" }, { status: 404 });
       }
       return NextResponse.json({ success: true });
     }
@@ -100,6 +102,7 @@ export async function PATCH(req) {
     const {
       id,
       mode_of_transport,
+      net_amount,
       self_name,
       courier_tracking_id,
       courier_company,
@@ -148,12 +151,10 @@ export async function PATCH(req) {
     }
 
     const db = await getDbConnection();
-    const [result] = await db.execute(
-      `UPDATE product_stock_request
+    let query = `UPDATE product_stock_request
          SET mode_of_transport = ?, self_name = ?, courier_tracking_id = ?, courier_company = ?,
-             porter_tracking_id = ?, porter_contact = ?, truck_number = ?, driver_name = ?, driver_number = ?
-       WHERE id = ? AND status = 'requested'`,
-      [
+             porter_tracking_id = ?, porter_contact = ?, truck_number = ?, driver_name = ?, driver_number = ?`;
+    const values = [
         upd.mode_of_transport,
         upd.self_name,
         upd.courier_tracking_id,
@@ -163,12 +164,17 @@ export async function PATCH(req) {
         upd.truck_number,
         upd.driver_name,
         upd.driver_number,
-        id,
-      ]
-    );
+    ];
+    if (net_amount !== null && net_amount !== undefined) {
+      query += `, net_amount = ?`;
+      values.push(net_amount);
+    }
+    query += ` WHERE id = ?`;
+    values.push(id);
+    const [result] = await db.execute(query, values);
 
     if (result.affectedRows === 0) {
-      return NextResponse.json({ error: "Cannot edit; status is not 'requested'" }, { status: 400 });
+      return NextResponse.json({ error: "Record not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });
