@@ -325,7 +325,13 @@ export default function DDManagementPage() {
     };
     const handleViewFile = (filePath) => {
         if (!filePath) return;
-        window.open(filePath, "_blank");
+        // Use proxy for Cloudinary URLs to avoid authentication issues
+        if (filePath.includes('cloudinary.com')) {
+            const proxyUrl = `/api/cloudinary-proxy?url=${encodeURIComponent(filePath)}`;
+            window.open(proxyUrl, "_blank");
+        } else {
+            window.open(filePath, "_blank");
+        }
     };
 
     const openPaymentModal = async (dd) => {
