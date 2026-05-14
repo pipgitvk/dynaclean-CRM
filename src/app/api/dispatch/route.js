@@ -7,7 +7,8 @@ export async function GET(req) {
     const tokenPayload = await getSessionPayload();
     if (!tokenPayload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = tokenPayload.role;
-    if ((role !== "warehouse incharge" && role !== "WAREHOUSE INCHARGE") && (role !== "superadmin" && role !== "SUPERADMIN") && (role !== "team leader" && role !== "TEAM LEADER") && (role !== "admin" && role !== "ADMIN")) {
+    const roleUpperDispatch = String(role).toUpperCase();
+    if (!["WAREHOUSE INCHARGE", "SUPERADMIN", "TEAM LEADER", "ADMIN", "DIRECTOR"].includes(roleUpperDispatch)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

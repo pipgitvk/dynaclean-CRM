@@ -46,7 +46,7 @@ export async function POST(request, { params }) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    if (payload.role !== "SUPERADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    if (!["SUPERADMIN", "DIRECTOR"].includes(String(payload.role).toUpperCase())) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
     const { id: raw } = await params;
     const id = Number.parseInt(String(raw ?? ""), 10);
