@@ -228,7 +228,11 @@ export async function GET(req) {
     }
     const db = await getDbConnection();
 
-    const query = `
+    const { searchParams } = new URL(req.url);
+    const fromDate = searchParams.get("fromDate");
+    const toDate = searchParams.get("toDate");
+
+    let query = `
       SELECT 
         psr.*,
         CASE 
@@ -237,10 +241,22 @@ export async function GET(req) {
           WHEN psr.status = 'fulfilled' THEN 'Fulfilled'
         END as status_label
       FROM product_stock_request psr
-      ORDER BY psr.created_at DESC
+      WHERE 1=1
     `;
 
-    const [requests] = await db.execute(query);
+    const params = [];
+    if (fromDate) {
+      query += ` AND DATE(psr.created_at) >= ?`;
+      params.push(fromDate);
+    }
+    if (toDate) {
+      query += ` AND DATE(psr.created_at) <= ?`;
+      params.push(toDate);
+    }
+
+    query += ` ORDER BY psr.created_at DESC`;
+
+    const [requests] = await db.execute(query, params);
 
     return NextResponse.json(requests);
   } catch (error) {
