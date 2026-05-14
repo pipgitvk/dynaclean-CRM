@@ -27,6 +27,7 @@ export async function PATCH(req) {
       const id = formData.get('id');
       const mode_of_transport = formData.get('mode_of_transport');
       const net_amount = formData.get('net_amount');
+      const price_per_unit = formData.get('price_per_unit');
       const fields = {
         self_name: formData.get('self_name'),
         courier_tracking_id: formData.get('courier_tracking_id'),
@@ -83,6 +84,7 @@ export async function PATCH(req) {
         upd.driver_number,
       ];
       if (net_amount !== null && net_amount !== '') { setParts.push('net_amount = ?'); values.push(net_amount); }
+      if (price_per_unit !== null && price_per_unit !== '') { setParts.push('price_per_unit = ?'); values.push(price_per_unit); }
       if (quotation_upload) { setParts.push('quotation_upload = ?'); values.push(quotation_upload); }
       if (payment_proof_upload) { setParts.push('payment_proof_upload = ?'); values.push(payment_proof_upload); }
       if (invoice_upload) { setParts.push('invoice_upload = ?'); values.push(invoice_upload); }
@@ -103,6 +105,7 @@ export async function PATCH(req) {
       id,
       mode_of_transport,
       net_amount,
+      price_per_unit,
       self_name,
       courier_tracking_id,
       courier_company,
@@ -168,6 +171,10 @@ export async function PATCH(req) {
     if (net_amount !== null && net_amount !== undefined) {
       query += `, net_amount = ?`;
       values.push(net_amount);
+    }
+    if (price_per_unit !== null && price_per_unit !== undefined) {
+      query += `, price_per_unit = ?`;
+      values.push(price_per_unit);
     }
     query += ` WHERE id = ?`;
     values.push(id);
