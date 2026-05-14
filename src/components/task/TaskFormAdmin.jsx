@@ -13,14 +13,31 @@ function defaultDatetimeLocal() {
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;
 }
 
-const initialFormData = () => ({
-  taskname: "",
-  taskassignto: "",
-  next_followup_date: defaultDatetimeLocal(),
-  task_prior: "Medium",
-  task_catg: "Software Development",
-  notes: "",
-});
+const initialFormData = () => {
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istTime = new Date(now.getTime() + istOffset);
+  const z = (n) => String(n).padStart(2, "0");
+  const recurrenceStartDate = `${istTime.getFullYear()}-${z(istTime.getMonth() + 1)}-${z(istTime.getDate())}T${z(istTime.getHours())}:${z(istTime.getMinutes())}`;
+
+  return {
+    taskname: "",
+    taskassignto: "",
+    next_followup_date: defaultDatetimeLocal(),
+    task_prior: "Medium",
+    task_catg: "Software Development",
+    notes: "",
+    is_recurring: false,
+    recurrence_type: "daily",
+    repeat_interval: 1,
+    weekly_days: [],
+    monthly_date: 1,
+    yearly_month: 1,
+    yearly_date: 1,
+    recurrence_start_date: recurrenceStartDate,
+    recurrence_end_date: "",
+  };
+};
 
 export default function TaskForm({ username }) {
   const router = useRouter();
@@ -59,7 +76,11 @@ export default function TaskForm({ username }) {
     );
 
     Object.entries(formData).forEach(([key, val]) => {
-      body.append(key, val);
+      if (key === "weekly_days" && Array.isArray(val)) {
+        body.append(key, JSON.stringify(val));
+      } else {
+        body.append(key, val);
+      }
     });
 
     // Append multiple attachments (images/docs)
@@ -214,6 +235,173 @@ export default function TaskForm({ username }) {
             className="input border border-gray-300 rounded-md p-2 w-full"
           />
         </div>
+      </div>
+
+      {/* Recurrence Section */}
+      <div className="border-t border-gray-200 pt-5">
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            type="checkbox"
+            name="is_recurring"
+            id="is_recurring"
+            checked={formData.is_recurring}
+            onChange={handleChange}
+            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label htmlFor="is_recurring" className="font-semibold text-gray-700">
+            Make this a recurring task
+          </label>
+        </div>
+
+        {formData.is_recurring && (
+          <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+            <div className="flex flex-wrap gap-4">
+              <div className="flex-1">
+                <label className="block font-semibold mb-2">Recurrence Type</label>
+                <select
+                  name="recurrence_type"
+                  value={formData.recurrence_type}
+                  onChange={handleChange}
+                  className="input border border-gray-300 rounded-md p-2 w-full"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="block font-semibold mb-2">Repeat Every</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    name="repeat_interval"
+                    value={formData.repeat_interval}
+                    onChange={handleChange}
+                    min="1"
+                    className="input border border-gray-300 rounded-md p-2 w-24"
+                  />
+                  <span className="text-sm text-gray-600">
+                    {formData.recurrence_type === "daily"
+                      ? "day(s)"
+                      : formData.recurrence_type === "weekly"
+                      ? "week(s)"
+                      : formData.recurrence_type === "monthly"
+                      ? "month(s)"
+                      : "year(s)"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {formData.recurrence_type === "weekly" && (
+              <div>
+                <label className="block font-semibold mb-2">Select Weekdays</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(
+                    (day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => {
+                          const newDays = formData.weekly_days.includes(day)
+                            ? formData.weekly_days.filter((d) => d !== day)
+                            : [...formData.weekly_days, day];
+                          setFormData((prev) => ({ ...prev, weekly_days: newDays }));
+                        }}
+                        className={`px-3 py-2 text-sm rounded-lg border ${
+                          formData.weekly_days.includes(day)
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-gray-700 border-gray-300"
+                        }`}
+                      >
+                        {day.charAt(0).toUpperCase() + day.slice(1)}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            {formData.recurrence_type === "monthly" && (
+              <div>
+                <label className="block font-semibold mb-2">Day of Month</label>
+                <select
+                  name="monthly_date"
+                  value={formData.monthly_date}
+                  onChange={handleChange}
+                  className="input border border-gray-300 rounded-md p-2 w-full"
+                >
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                    <option key={day} value={day}>
+                      {day}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {formData.recurrence_type === "yearly" && (
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1">
+                  <label className="block font-semibold mb-2">Month</label>
+                  <select
+                    name="yearly_month"
+                    value={formData.yearly_month}
+                    onChange={handleChange}
+                    className="input border border-gray-300 rounded-md p-2 w-full"
+                  >
+                    {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(
+                      (month, idx) => (
+                        <option key={month} value={idx + 1}>
+                          {month}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block font-semibold mb-2">Day</label>
+                  <select
+                    name="yearly_date"
+                    value={formData.yearly_date}
+                    onChange={handleChange}
+                    className="input border border-gray-300 rounded-md p-2 w-full"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                      <option key={day} value={day}>
+                        {day}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-4">
+              <div className="flex-1">
+                <label className="block font-semibold mb-2">Start Date</label>
+                <input
+                  type="datetime-local"
+                  name="recurrence_start_date"
+                  value={formData.recurrence_start_date}
+                  onChange={handleChange}
+                  className="input border border-gray-300 rounded-md p-2 w-full"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block font-semibold mb-2">End Date (Optional)</label>
+                <input
+                  type="datetime-local"
+                  name="recurrence_end_date"
+                  value={formData.recurrence_end_date}
+                  onChange={handleChange}
+                  className="input border border-gray-300 rounded-md p-2 w-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-4">

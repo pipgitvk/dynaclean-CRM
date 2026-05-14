@@ -25,7 +25,7 @@ export async function POST(req) {
     );
 
     const role = payload.role;
-    if (role !== "ACCOUNTANT" && role !== "ADMIN" && role !== "SUPERADMIN" && role !== "HR_MANAGER") {
+    if (!["ACCOUNTANT", "ADMIN", "SUPERADMIN", "HR_MANAGER", "DIRECTOR"].includes(String(role).toUpperCase())) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 

@@ -1,36 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
-import DirectorSidebar from "@/components/director/Sidebar";
 import { UserProvider } from "@/context/UserContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 
-function LayoutContent({ children, menuItems, showBackButton, backButtonPath }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+function LayoutContent({ children }) {
   const { theme } = useTheme();
-
-  // Close sidebar on small screens initially
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const isSmall = window.innerWidth < 1024; // tailwind lg breakpoint
-      if (isSmall) setSidebarOpen(false);
-    }
-  }, []);
 
   return (
     <div className={`flex h-screen ${theme.body.bg} transition-colors duration-300`}>
       <UserProvider>
-        <DirectorSidebar
-          isOpen={sidebarOpen}
-          menuItems={menuItems}
-          onCloseSidebar={() => setSidebarOpen(false)}
-          showBackButton={showBackButton}
-          backButtonPath={backButtonPath}
-        />
         <div className="flex flex-col flex-1 transition-all duration-300 overflow-hidden">
-          <Navbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
+          <Navbar />
           <main className={`p-3 sm:p-4 md:p-6 lg:p-8 overflow-auto ${theme.body.text}`}>{children}</main>
         </div>
       </UserProvider>
@@ -39,10 +21,10 @@ function LayoutContent({ children, menuItems, showBackButton, backButtonPath }) 
   );
 }
 
-export default function DirectorLayoutShell({ children, menuItems, showBackButton, backButtonPath }) {
+export default function DirectorLayoutShell({ children }) {
   return (
     <ThemeProvider>
-      <LayoutContent menuItems={menuItems} showBackButton={showBackButton} backButtonPath={backButtonPath}>{children}</LayoutContent>
+      <LayoutContent>{children}</LayoutContent>
     </ThemeProvider>
   );
 }

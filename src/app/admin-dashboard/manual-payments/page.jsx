@@ -29,7 +29,7 @@ export default async function ManualPaymentsPage() {
         role = payload.role;
 
         // Check if user has access
-        if (!["ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(role)) {
+        if (!["ACCOUNTANT", "ADMIN", "SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase())) {
             return (
                 <div className="p-6">
                     <p className="text-red-600">Access Denied. This page is only accessible to Accountant, Admin, and Superadmin roles.</p>
