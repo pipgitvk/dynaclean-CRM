@@ -77,7 +77,7 @@ export async function GET(req) {
         const params = [];
 
         // Role-based visibility
-        const isPrivileged = ["SUPERADMIN", "ADMIN", "ACCOUNTANT", "DIRECTOR"].includes(userRole);
+        const isPrivileged = ["SUPERADMIN", "ADMIN", "ACCOUNTANT"].includes(userRole);
         if (!isPrivileged && username) {
             query += " AND assigned_by = ?";
             params.push(username);

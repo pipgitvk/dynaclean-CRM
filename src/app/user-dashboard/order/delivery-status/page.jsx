@@ -44,7 +44,7 @@ export default async function DeliveryStatusPage() {
   const params = [];
 
   // Filter based on user role
-  if (!["ACCOUNTANT", "ADMIN", "WAREHOUSE INCHARGE", "DIRECTOR"].includes(String(userRole).toUpperCase())) {
+  if (!["ACCOUNTANT", "ADMIN", "WAREHOUSE INCHARGE"].includes(userRole)) {
     sql += " AND no.created_by = ?";
     params.push(username);
   }

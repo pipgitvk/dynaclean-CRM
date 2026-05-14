@@ -11,7 +11,7 @@ import {
 const VALID_STATUSES = ["APPROVED", "HOLD", "REJECTED"];
 
 function isAdmin(role) {
-  return ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
+  return role === "SUPERADMIN";
 }
 
 /** PUT /api/import-crm/billing/[id]

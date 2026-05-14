@@ -15,7 +15,7 @@ const PAGE_SIZE = 20;
 export default async function AdminSpecialPricingPage({ searchParams }) {
   const payload = await getSessionPayload();
 
-  if (!payload || !["SUPERADMIN", "DIRECTOR"].includes(String(payload.role).toUpperCase())) {
+  if (!payload || payload.role !== "SUPERADMIN") {
     return (
       <div className="p-6 text-red-500">
         Unauthorized: only admin can view and approve special prices.

@@ -139,7 +139,7 @@ export async function PUT(request, { params }) {
           { status: 400 },
         );
       }
-      if (!["SUPERADMIN", "DIRECTOR"].includes(String(mainPayload?.role).toUpperCase())) {
+      if (mainPayload?.role !== "SUPERADMIN") {
         return NextResponse.json(
           { message: "Forbidden: only SUPERADMIN can change employee status." },
           { status: 403 },

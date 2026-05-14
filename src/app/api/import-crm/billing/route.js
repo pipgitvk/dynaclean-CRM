@@ -5,7 +5,7 @@ import { ensureImportCrmTables } from "@/lib/ensureImportCrmTables";
 import path from "path";
 
 function isImportCrmAdmin(role) {
-  return ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
+  return role === "SUPERADMIN";
 }
 
 /** GET /api/import-crm/billing — admin: list all billing records */

@@ -10,8 +10,14 @@ export async function PUT(req, { params }) {
         }
 
         const role = tokenPayload.role;
-        const roleUpperPut = String(role).toUpperCase();
-        if (!["ADMIN", "SUPERADMIN", "WAREHOUSE INCHARGE", "DIRECTOR"].includes(roleUpperPut)) {
+        if (
+            role !== "admin" &&
+            role !== "ADMIN" &&
+            role !== "superadmin" &&
+            role !== "SUPERADMIN" &&
+            role !== "warehouse incharge" &&
+            role !== "WAREHOUSE INCHARGE"
+        ) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
@@ -56,8 +62,14 @@ export async function DELETE(req, { params }) {
         }
 
         const role = tokenPayload.role;
-        const roleUpperDel = String(role).toUpperCase();
-        if (!["ADMIN", "SUPERADMIN", "WAREHOUSE INCHARGE", "DIRECTOR"].includes(roleUpperDel)) {
+        if (
+            role !== "admin" &&
+            role !== "ADMIN" &&
+            role !== "superadmin" &&
+            role !== "SUPERADMIN" &&
+            role !== "warehouse incharge" &&
+            role !== "WAREHOUSE INCHARGE"
+        ) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 

@@ -12,7 +12,7 @@ export default async function ProductSpecialPrice({ params }) {
 
   const payload = await getSessionPayload();
    console.log("Hello Payload",payload);
-  if (!payload || !["SUPERADMIN", "DIRECTOR"].includes(String(payload.role).toUpperCase())) {
+  if (!payload || payload.role !== "SUPERADMIN") {
     return <div className="p-6 text-red-500">Unauthorized</div>;
   }
 

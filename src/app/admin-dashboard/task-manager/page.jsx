@@ -23,10 +23,8 @@ async function getUsernameFromToken() {
   }
 }
 
-async function getTasks(username, role) {
+async function getTasks(username) {
   const conn = await getDbConnection();
-
-  const isPrivileged = ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
 
   const query = `
     SELECT 
@@ -54,12 +52,14 @@ async function getTasks(username, role) {
       t.task_completion_date
     FROM 
       task t
-    ${isPrivileged ? "" : "WHERE t.createdby = ? OR t.taskassignto = ?"}
+    WHERE 
+      t.createdby = ? 
+      OR t.taskassignto = ?
     ORDER BY 
       t.task_id DESC
   `;
 
-  const [rows] = await conn.execute(query, isPrivileged ? [] : [username, username]);
+  const [rows] = await conn.execute(query, [username, username]);
   // await conn.end();
   return rows;
 }
@@ -69,17 +69,7 @@ export default async function TaskPage() {
     return <p className="text-red-600 p-4">❌ Unauthorized</p>;
   }
 
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  let role = "";
-  if (token) {
-    try {
-      const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
-      role = payload.role || "";
-    } catch {}
-  }
-
-  const tasks = await getTasks(username, role);
+  const tasks = await getTasks(username);
 
   return (
     <div className="p-6 mx-auto">

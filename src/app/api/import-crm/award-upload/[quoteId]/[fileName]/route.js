@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function isImportCrmAdmin(role) {
-  return ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
+  return role === "SUPERADMIN";
 }
 
 /** Serve files from uploads/import-crm-award/{quoteId}/ — admin only. */

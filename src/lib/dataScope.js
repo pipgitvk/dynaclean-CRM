@@ -1,14 +1,13 @@
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 export function isSuperAdminRole(role) {
-  const k = normalizeRoleKey(role);
-  return k === "SUPERADMIN" || k === "DIRECTOR";
+  return normalizeRoleKey(role) === "SUPERADMIN";
 }
 
-/** SUPERADMIN, ADMIN, and DIRECTOR may view any employee on the daily dashboard; all other roles are self-only. */
+/** SUPERADMIN and ADMIN may view any employee on the daily dashboard; all other roles are self-only. */
 export function canViewAllEmployeeDailyReports(role) {
   const k = normalizeRoleKey(role);
-  return k === "SUPERADMIN" || k === "ADMIN" || k === "DIRECTOR";
+  return k === "SUPERADMIN" || k === "ADMIN";
 }
 
 export function getScopedUsername(payload) {
