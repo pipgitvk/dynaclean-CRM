@@ -539,6 +539,8 @@ export default function DDManagementPage() {
         if (filePath.includes('cloudinary.com')) {
             const proxyUrl = `/api/cloudinary-proxy?url=${encodeURIComponent(filePath)}`;
             window.open(proxyUrl, "_blank");
+        } else if (filePath.startsWith('/uploads/')) {
+            window.open(`/api/serve-file?path=${encodeURIComponent(filePath)}`, "_blank");
         } else {
             window.open(filePath, "_blank");
         }

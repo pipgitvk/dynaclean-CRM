@@ -74,6 +74,15 @@ export async function GET(request) {
       });
     }
 
+    if (!response.ok && url.includes("/image/upload/") && url.toLowerCase().endsWith(".pdf")) {
+      console.log('[cloudinary-proxy] Trying raw URL converted from image PDF URL');
+      response = await fetch(url.replace("/image/upload/", "/raw/upload/"), {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+    }
+
     // Approach 3: Try with different resource type if still failing
     if (!response.ok && resourceType === "raw") {
       console.log('[cloudinary-proxy] Trying with image resource type');
