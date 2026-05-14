@@ -10,6 +10,16 @@ import autoTable from "jspdf-autotable";
 
 function SpareEditTransportModal({ open, onClose, record, onSaved }) {
   const [mode, setMode] = useState(record?.mode_of_transport || "");
+  const formatDateTimeForInput = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    // Use UTC methods to avoid timezone shifts
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   const [form, setForm] = useState({
     self_name: record?.self_name || "",
     courier_tracking_id: record?.courier_tracking_id || "",
@@ -21,6 +31,7 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
     driver_number: record?.driver_number || "",
     net_amount: record?.net_amount || "",
     price_per_unit: record?.price_per_unit || "",
+    created_at: formatDateTimeForInput(record?.created_at) || "",
   });
   useEffect(() => {
     setMode(record?.mode_of_transport || "");
@@ -35,6 +46,7 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
       driver_number: record?.driver_number || "",
       net_amount: record?.net_amount || "",
       price_per_unit: record?.price_per_unit || "",
+      created_at: formatDateTimeForInput(record?.created_at) || "",
     });
   }, [record]);
   const [files, setFiles] = useState({ quotation_upload: null, payment_proof_upload: null, invoice_upload: null, eway_bill: null });
@@ -48,6 +60,8 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
       fd.append('mode_of_transport', mode);
       fd.append('net_amount', form.net_amount);
       fd.append('price_per_unit', form.price_per_unit);
+      // Send date as YYYY-MM-DD format, API will convert to MySQL datetime
+      fd.append('created_at', form.created_at || '');
       if (mode === 'Self') fd.append('self_name', form.self_name);
       if (mode === 'Courier') { fd.append('courier_tracking_id', form.courier_tracking_id); fd.append('courier_company', form.courier_company); }
       if (mode === 'Porter') { fd.append('porter_tracking_id', form.porter_tracking_id); fd.append('porter_contact', form.porter_contact); }
@@ -93,6 +107,16 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
               className="w-full border p-2 rounded"
               value={form.net_amount}
               onChange={(e) => setForm({ ...form, net_amount: e.target.value })}
+              disabled={disabled}
+            />
+          </div>
+          <div>
+            <label className="block mb-1">Created Date</label>
+            <input
+              type="date"
+              className="w-full border p-2 rounded"
+              value={form.created_at ? form.created_at.split('T')[0] : ''}
+              onChange={(e) => setForm({ ...form, created_at: e.target.value })}
               disabled={disabled}
             />
           </div>
@@ -894,7 +918,7 @@ export default function SparePurchasesPage() {
                     <td className="p-3">{purchase.mode_of_transport || "—"}</td>
                     <td className="p-3">{getStatusBadge(purchase.status)}</td>
                     <td className="p-3">{purchase.created_by}</td>
-                    <td className="p-3">{new Date(purchase.created_at).toLocaleDateString()}</td>
+                    <td className="p-3">{new Date(purchase.created_at).toLocaleDateString('en-IN', { timeZone: 'UTC' })}</td>
                     <td className="p-3 text-center">
                       {purchase.spare_image ? (
                         <button onClick={() => setPreviewImage({ url: purchase.spare_image, type: getFileType(purchase.spare_image) })} className="text-gray-600 hover:text-blue-700">
