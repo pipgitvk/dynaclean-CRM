@@ -45,6 +45,7 @@ export default function DDManagementPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
+    const [typeFilter, setTypeFilter] = useState("all");
     const [userRole, setUserRole] = useState("GUEST");
     const [currentUserName, setCurrentUserName] = useState("");
 
@@ -182,7 +183,7 @@ export default function DDManagementPage() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/dd-management?status=${statusFilter}&search=${search}`);
+            const res = await fetch(`/api/dd-management?status=${statusFilter}&search=${search}&type=${typeFilter}`);
             const result = await res.json();
             if (res.ok) {
                 setData(result.data || []);
@@ -212,7 +213,7 @@ export default function DDManagementPage() {
         fetchUser();
         fetchData();
         fetchCreditStatements();
-    }, [statusFilter, search]);
+    }, [statusFilter, search, typeFilter]);
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -682,7 +683,7 @@ export default function DDManagementPage() {
             </div>
 
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className="relative col-span-2">
                     <Search className="absolute left-3 top-1/2 -reverse-y-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
@@ -703,6 +704,17 @@ export default function DDManagementPage() {
                     <option value="Filled">Filled</option>
                     <option value="Issued">Issued</option>
                     <option value="Sent to Client">Sent to Client</option>
+                    <option value="Claimed">Claimed</option>
+                </select>
+                <select
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                >
+                    <option value="all">All Types</option>
+                    <option value="DD">DD / EMD</option>
+                    <option value="BG">Bank Guarantee</option>
+                    <option value="EPAYMENT">E-Payment</option>
                 </select>
                 <div className="flex items-center gap-2 text-sm text-gray-500 justify-end">
                     <Clock size={16} /> Total Records: <span className="font-bold text-gray-900">{data.length}</span>

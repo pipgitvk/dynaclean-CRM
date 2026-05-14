@@ -66,6 +66,7 @@ export async function GET(req) {
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status");
         const search = searchParams.get("search");
+        const type = searchParams.get("type");
 
         const session = await getSessionPayload();
         const userRole = session?.role?.toUpperCase() || "GUEST";
@@ -85,6 +86,11 @@ export async function GET(req) {
         if (status && status !== "all") {
             query += " AND status = ?";
             params.push(status);
+        }
+
+        if (type && type !== "all") {
+            query += " AND type = ?";
+            params.push(type);
         }
 
         if (search) {
