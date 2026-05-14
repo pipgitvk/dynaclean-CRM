@@ -12,7 +12,7 @@ export async function GET() {
         const { role, username } = payload;
 
         // Check if user has access to this report
-        const allowedRoles = ["SUPERADMIN", "ADMIN", "ACCOUNTANT", "HR HEAD", "SALES", "TEAM LEADER"];
+        const allowedRoles = ["SUPERADMIN", "ADMIN", "ACCOUNTANT", "HR HEAD", "SALES", "TEAM LEADER", "DIRECTOR"];
         if (!allowedRoles.includes(role)) {
             return NextResponse.json({ error: "Access denied" }, { status: 403 });
         }

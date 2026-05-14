@@ -62,7 +62,7 @@ export async function POST(req) {
 
     // Add lead_source check for non-admin users
     let whereClause = "customer_id = ?";
-    if (role !== "SUPERADMIN" && role !== "ADMIN" && role !== "SERVICE HEAD") {
+    if (!["SUPERADMIN", "ADMIN", "SERVICE HEAD", "DIRECTOR"].includes(String(role).toUpperCase())) {
       whereClause += " AND lead_source = ?";
       params.push(username);
     }

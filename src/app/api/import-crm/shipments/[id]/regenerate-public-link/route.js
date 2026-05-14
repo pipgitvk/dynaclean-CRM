@@ -5,7 +5,7 @@ import { ensureImportCrmTables } from "@/lib/ensureImportCrmTables";
 import { generateImportCrmQuoteToken } from "@/lib/generateImportCrmQuoteToken";
 
 function isImportCrmAdmin(role) {
-  return role === "SUPERADMIN";
+  return ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
 }
 
 /** New public share token. Old URLs stop working; quote rows are kept. Same email can submit again on the new URL (duplicate check is per token). */
