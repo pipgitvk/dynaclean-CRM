@@ -65,7 +65,7 @@ export default async function OrdersPage() {
 
   const params = [];
 
-  if (!["SUPERADMIN"].includes(userRole)) {
+  if (!["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase())) {
     sql += " WHERE no.created_by = ?";
     params.push(username);
   }

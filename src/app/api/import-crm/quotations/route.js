@@ -4,7 +4,7 @@ import { getSessionPayload } from "@/lib/auth";
 import { ensureImportCrmTables } from "@/lib/ensureImportCrmTables";
 
 function isImportCrmAdmin(role) {
-  return role === "SUPERADMIN";
+  return ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
 }
 
 /** Quote submissions: public shipment link quotes only (not supplier import-quote links). */

@@ -16,15 +16,18 @@ export async function GET(req) {
     }
 
     let username;
+    let userRole = "";
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       username = decoded.username;
+      userRole = String(decoded.role ?? "").toUpperCase();
     } catch (error) {
       return NextResponse.json(
         { error: "Invalid or expired token." },
         { status: 401 },
       );
     }
+    const isPrivilegedRole = ["SUPERADMIN", "ADMIN", "DIRECTOR"].includes(userRole);
 
     const db = await getDbConnection();
 
@@ -55,6 +58,16 @@ export async function GET(req) {
       ) AND account_status = 1
       ORDER BY invoice_date DESC
     `;
+      [orders] = await db.execute(ordersQuery);
+    } else if (isPrivilegedRole) {
+      // Privileged roles (SUPERADMIN, ADMIN, DIRECTOR) see all leads
+      const customerQuery = `SELECT * FROM customers ORDER BY date_created DESC`;
+      [customers] = await db.execute(customerQuery);
+
+      const quotationsQuery = `SELECT * FROM quotations_records ORDER BY quote_date DESC`;
+      [quotations] = await db.execute(quotationsQuery);
+
+      const ordersQuery = `SELECT * FROM neworder WHERE account_status = 1 ORDER BY invoice_date DESC`;
       [orders] = await db.execute(ordersQuery);
     } else {
       // Total leads: manually assigned (assigned_to) OR auto-assigned (lead_source)
