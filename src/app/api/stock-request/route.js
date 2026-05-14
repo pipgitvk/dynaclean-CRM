@@ -28,6 +28,14 @@ export async function PATCH(req) {
       const mode_of_transport = formData.get('mode_of_transport');
       const net_amount = formData.get('net_amount');
       const price_per_unit = formData.get('price_per_unit');
+      let created_at = formData.get('created_at');
+      // Convert date format (YYYY-MM-DD) to MySQL datetime format (YYYY-MM-DD HH:MM:SS)
+      if (created_at && created_at.includes('-') && !created_at.includes(' ')) {
+        created_at = created_at + ' 00:00:00';
+      } else if (created_at && created_at.includes('T')) {
+        // Convert datetime-local format (YYYY-MM-DDTHH:MM) to MySQL format (YYYY-MM-DD HH:MM:SS)
+        created_at = created_at.replace('T', ' ') + ':00';
+      }
       const fields = {
         self_name: formData.get('self_name'),
         courier_tracking_id: formData.get('courier_tracking_id'),
@@ -85,6 +93,7 @@ export async function PATCH(req) {
       ];
       if (net_amount !== null && net_amount !== '') { setParts.push('net_amount = ?'); values.push(net_amount); }
       if (price_per_unit !== null && price_per_unit !== '') { setParts.push('price_per_unit = ?'); values.push(price_per_unit); }
+      if (created_at !== null && created_at !== '') { setParts.push('created_at = ?'); values.push(created_at); }
       if (quotation_upload) { setParts.push('quotation_upload = ?'); values.push(quotation_upload); }
       if (payment_proof_upload) { setParts.push('payment_proof_upload = ?'); values.push(payment_proof_upload); }
       if (invoice_upload) { setParts.push('invoice_upload = ?'); values.push(invoice_upload); }
@@ -106,6 +115,7 @@ export async function PATCH(req) {
       mode_of_transport,
       net_amount,
       price_per_unit,
+      created_at,
       self_name,
       courier_tracking_id,
       courier_company,
@@ -175,6 +185,10 @@ export async function PATCH(req) {
     if (price_per_unit !== null && price_per_unit !== undefined) {
       query += `, price_per_unit = ?`;
       values.push(price_per_unit);
+    }
+    if (created_at !== null && created_at !== undefined) {
+      query += `, created_at = ?`;
+      values.push(created_at);
     }
     query += ` WHERE id = ?`;
     values.push(id);
