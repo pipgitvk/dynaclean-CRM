@@ -25,12 +25,14 @@ function ProductStockList() {
   const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
   const [transferHistoryData, setTransferHistoryData] = useState([]);
   const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
+  const [purchasePriceData, setPurchasePriceData] = useState([]);
 
   useEffect(() => {
     fetchProductStock();
     fetchAvailableStock();
     fetchStockTransactions();
     fetchStockSummary();
+    fetchPurchasePrices();
   }, []);
 
   const fetchProductStock = async () => {
@@ -73,6 +75,17 @@ function ProductStockList() {
     } catch (err) {
       console.error("Error fetching stock summary:", err);
       setStockSummaryData([]);
+    }
+  };
+
+  const fetchPurchasePrices = async () => {
+    try {
+      const res = await fetch("/api/stock-request");
+      const data = await res.json();
+      setPurchasePriceData(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching purchase prices:", err);
+      setPurchasePriceData([]);
     }
   };
 
@@ -194,6 +207,34 @@ function ProductStockList() {
       : rows;
   }, [availableStockData, q]);
 
+  const priceMap = useMemo(() => {
+    const map = {};
+    purchasePriceData.forEach((p) => {
+      if (p.product_code && p.price_per_unit) {
+        map[p.product_code] = Number(p.price_per_unit);
+      }
+    });
+    return map;
+  }, [purchasePriceData]);
+
+  const totalAvailableStockPrice = useMemo(() => {
+    return filteredAvailableStock.reduce((sum, row) => {
+      const totalQty = (row.delhi || 0) + (row.south || 0);
+      const pricePerUnit = priceMap[row.product_code] || 0;
+      return sum + (totalQty * pricePerUnit);
+    }, 0);
+  }, [filteredAvailableStock, priceMap]);
+
+  const totalAvailableStockQty = useMemo(() => {
+    return filteredAvailableStock.reduce((sum, row) => {
+      return sum + ((row.delhi || 0) + (row.south || 0));
+    }, 0);
+  }, [filteredAvailableStock]);
+
+  const formatIndianCurrency = (value) => {
+    return value.toLocaleString('en-IN');
+  };
+
   const filteredTransactions = useMemo(() => {
     const rows = Array.isArray(stockTransactionsData) ? [...stockTransactionsData] : [];
     return rows.filter((row) => {
@@ -298,17 +339,6 @@ function ProductStockList() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-              <div className="text-sm font-medium text-blue-600">Total Min Qty</div>
-              <div className="text-2xl font-bold text-blue-800">{totalMinQty.toLocaleString()}</div>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-              <div className="text-sm font-medium text-green-600">Total Price</div>
-              <div className="text-2xl font-bold text-green-800">₹{totalPrice.toLocaleString()}</div>
-            </div>
-          </div>
-
           <div className="bg-white rounded-lg shadow overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -388,6 +418,13 @@ function ProductStockList() {
       {openSection === "available" && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">Available Stock</h2>
+          <div className="grid grid-cols-1 gap-4 mb-4">
+            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+              <div className="text-sm font-medium text-green-600">Total Stock Value</div>
+              <div className="text-2xl font-bold text-green-800">₹{formatIndianCurrency(totalAvailableStockPrice)}</div>
+              <div className="text-sm font-medium text-green-600 mt-1">Total Qty: {totalAvailableStockQty.toLocaleString('en-IN')}</div>
+            </div>
+          </div>
           <div className="flex justify-between items-center mb-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -415,6 +452,12 @@ function ProductStockList() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Total Qty
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Price/Unit
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total Price
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Delhi Godown
@@ -457,6 +500,12 @@ function ProductStockList() {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       {(row.delhi || 0) + (row.south || 0)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                      ₹{formatIndianCurrency(priceMap[row.product_code] || 0)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-green-700">
+                      ₹{formatIndianCurrency(((row.delhi || 0) + (row.south || 0)) * (priceMap[row.product_code] || 0))}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       {row.delhi || 0}
