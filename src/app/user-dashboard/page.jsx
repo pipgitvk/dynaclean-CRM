@@ -83,6 +83,55 @@ export default async function UserDashboardPage() {
     const pendingSparesCount = serviceCounts[0].pending_spares_count;
     const pendingCount = serviceCounts[0].pending_count;
 
+    // Fetch available stock data
+    const [availableStock] = await connection.execute(
+      `
+      SELECT
+        pss.product_code,
+        pl.product_image,
+        pl.item_name,
+        pss.total_quantity as total,
+        pss.Delhi as delhi,
+        pss.South as south,
+        pss.updated_at,
+        ps.location as location
+      FROM product_stock_summary pss
+      LEFT JOIN products_list pl
+          ON pss.product_code = pl.item_code
+      LEFT JOIN product_stock ps
+          ON ps.id = (
+              SELECT id
+              FROM product_stock ps2
+              WHERE ps2.product_code = pss.product_code
+                AND ps2.stock_status = 'in'
+              ORDER BY ps2.updated_at DESC
+              LIMIT 1
+          )
+      ORDER BY pss.updated_at DESC
+      `
+    );
+
+    // Fetch purchase price data
+    const [purchasePrices] = await connection.execute(
+      `
+      SELECT product_code, price_per_unit FROM product_stock_request
+      `
+    );
+
+    // Calculate total available stock price
+    const priceMap = {};
+    purchasePrices.forEach((p) => {
+      if (p.product_code && p.price_per_unit) {
+        priceMap[p.product_code] = Number(p.price_per_unit);
+      }
+    });
+
+    const totalAvailableStockPrice = availableStock.reduce((sum, row) => {
+      const totalQty = (row.delhi || 0) + (row.south || 0);
+      const pricePerUnit = priceMap[row.product_code] || 0;
+      return sum + (totalQty * pricePerUnit);
+    }, 0);
+
     if (!user) {
       return <p className="text-red-600">User not found</p>;
     }
@@ -96,6 +145,7 @@ export default async function UserDashboardPage() {
       completed: completedCount,
       pending: pendingCount,
       pendingSpares: pendingSparesCount,
+      totalAvailableStockPrice: totalAvailableStockPrice,
     };
 
     return <DashboardComponent user={user} counts={counts} />;

@@ -160,6 +160,8 @@ export default function DirectorDashboard({ user }) {
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState("Day");
+  const [totalAvailableStockPrice, setTotalAvailableStockPrice] = useState(0);
+  const [totalAvailableStockQty, setTotalAvailableStockQty] = useState(0);
   const [kpiData, setKpiData] = useState({
     taskPending: 0,
     stockValue: 0,
@@ -176,12 +178,47 @@ export default function DirectorDashboard({ user }) {
 
   useEffect(() => {
     fetchKpiData();
+    fetchAvailableStockPrice();
     
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("Morning");
     else if (hour < 17) setGreeting("Afternoon");
     else setGreeting("Evening");
   }, [dateFrom, dateTo]);
+
+  const fetchAvailableStockPrice = async () => {
+    try {
+      const [availableStockRes, purchasePricesRes] = await Promise.all([
+        fetch('/api/available-stock'),
+        fetch('/api/stock-request')
+      ]);
+
+      const availableStock = await availableStockRes.json();
+      const purchasePrices = await purchasePricesRes.json();
+
+      const priceMap = {};
+      purchasePrices.forEach((p) => {
+        if (p.product_code && p.price_per_unit) {
+          priceMap[p.product_code] = Number(p.price_per_unit);
+        }
+      });
+
+      const total = availableStock.reduce((sum, row) => {
+        const totalQty = (row.delhi || 0) + (row.south || 0);
+        const pricePerUnit = priceMap[row.product_code] || 0;
+        return sum + (totalQty * pricePerUnit);
+      }, 0);
+
+      const totalQty = availableStock.reduce((sum, row) => {
+        return sum + ((row.delhi || 0) + (row.south || 0));
+      }, 0);
+
+      setTotalAvailableStockPrice(total);
+      setTotalAvailableStockQty(totalQty);
+    } catch (error) {
+      console.error('Error fetching available stock price:', error);
+    }
+  };
 
   const fetchKpiData = async () => {
     try {
@@ -226,27 +263,36 @@ export default function DirectorDashboard({ user }) {
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <KPICard 
-          title="Pending Tasks" 
-          value={kpiData.taskPending} 
-          icon={ClipboardList} 
+        <KPICard
+          title="Pending Tasks"
+          value={kpiData.taskPending}
+          icon={ClipboardList}
           gradient="bg-blue-600"
           buttonText="VIEW TASKS"
           trend="up"
           trendValue="12"
           onClick={() => router.push("/director-dashboard/task-manager")}
         />
-        <KPICard 
-          title="Stock Value" 
-          value={`₹${Number(kpiData.stockValue || 0).toLocaleString('en-IN')}`} 
-          icon={Box} 
+        <KPICard
+          title="Available Stock Value"
+          value={`₹${Number(totalAvailableStockPrice || 0).toLocaleString('en-IN')}`}
+          icon={Box}
+          gradient="bg-green-600"
+          buttonText="INVENTORY"
+          subtext={`Total Qty: ${totalAvailableStockQty.toLocaleString('en-IN')}`}
+          onClick={() => router.push("/director-dashboard/product-stock")}
+        />
+        {/* <KPICard
+          title="Stock Value"
+          value={`₹${Number(kpiData.stockValue || 0).toLocaleString('en-IN')}`}
+          icon={Box}
           gradient="bg-slate-800"
           buttonText="INVENTORY"
           subtext="Net Asset Value"
           trend="down"
           trendValue="3.2"
           onClick={() => router.push("/director-dashboard/product-stock")}
-        />
+        /> */}
         <KPICard 
           title="Spare Value" 
           value={`₹${Number(kpiData.spareValue || 0).toLocaleString('en-IN')}`} 

@@ -11,7 +11,7 @@ import TodayReportButton from "@/components/TodayReportButton";
 import HrTodayReportButton from "@/components/HrTodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 
-export default function DefaultDashboard({ user }) {
+export default function DefaultDashboard({ user, counts }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
   const showHrCandidatesFollowUp = canAccessHiringModule(user?.userRole);
   const isHrRole = String(user?.userRole || "").trim() === "HR";
