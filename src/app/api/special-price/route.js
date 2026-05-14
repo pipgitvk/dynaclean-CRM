@@ -135,7 +135,7 @@ export async function DELETE(req) {
     const { role } = payload;
 
     // ✅ 2. Allow only ADMIN (Recommended)
-    if (!["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase())) {
+    if (role !== "SUPERADMIN") {
       return NextResponse.json(
         { error: "Forbidden: Only admin can delete special price" },
         { status: 403 }

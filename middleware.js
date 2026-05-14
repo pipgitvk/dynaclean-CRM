@@ -54,20 +54,6 @@ export async function middleware(request) {
     }
   }
 
-  // Redirect user-dashboard sub-routes to admin-dashboard (except main dashboard page)
-  // Skip redirect for DIRECTOR so they stay on user-dashboard routes
-  let roleNormForRedirect = "";
-  if (token) {
-    try {
-      const { payload } = await jwtVerify(token, secret);
-      roleNormForRedirect = String(payload.role ?? "").trim().toUpperCase();
-    } catch {}
-  }
-  if (pathname.startsWith("/user-dashboard/") && pathname !== "/user-dashboard" && roleNormForRedirect !== "DIRECTOR") {
-    const adminPath = pathname.replace("/user-dashboard", "/admin-dashboard");
-    return NextResponse.redirect(new URL(adminPath, request.url));
-  }
-
   // Protected routes
   if (
     pathname.startsWith("/admin-dashboard") ||
@@ -103,7 +89,7 @@ export async function middleware(request) {
 
       // Prospects module is used by SALES roles too.
       if (pathname.startsWith("/admin-dashboard/prospects")) {
-        if (["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"].includes(role) || roleNorm === "DIRECTOR") {
+        if (["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"].includes(role)) {
           return NextResponse.next();
         }
       }
@@ -120,7 +106,7 @@ export async function middleware(request) {
         }
       }
 
-      if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN" && roleNorm !== "DIRECTOR") {
+      if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN") {
         const dest = new URL("/user-dashboard", request.url);
         dest.search = request.nextUrl.search;
         return NextResponse.redirect(dest);
@@ -128,19 +114,19 @@ export async function middleware(request) {
 
       // SUPERADMIN-only modules (even if link is known)
       if (pathname.startsWith("/admin-dashboard/import-crm")) {
-        if (role !== "SUPERADMIN" && roleNorm !== "DIRECTOR") {
+        if (role !== "SUPERADMIN") {
           return NextResponse.redirect(new URL("/admin-dashboard", request.url));
         }
       }
 
       if (pathname.startsWith("/admin-dashboard/hiring-process")) {
-        if (role !== "SUPERADMIN" && roleNorm !== "DIRECTOR") {
+        if (role !== "SUPERADMIN") {
           return NextResponse.redirect(new URL("/admin-dashboard", request.url));
         }
       }
 
       if (pathname.startsWith("/admin-dashboard/gem-crm")) {
-        if (role !== "SUPERADMIN" && roleNorm !== "DIRECTOR") {
+        if (role !== "SUPERADMIN") {
           return NextResponse.redirect(new URL("/admin-dashboard", request.url));
         }
       }

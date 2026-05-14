@@ -10,7 +10,7 @@ export async function GET(_request, { params }) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-    if (!["SUPERADMIN", "DIRECTOR"].includes(String(payload.role).toUpperCase())) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    if (payload.role !== "SUPERADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
     const { billingId, fileName } = await params;
     const safeName = path.basename(decodeURIComponent(fileName || ""));

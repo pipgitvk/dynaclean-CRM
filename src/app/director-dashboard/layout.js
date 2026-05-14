@@ -1,19 +1,19 @@
 // app/director-dashboard/layout.js
 import "../globals.css";
-import getSidebarMenuItems from "@/lib/getSidebarMenuItems";
-import UserLayoutShell from "@/components/layouts/UserLayoutShell";
+import getDirectorSidebarMenuItems from "@/lib/getDirectorSidebarMenuItems";
+import DirectorLayoutShell from "@/components/layouts/DirectorLayoutShell";
 import ImpersonationWrapper from '../user-dashboard/ImpersonationWrapper';
 import IpGuard from "@/components/IpGuard";
 
 export default async function DirectorDashboardLayout({ children }) {
-  const menuItems = await getSidebarMenuItems();
+  const menuItems = await getDirectorSidebarMenuItems();
 
   return (
-    <UserLayoutShell menuItems={menuItems}>
+    <DirectorLayoutShell menuItems={menuItems}>
       <IpGuard />
       <ImpersonationWrapper>
         {children}
       </ImpersonationWrapper>
-    </UserLayoutShell>
+    </DirectorLayoutShell>
   );
 }

@@ -11,7 +11,7 @@ export async function POST(req) {
         const { payload } = await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
         const userRole = payload.role;
 
-        if (!['SUPERADMIN', 'DIRECTOR'].includes(String(userRole).toUpperCase())) {
+        if (userRole !== 'SUPERADMIN') {
             return NextResponse.json({ error: "Forbidden: Super Admin only" }, { status: 403 });
         }
 
