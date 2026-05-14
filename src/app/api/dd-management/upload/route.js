@@ -18,12 +18,15 @@ async function uploadToCloudinary(file, folder) {
   if (!file || !file.filepath) throw new Error("Missing file");
 
   const buffer = fs.readFileSync(file.filepath);
+  const fileName = file.originalFilename || file.newFilename || "";
+  const mimeType = file.mimetype || "";
+  const isPdf = mimeType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf");
   
   const upload = await new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(
       { 
         folder: `dd-management/${folder}`,
-        resource_type: "auto"
+        resource_type: isPdf ? "raw" : "auto"
       },
       (error, result) => {
         if (error) reject(error);
