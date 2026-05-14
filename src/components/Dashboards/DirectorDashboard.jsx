@@ -170,7 +170,11 @@ export default function DirectorDashboard({ user }) {
     totalStockPurchase: 0,
     totalSparePurchase: 0,
     totalSale: 0,
+    totalSaleAll: 0,
+    totalStockPurchaseAll: 0,
+    totalSparePurchaseAll: 0,
     totalProfit: 0,
+    totalProfitAll: 0,
     servicePending: 0,
     serviceCompleted: 0,
     servicePendingSpares: 0,
@@ -339,24 +343,24 @@ export default function DirectorDashboard({ user }) {
         />
         <KPICard 
           title="Total Revenue" 
-          value={`₹${Number(kpiData.totalSale || 0).toLocaleString('en-IN')}`} 
+          value={`₹${Number(kpiData.totalSaleAll || 0).toLocaleString('en-IN')}`} 
           icon={DollarSign} 
           gradient="bg-green-600"
           buttonText="FINANCIALS"
-          subtext="Gross Monthly"
+          subtext="All Time"
           trend="up"
           trendValue="22.7"
-          onClick={() => router.push("/director-dashboard/purchase/purchases")}
+          onClick={() => router.push("/director-dashboard/total-revenue")}
         />
         <KPICard 
           title="Net Profit" 
-          value={`₹${Number(kpiData.totalProfit || 0).toLocaleString('en-IN')}`} 
+          value={`₹${Number(kpiData.totalProfitAll || kpiData.totalProfit || 0).toLocaleString('en-IN')}`} 
           icon={TrendingUp} 
-          gradient="bg-rose-600"
-          buttonText="ANALYTICS"
-          subtext="Net Earnings"
-          trend="up"
-          trendValue="18.3"
+          gradient="bg-blue-600"
+          buttonText="INSIGHTS"
+          subtext={`Revenue ₹${Number(kpiData.totalSaleAll || 0).toLocaleString('en-IN')} • Purchase ₹${Number(kpiData.totalStockPurchaseAll || 0).toLocaleString('en-IN')}`}
+          trend={Number(kpiData.totalProfitAll || kpiData.totalProfit || 0) >= 0 ? "up" : "down"}
+          trendValue={Number(kpiData.totalProfitAll || kpiData.totalProfit || 0) >= 0 ? "18.3" : "-5.2"}
         />
         <KPICard 
           title="Service Operations" 

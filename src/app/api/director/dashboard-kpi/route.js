@@ -89,7 +89,7 @@ export async function GET(request) {
     let totalExpenses = 0;
     try {
       const [expensesResult] = await connection.execute(
-        "SELECT SUM(approved_amount) as total FROM expenses WHERE DATE(created_at) BETWEEN ? AND ?",
+        "SELECT SUM(approved_amount) as total FROM expenses WHERE DATE(TravelDate) BETWEEN ? AND ?",
         [startDate, endDate]
       );
       totalExpenses = expensesResult[0].total || 0;
@@ -112,7 +112,7 @@ export async function GET(request) {
     let totalStockPurchase = 0;
     try {
       const [stockPurchaseResult] = await connection.execute(
-        "SELECT SUM(purchase_price * quantity) as total FROM purchase WHERE type = 'stock' AND DATE(purchase_date) BETWEEN ? AND ?",
+        "SELECT SUM(net_amount) as total FROM product_stock_request WHERE status = 'fulfilled' AND DATE(created_at) BETWEEN ? AND ?",
         [startDate, endDate]
       );
       totalStockPurchase = stockPurchaseResult[0].total || 0;
@@ -124,7 +124,7 @@ export async function GET(request) {
     let totalStockPurchaseAll = 0;
     try {
       const [stockPurchaseAllResult] = await connection.execute(
-        "SELECT SUM(net_amount) as total FROM product_stock_request"
+        "SELECT SUM(net_amount) as total FROM product_stock_request WHERE status = 'fulfilled'"
       );
       totalStockPurchaseAll = parseFloat(stockPurchaseAllResult[0].total) || 0;
     } catch (e) {
@@ -135,7 +135,7 @@ export async function GET(request) {
     let totalSparePurchase = 0;
     try {
       const [sparePurchaseResult] = await connection.execute(
-        "SELECT SUM(purchase_price * quantity) as total FROM purchase WHERE type = 'spare' AND DATE(purchase_date) BETWEEN ? AND ?",
+        "SELECT SUM(net_amount) as total FROM spare_stock_request WHERE status = 'fulfilled' AND DATE(created_at) BETWEEN ? AND ?",
         [startDate, endDate]
       );
       totalSparePurchase = sparePurchaseResult[0].total || 0;
@@ -147,7 +147,7 @@ export async function GET(request) {
     let totalSparePurchaseAll = 0;
     try {
       const [sparePurchaseAllResult] = await connection.execute(
-        "SELECT SUM(net_amount) as total FROM spare_stock_request"
+        "SELECT SUM(net_amount) as total FROM spare_stock_request WHERE status = 'fulfilled'"
       );
       totalSparePurchaseAll = parseFloat(sparePurchaseAllResult[0].total) || 0;
     } catch (e) {
@@ -158,7 +158,7 @@ export async function GET(request) {
     let totalSale = 0;
     try {
       const [saleResult] = await connection.execute(
-        "SELECT SUM(total_amount) as total FROM orders WHERE DATE(created_at) BETWEEN ? AND ?",
+        "SELECT SUM(totalamt) as total FROM neworder WHERE approval_status = 'approved' AND DATE(created_at) BETWEEN ? AND ?",
         [startDate, endDate]
       );
       totalSale = saleResult[0].total || 0;
@@ -166,8 +166,22 @@ export async function GET(request) {
       console.error('Error fetching sale:', e);
     }
 
+    // Total Sale (all time) - matches total-revenue sales page calculation
+    let totalSaleAll = 0;
+    try {
+      const [saleAllResult] = await connection.execute(
+        "SELECT SUM(no.totalamt) as total FROM quotation_items qi LEFT JOIN neworder no ON qi.quote_number = no.quote_number WHERE no.approval_status = 'approved'"
+      );
+      totalSaleAll = parseFloat(saleAllResult[0].total) || 0;
+    } catch (e) {
+      console.error('Error fetching all sales:', e);
+    }
+
     // Total Profit (Sale - Purchase)
-    const totalProfit = (parseFloat(totalSale) || 0) - ((parseFloat(totalStockPurchase) || 0) + (parseFloat(totalSparePurchase) || 0));
+    const totalProfit = (parseFloat(totalSale) || 0) - (parseFloat(totalStockPurchase) || 0);
+
+    // Total Profit (all time)
+    const totalProfitAll = (parseFloat(totalSaleAll) || 0) - (parseFloat(totalStockPurchaseAll) || 0);
 
     // Service KPIs
     let servicePending = 0, serviceCompleted = 0, servicePendingSpares = 0;
@@ -210,7 +224,9 @@ export async function GET(request) {
       totalSparePurchase,
       totalSparePurchaseAll,
       totalSale,
-      totalProfit: totalProfit > 0 ? totalProfit : 0,
+      totalSaleAll,
+      totalProfit,
+      totalProfitAll,
       servicePending,
       serviceCompleted,
       servicePendingSpares,
