@@ -62,7 +62,9 @@ export default async function OrdersPage() {
       )`;
     params.push(username);
   } else if (
-    !["ACCOUNTANT", "ADMIN", "WAREHOUSE INCHARGE", "TEAM LEADER", "DIRECTOR"].includes(String(userRole).toUpperCase())
+    !["ACCOUNTANT", "ADMIN", "WAREHOUSE INCHARGE", "TEAM LEADER"].includes(
+      userRole
+    )
   ) {
     sql += " WHERE no.created_by = ?";
     params.push(username);

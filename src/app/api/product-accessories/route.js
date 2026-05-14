@@ -59,8 +59,15 @@ export async function POST(req) {
 
         const role = tokenPayload.role;
         // Only admins and superadmins can create accessories
-        const roleUpper = String(role).toUpperCase();
-        if (!["ADMIN", "SUPERADMIN", "WAREHOUSE INCHARGE", "DIRECTOR"].includes(roleUpper)) {
+        if (
+            role !== "admin" &&
+            role !== "ADMIN" &&
+            role !== "superadmin" &&
+            role !== "SUPERADMIN" &&
+            role !== "warehouse incharge" &&
+            role !== "WAREHOUSE INCHARGE"
+
+        ) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 

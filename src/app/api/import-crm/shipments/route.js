@@ -8,7 +8,7 @@ const TERMS = new Set(["FOB", "FCA", "CIF"]);
 const MODES = new Set(["Sea", "Air"]);
 
 function isImportCrmAdmin(role) {
-  return ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
+  return role === "SUPERADMIN";
 }
 
 function strOrNull(v) {

@@ -484,7 +484,7 @@ export async function DELETE(req) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
     const role = normalizeRoleKey(payload.role ?? payload.userRole ?? "");
-    if (!["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase())) {
+    if (role !== "SUPERADMIN") {
       return NextResponse.json(
         {
           success: false,

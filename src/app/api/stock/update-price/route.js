@@ -23,7 +23,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
         }
 
-        if (!['SUPERADMIN', 'DIRECTOR'].includes(String(role).toUpperCase())) {
+        if (role !== 'SUPERADMIN') {
             return NextResponse.json({ error: 'Forbidden: access denied' }, { status: 403 });
         }
 

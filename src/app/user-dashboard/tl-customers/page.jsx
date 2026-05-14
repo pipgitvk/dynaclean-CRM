@@ -95,8 +95,8 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   // For non-admin users: only show their leads (manual + automatic)
-  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR"];
-  if (!privilegedRoles.includes(String(payload?.role || "").toUpperCase())) {
+  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER"];
+  if (!privilegedRoles.includes(payload?.role || "")) {
     query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
     params.push(payload?.username || "", payload?.username || "");
   }

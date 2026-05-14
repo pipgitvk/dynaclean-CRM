@@ -550,7 +550,7 @@ export const SUPERADMIN_ONLY_MODULE_KEYS = new Set([]);
  */
 export function applySuperadminOnlyModuleRestrictions(allowedKeys, role) {
   const r = String(role ?? "").trim().toUpperCase();
-  if (r === "SUPERADMIN" || r === "DIRECTOR") return allowedKeys ?? null;
+  if (r === "SUPERADMIN") return allowedKeys ?? null;
   if (!allowedKeys) return allowedKeys ?? null;
   return allowedKeys.filter((k) => !SUPERADMIN_ONLY_MODULE_KEYS.has(k));
 }

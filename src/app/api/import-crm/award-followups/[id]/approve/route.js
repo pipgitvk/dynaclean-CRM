@@ -9,7 +9,7 @@ import {
 } from "@/lib/importCrmEmail";
 
 function isImportCrmAdmin(role) {
-  return ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
+  return role === "SUPERADMIN";
 }
 
 /** Approve a submitted award follow-up form. */
