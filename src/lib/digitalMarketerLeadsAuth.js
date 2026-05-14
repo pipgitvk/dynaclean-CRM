@@ -1,7 +1,7 @@
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 /** Who can open the 24h leads page and bulk upload. */
-const MODULE_ACCESS = new Set(["DIGITAL MARKETER", "SUPERADMIN"]);
+const MODULE_ACCESS = new Set(["DIGITAL MARKETER", "SUPERADMIN", "DIRECTOR"]);
 
 export function canAccessDigitalMarketerLeadsModule(role) {
   return MODULE_ACCESS.has(normalizeRoleKey(role));
