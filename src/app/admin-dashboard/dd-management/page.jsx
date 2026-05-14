@@ -65,6 +65,30 @@ export default function DDManagementPage() {
 
     const isAuthorized = ["ADMIN", "SUPERADMIN", "ACCOUNTANT"].includes(userRole.toUpperCase());
 
+    // Calculate statistics
+    const stats = useMemo(() => {
+        const bgRecords = data.filter(d => d.type === 'BG');
+        const ddRecords = data.filter(d => d.type === 'DD');
+        const epaymentRecords = data.filter(d => d.type === 'EPAYMENT');
+
+        const calculateStats = (records) => {
+            const total = records.reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+            const claimed = records.filter(r => r.claim_from_bank === true || r.claim_from_bank === 1).reduce((sum, r) => sum + parseFloat(r.amount || 0), 0);
+            return {
+                count: records.length,
+                total,
+                claimed,
+                remaining: total - claimed
+            };
+        };
+
+        return {
+            bg: calculateStats(bgRecords),
+            emd: calculateStats(ddRecords),
+            epayment: calculateStats(epaymentRecords)
+        };
+    }, [data]);
+
     // Form State
     const [formData, setFormData] = useState({
         type: "DD", // "DD" or "BG"
@@ -568,6 +592,93 @@ export default function DDManagementPage() {
                 >
                     <Plus size={20} /> New Assign
                 </button>
+            </div>
+
+            {/* Summary Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* BG Stats */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center font-bold">
+                            BG
+                        </div>
+                        <h3 className="font-bold text-gray-800">Bank Guarantee</h3>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Total Nos:</span>
+                            <span className="font-bold text-gray-900">{stats.bg.count}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Total Amount:</span>
+                            <span className="font-bold text-gray-900">₹{stats.bg.total.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Claimed Amount:</span>
+                            <span className="font-bold text-green-600">₹{stats.bg.claimed.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2 mt-2">
+                            <span className="text-gray-500">Remaining Amount:</span>
+                            <span className="font-bold text-orange-600">₹{stats.bg.remaining.toLocaleString('en-IN')}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* EMD Stats */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                            DD
+                        </div>
+                        <h3 className="font-bold text-gray-800">EMD / DD</h3>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Total Nos:</span>
+                            <span className="font-bold text-gray-900">{stats.emd.count}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Total Amount:</span>
+                            <span className="font-bold text-gray-900">₹{stats.emd.total.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Claimed Amount:</span>
+                            <span className="font-bold text-green-600">₹{stats.emd.claimed.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2 mt-2">
+                            <span className="text-gray-500">Remaining Amount:</span>
+                            <span className="font-bold text-orange-600">₹{stats.emd.remaining.toLocaleString('en-IN')}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Epayment Stats */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                            EP
+                        </div>
+                        <h3 className="font-bold text-gray-800">E-Payment</h3>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Total Nos:</span>
+                            <span className="font-bold text-gray-900">{stats.epayment.count}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Total Amount:</span>
+                            <span className="font-bold text-gray-900">₹{stats.epayment.total.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Claimed Amount:</span>
+                            <span className="font-bold text-green-600">₹{stats.epayment.claimed.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2 mt-2">
+                            <span className="text-gray-500">Remaining Amount:</span>
+                            <span className="font-bold text-orange-600">₹{stats.epayment.remaining.toLocaleString('en-IN')}</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Filters */}
