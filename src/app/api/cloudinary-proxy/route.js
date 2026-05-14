@@ -36,36 +36,56 @@ export async function GET(request) {
     }
     
     const publicIdWithFolder = parts.slice(versionIndex + 1).join('/');
-    const publicId = publicIdWithFolder.replace(/\.[^/.]+$/, ""); // Remove extension
-
+    
     // Get resource type from URL (image, video, raw, etc.)
-    // Default to 'auto' but try to detect from URL
-    let resourceType = "auto";
-    if (url.includes("/image/")) resourceType = "image";
+    // For PDFs and documents, use "raw"
+    let resourceType = "raw";
+    if (url.includes("/image/") && !url.endsWith('.pdf')) resourceType = "image";
     else if (url.includes("/video/")) resourceType = "video";
-    else if (url.includes("/raw/")) resourceType = "raw";
+    else if (url.includes("/auto/")) resourceType = "auto";
 
-    // Fetch the file from Cloudinary using the SDK
-    const result = await new Promise((resolve, reject) => {
-      cloudinary.api.resource(publicId, 
-        { resource_type: resourceType },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-    });
-
-    if (!result || !result.secure_url) {
-      return NextResponse.json(
-        { error: "File not found in Cloudinary" },
-        { status: 404 }
-      );
+    // Try multiple approaches to fetch the file
+    let response;
+    let signedUrl;
+    
+    // Approach 1: Try signed URL
+    try {
+      signedUrl = cloudinary.url(publicIdWithFolder, {
+        sign_url: true,
+        resource_type: resourceType,
+        type: 'upload',
+        secure: true
+      });
+      console.log('[cloudinary-proxy] Trying signed URL:', signedUrl);
+      response = await fetch(signedUrl);
+    } catch (e) {
+      console.log('[cloudinary-proxy] Signed URL failed, trying original URL');
     }
 
-    // Fetch the actual file content
-    const response = await fetch(result.secure_url);
+    // Approach 2: If signed URL failed, try original URL with fetch flags
+    if (!response || !response.ok) {
+      console.log('[cloudinary-proxy] Trying original URL with flags');
+      response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+    }
+
+    // Approach 3: Try with different resource type if still failing
+    if (!response.ok && resourceType === "raw") {
+      console.log('[cloudinary-proxy] Trying with image resource type');
+      signedUrl = cloudinary.url(publicIdWithFolder, {
+        sign_url: true,
+        resource_type: "image",
+        type: 'upload',
+        secure: true
+      });
+      response = await fetch(signedUrl);
+    }
+
     if (!response.ok) {
+      console.error('[cloudinary-proxy] All approaches failed');
       return NextResponse.json(
         { error: `Failed to fetch file: ${response.status}` },
         { status: response.status }
@@ -80,7 +100,7 @@ export async function GET(request) {
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${publicId.split('/').pop()}"`,
+        "Content-Disposition": `inline; filename="${publicIdWithFolder.split('/').pop()}"`,
         "Cache-Control": "public, max-age=31536000",
       },
     });
