@@ -29,12 +29,17 @@ export async function PATCH(req) {
       const net_amount = formData.get('net_amount');
       const price_per_unit = formData.get('price_per_unit');
       let created_at = formData.get('created_at');
+      const invoice_number = formData.get('invoice_number');
+      let invoice_date = formData.get('invoice_date');
       // Convert date format (YYYY-MM-DD) to MySQL datetime format (YYYY-MM-DD HH:MM:SS)
       if (created_at && created_at.includes('-') && !created_at.includes(' ')) {
         created_at = created_at + ' 00:00:00';
       } else if (created_at && created_at.includes('T')) {
         // Convert datetime-local format (YYYY-MM-DDTHH:MM) to MySQL format (YYYY-MM-DD HH:MM:SS)
         created_at = created_at.replace('T', ' ') + ':00';
+      }
+      if (invoice_date && invoice_date.includes('T')) {
+        invoice_date = invoice_date.split('T')[0];
       }
       const fields = {
         self_name: formData.get('self_name'),
@@ -94,6 +99,8 @@ export async function PATCH(req) {
       if (net_amount !== null && net_amount !== '') { setParts.push('net_amount = ?'); values.push(net_amount); }
       if (price_per_unit !== null && price_per_unit !== '') { setParts.push('price_per_unit = ?'); values.push(price_per_unit); }
       if (created_at !== null && created_at !== '') { setParts.push('created_at = ?'); values.push(created_at); }
+      if (invoice_number !== null && invoice_number !== '') { setParts.push('invoice_number = ?'); values.push(invoice_number); }
+      if (invoice_date !== null && invoice_date !== '') { setParts.push('invoice_date = ?'); values.push(invoice_date); }
       if (quotation_upload) { setParts.push('quotation_upload = ?'); values.push(quotation_upload); }
       if (payment_proof_upload) { setParts.push('payment_proof_upload = ?'); values.push(payment_proof_upload); }
       if (invoice_upload) { setParts.push('invoice_upload = ?'); values.push(invoice_upload); }
@@ -116,6 +123,8 @@ export async function PATCH(req) {
       net_amount,
       price_per_unit,
       created_at,
+      invoice_number,
+      invoice_date,
       self_name,
       courier_tracking_id,
       courier_company,
@@ -189,6 +198,14 @@ export async function PATCH(req) {
     if (created_at !== null && created_at !== undefined) {
       query += `, created_at = ?`;
       values.push(created_at);
+    }
+    if (invoice_number !== null && invoice_number !== undefined) {
+      query += `, invoice_number = ?`;
+      values.push(invoice_number);
+    }
+    if (invoice_date !== null && invoice_date !== undefined) {
+      query += `, invoice_date = ?`;
+      values.push(invoice_date);
     }
     query += ` WHERE id = ?`;
     values.push(id);
