@@ -39,7 +39,24 @@ function normalizeStatementExpenseAllocation(raw) {
   if (typeof o !== "object" || o === null || Array.isArray(o)) return null;
   const includeHead = o.includeHead !== false;
   const includeSubs = Array.isArray(o.includeSubs)
-    ? o.includeSubs.map((s) => String(s || "").trim()).filter(Boolean)
+    ? o.includeSubs
+        .map((entry) => {
+          if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+            const label = String(entry.label ?? entry.sub_head ?? "").trim();
+            if (!label) return null;
+            const headId = entry.headId != null && String(entry.headId).trim() !== ""
+              ? String(entry.headId).trim()
+              : null;
+            const headLabel = entry.headLabel != null && String(entry.headLabel).trim() !== ""
+              ? String(entry.headLabel).trim()
+              : null;
+            return { label, headId, headLabel };
+          }
+          const label = String(entry ?? "").trim();
+          if (!label) return null;
+          return { label, headId: null, headLabel: null };
+        })
+        .filter(Boolean)
     : [];
   const headLabel =
     o.headLabel != null && String(o.headLabel).trim() !== ""
@@ -139,26 +156,34 @@ export default function StatementExpensePicker({
   function bestOptionSource(expenseRow) {
     if (!expenseRow) return expenseRow;
     const k = expenseKey(expenseRow);
-    const ov = optionOverrides?.[k];
-    if (ov) {
-      return {
-        ...expenseRow,
-        head: ov.head,
-        sub_heads_joined: ov.subStr,
-      };
-    }
+
+    // Always find the richest candidate from rawList (most sub-heads) as aggregate fallback.
     const candidates = rawList.filter((x) => expenseKey(x) === k);
-    if (candidates.length === 0) return expenseRow;
-    let best = candidates[0];
-    let bestCount = subParts(headSubLines(best).subStr).length;
+    let bestAggregate = expenseRow;
+    let bestCount = subParts(headSubLines(expenseRow).subStr).length;
     for (const c of candidates) {
       const cnt = subParts(headSubLines(c).subStr).length;
       if (cnt > bestCount) {
-        best = c;
+        bestAggregate = c;
         bestCount = cnt;
       }
     }
-    return best;
+
+    const ov = optionOverrides?.[k];
+    if (ov) {
+      const aggregateSubStr = headSubLines(bestAggregate).subStr;
+      // Merge override + aggregate so user ticks are never lost if override has different sub-heads.
+      const ovParts = subParts(ov.subStr);
+      const aggParts = subParts(aggregateSubStr);
+      const merged = [...new Set([...ovParts, ...aggParts])].join(", ");
+      return {
+        ...expenseRow,
+        head: ov.head || expenseRow.head,
+        sub_heads_joined: merged || aggregateSubStr,
+      };
+    }
+
+    return bestAggregate;
   }
 
   // When expanding a statement-linked row, try to fetch the template (transaction_id empty)
@@ -205,9 +230,12 @@ export default function StatementExpensePicker({
     const sid = value != null && String(value).trim() !== "" ? String(value) : null;
     if (!sid) return;
     if (normAlloc) {
+      const labels = Array.isArray(normAlloc.includeSubs)
+        ? normAlloc.includeSubs.map((s) => (s && typeof s === "object" ? s.label : String(s || "").trim())).filter(Boolean)
+        : [];
       draftAllocationRef.current.set(sid, {
         includeHead: normAlloc.includeHead,
-        includeSubs: Array.isArray(normAlloc.includeSubs) ? normAlloc.includeSubs : [],
+        includeSubs: labels,
       });
     } else {
       draftAllocationRef.current.delete(sid);
@@ -249,7 +277,12 @@ export default function StatementExpensePicker({
     // Don't push invalid "nothing selected" state automatically; user must keep at least one tick.
     if (!headOk && subs.length === 0) return;
 
-    const nextAlloc = { includeHead: headOk, includeSubs: subs, headLabel: head || null };
+    const payloadSubs = subs.map((label) => ({
+      label,
+      headId: src?.id != null ? String(src.id) : null,
+      headLabel: head || null,
+    }));
+    const nextAlloc = { includeHead: headOk, includeSubs: payloadSubs, headLabel: head || null };
     const sig = JSON.stringify({ sid, nextAlloc });
     if (sig === lastAutoSyncRef.current) return;
     lastAutoSyncRef.current = sig;
@@ -272,9 +305,12 @@ export default function StatementExpensePicker({
       return;
     }
     if (sameRow && normAlloc) {
+      const stored = Array.isArray(normAlloc.includeSubs)
+        ? normAlloc.includeSubs.map((s) => (s && typeof s === "object" ? s.label : String(s || "").trim())).filter(Boolean)
+        : [];
       setIncludeHead(normAlloc.includeHead && !!head);
       const allowed = new Set(parts);
-      const subs = normAlloc.includeSubs.filter((s) => allowed.has(s));
+      const subs = stored.filter((s) => allowed.has(s));
       setSelectedSubs(new Set(subs));
       return;
     }
@@ -320,14 +356,21 @@ export default function StatementExpensePicker({
         toast.error("Select Head and/or at least one Sub-head — amount applies only to ticked items.");
         return;
       }
+      const payloadSubs = parts
+        .filter((p) => subs.has(p))
+        .map((label) => ({
+          label,
+          headId: src?.id != null ? String(src.id) : null,
+          headLabel: head || null,
+        }));
       onChange(String(e.id), {
         includeHead: headOk,
-        includeSubs: parts.filter((p) => subs.has(p)),
+        includeSubs: payloadSubs,
         headLabel: head || null,
       });
       draftAllocationRef.current.set(String(e.id), {
         includeHead: headOk,
-        includeSubs: parts.filter((p) => subs.has(p)),
+        includeSubs: payloadSubs.map((item) => item.label),
       });
     } else {
       onChange(String(e.id), null);
@@ -365,7 +408,8 @@ export default function StatementExpensePicker({
   }, [filteredList]);
 
   const renderExpenseRow = (e) => {
-    const { head, subStr } = headSubLines(e);
+    const src = bestOptionSource(e);
+    const { head, subStr } = headSubLines(src);
     const parts = subParts(subStr);
     const isExp = expandedId != null && String(expandedId) === String(e.id);
     const hasCat = !!head || parts.length > 0;
