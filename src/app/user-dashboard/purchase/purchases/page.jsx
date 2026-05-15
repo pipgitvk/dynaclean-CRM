@@ -15,6 +15,53 @@ const formatDisplayDate = (value) => {
   return parsed.toLocaleDateString("en-IN");
 };
 
+const FILE_SERVE_PREFIX = "/api/serve/";
+
+const isExternalUrl = (url) => /^https?:\/\//i.test(url);
+
+function resolvePurchaseFileUrl(raw) {
+  if (!raw) return "";
+  const value = String(raw).trim();
+  if (!value) return "";
+  if (isExternalUrl(value) || value.startsWith(FILE_SERVE_PREFIX)) {
+    return value;
+  }
+
+  let pathPart = value;
+  let hash = "";
+  let query = "";
+
+  const hashIndex = pathPart.indexOf("#");
+  if (hashIndex !== -1) {
+    hash = pathPart.slice(hashIndex);
+    pathPart = pathPart.slice(0, hashIndex);
+  }
+
+  const queryIndex = pathPart.indexOf("?");
+  if (queryIndex !== -1) {
+    query = pathPart.slice(queryIndex + 1);
+    pathPart = pathPart.slice(0, queryIndex);
+  }
+
+  const normalized = pathPart.replace(/^\/+/, "");
+  if (!normalized) return value;
+
+  const lastSegment = normalized.split("/").pop();
+  if (!lastSegment || !lastSegment.includes(".")) {
+    return value;
+  }
+
+  const encodedPath = normalized
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  const querySuffix = query ? `?${query}` : "";
+
+  return `${FILE_SERVE_PREFIX}${encodedPath}${querySuffix}${hash}`;
+}
+
 function EditTransportModal({ open, onClose, record, onSaved }) {
   const [mode, setMode] = useState(record?.mode_of_transport || "");
   const formatDateTimeForInput = (dateStr) => {
@@ -65,6 +112,12 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
   function onFileChange(e, key) { setFiles((f) => ({ ...f, [key]: e.target.files?.[0] || null })); }
   if (!open) return null;
   const disabled = false;
+  const existingFileLinks = {
+    quotation: resolvePurchaseFileUrl(record?.quotation_upload),
+    paymentProof: resolvePurchaseFileUrl(record?.payment_proof_upload),
+    invoice: resolvePurchaseFileUrl(record?.invoice_upload),
+    ewayBill: resolvePurchaseFileUrl(record?.eway_bill),
+  };
   async function save() {
     try {
       const fd = new FormData();
@@ -216,36 +269,36 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block mb-1 text-sm">Quotation Upload</label>
-                {record?.quotation_upload && (
+                {existingFileLinks.quotation && (
                   <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={record.quotation_upload} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                    Current: <a href={existingFileLinks.quotation} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'quotation_upload')} className="w-full border p-2 rounded" />
               </div>
               <div>
                 <label className="block mb-1 text-sm">Payment Proof Upload</label>
-                {record?.payment_proof_upload && (
+                {existingFileLinks.paymentProof && (
                   <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={record.payment_proof_upload} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                    Current: <a href={existingFileLinks.paymentProof} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'payment_proof_upload')} className="w-full border p-2 rounded" />
               </div>
               <div>
                 <label className="block mb-1 text-sm">Invoice Upload</label>
-                {record?.invoice_upload && (
+                {existingFileLinks.invoice && (
                   <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={record.invoice_upload} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                    Current: <a href={existingFileLinks.invoice} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'invoice_upload')} className="w-full border p-2 rounded" />
               </div>
               <div>
                 <label className="block mb-1 text-sm">E-Way Bill</label>
-                {record?.eway_bill && (
+                {existingFileLinks.ewayBill && (
                   <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={record.eway_bill} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                    Current: <a href={existingFileLinks.ewayBill} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'eway_bill')} className="w-full border p-2 rounded" />
@@ -1065,10 +1118,13 @@ export default function PurchasesPage() {
                       {purchase.product_image ? (
                         <button
                           onClick={() =>
-                            setPreviewImage({
-                              url: purchase.product_image,
-                              type: getFileType(purchase.product_image),
-                            })
+                            {
+                              const fileUrl = resolvePurchaseFileUrl(purchase.product_image);
+                              setPreviewImage({
+                                url: fileUrl,
+                                type: getFileType(fileUrl || purchase.product_image),
+                              });
+                            }
                           }
                           className="text-gray-600 hover:text-blue-700"
                         >
@@ -1210,12 +1266,19 @@ export default function PurchasesPage() {
                   <div key={label} className="border rounded p-3">
                     <div className="text-xs text-gray-500 mb-2">{label}</div>
                     {(() => {
-                      const ext = String(url).split('.').pop().toLowerCase();
-                      const isImg = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
-                      const isPdf = ext === 'pdf';
-                      if (isImg) return <img src={url} alt={label} className="w-full h-40 object-cover rounded" />;
-                      if (isPdf) return <iframe src={url} title={label} className="w-full h-40" />;
-                      return <a href={url} target="_blank" rel="noreferrer" className="text-blue-600 underline break-all">{url}</a>;
+                      const safeUrl = resolvePurchaseFileUrl(url);
+                      const type = getFileType(safeUrl || url);
+                      if (type === "image") {
+                        return <img src={safeUrl} alt={label} className="w-full h-40 object-cover rounded" />;
+                      }
+                      if (type === "pdf") {
+                        return <iframe src={safeUrl} title={label} className="w-full h-40" />;
+                      }
+                      return (
+                        <a href={safeUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline break-all">
+                          {url}
+                        </a>
+                      );
                     })()}
                   </div>
                 ))}
