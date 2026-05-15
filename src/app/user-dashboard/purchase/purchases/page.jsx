@@ -8,6 +8,13 @@ import ExcelJS from "exceljs";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+const formatDisplayDate = (value) => {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleDateString("en-IN");
+};
+
 function EditTransportModal({ open, onClose, record, onSaved }) {
   const [mode, setMode] = useState(record?.mode_of_transport || "");
   const formatDateTimeForInput = (dateStr) => {
@@ -20,6 +27,7 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
     const day = String(date.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+
   const [form, setForm] = useState({
     self_name: record?.self_name || "",
     courier_tracking_id: record?.courier_tracking_id || "",
@@ -32,6 +40,8 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
     net_amount: record?.net_amount || "",
     price_per_unit: record?.price_per_unit || "",
     created_at: formatDateTimeForInput(record?.created_at) || "",
+    invoice_number: record?.invoice_number || "",
+    invoice_date: formatDateTimeForInput(record?.invoice_date) || "",
   });
   useEffect(() => {
     setMode(record?.mode_of_transport || "");
@@ -47,6 +57,8 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
       net_amount: record?.net_amount || "",
       price_per_unit: record?.price_per_unit || "",
       created_at: formatDateTimeForInput(record?.created_at) || "",
+      invoice_number: record?.invoice_number || "",
+      invoice_date: formatDateTimeForInput(record?.invoice_date) || "",
     });
   }, [record]);
   const [files, setFiles] = useState({ quotation_upload: null, payment_proof_upload: null, invoice_upload: null, eway_bill: null });
@@ -62,6 +74,8 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
       fd.append('price_per_unit', form.price_per_unit);
       // Send date as YYYY-MM-DD format, API will convert to MySQL datetime
       fd.append('created_at', form.created_at || '');
+      fd.append('invoice_number', form.invoice_number || '');
+      fd.append('invoice_date', form.invoice_date || '');
       if (mode === 'Self') fd.append('self_name', form.self_name);
       if (mode === 'Courier') { fd.append('courier_tracking_id', form.courier_tracking_id); fd.append('courier_company', form.courier_company); }
       if (mode === 'Porter') { fd.append('porter_tracking_id', form.porter_tracking_id); fd.append('porter_contact', form.porter_contact); }
@@ -117,6 +131,27 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
               className="w-full border p-2 rounded"
               value={form.created_at ? form.created_at.split('T')[0] : ''}
               onChange={(e) => setForm({ ...form, created_at: e.target.value })}
+              disabled={disabled}
+            />
+          </div>
+          <div>
+            <label className="block mb-1">Invoice Number</label>
+            <input
+              type="text"
+              className="w-full border p-2 rounded"
+              value={form.invoice_number}
+              onChange={(e) => setForm({ ...form, invoice_number: e.target.value })}
+              disabled={disabled}
+              placeholder="Enter invoice number"
+            />
+          </div>
+          <div>
+            <label className="block mb-1">Invoice Date</label>
+            <input
+              type="date"
+              className="w-full border p-2 rounded"
+              value={form.invoice_date ? form.invoice_date.split('T')[0] : ''}
+              onChange={(e) => setForm({ ...form, invoice_date: e.target.value })}
               disabled={disabled}
             />
           </div>
@@ -771,6 +806,8 @@ export default function PurchasesPage() {
       { header: "Quantity", key: "quantity", width: 10 },
       { header: "Price/Unit", key: "price_per_unit", width: 12 },
       { header: "Net Amount", key: "net_amount", width: 12 },
+      { header: "Invoice No", key: "invoice_number", width: 18 },
+      { header: "Invoice Date", key: "invoice_date", width: 14 },
       { header: "From Company", key: "from_company", width: 20 },
       { header: "Mode of Transport", key: "mode_of_transport", width: 15 },
       { header: "Status", key: "status_label", width: 12 },
@@ -783,6 +820,7 @@ export default function PurchasesPage() {
         ...row,
         status_label: row.status_label || row.status,
         created_at: new Date(row.created_at).toLocaleString(),
+        invoice_date: formatDisplayDate(row.invoice_date),
       })
     );
 
@@ -807,6 +845,8 @@ export default function PurchasesPage() {
           "Product",
           "Qty",
           "Amount",
+          "Invoice No",
+          "Invoice Date",
           "From Company",
           "Transport",
           "Status",
@@ -818,6 +858,8 @@ export default function PurchasesPage() {
         row.product_name,
         row.quantity,
         row.net_amount,
+        row.invoice_number || "",
+        formatDisplayDate(row.invoice_date),
         row.from_company,
         row.mode_of_transport,
         row.status_label || row.status,
@@ -991,6 +1033,8 @@ export default function PurchasesPage() {
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('quantity')}>Qty {sortColumn === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('price_per_unit')}>Price/Unit {sortColumn === 'price_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('net_amount')}>Net Amount {sortColumn === 'net_amount' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('invoice_number')}>Invoice No {sortColumn === 'invoice_number' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('invoice_date')}>Invoice Date {sortColumn === 'invoice_date' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('from_company')}>From Company {sortColumn === 'from_company' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('mode_of_transport')}>Transport {sortColumn === 'mode_of_transport' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('status')}>Status {sortColumn === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -1010,6 +1054,8 @@ export default function PurchasesPage() {
                     <td className="p-3">{purchase.quantity}</td>
                     <td className="p-3">₹{Number(purchase.price_per_unit).toFixed(2)}</td>
                     <td className="p-3 font-semibold">₹{Number(purchase.net_amount).toFixed(2)}</td>
+                    <td className="p-3">{purchase.invoice_number || "—"}</td>
+                    <td className="p-3">{formatDisplayDate(purchase.invoice_date)}</td>
                     <td className="p-3">{purchase.from_company || "—"}</td>
                     <td className="p-3">{purchase.mode_of_transport || "—"}</td>
                     <td className="p-3">{getStatusBadge(purchase.status)}</td>
@@ -1117,6 +1163,8 @@ export default function PurchasesPage() {
                 ["Price/Unit", `₹${Number(detailPurchase.price_per_unit || 0).toFixed(2)}`],
                 ["Amount/Unit", detailPurchase.amount_per_unit],
                 ["Net Amount", `₹${Number(detailPurchase.net_amount || 0).toFixed(2)}`],
+                ["Invoice Number", detailPurchase.invoice_number],
+                ["Invoice Date", formatDisplayDate(detailPurchase.invoice_date)],
                 ["GST Rate", detailPurchase.gst_rate],
                 ["GST Toggle", detailPurchase.gst_toggle],
                 ["Tax Amount", detailPurchase.tax_amount],

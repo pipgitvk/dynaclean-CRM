@@ -10,6 +10,7 @@
     "migrate:profile-submission-status": "node scripts/migrate-profile-submission-status-varchar.js",
     "migrate:profile-submission-pending-assignee": "node scripts/migrate-profile-submission-pending-assignee.js",
     "migrate:gem-crm": "node scripts/migrate-gem-crm.js",
+    "migrate:stock-request-invoice": "node scripts/migrate-stock-request-invoice-fields.js",
     "build": "next build",
     "start": "node --no-deprecation ./node_modules/next/dist/bin/next start -p 3001",
     "lint": "next lint"
