@@ -151,7 +151,7 @@ export default async function SubHeadCardsPage({ searchParams }) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Link
-              href={`/admin-dashboard/client-expenses?client=${encodeURIComponent(client)}&group=${encodeURIComponent(group)}`}
+              href="/admin-dashboard/client-expenses/cards"
               className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100"
             >
               <ArrowLeft size={16} />
