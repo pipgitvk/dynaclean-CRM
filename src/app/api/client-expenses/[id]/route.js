@@ -58,7 +58,25 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const data = await req.json();
-    const { expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply, sub_heads, type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount } = data;
+    const {
+      expense_name,
+      client_name,
+      group_name,
+      tax_applicable,
+      tax_type,
+      main_head,
+      head,
+      supply,
+      sub_heads,
+      type_of_ledger,
+      cgst,
+      sgst,
+      igst,
+      hsn,
+      transaction_id,
+      gst_rate,
+      amount,
+    } = data;
 
     const txnId =
       transaction_id != null && String(transaction_id).trim() !== "" ? String(transaction_id).trim() : null;
@@ -96,11 +114,22 @@ export async function PUT(req, { params }) {
         await conn.execute("ALTER TABLE client_expenses ADD COLUMN transaction_id VARCHAR(255) NULL AFTER hsn");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT sub_heads FROM client_expenses LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE client_expenses ADD COLUMN sub_heads TEXT NULL AFTER amount");
+      } catch (__) {}
+    }
+    const subHeadsList = Array.isArray(sub_heads)
+      ? sub_heads.map((s) => String(s || "").trim()).filter(Boolean)
+      : [];
+    const subHeadsString = subHeadsList.length > 0 ? subHeadsList.join(", ") : null;
     const validSupply = ["goods", "services"].includes(supply) ? supply : null;
     const [result] = await conn.execute(
       `UPDATE client_expenses SET
         expense_name = ?, client_name = ?, group_name = ?, tax_applicable = ?, tax_type = ?, main_head = ?, head = ?, supply = ?,
-        type_of_ledger = ?, cgst = ?, sgst = ?, igst = ?, hsn = ?, transaction_id = ?, gst_rate = ?, amount = ?
+        type_of_ledger = ?, cgst = ?, sgst = ?, igst = ?, hsn = ?, transaction_id = ?, gst_rate = ?, amount = ?, sub_heads = ?
        WHERE id = ?`,
       [
         expense_name,
@@ -119,6 +148,7 @@ export async function PUT(req, { params }) {
         txnId,
         gst_rate != null && gst_rate !== "" ? Number(gst_rate) : null,
         amount != null && amount !== "" ? Number(amount) : null,
+        subHeadsString,
         id,
       ]
     );
@@ -128,7 +158,6 @@ export async function PUT(req, { params }) {
     }
 
     await conn.execute("DELETE FROM client_expense_sub_heads WHERE client_expense_id = ?", [id]);
-    const subHeadsList = Array.isArray(sub_heads) ? sub_heads : [];
     for (const sh of subHeadsList) {
       if (sh && typeof sh === "string" && sh.trim()) {
         await conn.execute(

@@ -143,7 +143,28 @@ export async function POST(req) {
         ? {
             includeHead: expense_allocation.includeHead !== false,
             includeSubs: Array.isArray(expense_allocation.includeSubs)
-              ? expense_allocation.includeSubs.map((s) => String(s || "").trim()).filter(Boolean)
+              ? expense_allocation.includeSubs
+                  .map((entry) => {
+                    if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+                      const label = String(entry.label ?? entry.sub_head ?? "").trim();
+                      if (!label) return null;
+                      return {
+                        label,
+                        headId:
+                          entry.headId != null && String(entry.headId).trim() !== ""
+                            ? String(entry.headId).trim()
+                            : null,
+                        headLabel:
+                          entry.headLabel != null && String(entry.headLabel).trim() !== ""
+                            ? String(entry.headLabel).trim()
+                            : null,
+                      };
+                    }
+                    const label = String(entry ?? "").trim();
+                    if (!label) return null;
+                    return { label, headId: null, headLabel: null };
+                  })
+                  .filter(Boolean)
               : [],
             headLabel:
               expense_allocation.headLabel != null &&

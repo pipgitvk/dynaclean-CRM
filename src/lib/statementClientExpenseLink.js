@@ -6,6 +6,51 @@
  * @param {{ includeHead: boolean, includeSubs: string[], headLabel?: string|null }} allocation
  *        includeSubs = labels to copy; empty array = no sub rows. headLabel used when includeHead true.
  */
+function normalizeIncludeSubs(raw) {
+  if (raw == null) return [];
+  const baseArray = Array.isArray(raw)
+    ? raw
+    : typeof raw === "string"
+      ? raw.split(",")
+      : [];
+
+  const seen = new Set();
+  const entries = [];
+
+  for (const item of baseArray) {
+    let label = "";
+    let headId = null;
+    let headLabel = null;
+
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      label = String(item.label ?? item.sub_head ?? "").trim();
+      if (item.headId != null && String(item.headId).trim() !== "") {
+        headId = String(item.headId).trim();
+      }
+      if (item.headLabel != null && String(item.headLabel).trim() !== "") {
+        headLabel = String(item.headLabel).trim();
+      }
+    } else {
+      label = String(item ?? "").trim();
+      if (label.includes("::")) {
+        const [maybeHead, maybeLabel] = label.split("::");
+        if (maybeLabel) {
+          headId = maybeHead.trim() || null;
+          label = maybeLabel.trim();
+        }
+      }
+    }
+
+    if (!label) continue;
+    const key = `${label}::${headId ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push({ label, headId, headLabel });
+  }
+
+  return entries;
+}
+
 export async function applyExpenseAllocation(conn, expenseId, allocation, templateHeadFallback) {
   const id = Number(expenseId);
   if (!Number.isFinite(id) || id < 1) return;
@@ -16,11 +61,20 @@ export async function applyExpenseAllocation(conn, expenseId, allocation, templa
         ? String(templateHeadFallback).trim()
         : null;
   const headVal = allocation?.includeHead ? headText : null;
-  await conn.execute(`UPDATE client_expenses SET head = ? WHERE id = ?`, [headVal, id]);
+  try {
+    await conn.execute("SELECT sub_heads FROM client_expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE client_expenses ADD COLUMN sub_heads TEXT NULL AFTER amount");
+    } catch (__) {}
+  }
   await conn.execute(`DELETE FROM client_expense_sub_heads WHERE client_expense_id = ?`, [id]);
-  const subs = Array.isArray(allocation?.includeSubs) ? allocation.includeSubs : [];
-  for (const s of subs) {
-    const label = s != null ? String(s).trim() : "";
+  const subs = normalizeIncludeSubs(allocation?.includeSubs);
+  const subLabels = subs.map((entry) => entry?.label != null ? String(entry.label).trim() : "").filter(Boolean);
+  const subJoined = subLabels.length > 0 ? subLabels.join(", ") : null;
+  await conn.execute(`UPDATE client_expenses SET head = ?, sub_heads = ? WHERE id = ?`, [headVal, subJoined, id]);
+  for (const entry of subs) {
+    const label = entry?.label != null ? String(entry.label).trim() : "";
     if (!label) continue;
     await conn.execute(
       `INSERT INTO client_expense_sub_heads (client_expense_id, sub_head) VALUES (?, ?)`,
@@ -68,10 +122,36 @@ export async function cloneClientExpenseFromTemplate(conn, templateId, opts) {
         ? String(alloc.headLabel).trim()
         : r.head ?? null;
 
+  try {
+    await conn.execute("SELECT sub_heads FROM client_expenses LIMIT 1");
+  } catch (_) {
+    try {
+      await conn.execute("ALTER TABLE client_expenses ADD COLUMN sub_heads TEXT NULL AFTER amount");
+    } catch (__) {}
+  }
+
+  const hasAllocation = alloc != null;
+  const allocSubsEntries = hasAllocation ? normalizeIncludeSubs(alloc?.includeSubs) : [];
+  const allocSubs = allocSubsEntries.map((entry) => entry?.label).filter(Boolean);
+
+  const subsToInsert = hasAllocation
+    ? Array.from(new Set(allocSubs))
+    : Array.isArray(subRows)
+      ? Array.from(
+          new Set(
+            subRows
+              .map((sh) => (sh?.sub_head != null ? String(sh.sub_head).trim() : ""))
+              .filter(Boolean),
+          ),
+        )
+      : [];
+
+  const subJoined = subsToInsert.length > 0 ? subsToInsert.join(", ") : null;
+
   const [ins] = await conn.execute(
     `INSERT INTO client_expenses (expense_name, client_name, group_name, tax_applicable, tax_type, main_head, head, supply,
-        type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        type_of_ledger, cgst, sgst, igst, hsn, transaction_id, gst_rate, amount, sub_heads)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       r.expense_name,
       r.client_name,
@@ -89,50 +169,10 @@ export async function cloneClientExpenseFromTemplate(conn, templateId, opts) {
       txn,
       r.gst_rate != null ? Number(r.gst_rate) : null,
       finalAmount,
+      subJoined,
     ],
   );
   const newId = ins.insertId;
-
-  const allocSubs =
-    alloc && Array.isArray(alloc.includeSubs)
-      ? alloc.includeSubs.map((s) => String(s || "").trim()).filter(Boolean)
-      : [];
-
-  const subsToInsert = [];
-  const seen = new Set();
-
-  if (Array.isArray(subRows) && subRows.length > 0) {
-    if (allocSubs.length > 0) {
-      const allow = new Set(allocSubs);
-      for (const sh of subRows) {
-        const label = sh?.sub_head != null ? String(sh.sub_head).trim() : "";
-        if (!label || !allow.has(label)) continue;
-        if (seen.has(label)) continue;
-        subsToInsert.push(label);
-        seen.add(label);
-        allow.delete(label);
-      }
-      for (const label of allow) {
-        if (label && !seen.has(label)) {
-          subsToInsert.push(label);
-          seen.add(label);
-        }
-      }
-    } else {
-      for (const sh of subRows) {
-        const label = sh?.sub_head != null ? String(sh.sub_head).trim() : "";
-        if (!label || seen.has(label)) continue;
-        subsToInsert.push(label);
-        seen.add(label);
-      }
-    }
-  } else if (allocSubs.length > 0) {
-    for (const label of allocSubs) {
-      if (!label || seen.has(label)) continue;
-      subsToInsert.push(label);
-      seen.add(label);
-    }
-  }
 
   for (const label of subsToInsert) {
     await conn.execute(
