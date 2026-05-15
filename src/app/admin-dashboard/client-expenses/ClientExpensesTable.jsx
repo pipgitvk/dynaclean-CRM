@@ -9,6 +9,8 @@ import { Eye, Search, RotateCcw, ChevronUp, ChevronDown, ArrowLeft, Inbox, X, Ca
 
 export default function ClientExpensesTable({ rows, client, group, initialSearchQuery = "", groupHasSubHeads = true }) {
   const router = useRouter();
+  const encodedClient = encodeURIComponent(client ?? "");
+  const encodedGroup = encodeURIComponent(group ?? "");
 
   useEffect(() => {
     const onVis = () => {
@@ -146,17 +148,22 @@ export default function ClientExpensesTable({ rows, client, group, initialSearch
               <RotateCcw size={16} />
               Refresh
             </button>
+            {groupHasSubHeads && client && (
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/admin-dashboard/client-expenses/sub-head-cards?client=${encodedClient}&group=${encodedGroup}`,
+                  )
+                }
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:shadow transition-all w-full sm:w-auto"
+              >
+                Sub-head summary
+              </button>
+            )}
             <button
               type="button"
-              onClick={() =>
-                router.push(
-                  client && group
-                    ? groupHasSubHeads
-                      ? `/admin-dashboard/client-expenses/sub-head-cards?client=${encodeURIComponent(client)}&group=${encodeURIComponent(group)}`
-                      : "/admin-dashboard/client-expenses/cards"
-                    : "/admin-dashboard/client-expenses/cards"
-                )
-              }
+              onClick={() => router.push("/admin-dashboard/client-expenses/cards")}
               className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:shadow transition-all w-full sm:w-auto"
             >
               <ArrowLeft size={16} />
