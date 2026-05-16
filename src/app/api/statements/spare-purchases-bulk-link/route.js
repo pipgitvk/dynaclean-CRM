@@ -1,4 +1,4 @@
-import db from "@/lib/db";
+import { getDbConnection } from "@/lib/db";
 
 export async function POST(request) {
   try {
@@ -6,50 +6,68 @@ export async function POST(request) {
     const { statementId, purchaseIds } = body;
 
     if (!statementId || !Array.isArray(purchaseIds) || purchaseIds.length === 0) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
+      return new Response(JSON.stringify({ error: "Missing required fields" }), { 
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const statement = await db.statement.findUnique({
-      where: { id: Number(statementId) },
-    });
+    const conn = await getDbConnection();
+    await conn.beginTransaction();
 
-    if (!statement) {
-      return new Response(JSON.stringify({ error: "Statement not found" }), { status: 404 });
-    }
+    try {
+      const [statementRows] = await conn.execute(
+        "SELECT id, linked_purchase_ids FROM statements WHERE id = ?",
+        [Number(statementId)]
+      );
 
-    const existingLinkedIds = [];
-    if (statement.linked_purchase_ids) {
-      try {
-        const parsed = JSON.parse(statement.linked_purchase_ids);
-        if (Array.isArray(parsed)) existingLinkedIds.push(...parsed);
-      } catch {
-        const split = String(statement.linked_purchase_ids).split(",");
-        existingLinkedIds.push(...split);
+      if (statementRows.length === 0) {
+        await conn.rollback();
+        return new Response(JSON.stringify({ error: "Statement not found" }), { 
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
       }
-    }
 
-    const newLinkedIds = [...existingLinkedIds];
-    for (const pid of purchaseIds) {
-      const key = `SP${Number(pid)}`;
-      if (!newLinkedIds.includes(key)) {
-        newLinkedIds.push(key);
+      const statement = statementRows[0];
+      let currentTokens = [];
+      
+      if (statement.linked_purchase_ids) {
+        try {
+          const parsed = JSON.parse(statement.linked_purchase_ids);
+          if (Array.isArray(parsed)) currentTokens = parsed;
+        } catch {
+          const split = String(statement.linked_purchase_ids).split(",");
+          currentTokens = split;
+        }
       }
+
+      purchaseIds.forEach(pid => {
+        const token = `SP${Number(pid)}`;
+        if (!currentTokens.includes(token)) {
+          currentTokens.push(token);
+        }
+      });
+
+      const nextLinkedIds = currentTokens.length > 0 ? JSON.stringify(currentTokens) : null;
+      const nextStatus = currentTokens.length > 0 ? "Settled" : "Unsettled";
+
+      await conn.execute(
+        "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ? WHERE id = ?",
+        [nextLinkedIds, nextStatus, Number(statementId)]
+      );
+
+      await conn.commit();
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      await conn.rollback();
+      throw error;
     }
-
-    const updatedStatement = await db.statement.update({
-      where: { id: Number(statementId) },
-      data: {
-        linked_purchase_ids: JSON.stringify(newLinkedIds),
-        invoice_status: "Settled",
-      },
-    });
-
-    return new Response(JSON.stringify({ success: true, statement: updatedStatement }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
   } catch (error) {
-    console.error("Error in spare-purchases-bulk-link:", error);
+    console.error("[spare-purchases-bulk-link] ERROR:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
