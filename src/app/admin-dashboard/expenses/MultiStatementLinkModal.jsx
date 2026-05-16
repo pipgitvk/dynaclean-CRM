@@ -5,7 +5,7 @@ import { toast } from "react-hot-toast";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 
-const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selectedExpensesTotal, onLinkSuccess }) => {
+const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selectedApprovedAmount, onLinkSuccess }) => {
   const [statements, setStatements] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -46,8 +46,8 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
     } else {
       const amount = Number(statement.amount || 0);
       
-      if (Math.abs(amount - selectedExpensesTotal) > 0.01) {
-        toast.error(`Statement amount (₹${amount.toFixed(2)}) must exactly match selected expenses total (₹${selectedExpensesTotal.toFixed(2)})`);
+      if (Math.abs(amount - selectedApprovedAmount) > 0.01) {
+        toast.error(`Statement amount (₹${amount.toFixed(2)}) must exactly match selected expenses total (₹${selectedApprovedAmount.toFixed(2)})`);
         return;
       }
       
@@ -64,7 +64,7 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
     const selectedStatement = statements.find(s => s.id === selectedIds[0]);
     if (!selectedStatement) return;
 
-    if (Math.abs(Number(selectedStatement.amount) - selectedExpensesTotal) > 0.01) {
+    if (Math.abs(Number(selectedStatement.amount) - selectedApprovedAmount) > 0.01) {
       toast.error(`Statement amount must exactly match selected expenses total`);
       return;
     }
@@ -112,7 +112,7 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Link Statements to Selected Expenses</h2>
             <p className="text-sm text-gray-500">Selected Expenses Count: <span className="font-bold text-gray-700">{selectedExpenseIds.size}</span></p>
-            <p className="text-sm text-gray-500">Selected Expenses Total: <span className="font-bold text-gray-700">₹{selectedExpensesTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
+            <p className="text-sm text-gray-500">Selected Expenses Total: <span className="font-bold text-gray-700">₹{selectedApprovedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
           </div>
           <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +186,7 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
             <div className="text-sm text-gray-600 font-medium">
               {selectedIds.length} statement(s) selected
             </div>
-            <div className={`text-xs font-semibold ${selectedTotal > selectedExpensesTotal ? 'text-red-600' : 'text-blue-600'}`}>
+            <div className={`text-xs font-semibold ${selectedTotal > selectedApprovedAmount ? 'text-red-600' : 'text-blue-600'}`}>
               Selected Total: ₹{selectedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </div>
           </div>
