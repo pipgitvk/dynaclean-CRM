@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, Download, Eye, Plus } from "lucide-react";
+import { Search, Download, Eye, Plus, Link2 } from "lucide-react";
+import MultiSparePurchaseLinkModal from "./MultiSparePurchaseLinkModal";
 import { toast } from "react-hot-toast";
 import ExcelJS from "exceljs";
 import jsPDF from "jspdf";
@@ -501,6 +502,8 @@ export default function SparePurchasesPage() {
   const [linkedPurchaseIds, setLinkedPurchaseIds] = useState(() => new Set());
   const [paymentTransByPurchaseId, setPaymentTransByPurchaseId] = useState(() => ({}));
   const [paymentStatementByPurchaseId, setPaymentStatementByPurchaseId] = useState(() => ({}));
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState(new Set());
+  const [isMultiLinkModalOpen, setIsMultiLinkModalOpen] = useState(false);
 
   useEffect(() => {
     loadPurchases();
@@ -697,6 +700,38 @@ export default function SparePurchasesPage() {
     return filtered;
   }, [purchases, search, statusFilter, paymentTransByPurchaseId, startDate, endDate, sortColumn, sortDirection]);
 
+  const togglePurchaseSelection = (id) => {
+    setSelectedPurchaseIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAllPurchases = () => {
+    if (selectedPurchaseIds.size === filteredPurchases.length) {
+      setSelectedPurchaseIds(new Set());
+    } else {
+      setSelectedPurchaseIds(new Set(filteredPurchases.map((p) => Number(p.id))));
+    }
+  };
+
+  const selectedTotals = useMemo(() => {
+    return filteredPurchases.reduce(
+      (acc, p) => {
+        if (selectedPurchaseIds.has(Number(p.id))) {
+          acc.selectedNetAmount += Number(p.net_amount) || 0;
+        }
+        return acc;
+      },
+      { selectedNetAmount: 0 }
+    );
+  }, [filteredPurchases, selectedPurchaseIds]);
+
   const totals = useMemo(() => {
     return filteredPurchases.reduce((acc, p) => {
       acc.totalQty += Number(p.quantity) || 0;
@@ -839,6 +874,18 @@ export default function SparePurchasesPage() {
             <span className="text-sm font-medium text-gray-700">Total Amount:</span>
             <span className="text-sm font-bold text-green-700">₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
+          {selectedPurchaseIds.size > 0 && (
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-sm font-medium text-gray-700">Selected Total:</span>
+              <span className="text-sm font-bold text-orange-700">₹{selectedTotals.selectedNetAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <button
+                onClick={() => setIsMultiLinkModalOpen(true)}
+                className="ml-2 px-3 py-1 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 flex items-center gap-1"
+              >
+                <Link2 className="w-4 h-4" /> Link Payment
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -852,6 +899,14 @@ export default function SparePurchasesPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-100 text-left">
                 <tr>
+                  <th className="p-3 border-b font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={selectedPurchaseIds.size === filteredPurchases.length && filteredPurchases.length > 0}
+                      onChange={toggleSelectAllPurchases}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                  </th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('id')}>ID {sortColumn === 'id' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('spare_id')}>Spare ID {sortColumn === 'spare_id' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('spare_name')}>Spare Name {sortColumn === 'spare_name' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -871,6 +926,14 @@ export default function SparePurchasesPage() {
               <tbody>
                 {filteredPurchases.map((purchase) => (
                   <tr key={purchase.id} className="border-t hover:bg-gray-50">
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedPurchaseIds.has(Number(purchase.id))}
+                        onChange={() => togglePurchaseSelection(Number(purchase.id))}
+                        className="w-4 h-4 text-blue-600 rounded"
+                      />
+                    </td>
                     <td className="p-3">#{purchase.id}</td>
                     <td className="p-3 font-medium">{purchase.spare_id}</td>
                     <td className="p-3">{purchase.spare_name}</td>
@@ -947,6 +1010,18 @@ export default function SparePurchasesPage() {
         purchase={linkPurchase}
         onLinked={markPurchaseLinked}
         currentStatementIds={paymentStatementByPurchaseId?.[Number(linkPurchase?.id)]}
+      />
+
+      <MultiSparePurchaseLinkModal
+        open={isMultiLinkModalOpen}
+        onClose={() => setIsMultiLinkModalOpen(false)}
+        selectedNetAmount={selectedTotals.selectedNetAmount}
+        selectedPurchaseIds={selectedPurchaseIds}
+        purchases={purchases}
+        onSuccess={() => {
+          loadLinkedPurchaseIds();
+          setSelectedPurchaseIds(new Set());
+        }}
       />
 
       {detailPurchase && (
