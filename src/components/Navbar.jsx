@@ -126,10 +126,14 @@ export default function Navbar({ onToggleSidebar }) {
   
   const markNotificationAsRead = async (notificationId) => {
     try {
-      await fetch(`/api/notifications/${notificationId}`, {
+      console.log("Marking notification as read:", notificationId);
+      const res = await fetch(`/api/notifications/${notificationId}`, {
         method: "PATCH",
         credentials: "include"
       });
+      console.log("Response status:", res.status);
+      const data = await res.json();
+      console.log("Response data:", data);
       // Refresh notifications after marking as read
       await fetchNotifications();
     } catch (error) {
@@ -366,11 +370,14 @@ export default function Navbar({ onToggleSidebar }) {
               aria-label="Notifications"
             >
               <Bell size={18} />
-              {notifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
-                  {notifications.length > 9 ? "9+" : notifications.length}
-                </span>
-              )}
+              {(() => {
+                const unreadCount = notifications.filter(n => !n.is_read).length;
+                return unreadCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                ) : null;
+              })()}
             </button>
             
             {/* Notification Dropdown */}
@@ -399,13 +406,41 @@ export default function Navbar({ onToggleSidebar }) {
                     notifications.map((notification) => (
                       <div 
                         key={notification.id} 
-                        className="p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => markNotificationAsRead(notification.id)}
+                        className={`p-3 border-b border-gray-100 ${!notification.is_read ? 'hover:bg-gray-50 cursor-pointer' : 'bg-gray-50 opacity-75'}`}
+                        onClick={() => {
+                          if (notification.related_id && notification.type === 'recurring_task' || notification.type === 'task_reassign') {
+                            const isAdminDashboard = pathname?.startsWith("/admin-dashboard");
+                            const viewTaskRoute = isAdminDashboard
+                              ? `/admin-dashboard/view-task/${notification.related_id}`
+                              : `/user-dashboard/view-task/${notification.related_id}`;
+                            router.push(viewTaskRoute);
+                            setShowNotificationDropdown(false);
+                          }
+                        }}
                       >
                         <p className="text-sm text-gray-800">{notification.message}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(notification.created_at).toLocaleString()}
-                        </p>
+                        <div className="flex justify-between items-center mt-2">
+                          <p className="text-xs text-gray-500">
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                          <div className="flex gap-2">
+                            {!notification.is_read && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markNotificationAsRead(notification.id);
+                                }}
+                                className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                              >
+                                Mark as Read
+                              </button>
+                            )}
+                            {notification.is_read && (
+                              <span className="text-xs text-green-600 font-medium">Read</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))
                   )}

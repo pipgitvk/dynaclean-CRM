@@ -280,10 +280,10 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                 Task ID {sortBy === 'task_id' && (sortOrder === 'asc' ? '↑' : '↓')}
               </th>
               <th
-                className="px-2 py-2 text-center w-10"
+                className="px-2 py-2 text-center"
                 title="Automatic recurring (cron)"
               >
-                A
+                Automatic
               </th>
               <th 
                 className="px-4 py-2 cursor-pointer hover:bg-gray-200"

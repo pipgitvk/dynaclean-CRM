@@ -30,7 +30,7 @@ export async function GET(req) {
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
-    const notifications = await NotificationService.getUnreadNotifications(empId);
+    const notifications = await NotificationService.getNotifications(empId);
     return NextResponse.json({ success: true, notifications });
   } catch (error) {
     console.error("Error fetching notifications:", error);

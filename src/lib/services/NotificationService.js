@@ -58,13 +58,13 @@ class NotificationService {
     }
   }
   
-  async getUnreadNotifications(userId) {
+  async getNotifications(userId) {
     try {
       const conn = await getDbConnection();
       await this.ensureNotificationTable(conn);
       const [notifications] = await conn.execute(
         `SELECT * FROM notifications 
-         WHERE user_id = ? AND is_read = false 
+         WHERE user_id = ? 
          ORDER BY created_at DESC 
          LIMIT 50`,
         [userId]
@@ -90,6 +90,48 @@ class NotificationService {
     } catch (error) {
       console.error("Error marking notification as read:", error);
       return { success: false };
+    }
+  }
+
+  async sendReassignNotification(taskId, taskName, oldAssignee, newAssignee, creatorId, adminId) {
+    try {
+      const conn = await getDbConnection();
+      await this.ensureNotificationTable(conn);
+
+      const recipientIds = new Set();
+
+      // Get new assignee empId
+      const [[newAssigneeEmp]] = await conn.execute(
+        `SELECT empId FROM emplist WHERE username = ? LIMIT 1`,
+        [newAssignee]
+      );
+      const newAssigneeId = newAssigneeEmp?.empId;
+
+      // Get admin/creator empId (if provided)
+      if (adminId) recipientIds.add(adminId);
+      if (creatorId) recipientIds.add(creatorId);
+      if (newAssigneeId) recipientIds.add(newAssigneeId);
+
+      if (recipientIds.size === 0) {
+        console.warn("⚠️ Skipping reassign notification: no valid recipient empIds");
+        return;
+      }
+
+      const messageForAssignee = `Task "${taskName}" has been reassigned to you`;
+      const messageForAdmin = `Task "${taskName}" has been reassigned to ${newAssignee}`;
+
+      for (const empId of recipientIds) {
+        const message = (empId === newAssigneeId) ? messageForAssignee : messageForAdmin;
+
+        await conn.execute(
+          `INSERT INTO notifications (user_id, message, type, related_id, created_at)
+           VALUES (?, ?, 'task_reassign', ?, NOW())`,
+          [empId, message, taskId]
+        );
+        console.log(`✅ Reassign notification sent to user ${empId} for task ${taskId}`);
+      }
+    } catch (error) {
+      console.error("Error sending reassign notification:", error);
     }
   }
 }

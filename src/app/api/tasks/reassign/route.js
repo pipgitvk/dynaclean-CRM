@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import NotificationService from "@/lib/services/NotificationService";
 
 export async function POST(req) {
   const { task_id, newAssignee } = await req.json();
@@ -11,7 +12,7 @@ export async function POST(req) {
 
   try {
     const [[taskRow]] = await conn.execute(
-      `SELECT createdby FROM task WHERE task_id = ?`,
+      `SELECT taskname, createdby, taskassignto FROM task WHERE task_id = ?`,
       [task_id]
     );
     if (!taskRow || taskRow.createdby !== currentUser) {
@@ -20,6 +21,23 @@ export async function POST(req) {
         { status: 403 }
       );
     }
+
+    const oldAssignee = taskRow.taskassignto;
+    const taskName = taskRow.taskname;
+
+    // Get current user's empId (who is reassigning the task)
+    const [[currentUserEmp]] = await conn.execute(
+      `SELECT empId FROM emplist WHERE username = ? LIMIT 1`,
+      [currentUser]
+    );
+    const currentUserEmpId = currentUserEmp?.empId;
+
+    // Get task creator's empId
+    const [[creatorEmp]] = await conn.execute(
+      `SELECT empId FROM emplist WHERE username = ? LIMIT 1`,
+      [taskRow.createdby]
+    );
+    const creatorEmpId = creatorEmp?.empId;
 
     const now = new Date().toISOString().slice(0, 19).replace("T", " ");
     await conn.query(
@@ -41,6 +59,17 @@ export async function POST(req) {
       FROM task WHERE task_id = ?`,
       [now, notes, currentUser, newAssignee, now, task_id]
     );
+
+    // Send reassign notifications!
+    await NotificationService.sendReassignNotification(
+      task_id,
+      taskName,
+      oldAssignee,
+      newAssignee,
+      creatorEmpId,
+      currentUserEmpId
+    );
+
     return NextResponse.json({ message: "Reassigned successfully" });
   } catch (err) {
     console.error(err);
