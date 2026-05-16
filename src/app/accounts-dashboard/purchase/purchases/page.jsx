@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, Download, Eye, Plus } from "lucide-react";
+import { Search, Download, Eye, Plus, Link2 } from "lucide-react";
+import MultiPurchaseLinkModal from "@/app/user-dashboard/purchase/purchases/MultiPurchaseLinkModal";
 import { toast } from "react-hot-toast";
 import ExcelJS from "exceljs";
 import jsPDF from "jspdf";
@@ -491,6 +492,8 @@ export default function PurchasesPage() {
   const [linkedPurchaseIds, setLinkedPurchaseIds] = useState(() => new Set());
   const [paymentTransByPurchaseId, setPaymentTransByPurchaseId] = useState(() => ({}));
   const [paymentStatementByPurchaseId, setPaymentStatementByPurchaseId] = useState(() => ({}));
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState(() => new Set());
+  const [isMultiLinkModalOpen, setIsMultiLinkModalOpen] = useState(false);
 
   useEffect(() => {
     loadPurchases();
@@ -630,6 +633,26 @@ export default function PurchasesPage() {
     }
   };
 
+  const togglePurchaseSelection = (id) => {
+    setSelectedPurchaseIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAllPurchases = () => {
+    if (selectedPurchaseIds.size === filteredPurchases.length) {
+      setSelectedPurchaseIds(new Set());
+    } else {
+      setSelectedPurchaseIds(new Set(filteredPurchases.map(p => Number(p.id))));
+    }
+  };
+
   const filteredPurchases = useMemo(() => {
     let filtered = purchases;
 
@@ -686,6 +709,15 @@ export default function PurchasesPage() {
 
     return filtered;
   }, [purchases, search, statusFilter, paymentTransByPurchaseId, startDate, endDate, sortColumn, sortDirection]);
+
+  const selectedTotals = useMemo(() => {
+    return filteredPurchases.reduce((acc, p) => {
+      if (selectedPurchaseIds.has(Number(p.id))) {
+        acc.selectedNetAmount += Number(p.net_amount) || 0;
+      }
+      return acc;
+    }, { selectedNetAmount: 0 });
+  }, [filteredPurchases, selectedPurchaseIds]);
 
   const totals = useMemo(() => {
     return filteredPurchases.reduce((acc, p) => {
@@ -932,6 +964,19 @@ export default function PurchasesPage() {
             <span className="text-sm font-medium text-gray-700">Total Amount:</span>
             <span className="text-sm font-bold text-green-700">₹{totals.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
+          {selectedPurchaseIds.size > 0 && (
+            <div className="flex items-center gap-2 bg-purple-50 px-3 py-2 rounded-md border border-purple-200">
+              <span className="text-sm font-medium text-purple-700">Selected Total:</span>
+              <span className="text-sm font-bold text-purple-800">₹{selectedTotals.selectedNetAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <button
+                onClick={() => setIsMultiLinkModalOpen(true)}
+                className="ml-2 text-purple-700 hover:text-purple-900"
+                title="Link Payment"
+              >
+                <Link2 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -948,6 +993,14 @@ export default function PurchasesPage() {
             <table className="min-w-full text-sm">
               <thead className="bg-gray-100 text-left">
                 <tr>
+                  <th className="p-3 border-b">
+                    <input
+                      type="checkbox"
+                      checked={filteredPurchases.length > 0 && selectedPurchaseIds.size === filteredPurchases.length}
+                      onChange={toggleSelectAllPurchases}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                  </th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('id')}>ID {sortColumn === 'id' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_code')}>Product Code {sortColumn === 'product_code' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_name')}>Product Name {sortColumn === 'product_name' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -967,6 +1020,14 @@ export default function PurchasesPage() {
               <tbody>
                 {filteredPurchases.map((purchase) => (
                   <tr key={purchase.id} className="border-t hover:bg-gray-50">
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedPurchaseIds.has(Number(purchase.id))}
+                        onChange={() => togglePurchaseSelection(Number(purchase.id))}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </td>
                     <td className="p-3">#{purchase.id}</td>
                     <td className="p-3 font-medium">{purchase.product_code}</td>
                     <td className="p-3">{purchase.product_name}</td>
@@ -1150,6 +1211,16 @@ export default function PurchasesPage() {
         purchase={linkPurchase}
         onLinked={markPurchaseLinked}
         currentStatementIds={paymentStatementByPurchaseId?.[Number(linkPurchase?.id)]}
+      />
+      
+      {/* Multi Purchase Link Modal */}
+      <MultiPurchaseLinkModal
+        isOpen={isMultiLinkModalOpen}
+        closeModal={() => setIsMultiLinkModalOpen(false)}
+        selectedPurchaseIds={selectedPurchaseIds}
+        selectedNetAmount={selectedTotals.selectedNetAmount}
+        purchases={purchases}
+        onLinkSuccess={() => { setSelectedPurchaseIds(new Set()); loadLinkedPurchaseIds(); }}
       />
 
       {/* Preview Modal */}
