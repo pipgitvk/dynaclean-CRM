@@ -258,9 +258,8 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-600">
             <div className="flex justify-between items-start">
               <div>
-                <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Selected Total</div>
-                <div className="text-2xl font-bold text-gray-800">₹{selectedTotalAmount.toFixed(2)}</div>
-                <div className="text-xs text-gray-400 mt-1">Selected Approved: ₹{selectedApprovedAmount.toFixed(2)}</div>
+                <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Selected Approved Amount</div>
+                <div className="text-2xl font-bold text-gray-800">₹{selectedApprovedAmount.toFixed(2)}</div>
               </div>
               <button
                 onClick={() => setIsMultiLinkModalOpen(true)}
@@ -617,7 +616,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
         isOpen={isMultiLinkModalOpen}
         closeModal={() => setIsMultiLinkModalOpen(false)}
         selectedExpenseIds={selectedExpenseIds}
-        selectedExpensesTotal={selectedTotalAmount}
+        selectedApprovedAmount={selectedApprovedAmount}
         onLinkSuccess={() => setSelectedExpenseIds(new Set())}
       />
     </div>
