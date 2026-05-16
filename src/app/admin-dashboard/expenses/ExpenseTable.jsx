@@ -7,6 +7,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Eye, CreditCard, Pencil, Link2, Edit3 } from "lucide-react";
 import Modal from "./Model";
 import StatementLinkModal from "./StatementLinkModal";
+import MultiStatementLinkModal from "./MultiStatementLinkModal";
 
 export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   const searchParams = useSearchParams();
@@ -17,6 +18,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate] = useState(dayjs().endOf("month").format("YYYY-MM-DD"));
   const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState(new Set());
 
   // Function to update URL search params
   const updateQueryParam = useCallback((name, value) => {
@@ -44,6 +46,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   const [selectedStatus, setSelectedStatus] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [isMultiLinkModalOpen, setIsMultiLinkModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowForLink, setSelectedRowForLink] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -162,6 +165,49 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
     return (va - vb) * dir;
   });
 
+  const toggleExpenseSelection = (id, row) => {
+    if (row.approval_status !== "Approved") {
+      alert("Only approved expenses can be selected for linking");
+      return;
+    }
+    setSelectedExpenseIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const approvedRows = sortedRows.filter(row => row.approval_status === "Approved");
+    if (selectedExpenseIds.size === approvedRows.length && approvedRows.length > 0) {
+      setSelectedExpenseIds(new Set());
+    } else {
+      setSelectedExpenseIds(new Set(approvedRows.map(row => row.ID)));
+    }
+  };
+
+  const calculateSelectedTotals = () => {
+    let selectedTotalAmount = 0;
+    let selectedApprovedAmount = 0;
+    sortedRows.forEach(row => {
+      if (selectedExpenseIds.has(row.ID)) {
+        selectedTotalAmount += getRowTotal(row);
+        const isRejected = row.approval_status === "Rejected";
+        const rowApproved = Number(row.approved_amount || 0);
+        if (!isRejected && rowApproved > 0) {
+          selectedApprovedAmount += rowApproved;
+        }
+      }
+    });
+    return { selectedTotalAmount, selectedApprovedAmount };
+  };
+
+  const { selectedTotalAmount, selectedApprovedAmount } = calculateSelectedTotals();
+
   const SortIcon = ({ column }) => {
     if (sortConfig.key !== column) return null;
     return <span className="ml-1">{sortConfig.direction === "asc" ? "▲" : "▼"}</span>;
@@ -195,7 +241,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-600">
           <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Total Amount</div>
           <div className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</div>
@@ -208,6 +254,24 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
           <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Pending Amount</div>
           <div className="text-2xl font-bold text-gray-800">₹{(totalAmount - approvedAmount).toFixed(2)}</div>
         </div>
+        {selectedExpenseIds.size > 0 && (
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-purple-600">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="text-sm text-gray-500 font-medium uppercase tracking-wider">Selected Total</div>
+                <div className="text-2xl font-bold text-gray-800">₹{selectedTotalAmount.toFixed(2)}</div>
+                <div className="text-xs text-gray-400 mt-1">Selected Approved: ₹{selectedApprovedAmount.toFixed(2)}</div>
+              </div>
+              <button
+                onClick={() => setIsMultiLinkModalOpen(true)}
+                className="text-purple-600 hover:text-purple-800 cursor-pointer"
+                title="Link Payment"
+              >
+                <Link2 size={20} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -275,6 +339,14 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
         <table className="min-w-full table-auto text-sm">
           <thead className="bg-gray-100 sticky top-0 z-10">
             <tr className="text-left font-semibold text-gray-700">
+              <th className="p-3">
+                <input
+                  type="checkbox"
+                  checked={sortedRows.filter(row => row.approval_status === "Approved").length > 0 && selectedExpenseIds.size === sortedRows.filter(row => row.approval_status === "Approved").length}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
               <th onClick={() => handleSort("ID")} className="p-3 cursor-pointer select-none">ID<SortIcon column="ID" /></th>
               <th onClick={() => handleSort("TravelDate")} className="p-3 cursor-pointer select-none">Date<SortIcon column="TravelDate" /></th>
               <th onClick={() => handleSort("username")} className="p-3 cursor-pointer select-none">Username<SortIcon column="username" /></th>
@@ -298,6 +370,15 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
 
                 return (
                   <tr key={row.ID}>
+                    <td className="p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedExpenseIds.has(row.ID)}
+                        onChange={() => toggleExpenseSelection(row.ID, row)}
+                        className="w-4 h-4 cursor-pointer"
+                        disabled={row.approval_status !== "Approved"}
+                      />
+                    </td>
                     <td className="p-3">{row.ID}</td>
                     <td className="p-3">
                       {row.TravelDate
@@ -411,7 +492,14 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
               key={row.ID}
               className="border rounded-lg p-4 shadow-sm bg-white text-sm space-y-1"
             >
-              <div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectedExpenseIds.has(row.ID)}
+                  onChange={() => toggleExpenseSelection(row.ID, row)}
+                  className="w-4 h-4 cursor-pointer"
+                  disabled={row.approval_status !== "Approved"}
+                />
                 <strong>ID:</strong> {row.ID}
               </div>
               <div>
@@ -523,6 +611,14 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
         closeModal={() => setIsLinkModalOpen(false)}
         row={selectedRowForLink}
         onLinkSuccess={handleLinkSuccess}
+      />
+
+      <MultiStatementLinkModal
+        isOpen={isMultiLinkModalOpen}
+        closeModal={() => setIsMultiLinkModalOpen(false)}
+        selectedExpenseIds={selectedExpenseIds}
+        selectedExpensesTotal={selectedTotalAmount}
+        onLinkSuccess={() => setSelectedExpenseIds(new Set())}
       />
     </div>
   );
