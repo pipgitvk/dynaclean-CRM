@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getDbConnection } from "@/lib/db";
 import ClientTaskTable from "@/components/task//ClientTaskTableAdmin"; // ⬅️ NEW
+import { TASK_LIST_SELECT_SQL } from "@/lib/taskListQuery";
+import RecurrenceService from "@/lib/services/RecurrenceService";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 export const dynamic = "force-dynamic";
@@ -24,34 +26,19 @@ async function getUsernameFromToken() {
 }
 
 async function getTasks(username, role) {
-  const conn = await getDbConnection();
+  const pool = await getDbConnection();
+  const setupConn = await pool.getConnection();
+  try {
+    await RecurrenceService.backfillAutomaticTaskAssignDates(setupConn);
+  } finally {
+    setupConn.release();
+  }
 
   const isPrivileged = ["SUPERADMIN", "DIRECTOR"].includes(String(role).toUpperCase());
 
   const query = `
     SELECT 
-      t.task_id, 
-      t.taskname, 
-      t.createdby, 
-      t.taskassignto, 
-      (
-        SELECT tf.reassign 
-        FROM task_followup tf 
-        WHERE tf.task_id = t.task_id 
-        ORDER BY tf.id DESC 
-        LIMIT 1
-      ) AS reassign,
-      (
-        SELECT tf.taskassignto 
-        FROM task_followup tf 
-        WHERE tf.task_id = t.task_id 
-        ORDER BY tf.id ASC 
-        LIMIT 1
-      ) AS first_assignto,
-      t.followed_date, 
-      t.next_followup_date, 
-      t.status, 
-      t.task_completion_date
+      ${TASK_LIST_SELECT_SQL}
     FROM 
       task t
     ${isPrivileged ? "" : "WHERE t.createdby = ? OR t.taskassignto = ?"}
@@ -59,7 +46,7 @@ async function getTasks(username, role) {
       t.task_id DESC
   `;
 
-  const [rows] = await conn.execute(query, isPrivileged ? [] : [username, username]);
+  const [rows] = await pool.execute(query, isPrivileged ? [] : [username, username]);
   // await conn.end();
   return rows;
 }

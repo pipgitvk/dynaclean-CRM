@@ -5,8 +5,15 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import AssignToInput from "@/components/AssigneInput/AssignToInput";
 
-/** Default deadline: now + 2h, as local `datetime-local` (minute precision). */
-function defaultDatetimeLocal() {
+/** Current local time for `datetime-local` (minute precision). */
+function nowDatetimeLocal() {
+  const d = new Date();
+  const z = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`;
+}
+
+/** Default deadline for one-off tasks: now + 2h. */
+function defaultDeadlineLocal() {
   const d = new Date();
   d.setTime(d.getTime() + 2 * 60 * 60 * 1000);
   const z = (n) => String(n).padStart(2, "0");
@@ -14,16 +21,12 @@ function defaultDatetimeLocal() {
 }
 
 const initialFormData = () => {
-  const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const istTime = new Date(now.getTime() + istOffset);
-  const z = (n) => String(n).padStart(2, "0");
-  const recurrenceStartDate = `${istTime.getFullYear()}-${z(istTime.getMonth() + 1)}-${z(istTime.getDate())}T${z(istTime.getHours())}:${z(istTime.getMinutes())}`;
+  const now = nowDatetimeLocal();
 
   return {
     taskname: "",
     taskassignto: "",
-    next_followup_date: defaultDatetimeLocal(),
+    next_followup_date: defaultDeadlineLocal(),
     task_prior: "Medium",
     task_catg: "Software Development",
     notes: "",
@@ -34,7 +37,7 @@ const initialFormData = () => {
     monthly_date: 1,
     yearly_month: 1,
     yearly_date: 1,
-    recurrence_start_date: recurrenceStartDate,
+    recurrence_start_date: now,
     recurrence_end_date: "",
   };
 };
@@ -48,10 +51,30 @@ export default function TaskForm({ username }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      };
+
+      // Recurring: use current time (not +2h deadline default) and keep fields in sync
+      if (name === "is_recurring" && checked) {
+        const now = nowDatetimeLocal();
+        next.next_followup_date = now;
+        next.recurrence_start_date = now;
+      }
+      if (next.is_recurring) {
+        if (name === "recurrence_start_date") {
+          next.next_followup_date = value;
+        }
+        if (name === "next_followup_date") {
+          next.recurrence_start_date = value;
+        }
+      }
+
+      return next;
+    });
   };
 
   const handleFileChange = (e, setter) => {
@@ -96,7 +119,13 @@ export default function TaskForm({ username }) {
       });
 
       if (res.ok) {
-        toast.success("✅ Task added successfully");
+        const data = await res.json().catch(() => ({}));
+        toast.success(
+          data.message ||
+            (data.recurring_task_id
+              ? `✅ Task created (ID ${data.task_id}). Recurring runs will continue automatically.`
+              : "✅ Task added successfully")
+        );
         router.push("/admin-dashboard");
       } else if (res.status === 409) {
         const err = await res.json().catch(() => ({ error: "Duplicate task" }));
@@ -147,7 +176,11 @@ export default function TaskForm({ username }) {
       {/* Deadline and Priority */}
       <div className="flex flex-wrap gap-4">
         <div className="flex-1">
-          <label className="block font-semibold">Deadline (Date & Time)</label>
+          <label className="block font-semibold">
+            {formData.is_recurring
+              ? "Due date & time (each occurrence)"
+              : "Deadline (Date & Time)"}
+          </label>
           <input
             type="datetime-local"
             name="next_followup_date"
@@ -156,6 +189,12 @@ export default function TaskForm({ username }) {
             onChange={handleChange}
             className="input border border-gray-300 rounded-md p-2 w-full"
           />
+          {formData.is_recurring && (
+            <p className="text-xs text-gray-500 mt-1">
+              First task saves now. Set this 1–2 minutes ahead to test — cron will create the
+              second task at this time; after that, daily repeats continue.
+            </p>
+          )}
         </div>
         <div className="flex-1">
           <label className="block font-semibold">Priority</label>
@@ -380,7 +419,9 @@ export default function TaskForm({ username }) {
 
             <div className="flex flex-wrap gap-4">
               <div className="flex-1">
-                <label className="block font-semibold mb-2">Start Date</label>
+                <label className="block font-semibold mb-2">
+                  First run / series start
+                </label>
                 <input
                   type="datetime-local"
                   name="recurrence_start_date"
@@ -388,6 +429,9 @@ export default function TaskForm({ username }) {
                   onChange={handleChange}
                   className="input border border-gray-300 rounded-md p-2 w-full"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Same time as due date above (kept in sync).
+                </p>
               </div>
               <div className="flex-1">
                 <label className="block font-semibold mb-2">End Date (Optional)</label>

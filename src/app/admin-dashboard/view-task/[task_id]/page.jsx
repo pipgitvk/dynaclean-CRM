@@ -25,7 +25,13 @@ async function getTaskDetails(taskId) {
 
   // Follow-ups (includes reassign entries)
   const [followupRows] = await connection.execute(
-    `SELECT followed_date, notes FROM task_followup WHERE task_id = ? ORDER BY followed_date DESC`,
+    `SELECT followed_date, notes FROM task_followup
+     WHERE task_id = ?
+       AND (
+         followed_date IS NOT NULL
+         OR (notes IS NOT NULL AND TRIM(notes) <> '')
+       )
+     ORDER BY followed_date DESC`,
     [taskId]
   );
 
@@ -48,8 +54,11 @@ export default async function ViewTaskPage({ params }) {
   const images = task.visiting_card?.split(",") || [];
   const videos = task.task_video?.split(",") || [];
 
-  const formatDate = (d) =>
-    d ? dayjs(d).format("DD MMM YYYY, hh:mm A") : "Not set";
+  const formatDate = (d) => {
+    if (!d || String(d).startsWith("0000-00-00")) return "Not set";
+    const parsed = dayjs(d);
+    return parsed.isValid() ? parsed.format("DD MMM YYYY, hh:mm A") : "Not set";
+  };
 
   const normalizeImagePath = (p) => {
     const s = (p || "").trim();
@@ -196,7 +205,7 @@ export default async function ViewTaskPage({ params }) {
                       <td className="px-4 py-2">
                         {formatDate(f.followed_date)}
                       </td>
-                      <td className="px-4 py-2">{f.notes}</td>
+                      <td className="px-4 py-2">{f.notes?.trim() || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

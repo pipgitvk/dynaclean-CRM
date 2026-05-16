@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getDbConnection } from "@/lib/db";
 import ClientTaskTable from "@/components/task/ClientTaskTable";
+import { TASK_LIST_SELECT_SQL } from "@/lib/taskListQuery";
 import { getSessionPayload } from "@/lib/auth";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -28,28 +29,7 @@ async function getTasks(username) {
 
   const query = `
     SELECT 
-      t.task_id, 
-      t.taskname, 
-      t.createdby, 
-      t.taskassignto, 
-      (
-        SELECT tf.reassign 
-        FROM task_followup tf 
-        WHERE tf.task_id = t.task_id 
-        ORDER BY tf.id DESC 
-        LIMIT 1
-      ) AS reassign,
-      (
-        SELECT tf.taskassignto 
-        FROM task_followup tf 
-        WHERE tf.task_id = t.task_id 
-        ORDER BY tf.id ASC 
-        LIMIT 1
-      ) AS first_assignto,
-      t.followed_date, 
-      t.next_followup_date, 
-      t.status, 
-      t.task_completion_date
+      ${TASK_LIST_SELECT_SQL}
     FROM 
       task t
     WHERE 

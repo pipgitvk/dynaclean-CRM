@@ -23,7 +23,13 @@ export default async function FollowupTaskPage({ params }) {
   );
 
   const [followups] = await conn.execute(
-    `SELECT followed_date, notes, status, image_path FROM task_followup WHERE task_id = ? ORDER BY followed_date DESC`,
+    `SELECT followed_date, notes, status, image_path FROM task_followup
+     WHERE task_id = ?
+       AND (
+         followed_date IS NOT NULL
+         OR (notes IS NOT NULL AND TRIM(notes) <> '')
+       )
+     ORDER BY followed_date DESC`,
     [taskId]
   );
 
