@@ -1,7 +1,10 @@
 import { getDbConnection } from "@/lib/db";
-import { parseLinkedPurchaseTokens, deriveStatementInvoiceStatus } from "@/lib/statementLinkedPurchases";
+import { parseLinkedPurchaseTokens } from "@/lib/statementLinkedPurchases";
 
 export async function PATCH(req) {
+  const pool = await getDbConnection();
+  const conn = await pool.getConnection();
+
   try {
     const { purchase_ids, statement_id } = await req.json();
 
@@ -19,16 +22,14 @@ export async function PATCH(req) {
       });
     }
 
-    const conn = await getDbConnection();
     await conn.beginTransaction();
 
     try {
-      // Get current statement
       const [statementRows] = await conn.execute(
         "SELECT id, linked_purchase_ids FROM statements WHERE id = ?",
         [statement_id]
       );
-      
+
       if (statementRows.length === 0) {
         await conn.rollback();
         return new Response(JSON.stringify({ ok: false, error: "Statement not found" }), {
@@ -38,18 +39,17 @@ export async function PATCH(req) {
       }
 
       const statement = statementRows[0];
-      let currentTokens = parseLinkedPurchaseTokens(statement.linked_purchase_ids);
+      const currentTokens = parseLinkedPurchaseTokens(statement.linked_purchase_ids);
 
-      // Add all purchase tokens
-      purchase_ids.forEach(id => {
+      purchase_ids.forEach((id) => {
         const token = `PP${id}`;
         if (!currentTokens.includes(token)) {
           currentTokens.push(token);
         }
       });
 
-      // Update statement
-      const nextLinkedIds = currentTokens.length > 0 ? JSON.stringify(currentTokens) : null;
+      const nextLinkedIds =
+        currentTokens.length > 0 ? JSON.stringify(currentTokens) : null;
       const nextStatus = currentTokens.length > 0 ? "Settled" : "Unsettled";
 
       await conn.execute(
@@ -72,5 +72,7 @@ export async function PATCH(req) {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
+  } finally {
+    conn.release();
   }
 }

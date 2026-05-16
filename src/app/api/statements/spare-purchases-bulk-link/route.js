@@ -1,18 +1,20 @@
 import { getDbConnection } from "@/lib/db";
 
 export async function POST(request) {
+  const pool = await getDbConnection();
+  const conn = await pool.getConnection();
+
   try {
     const body = await request.json();
     const { statementId, purchaseIds } = body;
 
     if (!statementId || !Array.isArray(purchaseIds) || purchaseIds.length === 0) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), { 
+      return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const conn = await getDbConnection();
     await conn.beginTransaction();
 
     try {
@@ -23,7 +25,7 @@ export async function POST(request) {
 
       if (statementRows.length === 0) {
         await conn.rollback();
-        return new Response(JSON.stringify({ error: "Statement not found" }), { 
+        return new Response(JSON.stringify({ error: "Statement not found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" },
         });
@@ -31,7 +33,7 @@ export async function POST(request) {
 
       const statement = statementRows[0];
       let currentTokens = [];
-      
+
       if (statement.linked_purchase_ids) {
         try {
           const parsed = JSON.parse(statement.linked_purchase_ids);
@@ -42,14 +44,15 @@ export async function POST(request) {
         }
       }
 
-      purchaseIds.forEach(pid => {
+      purchaseIds.forEach((pid) => {
         const token = `SP${Number(pid)}`;
         if (!currentTokens.includes(token)) {
           currentTokens.push(token);
         }
       });
 
-      const nextLinkedIds = currentTokens.length > 0 ? JSON.stringify(currentTokens) : null;
+      const nextLinkedIds =
+        currentTokens.length > 0 ? JSON.stringify(currentTokens) : null;
       const nextStatus = currentTokens.length > 0 ? "Settled" : "Unsettled";
 
       await conn.execute(
@@ -72,5 +75,7 @@ export async function POST(request) {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
+  } finally {
+    conn.release();
   }
 }
