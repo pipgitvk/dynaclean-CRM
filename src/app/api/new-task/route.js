@@ -236,6 +236,7 @@ export async function POST(req) {
     let firstTaskDue = null;
 
     if (is_recurring) {
+      await RecurrenceService.ensureRecurringSchema(conn);
       firstTaskDue = RecurrenceService.nowMysql().format("YYYY-MM-DD HH:mm:ss");
       const scheduleAt = recurrence_start_date || next_followup_date;
       firstRunAt = RecurrenceService.toMysqlDatetime(scheduleAt);

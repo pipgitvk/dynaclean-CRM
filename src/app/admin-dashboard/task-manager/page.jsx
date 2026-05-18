@@ -29,6 +29,7 @@ async function getTasks(username, role) {
   const pool = await getDbConnection();
   const setupConn = await pool.getConnection();
   try {
+    await RecurrenceService.ensureRecurringSchema(setupConn);
     await RecurrenceService.backfillAutomaticTaskAssignDates(setupConn);
   } finally {
     setupConn.release();

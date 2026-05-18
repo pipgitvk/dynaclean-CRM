@@ -17,6 +17,7 @@ export async function startRecurringTaskCron() {
   const pool = await getDbConnection();
   const conn = await pool.getConnection();
   try {
+    await RecurrenceService.ensureRecurringSchema(conn);
     await RecurrenceService.backfillAutomaticTaskAssignDates(conn);
   } finally {
     conn.release();
