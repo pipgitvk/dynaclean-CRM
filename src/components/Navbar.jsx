@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { Menu, LogOut, User, Plus, UserPlus, Search } from "lucide-react";
+import { Menu, LogOut, User, Plus, UserPlus, Search, Bell, X } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -19,6 +19,11 @@ export default function Navbar({ onToggleSidebar }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const searchRef = useRef(null);
+  
+  // Notifications state
+  const [notifications, setNotifications] = useState([]);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const notificationRef = useRef(null);
 
   const updateDropdownPosition = () => {
     const el = searchRef.current;
@@ -85,6 +90,56 @@ export default function Navbar({ onToggleSidebar }) {
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showDropdown]);
+  
+  // Close notification dropdown on click outside
+  useEffect(() => {
+    if (!showNotificationDropdown) return;
+    const handleClickOutsideNotifications = (e) => {
+      const target = e.target;
+      const isNotificationIcon = notificationRef.current?.contains(target);
+      const isNotificationDropdown = target.closest?.("[data-notification-dropdown]");
+      if (!isNotificationIcon && !isNotificationDropdown) setShowNotificationDropdown(false);
+    };
+    document.addEventListener("click", handleClickOutsideNotifications);
+    return () => document.removeEventListener("click", handleClickOutsideNotifications);
+  }, [showNotificationDropdown]);
+  
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications", { credentials: "include" });
+      const data = await res.json();
+      if (data.success) {
+        setNotifications(data.notifications || []);
+      }
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  };
+  
+  // Fetch notifications on component mount and poll every 30 seconds
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 15000);
+    return () => clearInterval(interval);
+  }, [username]);
+  
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      console.log("Marking notification as read:", notificationId);
+      const res = await fetch(`/api/notifications/${notificationId}`, {
+        method: "PATCH",
+        credentials: "include"
+      });
+      console.log("Response status:", res.status);
+      const data = await res.json();
+      console.log("Response data:", data);
+      // Refresh notifications after marking as read
+      await fetchNotifications();
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+    }
+  };
 
   const handleUser = async () => {
     try {
@@ -305,6 +360,94 @@ export default function Navbar({ onToggleSidebar }) {
             <Plus size={18} />
             <span className="hidden sm:inline font-medium">New Task</span>
           </button>
+          
+          {/* Notification Icon */}
+          <div className="relative" ref={notificationRef}>
+            <button
+              type="button"
+              onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
+              className="relative flex items-center justify-center text-white bg-gray-700 hover:bg-gray-800 px-3 py-2 min-[1100px]:px-3 min-[1100px]:py-2 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px] min-[1100px]:min-h-0"
+              aria-label="Notifications"
+            >
+              <Bell size={18} />
+              {(() => {
+                const unreadCount = notifications.filter(n => !n.is_read).length;
+                return unreadCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                ) : null;
+              })()}
+            </button>
+            
+            {/* Notification Dropdown */}
+            {showNotificationDropdown && (
+              <div 
+                data-notification-dropdown
+                className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] max-h-[400px] overflow-y-auto"
+              >
+                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+                  <h3 className="font-semibold text-gray-800">Notifications</h3>
+                  <button 
+                    type="button"
+                    onClick={() => setShowNotificationDropdown(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                
+                <div className="p-2">
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500">
+                      No new notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <div 
+                        key={notification.id} 
+                        className={`p-3 border-b border-gray-100 ${!notification.is_read ? 'hover:bg-gray-50 cursor-pointer' : 'bg-gray-50 opacity-75'}`}
+                        onClick={() => {
+                          if (notification.related_id && notification.type === 'recurring_task' || notification.type === 'task_reassign') {
+                            const isAdminDashboard = pathname?.startsWith("/admin-dashboard");
+                            const viewTaskRoute = isAdminDashboard
+                              ? `/admin-dashboard/view-task/${notification.related_id}`
+                              : `/user-dashboard/view-task/${notification.related_id}`;
+                            router.push(viewTaskRoute);
+                            setShowNotificationDropdown(false);
+                          }
+                        }}
+                      >
+                        <p className="text-sm text-gray-800">{notification.message}</p>
+                        <div className="flex justify-between items-center mt-2">
+                          <p className="text-xs text-gray-500">
+                            {new Date(notification.created_at).toLocaleString()}
+                          </p>
+                          <div className="flex gap-2">
+                            {!notification.is_read && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markNotificationAsRead(notification.id);
+                                }}
+                                className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                              >
+                                Mark as Read
+                              </button>
+                            )}
+                            {notification.is_read && (
+                              <span className="text-xs text-green-600 font-medium">Read</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <button
             type="button"

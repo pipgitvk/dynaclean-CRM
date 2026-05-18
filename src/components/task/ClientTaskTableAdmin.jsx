@@ -10,6 +10,7 @@ import {
 } from "@/lib/formatTaskDate";
 import { Repeat } from "lucide-react";
 import ReassignModal from "@/components/models/ReassignModal";
+import AutoTaskBadge, { isAutoTask } from "@/components/task/AutoTaskBadge";
 
 dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
@@ -278,6 +279,12 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
               >
                 Task ID {sortBy === 'task_id' && (sortOrder === 'asc' ? '↑' : '↓')}
               </th>
+              <th
+                className="px-2 py-2 text-center"
+                title="Automatic recurring (cron)"
+              >
+                Automatic
+              </th>
               <th 
                 className="px-4 py-2 cursor-pointer hover:bg-gray-200"
                 onClick={() => handleSort('taskname')}
@@ -314,6 +321,9 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
               filteredTasks.map((task) => (
                 <tr key={task.task_id} className={`border-t ${getTableRowColor(task)}`}>
                   <td className="px-4 py-2">{task.task_id}</td>
+                  <td className="px-2 py-2 text-center">
+                    {isAutoTask(task) ? <AutoTaskBadge /> : "—"}
+                  </td>
                   <td className="px-4 py-2">{task.taskname}</td>
                   <td className="px-4 py-2">{task.createdby}</td>
                   <td className="px-4 py-2">{task.first_assignto}</td>
@@ -362,7 +372,7 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="text-center px-4 py-6 text-gray-500">
+                <td colSpan="11" className="text-center px-4 py-6 text-gray-500">
                   No tasks found.
                 </td>
               </tr>
@@ -381,8 +391,9 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
                 <div className="text-sm mb-2">
                   <strong>Task ID:</strong> {task.task_id}
                 </div>
-                <div className="text-sm mb-2">
+                <div className="text-sm mb-2 flex items-center gap-2 flex-wrap">
                   <strong>Task Name:</strong> {task.taskname}
+                  {isAutoTask(task) ? <AutoTaskBadge /> : null}
                 </div>
                 <div className="text-sm mb-2">
                   <strong>Created By:</strong> {task.createdby}
