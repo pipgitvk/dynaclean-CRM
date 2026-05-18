@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
 export default function QuotationTableClient({ username, customerId }) {
@@ -11,6 +11,18 @@ export default function QuotationTableClient({ username, customerId }) {
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+
+  const employeeOptions = useMemo(() => {
+    const names = new Set();
+    quotations.forEach((q) => {
+      const trimmed = (q.emp_name || "").trim();
+      if (trimmed) {
+        names.add(trimmed);
+      }
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [quotations]);
 
   const fetchData = async () => {
     console.log("Fetching quotations for user:", username);
@@ -20,6 +32,7 @@ export default function QuotationTableClient({ username, customerId }) {
     // Append filters to the API request URL
     if (fromDate) url += `&from_date=${fromDate}`;
     if (toDate) url += `&to_date=${toDate}`;
+    if (employeeFilter) url += `&emp_name=${encodeURIComponent(employeeFilter)}`;
     if (customerId)
       url += `&customer_id=${encodeURIComponent(String(customerId))}`;
 
@@ -42,38 +55,46 @@ export default function QuotationTableClient({ username, customerId }) {
 
   useEffect(() => {
     fetchData(); // Load data initially
-  }, [username, fromDate, toDate, customerId]);
+  }, [username, fromDate, toDate, employeeFilter, customerId]);
 
   useEffect(() => {
-    if (!search) {
-      setFiltered(quotations);
-    } else {
-      const keyword = search.toLowerCase();
+    const keyword = search.trim().toLowerCase();
 
-      const filteredData = quotations.filter((q) => {
-        const quoteNumber = q.quote_number?.toString().toLowerCase() || "";
-        const companyName = q.company_name?.toLowerCase() || "";
-        const empName = q.emp_name?.toLowerCase() || "";
-        const email = q.email?.toLowerCase() || "";
-        const phone = q.phone?.toLowerCase() || "";
+    const filteredData = quotations.filter((q) => {
+      const empName = (q.emp_name || "").trim();
+      const matchesEmployee = employeeFilter ? empName === employeeFilter : true;
 
-        return (
-          quoteNumber.includes(keyword) ||
-          companyName.includes(keyword) ||
-          empName.includes(keyword) ||
-          email.includes(keyword) ||
-          phone.includes(keyword)
-        );
-      });
+      if (!matchesEmployee) {
+        return false;
+      }
 
-      setFiltered(filteredData);
-    }
-  }, [search, quotations]);
+      if (!keyword) {
+        return true;
+      }
+
+      const quoteNumber = q.quote_number?.toString().toLowerCase() || "";
+      const companyName = q.company_name?.toLowerCase() || "";
+      const empNameLower = empName.toLowerCase();
+      const email = q.email?.toLowerCase() || "";
+      const phone = q.phone?.toLowerCase() || "";
+
+      return (
+        quoteNumber.includes(keyword) ||
+        companyName.includes(keyword) ||
+        empNameLower.includes(keyword) ||
+        email.includes(keyword) ||
+        phone.includes(keyword)
+      );
+    });
+
+    setFiltered(filteredData);
+  }, [search, quotations, employeeFilter]);
 
   const handleReset = () => {
     setFromDate("");
     setToDate("");
     setSearch(""); // Also clear search on reset
+    setEmployeeFilter("");
   };
 
   return (
@@ -105,6 +126,18 @@ export default function QuotationTableClient({ username, customerId }) {
             onChange={(e) => setToDate(e.target.value)}
             className="border border-gray-300 rounded px-3 py-1 w-full"
           />
+          <select
+            value={employeeFilter}
+            onChange={(e) => setEmployeeFilter(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1 w-full sm:w-48"
+          >
+            <option value="">All Employees</option>
+            {employeeOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
         </div>
         <input
           type="text"
@@ -116,11 +149,11 @@ export default function QuotationTableClient({ username, customerId }) {
       </div>
 
       {/* Table - Visible on medium screens and larger */}
-      <div className="overflow-x-auto hidden md:block border rounded shadow">
+      <div className="overflow-x-auto hidden md:block rounded shadow">
         <span>
           <h2>Rows : {filtered.length}</h2>
         </span>
-        <table className="min-w-full table-auto text-sm text-gray-800 divide-y divide-gray-200">
+        <table className="min-w-full w-full table-auto text-sm text-gray-800 divide-y divide-gray-200">
           <thead className="bg-gray-100 text-left">
             <tr>
               <th className="px-4 py-2">Quotation ID</th>
