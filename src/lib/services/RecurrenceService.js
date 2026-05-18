@@ -3,6 +3,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { getDbConnection } from "@/lib/db";
 import NotificationService from "@/lib/services/NotificationService";
+import { convertISTtoUTC } from "@/lib/timezone";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -21,7 +22,23 @@ class RecurrenceService {
 
   toMysqlDatetime(value) {
     if (!value) return null;
-    const normalized = String(value).trim().replace("T", " ");
+
+    const strValue =
+      value instanceof Date ? value.toISOString() : String(value).trim();
+
+    if (!strValue) return null;
+
+    const converted = convertISTtoUTC(strValue);
+    if (converted) {
+      return converted;
+    }
+
+    const parsed = dayjs(strValue);
+    if (parsed.isValid()) {
+      return parsed.format("YYYY-MM-DD HH:mm:ss");
+    }
+
+    const normalized = strValue.replace("T", " ").replace(/Z$/, "");
     if (normalized.length === 16) return `${normalized}:00`;
     return normalized.slice(0, 19);
   }
