@@ -22,7 +22,7 @@ export default async function QuotationPage({ searchParams }) {
   const customerId = sp?.customer_id ? String(sp.customer_id).trim() : "";
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="w-full p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">
           Quotation Management
