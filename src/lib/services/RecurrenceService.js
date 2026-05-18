@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { getDbConnection } from "@/lib/db";
+import NotificationService from "@/lib/services/NotificationService";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -471,11 +472,22 @@ class RecurrenceService {
 
     console.log(`✅ Recurring task generated: Task ID ${task_id}, Recurring Task ID ${recurringTask.id}, Name: "${recurringTask.task_title}"`);
 
-    return {
+    const taskResult = {
       task_id: task_id,
       parent_recurring_task_id: recurringTask.id,
       due_date: originalNextRunAt,
     };
+
+    await NotificationService.sendAutomaticTaskNotification(
+      recurringTask,
+      taskResult,
+      {
+        assigneeUsername: assignedUsername,
+        creatorUsername,
+      }
+    );
+
+    return taskResult;
   }
 
   validateRecurrenceConfig(data) {

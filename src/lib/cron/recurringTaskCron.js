@@ -1,7 +1,6 @@
 import cron from "node-cron";
 import { getDbConnection } from "@/lib/db";
 import RecurrenceService from "@/lib/services/RecurrenceService";
-import NotificationService from "@/lib/services/NotificationService";
 
 const GLOBAL_KEY = "__recurringTaskCronStarted__";
 const GLOBAL_CRON_JOB_KEY = "__recurringTaskCronJob__";
@@ -165,7 +164,6 @@ async function generateRecurringTasks() {
         if (result) {
           generatedCount++;
           console.log(`✅ Generated task ${result.task_id} for recurring task ID ${lockedTask.id}`);
-          await NotificationService.sendAutomaticTaskNotification(lockedTask, result);
         } else {
           console.log(`🚫 Recurring task ID ${lockedTask.id} has reached end date, marked as inactive`);
         }
