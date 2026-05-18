@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ["face-api.js", "@tensorflow/tfjs"],
+  serverExternalPackages: ["face-api.js", "@tensorflow/tfjs", "node-cron"],
   images: {
     remotePatterns: [
       {
