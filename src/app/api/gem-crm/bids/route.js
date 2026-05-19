@@ -35,11 +35,6 @@ export async function GET(req) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
-    }
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page")) || 1;
     const limit = parseInt(searchParams.get("limit")) || 20;
@@ -57,16 +52,53 @@ export async function GET(req) {
     const conn = await getDbConnection();
     const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
 
+    console.log("DEBUG: User Info", {
+      username: payload?.username,
+      role: payload?.role,
+      empId: payload?.empId,
+      id: payload?.id,
+      resolvedEmpId: currentEmpId
+    });
+
     // Build WHERE clause
     const conditions = [];
     const params = [];
 
-    if (role === "GEM") {
-      if (!currentEmpId) {
-        return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
+    // Only SUPERADMIN can see all bids, others can only see their own assigned bids
+    if (payload.role !== "SUPERADMIN") {
+      // Try to filter by employee ID first
+      if (currentEmpId) {
+        console.log("DEBUG: Using resolved employee ID:", currentEmpId);
+        conditions.push("assigned_employee_id = ?");
+        params.push(currentEmpId);
+      } else {
+        // Fallback: try to get employee ID from username
+        const username = payload?.username;
+        console.log("DEBUG: Trying to resolve employee ID from username:", username);
+        if (username) {
+          const [empRows] = await conn.execute(
+            "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
+            [username]
+          );
+          if (empRows?.[0]?.empId) {
+            console.log("DEBUG: Found employee ID in emplist:", empRows[0].empId);
+            conditions.push("assigned_employee_id = ?");
+            params.push(empRows[0].empId);
+          } else {
+            const [repRows] = await conn.execute(
+              "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
+              [username]
+            );
+            if (repRows?.[0]?.empId) {
+              console.log("DEBUG: Found employee ID in rep_list:", repRows[0].empId);
+              conditions.push("assigned_employee_id = ?");
+              params.push(repRows[0].empId);
+            } else {
+              console.log("DEBUG: Employee ID not found for username:", username);
+            }
+          }
+        }
       }
-      conditions.push("assigned_employee_id = ?");
-      params.push(currentEmpId);
     }
 
     if (search) {
@@ -97,7 +129,7 @@ export async function GET(req) {
       params.push(platform);
     }
 
-    if (employeeId && role !== "GEM") {
+    if (employeeId && payload.role === "SUPERADMIN") {
       conditions.push("assigned_employee_id = ?");
       params.push(employeeId);
     }
@@ -192,11 +224,6 @@ export async function POST(req) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
-    }
     const { fields, files } = await parseFormData(req);
     
     // Normalize field values
@@ -247,7 +274,7 @@ export async function POST(req) {
 
     const conn = await getDbConnection();
     const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
-    if (role === "GEM" && !currentEmpId) {
+    if (payload.role === "GEM" && !currentEmpId) {
       await conn.end();
       return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
     }
@@ -291,7 +318,7 @@ export async function POST(req) {
         experience_required_years || null,
         delivery_days || null,
         inspection_required || 'no',
-        role === "GEM" ? currentEmpId : assigned_employee_id || null,
+        payload.role === "GEM" ? currentEmpId : assigned_employee_id || null,
         dd_id || null,
         remarks || null,
         payload.empId || payload.id || null,
