@@ -3,17 +3,56 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseFormData } from "@/lib/parseForm";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
+import { v2 as cloudinary } from "cloudinary";
 import fs from "fs/promises";
 import path from "path";
 
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "bid-documents");
 
-// Helper function to save bid document
+// Helper function to check if file is an image
+function isImageFile(file) {
+  const fileName = file.originalFilename || file.newFilename || "";
+  const mimeType = file.mimetype || "";
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+  const extension = fileName.toLowerCase().split('.').pop();
+  return mimeType.startsWith('image/') || imageExtensions.includes(`.${extension}`);
+}
+
+// Helper function to save bid document (images to Cloudinary, PDFs locally)
 async function saveBidDocument(file) {
   if (!file || !file.filepath || !file.originalFilename) {
     throw new Error("File is missing or invalid");
   }
 
+  // If it's an image, upload to Cloudinary
+  if (isImageFile(file)) {
+    const buffer = await fs.readFile(file.filepath);
+    
+    const upload = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        { 
+          folder: 'bid-documents',
+          resource_type: "auto"
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result.secure_url);
+        }
+      ).end(buffer);
+    });
+    
+    console.log("✅ Bid image uploaded to Cloudinary:", upload);
+    return upload;
+  }
+
+  // For PDFs and other documents, save locally
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const fileName = `${Date.now()}-${file.originalFilename}`;
   const targetPath = path.join(UPLOAD_DIR, fileName);
@@ -21,7 +60,7 @@ async function saveBidDocument(file) {
   try {
     const fileContent = await fs.readFile(file.filepath);
     await fs.writeFile(targetPath, fileContent);
-    console.log("✅ Bid document saved:", targetPath);
+    console.log("✅ Bid document saved locally:", targetPath);
     return `/uploads/bid-documents/${fileName}`;
   } finally {
     await fs.unlink(file.filepath).catch((err) => {
@@ -272,8 +311,8 @@ export async function PUT(req, { params }) {
     // Handle bid document upload if provided
     let bid_document = fields.bid_document || currentBid.bid_document;
     if (files.bid_document && files.bid_document[0]) {
-      // Delete old document if exists
-      if (currentBid.bid_document) {
+      // Delete old local file if it's a local path (PDFs)
+      if (currentBid.bid_document && currentBid.bid_document.startsWith('/uploads/')) {
         const oldPath = path.join(process.cwd(), "public", currentBid.bid_document);
         await fs.unlink(oldPath).catch(() => {});
       }
@@ -411,7 +450,8 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: "Bid not found" }, { status: 404 });
     }
 
-    if (bids.length > 0 && bids[0].bid_document) {
+    // Delete local file if it's a local path (PDFs)
+    if (bids.length > 0 && bids[0].bid_document && bids[0].bid_document.startsWith('/uploads/')) {
       const docPath = path.join(process.cwd(), "public", bids[0].bid_document);
       await fs.unlink(docPath).catch(() => {});
     }
