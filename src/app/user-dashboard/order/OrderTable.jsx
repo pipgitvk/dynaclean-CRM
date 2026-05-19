@@ -393,11 +393,21 @@ export default function OrderTable({ orders, userRole }) {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.textCol}`}
-                      >
-                        {status.icon} {status.text}
-                      </span>
+                      <div className="flex flex-col items-center gap-1">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.textCol}`}
+                        >
+                          {status.icon} {status.text}
+                        </span>
+                        {r.approval_remark && (
+                          <span
+                            className="text-xs text-gray-600 max-w-[180px] line-clamp-2 block text-left"
+                            title={r.approval_remark}
+                          >
+                            {r.approval_remark}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <span
@@ -485,6 +495,11 @@ export default function OrderTable({ orders, userRole }) {
                 <div>
                   <strong>Location:</strong> {r.state}
                 </div>
+                {r.approval_remark && (
+                  <div>
+                    <strong>Remark:</strong> {r.approval_remark}
+                  </div>
+                )}
               </div>
             );
           })

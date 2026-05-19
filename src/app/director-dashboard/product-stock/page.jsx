@@ -454,6 +454,9 @@ function ProductStockList() {
                     Total Qty
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Purchase Price
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Price/Unit
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -500,6 +503,9 @@ function ProductStockList() {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       {(row.delhi || 0) + (row.south || 0)}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-blue-700">
+                      ₹{formatIndianCurrency(priceMap[row.product_code] || 0)}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       ₹{formatIndianCurrency(priceMap[row.product_code] || 0)}
