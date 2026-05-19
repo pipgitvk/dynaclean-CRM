@@ -271,7 +271,7 @@ function ProductStockList() {
     return rows.filter(row =>
       (row.item_name || "").toLowerCase().includes(lowerQ) ||
       (row.item_code || "").toLowerCase().includes(lowerQ) ||
-      (row.product_number || "").toLowerCase().includes(lowerQ)
+      String(row.product_number || "").toLowerCase().includes(lowerQ)
     );
   }, [rows, q]);
 

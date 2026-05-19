@@ -43,6 +43,62 @@ function generateOrderId(todayCount) {
   return date + String(todayCount + 1).padStart(3, "0");
 }
 
+// GET endpoint to fetch orders
+export async function GET(req) {
+  try {
+    const token = req.cookies.get("token")?.value;
+    if (!token)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    
+    const { payload } = await jwtVerify(
+      token,
+      new TextEncoder().encode(process.env.JWT_SECRET),
+    );
+    const username = payload.username;
+    const userRole = payload.role;
+
+    const conn = await getDbConnection();
+
+    // Fetch orders based on role with individual items (not grouped)
+    let sql = `SELECT 
+                  no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
+                  no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
+                  no.created_at, no.created_by , no.einvoice_file, no.booking_id, no.quote_number, no.duedate,
+                  no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
+                  no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
+                  no.baseAmount, no.taxamt,
+                  no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
+                  no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
+                  qr.company_name, qr.emp_name, qr.state,
+                  qi.item_name,
+                  qi.item_code,
+                  qi.quantity,
+                  COALESCE(qi.total_taxable_amt, qi.taxable_price, 0) AS item_taxable_amt
+              FROM 
+                  neworder no
+              LEFT JOIN 
+                  quotations_records qr ON no.quote_number = qr.quote_number
+              LEFT JOIN 
+                  quotation_items qi ON no.quote_number = qi.quote_number`;
+
+    const params = [];
+
+    if (!["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase())) {
+      sql += " WHERE no.created_by = ?";
+      params.push(username);
+    }
+
+    sql += " ORDER BY no.created_at DESC";
+
+    const [orders] = await conn.execute(sql, params);
+
+    return NextResponse.json({ success: true, data: orders });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
+  }
+}
+
 export async function POST(req) {
   try {
     // 1. Authenticate

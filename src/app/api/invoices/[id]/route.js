@@ -188,6 +188,13 @@ export async function PATCH(req, context) {
         await conn.execute("ALTER TABLE invoices ADD COLUMN linked_trans_ids TEXT NULL");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT item_code FROM invoice_items LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoice_items ADD COLUMN item_code VARCHAR(100) NULL");
+      } catch (__) {}
+    }
 
     const [[existing]] = await conn.execute(
       `SELECT id FROM invoices WHERE id = ? LIMIT 1`,
@@ -361,13 +368,14 @@ export async function PATCH(req, context) {
       const sgst_amount = item.sgst_amount || 0;
       const igst_amount = item.igst_amount || 0;
       const total_amount = item.total_amount || 0;
+      const item_code = item.item_code || item.product_code || null;
 
       await conn.execute(
         `INSERT INTO invoice_items
          (invoice_id, item_name, description, hsn_code, quantity, rate, discount_percent,
           discount_amount, taxable_value, cgst_percent, sgst_percent, igst_percent,
-          cgst_amount, sgst_amount, igst_amount, total_amount, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          cgst_amount, sgst_amount, igst_amount, total_amount, item_code, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           invoiceId,
           item_name,
@@ -385,6 +393,7 @@ export async function PATCH(req, context) {
           sgst_amount,
           igst_amount,
           total_amount,
+          item_code,
         ],
       );
     }
