@@ -70,7 +70,7 @@ export async function GET(req) {
   const conn = await getDbConnection();
 
   let query = `
-  SELECT 
+  SELECT
     qr.quote_number,
     qr.quote_date,
     qr.company_name,
@@ -122,5 +122,20 @@ export async function GET(req) {
   query += ` ORDER BY qr.quote_date DESC`;
 
   const [rows] = await conn.execute(query, values);
-  return Response.json(rows);
+
+  // Fetch items for each quotation
+  const quotationsWithItems = await Promise.all(
+    rows.map(async (quote) => {
+      const [items] = await conn.execute(
+        "SELECT item_code as product_code, item_name, quantity, price_per_unit FROM quotation_items WHERE quote_number = ?",
+        [quote.quote_number]
+      );
+      return {
+        ...quote,
+        items: items || []
+      };
+    })
+  );
+
+  return Response.json(quotationsWithItems);
 }

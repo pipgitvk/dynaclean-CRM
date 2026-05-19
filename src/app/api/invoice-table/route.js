@@ -78,9 +78,23 @@ export async function GET(req) {
       [...values, limit, offset],
     );
 
+    // Fetch items for each invoice from invoice_items table (now with item_code column)
+    const invoicesWithItems = await Promise.all(
+      rows.map(async (invoice) => {
+        const [items] = await conn.execute(
+          "SELECT item_code as product_code, item_name, quantity, rate as price_per_unit FROM invoice_items WHERE invoice_id = ?",
+          [invoice.id]
+        );
+        return {
+          ...invoice,
+          items: items || []
+        };
+      })
+    );
+
     return NextResponse.json({
       success: true,
-      data: rows,
+      data: invoicesWithItems,
       meta: {
         page,
         limit,

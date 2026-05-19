@@ -411,6 +411,12 @@ const allMenuItems = [
         icon: "ClipboardList",
       },
       {
+        path: "/admin-dashboard/products-new",
+        name: "Products New",
+        roles: ["SUPERADMIN"],
+        icon: "ClipboardList",
+      },
+      {
         path: "/admin-dashboard/product-accessories",
         name: "Product Accessories",
         roles: ["SUPERADMIN"],
