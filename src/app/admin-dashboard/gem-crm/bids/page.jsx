@@ -46,12 +46,14 @@ export default function GemCrmBidsPage() {
   const [technicalStatusFilter, setTechnicalStatusFilter] = useState("");
   const [financialStatusFilter, setFinancialStatusFilter] = useState("");
   const [platformFilter, setPlatformFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
 
   useEffect(() => {
     fetchBids();
-  }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter]);
+  }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter, dateFrom, dateTo]);
 
   const fetchBids = async () => {
     try {
@@ -64,6 +66,8 @@ export default function GemCrmBidsPage() {
         ...(technicalStatusFilter && { technicalStatus: technicalStatusFilter }),
         ...(financialStatusFilter && { financialStatus: financialStatusFilter }),
         ...(platformFilter && { platform: platformFilter }),
+        ...(dateFrom && { dateFrom }),
+        ...(dateTo && { dateTo }),
       });
 
       const res = await fetch(`/api/gem-crm/bids?${params}`);
@@ -140,56 +144,80 @@ export default function GemCrmBidsPage() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Statuses</option>
-              <option value="new">New</option>
-              <option value="under_review">Under Review</option>
-              <option value="technical_preparation">Technical Preparation</option>
-              <option value="submitted">Submitted</option>
-              <option value="technical_qualified">Technical Qualified</option>
-              <option value="ra_participated">RA Participated</option>
-              <option value="won">Won</option>
-              <option value="lost">Lost</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+          <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Statuses</option>
+                <option value="new">New</option>
+                <option value="under_review">Under Review</option>
+                <option value="technical_preparation">Technical Preparation</option>
+                <option value="submitted">Submitted</option>
+                <option value="technical_qualified">Technical Qualified</option>
+                <option value="ra_participated">RA Participated</option>
+                <option value="won">Won</option>
+                <option value="lost">Lost</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
 
-            <select
-              value={technicalStatusFilter}
-              onChange={(e) => setTechnicalStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Technical Status</option>
-              <option value="pending">Pending</option>
-              <option value="qualified">Qualified</option>
-              <option value="disqualified">Disqualified</option>
-            </select>
+              <select
+                value={technicalStatusFilter}
+                onChange={(e) => setTechnicalStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Technical Status</option>
+                <option value="pending">Pending</option>
+                <option value="qualified">Qualified</option>
+                <option value="disqualified">Disqualified</option>
+              </select>
 
-            <select
-              value={financialStatusFilter}
-              onChange={(e) => setFinancialStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Financial Status</option>
-              <option value="pending">Pending</option>
-              <option value="qualified">Qualified</option>
-              <option value="disqualified">Disqualified</option>
-            </select>
+              <select
+                value={financialStatusFilter}
+                onChange={(e) => setFinancialStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Financial Status</option>
+                <option value="pending">Pending</option>
+                <option value="qualified">Qualified</option>
+                <option value="disqualified">Disqualified</option>
+              </select>
 
-            <select
-              value={platformFilter}
-              onChange={(e) => setPlatformFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">All Platforms</option>
-              <option value="GEM">GEM</option>
-              <option value="E Procurement">E Procurement</option>
-              <option value="Other">Other</option>
-            </select>
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Platforms</option>
+                <option value="GEM">GEM</option>
+                <option value="E Procurement">E Procurement</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Date From</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Date To</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>
