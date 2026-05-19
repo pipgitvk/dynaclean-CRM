@@ -9,6 +9,7 @@ import {
   Pencil,
   ChevronLeft,
   ChevronRight,
+  FileText,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -50,9 +51,11 @@ export default function GemCrmBidsPage() {
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
+  const [stats, setStats] = useState({ total: 0, won: 0, lost: 0 });
 
   useEffect(() => {
     fetchBids();
+    fetchStats();
   }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter, dateFrom, dateTo]);
 
   const fetchBids = async () => {
@@ -91,6 +94,18 @@ export default function GemCrmBidsPage() {
     fetchBids();
   };
 
+  const fetchStats = async () => {
+    try {
+      const res = await fetch("/api/gem-crm/bids/stats");
+      const result = await res.json();
+      if (result.success) {
+        setStats(result.data);
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
+
   const handlePageChange = (newPage) => {
     setPagination((prev) => ({ ...prev, page: newPage }));
   };
@@ -110,6 +125,45 @@ export default function GemCrmBidsPage() {
           <Plus className="w-4 h-4" />
           Add Bid
         </button>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Bids</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <FileText className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Bids Won</p>
+              <p className="text-3xl font-bold text-green-600 mt-2">{stats.won}</p>
+            </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <FileText className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Bids Lost</p>
+              <p className="text-3xl font-bold text-red-600 mt-2">{stats.lost}</p>
+            </div>
+            <div className="p-3 bg-red-100 rounded-lg">
+              <FileText className="w-6 h-6 text-red-600" />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
