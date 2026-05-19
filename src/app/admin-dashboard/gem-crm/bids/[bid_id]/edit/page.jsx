@@ -20,6 +20,7 @@ export default function EditBidPage({ params }) {
   const [isSaving, setIsSaving] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [bidId, setBidId] = useState(null);
+  const [bid, setBid] = useState(null);
   const [formData, setFormData] = useState({
     bidding_platform: "",
     bid_number: "",
@@ -130,6 +131,8 @@ export default function EditBidPage({ params }) {
           formattedEndDate,
           formattedOpenDate
         });
+        
+        setBid(bid);
         
         setFormData({
           bidding_platform: bid.bidding_platform || "",
