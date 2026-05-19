@@ -64,7 +64,7 @@ export default function DDManagementPage() {
     const [creditDateFrom, setCreditDateFrom] = useState("");
     const [creditDateTo, setCreditDateTo] = useState("");
 
-    const isAuthorized = ["ADMIN", "SUPERADMIN", "ACCOUNTANT"].includes(userRole.toUpperCase());
+    const isAuthorized = ["ADMIN", "SUPERADMIN", "ACCOUNTANT", "DIRECTOR"].includes(userRole.toUpperCase());
 
     // Calculate statistics
     const stats = useMemo(() => {
