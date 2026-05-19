@@ -79,13 +79,56 @@ export default function EditBidPage({ params }) {
       if (result.success) {
         const bid = result.data;
         
+        console.log("DEBUG: Raw bid data dates:", {
+          bid_start_date: bid.bid_start_date,
+          bid_end_date: bid.bid_end_date,
+          bid_open_date: bid.bid_open_date
+        });
+        
         // Helper function to format date for date input
         const formatDateForInput = (dateStr) => {
+          console.log("DEBUG: Formatting date:", dateStr, "Type:", typeof dateStr);
           if (!dateStr) return "";
-          const date = new Date(dateStr);
-          if (isNaN(date.getTime())) return "";
-          return date.toISOString().split('T')[0];
+          
+          let date;
+          // Try parsing the date string
+          if (typeof dateStr === 'string') {
+            // Handle various date formats
+            date = new Date(dateStr);
+            // If invalid, try parsing manually for YYYY-MM-DD format
+            if (isNaN(date.getTime())) {
+              const parts = dateStr.split('-');
+              if (parts.length === 3) {
+                date = new Date(parts[0], parts[1] - 1, parts[2]);
+              }
+            }
+          } else {
+            date = new Date(dateStr);
+          }
+          
+          if (isNaN(date.getTime())) {
+            console.log("Invalid date:", dateStr);
+            return "";
+          }
+          
+          // Format as YYYY-MM-DD
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const formatted = `${year}-${month}-${day}`;
+          console.log("DEBUG: Formatted date:", formatted);
+          return formatted;
         };
+        
+        const formattedStartDate = formatDateForInput(bid.bid_start_date);
+        const formattedEndDate = formatDateForInput(bid.bid_end_date);
+        const formattedOpenDate = formatDateForInput(bid.bid_open_date);
+        
+        console.log("DEBUG: Formatted dates:", {
+          formattedStartDate,
+          formattedEndDate,
+          formattedOpenDate
+        });
         
         setFormData({
           bidding_platform: bid.bidding_platform || "",
@@ -95,9 +138,9 @@ export default function EditBidPage({ params }) {
           bid_link: bid.bid_link || "",
           item_category: bid.item_category || "",
           organisation_id: bid.organisation_id || "",
-          bid_start_date: formatDateForInput(bid.bid_start_date),
-          bid_end_date: formatDateForInput(bid.bid_end_date),
-          bid_open_date: formatDateForInput(bid.bid_open_date),
+          bid_start_date: formattedStartDate,
+          bid_end_date: formattedEndDate,
+          bid_open_date: formattedOpenDate,
           bid_validity_days: bid.bid_validity_days || "",
           model_id: bid.model_id || "",
           specification: bid.specification || "",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseFormData } from "@/lib/parseForm";
+import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
 import fs from "fs/promises";
 import path from "path";
 
@@ -34,15 +35,6 @@ export async function GET(req, { params }) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
-    }
-    const currentEmpId = payload.empId || payload.id || null;
-    if (role === "GEM" && !currentEmpId) {
-      return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
-    }
 
     // Handle async params in Next.js 15+
     const resolvedParams = await params;
@@ -53,6 +45,41 @@ export async function GET(req, { params }) {
     }
 
     const conn = await getDbConnection();
+    const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
+
+    // Build WHERE clause for filtering
+    let whereClause = "WHERE b.bid_id = ?";
+    let queryParams = [bid_id];
+
+    // Only SUPERADMIN can see all bids, others can only see their own assigned bids
+    if (payload.role !== "SUPERADMIN") {
+      if (currentEmpId) {
+        whereClause += " AND b.assigned_employee_id = ?";
+        queryParams.push(currentEmpId);
+      } else {
+        // Fallback: try to get employee ID from username
+        const username = payload?.username;
+        if (username) {
+          const [empRows] = await conn.execute(
+            "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
+            [username]
+          );
+          if (empRows?.[0]?.empId) {
+            whereClause += " AND b.assigned_employee_id = ?";
+            queryParams.push(empRows[0].empId);
+          } else {
+            const [repRows] = await conn.execute(
+              "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
+              [username]
+            );
+            if (repRows?.[0]?.empId) {
+              whereClause += " AND b.assigned_employee_id = ?";
+              queryParams.push(repRows[0].empId);
+            }
+          }
+        }
+      }
+    }
 
     // Get bid details with safe joins
     let bids = [];
@@ -70,8 +97,8 @@ export async function GET(req, { params }) {
         FROM bids b
         LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
         LEFT JOIN dd_management dd ON b.dd_id = dd.id
-        WHERE b.bid_id = ? ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}`,
-        role === "GEM" ? [bid_id, currentEmpId] : [bid_id]
+        ${whereClause}`,
+        queryParams
       );
       bids = bidsResult;
     } catch (e) {
@@ -84,8 +111,8 @@ export async function GET(req, { params }) {
             e.email as assigned_employee_email
           FROM bids b
           LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
-          WHERE b.bid_id = ? ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}`,
-          role === "GEM" ? [bid_id, currentEmpId] : [bid_id]
+          ${whereClause}`,
+          queryParams
         );
         bids = bidsResult;
       } catch (e2) {
@@ -93,8 +120,8 @@ export async function GET(req, { params }) {
         const [bidsResult] = await conn.execute(
           `SELECT b.*
           FROM bids b
-          WHERE b.bid_id = ? ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}`,
-          role === "GEM" ? [bid_id, currentEmpId] : [bid_id]
+          ${whereClause}`,
+          queryParams
         );
         bids = bidsResult;
       }
@@ -175,15 +202,6 @@ export async function PUT(req, { params }) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
-    }
-    const currentEmpId = payload.empId || payload.id || null;
-    if (role === "GEM" && !currentEmpId) {
-      return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
-    }
 
     // Handle async params in Next.js 15+
     const resolvedParams = await params;
@@ -202,11 +220,46 @@ export async function PUT(req, { params }) {
     }
 
     const conn = await getDbConnection();
+    const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
+
+    // Build WHERE clause for filtering
+    let whereClause = "WHERE bid_id = ?";
+    let queryParams = [bid_id];
+
+    // Only SUPERADMIN can update all bids, others can only update their own assigned bids
+    if (payload.role !== "SUPERADMIN") {
+      if (currentEmpId) {
+        whereClause += " AND assigned_employee_id = ?";
+        queryParams.push(currentEmpId);
+      } else {
+        // Fallback: try to get employee ID from username
+        const username = payload?.username;
+        if (username) {
+          const [empRows] = await conn.execute(
+            "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
+            [username]
+          );
+          if (empRows?.[0]?.empId) {
+            whereClause += " AND assigned_employee_id = ?";
+            queryParams.push(empRows[0].empId);
+          } else {
+            const [repRows] = await conn.execute(
+              "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
+              [username]
+            );
+            if (repRows?.[0]?.empId) {
+              whereClause += " AND assigned_employee_id = ?";
+              queryParams.push(repRows[0].empId);
+            }
+          }
+        }
+      }
+    }
 
     // Get current bid to check for status change
     const [currentBids] = await conn.execute(
-      `SELECT bid_status, bid_document FROM bids WHERE bid_id = ? ${role === "GEM" ? "AND assigned_employee_id = ?" : ""}`,
-      role === "GEM" ? [bid_id, currentEmpId] : [bid_id]
+      `SELECT bid_status, bid_document FROM bids ${whereClause}`,
+      queryParams
     );
 
     if (currentBids.length === 0) {
@@ -244,7 +297,7 @@ export async function PUT(req, { params }) {
     ];
 
     for (const field of allowedFields) {
-      if (role === "GEM" && field === "assigned_employee_id") continue;
+      if (payload.role !== "SUPERADMIN" && field === "assigned_employee_id") continue;
       if (fields[field] !== undefined) {
         updateFields.push(`${field} = ?`);
         updateValues.push(fields[field]);
@@ -256,11 +309,10 @@ export async function PUT(req, { params }) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    updateValues.push(bid_id);
-    if (role === "GEM") updateValues.push(currentEmpId);
+    updateValues.push(...queryParams);
 
     await conn.execute(
-      `UPDATE bids SET ${updateFields.join(', ')} WHERE bid_id = ? ${role === "GEM" ? "AND assigned_employee_id = ?" : ""}`,
+      `UPDATE bids SET ${updateFields.join(', ')} ${whereClause}`,
       updateValues
     );
 
@@ -304,15 +356,6 @@ export async function DELETE(req, { params }) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
-      return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
-    }
-    const currentEmpId = payload.empId || payload.id || null;
-    if (role === "GEM" && !currentEmpId) {
-      return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
-    }
 
     // Handle async params in Next.js 15+
     const resolvedParams = await params;
@@ -322,11 +365,46 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: "Bid ID is required" }, { status: 400 });
     }
     const conn = await getDbConnection();
+    const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
+
+    // Build WHERE clause for filtering
+    let whereClause = "WHERE bid_id = ?";
+    let queryParams = [bid_id];
+
+    // Only SUPERADMIN can delete all bids, others can only delete their own assigned bids
+    if (payload.role !== "SUPERADMIN") {
+      if (currentEmpId) {
+        whereClause += " AND assigned_employee_id = ?";
+        queryParams.push(currentEmpId);
+      } else {
+        // Fallback: try to get employee ID from username
+        const username = payload?.username;
+        if (username) {
+          const [empRows] = await conn.execute(
+            "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
+            [username]
+          );
+          if (empRows?.[0]?.empId) {
+            whereClause += " AND assigned_employee_id = ?";
+            queryParams.push(empRows[0].empId);
+          } else {
+            const [repRows] = await conn.execute(
+              "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
+              [username]
+            );
+            if (repRows?.[0]?.empId) {
+              whereClause += " AND assigned_employee_id = ?";
+              queryParams.push(repRows[0].empId);
+            }
+          }
+        }
+      }
+    }
 
     // Get bid to delete document
     const [bids] = await conn.execute(
-      `SELECT bid_document FROM bids WHERE bid_id = ? ${role === "GEM" ? "AND assigned_employee_id = ?" : ""}`,
-      role === "GEM" ? [bid_id, currentEmpId] : [bid_id]
+      `SELECT bid_document FROM bids ${whereClause}`,
+      queryParams
     );
     if (bids.length === 0) {
       await conn.end();
@@ -340,8 +418,8 @@ export async function DELETE(req, { params }) {
 
     // Delete bid (cascade will delete documents and logs)
     await conn.execute(
-      `DELETE FROM bids WHERE bid_id = ? ${role === "GEM" ? "AND assigned_employee_id = ?" : ""}`,
-      role === "GEM" ? [bid_id, currentEmpId] : [bid_id]
+      `DELETE FROM bids ${whereClause}`,
+      queryParams
     );
 
     await conn.end();
