@@ -10,6 +10,7 @@ import {
   DollarSign,
   Calendar,
   User,
+  Eye,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -377,6 +378,17 @@ export default function EditBidPage({ params }) {
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                   <Upload className="w-5 h-5 text-gray-400" />
+                  {bid && bid.bid_document && (
+                    <a
+                      href={bid.bid_document}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="View Document"
+                    >
+                      <Eye className="w-5 h-5" />
+                    </a>
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Leave empty to keep existing document</p>
               </div>
