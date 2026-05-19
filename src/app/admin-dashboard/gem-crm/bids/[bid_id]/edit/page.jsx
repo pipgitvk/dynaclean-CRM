@@ -78,6 +78,15 @@ export default function EditBidPage({ params }) {
       const result = await res.json();
       if (result.success) {
         const bid = result.data;
+        
+        // Helper function to format date for date input
+        const formatDateForInput = (dateStr) => {
+          if (!dateStr) return "";
+          const date = new Date(dateStr);
+          if (isNaN(date.getTime())) return "";
+          return date.toISOString().split('T')[0];
+        };
+        
         setFormData({
           bidding_platform: bid.bidding_platform || "",
           bid_number: bid.bid_number || "",
@@ -86,9 +95,9 @@ export default function EditBidPage({ params }) {
           bid_link: bid.bid_link || "",
           item_category: bid.item_category || "",
           organisation_id: bid.organisation_id || "",
-          bid_start_date: bid.bid_start_date || "",
-          bid_end_date: bid.bid_end_date || "",
-          bid_open_date: bid.bid_open_date || "",
+          bid_start_date: formatDateForInput(bid.bid_start_date),
+          bid_end_date: formatDateForInput(bid.bid_end_date),
+          bid_open_date: formatDateForInput(bid.bid_open_date),
           bid_validity_days: bid.bid_validity_days || "",
           model_id: bid.model_id || "",
           specification: bid.specification || "",
@@ -416,7 +425,7 @@ export default function EditBidPage({ params }) {
                   Bid Start Date
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   name="bid_start_date"
                   value={formData.bid_start_date}
                   onChange={handleChange}
@@ -429,7 +438,7 @@ export default function EditBidPage({ params }) {
                   Bid End Date
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   name="bid_end_date"
                   value={formData.bid_end_date}
                   onChange={handleChange}
@@ -442,7 +451,7 @@ export default function EditBidPage({ params }) {
                   Bid Open Date
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   name="bid_open_date"
                   value={formData.bid_open_date}
                   onChange={handleChange}

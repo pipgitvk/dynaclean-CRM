@@ -266,7 +266,7 @@ export default function NewBidPage() {
                   Bid Start Date
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   name="bid_start_date"
                   value={formData.bid_start_date}
                   onChange={handleChange}
@@ -279,7 +279,7 @@ export default function NewBidPage() {
                   Bid End Date
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   name="bid_end_date"
                   value={formData.bid_end_date}
                   onChange={handleChange}
@@ -292,7 +292,7 @@ export default function NewBidPage() {
                   Bid Open Date
                 </label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   name="bid_open_date"
                   value={formData.bid_open_date}
                   onChange={handleChange}

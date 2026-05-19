@@ -7,7 +7,6 @@ import {
   Filter,
   Eye,
   Pencil,
-  Trash2,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -86,26 +85,6 @@ export default function GemCrmBidsPage() {
   const handleSearch = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
     fetchBids();
-  };
-
-  const handleDelete = async (bidId) => {
-    if (!confirm("Are you sure you want to delete this bid?")) return;
-
-    try {
-      const res = await fetch(`/api/gem-crm/bids/${bidId}`, {
-        method: "DELETE",
-      });
-      const result = await res.json();
-      if (result.success) {
-        toast.success("Bid deleted successfully");
-        fetchBids();
-      } else {
-        toast.error(result.error || "Failed to delete bid");
-      }
-    } catch (error) {
-      console.error("Error deleting bid:", error);
-      toast.error("Error deleting bid");
-    }
   };
 
   const handlePageChange = (newPage) => {
@@ -237,7 +216,16 @@ export default function GemCrmBidsPage() {
                   Employee
                 </th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
-                  Value
+                  Estimated Bid Value
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
+                  Publish Date
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
+                  Submission Date
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
+                  Opening Date
                 </th>
                 <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Status
@@ -250,7 +238,7 @@ export default function GemCrmBidsPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan="8" className="py-8 text-center text-gray-500">
+                  <td colSpan="11" className="py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
@@ -258,7 +246,7 @@ export default function GemCrmBidsPage() {
                 </tr>
               ) : bids.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-8 text-center text-gray-500">
+                  <td colSpan="11" className="py-8 text-center text-gray-500">
                     No bids found
                   </td>
                 </tr>
@@ -285,6 +273,15 @@ export default function GemCrmBidsPage() {
                         ? `₹${Number(bid.estimated_bid_value).toLocaleString()}`
                         : "-"}
                     </td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {bid.bid_start_date ? new Date(bid.bid_start_date).toLocaleDateString('en-IN') : "-"}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {bid.bid_end_date ? new Date(bid.bid_end_date).toLocaleDateString('en-IN') : "-"}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {bid.bid_open_date ? new Date(bid.bid_open_date).toLocaleDateString('en-IN') : "-"}
+                    </td>
                     <td className="py-3 px-4 text-center">
                       <StatusBadge status={bid.bid_status} />
                     </td>
@@ -303,13 +300,6 @@ export default function GemCrmBidsPage() {
                           title="Edit"
                         >
                           <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(bid.bid_id)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
