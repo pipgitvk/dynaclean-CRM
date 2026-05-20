@@ -502,12 +502,6 @@ export function normalizeModuleAccessKeys(keys) {
       out.add("targets");
       continue;
     }
-    // Legacy: installation-videos previously gated both list + manage pages
-    if (key === "installation-videos") {
-      out.add("installation-videos");
-      out.add("installation-videos-manage");
-      continue;
-    }
     out.add(key);
   }
   return [...out].filter((k) => known.has(k));
