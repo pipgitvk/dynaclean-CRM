@@ -51,13 +51,9 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
         c.phone
       FROM quotations_records qr
       JOIN customers c ON c.customer_id = qr.customer_id
-      WHERE (
-          c.sales_representative = ?
-          OR c.lead_source = ?
-          OR qr.emp_name = ?
-      )
+      WHERE qr.emp_name = ?
     `;
-    values.push(username, username, username);
+    values.push(username);
   }
 
   // ---------------------------------------------------------
