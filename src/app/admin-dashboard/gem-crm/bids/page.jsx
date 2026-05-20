@@ -286,9 +286,6 @@ export default function GemCrmBidsPage() {
                   Bid Number
                 </th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
-                  GEM Bid No
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Title
                 </th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
@@ -299,6 +296,9 @@ export default function GemCrmBidsPage() {
                 </th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Estimated Bid Value
+                </th>
+                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
+                  Bid Value
                 </th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Publish Date
@@ -338,9 +338,6 @@ export default function GemCrmBidsPage() {
                     <td className="py-3 px-4 text-sm font-medium text-blue-600">
                       {bid.bid_number || "-"}
                     </td>
-                    <td className="py-3 px-4 text-sm text-gray-900">
-                      {bid.gem_bid_no || "-"}
-                    </td>
                     <td className="py-3 px-4 text-sm text-gray-900 max-w-xs truncate">
                       {bid.bid_title || "-"}
                     </td>
@@ -353,6 +350,11 @@ export default function GemCrmBidsPage() {
                     <td className="py-3 px-4 text-sm text-gray-900 text-right">
                       {bid.estimated_bid_value
                         ? `₹${Number(bid.estimated_bid_value).toLocaleString()}`
+                        : "-"}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-900 text-right">
+                      {bid.bid_value
+                        ? `₹${Number(bid.bid_value).toLocaleString()}`
                         : "-"}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-600">
