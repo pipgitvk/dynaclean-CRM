@@ -57,6 +57,9 @@ export default function EditBidPage({ params }) {
     dd_id: "",
     remarks: "",
     bid_document: null,
+    ra_start_date: "",
+    ra_end_date: "",
+    order_id: "",
   });
 
   useEffect(() => {
@@ -171,6 +174,9 @@ export default function EditBidPage({ params }) {
           dd_id: bid.dd_id || "",
           remarks: bid.remarks || "",
           bid_document: null,
+          ra_start_date: formatDateForInput(bid.ra_start_date) || "",
+          ra_end_date: formatDateForInput(bid.ra_end_date) || "",
+          order_id: bid.order_id || "",
         });
       } else {
         toast.error("Failed to fetch bid details");
@@ -203,6 +209,33 @@ export default function EditBidPage({ params }) {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
+
+  // Status timeline order
+  const statusOrder = [
+    'new',
+    'under_review',
+    'technical_preparation',
+    'submitted',
+    'technical_qualified',
+    'ra_participated',
+    'won',
+    'lost',
+    'cancelled'
+  ];
+
+  const statusLabels = {
+    new: 'New',
+    under_review: 'Under Review',
+    technical_preparation: 'Technical Preparation',
+    submitted: 'Submitted',
+    technical_qualified: 'Technical Qualified',
+    ra_participated: 'RA Participated',
+    won: 'Won',
+    lost: 'Lost',
+    cancelled: 'Cancelled'
+  };
+
+  const currentStatusIndex = statusOrder.indexOf(formData.bid_status);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -259,6 +292,48 @@ export default function EditBidPage({ params }) {
           <X className="w-4 h-4" />
           Cancel
         </button>
+      </div>
+
+      {/* Status Timeline */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="flex items-center justify-between overflow-x-auto pb-2">
+          {statusOrder.map((status, index) => {
+            const isActive = status === formData.bid_status;
+            const isPast = index < currentStatusIndex;
+            
+            return (
+              <div key={status} className="flex items-center flex-1 min-w-max">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
+                      isActive
+                        ? 'bg-blue-600 text-white ring-4 ring-blue-100'
+                        : isPast
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {index + 1}
+                  </div>
+                  <span
+                    className={`text-xs mt-2 font-medium text-center transition-all duration-300 ${
+                      isActive ? 'text-blue-700 font-semibold' : isPast ? 'text-blue-600' : 'text-gray-400'
+                    }`}
+                  >
+                    {statusLabels[status]}
+                  </span>
+                </div>
+                {index < statusOrder.length - 1 && (
+                  <div
+                    className={`flex-1 h-0.5 mx-3 transition-all duration-500 ${
+                      index < currentStatusIndex ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Form */}
@@ -414,15 +489,19 @@ export default function EditBidPage({ params }) {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="new">New</option>
-                  <option value="under_review">Under Review</option>
-                  <option value="technical_preparation">Technical Preparation</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="technical_qualified">Technical Qualified</option>
-                  <option value="ra_participated">RA Participated</option>
-                  <option value="won">Won</option>
-                  <option value="lost">Lost</option>
-                  <option value="cancelled">Cancelled</option>
+                  {statusOrder.map((status) => {
+                    const statusIndex = statusOrder.indexOf(status);
+                    const isDisabled = statusIndex < currentStatusIndex && status !== formData.bid_status;
+                    return (
+                      <option 
+                        key={status} 
+                        value={status} 
+                        disabled={isDisabled}
+                      >
+                        {statusLabels[status]}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -470,6 +549,60 @@ export default function EditBidPage({ params }) {
                   placeholder="Reason for status change"
                 />
               </div>
+
+              {formData.bid_status === "ra_participated" && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">RA Participation Details</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        RA Start Date *
+                      </label>
+                      <input
+                        type="date"
+                        name="ra_start_date"
+                        value={formData.ra_start_date}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        RA End Date *
+                      </label>
+                      <input
+                        type="date"
+                        name="ra_end_date"
+                        value={formData.ra_end_date}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {formData.bid_status === "won" && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Won Bid Details</p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Order ID *
+                    </label>
+                    <input
+                      type="text"
+                      name="order_id"
+                      value={formData.order_id}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter Order ID"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
