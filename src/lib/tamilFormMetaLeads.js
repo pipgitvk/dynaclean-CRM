@@ -2,7 +2,8 @@
  * Tamil Meta form (1402217014975670): fetch from Graph + import new leads → KAVYA.
  * Shared by /api/meta-backfill/tamil-form-leads and /api/cron/meta-backfill-tamil
  */
-import { getDbConnection } from "@/lib/db";
+import { getDbConnection } from "./db";
+import { getFBCredentials } from "./fbCredentials";
 import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
 import {
   extractProductFromMetaFieldData,
@@ -161,9 +162,10 @@ export async function getExistingNormalizedPhonesSet(leadsInRange) {
 
 /** Import leads not yet in DB; all assigned to TAMIL_META_ASSIGNEE_USERNAME */
 export async function importNewTamilFormLeads({ since, until, skipCampaignResolve = false }) {
-  const token = process.env.FB_PAGE_TOKEN;
+  const credentials = await getFBCredentials();
+  const token = credentials?.FB_PAGE_TOKEN;
   if (!token) {
-    return { ok: false, error: "FB_PAGE_TOKEN not configured", status: 500 };
+    return { ok: false, error: "FB_PAGE_TOKEN not configured in database", status: 500 };
   }
 
   const { error, leadsInRange } = await fetchTamilFormLeadsFromMeta({

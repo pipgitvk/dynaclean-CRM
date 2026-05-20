@@ -294,6 +294,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "Upload",
       },
+      {
+        path: "/admin-dashboard/ads-management",
+        name: "Ads Management",
+        accessKey: "ads-management",
+        roles: ["SUPERADMIN"],
+        icon: "LayoutGrid",
+      },
     ],
   },
   {
@@ -769,13 +776,13 @@ const allMenuItems = [
     name: "GEM CRM",
     moduleKey: "gem-crm",
     roles: ["SUPERADMIN"],
-    icon: "Gavel",
+    icon: "Briefcase",
     children: [
       {
         path: "/admin-dashboard/gem-crm/dashboard",
         name: "Dashboard",
         roles: ["SUPERADMIN"],
-        icon: "LayoutDashboard",
+        icon: "LayoutGrid",
       },
       {
         path: "/admin-dashboard/gem-crm/bids",
@@ -787,7 +794,7 @@ const allMenuItems = [
         path: "/admin-dashboard/gem-crm/reports",
         name: "Reports",
         roles: ["SUPERADMIN"],
-        icon: "BarChart3",
+        icon: "ScrollText",
       },
     ],
   },

@@ -111,6 +111,10 @@ export default function OrderDetailsClient({
           label="Delivery Location"
           value={orderDetails.delivery_location}
         />
+        <Input label="PO Number / Gem Order Number" value={orderDetails.po_number} />
+        <Input label="Payment Date" value={formatDate(orderDetails.payment_date)} />
+        <Input label="Transaction ID" value={orderDetails.transaction_id} />
+        <Input label="Payment Amount" value={orderDetails.payment_amount ? `₹${Number(orderDetails.payment_amount).toFixed(2)}` : ""} />
         <TextArea label="Remark" value={orderDetails.sales_remark} />
       </div>
 

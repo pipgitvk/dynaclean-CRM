@@ -136,12 +136,44 @@ export async function POST(req) {
       ship_to,
       salesRemark,
       clientDeliveryDate,
+      poNumber,
+      paymentDate,
+      transactionId,
+      paymentAmount,
     } = fields;
 
     // Validate mandatory fields
     if (!salesRemark || salesRemark.trim() === "") {
       return NextResponse.json(
         { error: "Remark is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!poNumber || poNumber.trim() === "") {
+      return NextResponse.json(
+        { error: "PO Number / Gem Order Number is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!paymentDate || paymentDate.trim() === "") {
+      return NextResponse.json(
+        { error: "Payment Date is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!transactionId || transactionId.trim() === "") {
+      return NextResponse.json(
+        { error: "Transaction ID is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!paymentAmount || paymentAmount.trim() === "") {
+      return NextResponse.json(
+        { error: "Payment Amount is required" },
         { status: 400 },
       );
     }
@@ -222,8 +254,9 @@ export async function POST(req) {
       `INSERT INTO neworder
          (order_id, quote_number, po_file, payment_proof, client_name,
           contact, email, delivery_location, company_name, company_address,
-          state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status,
+          po_number, payment_date, transaction_id, payment_amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         quote_number,
@@ -243,6 +276,10 @@ export async function POST(req) {
         duedateISO,
         clientDeliveryDate || null,
         approvalStatus,
+        poNumber || null,
+        paymentDate || null,
+        transactionId || null,
+        paymentAmount || null,
       ],
     );
 

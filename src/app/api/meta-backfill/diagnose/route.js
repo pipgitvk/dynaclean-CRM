@@ -4,6 +4,7 @@
  * Helps identify: wrong form ID, token permissions, lead_distribution, webhook, why leads not in DB
  */
 import { getDbConnection } from "@/lib/db";
+import { getFBCredentials } from "@/lib/fbCredentials";
 
 function normalizePhone(phone) {
   if (!phone) return null;
@@ -15,9 +16,10 @@ function normalizePhone(phone) {
 }
 
 export async function GET() {
-  const token = process.env.FB_PAGE_TOKEN;
-  const formId = process.env.FB_LEAD_FORM_ID;
-  const pageId = process.env.FB_PAGE_ID;
+  const credentials = await getFBCredentials();
+  const token = credentials?.FB_PAGE_TOKEN;
+  const formId = credentials?.FB_LEAD_FORM_ID;
+  const pageId = credentials?.FB_PAGE_ID;
   const adAccountId = process.env.FB_AD_ACCOUNT_ID;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
@@ -33,7 +35,7 @@ export async function GET() {
   };
 
   if (!token) {
-    result.checks.push({ name: "Token", status: "missing", message: "FB_PAGE_TOKEN not set in .env" });
+    result.checks.push({ name: "Token", status: "missing", message: "FB_PAGE_TOKEN not configured in database" });
     return Response.json(result);
   }
 

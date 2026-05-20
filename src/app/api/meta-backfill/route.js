@@ -5,6 +5,7 @@ import {
   extractProductFromMetaFieldData,
   buildProductsInterestLabel,
 } from "@/lib/metaLeadProduct";
+import { getFBCredentials } from "@/lib/fbCredentials";
 
 // Allow up to 5 min for Meta API (mode=all can be slow)
 export const maxDuration = 300;
@@ -93,11 +94,12 @@ export async function GET(request) {
     return new Response("Missing since/until query params", { status: 400 });
   }
 
-  const token = process.env.FB_PAGE_TOKEN;
-  const formId = process.env.FB_LEAD_FORM_ID; // set this in .env
+  const credentials = await getFBCredentials();
+  const token = credentials?.FB_PAGE_TOKEN;
+  const formId = credentials?.FB_LEAD_FORM_ID;
 
   if (!token || !formId) {
-    return new Response("FB_PAGE_TOKEN or FB_LEAD_FORM_ID not configured", {
+    return new Response("FB_PAGE_TOKEN or FB_LEAD_FORM_ID not configured in database", {
       status: 500,
     });
   }
@@ -461,9 +463,10 @@ export async function POST(request) {
     return new Response("leadIds array is required", { status: 400 });
   }
 
-  const token = process.env.FB_PAGE_TOKEN;
+  const credentials = await getFBCredentials();
+  const token = credentials?.FB_PAGE_TOKEN;
   if (!token) {
-    return new Response("FB_PAGE_TOKEN not configured", { status: 500 });
+    return new Response("FB_PAGE_TOKEN not configured in database", { status: 500 });
   }
 
   const results = [];

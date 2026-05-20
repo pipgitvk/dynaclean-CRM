@@ -15,6 +15,7 @@ import {
   TAMIL_META_FORM_ID,
   TAMIL_META_ASSIGNEE_USERNAME,
 } from "@/lib/metaTamilLeadForm";
+import { getFBCredentials } from "@/lib/fbCredentials";
 
 export const maxDuration = 300;
 
@@ -45,9 +46,10 @@ export async function GET(request) {
       );
     }
 
-    const token = process.env.FB_PAGE_TOKEN;
+    const credentials = await getFBCredentials();
+    const token = credentials?.FB_PAGE_TOKEN;
     if (!token) {
-      return NextResponse.json({ error: "FB_PAGE_TOKEN not configured" }, { status: 500 });
+      return NextResponse.json({ error: "FB_PAGE_TOKEN not configured in database" }, { status: 500 });
     }
 
     const { error, leadsInRange, rawFetchedCount } = await fetchTamilFormLeadsFromMeta({

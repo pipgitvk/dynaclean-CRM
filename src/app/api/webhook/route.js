@@ -6,6 +6,7 @@ import {
 } from "@/lib/metaLeadProduct";
 import { TAMIL_META_FORM_ID, TAMIL_META_ASSIGNEE_USERNAME } from "@/lib/metaTamilLeadForm";
 import { resolveTamilAssigneeUsername } from "@/lib/tamilAssigneeResolve";
+import { getFBCredentials } from "@/lib/fbCredentials";
 
 // Disable caching - fixes 405 Method Not Allowed on production (Vercel, nginx, etc.)
 export const dynamic = "force-dynamic";
@@ -50,7 +51,10 @@ export async function GET(request) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token === process.env.FB_VERIFY_TOKEN) {
+  const credentials = await getFBCredentials();
+  const verifyToken = credentials?.FB_VERIFY_TOKEN;
+
+  if (mode === "subscribe" && token === verifyToken) {
     return new Response(challenge);
   }
 
@@ -83,7 +87,8 @@ export async function POST(request) {
 
   try {
     const conn = await getDbConnection();
-    const token = process.env.FB_PAGE_TOKEN;
+    const credentials = await getFBCredentials();
+    const token = credentials?.FB_PAGE_TOKEN;
 
     // Step 1: Fetch lead details using leadgen_id
     // Explicitly request field_data + ad_id, otherwise Meta may not include them

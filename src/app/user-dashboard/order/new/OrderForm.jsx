@@ -7,6 +7,10 @@ export default function OrderForm({ quotation, reset }) {
     poFile: null,
     salesRemark: "",
     clientDeliveryDate: "",
+    poNumber: "",
+    paymentDate: "",
+    transactionId: "",
+    paymentAmount: "",
     ...quotation,
   });
   const [hasPO, setHasPO] = useState(null);
@@ -143,6 +147,55 @@ export default function OrderForm({ quotation, reset }) {
               value={formData.clientDeliveryDate}
               onChange={(e) =>
                 setFormData((fd) => ({ ...fd, clientDeliveryDate: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded bg-white"
+            />
+          </div>
+          <div>
+            <label className="block font-medium mb-1">PO Number / Gem Order Number *</label>
+            <input
+              type="text"
+              required
+              value={formData.poNumber}
+              onChange={(e) =>
+                setFormData((fd) => ({ ...fd, poNumber: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded bg-white"
+            />
+          </div>
+          <div>
+            <label className="block font-medium mb-1">Payment Date *</label>
+            <input
+              type="date"
+              required
+              value={formData.paymentDate}
+              onChange={(e) =>
+                setFormData((fd) => ({ ...fd, paymentDate: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded bg-white"
+            />
+          </div>
+          <div>
+            <label className="block font-medium mb-1">Transaction ID *</label>
+            <input
+              type="text"
+              required
+              value={formData.transactionId}
+              onChange={(e) =>
+                setFormData((fd) => ({ ...fd, transactionId: e.target.value }))
+              }
+              className="w-full px-3 py-2 border rounded bg-white"
+            />
+          </div>
+          <div>
+            <label className="block font-medium mb-1">Payment Amount *</label>
+            <input
+              type="number"
+              step="0.01"
+              required
+              value={formData.paymentAmount}
+              onChange={(e) =>
+                setFormData((fd) => ({ ...fd, paymentAmount: e.target.value }))
               }
               className="w-full px-3 py-2 border rounded bg-white"
             />
