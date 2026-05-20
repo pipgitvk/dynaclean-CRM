@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS bids (
   bid_type VARCHAR(100) NULL,
   evaluation_method VARCHAR(100) NULL,
   estimated_bid_value DECIMAL(15,2) NULL DEFAULT 0,
+  bid_value DECIMAL(15,2) NULL DEFAULT 0,
   emd_required ENUM('yes','no') NULL DEFAULT 'no',
   emd_amount DECIMAL(15,2) NULL DEFAULT 0,
   epbg_percentage DECIMAL(8,2) NULL DEFAULT 0,
@@ -74,4 +75,7 @@ CREATE TABLE IF NOT EXISTS bid_logs (
 ALTER TABLE neworder ADD COLUMN bid_id INT NULL;
 ALTER TABLE neworder ADD COLUMN bid_number VARCHAR(100) NULL;
 ALTER TABLE neworder ADD COLUMN gem_bid_no VARCHAR(100) NULL;
+
+-- Add bid_value column if it doesn't exist
+ALTER TABLE bids ADD COLUMN bid_value DECIMAL(15,2) NULL DEFAULT 0;
 ALTER TABLE neworder ADD COLUMN bidding_platform VARCHAR(100) NULL;
