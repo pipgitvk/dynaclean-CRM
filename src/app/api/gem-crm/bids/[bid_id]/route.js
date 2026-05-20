@@ -328,7 +328,7 @@ export async function PUT(req, { params }) {
       'bid_document', 'item_category', 'organisation_id', 'bid_start_date',
       'bid_end_date', 'bid_open_date', 'bid_validity_days', 'model_id',
       'specification', 'total_quantity', 'bid_type', 'evaluation_method',
-      'estimated_bid_value', 'emd_required', 'emd_amount', 'epbg_percentage',
+      'estimated_bid_value', 'bid_value', 'emd_required', 'emd_amount', 'epbg_percentage',
       'epbg_duration_months', 'reverse_auction', 'turnover_required',
       'oem_turnover_required', 'experience_required_years', 'delivery_days',
       'inspection_required', 'technical_status', 'financial_status',

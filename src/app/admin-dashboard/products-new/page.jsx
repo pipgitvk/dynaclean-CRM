@@ -169,33 +169,22 @@ export default function ProductsNewPage() {
     console.log("Orders data:", orders);
     console.log("Orders length:", orders.length);
 
-    // Add stock transactions
-    stockTransactions
-      .filter(t => t.product_code === selectedProduct.item_code)
-      .forEach(t => {
-        const isOut = t.stock_status === 'out' || t.stock_status === 'OUT';
-        const isTransfer = t.stock_status === 'transfer' || t.stock_status === 'TRANSFER';
-        let transactionType = 'Purchase';
-        let typeColor = 'bg-green-100 text-green-800';
-        
-        if (isOut) {
-          transactionType = 'Sale';
-          typeColor = 'bg-red-100 text-red-800';
-        } else if (isTransfer) {
-          transactionType = 'Transfer';
-          typeColor = 'bg-yellow-100 text-yellow-800';
-        }
-        
+    // Stock transactions - removed
+
+    // Add purchase data from product_stock_request - only show those with IDs
+    purchaseData
+      .filter(p => p.product_code === selectedProduct.item_code)
+      .forEach(p => {
         combined.push({
-          type: transactionType,
-          typeColor: typeColor,
-          data: t,
+          type: 'Purchase',
+          typeColor: 'bg-green-100 text-green-800',
+          data: p,
           display: {
-            main: t.product_code,
-            sub1: t.stock_status,
-            sub2: `₹${(t.net_amount || 0).toLocaleString()}`,
-            quantity: t.quantity,
-            date: t.updated_at
+            main: `${p.product_code} (ID: ${p.id})`,
+            sub1: 'IN',
+            sub2: `₹${(p.net_amount || 0).toLocaleString()}`,
+            quantity: p.quantity,
+            date: p.created_at
           }
         });
       });
@@ -272,7 +261,7 @@ export default function ProductsNewPage() {
 
   useEffect(() => {
     combineData();
-  }, [selectedProduct, stockTransactions, stockSummary, invoices, quotations, orders]);
+  }, [selectedProduct, stockTransactions, stockSummary, invoices, quotations, orders, purchaseData]);
 
   const getAvailableQty = (productCode) => {
     const stock = availableStock.find(s => s.product_code === productCode);
