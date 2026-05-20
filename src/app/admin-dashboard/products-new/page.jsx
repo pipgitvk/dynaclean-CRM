@@ -169,7 +169,24 @@ export default function ProductsNewPage() {
     console.log("Orders data:", orders);
     console.log("Orders length:", orders.length);
 
-    // Stock transactions - removed
+    // Add stock transactions - only OUT (Sale) records
+    stockTransactions
+      .filter(t => t.product_code === selectedProduct.item_code)
+      .filter(t => t.stock_status === 'out' || t.stock_status === 'OUT')
+      .forEach(t => {
+        combined.push({
+          type: 'Sale',
+          typeColor: 'bg-red-100 text-red-800',
+          data: t,
+          display: {
+            main: t.product_code,
+            sub1: t.stock_status,
+            sub2: `₹${(t.net_amount || 0).toLocaleString()}`,
+            quantity: t.quantity,
+            date: t.updated_at
+          }
+        });
+      });
 
     // Add purchase data from product_stock_request - only show those with IDs
     purchaseData
