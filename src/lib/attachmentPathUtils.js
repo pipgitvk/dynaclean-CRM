@@ -33,3 +33,9 @@ export function splitAttachmentList(raw) {
   if (!raw || typeof raw !== "string") return [];
   return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
+
+/** Remove leading slashes from path to prevent double slash URLs in Next.js public folder */
+export function removeLeadingSlashes(path) {
+  if (!path || typeof path !== "string") return path;
+  return path.replace(/^\/+/, '');
+}

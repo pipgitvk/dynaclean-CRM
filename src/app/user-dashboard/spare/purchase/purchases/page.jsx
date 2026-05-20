@@ -183,8 +183,8 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
               <div>
                 <label className="block mb-1 text-sm">Quotation Upload</label>
                 {record?.quotation_upload && (
-                  <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={record.quotation_upload} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
+                    Current: <a href={`/${String(record.quotation_upload).replace(/^\/+/, '')}`} target="_blank" rel="noreferrer" className="text-blue-600 underline flex items-center gap-1"><Eye className="w-3 h-3" /> View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'quotation_upload')} className="w-full border p-2 rounded" />
@@ -192,8 +192,8 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
               <div>
                 <label className="block mb-1 text-sm">Payment Proof Upload</label>
                 {record?.payment_proof_upload && (
-                  <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={record.payment_proof_upload} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
+                    Current: <a href={`/${String(record.payment_proof_upload).replace(/^\/+/, '')}`} target="_blank" rel="noreferrer" className="text-blue-600 underline flex items-center gap-1"><Eye className="w-3 h-3" /> View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'payment_proof_upload')} className="w-full border p-2 rounded" />
@@ -201,8 +201,8 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
               <div>
                 <label className="block mb-1 text-sm">Invoice Upload</label>
                 {record?.invoice_upload && (
-                  <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={record.invoice_upload} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
+                    Current: <a href={`/${String(record.invoice_upload).replace(/^\/+/, '')}`} target="_blank" rel="noreferrer" className="text-blue-600 underline flex items-center gap-1"><Eye className="w-3 h-3" /> View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'invoice_upload')} className="w-full border p-2 rounded" />
@@ -210,8 +210,8 @@ function SpareEditTransportModal({ open, onClose, record, onSaved }) {
               <div>
                 <label className="block mb-1 text-sm">E-Way Bill</label>
                 {record?.eway_bill && (
-                  <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={record.eway_bill} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
+                    Current: <a href={`/${String(record.eway_bill).replace(/^\/+/, '')}`} target="_blank" rel="noreferrer" className="text-blue-600 underline flex items-center gap-1"><Eye className="w-3 h-3" /> View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'eway_bill')} className="w-full border p-2 rounded" />
@@ -984,7 +984,7 @@ export default function SparePurchasesPage() {
                     <td className="p-3">{new Date(purchase.created_at).toLocaleDateString('en-IN', { timeZone: 'UTC' })}</td>
                     <td className="p-3 text-center">
                       {purchase.spare_image ? (
-                        <button onClick={() => setPreviewImage({ url: purchase.spare_image, type: getFileType(purchase.spare_image) })} className="text-gray-600 hover:text-blue-700">
+                        <button onClick={() => setPreviewImage({ url: `/${String(purchase.spare_image).replace(/^\/+/, '')}`, type: getFileType(purchase.spare_image) })} className="text-gray-600 hover:text-blue-700">
                           <Eye className="w-5 h-5 inline" />
                         </button>
                       ) : (
@@ -1134,13 +1134,14 @@ export default function SparePurchasesPage() {
                     <div key={label} className="border rounded p-3">
                       <div className="text-xs text-gray-500 mb-2">{label}</div>
                       {(() => {
+                        const normalizedUrl = `/${String(url).replace(/^\/+/, '')}`;
                         const ext = String(url).split('.').pop().toLowerCase();
                         const isImg = ["jpg", "jpeg", "png", "gif", "webp"].includes(ext);
                         const isPdf = ext === 'pdf';
-                        if (isImg) return <img src={url} alt={label} className="w-full h-40 object-cover rounded" />;
-                        if (isPdf) return <iframe src={url} title={label} className="w-full h-40" />;
+                        if (isImg) return <img src={normalizedUrl} alt={label} className="w-full h-40 object-cover rounded" />;
+                        if (isPdf) return <iframe src={normalizedUrl} title={label} className="w-full h-40" />;
                         return (
-                          <a href={url} target="_blank" rel="noreferrer" className="text-blue-600 underline break-all">
+                          <a href={normalizedUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline break-all">
                             {url}
                           </a>
                         );
