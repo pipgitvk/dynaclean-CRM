@@ -58,6 +58,9 @@ export default function EditBidPage({ params }) {
     dd_id: "",
     remarks: "",
     bid_document: null,
+    ra_start_date: "",
+    ra_end_date: "",
+    order_id: "",
   });
 
   useEffect(() => {
@@ -172,6 +175,9 @@ export default function EditBidPage({ params }) {
           dd_id: bid.dd_id || "",
           remarks: bid.remarks || "",
           bid_document: null,
+          ra_start_date: formatDateForInput(bid.ra_start_date) || "",
+          ra_end_date: formatDateForInput(bid.ra_end_date) || "",
+          order_id: bid.order_id || "",
         });
       } else {
         toast.error("Failed to fetch bid details");
@@ -477,6 +483,57 @@ export default function EditBidPage({ params }) {
                   placeholder="Reason for status change"
                 />
               </div>
+
+              {formData.bid_status === "ra_participated" && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">RA Participation Details</p>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        RA Start Date
+                      </label>
+                      <input
+                        type="date"
+                        name="ra_start_date"
+                        value={formData.ra_start_date}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        RA End Date
+                      </label>
+                      <input
+                        type="date"
+                        name="ra_end_date"
+                        value={formData.ra_end_date}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {formData.bid_status === "won" && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Won Bid Details</p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Order ID
+                    </label>
+                    <input
+                      type="text"
+                      name="order_id"
+                      value={formData.order_id}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter Order ID"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

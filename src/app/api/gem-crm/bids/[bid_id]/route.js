@@ -332,7 +332,8 @@ export async function PUT(req, { params }) {
       'epbg_duration_months', 'reverse_auction', 'turnover_required',
       'oem_turnover_required', 'experience_required_years', 'delivery_days',
       'inspection_required', 'technical_status', 'financial_status',
-      'bid_status', 'assigned_employee_id', 'dd_id', 'remarks'
+      'bid_status', 'assigned_employee_id', 'dd_id', 'remarks', 'ra_start_date',
+      'ra_end_date', 'order_id'
     ];
 
     for (const field of allowedFields) {
