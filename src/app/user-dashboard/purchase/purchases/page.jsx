@@ -271,8 +271,8 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
               <div>
                 <label className="block mb-1 text-sm">Quotation Upload</label>
                 {existingFileLinks.quotation && (
-                  <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={existingFileLinks.quotation} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
+                    Current: <a href={existingFileLinks.quotation} target="_blank" rel="noreferrer" className="text-blue-600 underline flex items-center gap-1"><Eye size={12} /> View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'quotation_upload')} className="w-full border p-2 rounded" />
@@ -280,8 +280,8 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
               <div>
                 <label className="block mb-1 text-sm">Payment Proof Upload</label>
                 {existingFileLinks.paymentProof && (
-                  <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={existingFileLinks.paymentProof} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
+                    Current: <a href={existingFileLinks.paymentProof} target="_blank" rel="noreferrer" className="text-blue-600 underline flex items-center gap-1"><Eye size={12} /> View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'payment_proof_upload')} className="w-full border p-2 rounded" />
@@ -289,8 +289,8 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
               <div>
                 <label className="block mb-1 text-sm">Invoice Upload</label>
                 {existingFileLinks.invoice && (
-                  <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={existingFileLinks.invoice} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
+                    Current: <a href={existingFileLinks.invoice} target="_blank" rel="noreferrer" className="text-blue-600 underline flex items-center gap-1"><Eye size={12} /> View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'invoice_upload')} className="w-full border p-2 rounded" />
@@ -298,8 +298,8 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
               <div>
                 <label className="block mb-1 text-sm">E-Way Bill</label>
                 {existingFileLinks.ewayBill && (
-                  <div className="text-xs text-gray-600 mb-1">
-                    Current: <a href={existingFileLinks.ewayBill} target="_blank" rel="noreferrer" className="text-blue-600 underline">View</a>
+                  <div className="text-xs text-gray-600 mb-1 flex items-center gap-1">
+                    Current: <a href={existingFileLinks.ewayBill} target="_blank" rel="noreferrer" className="text-blue-600 underline flex items-center gap-1"><Eye size={12} /> View</a>
                   </div>
                 )}
                 <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(e) => onFileChange(e, 'eway_bill')} className="w-full border p-2 rounded" />
