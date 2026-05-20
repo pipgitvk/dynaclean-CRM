@@ -173,9 +173,22 @@ export default function ProductsNewPage() {
     stockTransactions
       .filter(t => t.product_code === selectedProduct.item_code)
       .forEach(t => {
+        const isOut = t.stock_status === 'out' || t.stock_status === 'OUT';
+        const isTransfer = t.stock_status === 'transfer' || t.stock_status === 'TRANSFER';
+        let transactionType = 'Purchase';
+        let typeColor = 'bg-green-100 text-green-800';
+        
+        if (isOut) {
+          transactionType = 'Sale';
+          typeColor = 'bg-red-100 text-red-800';
+        } else if (isTransfer) {
+          transactionType = 'Transfer';
+          typeColor = 'bg-yellow-100 text-yellow-800';
+        }
+        
         combined.push({
-          type: 'Transaction',
-          typeColor: 'bg-blue-100 text-blue-800',
+          type: transactionType,
+          typeColor: typeColor,
           data: t,
           display: {
             main: t.product_code,
@@ -248,21 +261,7 @@ export default function ProductsNewPage() {
       }
     });
 
-    Object.values(groupedOrders).forEach(o => {
-        combined.push({
-          type: 'Order',
-          typeColor: 'bg-green-100 text-green-800',
-          data: o,
-          display: {
-            main: o.order_id,
-            sub1: o.client_name,
-            sub2: `₹${(o.totalamt || 0).toLocaleString()}`,
-            quantity: Number(o.quantity) || 1,
-            date: o.created_at,
-            id: o.order_id
-          }
-        });
-      });
+    // Orders are not added to the combined data as per user request
 
     setCombinedData(combined.sort((a, b) => {
     const dateA = a.display.date ? new Date(a.display.date) : new Date(0);
@@ -576,10 +575,11 @@ export default function ProductsNewPage() {
                   className="max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">All Types</option>
-                  <option value="Transaction">Transaction</option>
+                  <option value="Purchase">Purchase</option>
+                  <option value="Sale">Sale</option>
+                  <option value="Transfer">Transfer</option>
                   <option value="Invoice">Invoice</option>
                   <option value="Quotation">Quotation</option>
-                  <option value="Order">Order</option>
                 </select>
                 <input
                   type="date"
@@ -600,9 +600,9 @@ export default function ProductsNewPage() {
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="p-3 border-b text-left font-semibold">Type</th>
-                      <th className="p-3 border-b text-left font-semibold">Main Info</th>
+                      <th className="p-3 border-b text-left font-semibold">Invoice/Ref.No</th>
                       <th className="p-3 border-b text-left font-semibold">Name</th>
-                      <th className="p-3 border-b text-left font-semibold">Status/Amount</th>
+                      <th className="p-3 border-b text-left font-semibold">Price/Unit</th>
                       <th className="p-3 border-b text-left font-semibold">Quantity</th>
                       <th className="p-3 border-b text-left font-semibold">Date</th>
                       <th className="p-3 border-b text-left font-semibold">Action</th>

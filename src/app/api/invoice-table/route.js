@@ -78,6 +78,15 @@ export async function GET(req) {
       [...values, limit, offset],
     );
 
+    // Check if item_code column exists in invoice_items table
+    try {
+      await conn.execute("SELECT item_code FROM invoice_items LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoice_items ADD COLUMN item_code VARCHAR(100) NULL");
+      } catch (__) {}
+    }
+
     // Fetch items for each invoice from invoice_items table (now with item_code column)
     const invoicesWithItems = await Promise.all(
       rows.map(async (invoice) => {
