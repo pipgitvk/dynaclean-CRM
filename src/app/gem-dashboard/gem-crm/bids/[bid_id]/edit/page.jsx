@@ -217,6 +217,45 @@ export default function EditBidPage({ params }) {
     }
   };
 
+  // Helper function to check if a field should be editable
+  const isFieldEditable = (fieldName) => {
+    // Status fields are always editable
+    const statusFields = ['bid_status', 'technical_status', 'financial_status', 'status_remarks'];
+    if (statusFields.includes(fieldName)) {
+      return true;
+    }
+    // Empty fields are editable
+    const value = formData[fieldName];
+    return value === null || value === '' || value === undefined;
+  };
+
+  // Status timeline order
+  const statusOrder = [
+    'new',
+    'under_review',
+    'technical_preparation',
+    'submitted',
+    'technical_qualified',
+    'ra_participated',
+    'won',
+    'lost',
+    'cancelled'
+  ];
+
+  const statusLabels = {
+    new: 'New',
+    under_review: 'Under Review',
+    technical_preparation: 'Technical Preparation',
+    submitted: 'Submitted',
+    technical_qualified: 'Technical Qualified',
+    ra_participated: 'RA Participated',
+    won: 'Won',
+    lost: 'Lost',
+    cancelled: 'Cancelled'
+  };
+
+  const currentStatusIndex = statusOrder.indexOf(formData.bid_status);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
@@ -274,6 +313,48 @@ export default function EditBidPage({ params }) {
         </button>
       </div>
 
+      {/* Status Timeline */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="flex items-center justify-between overflow-x-auto pb-2">
+          {statusOrder.map((status, index) => {
+            const isActive = status === formData.bid_status;
+            const isPast = index < currentStatusIndex;
+            
+            return (
+              <div key={status} className="flex items-center flex-1 min-w-max">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
+                      isActive
+                        ? 'bg-blue-600 text-white ring-4 ring-blue-100'
+                        : isPast
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-400'
+                    }`}
+                  >
+                    {index + 1}
+                  </div>
+                  <span
+                    className={`text-xs mt-2 font-medium text-center transition-all duration-300 ${
+                      isActive ? 'text-blue-700 font-semibold' : isPast ? 'text-blue-600' : 'text-gray-400'
+                    }`}
+                  >
+                    {statusLabels[status]}
+                  </span>
+                </div>
+                {index < statusOrder.length - 1 && (
+                  <div
+                    className={`flex-1 h-0.5 mx-3 transition-all duration-500 ${
+                      index < currentStatusIndex ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Form */}
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -292,7 +373,8 @@ export default function EditBidPage({ params }) {
                   name="bidding_platform"
                   value={formData.bidding_platform}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('bidding_platform')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bidding_platform') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                   required
                 >
                   <option value="">Select Platform</option>
@@ -311,7 +393,8 @@ export default function EditBidPage({ params }) {
                   name="bid_number"
                   value={formData.bid_number}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('bid_number')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_number') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                   required
                 />
               </div>
@@ -325,7 +408,8 @@ export default function EditBidPage({ params }) {
                   name="gem_bid_no"
                   value={formData.gem_bid_no}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('gem_bid_no')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('gem_bid_no') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -338,7 +422,8 @@ export default function EditBidPage({ params }) {
                   name="bid_title"
                   value={formData.bid_title}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('bid_title')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_title') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                   required
                 />
               </div>
@@ -352,7 +437,8 @@ export default function EditBidPage({ params }) {
                   name="bid_link"
                   value={formData.bid_link}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('bid_link')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_link') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                   placeholder="https://"
                 />
               </div>
@@ -366,7 +452,8 @@ export default function EditBidPage({ params }) {
                   name="item_category"
                   value={formData.item_category}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('item_category')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('item_category') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -379,7 +466,8 @@ export default function EditBidPage({ params }) {
                   name="organisation_id"
                   value={formData.organisation_id}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('organisation_id')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('organisation_id') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -393,7 +481,8 @@ export default function EditBidPage({ params }) {
                     name="bid_document"
                     onChange={handleChange}
                     accept=".pdf,.doc,.docx"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    disabled={!isFieldEditable('bid_document')}
+                    className={`flex-1 px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_document') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                   />
                   <Upload className="w-5 h-5 text-gray-400" />
                   {bid && bid.bid_document && (
@@ -427,15 +516,19 @@ export default function EditBidPage({ params }) {
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="new">New</option>
-                  <option value="under_review">Under Review</option>
-                  <option value="technical_preparation">Technical Preparation</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="technical_qualified">Technical Qualified</option>
-                  <option value="ra_participated">RA Participated</option>
-                  <option value="won">Won</option>
-                  <option value="lost">Lost</option>
-                  <option value="cancelled">Cancelled</option>
+                  {statusOrder.map((status) => {
+                    const statusIndex = statusOrder.indexOf(status);
+                    const isDisabled = statusIndex < currentStatusIndex && status !== formData.bid_status;
+                    return (
+                      <option 
+                        key={status} 
+                        value={status} 
+                        disabled={isDisabled}
+                      >
+                        {statusLabels[status]}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -490,26 +583,30 @@ export default function EditBidPage({ params }) {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        RA Start Date
+                        RA Start Date *
                       </label>
                       <input
                         type="date"
                         name="ra_start_date"
                         value={formData.ra_start_date}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        disabled={!isFieldEditable('ra_start_date')}
+                        required
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ra_start_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        RA End Date
+                        RA End Date *
                       </label>
                       <input
                         type="date"
                         name="ra_end_date"
                         value={formData.ra_end_date}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        disabled={!isFieldEditable('ra_end_date')}
+                        required
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ra_end_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                       />
                     </div>
                   </div>
@@ -521,14 +618,16 @@ export default function EditBidPage({ params }) {
                   <p className="text-sm font-medium text-gray-700 mb-3">Won Bid Details</p>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Order ID
+                      Order ID *
                     </label>
                     <input
                       type="text"
                       name="order_id"
                       value={formData.order_id}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      disabled={!isFieldEditable('order_id')}
+                      required
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('order_id') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                       placeholder="Enter Order ID"
                     />
                   </div>
@@ -553,7 +652,8 @@ export default function EditBidPage({ params }) {
                   name="bid_start_date"
                   value={formData.bid_start_date}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('bid_start_date')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_start_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -566,7 +666,8 @@ export default function EditBidPage({ params }) {
                   name="bid_end_date"
                   value={formData.bid_end_date}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('bid_end_date')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_end_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -579,7 +680,8 @@ export default function EditBidPage({ params }) {
                   name="bid_open_date"
                   value={formData.bid_open_date}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('bid_open_date')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_open_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -592,7 +694,8 @@ export default function EditBidPage({ params }) {
                   name="bid_validity_days"
                   value={formData.bid_validity_days}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('bid_validity_days')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_validity_days') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
             </div>
@@ -614,8 +717,9 @@ export default function EditBidPage({ params }) {
                   name="estimated_bid_value"
                   value={formData.estimated_bid_value}
                   onChange={handleChange}
+                  disabled={!isFieldEditable('estimated_bid_value')}
                   step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('estimated_bid_value') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -628,8 +732,9 @@ export default function EditBidPage({ params }) {
                   name="bid_value"
                   value={formData.bid_value}
                   onChange={handleChange}
+                  disabled={!isFieldEditable('bid_value')}
                   step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_value') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -641,7 +746,8 @@ export default function EditBidPage({ params }) {
                   name="emd_required"
                   value={formData.emd_required}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('emd_required')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('emd_required') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 >
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
@@ -658,8 +764,9 @@ export default function EditBidPage({ params }) {
                     name="emd_amount"
                     value={formData.emd_amount}
                     onChange={handleChange}
+                    disabled={!isFieldEditable('emd_amount')}
                     step="0.01"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('emd_amount') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                   />
                 </div>
               )}
@@ -673,8 +780,9 @@ export default function EditBidPage({ params }) {
                   name="epbg_percentage"
                   value={formData.epbg_percentage}
                   onChange={handleChange}
+                  disabled={!isFieldEditable('epbg_percentage')}
                   step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('epbg_percentage') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -687,7 +795,8 @@ export default function EditBidPage({ params }) {
                   name="epbg_duration_months"
                   value={formData.epbg_duration_months}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('epbg_duration_months')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('epbg_duration_months') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
             </div>
@@ -721,7 +830,8 @@ export default function EditBidPage({ params }) {
                   name="dd_id"
                   value={formData.dd_id}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('dd_id')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('dd_id') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                   placeholder="Enter DD/BG ID"
                 />
               </div>
@@ -735,7 +845,8 @@ export default function EditBidPage({ params }) {
                   name="total_quantity"
                   value={formData.total_quantity}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('total_quantity')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('total_quantity') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -748,7 +859,8 @@ export default function EditBidPage({ params }) {
                   name="delivery_days"
                   value={formData.delivery_days}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('delivery_days')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('delivery_days') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -761,7 +873,8 @@ export default function EditBidPage({ params }) {
                   name="experience_required_years"
                   value={formData.experience_required_years}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('experience_required_years')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('experience_required_years') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 />
               </div>
 
@@ -773,7 +886,8 @@ export default function EditBidPage({ params }) {
                   name="reverse_auction"
                   value={formData.reverse_auction}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('reverse_auction')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('reverse_auction') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 >
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
@@ -788,7 +902,8 @@ export default function EditBidPage({ params }) {
                   name="inspection_required"
                   value={formData.inspection_required}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  disabled={!isFieldEditable('inspection_required')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('inspection_required') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
                 >
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
@@ -806,8 +921,9 @@ export default function EditBidPage({ params }) {
               name="remarks"
               value={formData.remarks}
               onChange={handleChange}
+              disabled={!isFieldEditable('remarks')}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('remarks') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
             />
           </div>
         </div>
