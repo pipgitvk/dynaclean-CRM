@@ -348,7 +348,6 @@ export async function POST(req) {
         bid_type || null,
         evaluation_method || null,
         estimated_bid_value || null,
-        bid_value || null,
         emd_required || 'no',
         emd_amount || null,
         epbg_percentage || null,
