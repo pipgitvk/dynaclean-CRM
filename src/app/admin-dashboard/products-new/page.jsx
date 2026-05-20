@@ -169,14 +169,19 @@ export default function ProductsNewPage() {
     console.log("Orders data:", orders);
     console.log("Orders length:", orders.length);
 
-    // Add stock transactions - only OUT (Sale) records
+    // Add stock transactions - only OUT (Sale) and TRANSFER records
     stockTransactions
       .filter(t => t.product_code === selectedProduct.item_code)
-      .filter(t => t.stock_status === 'out' || t.stock_status === 'OUT')
+      .filter(t => t.stock_status === 'out' || t.stock_status === 'OUT' || t.stock_status === 'transfer' || t.stock_status === 'TRANSFER')
       .forEach(t => {
+        const isOut = t.stock_status === 'out' || t.stock_status === 'OUT';
+        const isTransfer = t.stock_status === 'transfer' || t.stock_status === 'TRANSFER';
+        let transactionType = isTransfer ? 'Transfer' : 'Sale';
+        let typeColor = isTransfer ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800';
+
         combined.push({
-          type: 'Sale',
-          typeColor: 'bg-red-100 text-red-800',
+          type: transactionType,
+          typeColor: typeColor,
           data: t,
           display: {
             main: t.product_code,
