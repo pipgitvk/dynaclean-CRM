@@ -37,6 +37,7 @@ export default function NewBidPage() {
     bid_type: "",
     evaluation_method: "",
     estimated_bid_value: "",
+    bid_value: "",
     emd_required: "no",
     emd_amount: "",
     epbg_percentage: "",
@@ -337,6 +338,20 @@ export default function NewBidPage() {
                   type="number"
                   name="estimated_bid_value"
                   value={formData.estimated_bid_value}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bid Value (₹)
+                </label>
+                <input
+                  type="number"
+                  name="bid_value"
+                  value={formData.bid_value}
                   onChange={handleChange}
                   step="0.01"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
