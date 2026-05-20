@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getDbConnection } from "@/lib/db";
 import { DASHBOARD_MAP } from "@/components/Dashboards";
+import GemCrmDashboardWrapper from "@/components/GemCrmDashboardWrapper";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
@@ -134,6 +135,11 @@ export default async function UserDashboardPage() {
 
     if (!user) {
       return <p className="text-red-600">User not found</p>;
+    }
+
+    // Show GEM CRM dashboard for GEM role users
+    if (role === "GEM") {
+      return <GemCrmDashboardWrapper />;
     }
 
     const DashboardComponent = DASHBOARD_MAP[role] || DASHBOARD_MAP["DEFAULT"];
