@@ -57,8 +57,26 @@ export async function GET(_req, context) {
       }
     }
 
+    // Ensure item_code column exists
+    try {
+      await conn.execute("SELECT item_code FROM invoice_items LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoice_items ADD COLUMN item_code VARCHAR(100) NULL");
+      } catch (__) {}
+    }
+
+    // Ensure description column exists
+    try {
+      await conn.execute("SELECT description FROM invoice_items LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoice_items ADD COLUMN description TEXT NULL");
+      } catch (__) {}
+    }
+
     const [items] = await conn.execute(
-      `SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC`,
+      `SELECT *, item_code as product_code FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC`,
       [invoiceId],
     );
 

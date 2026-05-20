@@ -204,7 +204,7 @@ export default function InvoiceItemsTable({ items, setItems }) {
                     "-"
                   )}
                 </td>
-                <td className="border px-2 py-2">{item.item_name || "-"}</td>
+                <td className="border px-2 py-2">{item.item_name || item.item_code || "-"}</td>
                 <td className="border px-2 py-2">
                   <div className="relative">
                     <input
