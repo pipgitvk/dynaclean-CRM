@@ -85,16 +85,6 @@ export default function LeadDistributionPage() {
         Lead Distribution Dashboard
       </h1>
 
-      {/* 🔹 Toggle Button (legacy form removed). Manual assign retained */}
-      <div className="flex justify-end items-center mb-6">
-        <button
-          onClick={() => router.push("/admin-dashboard/meta-backfill")}
-          className="bg-blue-600 text-white px-4 py-2 rounded shadow"
-        >
-          Meta BackFill
-        </button>
-      </div>
-
       {/* 🔹 Rep Search & Add */}
       <div className="bg-white border rounded p-4 shadow">
         <h2 className="font-semibold mb-2">Add Representative</h2>

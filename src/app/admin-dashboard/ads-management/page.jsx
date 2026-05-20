@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Eye, X } from "lucide-react";
+import { Eye, EyeOff, X } from "lucide-react";
 import {
   TAMIL_META_FORM_ID,
   TAMIL_META_ASSIGNEE_USERNAME,
@@ -164,6 +164,17 @@ export default function MetaBackfillPage() {
   const [tamilShowHistory, setTamilShowHistory] = useState(false);
   const [tamilCronHistory, setTamilCronHistory] = useState([]);
   const pollCountRefTamil = useRef(0);
+  const [credentialModalOpen, setCredentialModalOpen] = useState(false);
+  const [credentialForm, setCredentialForm] = useState({
+    FB_VERIFY_TOKEN: "",
+    FB_PAGE_ID: "",
+    FB_PAGE_TOKEN: "",
+    FB_LEAD_FORM_ID: "",
+  });
+  const [credentialLoading, setCredentialLoading] = useState(false);
+  const [credentialMessage, setCredentialMessage] = useState("");
+  const [currentCredentials, setCurrentCredentials] = useState(null);
+  const [showToken, setShowToken] = useState(false);
 
   /** Per assigned_to row: counts by lead_campaign bucket (from API byCampaignAndAssigner) */
   const assignerCampaignBreakdown = useMemo(() => {
@@ -247,6 +258,11 @@ export default function MetaBackfillPage() {
   useEffect(() => {
     setAutoPollEnabledState(getAutoPollEnabled());
     setTamilAutoPollEnabledState(getTamilAutoPollEnabled());
+  }, []);
+
+  // Load current credentials on page mount
+  useEffect(() => {
+    loadCurrentCredentials();
   }, []);
 
   // API call every 10 min when auto-poll is on (direct meta-backfill - fast response)
@@ -665,9 +681,203 @@ export default function MetaBackfillPage() {
     }
   };
 
+  const handleCredentialChange = (e) => {
+    const { name, value } = e.target;
+    setCredentialForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const loadCredentials = async () => {
+    try {
+      const res = await fetch("/api/fb-credentials");
+      if (res.ok) {
+        const data = await res.json();
+        setCredentialForm({
+          FB_VERIFY_TOKEN: data.FB_VERIFY_TOKEN || "",
+          FB_PAGE_ID: data.FB_PAGE_ID || "",
+          FB_PAGE_TOKEN: data.FB_PAGE_TOKEN || "",
+          FB_LEAD_FORM_ID: data.FB_LEAD_FORM_ID || "",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load credentials:", err);
+    }
+  };
+
+  const loadCurrentCredentials = async () => {
+    try {
+      const res = await fetch("/api/fb-credentials");
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentCredentials(data);
+      }
+    } catch (err) {
+      console.error("Failed to load current credentials:", err);
+    }
+  };
+
+  const handleCredentialSubmit = async (e) => {
+    e.preventDefault();
+    setCredentialLoading(true);
+    setCredentialMessage("");
+    try {
+      const res = await fetch("/api/fb-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(credentialForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCredentialMessage("Credentials saved successfully!");
+        setTimeout(() => {
+          setCredentialModalOpen(false);
+          setCredentialMessage("");
+        }, 1500);
+      } else {
+        setCredentialMessage(data.message || "Failed to save credentials.");
+      }
+    } catch (err) {
+      console.error(err);
+      setCredentialMessage("Network error. Please try again.");
+    } finally {
+      setCredentialLoading(false);
+    }
+  };
+
   return (
     <div className="p-4 space-y-4 max-w-full">
-      <h1 className="text-xl font-semibold">Meta Leads Backfill</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Meta Leads Backfill</h1>
+        <button
+          type="button"
+          onClick={() => setCredentialModalOpen(true)}
+          className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
+        >
+          Add Credential
+        </button>
+      </div>
+
+      {credentialModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setCredentialModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="credential-modal-title"
+          >
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <h2 id="credential-modal-title" className="text-xl font-semibold text-gray-900">
+                Add Credential
+              </h2>
+              <button
+                type="button"
+                onClick={() => !credentialLoading && setCredentialModalOpen(false)}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X size={22} />
+              </button>
+            </div>
+            {credentialMessage && (
+              <div
+                className={`mb-4 rounded-lg p-3 text-center text-sm font-medium ${
+                  credentialMessage.includes("successfully")
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {credentialMessage}
+              </div>
+            )}
+            <form onSubmit={handleCredentialSubmit} className="space-y-4">
+              {[
+                "FB_VERIFY_TOKEN",
+                "FB_PAGE_ID",
+                "FB_PAGE_TOKEN",
+                "FB_LEAD_FORM_ID",
+              ].map((field) => (
+                <div key={field}>
+                  <label className="mb-1 block text-sm font-medium text-gray-800">
+                    {field}
+                  </label>
+                  <input
+                    type="text"
+                    name={field}
+                    value={credentialForm[field]}
+                    onChange={handleCredentialChange}
+                    disabled={credentialLoading}
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                    required
+                  />
+                </div>
+              ))}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => !credentialLoading && setCredentialModalOpen(false)}
+                  disabled={credentialLoading}
+                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={credentialLoading}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {credentialLoading ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Facebook Credentials Display */}
+      <div className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
+        <h2 className="font-medium mb-3 text-blue-900">Facebook Credentials</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="bg-white rounded p-2 border">
+            <strong className="text-gray-600">FB_VERIFY_TOKEN:</strong>
+            <p className="mt-1 text-xs text-gray-700 break-all font-mono">
+              {currentCredentials?.FB_VERIFY_TOKEN || "Not configured"}
+            </p>
+          </div>
+          <div className="bg-white rounded p-2 border">
+            <strong className="text-gray-600">FB_PAGE_ID:</strong>
+            <p className="mt-1 text-xs text-gray-700 break-all font-mono">
+              {currentCredentials?.FB_PAGE_ID || "Not configured"}
+            </p>
+          </div>
+          <div className="bg-white rounded p-2 border">
+            <strong className="text-gray-600">FB_PAGE_TOKEN:</strong>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-xs text-gray-700 break-all font-mono flex-1">
+                {showToken ? (currentCredentials?.FB_PAGE_TOKEN || "Not configured") : (currentCredentials?.FB_PAGE_TOKEN ? "••••••••••••" : "Not configured")}
+              </p>
+              {currentCredentials?.FB_PAGE_TOKEN && (
+                <button
+                  type="button"
+                  onClick={() => setShowToken(!showToken)}
+                  className="p-1 text-gray-500 hover:text-gray-700"
+                  title={showToken ? "Hide token" : "Show token"}
+                >
+                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="bg-white rounded p-2 border">
+            <strong className="text-gray-600">FB_LEAD_FORM_ID:</strong>
+            <p className="mt-1 text-xs text-gray-700 break-all font-mono">
+              {currentCredentials?.FB_LEAD_FORM_ID || "Not configured"}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Detailing Diagnosis - Why leads not in DB */}
       <div className="border rounded-lg p-4 bg-amber-50/50 border-amber-200">

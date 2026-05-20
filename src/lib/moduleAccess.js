@@ -34,6 +34,7 @@ export const MODULE_TREE = [
       { key: "view-customers", label: "View Customers" },
       { key: "quotations", label: "Quotations" },
       { key: "invoices", label: "Invoices" },
+      { key: "ads-management", label: "Ads Management" },
     ],
   },
   {
@@ -181,7 +182,21 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "regularization-approvals", label: "Overtime" },
     ],
   },
-  { kind: "single", id: "tl-management", label: "TL Management", key: "tl-customers" },
+  {
+    kind: "group",
+    id: "tl-management",
+    label: "TL Management",
+    children: [
+      { kind: "leaf", key: "tl-customers", label: "TL Customers" },
+      { kind: "leaf", key: "add-customer", label: "Add Customer" },
+      { kind: "leaf", key: "view-customers", label: "View Customers" },
+      { kind: "leaf", key: "my-leads", label: "My Leads" },
+      { kind: "leaf", key: "dm-fresh-leads", label: "24h Fresh Leads (DM)" },
+      { kind: "leaf", key: "lead-distribution", label: "Lead Distribution" },
+      { kind: "leaf", key: "bulk-reassign", label: "Bulk Reassign Leads" },
+      { kind: "leaf", key: "ads-management", label: "Ads Management" },
+    ],
+  },
   {
     kind: "group",
     id: "reports",
