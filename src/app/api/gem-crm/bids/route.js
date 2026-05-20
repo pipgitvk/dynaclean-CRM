@@ -319,51 +319,104 @@ export async function POST(req) {
       return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
     }
 
+    // Get actual table structure
+    const [tableInfo] = await conn.execute("DESCRIBE bids");
+    const existingColumns = tableInfo.map(row => row.Field);
+    console.log("Existing columns in bids table:", existingColumns);
+
+    // Ensure all required columns exist
+    const columnsToCheck = [
+      { name: 'bidding_platform', type: 'VARCHAR(255) NULL' },
+      { name: 'bid_number', type: 'VARCHAR(255) NULL' },
+      { name: 'gem_bid_no', type: 'VARCHAR(255) NULL' },
+      { name: 'bid_title', type: 'VARCHAR(500) NULL' },
+      { name: 'bid_link', type: 'TEXT NULL' },
+      { name: 'bid_document', type: 'TEXT NULL' },
+      { name: 'item_category', type: 'VARCHAR(255) NULL' },
+      { name: 'organisation_id', type: 'INT NULL' },
+      { name: 'bid_start_date', type: 'DATE NULL' },
+      { name: 'bid_end_date', type: 'DATE NULL' },
+      { name: 'bid_open_date', type: 'DATE NULL' },
+      { name: 'bid_validity_days', type: 'INT NULL' },
+      { name: 'model_id', type: 'VARCHAR(255) NULL' },
+      { name: 'specification', type: 'TEXT NULL' },
+      { name: 'total_quantity', type: 'DECIMAL(10,2) NULL' },
+      { name: 'bid_type', type: 'VARCHAR(50) NULL' },
+      { name: 'evaluation_method', type: 'VARCHAR(50) NULL' },
+      { name: 'estimated_bid_value', type: 'DECIMAL(10,2) NULL' },
+      { name: 'bid_value', type: 'DECIMAL(10,2) NULL' },
+      { name: 'emd_required', type: 'ENUM("yes", "no") DEFAULT "no"' },
+      { name: 'emd_amount', type: 'DECIMAL(10,2) NULL' },
+      { name: 'epbg_percentage', type: 'DECIMAL(5,2) NULL' },
+      { name: 'epbg_duration_months', type: 'INT NULL' },
+      { name: 'reverse_auction', type: 'ENUM("yes", "no") DEFAULT "no"' },
+      { name: 'turnover_required', type: 'DECIMAL(10,2) NULL' },
+      { name: 'oem_turnover_required', type: 'DECIMAL(10,2) NULL' },
+      { name: 'experience_required_years', type: 'INT NULL' },
+      { name: 'delivery_days', type: 'INT NULL' },
+      { name: 'inspection_required', type: 'ENUM("yes", "no") DEFAULT "no"' },
+      { name: 'assigned_employee_id', type: 'INT NULL' },
+      { name: 'dd_id', type: 'INT NULL' },
+      { name: 'remarks', type: 'TEXT NULL' },
+      { name: 'created_by', type: 'INT NULL' }
+    ];
+
+    for (const { name, type } of columnsToCheck) {
+      if (!existingColumns.includes(name)) {
+        try {
+          await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
+          console.log(`✅ Added column ${name} to bids table`);
+        } catch (alterError) {
+          console.error(`❌ Failed to add column ${name}:`, alterError.message);
+        }
+      }
+    }
+
+    // Build INSERT statement dynamically based on actual columns
+    const insertColumns = columnsToCheck.map(c => c.name).join(', ');
+    const placeholders = columnsToCheck.map(() => '?').join(', ');
+    const values = [
+      bidding_platform || null,
+      bid_number || null,
+      gem_bid_no || null,
+      bid_title || null,
+      bid_link || null,
+      bid_document,
+      item_category || null,
+      organisation_id || null,
+      bid_start_date || null,
+      bid_end_date || null,
+      bid_open_date || null,
+      bid_validity_days || null,
+      model_id || null,
+      specification || null,
+      total_quantity || null,
+      bid_type || null,
+      evaluation_method || null,
+      estimated_bid_value || null,
+      bid_value || null,
+      emd_required || 'no',
+      emd_amount || null,
+      epbg_percentage || null,
+      epbg_duration_months || null,
+      reverse_auction || 'no',
+      turnover_required || null,
+      oem_turnover_required || null,
+      experience_required_years || null,
+      delivery_days || null,
+      inspection_required || 'no',
+      payload.role === "GEM" ? currentEmpId : assigned_employee_id || null,
+      dd_id || null,
+      remarks || null,
+      payload.empId || payload.id || null,
+    ];
+
+    console.log("INSERT columns:", insertColumns);
+    console.log("VALUES count:", values.length);
+
     const [result] = await conn.execute(
-      `INSERT INTO bids (
-        bidding_platform, bid_number, gem_bid_no, bid_title, bid_link, bid_document,
-        item_category, organisation_id, bid_start_date, bid_end_date, bid_open_date,
-        bid_validity_days, model_id, specification, total_quantity, bid_type,
-        evaluation_method, estimated_bid_value, bid_value, emd_required, emd_amount,
-        epbg_percentage, epbg_duration_months, reverse_auction, turnover_required,
-        oem_turnover_required, experience_required_years, delivery_days,
-        inspection_required, assigned_employee_id, dd_id, remarks, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        bidding_platform || null,
-        bid_number || null,
-        gem_bid_no || null,
-        bid_title || null,
-        bid_link || null,
-        bid_document,
-        item_category || null,
-        organisation_id || null,
-        bid_start_date || null,
-        bid_end_date || null,
-        bid_open_date || null,
-        bid_validity_days || null,
-        model_id || null,
-        specification || null,
-        total_quantity || null,
-        bid_type || null,
-        evaluation_method || null,
-        estimated_bid_value || null,
-        bid_value || null,
-        emd_required || 'no',
-        emd_amount || null,
-        epbg_percentage || null,
-        epbg_duration_months || null,
-        reverse_auction || 'no',
-        turnover_required || null,
-        oem_turnover_required || null,
-        experience_required_years || null,
-        delivery_days || null,
-        inspection_required || 'no',
-        payload.role === "GEM" ? currentEmpId : assigned_employee_id || null,
-        dd_id || null,
-        remarks || null,
-        payload.empId || payload.id || null,
-      ]
+      `INSERT INTO bids (${insertColumns}) VALUES (${placeholders})`,
+      values
     );
 
     // Log initial status
