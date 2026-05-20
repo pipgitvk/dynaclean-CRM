@@ -881,13 +881,6 @@ const allMenuItems = [
     icon: "Gavel",
     children: [
       {
-        path: "/gem-dashboard/gem-crm/dashboard",
-        name: "Dashboard",
-        moduleKey: "gem-crm-dashboard",
-        roles: ["ALL"],
-        icon: "LayoutDashboard",
-      },
-      {
         path: "/gem-dashboard/gem-crm/bids",
         name: "Bids",
         moduleKey: "gem-crm-bids",
