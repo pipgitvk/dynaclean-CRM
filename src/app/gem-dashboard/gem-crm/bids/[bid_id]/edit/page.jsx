@@ -221,7 +221,9 @@ export default function EditBidPage({ params }) {
   const isFieldEditable = (fieldName) => {
     // Status fields are always editable
     const statusFields = ['bid_status', 'technical_status', 'financial_status', 'status_remarks'];
-    if (statusFields.includes(fieldName)) {
+    // Financial value fields are always editable
+    const financialValueFields = ['estimated_bid_value', 'bid_value'];
+    if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName)) {
       return true;
     }
     // Empty fields are editable
