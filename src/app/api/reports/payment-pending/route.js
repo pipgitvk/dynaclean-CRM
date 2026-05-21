@@ -40,14 +40,14 @@ export async function GET() {
         AND (is_cancelled = 0 or is_cancelled IS NULL)
     `;
 
-        // Filter for SALES role - only their own orders
-        if (role === "SALES") {
+        // Filter for SALES and GEM roles - only their own orders
+        if (role === "SALES" || role === "GEM PORTAL" || role === "GEM") {
             sql += ` AND created_by = ?`;
         }
 
         sql += ` ORDER BY duedate ASC`;
 
-        const [rows] = role === "SALES"
+        const [rows] = (role === "SALES" || role === "GEM PORTAL" || role === "GEM")
             ? await pool.query(sql, [username])
             : await pool.query(sql);
 
