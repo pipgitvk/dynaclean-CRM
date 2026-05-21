@@ -76,7 +76,7 @@ export async function GET(_req, context) {
     }
 
     const [items] = await conn.execute(
-      `SELECT *, item_code as product_code FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC`,
+      `SELECT *, item_code as product_code, image_url as imageUrl FROM invoice_items WHERE invoice_id = ? ORDER BY id ASC`,
       [invoiceId],
     );
 
@@ -388,12 +388,14 @@ export async function PATCH(req, context) {
       const total_amount = item.total_amount || 0;
       const item_code = item.item_code || item.product_code || null;
 
+      const image_url = item.imageUrl || item.image_url || null;
+
       await conn.execute(
         `INSERT INTO invoice_items
          (invoice_id, item_name, description, hsn_code, quantity, rate, discount_percent,
           discount_amount, taxable_value, cgst_percent, sgst_percent, igst_percent,
-          cgst_amount, sgst_amount, igst_amount, total_amount, item_code, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          cgst_amount, sgst_amount, igst_amount, total_amount, item_code, image_url, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           invoiceId,
           item_name,
@@ -412,6 +414,7 @@ export async function PATCH(req, context) {
           igst_amount,
           total_amount,
           item_code,
+          image_url,
         ],
       );
     }
