@@ -1,5 +1,3 @@
-/** TL follow-up tag chips — shared by form and TL customers filter */
-
 /** Stored label for postpone + declined intent (replaces legacy `"Postponing"`). */
 export const TL_POSTPONDING_DECLINED_TAG = "Postponding/Declined";
 
