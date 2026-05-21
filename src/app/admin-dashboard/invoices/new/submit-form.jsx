@@ -368,11 +368,10 @@ const fetchQuotationAndFill = async () => {
       billing_address: quotation.billing_address,
       shipping_address: quotation.shipping_address,
       gst_number: quotation.gst_number,
-      amount_paid: Number(quotation.amount_paid || 0),
       state: quotation.state,
       state_code: quotation.state_code,
       customer_id: quotation.customer_id,
-      quotation_id: quotation.quotation_id, 
+      quotation_id: quotation.quotation_id,
       due_date: quotation.due_date
   ? quotation.due_date.split("T")[0]
   : "",
