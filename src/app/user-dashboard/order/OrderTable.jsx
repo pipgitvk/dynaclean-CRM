@@ -519,6 +519,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
 
   const popRef = useRef(null);
   const role = (userRole || "").toString().trim().toLowerCase();
+  const isGem = role.includes("gem");
   const canViewSales = [
     "back office",
     "accountant",
@@ -528,7 +529,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "gem portal",
     "team leader",
     "service head",
-  ].includes(role);
+  ].includes(role) || isGem;
   const isAdmin = role === "admin";
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
@@ -576,103 +577,101 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
       {isOpen && (
         <div
           ref={popRef}
-          className="absolute right-0 mt-2 w-56 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border"
+          className="absolute right-0 mt-2 w-56 origin-top-right rounded-lg bg-white shadow-lg ring-1 ring-black/5 z-20 border min-h-[40px]"
         >
-          <div className="py-1 text-sm">
-            {canViewSales && (
-              <Link
-                href={`/user-dashboard/order/${r.order_id}`}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                title="View Sales"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ClipboardList size={16} />
-                <span>View Sales</span>
-              </Link>
-            )}
-            {["accountant", "admin", "team leader"].includes(role) &&
-              (r.report_file ? (
-                <Link
-                  href={`/user-dashboard/order/view/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="View Report"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileText size={16} />
-                  <span>View Report</span>
-                </Link>
-              ) : (
-                <div className="flex items-center">
+          <div className="py-1 text-sm flex flex-col">
+            <Link
+              href={`/user-dashboard/order/${r.order_id}`}
+              className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+              title="View Sales"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ClipboardList size={16} />
+              <span>View Sales</span>
+            </Link>
+            {!isGem && (
+              <>
+                {["accountant", "admin", "team leader"].includes(role) &&
+                  (r.report_file ? (
+                    <Link
+                      href={`/user-dashboard/order/view/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                      title="View Report"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FileText size={16} />
+                      <span>View Report</span>
+                    </Link>
+                  ) : (
+                    <div className="flex items-center">
+                      <Link
+                        href={`/user-dashboard/order/upload/${r.order_id}`}
+                        className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-yellow-700"
+                        title="Upload Report"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <UploadCloud size={16} />
+                        <span>Upload Report</span>
+                      </Link>
+                      <div className="px-2">
+                        <DeleteButton orderId={r.order_id} />
+                      </div>
+                    </div>
+                  ))}
+                {(isAdmin || isTeamLeader) &&
+                  (hasBooking ? (
+                    <Link
+                      href={`/user-dashboard/order/view-booking/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                      title="View Booking"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FileCheck size={16} />
+                      <span>View Booking</span>
+                    </Link>
+                  ) : (
+                    <Link
+                      href={`/user-dashboard/order/upload-booking/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700 w-full block"
+                      title="Create Booking"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <UploadCloud size={16} />
+                      <span>Create Booking</span>
+                    </Link>
+                  ))}
+                {isWarehouse && hasBooking && dispatchStatus === 0 && (
                   <Link
-                    href={`/user-dashboard/order/upload/${r.order_id}`}
-                    className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-yellow-700"
-                    title="Upload Report"
+                    href={`/user-dashboard/order/dispatch/${r.order_id}`}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                    title="Dispatch"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <UploadCloud size={16} />
-                    <span>Upload Report</span>
+                    <CheckCircle size={16} />
+                    <span>Dispatch</span>
                   </Link>
-                  <div className="px-2">
-                    <DeleteButton orderId={r.order_id} />
+                )}
+                {(isWarehouse || isAdmin || isTeamLeader) &&
+                  hasBooking &&
+                  dispatchStatus === 1 && (
+                    <Link
+                      href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 w-full block"
+                      title="View Dispatch"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Search size={16} />
+                      <span>View Dispatch</span>
+                    </Link>
+                  )}
+                {["accountant", "admin"].includes(role) && r.report_file && (
+                  <div className="px-3 py-2 w-full block" onClick={(e) => e.stopPropagation()}>
+                    <EditPaymentButton order={r} />
                   </div>
-                </div>
-              ))}
-            {(isAdmin || isTeamLeader) &&
-              (hasBooking ? (
-                <Link
-                  href={`/user-dashboard/order/view-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="View Booking"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <FileCheck size={16} />
-                  <span>View Booking</span>
-                </Link>
-              ) : (
-                <Link
-                  href={`/user-dashboard/order/upload-booking/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
-                  title="Create Booking"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <UploadCloud size={16} />
-                  <span>Create Booking</span>
-                </Link>
-              ))}
-            {isWarehouse && hasBooking && dispatchStatus === 0 && (
-              <>
-                <Link
-                  href={`/user-dashboard/order/dispatch/${r.order_id}`}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                  title="Dispatch"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <CheckCircle size={16} />
-                  <span>Dispatch</span>
-                </Link>
+                )}
+                <UpdateDeliveryMenuItem order={r} />
               </>
             )}
-            {(isWarehouse || isAdmin || isTeamLeader) &&
-              hasBooking &&
-              dispatchStatus === 1 && (
-                <>
-                  <Link
-                    href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                    title="View Dispatch"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Search size={16} />
-                    <span>View Dispatch</span>
-                  </Link>
-                </>
-              )}
-            {["accountant", "admin"].includes(role) && r.report_file && (
-              <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                <EditPaymentButton order={r} />
-              </div>
-            )}
-            <UpdateDeliveryMenuItem order={r} />
           </div>
         </div>
       )}
