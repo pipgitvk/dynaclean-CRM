@@ -69,17 +69,31 @@ export async function GET(req) {
     // Get orders created from bids (safe query - handle if bid_id column doesn't exist)
     let orderStats = [{ order_count: 0, order_amount: 0 }];
     try {
-      const [orderResult] = await conn.execute(`
-        SELECT 
-          COUNT(*) as order_count,
-          COALESCE(SUM(total_amount), 0) as order_amount
-        FROM neworder n
-        ${role === "GEM" ? "INNER JOIN bids b ON n.bid_id = b.bid_id" : ""}
-        WHERE n.bid_id IS NOT NULL ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
+      // First, get all order_ids from won bids
+      const [wonBidsOrders] = await conn.execute(`
+        SELECT order_id 
+        FROM bids 
+        WHERE bid_status = 'won' 
+        AND order_id IS NOT NULL 
+        AND order_id != ''
+        ${role === "GEM" ? "AND assigned_employee_id = ?" : ""}
       `, bidParams);
-      orderStats = orderResult;
+
+      if (wonBidsOrders.length > 0) {
+        const orderIds = wonBidsOrders.map(b => b.order_id);
+        const placeholders = orderIds.map(() => '?').join(',');
+        
+        const [orderResult] = await conn.execute(`
+          SELECT 
+            COUNT(*) as order_count,
+            COALESCE(SUM(totalamt), 0) as order_amount
+          FROM neworder
+          WHERE order_id IN (${placeholders})
+        `, orderIds);
+        orderStats = orderResult;
+      }
     } catch (e) {
-      console.log("Order stats query failed (bid_id column may not exist):", e.message);
+      console.log("Order stats query failed:", e.message);
     }
 
     // Get active EMD count (linked to bids) - safe query
@@ -88,10 +102,10 @@ export async function GET(req) {
       const [emdResult] = await conn.execute(`
         SELECT 
           COUNT(*) as active_emd_count,
-          COALESCE(SUM(dd.amount), 0) as total_emd_amount
-        FROM dd_management dd
+          COALESCE(SUM(amount), 0) as total_emd_amount
+        FROM dd_records dd
         INNER JOIN bids b ON dd.id = b.dd_id
-        WHERE dd.status IN ('Assigned', 'Filled', 'Issued')
+        WHERE dd.type = 'DD' AND dd.status IN ('Assigned', 'Filled', 'Issued')
         ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
       `, bidParams);
       emdStats = emdResult;
@@ -105,8 +119,8 @@ export async function GET(req) {
       const [bgResult] = await conn.execute(`
         SELECT 
           COUNT(*) as active_bg_count,
-          COALESCE(SUM(dd.amount), 0) as total_bg_amount
-        FROM dd_management dd
+          COALESCE(SUM(amount), 0) as total_bg_amount
+        FROM dd_records dd
         INNER JOIN bids b ON dd.id = b.dd_id
         WHERE dd.type = 'BG' AND dd.status IN ('Assigned', 'Filled', 'Issued')
         ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
