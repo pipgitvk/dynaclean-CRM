@@ -40,6 +40,14 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
   </div>
 );
 
+// Helper function to format number with Indian comma system
+const formatIndianNumber = (num) => {
+  return new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(num);
+};
+
 export default function GemCrmDashboard() {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -214,7 +222,7 @@ export default function GemCrmDashboard() {
         />
         <StatCard
           title="Won Bid Value"
-          value={`₹${(stats.wonBidValue / 100000).toFixed(2)}L`}
+          value={`₹${formatIndianNumber(stats.wonBidValue)}`}
           icon={TrendingUp}
           color="bg-green-600"
         />

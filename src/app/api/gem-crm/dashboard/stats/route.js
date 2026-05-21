@@ -60,11 +60,50 @@ export async function GET(req) {
       bidParams
     );
 
-    // Get won bids total value
-    const [wonValue] = await conn.execute(
-      `SELECT COALESCE(SUM(estimated_bid_value), 0) as total FROM bids WHERE bid_status = 'won' ${bidAnd}`,
-      bidParams
-    );
+    // Get won bids total value (use actual order value if available, else estimated bid value)
+    let wonBidValue = 0;
+    try {
+      // First, get all order_ids from won bids
+      const [wonBidsOrders] = await conn.execute(`
+        SELECT order_id
+        FROM bids
+        WHERE bid_status = 'won'
+        AND order_id IS NOT NULL
+        AND order_id != ''
+        ${role === "GEM" ? "AND assigned_employee_id = ?" : ""}
+      `, bidParams);
+
+      if (wonBidsOrders.length > 0) {
+        const orderIds = wonBidsOrders.map(b => b.order_id);
+        const placeholders = orderIds.map(() => '?').join(',');
+
+        // Get totalamt from neworder for these order_ids
+        const [orderValues] = await conn.execute(`
+          SELECT COALESCE(SUM(totalamt), 0) as total
+          FROM neworder
+          WHERE order_id IN (${placeholders})
+        `, orderIds);
+
+        wonBidValue = parseFloat(orderValues[0].total) || 0;
+      }
+
+      // If no orders found, fall back to estimated bid value
+      if (wonBidValue === 0) {
+        const [wonValue] = await conn.execute(
+          `SELECT COALESCE(SUM(estimated_bid_value), 0) as total FROM bids WHERE bid_status = 'won' ${bidAnd}`,
+          bidParams
+        );
+        wonBidValue = parseFloat(wonValue[0].total) || 0;
+      }
+    } catch (e) {
+      console.log("Won bid value calculation failed:", e.message);
+      // Fallback to original query
+      const [wonValue] = await conn.execute(
+        `SELECT COALESCE(SUM(estimated_bid_value), 0) as total FROM bids WHERE bid_status = 'won' ${bidAnd}`,
+        bidParams
+      );
+      wonBidValue = parseFloat(wonValue[0].total) || 0;
+    }
 
     // Get orders created from bids (safe query - handle if bid_id column doesn't exist)
     let orderStats = [{ order_count: 0, order_amount: 0 }];
@@ -212,7 +251,7 @@ export async function GET(req) {
         technicalStatusCounts: technicalStatusMap,
         financialStatusCounts: financialStatusMap,
         totalBidValue: parseFloat(totalValue[0].total) || 0,
-        wonBidValue: parseFloat(wonValue[0].total) || 0,
+        wonBidValue: wonBidValue,
         participated: statusMap['submitted'] || 0 + statusMap['technical_qualified'] || 0 + statusMap['ra_participated'] || 0,
         won: statusMap['won'] || 0,
         lost: statusMap['lost'] || 0,
