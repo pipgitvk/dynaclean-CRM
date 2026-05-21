@@ -241,6 +241,8 @@ export default function AddDeliveryChallanPage() {
                 <option value="truck">Truck</option>
                 <option value="van">Van</option>
                 <option value="courier">Courier</option>
+                <option value="air">Air</option>
+                <option value="sea">Sea</option>
                 <option value="other">Other</option>
               </select>
             </div>
