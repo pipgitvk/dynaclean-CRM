@@ -223,7 +223,9 @@ export default function EditBidPage({ params }) {
     const statusFields = ['bid_status', 'technical_status', 'financial_status', 'status_remarks'];
     // Financial value fields are always editable
     const financialValueFields = ['estimated_bid_value', 'bid_value'];
-    if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName)) {
+    // Remarks field is always editable
+    const remarksFields = ['remarks'];
+    if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName) || remarksFields.includes(fieldName)) {
       return true;
     }
     // Empty fields are editable
