@@ -110,6 +110,7 @@ export const MODULE_TREE = [
     label: "Main Expenses",
     children: [
       { key: "client-expenses", label: "Main Expenses" },
+      { key: "delivery-challan", label: "Delivery Challan" },
       { key: "statements", label: "Statements" },
       { key: "salary-slips", label: "Salary Slips" },
     ],
@@ -324,7 +325,9 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     label: "Main Expenses",
     children: [
       { kind: "leaf", key: "client-expenses", label: "Main Expenses" },
+      { kind: "leaf", key: "delivery-challan", label: "Delivery Challan" },
       { kind: "leaf", key: "statements", label: "Statements" },
+      { kind: "leaf", key: "salary-slips", label: "Salary Slips" },
     ],
   },
   {

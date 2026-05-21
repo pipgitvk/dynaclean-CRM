@@ -136,6 +136,13 @@ export default function DeliveryChallanViewPage() {
     console.error("Error parsing transportation details", e);
   }
 
+  const {
+    mode: transportationMode,
+    vehicle_no: vehicleNumber,
+    driver_name: driverName,
+    driver_contact: driverContact,
+  } = transportationDetails || {};
+
   const totalQuantity = challan.items?.reduce((sum, item) => sum + (item.product_quantity || 0), 0) || 0;
 
   return (
@@ -197,6 +204,10 @@ export default function DeliveryChallanViewPage() {
             <div className="border-r border-[#9ca3af] p-3 bg-[#ffffff]">
               <h3 className="font-bold mb-1 border-b border-[#e5e7eb] pb-0.5 text-[#000000]">Transportation Details</h3>
               <div className="space-y-1 mt-1 text-[#000000]">
+                <p><span className="font-medium">Mode:</span> {transportationMode ? transportationMode.toString().toUpperCase() : "-"}</p>
+                <p><span className="font-medium">Vehicle No:</span> {vehicleNumber || "-"}</p>
+                <p><span className="font-medium">Driver Name:</span> {driverName || "-"}</p>
+                <p><span className="font-medium">Driver Contact:</span> {driverContact || "-"}</p>
                 <p><span className="font-medium">Delivery Date:</span> {challan.delivery_date ? new Date(challan.delivery_date).toLocaleDateString("en-GB") : "-"}</p>
                 <p className="leading-tight"><span className="font-medium">Delivery Location:</span> {challan.delivery_location || "-"}</p>
               </div>

@@ -609,6 +609,13 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/admin-dashboard/delivery-challan",
+        name: "Delivery Challan",
+        moduleKey: "delivery-challan",
+        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        icon: "Package",
+      },
+      {
         path: "/admin-dashboard/statements",
         name: "Statement",
         moduleKey: "statements",

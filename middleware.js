@@ -99,6 +99,7 @@ export async function middleware(request) {
         "/admin-dashboard/client-expenses",
         "/admin-dashboard/statements",
         "/admin-dashboard/all-expenses",
+        "/admin-dashboard/delivery-challan",
       ];
       if (ACCOUNTANT_ADMIN_PREFIXES.some((p) => pathname.startsWith(p))) {
         if (isJwtAccountingRole(role)) {
