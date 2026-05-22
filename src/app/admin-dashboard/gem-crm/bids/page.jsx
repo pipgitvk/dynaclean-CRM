@@ -10,9 +10,12 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  X,
+  AlertTriangle,
+  Timer,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -40,6 +43,7 @@ const StatusBadge = ({ status }) => {
 
 export default function GemCrmBidsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [bids, setBids] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -49,6 +53,8 @@ export default function GemCrmBidsPage() {
   const [platformFilter, setPlatformFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [endingSoonFilter, setEndingSoonFilter] = useState(searchParams.get('endingSoon') === 'true');
+  const [activeRAFilter, setActiveRAFilter] = useState(searchParams.get('activeRA') === 'true');
   const [showFilters, setShowFilters] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [stats, setStats] = useState({ total: 0, won: 0, lost: 0 });
@@ -56,7 +62,7 @@ export default function GemCrmBidsPage() {
   useEffect(() => {
     fetchBids();
     fetchStats();
-  }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter, dateFrom, dateTo]);
+  }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter, dateFrom, dateTo, endingSoonFilter, activeRAFilter]);
 
   const fetchBids = async () => {
     try {
@@ -71,6 +77,8 @@ export default function GemCrmBidsPage() {
         ...(platformFilter && { platform: platformFilter }),
         ...(dateFrom && { dateFrom }),
         ...(dateTo && { dateTo }),
+        ...(endingSoonFilter && { endingSoon: 'true' }),
+        ...(activeRAFilter && { activeRA: 'true' }),
       });
 
       const res = await fetch(`/api/gem-crm/bids?${params}`);
@@ -110,6 +118,16 @@ export default function GemCrmBidsPage() {
     setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
+  const clearEndingSoonFilter = () => {
+    setEndingSoonFilter(false);
+    router.push('/admin-dashboard/gem-crm/bids');
+  };
+
+  const clearActiveRAFilter = () => {
+    setActiveRAFilter(false);
+    router.push('/admin-dashboard/gem-crm/bids');
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -126,6 +144,40 @@ export default function GemCrmBidsPage() {
           Add Bid
         </button>
       </div>
+
+      {/* Ending Soon Filter Banner */}
+      {endingSoonFilter && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-orange-600" />
+            <span className="text-orange-800 font-medium">Showing bids ending within 1 week</span>
+          </div>
+          <button
+            onClick={clearEndingSoonFilter}
+            className="flex items-center gap-1 text-orange-700 hover:text-orange-900 transition-colors"
+          >
+            <X className="w-4 h-4" />
+            Clear Filter
+          </button>
+        </div>
+      )}
+
+      {/* Active RA Filter Banner */}
+      {activeRAFilter && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Timer className="w-5 h-5 text-purple-600" />
+            <span className="text-purple-800 font-medium">Showing bids with active RA period</span>
+          </div>
+          <button
+            onClick={clearActiveRAFilter}
+            className="flex items-center gap-1 text-purple-700 hover:text-purple-900 transition-colors"
+          >
+            <X className="w-4 h-4" />
+            Clear Filter
+          </button>
+        </div>
+      )}
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
