@@ -203,6 +203,28 @@ export async function GET(req) {
       ${bidWhere}
     `, bidParams);
 
+    // Get bids ending within 1 week
+    const [endingSoon] = await conn.execute(`
+      SELECT COUNT(*) as count
+      FROM bids
+      WHERE bid_end_date IS NOT NULL
+        AND bid_end_date >= CURDATE()
+        AND bid_end_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+        ${bidAnd}
+    `, bidParams);
+
+    // Get bids with active RA period (today between RA start and end date)
+    const [activeRA] = await conn.execute(`
+      SELECT COUNT(*) as count
+      FROM bids
+      WHERE bid_status = 'ra_participated'
+        AND ra_start_date IS NOT NULL
+        AND ra_end_date IS NOT NULL
+        AND CURDATE() >= ra_start_date
+        AND CURDATE() <= ra_end_date
+        ${bidAnd}
+    `, bidParams);
+
     // Get employee-wise bid counts (safe query)
     let employeeBids = [];
     try {
@@ -269,6 +291,8 @@ export async function GET(req) {
             ? ((winLoss[0].won / winLoss[0].total) * 100).toFixed(2) 
             : 0,
         },
+        endingSoon: endingSoon[0].count || 0,
+        activeRA: activeRA[0].count || 0,
         monthlyBids,
         platformBids,
         employeeBids,

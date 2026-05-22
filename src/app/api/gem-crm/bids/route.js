@@ -86,6 +86,8 @@ export async function GET(req) {
     const organisationId = searchParams.get("organisationId") || "";
     const dateFrom = searchParams.get("dateFrom") || "";
     const dateTo = searchParams.get("dateTo") || "";
+    const endingSoon = searchParams.get("endingSoon") === "true";
+    const activeRA = searchParams.get("activeRA") === "true";
 
     const offset = (page - 1) * limit;
     const conn = await getDbConnection();
@@ -188,8 +190,23 @@ export async function GET(req) {
       params.push(dateTo);
     }
 
-    const whereClause = conditions.length > 0 
-      ? "WHERE " + conditions.join(" AND ") 
+    // Filter for bids ending within 1 week
+    if (endingSoon) {
+      conditions.push("bid_end_date >= CURDATE()");
+      conditions.push("bid_end_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
+    }
+
+    // Filter for bids with active RA period (today between RA start and end date)
+    if (activeRA) {
+      conditions.push("bid_status = 'ra_participated'");
+      conditions.push("ra_start_date IS NOT NULL");
+      conditions.push("ra_end_date IS NOT NULL");
+      conditions.push("CURDATE() >= ra_start_date");
+      conditions.push("CURDATE() <= ra_end_date");
+    }
+
+    const whereClause = conditions.length > 0
+      ? "WHERE " + conditions.join(" AND ")
       : "";
 
     // Get total count
