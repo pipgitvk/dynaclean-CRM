@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   FileText,
   TrendingUp,
@@ -13,20 +14,45 @@ import {
   BarChart3,
   Users,
   Building2,
+  AlertTriangle,
+  Timer,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
-const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
-  <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+const StatCard = ({ title, value, icon: Icon, color, subtitle, onClick, isEndingSoon, isActiveRA }) => (
+  <div
+    onClick={onClick}
+    className={`rounded-xl shadow-md p-6 border transition-all ${
+      isEndingSoon
+        ? 'bg-gradient-to-r from-orange-500 to-red-500 border-orange-400 hover:shadow-xl hover:scale-105 cursor-pointer'
+        : isActiveRA
+        ? 'bg-gradient-to-r from-green-500 to-emerald-600 border-green-400 hover:shadow-xl hover:scale-105 cursor-pointer'
+        : `bg-white border-gray-100 ${onClick ? 'cursor-pointer hover:shadow-lg transition-shadow' : ''}`
+    }`}
+  >
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
+        <p className={`text-sm font-semibold mb-1 ${
+          isEndingSoon || isActiveRA ? 'text-white/90' : 'text-gray-500'
+        }`}>
+          {title}
+        </p>
+        <p className={`text-4xl font-extrabold ${
+          isEndingSoon || isActiveRA ? 'text-white drop-shadow-sm' : 'text-gray-900'
+        }`}>
+          {value}
+        </p>
         {subtitle && (
-          <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+          <p className={`text-sm font-medium mt-2 ${
+            isEndingSoon || isActiveRA ? 'text-white/80' : 'text-gray-500'
+          }`}>
+            {subtitle}
+          </p>
         )}
       </div>
-      <div className={`p-3 rounded-lg ${color}`}>
+      <div className={`p-3 rounded-lg ${
+        isEndingSoon || isActiveRA ? 'bg-white/20' : color
+      }`}>
         <Icon className="w-6 h-6 text-white" />
       </div>
     </div>
@@ -36,6 +62,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle }) => (
 const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
 
 export default function GemCrmDashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -82,6 +109,30 @@ export default function GemCrmDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">GEM CRM Dashboard</h1>
         <p className="text-gray-600 mt-1">Government Tender Management Overview</p>
+      </div>
+
+      {/* Ending Soon Card & Active RA Card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Ending Soon Bids"
+          value={stats.endingSoon}
+          icon={AlertTriangle}
+          color="bg-orange-500"
+          subtitle="Within 1 week"
+          onClick={() => router.push('/admin-dashboard/gem-crm/bids?endingSoon=true')}
+          isEndingSoon={true}
+          isActiveRA={false}
+        />
+        <StatCard
+          title="Active RA"
+          value={stats.activeRA}
+          icon={Timer}
+          color="bg-purple-500"
+          subtitle="RA period active"
+          onClick={() => router.push('/admin-dashboard/gem-crm/bids?activeRA=true')}
+          isEndingSoon={false}
+          isActiveRA={true}
+        />
       </div>
 
       {/* Stats Cards */}
