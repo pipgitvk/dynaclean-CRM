@@ -244,18 +244,27 @@ export async function POST(request) {
         [session.username, leave_type]
       );
 
-      const takenCount = takenLeaves[0].taken || 0;
+      const takenCount = Number(takenLeaves[0].taken || 0);
       const allowedKey = `${leave_type}_allowed`;
-      const maxAllowed = leavePolicy[allowedKey] || 0;
+      const maxAllowed = Number(leavePolicy[allowedKey] || 0);
       
       // Calculate accrued leaves based on custom accrual start date, date of joining, and employment status
-      const accruedAllowed = calculateAccruedLeaves(
+      const accruedAllowed = Number(calculateAccruedLeaves(
         profile.date_of_joining,
         leavePolicy.accrual_start_date,
         maxAllowed,
         profile.employment_status,
         leave_type
-      );
+      ));
+
+      console.log('Leave validation debug:', {
+        leave_type,
+        takenCount,
+        totalDays,
+        accruedAllowed,
+        available: accruedAllowed - takenCount,
+        condition: takenCount + totalDays > accruedAllowed
+      });
 
       // Check if requesting leave exceeds available balance
       if (takenCount + totalDays > accruedAllowed) {
