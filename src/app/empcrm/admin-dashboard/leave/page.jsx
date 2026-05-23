@@ -41,11 +41,26 @@ export default function AdminLeaveManagement() {
 
   // Tabs: approvals | employee
   const [activeTab, setActiveTab] = useState("approvals");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [userRole, setUserRole] = useState("");
 
   useEffect(() => {
     fetchLeaves();
     fetchEmployees();
+    fetchUserRole();
   }, []);
+
+  const fetchUserRole = async () => {
+    try {
+      const res = await fetch("/api/me");
+      const data = await res.json();
+      const role = data?.userRole || data?.role || "";
+      setUserRole(role);
+      setIsSuperAdmin(role === "SUPERADMIN");
+    } catch (e) {
+      console.error("Error fetching user role:", e);
+    }
+  };
 
   // HR-only UI for setting reporting manager
   useEffect(() => {
@@ -292,7 +307,10 @@ export default function AdminLeaveManagement() {
       month: 'short',
       year: 'numeric'
     });
-  };
+  };{isSuperAdmin 
+            ? "View and approve leave applications. As SUPERADMIN, you can approve any leave."
+            : ""
+          }
 
   const pendingCount = leaves.filter(l => l.status === "pending").length;
   const approvedCount = leaves.filter(l => l.status === "approved").length;
@@ -473,15 +491,39 @@ export default function AdminLeaveManagement() {
                       {getStatusBadge(leave.status)}
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => {
-                          setSelectedLeave(leave);
-                          setShowApprovalModal(true);
-                        }}
-                        className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-medium"
-                      >
-                        View
-                      </button>
+                      <div className="flex gap-2">
+                        {isSuperAdmin && leave.status === "pending" && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setSelectedLeave(leave);
+                                setShowApprovalModal(true);
+                              }}
+                              className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedLeave(leave);
+                                setShowApprovalModal(true);
+                              }}
+                              className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedLeave(leave);
+                            setShowApprovalModal(true);
+                          }}
+                          className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                        >
+                          View
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -681,31 +723,69 @@ export default function AdminLeaveManagement() {
 
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-between items-center">
-              {canAddReportingManager && (
+            <div className="p-6 border-t border-gray-200">
+              {/* SUPERADMIN Approve/Reject Actions */}
+              {isSuperAdmin && selectedLeave.status === "pending" && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rejection Reason (if rejecting)
+                  </label>
+                  <textarea
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="Enter reason for rejection..."
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-between items-center">
+                <div className="flex gap-2">
+                  {isSuperAdmin && selectedLeave.status === "pending" && (
+                    <>
+                      <button
+                        onClick={() => handleApprove(selectedLeave.id)}
+                        disabled={actionLoading}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {actionLoading ? "Processing..." : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => handleReject(selectedLeave.id)}
+                        disabled={actionLoading}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {actionLoading ? "Processing..." : "Reject"}
+                      </button>
+                    </>
+                  )}
+                  {canAddReportingManager && (
+                    <button
+                      onClick={() => {
+                        setSelectedReportingManager("");
+                        setShowReportingManagerModal(true);
+                      }}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                      disabled={reportingManagerSaving}
+                    >
+                      {reportingManagerSaving ? "Saving..." : "Add Reporting Manager"}
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => {
+                    setShowApprovalModal(false);
+                    setRejectionReason("");
+                    setSelectedLeave(null);
+                    setShowReportingManagerModal(false);
                     setSelectedReportingManager("");
-                    setShowReportingManagerModal(true);
                   }}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                  disabled={reportingManagerSaving}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                 >
-                  {reportingManagerSaving ? "Saving..." : "Add Reporting Manager"}
+                  Close
                 </button>
-              )}
-              <button
-                onClick={() => {
-                  setShowApprovalModal(false);
-                  setRejectionReason("");
-                  setSelectedLeave(null);
-                  setShowReportingManagerModal(false);
-                  setSelectedReportingManager("");
-                }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                Close
-              </button>
+              </div>
             </div>
           </div>
         </div>
