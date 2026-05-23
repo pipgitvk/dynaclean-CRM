@@ -225,7 +225,9 @@ export default function EditBidPage({ params }) {
     const financialValueFields = ['estimated_bid_value', 'bid_value'];
     // Remarks field is always editable
     const remarksFields = ['remarks'];
-    if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName) || remarksFields.includes(fieldName)) {
+    // Inspection and Reverse Auction fields are always editable
+    const inspectionFields = ['inspection_required', 'reverse_auction'];
+    if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName) || remarksFields.includes(fieldName) || inspectionFields.includes(fieldName)) {
       return true;
     }
     // Empty fields are editable
