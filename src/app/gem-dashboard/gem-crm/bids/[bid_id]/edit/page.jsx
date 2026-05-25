@@ -60,6 +60,7 @@ export default function EditBidPage({ params }) {
     bid_document: null,
     ra_start_date: "",
     ra_end_date: "",
+    ra_last_price: "",
     order_id: "",
   });
 
@@ -177,6 +178,7 @@ export default function EditBidPage({ params }) {
           bid_document: null,
           ra_start_date: formatDateForInput(bid.ra_start_date) || "",
           ra_end_date: formatDateForInput(bid.ra_end_date) || "",
+          ra_last_price: bid.ra_last_price || "",
           order_id: bid.order_id || "",
         });
       } else {
@@ -225,7 +227,7 @@ export default function EditBidPage({ params }) {
     const financialValueFields = ['estimated_bid_value', 'bid_value'];
     // Remarks field is always editable
     const remarksFields = ['remarks'];
-    // Inspection and Reverse Auction fields are always editable
+    // Inspection and Reverse Auction fields are always editable, 'ra_last_price'
     const inspectionFields = ['inspection_required', 'reverse_auction'];
     if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName) || remarksFields.includes(fieldName) || inspectionFields.includes(fieldName)) {
       return true;
@@ -613,6 +615,21 @@ export default function EditBidPage({ params }) {
                         disabled={!isFieldEditable('ra_end_date')}
                         required
                         className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ra_end_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        RA Last Price
+                      </label>
+                      <input
+                        type="number"
+                        name="ra_last_price"
+                        value={formData.ra_last_price}
+                        onChange={handleChange}
+                        disabled={!isFieldEditable('ra_last_price')}
+                        step="0.01"
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ra_last_price') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                        placeholder="Enter RA last price"
                       />
                     </div>
                   </div>
