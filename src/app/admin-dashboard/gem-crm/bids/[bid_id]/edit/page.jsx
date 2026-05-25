@@ -59,6 +59,7 @@ export default function EditBidPage({ params }) {
     bid_document: null,
     ra_start_date: "",
     ra_end_date: "",
+    ra_last_price: "",
     order_id: "",
   });
 
@@ -176,6 +177,7 @@ export default function EditBidPage({ params }) {
           bid_document: null,
           ra_start_date: formatDateForInput(bid.ra_start_date) || "",
           ra_end_date: formatDateForInput(bid.ra_end_date) || "",
+          ra_last_price: bid.ra_last_price || "",
           order_id: bid.order_id || "",
         });
       } else {
@@ -578,6 +580,20 @@ export default function EditBidPage({ params }) {
                         onChange={handleChange}
                         required
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        RA Last Price
+                      </label>
+                      <input
+                        type="number"
+                        name="ra_last_price"
+                        value={formData.ra_last_price}
+                        onChange={handleChange}
+                        step="0.01"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter RA last price"
                       />
                     </div>
                   </div>
