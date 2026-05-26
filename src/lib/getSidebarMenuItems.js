@@ -31,7 +31,8 @@ function transformMenuItemPaths(item, roleKey) {
   }
 
   // Don't transform my-leads path for digital marketers
-  if (item.path?.startsWith("/user-dashboard/my-leads") && (roleKey.includes("DIGITAL") || roleKey.includes("MARKETER"))) {
+  const roleUpper = String(roleKey || "").toUpperCase();
+  if (item.path?.startsWith("/user-dashboard/my-leads") && (roleUpper.includes("DIGITAL") || roleUpper.includes("MARKETER"))) {
     return item;
   }
 
@@ -963,7 +964,8 @@ export default async function getSidebarMenuItems() {
             // When module_access is configured, a leaf link MUST have a moduleKey to be shown.
             // Otherwise older menu entries would "leak" through and ignore module_access.
             // Exception: Digital marketers can access my-leads regardless of module_access
-            const isMyLeadsForDM = item?.moduleKey === "my-leads" && (roleKey.includes("DIGITAL") || roleKey.includes("MARKETER"));
+            const roleUpper = String(roleKey || "").toUpperCase();
+            const isMyLeadsForDM = item?.moduleKey === "my-leads" && (roleUpper.includes("DIGITAL") || roleUpper.includes("MARKETER"));
             const allowed = isMyLeadsForDM || (item?.moduleKey
               ? isSectionAllowed(item.moduleKey, allowedModules)
               : item?.path
