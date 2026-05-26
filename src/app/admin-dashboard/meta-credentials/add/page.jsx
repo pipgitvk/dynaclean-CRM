@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus, X } from 'lucide-react';
+import MetaFormAssignments from '@/components/MetaFormAssignments';
 
 export default function AddCredentialPage() {
   const router = useRouter();
@@ -13,7 +14,6 @@ export default function AddCredentialPage() {
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [formData, setFormData] = useState({
-    employeeName: '',
     verifyToken: '',
     pageId: '',
     pageToken: '',
@@ -69,12 +69,8 @@ export default function AddCredentialPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validation
-    if (!formData.employeeName.trim()) {
-      toast.error('Employee name is required');
-      return;
-    }
     if (!formData.verifyToken.trim()) {
       toast.error('Verify token is required');
       return;
@@ -87,7 +83,7 @@ export default function AddCredentialPage() {
       toast.error('Page token is required');
       return;
     }
-    
+
     const validFormIds = formData.formIds.filter(id => id.trim());
     if (validFormIds.length === 0) {
       toast.error('At least one form ID is required');
@@ -97,8 +93,12 @@ export default function AddCredentialPage() {
     try {
       setLoading(true);
       const response = await axios.post('/api/meta-credentials', {
-        ...formData,
-        formIds: validFormIds
+        employeeName: null,
+        verifyToken: formData.verifyToken,
+        pageId: formData.pageId,
+        pageToken: formData.pageToken,
+        formIds: validFormIds,
+        isActive: true
       });
 
       if (response.data.success) {
@@ -124,41 +124,11 @@ export default function AddCredentialPage() {
           Back to Credentials
         </Link>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Add New Meta Credential</h1>
-        <p className="text-gray-600">Add a new Meta Facebook Lead credential for an employee</p>
+        <p className="text-gray-600">Add a new Meta Facebook Lead credential and configure form-specific lead distribution</p>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Employee Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Employee <span className="text-red-500">*</span>
-            </label>
-            {loadingEmployees ? (
-              <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
-                Loading employees...
-              </div>
-            ) : (
-              <select
-                name="employeeName"
-                value={formData.employeeName}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select an employee</option>
-                {employees.map((emp) => (
-                  <option key={emp.username} value={emp.username}>
-                    {emp.name || emp.username}
-                  </option>
-                ))}
-              </select>
-            )}
-            <p className="mt-1 text-sm text-gray-500">
-              Select the employee who will receive leads from these forms
-            </p>
-          </div>
-
           {/* Verify Token */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -252,9 +222,12 @@ export default function AddCredentialPage() {
               Add Another Form ID
             </button>
             <p className="mt-1 text-sm text-gray-500">
-              Add one or more lead form IDs. Leads from these forms will be assigned to this employee.
+              Add one or more lead form IDs. Leads from these forms will be assigned based on your configuration.
             </p>
           </div>
+
+          {/* Form-Specific Assignments */}
+          <MetaFormAssignments formIds={formData.formIds} employees={employees} />
 
           {/* Submit Buttons */}
           <div className="flex items-center gap-4 pt-4 border-t">

@@ -156,18 +156,18 @@ export default function MetaCredentialsPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Meta Credentials Management</h1>
-        <p className="text-gray-600">Manage multiple Meta Facebook Lead credentials for different employees</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Meta Credentials Management</h1>
+        <p className="text-gray-600 text-sm md:text-base">Manage multiple Meta Facebook Lead credentials for different employees</p>
       </div>
 
       {/* Cron Status Card */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Automatic Cron Status</h2>
-            <div className="flex items-center gap-4">
+      <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex-1">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900 mb-2">Automatic Cron Status</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <div className="flex items-center gap-2">
                 {cronStatus?.isRunning ? (
                   <div className="flex items-center gap-2 text-green-600">
@@ -184,10 +184,10 @@ export default function MetaCredentialsPage() {
               </div>
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <button
               onClick={handleToggleCron}
-              className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 ${
                 cronStatus?.isRunning
                   ? 'bg-red-600 text-white hover:bg-red-700'
                   : 'bg-green-600 text-white hover:bg-green-700'
@@ -196,66 +196,66 @@ export default function MetaCredentialsPage() {
               {cronStatus?.isRunning ? (
                 <>
                   <PowerOff className="w-4 h-4" />
-                  Stop Cron
+                  <span>Stop</span>
                 </>
               ) : (
                 <>
                   <Power className="w-4 h-4" />
-                  Start Cron
+                  <span>Start</span>
                 </>
               )}
             </button>
             <button
               onClick={handleManualSync}
               disabled={syncing}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center gap-2 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Manual Sync'}
+              <span>{syncing ? 'Syncing...' : 'Sync'}</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Add Credential Button */}
-      <div className="mb-6 flex gap-3">
+      <div className="mb-6 flex flex-col sm:flex-row gap-3">
         <Link
           href="/admin-dashboard/meta-credentials/add"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
         >
           <Plus className="w-4 h-4" />
           Add New Credential
         </Link>
         <Link
           href="/admin-dashboard/skipped-leads"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700"
         >
           <Database className="w-4 h-4" />
-          View Skipped Leads
+          Skipped Leads
         </Link>
         <Link
           href="/admin-dashboard/imported-leads"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
         >
           <CheckCircle className="w-4 h-4" />
-          View Imported Leads
+          Imported Leads
         </Link>
       </div>
 
       {/* Credentials List */}
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {credentials.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <div className="col-span-full bg-white rounded-lg shadow-md p-8 md:p-12 text-center">
             <div className="text-gray-400 mb-4">
-              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-12 h-12 md:w-16 md:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No credentials added yet</h3>
-            <p className="text-gray-500 mb-4">Add your first Meta credential to start syncing leads</p>
+            <h3 className="text-base md:text-lg font-medium text-gray-900 mb-2">No credentials added yet</h3>
+            <p className="text-gray-500 mb-4 text-sm md:text-base">Add your first Meta credential to start syncing leads</p>
             <Link
               href="/admin-dashboard/meta-credentials/add"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" />
               Add Credential
@@ -263,11 +263,11 @@ export default function MetaCredentialsPage() {
           </div>
         ) : (
           credentials.map((cred) => (
-            <div key={cred._id} className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-start justify-between">
+            <div key={cred._id} className="bg-white rounded-lg shadow-md p-4 md:p-6">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <h3 className="text-xl font-semibold text-gray-900">{cred.employeeName}</h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                    <h3 className="text-lg md:text-xl font-semibold text-gray-900">{cred.employeeName}</h3>
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
                         cred.isActive
@@ -283,13 +283,13 @@ export default function MetaCredentialsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Page ID</label>
-                      <p className="text-gray-900 font-mono text-sm">{cred.pageId}</p>
+                      <label className="text-xs md:text-sm font-medium text-gray-500">Page ID</label>
+                      <p className="text-gray-900 font-mono text-xs md:text-sm break-all">{cred.pageId}</p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Form IDs</label>
+                      <label className="text-xs md:text-sm font-medium text-gray-500">Form IDs</label>
                       <div className="flex flex-wrap gap-1">
                         {Array.isArray(cred.formIds) && cred.formIds.length > 0 ? (
                           cred.formIds.map((formId, idx) => (
@@ -303,15 +303,15 @@ export default function MetaCredentialsPage() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Leads Imported to CRM</label>
-                      <p className="text-gray-900 font-semibold">{cred.totalLeadsImported || 0}</p>
+                      <label className="text-xs md:text-sm font-medium text-gray-500">Leads Imported to CRM</label>
+                      <p className="text-gray-900 font-semibold text-lg md:text-base">{cred.totalLeadsImported || 0}</p>
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-500">Last Sync</label>
+                      <label className="text-xs md:text-sm font-medium text-gray-500">Last Sync</label>
                       <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        <p className="text-gray-900 text-sm">
-                          {cred.lastSyncAt 
+                        <Clock className="w-3 h-3 md:w-4 md:h-4 text-gray-400" />
+                        <p className="text-gray-900 text-xs md:text-sm">
+                          {cred.lastSyncAt
                             ? new Date(cred.lastSyncAt + 'Z').toLocaleString('en-IN', {
                                 timeZone: 'Asia/Kolkata',
                                 day: '2-digit',
@@ -327,15 +327,15 @@ export default function MetaCredentialsPage() {
                       </div>
                     </div>
                     {cred.lastSyncMessage && (
-                      <div className="md:col-span-2">
-                        <label className="text-sm font-medium text-gray-500">Last Sync Message</label>
-                        <p className="text-gray-700 text-sm">{cred.lastSyncMessage}</p>
+                      <div className="sm:col-span-2 lg:col-span-3">
+                        <label className="text-xs md:text-sm font-medium text-gray-500">Last Sync Message</label>
+                        <p className="text-gray-700 text-xs md:text-sm">{cred.lastSyncMessage}</p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 ml-4">
+                <div className="flex items-center gap-2 md:ml-4 justify-end">
                   <button
                     onClick={() => handleToggleActive(cred._id, cred.isActive)}
                     className={`p-2 rounded-lg ${

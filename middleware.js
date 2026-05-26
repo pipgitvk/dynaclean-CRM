@@ -154,6 +154,14 @@ export async function middleware(request) {
         }
       }
 
+      // Allow digital marketers to access my-leads with social_media campaign
+      if (
+        pathname.startsWith("/user-dashboard/my-leads") &&
+        (roleNorm.includes("DIGITAL") || roleNorm.includes("MARKETER"))
+      ) {
+        return NextResponse.next();
+      }
+
       if (
         pathname.startsWith("/user-dashboard") &&
         role === "SUPERADMIN" &&

@@ -175,6 +175,20 @@ export default function EmployeeLeadsTable() {
                         ))}
                     </select>
                 </div>
+                <div>
+                    <select
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={filterCreatedBy}
+                        onChange={(e) => setFilterCreatedBy(e.target.value)}
+                    >
+                        <option value="all">All Creators</option>
+                        {uniqueCreators.map((creator) => (
+                            <option key={creator} value={creator}>
+                                {creator}
+                            </option>
+                        ))}
+                    </select>
+                </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                     <input
                         type="date"
