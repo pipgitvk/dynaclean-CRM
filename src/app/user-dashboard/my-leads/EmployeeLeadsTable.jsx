@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useUser } from "@/context/UserContext";
 
 export default function EmployeeLeadsTable() {
+    const { user } = useUser();
     const [leads, setLeads] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStage, setFilterStage] = useState("all");
     const [filterCampaign, setFilterCampaign] = useState("all");
-    const [filterCreatedBy, setFilterCreatedBy] = useState("all");
+    const [filterCreatedBy, setFilterCreatedBy] = useState(user?.username || "all");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const router = useRouter();
@@ -20,6 +22,16 @@ export default function EmployeeLeadsTable() {
         const campaign = searchParams.get("campaign");
         fetchLeads(campaign);
     }, [searchParams]);
+
+    useEffect(() => {
+        if (user?.username) {
+            if (user?.role === "DIGITAL MARKETER") {
+                setFilterCreatedBy("all");
+            } else {
+                setFilterCreatedBy(user.username);
+            }
+        }
+    }, [user]);
 
     const fetchLeads = async (campaign) => {
         try {
@@ -159,20 +171,6 @@ export default function EmployeeLeadsTable() {
                         {uniqueCampaigns.map((campaign) => (
                             <option key={campaign} value={campaign}>
                                 {campaign}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <select
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        value={filterCreatedBy}
-                        onChange={(e) => setFilterCreatedBy(e.target.value)}
-                    >
-                        <option value="all">All Creators</option>
-                        {uniqueCreators.map((creator) => (
-                            <option key={creator} value={creator}>
-                                {creator}
                             </option>
                         ))}
                     </select>

@@ -120,6 +120,29 @@ export async function GET(req, { params }) {
       }
     }
 
+    // Ensure RA columns exist in database
+    const columnsToCheck = [
+      { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
+      { name: 'ra_start_date', type: 'DATE NULL' },
+      { name: 'ra_end_date', type: 'DATE NULL' },
+      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
+      { name: 'customer_id', type: 'VARCHAR(255) NULL' }
+    ];
+
+    const [tableInfo] = await conn.execute("DESCRIBE bids");
+    const existingColumns = tableInfo.map(row => row.Field);
+
+    for (const { name, type } of columnsToCheck) {
+      if (!existingColumns.includes(name)) {
+        try {
+          await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
+          console.log(`✅ Added column ${name} to bids table`);
+        } catch (alterError) {
+          console.error(`❌ Failed to add column ${name}:`, alterError.message);
+        }
+      }
+    }
+
     // Get bid details with safe joins
     let bids = [];
     try {
