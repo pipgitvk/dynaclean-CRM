@@ -52,6 +52,9 @@ export default function NewBidPage() {
     dd_id: "",
     remarks: "",
     bid_document: null,
+    ra_participated: "no",
+    ra_start_date: "",
+    ra_end_date: "",
   });
 
   useEffect(() => {
@@ -504,6 +507,53 @@ export default function NewBidPage() {
                   <option value="yes">Yes</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  RA Participated
+                </label>
+                <select
+                  name="ra_participated"
+                  value={formData.ra_participated}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+
+              {formData.ra_participated === "yes" && (
+                <div className="md:col-span-2 border-t border-gray-200 pt-4 mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-3">RA Participation Details</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        RA Start Date *
+                      </label>
+                      <input
+                        type="date"
+                        name="ra_start_date"
+                        value={formData.ra_start_date}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        RA End Date *
+                      </label>
+                      <input
+                        type="date"
+                        name="ra_end_date"
+                        value={formData.ra_end_date}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
