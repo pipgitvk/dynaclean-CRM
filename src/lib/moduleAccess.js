@@ -587,7 +587,7 @@ const HR_DENY_MODULE_KEYS = new Set([
 export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
   if (!allowedKeys) return allowedKeys ?? null;
   const r = String(role ?? "").trim().toUpperCase();
-  const isHr = r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE";
+  const isHr = r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE" || r === "JUNIOR HR EXECUTIVE" || r === "HR RECRUITER";
   if (!isHr) return allowedKeys;
   return allowedKeys.filter((k) => !HR_DENY_MODULE_KEYS.has(k));
 }

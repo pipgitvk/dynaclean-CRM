@@ -22,7 +22,7 @@ export async function GET(request) {
     const conn = await getDbConnection();
     
     // Check if user is admin/HR
-    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE"].includes(session.role);
+    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].includes(session.role);
     
     // If not admin, only allow viewing own documents
     if (!isAdmin && username && username !== session.username) {
@@ -101,7 +101,7 @@ export async function POST(request) {
     }
 
     // Check if user is admin/HR
-    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE"].includes(session.role);
+    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].includes(session.role);
     if (!isAdmin) {
       return NextResponse.json(
         { success: false, error: "Access denied. Only HR/Admin can upload documents." },
@@ -256,7 +256,7 @@ export async function DELETE(request) {
     }
 
     // Check if user is admin/HR
-    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE"].includes(session.role);
+    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].includes(session.role);
     if (!isAdmin) {
       return NextResponse.json(
         { success: false, error: "Access denied. Only HR/Admin can delete documents." },
