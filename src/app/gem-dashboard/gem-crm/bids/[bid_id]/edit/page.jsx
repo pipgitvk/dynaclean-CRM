@@ -58,6 +58,7 @@ export default function EditBidPage({ params }) {
     dd_id: "",
     remarks: "",
     bid_document: null,
+    ra_participated: "no",
     ra_start_date: "",
     ra_end_date: "",
     ra_last_price: "",
@@ -87,6 +88,11 @@ export default function EditBidPage({ params }) {
       if (result.success) {
         const bid = result.data;
         
+        console.log("DEBUG: Raw bid data:", {
+          ra_participated: bid.ra_participated,
+          ra_start_date: bid.ra_start_date,
+          ra_end_date: bid.ra_end_date
+        });
         console.log("DEBUG: Raw bid data dates:", {
           bid_start_date: bid.bid_start_date,
           bid_end_date: bid.bid_end_date,
@@ -176,6 +182,7 @@ export default function EditBidPage({ params }) {
           dd_id: bid.dd_id || "",
           remarks: bid.remarks || "",
           bid_document: null,
+          ra_participated: bid.ra_participated || "no",
           ra_start_date: formatDateForInput(bid.ra_start_date) || "",
           ra_end_date: formatDateForInput(bid.ra_end_date) || "",
           ra_last_price: bid.ra_last_price || "",
@@ -228,7 +235,7 @@ export default function EditBidPage({ params }) {
     // Remarks field is always editable
     const remarksFields = ['remarks'];
     // Inspection and Reverse Auction fields are always editable, 'ra_last_price'
-    const inspectionFields = ['inspection_required', 'reverse_auction'];
+    const inspectionFields = ['inspection_required', 'reverse_auction', 'ra_participated'];
     if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName) || remarksFields.includes(fieldName) || inspectionFields.includes(fieldName)) {
       return true;
     }
@@ -585,10 +592,25 @@ export default function EditBidPage({ params }) {
                 />
               </div>
 
-              {formData.bid_status === "ra_participated" && (
-                <div className="border-t border-gray-200 pt-4 mt-4">
+              <div className="border-t border-gray-200 pt-4 mt-4">
                   <p className="text-sm font-medium text-gray-700 mb-3">RA Participation Details</p>
-                  <div className="space-y-4">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      RA Participated
+                    </label>
+                    <select
+                      name="ra_participated"
+                      value={formData.ra_participated}
+                      onChange={handleChange}
+                      disabled={true}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                    >
+                      <option value="no">No</option>
+                      <option value="yes">Yes</option>
+                    </select>
+                  </div>
+                  {formData.ra_participated === "yes" && (
+                    <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         RA Start Date *
@@ -632,9 +654,9 @@ export default function EditBidPage({ params }) {
                         placeholder="Enter RA last price"
                       />
                     </div>
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )}
 
               {formData.bid_status === "won" && (
                 <div className="border-t border-gray-200 pt-4 mt-4">

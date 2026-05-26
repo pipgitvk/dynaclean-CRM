@@ -308,6 +308,28 @@ export async function PUT(req, { params }) {
 
     const currentBid = currentBids[0];
 
+    // Ensure RA columns exist in database
+    const columnsToCheck = [
+      { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
+      { name: 'ra_start_date', type: 'DATE NULL' },
+      { name: 'ra_end_date', type: 'DATE NULL' },
+      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' }
+    ];
+
+    const [tableInfo] = await conn.execute("DESCRIBE bids");
+    const existingColumns = tableInfo.map(row => row.Field);
+
+    for (const { name, type } of columnsToCheck) {
+      if (!existingColumns.includes(name)) {
+        try {
+          await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
+          console.log(`✅ Added column ${name} to bids table`);
+        } catch (alterError) {
+          console.error(`❌ Failed to add column ${name}:`, alterError.message);
+        }
+      }
+    }
+
     // Handle bid document upload if provided
     let bid_document = fields.bid_document || currentBid.bid_document;
     if (files.bid_document && files.bid_document[0]) {
@@ -332,8 +354,8 @@ export async function PUT(req, { params }) {
       'epbg_duration_months', 'reverse_auction', 'turnover_required',
       'oem_turnover_required', 'experience_required_years', 'delivery_days',
       'inspection_required', 'technical_status', 'financial_status',
-      'bid_status', 'assigned_employee_id', 'dd_id', 'remarks', 'ra_start_date',
-      'ra_end_date', 'order_id'
+      'bid_status', 'assigned_employee_id', 'dd_id', 'remarks', 'ra_participated',
+      'ra_start_date', 'ra_end_date', 'ra_last_price', 'order_id'
     ];
 
     for (const field of allowedFields) {

@@ -277,10 +277,12 @@ export async function GET(req) {
 
 // POST - Create new bid
 export async function POST(req) {
+  console.log("POST /api/gem-crm/bids called");
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { fields, files } = await parseFormData(req);
+    console.log("Parsed formData, fields:", Object.keys(fields));
     
     // Normalize field values
     for (const key in fields) {
@@ -321,7 +323,17 @@ export async function POST(req) {
       assigned_employee_id,
       dd_id,
       remarks,
+      ra_participated,
+      ra_start_date,
+      ra_end_date,
     } = fields;
+
+    console.log("DEBUG: Received fields:", {
+      ra_participated,
+      ra_start_date,
+      ra_end_date,
+      reverse_auction
+    });
 
     // Handle bid document upload
     let bid_document = null;
@@ -372,10 +384,19 @@ export async function POST(req) {
       { name: 'experience_required_years', type: 'INT NULL' },
       { name: 'delivery_days', type: 'INT NULL' },
       { name: 'inspection_required', type: 'ENUM("yes", "no") DEFAULT "no"' },
+      { name: 'technical_status', type: 'VARCHAR(50) NULL' },
+      { name: 'financial_status', type: 'VARCHAR(50) NULL' },
+      { name: 'bid_status', type: 'VARCHAR(50) NULL' },
       { name: 'assigned_employee_id', type: 'INT NULL' },
       { name: 'dd_id', type: 'INT NULL' },
       { name: 'remarks', type: 'TEXT NULL' },
-      { name: 'created_by', type: 'INT NULL' }
+      { name: 'ra_start_date', type: 'DATE NULL' },
+      { name: 'ra_end_date', type: 'DATE NULL' },
+      { name: 'order_id', type: 'VARCHAR(255) NULL' },
+      { name: 'created_by', type: 'INT NULL' },
+      { name: 'bid_value', type: 'DECIMAL(10,2) NULL' },
+      { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
+      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' }
     ];
 
     for (const { name, type } of columnsToCheck) {
@@ -422,14 +443,25 @@ export async function POST(req) {
       experience_required_years || null,
       delivery_days || null,
       inspection_required || 'no',
+      'pending',
+      'pending',
+      'new',
       payload.role === "GEM" ? currentEmpId : assigned_employee_id || null,
       dd_id || null,
       remarks || null,
+      ra_start_date || null,
+      ra_end_date || null,
+      null,
       payload.empId || payload.id || null,
+      bid_value || null,
+      ra_participated || 'no',
+      ra_last_price || null,
     ];
 
     console.log("INSERT columns:", insertColumns);
     console.log("VALUES count:", values.length);
+    console.log("VALUES for INSERT:", values.slice(-10)); // Last 10 values including RA fields
+    console.log("Full VALUES array:", values);
 
     const [result] = await conn.execute(
       `INSERT INTO bids (${insertColumns}) VALUES (${placeholders})`,
