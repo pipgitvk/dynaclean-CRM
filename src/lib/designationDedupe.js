@@ -11,6 +11,7 @@ export const HR_TARGET_ALLOWED_DESIGNATIONS = [
   "Director",
   "Junior HR Executive",
   "HR Executive",
+  "HR Recruiter",
   "Senior HR Executive",
   "HR Manager",
   "Team leader",

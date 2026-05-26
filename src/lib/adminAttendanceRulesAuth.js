@@ -14,6 +14,7 @@ export const ATTENDANCE_RULES_ALLOWED_ROLES = [
   "HR HEAD",
   "HR Executive",
   "JUNIOR HR EXECUTIVE",
+  "HR RECRUITER",
 ];
 
 const MANAGE_ATTENDANCE_RULES_ROLES = new Set(

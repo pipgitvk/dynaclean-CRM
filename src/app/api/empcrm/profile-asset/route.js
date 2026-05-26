@@ -7,7 +7,7 @@ import { getSessionPayload } from "@/lib/auth";
 function isEmpcrmProfileViewer(session) {
   if (!session?.role) return false;
   const r = String(session.role).trim();
-  return ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE"].some((a) => a.toLowerCase() === r.toLowerCase());
+  return ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].some((a) => a.toLowerCase() === r.toLowerCase());
 }
 
 /** path segments under public/ — must start with employee_profiles */

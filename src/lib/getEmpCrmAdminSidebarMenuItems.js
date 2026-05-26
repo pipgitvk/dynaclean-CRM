@@ -30,19 +30,19 @@ function attachProfileApprovalsBadge(items, pendingCount) {
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 const empCrmMenuItems = [
-  { path: "/empcrm/admin-dashboard", name: "EMPCRM Dashboard", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "Home" },
-  { path: "/empcrm/admin-dashboard/profile", name: "Profile Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "UserCircle" },
-  { path: "/empcrm/admin-dashboard/profile/approvals", name: "Profile Approvals", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "UserCircle" },
-  { path: "/empcrm/admin-dashboard/leave", name: "Leave Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "Calendar" },
+  { path: "/empcrm/admin-dashboard", name: "EMPCRM Dashboard", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Home" },
+  { path: "/empcrm/admin-dashboard/profile", name: "Profile Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserCircle" },
+  { path: "/empcrm/admin-dashboard/profile/approvals", name: "Profile Approvals", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserCircle" },
+  { path: "/empcrm/admin-dashboard/leave", name: "Leave Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Calendar" },
 
 
-  { path: "/empcrm/admin-dashboard/attendance-summary", name: "Attendance Summary", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "LayoutGrid" },
-  { path: "/empcrm/admin-dashboard/attendance", name: "Attendance details", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "Clock" },
-  { path: "/empcrm/admin-dashboard/attendance-rules", name: "Attendance Rules", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "Settings" },
-  { path: "/empcrm/admin-dashboard/documents", name: "Employee Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "FileText" },
-  { path: "/empcrm/admin-dashboard/hiring", name: "Hiring", roles: ["HR HEAD", "HR", "Junior HR Executive", "HR Executive"], icon: "UserPlus" },
-  { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "ACCOUNTANT"], icon: "DollarSign" },
-  { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "ACCOUNTANT"], icon: "Receipt" },
+  { path: "/empcrm/admin-dashboard/attendance-summary", name: "Attendance Summary", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "LayoutGrid" },
+  { path: "/empcrm/admin-dashboard/attendance", name: "Attendance details", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Clock" },
+  { path: "/empcrm/admin-dashboard/attendance-rules", name: "Attendance Rules", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "Settings" },
+  { path: "/empcrm/admin-dashboard/documents", name: "Employee Documents", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "FileText" },
+  { path: "/empcrm/admin-dashboard/hiring", name: "Hiring", roles: ["HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter"], icon: "UserPlus" },
+  { path: "/empcrm/admin-dashboard/salary", name: "Salary Management", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "DollarSign" },
+  { path: "/empcrm/admin-dashboard/salary-slips", name: "Salary slips", roles: ["SUPERADMIN", "HR HEAD", "HR", "Junior HR Executive", "HR Executive", "HR Recruiter", "ACCOUNTANT"], icon: "Receipt" },
 ];
 
 export default async function getEmpCrmAdminSidebarMenuItems() {
@@ -98,7 +98,7 @@ export async function getEmpCrmAdminBackButtonPath() {
   }
 
   const roleKey = normalizeRoleKey(role || "GUEST") || "GUEST";
-  const shouldGoToUserDashboard = roleKey === "ACCOUNTANT" || roleKey === "JUNIOR HR EXECUTIVE";
+  const shouldGoToUserDashboard = roleKey === "ACCOUNTANT" || roleKey === "JUNIOR HR EXECUTIVE" || roleKey === "HR RECRUITER";
   return shouldGoToUserDashboard ? "/user-dashboard" : "/admin-dashboard";
 }
 
