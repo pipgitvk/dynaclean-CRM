@@ -326,6 +326,7 @@ export async function POST(req) {
       ra_participated,
       ra_start_date,
       ra_end_date,
+      ra_last_price,
       customer_id,
     } = fields;
 
