@@ -3,6 +3,7 @@ const { getActiveCredentials, updateCredentialSync } = require('../mysql/metaCre
 const { createLead, getLeadByLeadgenId, markLeadAsImported } = require('../mysql/metaLeadModel');
 const { createSyncLog } = require('../mysql/metaSyncLogModel');
 const { normalizePhone, PHONE_LAST10_WHERE } = require('../phone-check');
+const { resolveAssigneeFromFormAssignments, resolveAssigneeFromLeadDistribution } = require('../leadDistributionResolver');
 
 /**
  * Fetch leads from Meta Graph API for a specific form
@@ -181,7 +182,7 @@ async function syncLeadsForCredential(credential, options = {}) {
   let leadsImported = 0;
   let leadsSkipped = 0;
   let errorMessage = null;
-  
+
   try {
     // Fetch leads for each form ID
     for (const formId of credential.formIds) {
@@ -191,38 +192,64 @@ async function syncLeadsForCredential(credential, options = {}) {
         since,
         until
       );
-      
+
       leadsFetched += rawLeads.length;
-      
+
       for (const rawLead of rawLeads) {
         const leadgenId = rawLead.id;
-        
+
         // Check if lead already exists in meta_leads table
         const existingMetaLead = await getLeadByLeadgenId(leadgenId);
         if (existingMetaLead) {
           leadsSkipped++;
           continue;
         }
-        
+
         // Parse lead data
         const fieldData = rawLead.field_data || [];
         const parsedLead = parseLeadFromFieldData(fieldData);
-        
+
         // Resolve campaign name if ad_id exists
         let campaignName = '';
         if (rawLead.ad_id) {
           campaignName = await resolveCampaignNameForAd(rawLead.ad_id, credential.pageToken);
         }
-        
+
         // Extract product from form data
         const formProduct = fieldData.find(f => f.name === 'product')?.values?.[0] || '';
         const productsInterest = campaignName ? `${formProduct} - ${campaignName}` : formProduct;
-        
+
+        // Resolve assignee - use employeeName if set, otherwise use form-specific or general lead distribution
+        let assignedTo = credential.employeeName;
+        let employeeName = credential.employeeName;
+
+        if (!assignedTo) {
+          try {
+            // First try form-specific assignments
+            assignedTo = await resolveAssigneeFromFormAssignments(formId);
+
+            if (!assignedTo) {
+              // Fallback to general lead distribution
+              assignedTo = await resolveAssigneeFromLeadDistribution();
+              console.log(`Auto-distributed lead (general distribution) to: ${assignedTo}`);
+            } else {
+              console.log(`Auto-distributed lead (form-specific) to: ${assignedTo} for form: ${formId}`);
+            }
+
+            employeeName = assignedTo;
+          } catch (err) {
+            console.error('Error resolving assignee:', err);
+            errorMessage = 'Failed to resolve assignee';
+            leadsSkipped++;
+            continue;
+          }
+        }
+
         // Create meta_leads record with duplicate error handling
         const metaLead = await createLead({
           leadgenId,
-          assignedTo: credential.employeeName,
-          employeeName: credential.employeeName,
+          assignedTo,
+          employeeName,
           formId,
           pageId: credential.pageId,
           leadData: {
@@ -235,13 +262,13 @@ async function syncLeadsForCredential(credential, options = {}) {
           campaignName,
           productsInterest
         });
-        
+
         // If lead is null, it means duplicate - skip it
         if (metaLead === null) {
           leadsSkipped++;
           continue;
         }
-        
+
         // Auto-import to CRM if requested
         if (autoImport) {
           const existsInCRM = await checkLeadExistsInCRM(parsedLead.phone);
@@ -252,11 +279,11 @@ async function syncLeadsForCredential(credential, options = {}) {
                   ...parsedLead,
                   products_interest: productsInterest
                 },
-                credential.employeeName
+                assignedTo
               );
-              
+
               await markLeadAsImported(leadgenId, customerId);
-              
+
               leadsImported++;
             } catch (err) {
               console.error('Error importing lead to CRM:', err);

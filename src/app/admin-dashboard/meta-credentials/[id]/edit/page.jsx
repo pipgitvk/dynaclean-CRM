@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus, X, Loader2 } from 'lucide-react';
+import MetaFormAssignments from '@/components/MetaFormAssignments';
 
 export default function EditCredentialPage() {
   const router = useRouter();
@@ -15,7 +16,6 @@ export default function EditCredentialPage() {
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [formData, setFormData] = useState({
-    employeeName: '',
     verifyToken: '',
     pageId: '',
     pageToken: '',
@@ -63,7 +63,6 @@ export default function EditCredentialPage() {
         console.log('Setting formIds to:', JSON.stringify(formIds));
         
         setFormData({
-          employeeName: cred.employeeName || '',
           verifyToken: cred.verifyToken || '',
           pageId: cred.pageId || '',
           pageToken: cred.pageToken || '',
@@ -113,12 +112,8 @@ export default function EditCredentialPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validation
-    if (!formData.employeeName.trim()) {
-      toast.error('Employee name is required');
-      return;
-    }
     if (!formData.verifyToken.trim()) {
       toast.error('Verify token is required');
       return;
@@ -131,7 +126,7 @@ export default function EditCredentialPage() {
       toast.error('Page token is required');
       return;
     }
-    
+
     const validFormIds = formData.formIds.filter(id => id.trim());
     if (validFormIds.length === 0) {
       toast.error('At least one form ID is required');
@@ -141,8 +136,12 @@ export default function EditCredentialPage() {
     try {
       setSaving(true);
       const response = await axios.put(`/api/meta-credentials/${params.id}`, {
-        ...formData,
-        formIds: validFormIds
+        employeeName: null,
+        verifyToken: formData.verifyToken,
+        pageId: formData.pageId,
+        pageToken: formData.pageToken,
+        formIds: validFormIds,
+        isActive: formData.isActive
       });
 
       if (response.data.success) {
@@ -176,38 +175,11 @@ export default function EditCredentialPage() {
           Back to Credentials
         </Link>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Edit Meta Credential</h1>
-        <p className="text-gray-600">Update Meta Facebook Lead credential for {formData.employeeName}</p>
+        <p className="text-gray-600">Update Meta Facebook Lead credential</p>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Employee Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Employee <span className="text-red-500">*</span>
-            </label>
-            {loadingEmployees ? (
-              <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
-                Loading employees...
-              </div>
-            ) : (
-              <select
-                name="employeeName"
-                value={formData.employeeName}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select an employee</option>
-                {employees.map((emp) => (
-                  <option key={emp.username} value={emp.username}>
-                    {emp.name || emp.username}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
           {/* Verify Token */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -292,6 +264,9 @@ export default function EditCredentialPage() {
               Add Another Form ID
             </button>
           </div>
+
+          {/* Form-Specific Assignments */}
+          <MetaFormAssignments formIds={formData.formIds} employees={employees} />
 
           {/* Active Status */}
           <div className="flex items-center gap-3">

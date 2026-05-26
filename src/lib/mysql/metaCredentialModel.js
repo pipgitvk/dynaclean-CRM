@@ -11,7 +11,7 @@ async function createCredential(data) {
     `INSERT INTO meta_credentials (employee_name, verify_token, page_id, page_token, form_ids, is_active)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [
-      data.employeeName,
+      data.employeeName || null,
       data.verifyToken,
       data.pageId,
       data.pageToken,
@@ -129,7 +129,7 @@ async function updateCredential(id, data) {
   
   if (data.employeeName !== undefined) {
     updates.push('employee_name = ?');
-    values.push(data.employeeName);
+    values.push(data.employeeName || null);
   }
   if (data.verifyToken !== undefined) {
     updates.push('verify_token = ?');
