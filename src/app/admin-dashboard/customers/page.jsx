@@ -45,7 +45,8 @@ export default async function HomePage({ searchParams }) {
     let query = `
       SELECT
         c.*,
-        cf.notes AS latest_note
+        cf.notes AS latest_note,
+        IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers
       FROM
         customers c
       LEFT JOIN (
@@ -56,6 +57,7 @@ export default async function HomePage({ searchParams }) {
         FROM
           customers_followup
       ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
+      LEFT JOIN bids b ON c.customer_id = b.customer_id
       WHERE 1=1
     `;
 
@@ -108,7 +110,7 @@ export default async function HomePage({ searchParams }) {
     totalPages = Math.ceil(totalRecords / pageSize);
 
     // Add pagination
-    query += ` ORDER BY c.date_created DESC LIMIT ? OFFSET ?`;
+    query += ` GROUP BY c.customer_id ORDER BY c.date_created DESC LIMIT ? OFFSET ?`;
     params.push(pageSize, offset);
 
     const [rows] = await connection.execute(query, params);

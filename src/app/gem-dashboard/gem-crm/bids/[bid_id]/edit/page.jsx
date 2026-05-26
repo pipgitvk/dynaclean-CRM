@@ -187,6 +187,7 @@ export default function EditBidPage({ params }) {
           ra_end_date: formatDateForInput(bid.ra_end_date) || "",
           ra_last_price: bid.ra_last_price || "",
           order_id: bid.order_id || "",
+          customer_id: bid.customer_id || "",
         });
       } else {
         toast.error("Failed to fetch bid details");
@@ -425,6 +426,21 @@ export default function EditBidPage({ params }) {
                   onChange={handleChange}
                   disabled={!isFieldEditable('gem_bid_no')}
                   className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('gem_bid_no') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer ID (GEM ID)
+                </label>
+                <input
+                  type="text"
+                  name="customer_id"
+                  value={formData.customer_id}
+                  onChange={handleChange}
+                  disabled={!isFieldEditable('customer_id')}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('customer_id') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  placeholder="Enter customer GEM ID"
                 />
               </div>
 

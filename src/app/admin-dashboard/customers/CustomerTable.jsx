@@ -253,6 +253,7 @@ export default function CustomerTable({
                   <th className="px-4 py-2 text-left">notes</th>
                   <th className="px-4 py-2 text-left">Status</th>
                   <th className="px-4 py-2 text-left">Stage</th>
+                  <th className="px-4 py-2 text-left">Bid Numbers</th>
                   <th className="px-4 py-2 text-left">Products Interest</th>
                   <th className="px-4 py-2 text-left">Date Created</th>
                   <th className="px-4 py-2 text-left">Action</th>
@@ -274,6 +275,7 @@ export default function CustomerTable({
                     </td>
                     <td className="px-4 py-2">{row.status}</td>
                     <td className="px-4 py-2">{row.stage}</td>
+                    <td className="px-4 py-2">{row.bid_numbers || "-"}</td>
                     <td className="px-4 py-2">{row.products_interest}</td>
                     <td className="px-4 py-2">
                       {format(new Date(row.date_created), "dd MMM yyyy")}

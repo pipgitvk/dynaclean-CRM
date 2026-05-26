@@ -270,6 +270,7 @@ export default function CustomerTable({
                   "Stage",
                   "Notes",
                   "Created",
+                  "Bid Numbers",
                   "Products Interest",
                 ].map((h) => (
                   <th key={h} className="px-4 py-2 text-left whitespace-nowrap">
@@ -296,6 +297,7 @@ export default function CustomerTable({
                   <td className="px-4 py-2">
                     {dayjs(r.date_created).format("DD MMM YYYY")}
                   </td>
+                  <td className="px-4 py-2">{r.bid_numbers || "-"}</td>
                   <td className="px-4 py-2">{r.products_interest}</td>
                   <td className="px-4 py-2 flex items-center gap-2 justify-center text-gray-600">
                     <button
