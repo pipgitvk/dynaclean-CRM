@@ -2,7 +2,30 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { HR_TARGET_ALLOWED_DESIGNATIONS } from "@/lib/designationDedupe";
 
-const ALLOWED_USER_ROLES = new Set([...HR_TARGET_ALLOWED_DESIGNATIONS, "DIRECTOR", "JUNIOR HR EXECUTIVE", "HR RECRUITER", "GEM"]);
+const ALLOWED_USER_ROLES = new Set([
+  ...HR_TARGET_ALLOWED_DESIGNATIONS,
+  "DIRECTOR",
+  "JUNIOR HR EXECUTIVE",
+  "HR RECRUITER",
+  "GEM",
+  "ACCOUNTANT",
+  "TEAM LEADER",
+  "SALES",
+  "SALES HEAD",
+  "DIGITAL MARKETER",
+  "ADMIN",
+  "HR",
+  "HR HEAD",
+  "GRAPHIC DESIGNER",
+  "DESIGN ENGINEER",
+  "DEVELOPER",
+  "SERVICE ENGINEER",
+  "SERVICE TECHNICIAN",
+  "SERVICE HEAD",
+  "WELDER",
+  "WELDER HELPER",
+  "WAREHOUSE INCHARGE",
+]);
 
 export async function POST(request) {
   try {
