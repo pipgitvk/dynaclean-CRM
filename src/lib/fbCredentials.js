@@ -13,16 +13,14 @@ async function getFBCredentials() {
       "SELECT FB_VERIFY_TOKEN, FB_PAGE_ID, FB_PAGE_TOKEN, FB_LEAD_FORM_ID FROM FB_credentials ORDER BY created_at DESC LIMIT 1"
     );
 
-    await conn.end();
-
     if (rows.length === 0) {
       return null;
     }
 
     return rows[0];
   } catch (error) {
-    console.error("Error fetching FB credentials:", error);
-    return null;
+    console.error('Error fetching FB credentials:', error);
+    throw error;
   }
 }
 

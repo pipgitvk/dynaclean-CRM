@@ -301,6 +301,18 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "LayoutGrid",
       },
+      {
+        path: "/admin-dashboard/meta-dashboard",
+        name: "Meta Lead Dashboard",
+        roles: ["SUPERADMIN"],
+        icon: "LayoutDashboard",
+      },
+      {
+        path: "/admin-dashboard/meta-credentials",
+        name: "Meta Credentials",
+        roles: ["SUPERADMIN"],
+        icon: "Settings",
+      },
     ],
   },
   {
