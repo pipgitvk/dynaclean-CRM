@@ -27,7 +27,7 @@ export async function GET(req) {
         { status: 401 },
       );
     }
-    const isPrivilegedRole = ["SUPERADMIN", "ADMIN", "DIRECTOR"].includes(userRole);
+    const isPrivilegedRole = ["SUPERADMIN", "ADMIN", "DIRECTOR", "DIGITAL MARKETER"].includes(userRole);
 
     const db = await getDbConnection();
 
