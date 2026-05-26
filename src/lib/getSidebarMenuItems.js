@@ -24,12 +24,17 @@ function getDashboardPrefix(roleKey) {
 // Transform menu item paths based on role
 function transformMenuItemPaths(item, roleKey) {
   const dashboardPrefix = getDashboardPrefix(roleKey);
-  
+
   // Don't transform admin-dashboard or empcrm paths
   if (item.path?.startsWith("/admin-dashboard") || item.path?.startsWith("/empcrm")) {
     return item;
   }
-  
+
+  // Don't transform my-leads path for digital marketers (they need to access user-dashboard/my-leads)
+  if (item.path?.startsWith("/user-dashboard/my-leads") && (roleKey.includes("DIGITAL") || roleKey.includes("MARKETER"))) {
+    return item;
+  }
+
   // Transform user-dashboard paths to role-specific dashboard
   if (item.path?.startsWith("/user-dashboard")) {
     return {
