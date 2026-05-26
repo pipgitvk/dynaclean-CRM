@@ -313,7 +313,8 @@ export async function PUT(req, { params }) {
       { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
       { name: 'ra_start_date', type: 'DATE NULL' },
       { name: 'ra_end_date', type: 'DATE NULL' },
-      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' }
+      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
+      { name: 'customer_id', type: 'VARCHAR(255) NULL' }
     ];
 
     const [tableInfo] = await conn.execute("DESCRIBE bids");
@@ -355,7 +356,7 @@ export async function PUT(req, { params }) {
       'oem_turnover_required', 'experience_required_years', 'delivery_days',
       'inspection_required', 'technical_status', 'financial_status',
       'bid_status', 'assigned_employee_id', 'dd_id', 'remarks', 'ra_participated',
-      'ra_start_date', 'ra_end_date', 'ra_last_price', 'order_id'
+      'ra_start_date', 'ra_end_date', 'ra_last_price', 'order_id', 'customer_id'
     ];
 
     for (const field of allowedFields) {

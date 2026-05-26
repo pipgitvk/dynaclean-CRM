@@ -54,6 +54,7 @@ export default function NewBidPage() {
     ra_participated: "no",
     ra_start_date: "",
     ra_end_date: "",
+    customer_id: "",
   });
 
   useEffect(() => {
@@ -182,6 +183,20 @@ export default function NewBidPage() {
                   value={formData.gem_bid_no}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer ID (GEM ID)
+                </label>
+                <input
+                  type="text"
+                  name="customer_id"
+                  value={formData.customer_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter customer GEM ID"
                 />
               </div>
 

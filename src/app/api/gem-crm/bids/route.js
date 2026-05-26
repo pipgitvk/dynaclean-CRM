@@ -326,6 +326,7 @@ export async function POST(req) {
       ra_participated,
       ra_start_date,
       ra_end_date,
+      customer_id,
     } = fields;
 
     console.log("DEBUG: Received fields:", {
@@ -396,7 +397,8 @@ export async function POST(req) {
       { name: 'created_by', type: 'INT NULL' },
       { name: 'bid_value', type: 'DECIMAL(10,2) NULL' },
       { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
-      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' }
+      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
+      { name: 'customer_id', type: 'VARCHAR(255) NULL' }
     ];
 
     for (const { name, type } of columnsToCheck) {
@@ -455,6 +457,7 @@ export async function POST(req) {
       payload.empId || payload.id || null,
       bid_value || null,
       ra_participated || 'no',
+      customer_id || null,
       ra_last_price || null,
     ];
 
@@ -474,6 +477,32 @@ export async function POST(req) {
        VALUES (?, NULL, 'new', 'Bid created', ?)`,
       [result.insertId, payload.empId || payload.id || null]
     );
+
+    // Create/update customer in customers table if customer_id is provided
+    if (customer_id && customer_id.trim() !== "") {
+      try {
+        // Check if customer already exists
+        const [existingCustomer] = await conn.execute(
+          `SELECT customer_id FROM customers WHERE customer_id = ?`,
+          [customer_id]
+        );
+
+        if (existingCustomer.length === 0) {
+          // Create new customer entry
+          await conn.execute(
+            `INSERT INTO customers (customer_id, first_name, last_name, email, phone, company)
+             VALUES (?, '', '', '', '', '')`,
+            [customer_id]
+          );
+          console.log(`✅ Created customer entry with ID: ${customer_id}`);
+        } else {
+          console.log(`ℹ️ Customer with ID ${customer_id} already exists`);
+        }
+      } catch (customerError) {
+        console.error("❌ Failed to create/update customer:", customerError.message);
+        // Don't fail the bid creation if customer creation fails
+      }
+    }
 
     await conn.end();
 

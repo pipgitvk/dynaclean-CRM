@@ -167,11 +167,14 @@ export default async function CustomersPage({ searchParams }) {
       c.notes,
       c.date_created,
       c.lead_campaign,
-      c.products_interest
+      c.products_interest,
+      IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers
       ${followupSelectFields} -- This inserts the conditional select statement
     FROM customers c
+    LEFT JOIN bids b ON c.customer_id = b.customer_id
     ${joinClause}
     WHERE ${whereClauseString}
+    GROUP BY c.customer_id
   `;
 
   let orderBy = "c.date_created DESC"; // default

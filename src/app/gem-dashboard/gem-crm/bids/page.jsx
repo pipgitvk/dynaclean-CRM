@@ -334,6 +334,9 @@ export default function GemCrmBidsPage() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase bg-green-50">
+                  Customer ID
+                </th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Bid Number
                 </th>
@@ -372,7 +375,7 @@ export default function GemCrmBidsPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan="11" className="py-8 text-center text-gray-500">
+                  <td colSpan="12" className="py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
@@ -380,13 +383,16 @@ export default function GemCrmBidsPage() {
                 </tr>
               ) : bids.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="py-8 text-center text-gray-500">
+                  <td colSpan="12" className="py-8 text-center text-gray-500">
                     No bids found
                   </td>
                 </tr>
               ) : (
                 bids.map((bid) => (
                   <tr key={bid.bid_id} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-3 px-4 text-sm font-medium text-green-600 bg-green-50">
+                      {bid.customer_id || "-"}
+                    </td>
                     <td className="py-3 px-4 text-sm font-medium text-blue-600">
                       {bid.bid_number || "-"}
                     </td>

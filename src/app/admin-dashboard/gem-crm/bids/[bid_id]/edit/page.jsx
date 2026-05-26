@@ -61,6 +61,7 @@ export default function EditBidPage({ params }) {
     ra_end_date: "",
     ra_last_price: "",
     order_id: "",
+    customer_id: "",
   });
 
   useEffect(() => {
@@ -184,6 +185,7 @@ export default function EditBidPage({ params }) {
           ra_start_date: formatDateForInput(bid.ra_start_date) || "",
           ra_end_date: formatDateForInput(bid.ra_end_date) || "",
           ra_last_price: bid.ra_last_price || "",
+          customer_id: bid.customer_id || "",
           order_id: bid.order_id || "",
         });
       } else {
@@ -396,6 +398,20 @@ export default function EditBidPage({ params }) {
                   value={formData.gem_bid_no}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer ID (GEM ID)
+                </label>
+                <input
+                  type="text"
+                  name="customer_id"
+                  value={formData.customer_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter customer GEM ID"
                 />
               </div>
 
