@@ -396,7 +396,6 @@ export async function POST(req) {
       { name: 'ra_end_date', type: 'DATE NULL' },
       { name: 'order_id', type: 'VARCHAR(255) NULL' },
       { name: 'created_by', type: 'INT NULL' },
-      { name: 'bid_value', type: 'DECIMAL(10,2) NULL' },
       { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
       { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
       { name: 'customer_id', type: 'VARCHAR(255) NULL' }
@@ -456,7 +455,6 @@ export async function POST(req) {
       ra_end_date || null,
       null,
       payload.empId || payload.id || null,
-      bid_value || null,
       ra_participated || 'no',
       customer_id || null,
       ra_last_price || null,
