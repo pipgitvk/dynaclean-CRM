@@ -41,6 +41,19 @@ export default async function HomePage({ searchParams }) {
   try {
     connection = await getDbConnection();
 
+    // Ensure customer_id column exists in bids table
+    const [bidsTableInfo] = await connection.execute("DESCRIBE bids");
+    const bidsExistingColumns = bidsTableInfo.map(row => row.Field);
+    
+    if (!bidsExistingColumns.includes('customer_id')) {
+      try {
+        await connection.execute(`ALTER TABLE bids ADD COLUMN customer_id VARCHAR(255) NULL`);
+        console.log(`✅ Added column customer_id to bids table`);
+      } catch (alterError) {
+        console.error(`❌ Failed to add column customer_id to bids table:`, alterError.message);
+      }
+    }
+
     // Build query with filters
     let query = `
       SELECT
