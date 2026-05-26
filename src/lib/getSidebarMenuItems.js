@@ -30,7 +30,7 @@ function transformMenuItemPaths(item, roleKey) {
     return item;
   }
 
-  // Don't transform my-leads path for digital marketers (they need to access user-dashboard/my-leads)
+  // Don't transform my-leads path for digital marketers
   if (item.path?.startsWith("/user-dashboard/my-leads") && (roleKey.includes("DIGITAL") || roleKey.includes("MARKETER"))) {
     return item;
   }
@@ -962,11 +962,13 @@ export default async function getSidebarMenuItems() {
               : [];
             // When module_access is configured, a leaf link MUST have a moduleKey to be shown.
             // Otherwise older menu entries would "leak" through and ignore module_access.
-            const allowed = item?.moduleKey
+            // Exception: Digital marketers can access my-leads regardless of module_access
+            const isMyLeadsForDM = item?.moduleKey === "my-leads" && (roleKey.includes("DIGITAL") || roleKey.includes("MARKETER"));
+            const allowed = isMyLeadsForDM || (item?.moduleKey
               ? isSectionAllowed(item.moduleKey, allowedModules)
               : item?.path
                 ? false
-                : true;
+                : true);
             // If it originally has children, keep it only if any child remains.
             // This prevents "empty groups" (e.g. Orders) from showing just because
             // a broad parent moduleKey like "dashboard" is allowed.
