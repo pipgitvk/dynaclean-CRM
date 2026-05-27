@@ -2741,23 +2741,25 @@ const NewInvoice = ({ invoice }) => {
     Buyer (Bill To) : {data.buyer.name}
   </span>
 
-  <div
-    style={{
-      display: "flex",
-      width: "100%",
-      gap: "10px",
-      marginBottom: "3px",
-      flexWrap: "wrap",              // important fix
-      alignItems: "flex-start"
-    }}
-  >
+  <div style={{ marginBottom: "3px" }}>
     <span style={{ fontWeight: "bold" }}>
       Address:{" "}
       <span style={{ fontWeight: "normal" }}>
         {data.buyer.address}
       </span>
     </span>
+  </div>
 
+  <div
+    style={{
+      display: "flex",
+      width: "100%",
+      gap: "10px",
+      marginBottom: "3px",
+      flexWrap: "wrap",
+      alignItems: "flex-start"
+    }}
+  >
     <span style={{ fontWeight: "bold" }}>
       GSTIN:{" "}
       <span style={{ fontWeight: "normal" }}>
