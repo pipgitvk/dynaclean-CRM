@@ -963,14 +963,12 @@ export default async function getSidebarMenuItems() {
               : [];
             // When module_access is configured, a leaf link MUST have a moduleKey to be shown.
             // Otherwise older menu entries would "leak" through and ignore module_access.
-            // Exception: Digital marketers can access my-leads regardless of module_access
-            const roleUpper = String(roleKey || "").toUpperCase();
-            const isMyLeadsForDM = item?.moduleKey === "my-leads" && (roleUpper.includes("DIGITAL") || roleUpper.includes("MARKETER"));
-            const allowed = isMyLeadsForDM || (item?.moduleKey
+            // My Leads is accessible to anyone who has the my-leads module key in their module_access
+            const allowed = item?.moduleKey
               ? isSectionAllowed(item.moduleKey, allowedModules)
               : item?.path
                 ? false
-                : true);
+                : true;
             // If it originally has children, keep it only if any child remains.
             // This prevents "empty groups" (e.g. Orders) from showing just because
             // a broad parent moduleKey like "dashboard" is allowed.
