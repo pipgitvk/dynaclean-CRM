@@ -12,9 +12,9 @@ export default function MyLeadsPage() {
 
   const handleToggle = () => {
     if (isSocialMedia) {
-      router.push("/user-dashboard/my-leads"); // Go back to normal leads
+      router.push("/digital-marketing-dashboard/my-leads"); // Go back to normal leads
     } else {
-      router.push("/user-dashboard/my-leads?campaign=social_media"); // Show social media leads
+      router.push("/digital-marketing-dashboard/my-leads?campaign=social_media"); // Show social media leads
     }
   };
 
