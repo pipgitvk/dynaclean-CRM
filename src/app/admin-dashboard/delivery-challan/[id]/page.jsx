@@ -188,7 +188,7 @@ export default function DeliveryChallanViewPage() {
               <p className="text-[11px] font-bold text-[#000000] leading-tight">Gandhi Nagar, Ganapathy, Coimbatore, Coimbatore, Tamil Nadu,</p>
               <p className="text-[11px] font-bold text-[#000000] leading-tight">641006</p>
               <p className="text-[11px] font-bold text-[#000000] mt-1 leading-tight">Phone no.: 9220454360 Email: sales@dynacleanindustries.com</p>
-              <p className="text-[11px] font-bold text-[#000000] leading-tight">GSTIN: 33DULPK4662J1ZA, State: 33- Tamil Nadu</p>
+              <p className="text-[11px] font-bold text-[#000000] leading-tight">GSTIN: 07AAKCD6495M1ZV, State: 33- Tamil Nadu</p>
             </div>
           </div>
 
@@ -305,10 +305,9 @@ export default function DeliveryChallanViewPage() {
               </div>
             </div>
             <div className="p-4 flex flex-col justify-between items-center text-center bg-[#ffffff]">
-              <h3 className="font-bold w-full text-right text-[#000000]">For : Dynaclean Industries Pvt Ltd</h3>
               <div className="flex-1 flex items-center justify-center py-2 bg-[#ffffff]">
                 {/* Signature Image */}
-                <img src="/images/sign.png" alt="Signature" className="w-28 h-28 object-contain" />
+                <img src="/images/sign.png" alt="Signature" className="w-20 h-20 object-contain" />
               </div>
               <h3 className="font-bold text-[#000000]">Authorized Signatory</h3>
             </div>
