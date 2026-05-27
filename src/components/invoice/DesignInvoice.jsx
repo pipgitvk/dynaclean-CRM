@@ -2726,87 +2726,35 @@ const NewInvoice = ({ invoice }) => {
  <td
   style={{
     border: "1px solid #000",
-    padding: "4px",              // increased padding
+    padding: "4px",
     width: "50%",
     borderBottom: "0px",
     verticalAlign: "top",
     wordBreak: "break-word",
+    overflowWrap: "break-word",
     borderRight: "0px",
     whiteSpace: "normal",
-    lineHeight: "1.5",           // slightly increased
-    overflow: "visible"          // prevent clipping
+    lineHeight: "1.5",
+    overflow: "hidden"
   }}
 >
-  <span style={{ fontWeight: "bold", marginBottom: "4px", display: "block" }}>
-    Buyer (Bill To) : {data.buyer.name}
-  </span>
+  <div style={{ marginBottom: "4px" }}><b>Buyer (Bill To) : {data.buyer.name}</b></div>
+
+  <div style={{ marginBottom: "3px" }}><b>Address: </b>{data.buyer.address}</div>
 
   <div style={{ marginBottom: "3px" }}>
-    <span style={{ fontWeight: "bold" }}>
-      Address:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.buyer.address}
-      </span>
-    </span>
+    <b>GSTIN: </b>{data.buyer.gstin || "22AAAAA0000A1Z5"}
+    {"   "}
+    <b>State: </b>{data.buyer.state}
   </div>
 
-  <div
-    style={{
-      display: "flex",
-      width: "100%",
-      gap: "10px",
-      marginBottom: "3px",
-      flexWrap: "wrap",
-      alignItems: "flex-start"
-    }}
-  >
-    <span style={{ fontWeight: "bold" }}>
-      GSTIN:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.buyer.gstin || "22AAAAA0000A1Z5"}
-      </span>
-    </span>
-
-    <span style={{ fontWeight: "bold" }}>
-      State:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.buyer.state}
-      </span>
-    </span>
+  <div style={{ marginBottom: "3px" }}>
+    <b>Place of Supply: </b>{data.buyer.placeOfSupply}
+    {"   "}
+    <b>Contact: </b>{data.buyer.contactPerson} ({data.buyer.phone})
   </div>
 
-  <div
-    style={{
-      display: "flex",
-      width: "100%",
-      gap: "10px",
-      flexWrap: "wrap",              // important fix
-      alignItems: "flex-start",
-      marginBottom: "3px"
-    }}
-  >
-    <span style={{ fontWeight: "bold" }}>
-      Place of Supply:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.buyer.placeOfSupply}
-      </span>
-    </span>
-
-    <span style={{ fontWeight: "bold" }}>
-      Contact:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.buyer.contactPerson}
-      </span>{" "}
-      ({data.buyer.phone})
-    </span>
-  </div>
-
-  <span style={{ fontWeight: "bold", display: "block",marginBottom: "1px" }}>
-    Email:{" "}
-    <span style={{ fontWeight: "normal" }}>
-      {data.buyer.email}
-    </span>
-  </span>
+  <div style={{ marginBottom: "1px" }}><b>Email: </b>{data.buyer.email}</div>
 </td>
 
 
@@ -2818,65 +2766,23 @@ const NewInvoice = ({ invoice }) => {
     padding: "4px",               // increased from 3px
     width: "50%",
     borderBottom: "0px",
-    lineHeight: "1.5",            // reduced from 1.9 (too large causes clipping)
+    lineHeight: "1.5",
     verticalAlign: "top",
     wordBreak: "break-word",
     overflowWrap: "break-word",
     whiteSpace: "normal",
-    overflow: "visible"           // prevent cutting
+    overflow: "hidden"
   }}
 >
-  <p style={{ fontWeight: "bold", margin: 0, marginBottom: "4px" }}>
-    Consignee (Ship To) : {data.consignee.name}
-  </p>
+  <div style={{ marginBottom: "4px" }}><b>Consignee (Ship To) : {data.consignee.name}</b></div>
 
-  <div
-    style={{
-      display: "block",
-      width: "100%",
-      marginBottom: "3px",
-    }}
-  >
-    <p style={{ fontWeight: "bold", margin: 0, marginBottom: "2px" }}>
-      Address:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.consignee.address}
-      </span>
-    </p>
+  <div style={{ marginBottom: "3px" }}><b>Address: </b>{data.consignee.address}</div>
 
-    <p style={{ fontWeight: "bold", margin: 0, marginBottom: "2px" }}>
-      GSTIN:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.consignee.gstin || "22AAAAA0000A1Z5"}
-      </span>
-    </p>
+  <div style={{ marginBottom: "3px" }}><b>GSTIN: </b>{data.consignee.gstin || "22AAAAA0000A1Z5"}</div>
 
-    <p style={{ fontWeight: "bold", margin: 0 }}>
-      State:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.consignee.state}
-      </span>
-    </p>
-  </div>
+  <div style={{ marginBottom: "3px" }}><b>State: </b>{data.consignee.state}</div>
 
-  <div
-    style={{
-      display: "flex",
-      width: "100%",
-      gap: "10px",
-      flexWrap: "wrap",           // IMPORTANT
-      alignItems: "flex-start",
-      marginTop: "3px"
-    }}
-  >
-    <p style={{ fontWeight: "bold", margin: 0 }}>
-      Contact:{" "}
-      <span style={{ fontWeight: "normal" }}>
-        {data.consignee.contactPerson}
-      </span>{" "}
-      ({data.consignee.phone})
-    </p>
-  </div>
+  <div style={{ marginBottom: "3px" }}><b>Contact: </b>{data.consignee.contactPerson} ({data.consignee.phone})</div>
 </td>
 
 
