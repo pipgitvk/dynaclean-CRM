@@ -28,7 +28,7 @@ export async function POST(request) {
     const body = await request.json();
     const { employeeName, verifyToken, pageId, pageToken, formIds } = body;
     
-    if (!employeeName || !verifyToken || !pageId || !pageToken || !formIds) {
+    if (!verifyToken || !pageId || !pageToken || !formIds) {
       return NextResponse.json(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
