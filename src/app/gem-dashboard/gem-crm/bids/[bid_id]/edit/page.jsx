@@ -237,11 +237,13 @@ export default function EditBidPage({ params }) {
     const remarksFields = ['remarks'];
     // Inspection and Reverse Auction fields are always editable, 'ra_participated', 'ra_last_price'
     const inspectionFields = ['inspection_required', 'reverse_auction', 'ra_participated', 'ra_last_price'];
-    if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName) || remarksFields.includes(fieldName) || inspectionFields.includes(fieldName)) {
+    // Document upload is always allowed (for replacement)
+    const alwaysEditableFields = ['bid_document'];
+    if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName) || remarksFields.includes(fieldName) || inspectionFields.includes(fieldName) || alwaysEditableFields.includes(fieldName)) {
       return true;
     }
-    // Empty fields are editable
-    const value = formData[fieldName];
+    // Use original server data (not live form state) so fields don't lock while typing
+    const value = bid ? bid[fieldName] : formData[fieldName];
     return value === null || value === '' || value === undefined;
   };
 
