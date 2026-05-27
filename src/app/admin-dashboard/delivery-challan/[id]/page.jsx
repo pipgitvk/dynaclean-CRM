@@ -101,21 +101,22 @@ export default function DeliveryChallanViewPage() {
         unit: "mm",
         format: "a4",
       });
-      
-      const imgWidth = 210; // A4 width in mm
+
+      const margin = 10; // 10mm margin on all sides
+      const imgWidth = 210 - (margin * 2); // A4 width minus margins
       const pageHeight = 297; // A4 height in mm
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
+
       let heightLeft = imgHeight;
-      let position = 0;
-      
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+      let position = margin;
+
+      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
-      
+
       while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
+        position = heightLeft - imgHeight + margin;
         pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
       
@@ -179,10 +180,10 @@ export default function DeliveryChallanViewPage() {
             {/* Header Section */}
           <div className="flex border-b border-[#9ca3af] bg-[#ffffff]">
             <div className="w-1/3 p-6 flex items-center justify-center bg-[#ffffff]">
-              <img src="/logo.png" alt="Dynaclean Logo" className="max-h-28 w-auto object-contain" />
+              <img src="/logo.png" alt="Dynaclean Logo" className="max-h-20 w-auto object-contain" />
             </div>
             <div className="w-2/3 p-6 text-right bg-[#ffffff]">
-              <h1 className="text-2xl font-extrabold text-[#000000] mb-1">DYNACLEAN INDUSTRIES</h1>
+              <h1 className="text-2xl font-bold text-[#000000] mb-1">Dynaclean Industries Pvt Ltd</h1>
               <p className="text-[11px] font-bold text-[#000000] leading-tight">1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,</p>
               <p className="text-[11px] font-bold text-[#000000] leading-tight">Gandhi Nagar, Ganapathy, Coimbatore, Coimbatore, Tamil Nadu,</p>
               <p className="text-[11px] font-bold text-[#000000] leading-tight">641006</p>
@@ -219,6 +220,11 @@ export default function DeliveryChallanViewPage() {
                 <p><span className="font-medium">Date :</span> {challan.challan_date ? new Date(challan.challan_date).toLocaleDateString("en-GB") : "-"}</p>
               </div>
             </div>
+          </div>
+
+          {/* E-way Bill Section */}
+          <div className="border-b border-[#9ca3af] p-3 text-[11px] bg-[#ffffff]">
+            <p><span className="font-bold text-[#000000]">E-way Bill:</span> <span className="text-[#000000]">{challan.eway_bill || "-"}</span></p>
           </div>
 
           {/* Items Table */}
@@ -299,10 +305,10 @@ export default function DeliveryChallanViewPage() {
               </div>
             </div>
             <div className="p-4 flex flex-col justify-between items-center text-center bg-[#ffffff]">
-              <h3 className="font-bold w-full text-right text-[#000000]">For : DYNACLEAN INDUSTRIES</h3>
+              <h3 className="font-bold w-full text-right text-[#000000]">For : Dynaclean Industries Pvt Ltd</h3>
               <div className="flex-1 flex items-center justify-center py-2 bg-[#ffffff]">
                 {/* Signature Image */}
-                <img src="/images/sign.png" alt="Signature" className="w-20 h-20 object-contain" />
+                <img src="/images/sign.png" alt="Signature" className="w-28 h-28 object-contain" />
               </div>
               <h3 className="font-bold text-[#000000]">Authorized Signatory</h3>
             </div>

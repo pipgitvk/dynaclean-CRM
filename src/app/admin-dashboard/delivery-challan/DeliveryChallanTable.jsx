@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import dayjs from "dayjs";
 import { useState } from "react";
-import { Eye, Search, RotateCcw, ChevronUp, ChevronDown, Inbox, X, Calendar, Package } from "lucide-react";
+import { Eye, Search, RotateCcw, ChevronUp, ChevronDown, Inbox, X, Calendar, Package, Edit } from "lucide-react";
 
 export default function DeliveryChallanTable({ rows }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -121,6 +121,9 @@ export default function DeliveryChallanTable({ rows }) {
       <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</td>
       <td className="p-3">
         <div className="flex gap-1.5 items-center">
+          <Link href={`/admin-dashboard/delivery-challan/${row.id}/edit`} className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 transition-colors" title="Edit">
+            <Edit size={16} />
+          </Link>
           <Link href={`/admin-dashboard/delivery-challan/${row.id}`} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors" title="View">
             <Eye size={16} />
           </Link>
@@ -258,6 +261,7 @@ export default function DeliveryChallanTable({ rows }) {
             </div>
             <div className="pt-3 border-t border-gray-100 flex justify-end items-center">
               <div className="flex gap-1.5">
+                <Link href={`/admin-dashboard/delivery-challan/${row.id}/edit`} className="p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100" title="Edit"><Edit size={16} /></Link>
                 <Link href={`/admin-dashboard/delivery-challan/${row.id}`} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100" title="View"><Eye size={16} /></Link>
               </div>
             </div>

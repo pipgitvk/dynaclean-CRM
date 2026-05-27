@@ -1,13 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Save, X } from "lucide-react";
 import Image from "next/image";
 
-export default function AddDeliveryChallanPage() {
+export default function EditDeliveryChallanPage() {
   const router = useRouter();
+  const params = useParams();
+  const id = params.id;
   const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState({
@@ -37,6 +40,65 @@ export default function AddDeliveryChallanPage() {
       price: 0,
     },
   ]);
+
+  useEffect(() => {
+    const fetchChallan = async () => {
+      try {
+        const response = await fetch(`/api/admin/delivery-challan/${id}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch delivery challan");
+        }
+        const data = await response.json();
+        const challan = data.data;
+
+        // Parse transportation details
+        let transportationDetails = {};
+        try {
+          transportationDetails = JSON.parse(challan.transportation_details || "{}");
+        } catch (e) {
+          console.error("Error parsing transportation details", e);
+        }
+
+        setFormData({
+          delivery_challan_for: challan.delivery_challan_for || "",
+          ship_to: challan.ship_to || "",
+          transportation_mode: transportationDetails.mode || "",
+          vehicle_no: transportationDetails.vehicle_no || "",
+          driver_name: transportationDetails.driver_name || "",
+          driver_contact: transportationDetails.driver_contact || "",
+          delivery_date: challan.delivery_date || "",
+          delivery_location: challan.delivery_location || "",
+          challan_no: challan.challan_no || "",
+          challan_date: challan.challan_date || "",
+          eway_bill: challan.eway_bill || "",
+          remarks: challan.remarks || "",
+        });
+
+        // Set items
+        if (challan.items && challan.items.length > 0) {
+          const formattedItems = challan.items.map(item => ({
+            productCode: item.product_code || "",
+            imageUrl: item.product_image || "",
+            name: item.product_name || "",
+            hsn: item.product_hsn || "",
+            specification: item.product_specification || "",
+            unit: item.product_unit || "",
+            quantity: item.product_quantity || 1,
+            price: item.product_price || 0,
+          }));
+          setItems(formattedItems);
+        }
+      } catch (err) {
+        setError(err.message || "Failed to fetch delivery challan");
+      } finally {
+        setFetchLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchChallan();
+    }
+  }, [id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -140,8 +202,8 @@ export default function AddDeliveryChallanPage() {
         driver_contact: formData.driver_contact,
       });
 
-      const response = await fetch("/api/admin/delivery-challan", {
-        method: "POST",
+      const response = await fetch(`/api/admin/delivery-challan/${id}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
@@ -160,7 +222,7 @@ export default function AddDeliveryChallanPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create delivery challan");
+        throw new Error("Failed to update delivery challan");
       }
 
       router.push("/admin-dashboard/delivery-challan");
@@ -171,6 +233,14 @@ export default function AddDeliveryChallanPage() {
     }
   };
 
+  if (fetchLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex items-center gap-4 mb-6">
@@ -180,7 +250,7 @@ export default function AddDeliveryChallanPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold text-gray-700">Add Delivery Challan</h1>
+        <h1 className="text-2xl font-bold text-gray-700">Edit Delivery Challan</h1>
       </div>
 
       {error && (
@@ -531,7 +601,7 @@ export default function AddDeliveryChallanPage() {
             className="w-fit inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={18} />
-            {loading ? "Saving..." : "Save Delivery Challan"}
+            {loading ? "Updating..." : "Update Delivery Challan"}
           </button>
           <button
             type="button"

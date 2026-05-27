@@ -52,3 +52,97 @@ export async function GET(request, { params }) {
     );
   }
 }
+
+export async function PUT(request, { params }) {
+  try {
+    const { id } = await params;
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
+
+    const body = await request.json();
+    const {
+      delivery_challan_for,
+      ship_to,
+      transportation_details,
+      delivery_date,
+      delivery_location,
+      challan_no,
+      challan_date,
+      eway_bill,
+      items,
+      remarks,
+    } = body;
+
+    const conn = await getDbConnection();
+
+    // Add eway_bill column if it doesn't exist
+    try {
+      await conn.execute(`ALTER TABLE delivery_challans ADD COLUMN eway_bill VARCHAR(255)`);
+    } catch (err) {
+      // Column might already exist, ignore error
+    }
+
+    // Update delivery challan
+    await conn.execute(
+      `UPDATE delivery_challans 
+        SET delivery_challan_for = ?, ship_to = ?, transportation_details = ?, 
+            delivery_date = ?, delivery_location = ?, challan_no = ?, 
+            challan_date = ?, eway_bill = ?, remarks = ?
+        WHERE id = ?`,
+      [
+        delivery_challan_for,
+        ship_to,
+        transportation_details,
+        delivery_date,
+        delivery_location,
+        challan_no,
+        challan_date,
+        eway_bill,
+        remarks,
+        id,
+      ]
+    );
+
+    // Delete existing items
+    await conn.execute(
+      "DELETE FROM delivery_challan_items WHERE delivery_challan_id = ?",
+      [id]
+    );
+
+    // Insert updated items
+    if (items && Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        await conn.execute(
+          `INSERT INTO delivery_challan_items 
+            (delivery_challan_id, product_code, product_name, product_hsn, product_specification, product_unit, product_price, product_quantity, product_image)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            item.productCode,
+            item.name,
+            item.hsn,
+            item.specification,
+            item.unit,
+            item.price,
+            item.quantity,
+            item.imageUrl,
+          ]
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error updating delivery challan:", error);
+    return NextResponse.json(
+      { error: "Failed to update delivery challan" },
+      { status: 500 }
+    );
+  }
+}

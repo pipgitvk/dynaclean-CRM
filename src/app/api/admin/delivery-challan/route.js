@@ -28,6 +28,7 @@ export async function POST(request) {
       delivery_location,
       challan_no,
       challan_date,
+      eway_bill,
       items,
       remarks,
     } = body;
@@ -58,6 +59,13 @@ export async function POST(request) {
       // Column might already exist, ignore error
     }
 
+    // Add eway_bill column if it doesn't exist
+    try {
+      await conn.execute(`ALTER TABLE delivery_challans ADD COLUMN eway_bill VARCHAR(255)`);
+    } catch (err) {
+      // Column might already exist, ignore error
+    }
+
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS delivery_challan_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -77,8 +85,8 @@ export async function POST(request) {
     // Insert delivery challan
     const [result] = await conn.execute(
       `INSERT INTO delivery_challans 
-        (delivery_challan_for, ship_to, transportation_details, delivery_date, delivery_location, challan_no, challan_date, remarks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (delivery_challan_for, ship_to, transportation_details, delivery_date, delivery_location, challan_no, challan_date, eway_bill, remarks)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         delivery_challan_for,
         ship_to,
@@ -87,6 +95,7 @@ export async function POST(request) {
         delivery_location,
         challan_no,
         challan_date,
+        eway_bill,
         remarks,
       ]
     );
