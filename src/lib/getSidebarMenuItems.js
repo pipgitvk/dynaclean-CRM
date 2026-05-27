@@ -24,16 +24,24 @@ function getDashboardPrefix(roleKey) {
 // Transform menu item paths based on role
 function transformMenuItemPaths(item, roleKey) {
   const dashboardPrefix = getDashboardPrefix(roleKey);
+  const roleUpper = String(roleKey || "").toUpperCase();
 
   // Don't transform admin-dashboard or empcrm paths
   if (item.path?.startsWith("/admin-dashboard") || item.path?.startsWith("/empcrm")) {
     return item;
   }
 
-  // Don't transform my-leads path for digital marketers
-  const roleUpper = String(roleKey || "").toUpperCase();
+  // Don't transform my-leads path for digital marketers - middleware allows /user-dashboard/my-leads
   if (item.path?.startsWith("/user-dashboard/my-leads") && (roleUpper.includes("DIGITAL") || roleUpper.includes("MARKETER"))) {
     return item;
+  }
+
+  // Transform children recursively
+  if (item.children?.length) {
+    return {
+      ...item,
+      children: item.children.map(child => transformMenuItemPaths(child, roleKey)),
+    };
   }
 
   // Transform user-dashboard paths to role-specific dashboard
@@ -41,14 +49,6 @@ function transformMenuItemPaths(item, roleKey) {
     return {
       ...item,
       path: item.path.replace("/user-dashboard", dashboardPrefix),
-    };
-  }
-  
-  // Transform children recursively
-  if (item.children?.length) {
-    return {
-      ...item,
-      children: item.children.map(child => transformMenuItemPaths(child, roleKey)),
     };
   }
   
