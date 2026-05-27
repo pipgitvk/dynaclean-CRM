@@ -31,11 +31,6 @@ function transformMenuItemPaths(item, roleKey) {
     return item;
   }
 
-  // Don't transform my-leads path for digital marketers - middleware allows /user-dashboard/my-leads
-  if (item.path?.startsWith("/user-dashboard/my-leads") && (roleUpper.includes("DIGITAL") || roleUpper.includes("MARKETER"))) {
-    return item;
-  }
-
   // Transform children recursively
   if (item.children?.length) {
     return {
