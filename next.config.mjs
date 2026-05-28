@@ -38,6 +38,11 @@ const nextConfig = {
         source: "/uploads/:path*",
         destination: "/api/serve/:path*",
       },
+      // Serve company documents via catch-all API route
+      {
+        source: "/company_documents/:path*",
+        destination: "/api/serve/:path*",
+      },
     ];
   },
 };
