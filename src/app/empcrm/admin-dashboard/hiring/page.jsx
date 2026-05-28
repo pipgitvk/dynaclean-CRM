@@ -177,6 +177,7 @@ export default function HiringPage() {
   const [filterInterviewFrom, setFilterInterviewFrom] = useState("");
   const [filterInterviewTo, setFilterInterviewTo] = useState("");
   const [filterCandidateName, setFilterCandidateName] = useState("");
+  const [filterEmpContact, setFilterEmpContact] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterNextFollowupFrom, setFilterNextFollowupFrom] = useState("");
   const [filterNextFollowupTo, setFilterNextFollowupTo] = useState("");
@@ -195,7 +196,6 @@ export default function HiringPage() {
 
   const hasActiveFilters =
     Boolean(filterCandidateName) ||
-    Boolean(filterStatus) ||
     Boolean(filterNextFollowupFrom) ||
     Boolean(filterNextFollowupTo) ||
     Boolean(filterMode) ||
@@ -213,6 +213,7 @@ export default function HiringPage() {
     setFilterInterviewFrom("");
     setFilterInterviewTo("");
     setFilterCandidateName("");
+    setFilterEmpContact("");
     setFilterStatus("");
     setFilterNextFollowupFrom("");
     setFilterNextFollowupTo("");
@@ -249,6 +250,7 @@ export default function HiringPage() {
       let url = `/api/empcrm/hiring?`;
       const params = new URLSearchParams();
       if (filterCandidateName) params.append("candidate_name", filterCandidateName);
+      if (filterEmpContact) params.append("emp_contact", filterEmpContact);
       if (filterStatus) params.append("status", filterStatus);
       if (filterNextFollowupFrom) params.append("next_followup_from", filterNextFollowupFrom);
       if (filterNextFollowupTo) params.append("next_followup_to", filterNextFollowupTo);
@@ -275,7 +277,7 @@ export default function HiringPage() {
       setLoading(false);
     }
   }, [
-    filterCandidateName, filterStatus, filterNextFollowupFrom, filterNextFollowupTo,
+    filterCandidateName, filterEmpContact, filterStatus, filterNextFollowupFrom, filterNextFollowupTo,
     filterMode, filterDesignation, filterJoinFrom, filterJoinTo, filterInterviewFrom, filterInterviewTo
   ]);
 
@@ -289,7 +291,8 @@ export default function HiringPage() {
     if (stored) {
       setFilterCandidateName(stored.candidate_name || "");
       setFilterStatus(stored.status || "");
-      setFilterNextFollowupFrom(stored.next_followup_from || "");
+      setFilterNextFollowupFrom(stored.next_follme || "");
+      setFilterEopContact(stored.wmp_contactup_from || "");
       setFilterNextFollowupTo(stored.next_followup_to || "");
       setFilterMode(stored.interview_mode || "");
       setFilterDesignation(stored.designation || "");
@@ -311,6 +314,7 @@ export default function HiringPage() {
           FILTER_STORAGE_KEY,
           JSON.stringify({
             candidate_name: filterCandidateName,
+            emp_contact: filterEmpContact,
             status: filterStatus,
             next_followup_from: filterNextFollowupFrom,
             next_followup_to: filterNextFollowupTo,
@@ -329,6 +333,7 @@ export default function HiringPage() {
   }, [
     filtersHydrated,
     filterCandidateName,
+    filterEmpContact,
     filterStatus,
     filterNextFollowupFrom,
     filterNextFollowupTo,
@@ -566,6 +571,16 @@ export default function HiringPage() {
               className={`${fieldClass} min-h-[44px]`}
               value={filterCandidateName}
               onChange={(e) => setFilterCandidateName(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-2">
+            <label className="text-xs font-medium uppercase tracking-wide text-slate-500">Contact</label>
+            <input
+              type="text"
+              placeholder="Search contact"
+              className={`${fieldClass} min-h-[44px]`}
+              value={filterEmpContact}
+              onChange={(e) => setFilterEmpContact(e.target.value)}
             />
           </div>
           <div className="flex flex-col gap-1.5 min-w-0 sm:col-span-1 lg:col-span-3">

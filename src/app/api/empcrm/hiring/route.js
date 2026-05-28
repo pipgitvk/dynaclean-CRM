@@ -77,6 +77,7 @@ export async function GET(req) {
     }
 
     const candidateNameParam = searchParams.get("candidate_name");
+    const empContactParam = searchParams.get("emp_contact");
     const statusParam = searchParams.get("status");
     const designationParam = searchParams.get("designation");
     const modeParam = searchParams.get("interview_mode");
@@ -97,6 +98,10 @@ export async function GET(req) {
     const candidateNameTrimmed =
       candidateNameParam != null && String(candidateNameParam).trim() !== ""
         ? String(candidateNameParam).trim()
+        : null;
+    const empContactTrimmed =
+      empContactParam != null && String(empContactParam).trim() !== ""
+        ? String(empContactParam).trim()
         : null;
     const statusTrimmed =
       statusParam != null && String(statusParam).trim() !== ""
@@ -162,6 +167,10 @@ export async function GET(req) {
     if (candidateNameTrimmed != null) {
       sql += ` AND h.candidate_name LIKE ?`;
       params.push(`%${candidateNameTrimmed}%`);
+    }
+    if (empContactTrimmed != null) {
+      sql += ` AND h.emp_contact LIKE ?`;
+      params.push(`%${empContactTrimmed}%`);
     }
     if (statusTrimmed != null) {
       if (["Didn't receive the call", "Cut the call", "Not reachable"].includes(statusTrimmed)) {
