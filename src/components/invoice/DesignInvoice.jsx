@@ -2743,7 +2743,7 @@ const NewInvoice = ({ invoice }) => {
   <div style={{ marginBottom: "3px" }}><b>Address: </b>{data.buyer.address}</div>
 
   <div style={{ marginBottom: "3px" }}>
-    <b>GSTIN: </b>{data.buyer.gstin || "22AAAAA0000A1Z5"}
+    <b>GSTIN: </b>{data.buyer.gstin || "N/A"}
     {"   "}
     <b>State: </b>{data.buyer.state}
   </div>
@@ -2778,7 +2778,7 @@ const NewInvoice = ({ invoice }) => {
 
   <div style={{ marginBottom: "3px" }}><b>Address: </b>{data.consignee.address}</div>
 
-  <div style={{ marginBottom: "3px" }}><b>GSTIN: </b>{data.consignee.gstin || "22AAAAA0000A1Z5"}</div>
+  <div style={{ marginBottom: "3px" }}><b>GSTIN: </b>{data.consignee.gstin || "N/A"}</div>
 
   <div style={{ marginBottom: "3px" }}><b>State: </b>{data.consignee.state}</div>
 

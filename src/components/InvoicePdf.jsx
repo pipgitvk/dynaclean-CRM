@@ -536,7 +536,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                   </Text>
                   <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
                     <Text style={styles.bold}>GSTIN: </Text>
-                    <Text>{data.buyer.gstin || "22AAAAA0000A1Z5"}</Text>
+                    <Text>{data.buyer.gstin || "N/A"}</Text>
                     <Text>   </Text>
                     <Text style={styles.bold}>State: </Text>
                     <Text>{data.buyer.state || "-"}</Text>
@@ -566,7 +566,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                   </Text>
                   <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
                     <Text style={styles.bold}>GSTIN: </Text>
-                    <Text>{data.consignee.gstin || "22AAAAA0000A1Z5"}</Text>
+                    <Text>{data.consignee.gstin || "N/A"}</Text>
                   </Text>
                   <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
                     <Text style={styles.bold}>State: </Text>

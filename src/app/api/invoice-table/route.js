@@ -322,6 +322,7 @@ export async function POST(req) {
     // Insert invoice_items for each item
     for (let item of items) {
       const item_name = item.item_name || null;
+      const item_code = item.item_code || null;
       const description = item.description || null;
       const hsn_code = item.hsn_code || null;
       const quantity = item.quantity || 0;
@@ -339,12 +340,13 @@ export async function POST(req) {
 
       await conn.execute(
         `INSERT INTO invoice_items 
-         (invoice_id, item_name, description, hsn_code, quantity, rate, discount_percent, 
+         (invoice_id, item_code, item_name, description, hsn_code, quantity, rate, discount_percent, 
           discount_amount, taxable_value, cgst_percent, sgst_percent, igst_percent, 
           cgst_amount, sgst_amount, igst_amount, total_amount, image_url, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           invoiceId,
+          item_code,
           item_name,
           description,
           hsn_code,
