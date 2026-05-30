@@ -255,32 +255,6 @@ export default function EditCredentialPage() {
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={handleAddFormId}
-              className="mt-2 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-              Add Another Form ID
-            </button>
-          </div>
-
-          {/* Form-Specific Assignments */}
-          <MetaFormAssignments formIds={formData.formIds} employees={employees} />
-
-          {/* Active Status */}
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              name="isActive"
-              id="isActive"
-              checked={formData.isActive}
-              onChange={handleInputChange}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
-              Active (this credential will be used for lead syncing)
-            </label>
           </div>
 
           {/* Submit Buttons */}

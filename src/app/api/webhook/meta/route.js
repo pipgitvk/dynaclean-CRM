@@ -155,12 +155,20 @@ export async function POST(request) {
             if (normalizedPhone.length === 10) {
               try {
                 const conn = await getDbConnection();
-                const [rows] = await conn.execute(
+                
+                // Check if phone exists in customers table
+                const [custRows] = await conn.execute(
                   `SELECT customer_id FROM customers WHERE ${PHONE_LAST10_WHERE} LIMIT 1`,
                   [normalizedPhone]
                 );
                 
-                if (rows.length === 0) {
+                // Check if phone exists in meta_leads table (already imported)
+                const [metaRows] = await conn.execute(
+                  `SELECT id FROM meta_leads WHERE ${PHONE_LAST10_WHERE} AND is_imported_to_crm = 1 LIMIT 1`,
+                  [normalizedPhone]
+                );
+                
+                if (custRows.length === 0 && metaRows.length === 0) {
                   // Import to CRM
                   const now = new Date();
                   const phoneToStore = normalizedPhone;
@@ -210,7 +218,11 @@ export async function POST(request) {
                   
                   console.log(`✅ Lead imported to CRM: ${customerId}`);
                 } else {
-                  console.log(`⚠️ Lead phone already exists in CRM: ${normalizedPhone}`);
+                  if (custRows.length > 0) {
+                    console.log(`⚠️ Lead phone already exists in CRM: ${normalizedPhone}`);
+                  } else if (metaRows.length > 0) {
+                    console.log(`⚠️ Lead phone already exists in meta_leads (imported): ${normalizedPhone}`);
+                  }
                 }
               } catch (err) {
                 console.error('❌ Error importing lead to CRM:', err);

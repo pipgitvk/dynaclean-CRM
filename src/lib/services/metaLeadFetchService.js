@@ -120,6 +120,38 @@ async function checkLeadExistsInCRM(phone) {
 }
 
 /**
+ * Check if lead already exists in meta_leads table (by leadgenId or phone)
+ */
+async function checkLeadExistsInMetaLeads(leadgenId, phone) {
+  try {
+    const conn = await getDbConnection();
+    let query = 'SELECT id FROM meta_leads WHERE is_imported_to_crm = 1';
+    const params = [];
+
+    if (leadgenId) {
+      query += ' AND leadgen_id = ?';
+      params.push(leadgenId);
+    }
+
+    if (phone) {
+      const normalizedPhone = normalizePhone(phone);
+      if (normalizedPhone.length === 10) {
+        query += ` OR JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone_number')) IS NOT NULL AND RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone_number')), ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', ''), ',', ''), 10) = ?`;
+        params.push(normalizedPhone);
+      }
+    }
+
+    query += ' LIMIT 1';
+
+    const [rows] = await conn.execute(query, params);
+    return rows.length > 0;
+  } catch (error) {
+    console.error('Error checking lead in meta_leads:', error);
+    return false;
+  }
+}
+
+/**
  * Import lead into CRM (MySQL customers table)
  */
 async function importLeadToCRM(lead, assignedTo) {
@@ -272,7 +304,9 @@ async function syncLeadsForCredential(credential, options = {}) {
         // Auto-import to CRM if requested
         if (autoImport) {
           const existsInCRM = await checkLeadExistsInCRM(parsedLead.phone);
-          if (!existsInCRM && parsedLead.phone) {
+          const existsInMetaLeads = await checkLeadExistsInMetaLeads(leadgenId, parsedLead.phone);
+
+          if (!existsInCRM && !existsInMetaLeads && parsedLead.phone) {
             try {
               const customerId = await importLeadToCRM(
                 {
@@ -285,11 +319,17 @@ async function syncLeadsForCredential(credential, options = {}) {
               await markLeadAsImported(leadgenId, customerId);
 
               leadsImported++;
+              console.log(`✅ Imported lead ${leadgenId} to CRM (phone: ${parsedLead.phone})`);
             } catch (err) {
               console.error('Error importing lead to CRM:', err);
             }
           } else {
             leadsSkipped++;
+            if (existsInCRM) {
+              console.log(`⚠️ Skipped lead ${leadgenId} - phone ${parsedLead.phone} already exists in CRM`);
+            } else if (existsInMetaLeads) {
+              console.log(`⚠️ Skipped lead ${leadgenId} - lead already imported to CRM (by leadgenId or phone)`);
+            }
           }
         }
       }

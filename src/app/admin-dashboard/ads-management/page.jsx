@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Eye, EyeOff, X } from "lucide-react";
 import {
   TAMIL_META_FORM_ID,
@@ -120,6 +122,10 @@ function addTamilCronHistory(entry) {
 }
 
 export default function MetaBackfillPage() {
+  const searchParams = useSearchParams();
+  const formIdsParam = searchParams.get('formIds');
+  const filteredFormIds = formIdsParam ? formIdsParam.split(',') : null;
+
   const [since, setSince] = useState("");
   const [until, setUntil] = useState("");
   const [leads, setLeads] = useState([]);
@@ -386,7 +392,10 @@ export default function MetaBackfillPage() {
     }
     setLoading(true);
     try {
-      const baseUrl = `/api/meta-backfill?since=${since}&until=${until}`;
+      let baseUrl = `/api/meta-backfill?since=${since}&until=${until}`;
+      if (filteredFormIds) {
+        baseUrl += `&formIds=${filteredFormIds.join(',')}`;
+      }
       const url = autoImportEnabled ? `${baseUrl}&autoImport=1` : baseUrl;
       const res = await fetch(url);
       const data = await res.json();
@@ -416,7 +425,10 @@ export default function MetaBackfillPage() {
     setLeads([]);
     setLoading(true);
     try {
-      const baseUrl = `/api/meta-backfill?mode=all`;
+      let baseUrl = `/api/meta-backfill?mode=all`;
+      if (filteredFormIds) {
+        baseUrl += `&formIds=${filteredFormIds.join(',')}`;
+      }
       const url = autoImportEnabled ? `${baseUrl}&autoImport=1` : baseUrl;
       const res = await fetch(url);
       const data = await res.json();
@@ -449,7 +461,11 @@ export default function MetaBackfillPage() {
     }
     setLeadsReportLoading(true);
     try {
-      const res = await fetch(`/api/meta-backfill/leads-report?from=${since}&to=${until}`);
+      let url = `/api/meta-backfill/leads-report?from=${since}&to=${until}`;
+      if (filteredFormIds) {
+        url += `&formIds=${filteredFormIds.join(',')}`;
+      }
+      const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) {
         setMessage(data?.error || "Failed to fetch leads report");
@@ -478,6 +494,9 @@ export default function MetaBackfillPage() {
         to: until,
         assigner: assignerLabel,
       });
+      if (filteredFormIds) {
+        q.append('formIds', filteredFormIds.join(','));
+      }
       const res = await fetch(`/api/meta-backfill/leads-report/by-assigner?${q.toString()}`);
       const data = await res.json();
       if (!res.ok) {
@@ -506,6 +525,9 @@ export default function MetaBackfillPage() {
         to: until,
         employee: employeeName,
       });
+      if (filteredFormIds) {
+        q.append('formIds', filteredFormIds.join(','));
+      }
       const res = await fetch(`/api/meta-backfill/leads-report/details?${q.toString()}`);
       const data = await res.json();
       if (!res.ok) {
@@ -535,13 +557,20 @@ export default function MetaBackfillPage() {
     setMessage("");
     try {
       const q = new URLSearchParams({ from: since, to: until, by });
+      if (filteredFormIds) {
+        q.append('formIds', filteredFormIds.join(','));
+      }
       const res = await fetch(`/api/meta-backfill/leads-report/assigned-by?${q.toString()}`);
       const data = await res.json();
       if (!res.ok) {
         setAssignedByError(data?.error || "Failed to load leads");
         return;
       }
-      setAssignedByLeads(data.leads || []);
+      if (data.mode === 'employee_counts') {
+        setAssignedByLeads(data.employeeCounts || []);
+      } else {
+        setAssignedByLeads(data.leads || []);
+      }
     } catch (err) {
       console.error(err);
       setAssignedByError("Error loading leads");
@@ -746,7 +775,23 @@ export default function MetaBackfillPage() {
   return (
     <div className="p-4 space-y-4 max-w-full">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Meta Leads Backfill</h1>
+        <div>
+          <h1 className="text-xl font-semibold">Meta Leads Backfill</h1>
+          {filteredFormIds && (
+            <p className="text-sm text-gray-600 mt-1">
+              Filtered by Form IDs: {filteredFormIds.join(', ')}
+            </p>
+          )}
+        </div>
+        {filteredFormIds && (
+          <Link
+            href="/admin-dashboard/ads-management"
+            className="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-700"
+          >
+            Clear Filter
+          </Link>
+        )}
+        {/*
         <button
           type="button"
           onClick={() => setCredentialModalOpen(true)}
@@ -754,6 +799,7 @@ export default function MetaBackfillPage() {
         >
           Add Credential
         </button>
+        */}
       </div>
 
       {credentialModalOpen && (
@@ -835,49 +881,6 @@ export default function MetaBackfillPage() {
           </div>
         </div>
       )}
-
-      {/* Facebook Credentials Display */}
-      <div className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
-        <h2 className="font-medium mb-3 text-blue-900">Facebook Credentials</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div className="bg-white rounded p-2 border">
-            <strong className="text-gray-600">FB_VERIFY_TOKEN:</strong>
-            <p className="mt-1 text-xs text-gray-700 break-all font-mono">
-              {currentCredentials?.FB_VERIFY_TOKEN || "Not configured"}
-            </p>
-          </div>
-          <div className="bg-white rounded p-2 border">
-            <strong className="text-gray-600">FB_PAGE_ID:</strong>
-            <p className="mt-1 text-xs text-gray-700 break-all font-mono">
-              {currentCredentials?.FB_PAGE_ID || "Not configured"}
-            </p>
-          </div>
-          <div className="bg-white rounded p-2 border">
-            <strong className="text-gray-600">FB_PAGE_TOKEN:</strong>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-xs text-gray-700 break-all font-mono flex-1">
-                {showToken ? (currentCredentials?.FB_PAGE_TOKEN || "Not configured") : (currentCredentials?.FB_PAGE_TOKEN ? "••••••••••••" : "Not configured")}
-              </p>
-              {currentCredentials?.FB_PAGE_TOKEN && (
-                <button
-                  type="button"
-                  onClick={() => setShowToken(!showToken)}
-                  className="p-1 text-gray-500 hover:text-gray-700"
-                  title={showToken ? "Hide token" : "Show token"}
-                >
-                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="bg-white rounded p-2 border">
-            <strong className="text-gray-600">FB_LEAD_FORM_ID:</strong>
-            <p className="mt-1 text-xs text-gray-700 break-all font-mono">
-              {currentCredentials?.FB_LEAD_FORM_ID || "Not configured"}
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Detailing Diagnosis - Why leads not in DB */}
       <div className="border rounded-lg p-4 bg-amber-50/50 border-amber-200">
@@ -988,6 +991,7 @@ export default function MetaBackfillPage() {
       </div>
 
       {/* Automatic Cron - fetches leads from Meta */}
+      {/*
       <div className="border rounded-lg p-4 bg-blue-50/50 border-blue-200">
         <h2 className="font-medium mb-3 text-blue-900">Automatic Cron (every 10 min)</h2>
         <div className="flex flex-wrap gap-2 items-center">
@@ -1104,8 +1108,10 @@ export default function MetaBackfillPage() {
           </div>
         )}
       </div>
+      */}
 
       {/* Tamil form cron — same rhythm as main cron; imports Form {TAMIL_META_FORM_ID} → KAVYA */}
+      {/*
       <div className="border rounded-lg p-4 bg-cyan-50/50 border-cyan-200">
         <h2 className="font-medium mb-3 text-cyan-950">
           Tamil leads — Automatic Cron (every 10 min)
@@ -1239,7 +1245,10 @@ export default function MetaBackfillPage() {
           </div>
         )}
       </div>
+      */}
 
+      {/* Automatic import new Meta leads to DB */}
+      {/*
       <div className="border rounded-lg p-3 bg-gray-50">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -1276,6 +1285,7 @@ export default function MetaBackfillPage() {
           </div>
         </div>
       </div>
+      */}
 
       <form onSubmit={handleFetch} className="space-y-2">
         <div className="flex flex-wrap gap-3 items-end">
@@ -1837,62 +1847,86 @@ export default function MetaBackfillPage() {
               )}
               {!assignedByLoading && !assignedByError && assignedByLeads.length > 0 && (
                 <>
-                  <div className="mb-3 rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2 text-sm text-gray-800">
-                    {/* <span className="font-medium text-teal-950">Campaign (lead_campaign):</span>{" "} */}
-                    <span className="ml-1">
-                      social_media={assignedByCampaignTotals.social_media}
-                    </span>
-                    <span className="mx-2 text-gray-400">|</span>
-                    <span>indiamart={assignedByCampaignTotals.indiamart}</span>
-                    <span className="mx-2 text-gray-400">|</span>
-                    <span>google={assignedByCampaignTotals.google}</span>
-                  </div>
-                  <div className="overflow-x-auto border rounded">
-                  <table className="min-w-full text-xs sm:text-sm">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-2 py-2 text-left border-b">ID</th>
-                        <th className="px-2 py-2 text-left border-b">Name</th>
-                        <th className="px-2 py-2 text-left border-b">Phone</th>
-                        <th className="px-2 py-2 text-left border-b">Email</th>
-                        <th className="px-2 py-2 text-left border-b">lead_source</th>
-                        <th className="px-2 py-2 text-left border-b">sales_representative</th>
-                        {/* <th className="px-2 py-2 text-left border-b">Added By</th> */}
-                        <th className="px-2 py-2 text-left border-b">Status</th>
-                        <th className="px-2 py-2 text-left border-b">Stage</th>
-                        <th className="px-2 py-2 text-left border-b">Campaign</th>
-                        <th className="px-2 py-2 text-left border-b">Created</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {assignedByLeads.map((lead) => {
-                        const fullName = [lead.first_name, lead.last_name]
-                          .filter(Boolean)
-                          .join(" ")
-                          .trim() || "—";
-                        const created =
-                          lead.date_created != null
-                            ? String(lead.date_created).slice(0, 19).replace("T", " ")
-                            : "—";
-                        return (
-                          <tr key={lead.customer_id} className="border-b border-gray-100">
-                            <td className="px-2 py-2 whitespace-nowrap">{lead.customer_id}</td>
-                            <td className="px-2 py-2">{fullName}</td>
-                            <td className="px-2 py-2 whitespace-nowrap">{lead.phone || "—"}</td>
-                            <td className="px-2 py-2 break-all max-w-[160px]">{lead.email || "—"}</td>
-                            <td className="px-2 py-2 whitespace-nowrap">{lead.lead_source || "—"}</td>
-                            <td className="px-2 py-2 whitespace-nowrap">{lead.sales_representative || "—"}</td>
-                            <td className="px-2 py-2 whitespace-nowrap">{lead.assigned_to || "—"}</td>
-                            <td className="px-2 py-2">{lead.status || "—"}</td>
-                            <td className="px-2 py-2">{lead.stage || "—"}</td>
-                            <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
-                            <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
+                  {/* Employee counts format (when formIds are filtered) */}
+                  {assignedByLeads[0]?.employee !== undefined && assignedByLeads[0]?.lead_count !== undefined ? (
+                    <div className="overflow-x-auto border rounded">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-4 py-2 text-left border-b">Employee</th>
+                            <th className="px-4 py-2 text-right border-b">Lead Count</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                        </thead>
+                        <tbody>
+                          {assignedByLeads.map((row, i) => (
+                            <tr key={i} className="border-b border-gray-100">
+                              <td className="px-4 py-2 font-medium">{row.employee}</td>
+                              <td className="px-4 py-2 text-right font-bold">{row.lead_count}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mb-3 rounded-lg border border-teal-200 bg-teal-50/60 px-3 py-2 text-sm text-gray-800">
+                        {/* <span className="font-medium text-teal-950">Campaign (lead_campaign):</span>{" "} */}
+                        <span className="ml-1">
+                          social_media={assignedByCampaignTotals.social_media}
+                        </span>
+                        <span className="mx-2 text-gray-400">|</span>
+                        <span>indiamart={assignedByCampaignTotals.indiamart}</span>
+                        <span className="mx-2 text-gray-400">|</span>
+                        <span>google={assignedByCampaignTotals.google}</span>
+                      </div>
+                      <div className="overflow-x-auto border rounded">
+                      <table className="min-w-full text-xs sm:text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-2 py-2 text-left border-b">ID</th>
+                            <th className="px-2 py-2 text-left border-b">Name</th>
+                            <th className="px-2 py-2 text-left border-b">Phone</th>
+                            <th className="px-2 py-2 text-left border-b">Email</th>
+                            <th className="px-2 py-2 text-left border-b">lead_source</th>
+                            <th className="px-2 py-2 text-left border-b">sales_representative</th>
+                            {/* <th className="px-2 py-2 text-left border-b">Added By</th> */}
+                            <th className="px-2 py-2 text-left border-b">Status</th>
+                            <th className="px-2 py-2 text-left border-b">Stage</th>
+                            <th className="px-2 py-2 text-left border-b">Campaign</th>
+                            <th className="px-2 py-2 text-left border-b">Created</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {assignedByLeads.map((lead) => {
+                            const fullName = [lead.first_name, lead.last_name]
+                              .filter(Boolean)
+                              .join(" ")
+                              .trim() || "—";
+                            const created =
+                              lead.date_created != null
+                                ? String(lead.date_created).slice(0, 19).replace("T", " ")
+                                : "—";
+                            return (
+                              <tr key={lead.customer_id} className="border-b border-gray-100">
+                                <td className="px-2 py-2 whitespace-nowrap">{lead.customer_id}</td>
+                                <td className="px-2 py-2">{fullName}</td>
+                                <td className="px-2 py-2 whitespace-nowrap">{lead.phone || "—"}</td>
+                                <td className="px-2 py-2 break-all max-w-[160px]">{lead.email || "—"}</td>
+                                <td className="px-2 py-2 whitespace-nowrap">{lead.lead_source || "—"}</td>
+                                <td className="px-2 py-2 whitespace-nowrap">{lead.sales_representative || "—"}</td>
+                                <td className="px-2 py-2 whitespace-nowrap">{lead.assigned_to || "—"}</td>
+                                <td className="px-2 py-2">{lead.status || "—"}</td>
+                                <td className="px-2 py-2">{lead.stage || "—"}</td>
+                                <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
+                                <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

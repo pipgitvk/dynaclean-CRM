@@ -1,15 +1,16 @@
 /**
- * GET /api/meta-backfill/leads-report/details?from=YYYY-MM-DD&to=YYYY-MM-DD&employee=...
+ * GET /api/meta-backfill/leads-report/details?from=YYYY-MM-DD&to=YYYY-MM-DD&employee=...&formIds=xxx,yyy
  * Lists customers (leads) counted for that employee in leads-report, same CASE as aggregate.
+ * When formIds is provided, filters to only show leads from those specific form IDs.
  */
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 const EMPLOYEE_CASE = `CASE 
-  WHEN assigned_to IS NULL OR assigned_to = '' OR assigned_to = 'Automatic' 
-  THEN COALESCE(lead_source, sales_representative, 'Unassigned')
-  ELSE assigned_to 
+  WHEN c.assigned_to IS NULL OR c.assigned_to = '' OR c.assigned_to = 'Automatic' 
+  THEN COALESCE(c.lead_source, c.sales_representative, 'Unassigned')
+  ELSE c.assigned_to 
 END`;
 
 export async function GET(request) {
@@ -27,6 +28,8 @@ export async function GET(request) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
     const employee = searchParams.get("employee");
+    const formIdsParam = searchParams.get("formIds");
+    const formIds = formIdsParam ? formIdsParam.split(',') : null;
 
     if (!from || !to) {
       return NextResponse.json(
@@ -40,26 +43,41 @@ export async function GET(request) {
 
     const conn = await getDbConnection();
 
-    const [rows] = await conn.execute(
-      `SELECT 
-        customer_id,
-        first_name,
-        last_name,
-        phone,
-        email,
-        status,
-        stage,
-        lead_campaign,
-        date_created,
-        assigned_to,
-        lead_source,
-        sales_representative
-       FROM customers
-       WHERE DATE(date_created) BETWEEN ? AND ?
-       AND (${EMPLOYEE_CASE}) = ?
-       ORDER BY date_created DESC`,
-      [from, to, employee]
-    );
+    let query = `
+      SELECT 
+        c.customer_id,
+        c.first_name,
+        c.last_name,
+        c.phone,
+        c.email,
+        c.status,
+        c.stage,
+        c.lead_campaign,
+        c.date_created,
+        c.assigned_to,
+        c.lead_source,
+        c.sales_representative
+       FROM customers c`;
+    
+    let params = [from, to, employee];
+
+    // Join with meta_leads if formIds filter is present
+    if (formIds && formIds.length > 0) {
+      query += ` INNER JOIN meta_leads ml ON c.customer_id = ml.crm_customer_id`;
+    }
+
+    query += ` WHERE DATE(c.date_created) BETWEEN ? AND ?
+       AND (${EMPLOYEE_CASE}) = ?`;
+
+    // Add formIds filter if present
+    if (formIds && formIds.length > 0) {
+      query += ` AND ml.form_id IN (${formIds.map(() => '?').join(',')})`;
+      params.push(...formIds);
+    }
+
+    query += ` ORDER BY c.date_created DESC`;
+
+    const [rows] = await conn.execute(query, params);
 
     return NextResponse.json({
       success: true,

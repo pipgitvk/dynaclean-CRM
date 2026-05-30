@@ -213,21 +213,7 @@ export default function AddCredentialPage() {
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={handleAddFormId}
-              className="mt-2 inline-flex items-center gap-2 text-blue-600 hover:text-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-              Add Another Form ID
-            </button>
-            <p className="mt-1 text-sm text-gray-500">
-              Add one or more lead form IDs. Leads from these forms will be assigned based on your configuration.
-            </p>
           </div>
-
-          {/* Form-Specific Assignments */}
-          <MetaFormAssignments formIds={formData.formIds} employees={employees} />
 
           {/* Submit Buttons */}
           <div className="flex items-center gap-4 pt-4 border-t">

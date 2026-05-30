@@ -88,6 +88,8 @@ export async function GET(request) {
     autoImportParam === "1" ||
     autoImportParam === "true" ||
     autoImportParam === "yes";
+  const formIdsParam = searchParams.get("formIds");
+  const formIds = formIdsParam ? formIdsParam.split(',') : null;
 
   // For normal mode we require a date range; for mode=all we don't
   if (mode !== "all" && (!since || !until)) {
@@ -96,7 +98,7 @@ export async function GET(request) {
 
   const credentials = await getFBCredentials();
   const token = credentials?.FB_PAGE_TOKEN;
-  const formId = credentials?.FB_LEAD_FORM_ID;
+  const formId = formIds ? formIds[0] : credentials?.FB_LEAD_FORM_ID;
 
   if (!token || !formId) {
     return new Response("FB_PAGE_TOKEN or FB_LEAD_FORM_ID not configured in database", {
@@ -105,44 +107,48 @@ export async function GET(request) {
   }
 
   try {
-    // Build Meta leads API URL
-    let url = new URL(`https://graph.facebook.com/v18.0/${formId}/leads`);
-    url.searchParams.set("access_token", token);
-    url.searchParams.set("limit", "100"); // page size
-    url.searchParams.set("fields", "field_data,ad_id,created_time");
-
-    // Only send time_range if we're not fetching ALL history
-    if (mode !== "all") {
-      url.searchParams.set("time_range[since]", since);
-      url.searchParams.set("time_range[until]", until);
-    }
-
-    // Fetch pages from Meta (max 20 pages = 2000 leads for mode=all to avoid timeout)
+    // Build Meta leads API URL(s) - support multiple form IDs
+    const targetFormIds = formIds || [formId];
     let rawLeads = [];
-    let pageCount = 0;
-    const maxPages = mode === "all" ? 20 : 50;
-    while (url && pageCount < maxPages) {
-      pageCount += 1;
-      const res = await fetch(url.toString());
-      const data = await res.json();
-      console.log("data from meta page", pageCount, data?.data?.length);
 
-      if (!res.ok) {
-        console.error("❌ Meta backfill error:", data);
-        return Response.json(
-          {
-            error: "meta_fetch_failed",
-            message: "Failed to fetch leads from Meta",
-            metaError: data?.error || data,
-          },
-          { status: 502 }
-        );
+    for (const currentFormId of targetFormIds) {
+      let url = new URL(`https://graph.facebook.com/v18.0/${currentFormId}/leads`);
+      url.searchParams.set("access_token", token);
+      url.searchParams.set("limit", "100"); // page size
+      url.searchParams.set("fields", "field_data,ad_id,created_time");
+
+      // Only send time_range if we're not fetching ALL history
+      if (mode !== "all") {
+        url.searchParams.set("time_range[since]", since);
+        url.searchParams.set("time_range[until]", until);
       }
 
-      rawLeads = rawLeads.concat(data?.data || []);
+      // Fetch pages from Meta (max 20 pages = 2000 leads for mode=all to avoid timeout)
+      let pageCount = 0;
+      const maxPages = mode === "all" ? 20 : 50;
+      while (url && pageCount < maxPages) {
+        pageCount += 1;
+        const res = await fetch(url.toString());
+        const data = await res.json();
+        console.log(`data from meta page ${currentFormId} page`, pageCount, data?.data?.length);
 
-      const next = data?.paging?.next;
-      url = next ? new URL(next) : null;
+        if (!res.ok) {
+          console.error("❌ Meta backfill error:", data);
+          return Response.json(
+            {
+              error: "meta_fetch_failed",
+              message: `Failed to fetch leads from Meta for form ${currentFormId}`,
+              metaError: data?.error || data,
+            },
+            { status: 502 }
+          );
+        }
+
+        rawLeads = rawLeads.concat(data?.data || []);
+
+        const next = data?.paging?.next;
+        url = next ? new URL(next) : null;
+      }
     }
 
     // Map raw leads into our shape

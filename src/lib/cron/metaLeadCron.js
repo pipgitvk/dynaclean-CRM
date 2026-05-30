@@ -1,22 +1,64 @@
 const cron = require('node-cron');
 const { syncAllActiveCredentials } = require('../services/metaLeadFetchService');
+const { getSetting, setSetting } = require('../mysql/settingsModel');
 
 let cronJob = null;
+let currentInterval = 1; // Default 1 minute
+
+/**
+ * Load cron interval from database
+ */
+async function loadCronInterval() {
+  try {
+    const savedInterval = await getSetting('meta_cron_interval');
+    if (savedInterval) {
+      currentInterval = parseInt(savedInterval);
+      console.log(`📊 Loaded cron interval from database: ${currentInterval} minute(s)`);
+    }
+  } catch (error) {
+    console.error('Failed to load cron interval from database:', error);
+  }
+}
+
+/**
+ * Convert minutes to cron expression
+ * For example: 1 minute runs every minute, 2 minutes runs every 2 minutes
+ */
+function minutesToCron(minutes) {
+  if (minutes === 1) return '* * * * *';
+  return `*/${minutes} * * * *`;
+}
 
 /**
  * Start the automatic cron job for Meta lead sync
- * Runs every 1 minute
+ * @param {number} interval - Interval in minutes (default: 1)
  */
-function startMetaLeadCron() {
+async function startMetaLeadCron(interval = 1) {
   if (cronJob) {
     console.log('⚠️ Meta lead cron job is already running');
     return;
   }
-  
-  console.log('🚀 Starting Meta lead cron job (every 1 minute)...');
-  
-  // Run every 1 minute
-  cronJob = cron.schedule('* * * * *', async () => {
+
+  // Load interval from database if not provided
+  if (interval === 1) {
+    await loadCronInterval();
+  } else {
+    currentInterval = interval;
+    // Save to database
+    try {
+      await setSetting('meta_cron_interval', interval.toString());
+      console.log(`💾 Saved cron interval to database: ${interval} minute(s)`);
+    } catch (error) {
+      console.error('Failed to save cron interval to database:', error);
+    }
+  }
+
+  const cronExpression = minutesToCron(currentInterval);
+
+  console.log(`🚀 Starting Meta lead cron job (every ${currentInterval} minute(s))...`);
+
+  // Run with custom interval
+  cronJob = cron.schedule(cronExpression, async () => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] 🔄 Running Meta lead sync cron...`);
     
@@ -67,12 +109,23 @@ function stopMetaLeadCron() {
 }
 
 /**
+ * Restart the cron job with a new interval
+ * @param {number} interval - New interval in minutes
+ */
+async function restartMetaLeadCron(interval = 1) {
+  stopMetaLeadCron();
+  await startMetaLeadCron(interval);
+  console.log(`🔄 Cron job restarted with ${interval} minute interval`);
+}
+
+/**
  * Get cron job status
  */
 function getCronStatus() {
   return {
     isRunning: cronJob !== null,
-    schedule: '*/10 * * * *' // Every 10 minutes
+    interval: currentInterval,
+    schedule: minutesToCron(currentInterval)
   };
 }
 
@@ -102,6 +155,7 @@ async function manualSync(options = {}) {
 module.exports = {
   startMetaLeadCron,
   stopMetaLeadCron,
+  restartMetaLeadCron,
   getCronStatus,
   manualSync
 };

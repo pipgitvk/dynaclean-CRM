@@ -13,6 +13,8 @@ export async function GET(request) {
     const assignedTo = searchParams.get('assignedTo');
     const formId = searchParams.get('formId');
     const isImported = searchParams.get('isImported');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     const limit = parseInt(searchParams.get('limit')) || 100;
     const skip = parseInt(searchParams.get('skip')) || 0;
     
@@ -21,11 +23,13 @@ export async function GET(request) {
     if (formId) filters.formId = formId;
     if (isImported !== null) {
       filters.isImported = isImported === 'true';
-      // For skipped leads, get unique leads by leadgen_id
-      if (filters.isImported === false) {
-        filters.unique = true;
-      }
     }
+    const uniqueParam = searchParams.get('unique');
+    if (uniqueParam !== null) {
+      filters.unique = uniqueParam === 'true';
+    }
+    if (startDate) filters.startDate = startDate;
+    if (endDate) filters.endDate = endDate;
     filters.limit = limit;
     filters.skip = skip;
     

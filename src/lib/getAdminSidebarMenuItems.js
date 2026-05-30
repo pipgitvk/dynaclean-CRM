@@ -296,14 +296,14 @@ const allMenuItems = [
       },
       {
         path: "/admin-dashboard/ads-management",
-        name: "Ads Management",
+        name: "Meta backfill",
         accessKey: "ads-management",
         roles: ["SUPERADMIN"],
         icon: "LayoutGrid",
       },
       {
         path: "/admin-dashboard/meta-credentials",
-        name: "Meta Credentials",
+        name: "Ads management",
         roles: ["SUPERADMIN"],
         icon: "Settings",
       },

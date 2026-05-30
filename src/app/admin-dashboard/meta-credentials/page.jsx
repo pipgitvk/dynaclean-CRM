@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { Plus, Edit2, Trash2, Power, PowerOff, RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Database } from 'lucide-react';
+import { Plus, Edit2, Trash2, Power, PowerOff, RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Database, Eye, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -13,16 +13,17 @@ export default function MetaCredentialsPage() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [cronStatus, setCronStatus] = useState(null);
+  const [cronInterval, setCronInterval] = useState(1);
 
   useEffect(() => {
     fetchCredentials();
     fetchCronStatus();
   }, []);
 
-  // Auto-start cron if not running
+  // Sync interval from cronStatus
   useEffect(() => {
-    if (cronStatus !== null && !cronStatus.isRunning) {
-      handleAutoStartCron();
+    if (cronStatus?.interval) {
+      setCronInterval(cronStatus.interval);
     }
   }, [cronStatus]);
 
@@ -113,7 +114,7 @@ export default function MetaCredentialsPage() {
   const handleToggleCron = async () => {
     try {
       const action = cronStatus?.isRunning ? 'stop' : 'start';
-      const response = await axios.post('/api/cron/meta-leads-sync', { action });
+      const response = await axios.post('/api/cron/meta-leads-sync', { action, interval: cronInterval });
       if (response.data.success) {
         toast.success(response.data.message);
         fetchCronStatus();
@@ -126,13 +127,33 @@ export default function MetaCredentialsPage() {
 
   const handleAutoStartCron = async () => {
     try {
-      const response = await axios.post('/api/cron/meta-leads-sync', { action: 'start' });
+      const response = await axios.post('/api/cron/meta-leads-sync', { action: 'start', interval: cronInterval });
       if (response.data.success) {
         console.log('✅ Cron auto-started');
         fetchCronStatus();
       }
     } catch (error) {
       console.error('Failed to auto-start cron:', error);
+    }
+  };
+
+  const handleIntervalChange = (value) => {
+    const newInterval = parseInt(value);
+    setCronInterval(newInterval);
+  };
+
+  const handleUpdateInterval = async () => {
+    if (cronStatus?.isRunning) {
+      try {
+        const response = await axios.post('/api/cron/meta-leads-sync', { action: 'restart', interval: cronInterval });
+        if (response.data.success) {
+          toast.success(`Cron interval updated to ${cronInterval} minute(s)`);
+          fetchCronStatus();
+        }
+      } catch (error) {
+        toast.error('Failed to update cron interval');
+        console.error(error);
+      }
     }
   };
 
@@ -180,8 +201,28 @@ export default function MetaCredentialsPage() {
                     <span className="font-medium">Stopped</span>
                   </div>
                 )}
-                <span className="text-gray-500 text-sm">Schedule: Every 1 minute</span>
+                <span className="text-gray-500 text-sm">Schedule: Every {cronStatus?.interval || 1} minute(s)</span>
               </div>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-end">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Interval (min):</label>
+              <input
+                type="number"
+                min="1"
+                max="60"
+                value={cronInterval}
+                onChange={(e) => handleIntervalChange(e.target.value)}
+                className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <button
+                onClick={handleUpdateInterval}
+                disabled={!cronStatus?.isRunning}
+                className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Update
+              </button>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -239,6 +280,13 @@ export default function MetaCredentialsPage() {
         >
           <CheckCircle className="w-4 h-4" />
           Imported Leads
+        </Link>
+        <Link
+          href="/admin-dashboard/meta-logs"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700"
+        >
+          <Clock className="w-4 h-4" />
+          View Logs
         </Link>
       </div>
 
@@ -347,6 +395,20 @@ export default function MetaCredentialsPage() {
                   >
                     {cred.isActive ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
                   </button>
+                  <Link
+                    href={`/admin-dashboard/meta-credentials/${cred._id}/view`}
+                    className="p-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200"
+                    title="View"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    href={`/admin-dashboard/ads-management?formIds=${encodeURIComponent(cred.formIds.join(','))}`}
+                    className="p-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200"
+                    title="Meta Backfill"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
                   <Link
                     href={`/admin-dashboard/meta-credentials/${cred._id}/edit`}
                     className="p-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"

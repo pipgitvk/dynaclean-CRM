@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { isCronRequestAuthorized } from '@/lib/cronAuth';
-import { 
-  startMetaLeadCron, 
-  stopMetaLeadCron, 
-  getCronStatus, 
-  manualSync 
+import {
+  startMetaLeadCron,
+  stopMetaLeadCron,
+  restartMetaLeadCron,
+  getCronStatus,
+  manualSync
 } from '@/lib/cron/metaLeadCron';
 
 // GET - Get cron status or trigger manual sync
@@ -49,31 +50,39 @@ export async function POST(request) {
     if (!(await isCronRequestAuthorized(request))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     const body = await request.json();
-    const { action } = body;
-    
+    const { action, interval } = body;
+
     if (action === 'start') {
-      startMetaLeadCron();
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Cron job started' 
+      await startMetaLeadCron(interval || 1);
+      return NextResponse.json({
+        success: true,
+        message: 'Cron job started'
       });
     }
-    
+
     if (action === 'stop') {
       stopMetaLeadCron();
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Cron job stopped' 
+      return NextResponse.json({
+        success: true,
+        message: 'Cron job stopped'
       });
     }
-    
+
+    if (action === 'restart') {
+      await restartMetaLeadCron(interval || 1);
+      return NextResponse.json({
+        success: true,
+        message: `Cron job restarted with ${interval || 1} minute interval`
+      });
+    }
+
     return NextResponse.json(
-      { success: false, error: 'Invalid action. Use "start" or "stop"' },
+      { success: false, error: 'Invalid action. Use "start", "stop", or "restart"' },
       { status: 400 }
     );
-    
+
   } catch (error) {
     console.error('Error in cron POST API:', error);
     return NextResponse.json(

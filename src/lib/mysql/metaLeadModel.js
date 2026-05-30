@@ -74,6 +74,14 @@ async function getAllLeads(filters = {}) {
       query += ' AND is_imported_to_crm = ?';
       values.push(filters.isImported ? 1 : 0);
     }
+    if (filters.startDate) {
+      query += ' AND DATE(created_at) >= ?';
+      values.push(filters.startDate);
+    }
+    if (filters.endDate) {
+      query += ' AND DATE(created_at) <= ?';
+      values.push(filters.endDate);
+    }
   }
   
   query += ' ORDER BY created_at DESC';
@@ -114,6 +122,14 @@ async function countLeads(filters = {}) {
   if (filters.isImported !== undefined) {
     where += ' AND is_imported_to_crm = ?';
     values.push(filters.isImported ? 1 : 0);
+  }
+  if (filters.startDate) {
+    where += ' AND DATE(created_at) >= ?';
+    values.push(filters.startDate);
+  }
+  if (filters.endDate) {
+    where += ' AND DATE(created_at) <= ?';
+    values.push(filters.endDate);
   }
   
   const [rows] = await conn.execute(`SELECT COUNT(*) as count FROM meta_leads ${where}`, values);

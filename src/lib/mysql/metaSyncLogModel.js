@@ -66,6 +66,11 @@ async function getSyncLogsWithCredentialInfo(filters = {}) {
     values.push(filters.credentialId);
   }
   
+  if (filters.formId) {
+    query += ' AND JSON_CONTAINS(sl.form_ids_processed, ?)';
+    values.push(JSON.stringify(filters.formId));
+  }
+  
   if (filters.startDate) {
     query += ' AND DATE(sl.synced_at) >= ?';
     values.push(filters.startDate);

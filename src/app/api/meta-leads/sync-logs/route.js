@@ -6,12 +6,14 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const credentialId = searchParams.get('credentialId');
+    const formId = searchParams.get('formId');
     const limit = parseInt(searchParams.get('limit'));
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     
     const filters = {};
     if (credentialId) filters.credentialId = credentialId;
+    if (formId) filters.formId = formId;
     if (limit) filters.limit = limit;
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;
