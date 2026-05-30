@@ -56,7 +56,7 @@ export default function GoodFollowupsTable({ data, isLoading }) {
   const stages = Array.from(
     new Set(data?.map((item) => item.stage).filter(Boolean))
   );
-  const statuses = ["NEW", "Very Good", "Average", "Poor", "Denied"];
+  const statuses = ["NEW", "Very Good", "Average", "Poor", "Denied", "Invalid"];
 
   useEffect(() => {
     if (!data) return;

@@ -19,7 +19,7 @@ export default function FollowupForm({ customerId }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerCurrentStage, setCustomerCurrentStage] = useState("New");
 
-  const statusList = ["Very Good", "Average", "Poor", "Denied"];
+  const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
   const tagOptions = ["Demo", "Prime", "Repeat order", "Mail", "Running Orders", "N/A"];
   const stageOptions = [
     "New",
@@ -285,19 +285,22 @@ export default function FollowupForm({ customerId }) {
         </p>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700">
-          Next Follow-up Date (IST)
-        </label>
-        <input
-          type="datetime-local"
-          name="next_followup_date"
-          value={formData.next_followup_date}
-          onChange={handleChange}
-          className="w-full px-4 py-2 border rounded-lg"
-          required
-        />
-      </div>
+      {/* Next Follow-up Date - Hide when status is Denied or Invalid */}
+      {formData.status !== "Denied" && formData.status !== "Invalid" && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Next Follow-up Date (IST)
+          </label>
+          <input
+            type="datetime-local"
+            name="next_followup_date"
+            value={formData.next_followup_date}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border rounded-lg"
+            required
+          />
+        </div>
+      )}
 
       <button
         type="submit"

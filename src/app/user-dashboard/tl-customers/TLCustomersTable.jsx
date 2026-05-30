@@ -198,13 +198,16 @@ export default function TLCustomersTable({
 
   // denied customer not show
   const allowCustomerByStatus = (customer) => {
-    // Show Denied ONLY when explicitly selected
+    // Show Denied or Invalid ONLY when explicitly selected
     if (selectedStatus === "Denied") {
       return customer.status === "Denied";
     }
+    if (selectedStatus === "Invalid") {
+      return customer.status === "Invalid";
+    }
 
-    // Otherwise hide Denied
-    return customer.status !== "Denied";
+    // Otherwise hide Denied and Invalid
+    return customer.status !== "Denied" && customer.status !== "Invalid";
   };
 
   // Get counts for statuses
@@ -216,6 +219,7 @@ export default function TLCustomersTable({
       "Average",
       "Poor",
       "Denied",
+      "Invalid",
       "old_reassign",
     ];
     const statusCounts = {};
@@ -536,6 +540,7 @@ export default function TLCustomersTable({
                       "Average",
                       "Poor",
                       "Denied",
+                      "Invalid",
                       "old_reassign",
                     ].map((s) => {
                       const statusCounts = getStatusCounts();

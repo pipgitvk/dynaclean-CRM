@@ -42,7 +42,7 @@ export default function EditCustomerForm({ initialData }) {
     "Construction Company",
     "Transportation Companies",
   ];
-  const statusList = ["Very Good", "Average", "Poor", "Denied"];
+  const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
   const stageOptions = [
     "New",
     "Contacted",

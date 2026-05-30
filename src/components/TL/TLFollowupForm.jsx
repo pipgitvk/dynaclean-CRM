@@ -43,7 +43,7 @@ export default function TLFollowupForm({
     stage: "New",
   });
 
-  const statusOptions = ["Good", "Very Good", "Average", "Poor", "Denied"];
+  const statusOptions = ["Good", "Very Good", "Average", "Poor", "Denied", "Invalid"];
   const tagOptions = getTlTagOptions();
   const stageOptions = [
     "New",

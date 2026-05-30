@@ -15,7 +15,7 @@ const campaignList = [
   { value: "website_visit", label: "Website Visit" },
   { value: "reference", label: "Reference" },
 ];
-const statusList = ["Very Good", "Average", "Poor", "Denied"];
+const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
 
 export default function ReportsPage() {
   const router = useRouter();
