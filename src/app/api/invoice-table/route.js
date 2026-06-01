@@ -66,6 +66,7 @@ export async function GET(req) {
         id,
         invoice_number,
         customer_name AS buyer_name,
+        gst_number,
         COALESCE(order_date, invoice_date) AS order_date,
         (cgst + sgst + igst) AS tax_amount,
         grand_total,
@@ -91,7 +92,7 @@ export async function GET(req) {
     const invoicesWithItems = await Promise.all(
       rows.map(async (invoice) => {
         const [items] = await conn.execute(
-          "SELECT item_code as product_code, item_name, quantity, rate as price_per_unit, image_url as imageUrl FROM invoice_items WHERE invoice_id = ?",
+          "SELECT item_code as product_code, item_name, quantity, rate as price_per_unit, image_url as imageUrl, hsn_code, taxable_value, cgst_amount, sgst_amount, igst_amount FROM invoice_items WHERE invoice_id = ?",
           [invoice.id]
         );
         return {

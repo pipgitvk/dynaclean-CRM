@@ -18,6 +18,25 @@ export default function EmployeeCardsClient({ employees }) {
     );
   }, [employees, searchTerm]);
 
+  // Calculate overall summary statistics
+  const overallStats = useMemo(() => {
+    let total = 0;
+    let paid = 0;
+    let pendingApproval = 0;
+    let toPay = 0;
+
+    employees.forEach(emp => {
+      if (emp.stats) {
+        total += emp.stats.total || 0;
+        paid += emp.stats.paid || 0;
+        pendingApproval += emp.stats.pendingApproval || 0;
+        toPay += emp.stats.toPay || 0;
+      }
+    });
+
+    return { total, paid, pendingApproval, toPay };
+  }, [employees]);
+
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6">
       <div className="flex flex-col gap-4 mb-6">
@@ -44,6 +63,57 @@ export default function EmployeeCardsClient({ employees }) {
         </div>
       </div>
 
+      {/* Summary Statistics Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+              <IndianRupee className="w-5 h-5" />
+            </div>
+            <span className="text-sm font-medium text-gray-600">Total</span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">
+            ₹{overallStats.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-lg bg-green-50 text-green-600">
+              <IndianRupee className="w-5 h-5" />
+            </div>
+            <span className="text-sm font-medium text-gray-600">Paid</span>
+          </div>
+          <p className="text-2xl font-bold text-green-600">
+            ₹{overallStats.paid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-lg bg-yellow-50 text-yellow-600">
+              <IndianRupee className="w-5 h-5" />
+            </div>
+            <span className="text-sm font-medium text-gray-600">Pending Approval</span>
+          </div>
+          <p className="text-2xl font-bold text-yellow-600">
+            ₹{overallStats.pendingApproval.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-lg bg-purple-50 text-purple-600">
+              <IndianRupee className="w-5 h-5" />
+            </div>
+            <span className="text-sm font-medium text-gray-600">To Pay (Approved)</span>
+          </div>
+          <p className="text-2xl font-bold text-purple-600">
+            ₹{overallStats.toPay.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredEmployees.map((emp) => (
           <Link
@@ -65,6 +135,28 @@ export default function EmployeeCardsClient({ employees }) {
               <p className="text-sm text-gray-500 font-medium">{emp.userRole || "Employee"}</p>
               <p className="text-xs text-gray-400 truncate">{emp.email || "No email"}</p>
             </div>
+
+            {/* Employee Statistics */}
+            {emp.stats && (
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Total:</span>
+                  <span className="font-semibold text-gray-900">₹{emp.stats.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Paid:</span>
+                  <span className="font-semibold text-green-600">₹{emp.stats.paid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Pending:</span>
+                  <span className="font-semibold text-yellow-600">₹{emp.stats.pendingApproval.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">To Pay:</span>
+                  <span className="font-semibold text-purple-600">₹{emp.stats.toPay.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 pt-4 border-t border-gray-50 flex items-center justify-between">
               <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Username</span>

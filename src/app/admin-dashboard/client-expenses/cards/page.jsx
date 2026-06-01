@@ -31,8 +31,12 @@ export default async function ClientExpensesCardsPage() {
         await conn.execute("ALTER TABLE client_expenses ADD COLUMN transaction_id VARCHAR(255) NULL AFTER hsn");
       } catch (__) {}
     }
+    
+    // Get all fields for export
     const [result] = await conn.execute(
-      `SELECT ce.id, ce.expense_name, ce.client_name, ce.group_name, ce.amount, ce.transaction_id,
+      `SELECT ce.id, ce.expense_name, ce.client_name, ce.group_name, ce.main_head, ce.head, 
+              ce.supply, ce.type_of_ledger, ce.cgst, ce.sgst, ce.igst, ce.hsn, ce.transaction_id,
+              ce.gst_rate, ce.amount, ce.created_at, ce.updated_at, ce.tax_applicable, ce.tax_type,
               GROUP_CONCAT(cesh.sub_head SEPARATOR ', ') as sub_head,
               COALESCE(
                 NULLIF(

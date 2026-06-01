@@ -33,12 +33,68 @@ export default async function EmployeeCardsPage() {
        WHERE r.status = 1 
        ORDER BY r.username ASC`
     );
-    // Map to the expected structure
+    
+    // Fetch expense statistics for each employee
+    const employeeStats = {};
+    for (const emp of result) {
+      const username = emp.username;
+      const [expenseData] = await conn.execute(
+        `SELECT 
+           ID,
+           TravelDate,
+           TicketCost,
+           HotelCost,
+           MealsCost,
+           OtherExpenses,
+           approved_amount,
+           payment_date,
+           approval_status
+         FROM expenses
+         WHERE username = ?
+         ORDER BY TravelDate DESC`,
+        [username]
+      );
+      
+      let total = 0;
+      let paid = 0;
+      let pendingApproval = 0;
+      let toPay = 0;
+      
+      for (const expense of expenseData) {
+        const expenseTotal = Number(expense.TicketCost || 0) + 
+                            Number(expense.HotelCost || 0) + 
+                            Number(expense.MealsCost || 0) + 
+                            Number(expense.OtherExpenses || 0);
+        total += expenseTotal;
+        
+        if (expense.payment_date) {
+          paid += expenseTotal;
+        }
+        
+        if (expense.approval_status === 'Pending') {
+          pendingApproval += expenseTotal;
+        }
+        
+        if (expense.approval_status === 'Approved' && !expense.payment_date) {
+          toPay += Number(expense.approved_amount || 0);
+        }
+      }
+      
+      employeeStats[username] = {
+        total,
+        paid,
+        pendingApproval,
+        toPay
+      };
+    }
+    
+    // Map to the expected structure with stats
     employees = result.map(emp => ({
       username: emp.username,
       name: emp.username,
       userRole: "Employee",
-      email: ""
+      email: "",
+      stats: employeeStats[emp.username] || { total: 0, paid: 0, pendingApproval: 0, toPay: 0 }
     }));
   } catch (err) {
     console.error("[employee-cards] DB error:", err?.message);

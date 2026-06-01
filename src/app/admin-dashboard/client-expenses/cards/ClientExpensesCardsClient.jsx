@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, User, IndianRupee, ListChecks, ChevronRight, Search, LayoutList } from "lucide-react";
+import { Building2, User, IndianRupee, ListChecks, ChevronRight, Search, LayoutList, Download, Calendar } from "lucide-react";
+import ExcelJS from "exceljs";
 
 function buildSummary(rows) {
   const summaryMap = {};
@@ -50,6 +51,9 @@ function buildSummary(rows) {
 export default function ClientExpensesCardsClient({ rows }) {
   const router = useRouter();
   const [txnSearch, setTxnSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const onVis = () => {
@@ -60,14 +64,125 @@ export default function ClientExpensesCardsClient({ rows }) {
   }, [router]);
 
   const filteredRows = useMemo(() => {
+    let filtered = rows;
+    
+    // Filter by transaction ID search
     const q = txnSearch.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => {
-      const expenseTid = (r.transaction_id || "").toLowerCase();
-      const stmtTid = (r.statement_trans_ids || "").toLowerCase();
-      return expenseTid.includes(q) || stmtTid.includes(q);
-    });
-  }, [rows, txnSearch]);
+    if (q) {
+      filtered = filtered.filter((r) => {
+        const expenseTid = (r.transaction_id || "").toLowerCase();
+        const stmtTid = (r.statement_trans_ids || "").toLowerCase();
+        return expenseTid.includes(q) || stmtTid.includes(q);
+      });
+    }
+    
+    // Filter by date range
+    if (fromDate) {
+      filtered = filtered.filter((r) => {
+        const expenseDate = new Date(r.created_at);
+        const from = new Date(fromDate);
+        return expenseDate >= from;
+      });
+    }
+    
+    if (toDate) {
+      filtered = filtered.filter((r) => {
+        const expenseDate = new Date(r.created_at);
+        const to = new Date(toDate);
+        to.setHours(23, 59, 59, 999); // End of the day
+        return expenseDate <= to;
+      });
+    }
+    
+    return filtered;
+  }, [rows, txnSearch, fromDate, toDate]);
+
+  const handleExportToExcel = async () => {
+    setIsExporting(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Client Expenses");
+
+      // Define columns
+      worksheet.columns = [
+        { header: "ID", key: "id", width: 10 },
+        { header: "Expense Name", key: "expense_name", width: 30 },
+        { header: "Client Name", key: "client_name", width: 25 },
+        { header: "Group Name", key: "group_name", width: 25 },
+        { header: "Main Head", key: "main_head", width: 15 },
+        { header: "Head", key: "head", width: 20 },
+        { header: "Supply", key: "supply", width: 15 },
+        { header: "Type of Ledger", key: "type_of_ledger", width: 20 },
+        { header: "CGST", key: "cgst", width: 12 },
+        { header: "SGST", key: "sgst", width: 12 },
+        { header: "IGST", key: "igst", width: 12 },
+        { header: "HSN", key: "hsn", width: 15 },
+        { header: "Transaction ID", key: "transaction_id", width: 20 },
+        { header: "GST Rate", key: "gst_rate", width: 12 },
+        { header: "Amount", key: "amount", width: 15 },
+        { header: "Tax Applicable", key: "tax_applicable", width: 15 },
+        { header: "Tax Type", key: "tax_type", width: 15 },
+        { header: "Sub Head", key: "sub_head", width: 30 },
+        { header: "Statement Trans IDs", key: "statement_trans_ids", width: 30 },
+        { header: "Created At", key: "created_at", width: 20 },
+        { header: "Updated At", key: "updated_at", width: 20 },
+      ];
+
+      // Style the header row
+      worksheet.getRow(1).font = { bold: true, size: 12 };
+      worksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE0E0E0" },
+      };
+
+      // Add data rows
+      filteredRows.forEach((row) => {
+        worksheet.addRow({
+          id: row.id,
+          expense_name: row.expense_name || "",
+          client_name: row.client_name || "",
+          group_name: row.group_name || "",
+          main_head: row.main_head || "",
+          head: row.head || "",
+          supply: row.supply || "",
+          type_of_ledger: row.type_of_ledger || "",
+          cgst: row.cgst || 0,
+          sgst: row.sgst || 0,
+          igst: row.igst || 0,
+          hsn: row.hsn || "",
+          transaction_id: row.transaction_id || "",
+          gst_rate: row.gst_rate || 0,
+          amount: row.amount || 0,
+          tax_applicable: row.tax_applicable ? "Yes" : "No",
+          tax_type: row.tax_type || "",
+          sub_head: row.sub_head || "",
+          statement_trans_ids: row.statement_trans_ids || "",
+          created_at: row.created_at ? new Date(row.created_at).toLocaleString() : "",
+          updated_at: row.updated_at ? new Date(row.updated_at).toLocaleString() : "",
+        });
+      });
+
+      // Generate buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      // Create download link
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `client_expenses_${fromDate || "all"}_${toDate || "all"}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Failed to export data. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const summaryCards = useMemo(() => buildSummary(filteredRows), [filteredRows]);
 
@@ -119,17 +234,43 @@ export default function ClientExpensesCardsClient({ rows }) {
             >
               Sub-category
             </Link>
+            <button
+              onClick={handleExportToExcel}
+              disabled={isExporting || filteredRows.length === 0}
+              className="w-full sm:w-auto inline-flex justify-center items-center bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg shadow text-sm font-medium whitespace-nowrap gap-2"
+            >
+              <Download className="w-4 h-4" />
+              {isExporting ? "Exporting..." : "Export Excel"}
+            </button>
           </div>
-          <div className="relative w-full lg:flex-1 lg:min-w-[220px] lg:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            <input
-              type="search"
-              value={txnSearch}
-              onChange={(e) => setTxnSearch(e.target.value)}
-              placeholder="Search by Transaction ID"
-              className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-              autoComplete="off"
-            />
+          <div className="flex flex-col sm:flex-row gap-2 items-center">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-gray-400" />
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
+              <span className="text-gray-500">to</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
+            </div>
+            <div className="relative w-full lg:flex-1 lg:min-w-[220px] lg:max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="search"
+                value={txnSearch}
+                onChange={(e) => setTxnSearch(e.target.value)}
+                placeholder="Search by Transaction ID"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                autoComplete="off"
+              />
+            </div>
           </div>
         </div>
       </div>
