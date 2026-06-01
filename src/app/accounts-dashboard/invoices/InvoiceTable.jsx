@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import InvoiceEditModal from "@/app/admin-dashboard/invoices/InvoiceEditModal";
+import ExcelJS from "exceljs";
 
 export default function InvoiceTable() {
   const [invoices, setInvoices] = useState([]);
@@ -26,6 +27,7 @@ export default function InvoiceTable() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [fetchError, setFetchError] = useState(null);
   const [editId, setEditId] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -94,6 +96,150 @@ export default function InvoiceTable() {
     setCurrentPage(1);
   };
 
+  const fetchAllDataForExport = async () => {
+    const params = new URLSearchParams();
+    params.append("page", 1);
+    params.append("limit", 100000); // Large limit to get all data
+    params.append("sort", sortBy);
+    params.append("order", sortOrder);
+
+    if (fromDate) params.append("fromDate", fromDate);
+    if (toDate) params.append("toDate", toDate);
+    if (search) params.append("search", search);
+
+    try {
+      const res = await fetch(`/api/invoice-table?${params.toString()}`);
+      const response = await res.json();
+
+      if (response.success) {
+        return response.data || [];
+      } else {
+        throw new Error(response.detail || response.error || "Failed to load invoices");
+      }
+    } catch (err) {
+      console.error("Fetch invoices for export failed:", err);
+      throw err;
+    }
+  };
+
+  const handleExportToExcel = async () => {
+    setIsExporting(true);
+    try {
+      const allInvoices = await fetchAllDataForExport();
+
+      if (allInvoices.length === 0) {
+        alert("No data to export");
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Invoices");
+
+      // Define columns for main invoice data
+      worksheet.columns = [
+        { header: "ID", key: "id", width: 10 },
+        { header: "Invoice Number", key: "invoice_number", width: 25 },
+        { header: "GSTIN No", key: "gst_number", width: 20 },
+        { header: "Employee Name", key: "employee_name", width: 20 },
+        { header: "Buyer Name", key: "buyer_name", width: 30 },
+        { header: "Order Date", key: "order_date", width: 15 },
+        { header: "Tax Amount", key: "tax_amount", width: 15 },
+        { header: "Grand Total", key: "grand_total", width: 15 },
+        { header: "Created At", key: "created_at", width: 20 },
+        { header: "Item Code", key: "item_code", width: 15 },
+        { header: "Item Name", key: "item_name", width: 30 },
+        { header: "HSN", key: "hsn_code", width: 15 },
+        { header: "Quantity", key: "quantity", width: 12 },
+        { header: "Taxable Value", key: "taxable_value", width: 15 },
+        { header: "CGST", key: "cgst_amount", width: 12 },
+        { header: "SGST", key: "sgst_amount", width: 12 },
+        { header: "IGST", key: "igst_amount", width: 12 },
+        { header: "Price Per Unit", key: "price_per_unit", width: 15 },
+        { header: "Image URL", key: "imageUrl", width: 40 },
+      ];
+
+      // Style the header row
+      worksheet.getRow(1).font = { bold: true, size: 12 };
+      worksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE0E0E0" },
+      };
+
+      // Add data rows - flatten items into rows
+      allInvoices.forEach((invoice) => {
+        if (invoice.items && invoice.items.length > 0) {
+          // Add a row for each item
+          invoice.items.forEach((item, index) => {
+            worksheet.addRow({
+              id: index === 0 ? invoice.id : "",
+              invoice_number: index === 0 ? invoice.invoice_number : "",
+              gst_number: index === 0 ? (invoice.gst_number || "") : "",
+              employee_name: index === 0 ? (invoice.employee_name || "") : "",
+              buyer_name: index === 0 ? invoice.buyer_name : "",
+              order_date: index === 0 ? (invoice.order_date ? new Date(invoice.order_date).toLocaleDateString("en-IN") : "") : "",
+              tax_amount: index === 0 ? invoice.tax_amount : "",
+              grand_total: index === 0 ? invoice.grand_total : "",
+              created_at: index === 0 ? (invoice.created_at ? new Date(invoice.created_at).toLocaleString("en-IN") : "") : "",
+              item_code: item.product_code || "",
+              item_name: item.item_name || "",
+              hsn_code: item.hsn_code || "",
+              quantity: item.quantity || 0,
+              taxable_value: item.taxable_value || 0,
+              cgst_amount: item.cgst_amount || 0,
+              sgst_amount: item.sgst_amount || 0,
+              igst_amount: item.igst_amount || 0,
+              price_per_unit: item.price_per_unit || 0,
+              imageUrl: item.imageUrl || "",
+            });
+          });
+        } else {
+          // Add a row for invoice without items
+          worksheet.addRow({
+            id: invoice.id,
+            invoice_number: invoice.invoice_number,
+            gst_number: invoice.gst_number || "",
+            employee_name: invoice.employee_name || "",
+            buyer_name: invoice.buyer_name,
+            order_date: invoice.order_date ? new Date(invoice.order_date).toLocaleDateString("en-IN") : "",
+            tax_amount: invoice.tax_amount,
+            grand_total: invoice.grand_total,
+            created_at: invoice.created_at ? new Date(invoice.created_at).toLocaleString("en-IN") : "",
+            item_code: "",
+            item_name: "",
+            hsn_code: "",
+            quantity: 0,
+            taxable_value: 0,
+            cgst_amount: 0,
+            sgst_amount: 0,
+            igst_amount: 0,
+            price_per_unit: 0,
+            imageUrl: "",
+          });
+        }
+      });
+
+      // Generate buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      // Create download link
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoices_${fromDate || "all"}_${toDate || "all"}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Failed to export data. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const getPageNumbers = () => {
     const pages = [];
     const max = 5;
@@ -135,6 +281,13 @@ export default function InvoiceTable() {
             onChange={(e) => setToDate(e.target.value)}
             className="border px-3 py-1 rounded"
           />
+          <button
+            onClick={handleExportToExcel}
+            disabled={isExporting}
+            className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {isExporting ? "Exporting..." : "Export Excel"}
+          </button>
         </div>
         <input
           type="text"
