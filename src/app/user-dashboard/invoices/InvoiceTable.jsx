@@ -157,6 +157,7 @@ export default function InvoiceTable() {
                 Invoice No <SortIcon column="invoice_number" />
               </th>
               <th className="px-4 py-2">Buyer</th>
+              <th className="px-4 py-2">Employee</th>
               <th
                 onClick={() => handleSort("order_date")}
                 className="px-4 py-2 cursor-pointer"
@@ -177,13 +178,13 @@ export default function InvoiceTable() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7" className="text-center py-4">
+                <td colSpan="8" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="7" className="text-center py-6 text-red-600">
+                <td colSpan="8" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -192,6 +193,7 @@ export default function InvoiceTable() {
                 <tr key={i.id} className="border-t hover:bg-gray-50">
                   <td className="px-4 py-2 font-medium">{i.invoice_number}</td>
                   <td className="px-4 py-2">{i.buyer_name}</td>
+                  <td className="px-4 py-2">{i.employee_name || "-"}</td>
                   <td className="px-4 py-2">
                     {new Date(i.order_date).toLocaleDateString("en-IN")}
                   </td>
@@ -225,7 +227,7 @@ export default function InvoiceTable() {
               ))
             ) : (
               <tr>
-                <td colSpan="7" className="text-center py-6 text-gray-500">
+                <td colSpan="8" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>

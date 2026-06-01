@@ -59,6 +59,19 @@ export async function GET(req) {
     const total = countRow.total;
     const totalPages = Math.ceil(total / limit);
 
+    // Check if employee_name column exists in invoices table
+    try {
+      await conn.execute("SELECT employee_name FROM invoices LIMIT 1");
+      console.log("employee_name column exists in invoices table");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoices ADD COLUMN employee_name VARCHAR(255) NULL DEFAULT NULL AFTER gst_number");
+        console.log("Added employee_name column to invoices table");
+      } catch (__) {
+        console.error("Failed to add employee_name column to invoices table");
+      }
+    }
+
     // Data buyer_name
     const [rows] = await conn.execute(
       `
@@ -67,6 +80,7 @@ export async function GET(req) {
         invoice_number,
         customer_name AS buyer_name,
         gst_number,
+        employee_name,
         COALESCE(order_date, invoice_date) AS order_date,
         (cgst + sgst + igst) AS tax_amount,
         grand_total,
@@ -138,6 +152,8 @@ export async function POST(req) {
 
     const body = await req.json();
 
+    console.log("Invoice creation request body:", { quotation_id: body.quotation_id, customer_name: body.customer_name });
+
     const {
       quotation_id = null,
       invoice_date,
@@ -185,6 +201,42 @@ export async function POST(req) {
 
     const pool = await getDbConnection();
     conn = await pool.getConnection();
+
+    // Fetch employee name from quotation if quotation_id is provided
+    let employeeName = payload?.username || null;
+    console.log("Initial employeeName from session:", employeeName);
+    console.log("quotation_id:", quotation_id);
+    if (quotation_id) {
+      try {
+        // First try to find by quote_number
+        let [quoteResult] = await conn.execute(
+          "SELECT emp_name FROM quotations_records WHERE quote_number = ?",
+          [quotation_id]
+        );
+        console.log("Quotation query result (by quote_number):", quoteResult);
+
+        // If not found by quote_number, try by primary key S.No.
+        if (quoteResult.length === 0) {
+          [quoteResult] = await conn.execute(
+            "SELECT emp_name FROM quotations_records WHERE `S.No.` = ?",
+            [quotation_id]
+          );
+          console.log("Quotation query result (by S.No.):", quoteResult);
+        }
+
+        if (quoteResult.length > 0 && quoteResult[0].emp_name) {
+          employeeName = quoteResult[0].emp_name;
+          console.log("Employee name from quotation (emp_name):", employeeName);
+        } else {
+          console.log("Quotation found but no emp_name, using session username:", employeeName);
+        }
+      } catch (err) {
+        console.error("Failed to fetch employee name from quotation:", err);
+        // Fall back to session username
+      }
+    } else {
+      console.log("No quotation_id provided, using session username:", employeeName);
+    }
 
     await conn.beginTransaction();
 
@@ -255,15 +307,33 @@ export async function POST(req) {
           } catch (__) {}
         }
 
-        const [result] = await conn.execute(
-          `INSERT INTO invoices 
+        // Check if employee_name column exists
+        let employeeNameColumnExists = false;
+        try {
+          await conn.execute("SELECT employee_name FROM invoices LIMIT 1");
+          employeeNameColumnExists = true;
+          console.log("employee_name column exists in invoices table (POST)");
+        } catch (_) {
+          try {
+            await conn.execute("ALTER TABLE invoices ADD COLUMN employee_name VARCHAR(255) NULL DEFAULT NULL AFTER gst_number");
+            employeeNameColumnExists = true;
+            console.log("Added employee_name column to invoices table (POST)");
+          } catch (__) {
+            console.error("Failed to add employee_name column to invoices table (POST)");
+          }
+        }
+
+        // Conditionally build INSERT statement based on whether employee_name column exists
+        let insertQuery, insertValues;
+        if (employeeNameColumnExists) {
+          insertQuery = `INSERT INTO invoices 
            (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
-            customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
+            customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, employee_name, state, state_code, 
             subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
             payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
             customer_id, linked_trans_ids, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-          [
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+          insertValues = [
             quotation_id,
             finalInvoiceNumber,
             serverInvoiceDate,
@@ -273,11 +343,50 @@ export async function POST(req) {
             customer_email,
             customer_phone,
             billing_address,
-            // billing_state,
-            // billing_country,
             shipping_address,
-            // shipping_state,
-            // shipping_country,
+            Consignee,
+            Consignee_Contact,
+            gst_number,
+            employeeName,
+            state,
+            state_code,
+            subtotal,
+            cgst,
+            sgst,
+            igst,
+            total_tax,
+            round_off || 0,
+            grand_total,
+            amount_paid,
+            balance_amount,
+            payment_status,
+            notes,
+            terms_conditions,
+            buyers_order_no,
+            eway_bill_no,
+            delivery_challan_no,
+            customerIdSql,
+            linkedTransIdsJson,
+          ];
+        } else {
+          insertQuery = `INSERT INTO invoices 
+           (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
+            customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
+            subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
+            payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
+            customer_id, linked_trans_ids, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+          insertValues = [
+            quotation_id,
+            finalInvoiceNumber,
+            serverInvoiceDate,
+            serverOrderDate,
+            due_date,
+            customer_name,
+            customer_email,
+            customer_phone,
+            billing_address,
+            shipping_address,
             Consignee,
             Consignee_Contact,
             gst_number,
@@ -300,8 +409,12 @@ export async function POST(req) {
             delivery_challan_no,
             customerIdSql,
             linkedTransIdsJson,
-          ],
-        );
+          ];
+        }
+
+        const [result] = await conn.execute(insertQuery, insertValues);
+
+        console.log("Inserted invoice with employee_name:", { invoice_number: finalInvoiceNumber, employee_name: employeeName, insertId: result.insertId });
 
         invoiceId = result.insertId;
         // Success, break retry loop
