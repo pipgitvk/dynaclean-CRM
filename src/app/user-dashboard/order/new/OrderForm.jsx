@@ -1,7 +1,10 @@
 "use client";
 import { useState, useMemo } from "react";
+import { useUser } from "@/context/UserContext";
 
 export default function OrderForm({ quotation, reset }) {
+  const { user } = useUser();
+  const isGemRole = user?.userRole === "GEM";
   const [formData, setFormData] = useState({
     paymentProof: null,
     poFile: null,
@@ -151,18 +154,20 @@ export default function OrderForm({ quotation, reset }) {
               className="w-full px-3 py-2 border rounded bg-white"
             />
           </div>
-          <div>
-            <label className="block font-medium mb-1">PO Number / Gem Order Number *</label>
-            <input
-              type="text"
-              required
-              value={formData.poNumber}
-              onChange={(e) =>
-                setFormData((fd) => ({ ...fd, poNumber: e.target.value }))
-              }
-              className="w-full px-3 py-2 border rounded bg-white"
-            />
-          </div>
+          {isGemRole && (
+            <div>
+              <label className="block font-medium mb-1">PO Number / Gem Order Number *</label>
+              <input
+                type="text"
+                required
+                value={formData.poNumber}
+                onChange={(e) =>
+                  setFormData((fd) => ({ ...fd, poNumber: e.target.value }))
+                }
+                className="w-full px-3 py-2 border rounded bg-white"
+              />
+            </div>
+          )}
           <div>
             <label className="block font-medium mb-1">Payment Date *</label>
             <input

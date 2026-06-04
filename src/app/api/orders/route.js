@@ -150,7 +150,9 @@ export async function POST(req) {
       );
     }
 
-    if (!poNumber || poNumber.trim() === "") {
+    const isGemRole = payload.role === "GEM";
+
+    if (isGemRole && (!poNumber || poNumber.trim() === "")) {
       return NextResponse.json(
         { error: "PO Number / Gem Order Number is required" },
         { status: 400 },
