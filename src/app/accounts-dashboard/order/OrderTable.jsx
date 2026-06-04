@@ -117,22 +117,36 @@ export default function OrderTable({ orders, userRole }) {
   const exportToCSV = () => {
     const headers = [
       "Order ID", "Created By", "Order Date", "Client Name", "Company Name", 
-      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status", "Due Date"
+      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status", "Due Date", "Total Amount", "Paid Amount"
     ];
-    const csvData = filteredOrders.map(order => [
-      order.order_id,
-      order.created_by,
-      dayjs(order.created_at).format("DD/MM/YYYY"),
-      order.client_name,
-      order.company_name,
-      order.contact,
-      order.state,
-      order.item_name,
-      order.item_code,
-      getStatusText(order).text,
-      order.payment_status,
-      dayjs(order.duedate).format("DD/MM/YYYY"),
-    ]);
+    const csvData = filteredOrders.map(order => {
+      // Calculate total paid amount
+      const prevAmounts = (order.payment_amount || "")
+        .toString()
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(x => Number(x))
+        .filter(n => !isNaN(n));
+      const totalPaid = prevAmounts.reduce((sum, n) => sum + n, 0);
+      
+      return [
+        order.order_id,
+        order.created_by,
+        dayjs(order.created_at).format("DD/MM/YYYY"),
+        order.client_name,
+        order.company_name,
+        order.contact,
+        order.state,
+        order.item_name,
+        order.item_code,
+        getStatusText(order).text,
+        order.payment_status,
+        dayjs(order.duedate).format("DD/MM/YYYY"),
+        order.totalamt || 0,
+        totalPaid
+      ];
+    });
 
     const csvContent = [
       headers.join(","),

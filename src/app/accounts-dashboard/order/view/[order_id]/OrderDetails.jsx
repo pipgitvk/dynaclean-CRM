@@ -23,6 +23,17 @@ export default function OrderDetails({ data }) {
     return isNaN(date) ? d : date.toLocaleDateString("en-IN");
   };
 
+  const totalPaid = () => {
+    if (!orderDetails.payment_amount) return 0;
+    const amounts = String(orderDetails.payment_amount)
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(x => Number(x))
+      .filter(n => !isNaN(n));
+    return amounts.reduce((sum, n) => sum + n, 0);
+  };
+
   const files = [
     { label: "Payment Proof", key: "payment_proof" },
     { label: "Purchase Order", key: "po_file" },
@@ -76,6 +87,7 @@ export default function OrderDetails({ data }) {
           ["Invoice Number", orderDetails.invoice_number],
           ["Total Tax", currency(orderDetails.taxamt)],
           ["Total Amount", currency(orderDetails.totalamt)],
+          ["Total Paid Amount", currency(totalPaid())],
           ["Due Date", formatDate(orderDetails.duedate)],
           ["Booking ID", orderDetails.booking_id],
           ["Dispatch Person", orderDetails.dispatch_person],

@@ -45,6 +45,17 @@ export default function OrderDetailsClient({
     return { totalQty, totalTaxable, totalGst, totalAmount };
   }, [items]);
 
+  const totalPaid = useMemo(() => {
+    if (!orderDetails.payment_amount) return 0;
+    const amounts = String(orderDetails.payment_amount)
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(x => Number(x))
+      .filter(n => !isNaN(n));
+    return amounts.reduce((sum, n) => sum + n, 0);
+  }, [orderDetails.payment_amount]);
+
   const currentStage = useMemo(() => {
     const statusList = [
       statuses?.sales_status,
@@ -112,6 +123,8 @@ export default function OrderDetailsClient({
           value={orderDetails.delivery_location}
         />
         <Input label="PO Number / Gem Order Number" value={orderDetails.po_number} />
+        <Input label="Total Amount" value={`₹${(orderDetails.totalamt || totalAmount || 0).toFixed(2)}`} />
+        <Input label="Total Paid Amount" value={`₹${totalPaid.toFixed(2)}`} />
         <Input label="Payment Date" value={formatDate(orderDetails.payment_date)} />
         <Input label="Transaction ID" value={orderDetails.transaction_id} />
         <Input label="Payment Amount" value={orderDetails.payment_amount ? `₹${Number(orderDetails.payment_amount).toFixed(2)}` : ""} />
