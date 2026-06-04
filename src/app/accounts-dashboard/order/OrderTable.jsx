@@ -11,6 +11,7 @@ import {
   XCircle,
   MoreVertical,
   Truck,
+  Download,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
@@ -112,6 +113,38 @@ export default function OrderTable({ orders, userRole }) {
     });
     setFilteredOrders(result);
   }, [searchQuery, orders, statusFilter, dateFrom, dateTo, createdByFilter]);
+
+  const exportToCSV = () => {
+    const headers = [
+      "Order ID", "Created By", "Order Date", "Client Name", "Company Name", 
+      "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status", "Due Date"
+    ];
+    const csvData = filteredOrders.map(order => [
+      order.order_id,
+      order.created_by,
+      dayjs(order.created_at).format("DD/MM/YYYY"),
+      order.client_name,
+      order.company_name,
+      order.contact,
+      order.state,
+      order.item_name,
+      order.item_code,
+      getStatusText(order).text,
+      order.payment_status,
+      dayjs(order.duedate).format("DD/MM/YYYY"),
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...csvData.map(row => row.map(cell => `"${cell || ""}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `orders-${dayjs().format("YYYY-MM-DD")}.csv`;
+    link.click();
+  };
 
   const getStatusText = (order) => {
     // Check for return status first (highest priority)
@@ -261,6 +294,13 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
+        <button
+          onClick={exportToCSV}
+          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+        >
+          <Download size={18} />
+          Export CSV
+        </button>
       </div>
 
       {/* 🧰 Filters */}
