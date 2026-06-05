@@ -126,7 +126,12 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
         summary.absents++;
       }
     } else if (isOnLeave) {
-      summary.leaves++;
+      const leave = leaveMap.get(dateString);
+      if (leave?.leave_type === 'unpaid') {
+        summary.absents++;
+      } else {
+        summary.leaves++;
+      }
     } else {
       summary.absents++;
     }

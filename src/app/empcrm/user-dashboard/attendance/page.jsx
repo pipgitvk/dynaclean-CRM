@@ -277,10 +277,11 @@ const AttendancePage = () => {
         });
       } else if (isOnLeave) {
         const leaveInfo = leaveMap.get(dateString);
+        const isUnpaid = leaveInfo?.leave_type === "unpaid";
         allDates.push({
           ...base,
           date: d.toISOString(),
-          type: "leave",
+          type: isUnpaid ? "absent" : "leave",
           leaveType: leaveInfo?.leave_type || "Leave",
           leaveReason: leaveInfo?.reason || null,
         });

@@ -121,18 +121,19 @@ export function dateToYmdKey(value) {
   return ymdKey(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 
-function buildLeaveDateSetForUser(leaves, username) {
-  const set = new Set();
+function buildLeaveDateMapForUser(leaves, username) {
+  const map = new Map();
   const u = String(username ?? "").trim().toLowerCase();
   for (const leave of leaves || []) {
     if (String(leave.username ?? "").trim().toLowerCase() !== u) continue;
     const from = new Date(leave.from_date);
     const to = new Date(leave.to_date);
     for (let x = new Date(from); x <= to; x.setDate(x.getDate() + 1)) {
-      set.add(ymdKey(x.getFullYear(), x.getMonth() + 1, x.getDate()));
+      const dateKey = ymdKey(x.getFullYear(), x.getMonth() + 1, x.getDate());
+      map.set(dateKey, leave.leave_type);
     }
   }
-  return set;
+  return map;
 }
 
 /**
@@ -174,7 +175,7 @@ export function computeSalaryPayDaysForUser(p) {
     if (k) dateMap.set(k, log);
   }
 
-  const leaveDates = buildLeaveDateSetForUser(leavesAll, username);
+  const leaveMap = buildLeaveDateMapForUser(leavesAll, username);
 
   let present = 0;
   let half_day = 0;
@@ -215,7 +216,8 @@ export function computeSalaryPayDaysForUser(p) {
     const dow = d.getDay();
     const isSunday = dow === 0;
     const isHoliday = holidayMap.has(dateString);
-    const isOnLeave = leaveDates.has(dateString);
+    const leaveType = leaveMap.get(dateString);
+    const isOnLeave = leaveType !== undefined;
 
     periodDays++;
     if (isSunday) sundaysInPeriod++;
@@ -256,8 +258,12 @@ export function computeSalaryPayDaysForUser(p) {
       continue;
     }
     if (isOnLeave) {
-      paid_leave++;
-      weekdayPayCredits += 1;
+      if (leaveType === 'unpaid') {
+        lop++;
+      } else {
+        paid_leave++;
+        weekdayPayCredits += 1;
+      }
       continue;
     }
     lop++;
