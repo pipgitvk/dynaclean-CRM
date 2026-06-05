@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Users, UserCheck, UserX, TrendingUp } from "lucide-react";
 import { Settings } from "lucide-react";
-import HrTargetVsCompletedChart from "@/components/empcrm/HrTargetVsCompletedChart";
 import { canViewHrTargetChart } from "@/lib/hrTargetEligibleRoles";
 
 export default function EmpCrmDashboard() {
@@ -126,11 +125,6 @@ export default function EmpCrmDashboard() {
             </div>
           ))}
         </div>
-        {showHrTargetChart && (
-          <div className="w-full max-w-6xl">
-            <HrTargetVsCompletedChart />
-          </div>
-        )}
         </div>
       )}
 
