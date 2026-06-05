@@ -254,7 +254,7 @@ const GenerateSalaryPage = () => {
 
             if (existingRecord) {
                 setFormData({
-                    working_days: existingRecord.working_days,
+                    working_days: 30,
                     present_days:
                         payDaysFromAttendance !== null
                             ? payDaysFromAttendance
@@ -266,6 +266,7 @@ const GenerateSalaryPage = () => {
             } else {
                 setFormData((prev) => ({
                     ...prev,
+                    working_days: 30,
                     present_days: payDaysFromAttendance ?? 0,
                     status: "draft",
                 }));
@@ -284,7 +285,7 @@ const GenerateSalaryPage = () => {
         const { working_days, present_days, overtime_hours } = formData;
 
         // Basic Calcs
-        const workingDays = Number(working_days) || 30;
+        const workingDays = 30;
         const presentDays = Number(present_days) || 0;
         const overtimeHours = Number(overtime_hours) || 0;
 

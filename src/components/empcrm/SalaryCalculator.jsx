@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 const SalaryCalculator = ({ employee, onCalculate }) => {
   const [formData, setFormData] = useState({
     salary_month: "",
-    working_days: 22,
+    working_days: 30,
     present_days: 22,
     overtime_hours: 0
   });
@@ -105,8 +105,8 @@ const SalaryCalculator = ({ employee, onCalculate }) => {
               type="number"
               name="working_days"
               value={formData.working_days}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
               min="1"
               max="31"
               required

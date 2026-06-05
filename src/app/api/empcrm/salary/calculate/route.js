@@ -57,7 +57,7 @@ export async function POST(request) {
       AND (esd.effective_from <= ? AND (esd.effective_to IS NULL OR esd.effective_to >= ?))
     `, [username, salary_month + '-31', salary_month + '-01']);
 
-    const workingDays = Math.max(1, Number(working_days) || 30);
+    const workingDays = 30;
     const presentDays = Number(present_days) || 0;
     const overtimeHours = Number(overtime_hours) || 0;
 

@@ -292,8 +292,7 @@ export async function GET(request) {
     }
 
     const { year, month, label: salaryMonth } = prevMonth();
-    const calWorkingDays = calcWorkingDays(year, month);
-    const workingDays = settings.working_days > 0 ? settings.working_days : calWorkingDays;
+    const workingDays = 30;
     const defaultStatus = settings.generate_status || "draft";
 
     // Check duplicate run for this month

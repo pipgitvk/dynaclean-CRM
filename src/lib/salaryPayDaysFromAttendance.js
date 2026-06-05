@@ -149,7 +149,7 @@ export function computeSalaryPayDaysForUser(p) {
   const { monthStr, logs, holidaysAll, leavesAll, username, rules, dateOfJoining } = p;
   const [y, m] = monthStr.split("-").map(Number);
   const monthIndex = m - 1;
-  const daysInMonth = new Date(y, monthIndex + 1, 0).getDate();
+  const daysInMonth = 30; // Always use 30 days for salary calculation
   const today = startOfDay(new Date());
   const payrollMonthElapsed = isSalaryMonthFullyElapsed(monthStr, today);
   let dojValid = false;
