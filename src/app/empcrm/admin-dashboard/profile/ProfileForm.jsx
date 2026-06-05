@@ -237,8 +237,12 @@ export default function ProfileForm({
       "doc_electricity_bill",
       "doc_10th_certificate",
       "doc_12th_certificate",
-      "doc_employment_confirmation_letter",
     ];
+    
+    // Only require Employment Confirmation Letter for admins (privileged editors)
+    if (isPrivilegedEditor) {
+      MANDATORY_KEYS.push("doc_employment_confirmation_letter");
+    }
 
     if (effectiveExperiencedForEmployeeReassignUi(isExperienced, reassignFieldKeys)) {
       MANDATORY_KEYS.push(
