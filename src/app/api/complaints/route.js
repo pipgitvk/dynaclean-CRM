@@ -174,11 +174,11 @@ export async function GET(req) {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
       `(SELECT username FROM rep_list 
-        WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE HEAD') 
+        WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE HEAD', 'SERVICE SUPPORT ENGINEER') 
         AND (status = 1 OR status IS NULL))
        UNION
        (SELECT username FROM emplist 
-        WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE HEAD') 
+        WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE HEAD', 'SERVICE SUPPORT ENGINEER') 
         AND (status = 1 OR status IS NULL))
        ORDER BY username`,
     );
