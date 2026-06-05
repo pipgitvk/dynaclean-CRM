@@ -212,8 +212,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   if (employee) {
-    kpiQuery += ` AND c.lead_source = ?`;
-    kpiParams.push(employee);
+    kpiQuery += ` AND (c.lead_source = ? OR c.assigned_to = ?)`;
+    kpiParams.push(employee, employee);
   }
 
   if (status) {

@@ -101,10 +101,10 @@ export default async function TLCustomersPage({ searchParams }) {
     params.push(payload?.username || "", payload?.username || "");
   }
 
-  // Filter by employee (lead_source)
+  // Filter by employee (lead_source or assigned_to)
   if (employee) {
-    query += ` AND c.lead_source = ?`;
-    params.push(employee);
+    query += ` AND (c.lead_source = ? OR c.assigned_to = ?)`;
+    params.push(employee, employee);
   }
 
   // Filter by status
@@ -229,8 +229,8 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   if (employee) {
-    kpiQuery += ` AND c.lead_source = ?`;
-    kpiParams.push(employee);
+    kpiQuery += ` AND (c.lead_source = ? OR c.assigned_to = ?)`;
+    kpiParams.push(employee, employee);
   }
 
   if (status) {

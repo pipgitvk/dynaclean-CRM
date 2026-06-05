@@ -118,7 +118,7 @@ export default function TLCustomersTable({
   // Get counts for each filter using KPI data (all customers)
   const getFilterCounts = () => {
     const now = dayjs();
-    const total = customersForKPI.length;
+    const total = customersForKPI.filter((customer) => allowCustomerByStatus(customer)).length;
     // const upcoming = customersForKPI.filter((customer) => {
     //   const nextFollowup =
     //     customer.tl_next_followup || customer.latest_next_followup;
@@ -130,11 +130,13 @@ export default function TLCustomersTable({
 
     const upcoming = customersForKPI.filter(
       (customer) =>
+        allowCustomerByStatus(customer) &&
         customer.multi_tag &&
         customer.multi_tag.toLowerCase().includes("strong followup"),
     ).length;
 
     const due = customersForKPI.filter((customer) => {
+      if (!allowCustomerByStatus(customer)) return false;
       // Exclude closed stages
       const excludedStages = [
         "Won (Order Received)",
@@ -149,6 +151,7 @@ export default function TLCustomersTable({
     }).length;
     const prime = customersForKPI.filter(
       (customer) =>
+        allowCustomerByStatus(customer) &&
         customer.multi_tag &&
         customer.multi_tag.toLowerCase().includes("prime"),
     ).length;
@@ -186,6 +189,7 @@ export default function TLCustomersTable({
     const tagCounts = {};
     filterTagOptions.forEach((tag) => {
       tagCounts[tag] = customersForKPI.filter((customer) => {
+        if (!allowCustomerByStatus(customer)) return false;
         if (!customer.multi_tag) return tag === "Clear";
         return customer.multi_tag
           .split(", ")
@@ -225,7 +229,10 @@ export default function TLCustomersTable({
     const statusCounts = {};
     statuses.forEach((status) => {
       statusCounts[status] = customersForKPI.filter(
-        (customer) => customer.status === status,
+        (customer) => {
+          // For status counts, we still show all (since you can explicitly select Denied/Invalid
+          return customer.status === status;
+        }
       ).length;
     });
     return statusCounts;
@@ -252,7 +259,9 @@ export default function TLCustomersTable({
     const stageCounts = {};
     stages.forEach((stage) => {
       stageCounts[stage] = customersForKPI.filter(
-        (customer) => customer.stage === stage,
+        (customer) => {
+          return allowCustomerByStatus(customer) && customer.stage === stage;
+        }
       ).length;
     });
     return stageCounts;
