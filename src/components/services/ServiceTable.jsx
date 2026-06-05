@@ -13,7 +13,8 @@ export default function ServiceTable({ serviceRecords, role }) {
   const [complaintDateFrom, setComplaintDateFrom] = useState("");
   const [complaintDateTo, setComplaintDateTo] = useState("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("PENDING");
+  const [assignedFilter, setAssignedFilter] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -108,6 +109,14 @@ export default function ServiceTable({ serviceRecords, role }) {
       return false;
     }
 
+    // Assigned filter
+    if (assignedFilter === "NOT_ASSIGNED" && record.assigned_to) {
+      return false;
+    }
+    if (assignedFilter === "ASSIGNED" && !record.assigned_to) {
+      return false;
+    }
+
     return true;
   });
 
@@ -149,6 +158,7 @@ export default function ServiceTable({ serviceRecords, role }) {
     setComplaintDateFilter("");
     setServiceTypeFilter("");
     setStatusFilter("");
+    setAssignedFilter("");
     setCurrentPage(1);
   };
 
@@ -165,17 +175,17 @@ export default function ServiceTable({ serviceRecords, role }) {
     new Set([...uniqueStatuses.filter(Boolean), "PENDING BY CUSTOMER"]),
   );
 
-  // Calculate KPIs based on status
+  // Calculate KPIs based on filtered status
   const kpiData = {
-    total: records.length,
-    completed: records.filter((r) => r.status?.toUpperCase() === "COMPLETED")
+    total: filteredRecords.length,
+    completed: filteredRecords.filter((r) => r.status?.toUpperCase() === "COMPLETED")
       .length,
-    pending: records.filter((r) => r.status?.toUpperCase() === "PENDING")
+    pending: filteredRecords.filter((r) => r.status?.toUpperCase() === "PENDING")
       .length,
-    pendingSpares: records.filter(
+    pendingSpares: filteredRecords.filter(
       (r) => r.status?.toUpperCase() === "PENDING FOR SPARES",
     ).length,
-    pendingByCustomer: records.filter(
+    pendingByCustomer: filteredRecords.filter(
       (r) => r.status?.toUpperCase() === "PENDING BY CUSTOMER",
     ).length,
   };
@@ -392,7 +402,7 @@ export default function ServiceTable({ serviceRecords, role }) {
           </div>
 
           {/* Filters Row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Complaint Date
@@ -475,6 +485,23 @@ export default function ServiceTable({ serviceRecords, role }) {
                     {status}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Assigned
+              </label>
+              <select
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={assignedFilter}
+                onChange={(e) => {
+                  setAssignedFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+              >
+                <option value="">All</option>
+                <option value="ASSIGNED">Assigned</option>
+                <option value="NOT_ASSIGNED">Not Assigned</option>
               </select>
             </div>
           </div>
@@ -580,11 +607,21 @@ export default function ServiceTable({ serviceRecords, role }) {
                       <td className="px-6 py-3">
                         {record.customer_name || "N/A"}
                       </td>
-                      <td className="px-6 py-3 max-w-[250px] whitespace-normal break-words relative group">
-                        <span>{record.complaint_summary}</span>
-
-                        <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block bg-black text-white text-xs p-2 rounded shadow-lg max-w-xs z-50 whitespace-normal break-words">
-                          {record.complaint_summary}
+                      <td className="px-6 py-3 max-w-[350px] whitespace-normal break-words relative group">
+                        <div className="space-y-1">
+                          {record.model && (
+                            <div className="text-sm text-gray-700">
+                              <span className="font-semibold">Model:</span> {record.model}
+                            </div>
+                          )}
+                          {record.state && (
+                            <div className="text-sm text-gray-700">
+                              <span className="font-semibold">State:</span> {record.state}
+                            </div>
+                          )}
+                          <div className="text-sm">
+                            <span className="font-semibold">Issue:</span> {record.complaint_summary}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-3 max-w-[180px] whitespace-normal break-words relative group">
@@ -839,9 +876,25 @@ export default function ServiceTable({ serviceRecords, role }) {
                     </p>
                   </div>
                   <div className="border-t border-gray-200 pt-2">
+                    {record.model && (
+                      <p className="text-gray-500">
+                        <span className="font-semibold text-gray-700">
+                          Model:
+                        </span>{" "}
+                        {record.model}
+                      </p>
+                    )}
+                    {record.state && (
+                      <p className="text-gray-500">
+                        <span className="font-semibold text-gray-700">
+                          State:
+                        </span>{" "}
+                        {record.state}
+                      </p>
+                    )}
                     <p className="text-gray-500">
                       <span className="font-semibold text-gray-700">
-                        Summary:
+                        Issue:
                       </span>{" "}
                       {record.complaint_summary}
                     </p>
