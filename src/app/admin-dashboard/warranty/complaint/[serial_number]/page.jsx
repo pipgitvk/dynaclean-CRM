@@ -26,7 +26,7 @@ export default function AddComplaintPage({ params }) {
       complaint_date: new Date().toISOString().split("T")[0], // YYYY-MM-DD
       complaint_summary: "",
       status: "PENDING",
-      assigned_to: "",
+      assigned_to: "NOT ASSIGNED",
       attachments: null,
     },
   });
@@ -192,9 +192,7 @@ export default function AddComplaintPage({ params }) {
               </label>
               <select
                 id="assigned_to"
-                {...register("assigned_to", {
-                  required: "Please assign to a user",
-                })}
+                {...register("assigned_to")}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 disabled={loadingUsers}
               >
@@ -202,7 +200,7 @@ export default function AddComplaintPage({ params }) {
                   <option value="">Loading users...</option>
                 ) : (
                   <>
-                    <option value="">Select a user</option>
+                    <option value="NOT ASSIGNED">NOT ASSIGNED</option>
                     {users.map((user) => (
                       <option key={user} value={user}>
                         {user}
