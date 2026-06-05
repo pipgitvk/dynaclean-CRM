@@ -46,7 +46,7 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
   const { monthStr, username, logs, holidaysAll, leavesAll, rules, dateOfJoining } = p;
   const [y, m] = monthStr.split("-").map(Number);
   const monthIndex = m - 1;
-  const daysInMonth = new Date(y, monthIndex + 1, 0).getDate();
+  const daysInMonth = 30;
   const today = startOfDay(new Date());
   const payrollMonthElapsed = isSalaryMonthFullyElapsed(monthStr, today);
 

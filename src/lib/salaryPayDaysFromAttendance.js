@@ -199,6 +199,8 @@ export function computeSalaryPayDaysForUser(p) {
   let requiredWorkingDays = 0;
   /** For UI: Sundays in eligible period (incl. Sunday that is also a company holiday). */
   let sundaysInPeriod = 0;
+  /** For UI: Actual dates of Sundays in eligible period */
+  const sundaysInPeriodDates = [];
   /** Company holidays on Mon–Sat in period (not double-counted with Sundays). */
   let holidayWeekdaysInPeriod = 0;
 
@@ -220,7 +222,10 @@ export function computeSalaryPayDaysForUser(p) {
     const isOnLeave = leaveType !== undefined;
 
     periodDays++;
-    if (isSunday) sundaysInPeriod++;
+    if (isSunday) {
+      sundaysInPeriod++;
+      sundaysInPeriodDates.push(dateString);
+    }
     if (isHoliday && !isSunday) holidayWeekdaysInPeriod++;
     if (!isSunday && !isHoliday) {
       requiredWorkingDays++;
@@ -308,6 +313,7 @@ export function computeSalaryPayDaysForUser(p) {
     pay_days_base: payDaysBase,
     sundays_unpaid_whole_week_off: sundaysUnpaidNoWeekPresence,
     sunday_worked_dates: sundayWorkedDates,
+    sundays_in_period_dates: sundaysInPeriodDates,
     period_days: periodDays,
     sundays_in_period: sundaysInPeriod,
     holiday_weekdays_in_period: holidayWeekdaysInPeriod,

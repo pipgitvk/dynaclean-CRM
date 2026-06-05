@@ -206,12 +206,14 @@ const GenerateSalaryPage = () => {
                         lop: Number(empAtt.lop_count) || 0,
                         paidLeave: Number(empAtt.paid_leave_days) || 0,
                         payDays: Number(empAtt.pay_days) || 0,
+                        sundaysInPeriodDates: empAtt.pay_sundays_in_period_dates || [],
                         payCalc:
                             empAtt.pay_period_days != null &&
                             empAtt.pay_period_days !== ""
                                 ? {
                                       periodDays: Number(empAtt.pay_period_days),
                                       sundaysInPeriod: Number(empAtt.pay_sundays_in_period) || 0,
+                                      sundaysInPeriodDates: empAtt.pay_sundays_in_period_dates || [],
                                       holidayWeekdaysInPeriod:
                                           Number(empAtt.pay_holiday_weekdays_in_period) || 0,
                                       requiredWorkingDays:
@@ -850,6 +852,13 @@ const GenerateSalaryPage = () => {
                                                     : attendanceBreakdown.payCalc.sundaysInPeriod
                                             )}
                                         </span>
+                                        {!attendanceDisplayAllZero && attendanceBreakdown.payCalc.sundaysInPeriodDates && attendanceBreakdown.payCalc.sundaysInPeriodDates.length > 0 && (
+                                            <ul className="text-[10px] text-slate-500 mt-1 ml-4 list-disc">
+                                                {attendanceBreakdown.payCalc.sundaysInPeriodDates.map((date, i) => (
+                                                    <li key={i}>{formatDate(date)}</li>
+                                                ))}
+                                            </ul>
+                                        )}
                                     </li>
                                     <li>
                                         Holidays on weekdays (in period) ={" "}
