@@ -286,14 +286,14 @@ export default function ServiceTable({ serviceRecords, role }) {
   };
 
   return (
-    <div className="flex justify-center items-center bg-gray-50 py-6 px-4">
+    <div className="flex justify-center items-center bg-gray-50 py-2 sm:py-4 lg:py-6 px-2 sm:px-4">
       <div className="bg-white shadow-xl rounded-lg w-full overflow-hidden">
         {/* KPI Section */}
         <div className="bg-linear-to-r from-blue-50 to-indigo-50 p-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-800 mb-3">
             Service Status Overview
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -381,12 +381,12 @@ export default function ServiceTable({ serviceRecords, role }) {
         </div>
 
         {/* Search + Filters */}
-        <div className="px-4 py-4 space-y-3">
-          <div className="flex gap-2">
+        <div className="px-2 sm:px-4 py-3 sm:py-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               placeholder="Search records (including company name)..."
-              className="p-3 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="p-2 sm:p-3 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -395,14 +395,14 @@ export default function ServiceTable({ serviceRecords, role }) {
             />
             <button
               onClick={handleResetSearch}
-              className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition-colors duration-200 whitespace-nowrap"
+              className="px-3 sm:px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition-colors duration-200 whitespace-nowrap text-sm"
             >
               Reset
             </button>
           </div>
 
           {/* Filters Row */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4">
             {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Complaint Date
@@ -422,7 +422,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                 Complaint Date (Range)
               </label>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="date"
                   className="p-2 w-full border border-gray-300 rounded-lg shadow-sm
@@ -508,7 +508,7 @@ export default function ServiceTable({ serviceRecords, role }) {
         </div>
 
         {/* Table (visible on larger screens) */}
-        <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[600px]">
+        <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[500px] lg:max-h-[600px]">
           <table className="min-w-full text-sm text-gray-700">
             <thead className="bg-blue-600 text-white sticky top-0">
               <tr>
@@ -761,14 +761,14 @@ export default function ServiceTable({ serviceRecords, role }) {
             </tbody>
           </table>
           {/* Pagination Controls - Desktop */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-            <div className="text-xs text-gray-600">
+          <div className="flex flex-col sm:flex-row items-center justify-between px-2 sm:px-4 py-3 border-t border-gray-200 gap-2">
+            <div className="text-xs sm:text-sm text-gray-600">
               Showing {Math.min(totalItems, startIndex + 1)} to{" "}
               {Math.min(endIndex, totalItems)} of {totalItems}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-center">
               <select
-                className="border rounded px-2 py-1 text-xs"
+                className="border rounded px-2 py-1 text-xs sm:text-sm"
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));
@@ -782,17 +782,17 @@ export default function ServiceTable({ serviceRecords, role }) {
                 ))}
               </select>
               <button
-                className="px-2 py-1 text-xs bg-gray-100 rounded disabled:opacity-50"
+                className="px-2 py-1 text-xs sm:text-sm bg-gray-100 rounded disabled:opacity-50"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={safeCurrentPage === 1}
               >
                 Prev
               </button>
-              <span className="text-xs text-gray-700">
+              <span className="text-xs sm:text-sm text-gray-700">
                 Page {safeCurrentPage} / {totalPages}
               </span>
               <button
-                className="px-2 py-1 text-xs bg-gray-100 rounded disabled:opacity-50"
+                className="px-2 py-1 text-xs sm:text-sm bg-gray-100 rounded disabled:opacity-50"
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
                 }
@@ -805,7 +805,7 @@ export default function ServiceTable({ serviceRecords, role }) {
         </div>
 
         {/* Card view (visible on small screens) */}
-        <div className="md:hidden p-4 space-y-4">
+        <div className="md:hidden p-2 sm:p-4 space-y-3 sm:space-y-4">
           {paginatedRecords.length === 0 ? (
             <div className="text-center text-gray-500 py-4">
               No service records found.
