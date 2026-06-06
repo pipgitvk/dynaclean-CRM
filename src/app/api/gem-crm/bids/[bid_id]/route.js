@@ -126,7 +126,13 @@ export async function GET(req, { params }) {
       { name: 'ra_start_date', type: 'DATE NULL' },
       { name: 'ra_end_date', type: 'DATE NULL' },
       { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
-      { name: 'customer_id', type: 'VARCHAR(255) NULL' }
+      { name: 'customer_id', type: 'VARCHAR(255) NULL' },
+      { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
+      { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
+      { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' }
     ];
 
     const [tableInfo] = await conn.execute("DESCRIBE bids");
@@ -337,7 +343,13 @@ export async function PUT(req, { params }) {
       { name: 'ra_start_date', type: 'DATE NULL' },
       { name: 'ra_end_date', type: 'DATE NULL' },
       { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
-      { name: 'customer_id', type: 'VARCHAR(255) NULL' }
+      { name: 'customer_id', type: 'VARCHAR(255) NULL' },
+      { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
+      { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
+      { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' }
     ];
 
     const [tableInfo] = await conn.execute("DESCRIBE bids");
@@ -379,7 +391,9 @@ export async function PUT(req, { params }) {
       'oem_turnover_required', 'experience_required_years', 'delivery_days',
       'inspection_required', 'technical_status', 'financial_status',
       'bid_status', 'assigned_employee_id', 'dd_id', 'remarks', 'ra_participated',
-      'ra_start_date', 'ra_end_date', 'ra_last_price', 'order_id', 'customer_id'
+      'ra_start_date', 'ra_end_date', 'ra_last_price', 'order_id', 'customer_id',
+      'sd_deduction', 'ld_deduction', 'epbg_deduction', 'tds_under_ita',
+      'tds_under_gst', 'other_deduction'
     ];
 
     for (const field of allowedFields) {

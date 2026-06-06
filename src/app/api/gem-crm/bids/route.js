@@ -328,6 +328,12 @@ export async function POST(req) {
       ra_end_date,
       ra_last_price,
       customer_id,
+      sd_deduction,
+      ld_deduction,
+      epbg_deduction,
+      tds_under_ita,
+      tds_under_gst,
+      other_deduction,
     } = fields;
 
     console.log("DEBUG: Received fields:", {
@@ -398,7 +404,13 @@ export async function POST(req) {
       { name: 'created_by', type: 'INT NULL' },
       { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
       { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
-      { name: 'customer_id', type: 'VARCHAR(255) NULL' }
+      { name: 'customer_id', type: 'VARCHAR(255) NULL' },
+      { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
+      { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
+      { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
+      { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' }
     ];
 
     for (const { name, type } of columnsToCheck) {
@@ -456,8 +468,14 @@ export async function POST(req) {
       null,
       payload.empId || payload.id || null,
       ra_participated || 'no',
-      customer_id || null,
       ra_last_price || null,
+      customer_id || null,
+      sd_deduction || null,
+      ld_deduction || null,
+      epbg_deduction || null,
+      tds_under_ita || null,
+      tds_under_gst || null,
+      other_deduction || null,
     ];
 
     console.log("INSERT columns:", insertColumns);

@@ -7,7 +7,7 @@ import path from "path";
 function isEmpcrmProfileAdmin(session) {
   if (!session?.role) return false;
   const r = String(session.role).trim();
-  return ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].some((a) => a.toLowerCase() === r.toLowerCase());
+  return ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "HR RECRUITER", "JUNIOR HR EXECUTIVE"].some((a) => a.toLowerCase() === r.toLowerCase());
 }
 
 const parseMaybeJson = (val, fallback) => {

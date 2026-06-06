@@ -11,6 +11,7 @@ import {
   Calendar,
   User,
   Building2,
+  Calculator,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -56,6 +57,12 @@ export default function NewBidPage() {
     ra_start_date: "",
     ra_end_date: "",
     customer_id: "",
+    sd_deduction: "",
+    ld_deduction: "",
+    epbg_deduction: "",
+    tds_under_ita: "",
+    tds_under_gst: "",
+    other_deduction: "",
   });
 
   useEffect(() => {
@@ -430,6 +437,94 @@ export default function NewBidPage() {
                   name="epbg_duration_months"
                   value={formData.epbg_duration_months}
                   onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* GEM Payment Deductions */}
+          <div className="lg:col-span-2">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Calculator className="w-5 h-5" />
+              GEM Payment Deductions
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  SD (₹)
+                </label>
+                <input
+                  type="number"
+                  name="sd_deduction"
+                  value={formData.sd_deduction}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  LD (₹)
+                </label>
+                <input
+                  type="number"
+                  name="ld_deduction"
+                  value={formData.ld_deduction}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  EPBG (₹)
+                </label>
+                <input
+                  type="number"
+                  name="epbg_deduction"
+                  value={formData.epbg_deduction}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  TDS under ITA (₹)
+                </label>
+                <input
+                  type="number"
+                  name="tds_under_ita"
+                  value={formData.tds_under_ita}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  TDS under GST (₹)
+                </label>
+                <input
+                  type="number"
+                  name="tds_under_gst"
+                  value={formData.tds_under_gst}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Other (₹)
+                </label>
+                <input
+                  type="number"
+                  name="other_deduction"
+                  value={formData.other_deduction}
+                  onChange={handleChange}
+                  step="0.01"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
