@@ -13,6 +13,19 @@ function ProductAndSpareLists({ type }) {
   const [q, setQ] = useState("");
   const [editingPrice, setEditingPrice] = useState({ key: null, field: null, value: "" });
   const [savingPrice, setSavingPrice] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    item_code: '',
+    item_name: '',
+    product_number: '',
+    min_qty: '',
+    price_per_unit: '',
+    last_negotiation_price: '',
+    specification: '',
+    image: null
+  });
 
   const handleSavePrice = async (row, field) => {
     const code = type === 'product' ? row.item_code : row.id;
@@ -51,6 +64,67 @@ function ProductAndSpareLists({ type }) {
       alert("Error updating price");
     } finally {
       setSavingPrice(false);
+    }
+  };
+
+  const handleOpenEditModal = (row) => {
+    setEditingProduct(row);
+    setEditFormData({
+      item_code: row.item_code || '',
+      item_name: row.item_name || '',
+      product_number: row.product_number || '',
+      min_qty: row.min_qty || '',
+      price_per_unit: row.price_per_unit || row.price || '',
+      last_negotiation_price: row.last_negotiation_price || '',
+      specification: row.specification || '',
+      image: null
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveProduct = async () => {
+    if (!editingProduct || savingProduct) return;
+
+    try {
+      setSavingProduct(true);
+      const formData = new FormData();
+      formData.append('item_code', editFormData.item_code);
+      formData.append('item_name', editFormData.item_name);
+      formData.append('product_number', editFormData.product_number);
+      formData.append('min_qty', editFormData.min_qty);
+      formData.append('price_per_unit', editFormData.price_per_unit);
+      formData.append('last_negotiation_price', editFormData.last_negotiation_price);
+      formData.append('specification', editFormData.specification);
+      if (editFormData.image) {
+        formData.append('image', editFormData.image);
+      }
+
+      const res = await fetch("/api/products/update", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Failed to update product");
+        return;
+      }
+
+      // Refresh the data
+      const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
+      fetch(url)
+        .then(r => r.json())
+        .then(d => setRows(Array.isArray(d) ? d : []))
+        .catch(() => setRows([]));
+
+      setShowEditModal(false);
+      setEditingProduct(null);
+      alert("Product updated successfully");
+    } catch (err) {
+      console.error(err);
+      alert("Error updating product");
+    } finally {
+      setSavingProduct(false);
     }
   };
 
@@ -129,6 +203,7 @@ function ProductAndSpareLists({ type }) {
                   <th className="p-2 text-left">Price</th>
                   <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
+                  <th className="p-2 text-left">Actions</th>
                 </>
               ) : (
                 <>
@@ -139,6 +214,7 @@ function ProductAndSpareLists({ type }) {
                   <th className="p-2 text-left">Price</th>
                   <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
+                  <th className="p-2 text-left">Actions</th>
                 </>
               )}
             </tr>
@@ -205,6 +281,14 @@ function ProductAndSpareLists({ type }) {
                           )}
                         </td>
                         <td className="p-2">{r.specification}</td>
+                        <td className="p-2">
+                          <button
+                            onClick={() => handleOpenEditModal(r)}
+                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                          >
+                            Edit
+                          </button>
+                        </td>
                       </>
                     ) : (
                       <>
@@ -250,6 +334,14 @@ function ProductAndSpareLists({ type }) {
                           )}
                         </td>
                         <td className="p-2">{r.specification}</td>
+                        <td className="p-2">
+                          <button
+                            onClick={() => handleOpenEditModal(r)}
+                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                          >
+                            Edit
+                          </button>
+                        </td>
                       </>
                     )}
                   </>
@@ -259,7 +351,7 @@ function ProductAndSpareLists({ type }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={type === "product" ? 6 : 5}>
+                <td className="p-2 text-gray-500" colSpan={type === "product" ? 9 : 8}>
                   No data
                 </td>
               </tr>
@@ -395,11 +487,155 @@ function ProductAndSpareLists({ type }) {
                     <p><span className="font-semibold">Specification:</span> {r.specification}</p>
                   </>
                 )}
+                <div className="mt-2 pt-2 border-t">
+                  <button
+                    onClick={() => handleOpenEditModal(r)}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 w-full"
+                  >
+                    Edit
+                  </button>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* EDIT MODAL */}
+      {showEditModal && editingProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold">Edit {type === 'product' ? 'Product' : 'Spare'}</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Image */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Image</label>
+                {type === 'product' && (
+                  <img
+                    src={pickProductImageUrl(editingProduct.image_path, editingProduct.product_image)}
+                    alt="Current"
+                    className="w-20 h-20 object-cover rounded mb-2"
+                  />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setEditFormData({ ...editFormData, image: e.target.files[0] })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+
+              {/* Code */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {type === 'product' ? 'Code' : 'Spare No'}
+                </label>
+                <input
+                  type="text"
+                  value={editFormData.item_code}
+                  onChange={(e) => setEditFormData({ ...editFormData, item_code: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                  disabled={type === 'product'} // Code should not be editable for products
+                />
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={editFormData.item_name}
+                  onChange={(e) => setEditFormData({ ...editFormData, item_name: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+
+              {/* Product Number (only for products) */}
+              {type === 'product' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Product No</label>
+                  <input
+                    type="text"
+                    value={editFormData.product_number}
+                    onChange={(e) => setEditFormData({ ...editFormData, product_number: e.target.value })}
+                    className="w-full border rounded p-2 text-sm"
+                  />
+                </div>
+              )}
+
+              {/* Min Qty */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Min Qty</label>
+                <input
+                  type="number"
+                  value={editFormData.min_qty}
+                  onChange={(e) => setEditFormData({ ...editFormData, min_qty: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+
+              {/* Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                <input
+                  type="number"
+                  value={editFormData.price_per_unit}
+                  onChange={(e) => setEditFormData({ ...editFormData, price_per_unit: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+
+              {/* Last Negotiation Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last Neg. Price</label>
+                <input
+                  type="number"
+                  value={editFormData.last_negotiation_price}
+                  onChange={(e) => setEditFormData({ ...editFormData, last_negotiation_price: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+
+              {/* Specification */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Specification</label>
+                <textarea
+                  value={editFormData.specification}
+                  onChange={(e) => setEditFormData({ ...editFormData, specification: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50"
+                disabled={savingProduct}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveProduct}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                disabled={savingProduct}
+              >
+                {savingProduct ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
