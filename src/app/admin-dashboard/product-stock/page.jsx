@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Image from "next/image";
 import { Eye, Search, Pencil, ArrowRightLeft, History, X } from "lucide-react";
 import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";

@@ -91,10 +91,6 @@ export async function POST(request) {
             updates.push('specification = ?');
             values.push(specification);
         }
-        if (imagePath) {
-            updates.push('product_image = ?');
-            values.push(imagePath);
-        }
 
         if (updates.length === 0) {
             return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
@@ -104,6 +100,18 @@ export async function POST(request) {
 
         const query = `UPDATE products_list SET ${updates.join(', ')} WHERE item_code = ?`;
         await db.execute(query, values);
+
+        // Handle image update separately - insert into product_images table
+        if (imagePath) {
+            // First, delete existing images for this product
+            await db.execute('DELETE FROM product_images WHERE item_code = ?', [item_code]);
+            
+            // Then insert the new image
+            await db.execute(
+                'INSERT INTO product_images (item_code, image_path) VALUES (?, ?)',
+                [item_code, imagePath]
+            );
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {
