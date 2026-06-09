@@ -702,7 +702,7 @@ export default function InvoiceEditModal({
                 </div>
               </div>
 
-              <InvoiceItemsTable items={items} setItems={setItems} />
+              <InvoiceItemsTable items={items} setItems={setItems} isEditMode={true} />
 
               <TaxAndSummary
                 items={items}

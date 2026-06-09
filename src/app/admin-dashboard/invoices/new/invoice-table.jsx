@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 
-export default function InvoiceItemsTable({ items, setItems }) {
+export default function InvoiceItemsTable({ items, setItems, isEditMode = false }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
 
@@ -211,13 +211,16 @@ export default function InvoiceItemsTable({ items, setItems }) {
                       type="text"
                       value={item.item_code || ""}
                       onChange={(e) => {
-                        handleChange(idx, "item_code", e.target.value);
-                        fetchProductDetails(e.target.value, idx, true);
+                        if (!isEditMode) {
+                          handleChange(idx, "item_code", e.target.value);
+                          fetchProductDetails(e.target.value, idx, true);
+                        }
                       }}
-                      className="border p-1 w-24 text-xs rounded"
+                      className={`border p-1 w-24 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                      readOnly={isEditMode}
                     />
-                    {/* Dropdown */}
-                    {activeRowIndex === idx &&
+                    {/* Dropdown - only show if not edit mode */}
+                    {!isEditMode && activeRowIndex === idx &&
                       productSuggestions.length > 0 && (
                         <ul className="absolute z-10 bg-white border rounded shadow-sm mt-1 max-h-40 overflow-y-auto w-48 text-xs">
                           {productSuggestions.map((p, i) => (
@@ -255,12 +258,15 @@ export default function InvoiceItemsTable({ items, setItems }) {
                   <input
                     type="number"
                     value={item.quantity ?? 1}
-                    onChange={(e) =>
-                      handleChange(idx, "quantity", e.target.value)
-                    }
-                    className="border p-1 w-16 text-xs rounded"
+                    onChange={(e) => {
+                      if (!isEditMode) {
+                        handleChange(idx, "quantity", e.target.value);
+                      }
+                    }}
+                    className={`border p-1 w-16 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
                     min="0"
                     step="0.01"
+                    readOnly={isEditMode}
                   />
                 </td>
                 <td className="border px-2 py-2">{item.unit || "-"}</td>
@@ -268,49 +274,66 @@ export default function InvoiceItemsTable({ items, setItems }) {
                   <input
                     type="number"
                     value={item.rate ?? 0}
-                    onChange={(e) => handleChange(idx, "rate", e.target.value)}
-                    onBlur={(e) => handleBlur(idx, "rate", e.target.value)}
-                    className="border p-1 w-24 text-xs rounded"
+                    onChange={(e) => {
+                      if (!isEditMode) {
+                        handleChange(idx, "rate", e.target.value);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!isEditMode) {
+                        handleBlur(idx, "rate", e.target.value);
+                      }
+                    }}
+                    className={`border p-1 w-24 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
                     min="0"
                     step="0.01"
+                    readOnly={isEditMode}
                   />
                 </td>
                 <td className="border px-2 py-2">
                   <input
                     type="number"
                     value={item.discount_percent ?? 0}
-                    onChange={(e) =>
-                      handleChange(idx, "discount_percent", e.target.value)
-                    }
-                    className="border p-1 w-16 text-xs rounded"
+                    onChange={(e) => {
+                      if (!isEditMode) {
+                        handleChange(idx, "discount_percent", e.target.value);
+                      }
+                    }}
+                    className={`border p-1 w-16 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
                     min="0"
                     max="100"
                     step="0.01"
+                    readOnly={isEditMode}
                   />
                 </td>
                 <td className="border px-2 py-2">
                   <input
                     type="number"
                     value={item.discount_amount ?? 0}
-                    onChange={(e) =>
-                      handleChange(idx, "discount_amount", e.target.value)
-                    }
-                    className="border p-1 w-20 text-xs rounded"
+                    onChange={(e) => {
+                      if (!isEditMode) {
+                        handleChange(idx, "discount_amount", e.target.value);
+                      }
+                    }}
+                    className={`border p-1 w-20 text-xs rounded ${isEditMode ? "bg-gray-100 cursor-not-allowed" : ""}`}
                     min="0"
                     step="0.01"
+                    readOnly={isEditMode}
                   />
                 </td>
                 <td className="border px-2 py-2">
                   ₹ {(item.taxable_value || 0).toFixed(2)}
                 </td>
                 <td className="border px-2 py-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => removeRow(idx)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    🗑
-                  </button>
+                  {!isEditMode && (
+                    <button
+                      type="button"
+                      onClick={() => removeRow(idx)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      🗑
+                    </button>
+                  )}
                 </td>
               </tr>
             );
@@ -336,13 +359,15 @@ export default function InvoiceItemsTable({ items, setItems }) {
       </table>
 
       <div className="mt-3 text-center">
-        <button
-          type="button"
-          onClick={addRow}
-          className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm"
-        >
-          + Add Product
-        </button>
+        {!isEditMode && (
+          <button
+            type="button"
+            onClick={addRow}
+            className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm"
+          >
+            + Add Product
+          </button>
+        )}
       </div>
     </div>
   );
