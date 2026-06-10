@@ -11,6 +11,8 @@ function SpareList() {
   const [q, setQ] = useState("");
   const [editingPrice, setEditingPrice] = useState({ key: null, field: null, value: "" });
   const [savingPrice, setSavingPrice] = useState(false);
+  const [editingSpare, setEditingSpare] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleSavePrice = async (row, field) => {
     const code = row.id;
@@ -48,6 +50,50 @@ function SpareList() {
       alert("Error updating price");
     } finally {
       setSavingPrice(false);
+    }
+  };
+
+  const handleEditClick = (spare) => {
+    setEditingSpare({ ...spare });
+    setIsModalOpen(true);
+  };
+
+  const handleSaveSpare = async () => {
+    try {
+      const formData = new FormData();
+      formData.append('id', editingSpare.id);
+      formData.append('spare_number', editingSpare.spare_number);
+      formData.append('item_name', editingSpare.item_name);
+      formData.append('min_qty', editingSpare.min_qty);
+      formData.append('price', editingSpare.price);
+      formData.append('last_negotiation_price', editingSpare.last_negotiation_price);
+      formData.append('specification', editingSpare.specification);
+      if (editingSpare.newImageFile) {
+        formData.append('image', editingSpare.newImageFile);
+      }
+
+      const res = await fetch('/api/spare/update', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(data.error || 'Failed to update spare');
+        return;
+      }
+
+      // Refresh the list
+      fetch('/api/spare/list')
+        .then(r => r.json())
+        .then(d => setRows(Array.isArray(d) ? d : []))
+        .catch(() => setRows([]));
+
+      setIsModalOpen(false);
+      setEditingSpare(null);
+    } catch (error) {
+      console.error('Error saving spare:', error);
+      alert('Failed to update spare');
     }
   };
 
@@ -116,6 +162,7 @@ function SpareList() {
               <th className="p-2 text-left">Price</th>
               <th className="p-2 text-left">Last Neg. Price</th>
               <th className="p-2 text-left">Specification</th>
+              <th className="p-2 text-left">Actions</th>
             </tr>
           </thead>
 
@@ -176,6 +223,14 @@ function SpareList() {
                       )}
                     </td>
                     <td className="p-2">{r.specification}</td>
+                    <td className="p-2">
+                      <button
+                        onClick={() => handleEditClick(r)}
+                        className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
+                    </td>
                   </>
                 </tr>
               );
@@ -183,7 +238,7 @@ function SpareList() {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={7}>
+                <td className="p-2 text-gray-500" colSpan={8}>
                   No data
                 </td>
               </tr>
@@ -215,8 +270,14 @@ function SpareList() {
                   </div>
                 )}
 
-                <div className="text-sm font-semibold text-gray-800">
-                  {r.item_name}
+                <div className="flex-1">
+                  <div className="text-sm font-semibold text-gray-800">{r.item_name}</div>
+                  <button
+                    onClick={() => handleEditClick(r)}
+                    className="mt-1 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  >
+                    Edit
+                  </button>
                 </div>
               </div>
 
@@ -271,6 +332,139 @@ function SpareList() {
         })}
       </div>
 
+      {/* EDIT MODAL */}
+      {isModalOpen && editingSpare && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-lg font-semibold">Edit Spare</h3>
+              <button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingSpare(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {/* Spare Number */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Spare No</label>
+                <input
+                  type="text"
+                  value={editingSpare.spare_number || ""}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, spare_number: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
+              {/* Item Name */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Name</label>
+                <input
+                  type="text"
+                  value={editingSpare.item_name || ""}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, item_name: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
+              {/* Min Qty */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Min Qty</label>
+                <input
+                  type="number"
+                  value={editingSpare.min_qty || 0}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, min_qty: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
+              {/* Price */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Price</label>
+                <input
+                  type="number"
+                  value={editingSpare.price || 0}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, price: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  step="0.01"
+                />
+              </div>
+              {/* Last Negotiation Price */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Last Neg. Price</label>
+                <input
+                  type="number"
+                  value={editingSpare.last_negotiation_price || 0}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, last_negotiation_price: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  step="0.01"
+                />
+              </div>
+              {/* Specification */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Specification</label>
+                <textarea
+                  value={editingSpare.specification || ""}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, specification: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  rows={4}
+                />
+              </div>
+              {/* Image Upload */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Image</label>
+                {editingSpare.image && (
+                  <img
+                    src={editingSpare.image}
+                    className="w-24 h-24 object-cover rounded mb-2"
+                    alt="Current"
+                  />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      setEditingSpare({
+                        ...editingSpare,
+                        newImageFile: file,
+                        imagePreview: URL.createObjectURL(file)
+                      });
+                    }
+                  }}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+                {editingSpare.imagePreview && (
+                  <img
+                    src={editingSpare.imagePreview}
+                    className="w-24 h-24 object-cover rounded mt-2"
+                    alt="Preview"
+                  />
+                )}
+              </div>
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingSpare(null);
+                }}
+                className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSpare}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
