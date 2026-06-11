@@ -4,6 +4,8 @@ import { getDbConnection } from "@/lib/db";
 import { getISTDateString, getISTDateTimeString } from "@/lib/istDateTime";
 import { NextResponse } from "next/server";
 
+export const dynamic = 'force-dynamic';
+
 
 
 const getReverseGeocode = async (lat, lon) => {
