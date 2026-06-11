@@ -4,8 +4,87 @@ import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import fs from 'fs/promises';
 import path from 'path';
+import heicConvert from 'heic-convert';
+import { v2 as cloudinary } from 'cloudinary';
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+
+/**
+ * Cloudinary when creds exist and either:
+ * - NODE_ENV=production (real production deploy), or
+ * - SPARE_IMAGES_USE_CLOUDINARY=true — use when you run `npm run dev` locally but DB points to production.
+ * Force disk: SPARE_IMAGES_FORCE_LOCAL=true
+ */
+function useCloudinaryForSpareImages() {
+    if (process.env.SPARE_IMAGES_FORCE_LOCAL === '1' || process.env.SPARE_IMAGES_FORCE_LOCAL === 'true') {
+        return false;
+    }
+    const hasCreds = Boolean(
+        process.env.CLOUDINARY_CLOUD_NAME &&
+        process.env.CLOUDINARY_API_KEY &&
+        process.env.CLOUDINARY_API_SECRET
+    );
+    if (!hasCreds) return false;
+    const optIn =
+        process.env.SPARE_IMAGES_USE_CLOUDINARY === '1' ||
+        process.env.SPARE_IMAGES_USE_CLOUDINARY === 'true';
+    if (optIn) return true;
+    return process.env.NODE_ENV === 'production';
+}
+
+function safePathSegment(seg) {
+    return String(seg ?? 'x').replace(/[^\w.-]+/g, '_').slice(0, 120) || 'x';
+}
+
+async function prepareSpareFileBuffer(file) {
+    const originalName = file.name.replace(/ /g, '_');
+    const ext = path.extname(originalName).toLowerCase();
+    const isHeic = ext === '.heic' || ext === '.heif';
+    let buffer = Buffer.from(await file.arrayBuffer());
+    let outExt = ext;
+    if (isHeic) {
+        buffer = Buffer.from(await heicConvert({ buffer, format: 'JPEG', quality: 0.9 }));
+        outExt = '.jpg';
+    }
+    const baseStem = path.basename(originalName, path.extname(originalName));
+    const fileName = `${Date.now()}-${baseStem}${outExt}`;
+    return { buffer, fileName };
+}
+
+async function uploadBufferToCloudinary(buffer, folder, resourceType = 'image') {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder, resource_type: resourceType },
+            (error, result) => {
+                if (error) reject(error);
+                else resolve(result?.secure_url || '');
+            }
+        );
+        stream.end(buffer);
+    });
+}
+
+async function saveSpareFile(file, item_name, subfolder = '') {
+    const { buffer, fileName } = await prepareSpareFileBuffer(file);
+    const relPath = `/spare_files/${item_name}${subfolder ? '/' + subfolder : ''}/${fileName}`;
+
+    if (useCloudinaryForSpareImages()) {
+        const folder = `spare_files/${safePathSegment(item_name)}${subfolder ? '/' + safePathSegment(subfolder) : ''}`;
+        const url = await uploadBufferToCloudinary(buffer, folder, 'auto');
+        if (!url) throw new Error('Cloudinary upload returned no URL');
+        return url;
+    }
+
+    const spareDir = path.join(process.cwd(), 'public/spare_files', item_name, subfolder);
+    await fs.mkdir(spareDir, { recursive: true });
+    await fs.writeFile(path.join(spareDir, fileName), buffer);
+    return relPath;
+}
 
 export async function POST(request) {
     try {
@@ -47,7 +126,7 @@ export async function POST(request) {
 
         const db = await getDbConnection();
 
-        // Get current spare details to know existing image and item_name for directory structure
+        // Get current spare details
         const [currentSpare] = await db.execute('SELECT * FROM spare_list WHERE id = ? LIMIT 1', [id]);
         if (currentSpare.length === 0) {
             return NextResponse.json({ error: 'Spare not found' }, { status: 404 });
@@ -57,44 +136,35 @@ export async function POST(request) {
         // Handle image upload if provided
         let imagePath = existingSpare.image; // Keep existing image by default
         if (imageFile && imageFile.size > 0) {
-            const itemNameForDir = item_name || existingSpare.item_name;
-            const uploadDir = path.join(process.cwd(), 'public', 'spare_files', itemNameForDir);
-            await fs.mkdir(uploadDir, { recursive: true });
-
-            const fileName = `image_${Date.now()}-${imageFile.name.replace(/ /g, '_')}`;
-            const finalPath = path.join(uploadDir, fileName);
-
-            const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
-            await fs.writeFile(finalPath, fileBuffer);
-
-            imagePath = `/spare_files/${itemNameForDir}/${fileName}`;
+            const itemNameForSave = item_name || existingSpare.item_name;
+            imagePath = await saveSpareFile(imageFile, itemNameForSave);
         }
 
         // Build update query dynamically
         const updates = [];
         const values = [];
 
-        if (spare_number !== null) {
+        if (spare_number !== null && spare_number !== undefined) {
             updates.push('spare_number = ?');
             values.push(spare_number);
         }
-        if (item_name !== null) {
+        if (item_name !== null && item_name !== undefined) {
             updates.push('item_name = ?');
             values.push(item_name);
         }
-        if (min_qty !== null) {
+        if (min_qty !== null && min_qty !== undefined) {
             updates.push('min_qty = ?');
             values.push(min_qty);
         }
-        if (price !== null) {
+        if (price !== null && price !== undefined) {
             updates.push('price = ?');
             values.push(price);
         }
-        if (last_negotiation_price !== null) {
+        if (last_negotiation_price !== null && last_negotiation_price !== undefined) {
             updates.push('last_negotiation_price = ?');
             values.push(last_negotiation_price);
         }
-        if (specification !== null) {
+        if (specification !== null && specification !== undefined) {
             updates.push('specification = ?');
             values.push(specification);
         }
