@@ -4,8 +4,87 @@ import { jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import fs from 'fs/promises';
 import path from 'path';
+import heicConvert from 'heic-convert';
+import { v2 as cloudinary } from 'cloudinary';
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+
+/**
+ * Cloudinary when creds exist and either:
+ * - NODE_ENV=production (real production deploy), or
+ * - PRODUCT_IMAGES_USE_CLOUDINARY=true — use when you run `npm run dev` locally but DB points to production (otherwise NODE_ENV is development and paths would stay /product_images/... on your PC only).
+ * Force disk: PRODUCT_IMAGES_FORCE_LOCAL=true
+ */
+function useCloudinaryForProductImages() {
+    if (process.env.PRODUCT_IMAGES_FORCE_LOCAL === '1' || process.env.PRODUCT_IMAGES_FORCE_LOCAL === 'true') {
+        return false;
+    }
+    const hasCreds = Boolean(
+        process.env.CLOUDINARY_CLOUD_NAME &&
+        process.env.CLOUDINARY_API_KEY &&
+        process.env.CLOUDINARY_API_SECRET
+    );
+    if (!hasCreds) return false;
+    const optIn =
+        process.env.PRODUCT_IMAGES_USE_CLOUDINARY === '1' ||
+        process.env.PRODUCT_IMAGES_USE_CLOUDINARY === 'true';
+    if (optIn) return true;
+    return process.env.NODE_ENV === 'production';
+}
+
+function safePathSegment(seg) {
+    return String(seg ?? 'x').replace(/[^\w.-]+/g, '_').slice(0, 120) || 'x';
+}
+
+async function prepareProductImageBuffer(file) {
+    const originalName = file.name.replace(/ /g, '_');
+    const ext = path.extname(originalName).toLowerCase();
+    const isHeic = ext === '.heic' || ext === '.heif';
+    let buffer = Buffer.from(await file.arrayBuffer());
+    let outExt = ext;
+    if (isHeic) {
+        buffer = Buffer.from(await heicConvert({ buffer, format: 'JPEG', quality: 0.9 }));
+        outExt = '.jpg';
+    }
+    const baseStem = path.basename(originalName, path.extname(originalName));
+    const fileName = `${Date.now()}-${baseStem}${outExt}`;
+    return { buffer, fileName };
+}
+
+async function uploadBufferToCloudinary(buffer, folder) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder, resource_type: 'image' },
+            (error, result) => {
+                if (error) reject(error);
+                else resolve(result?.secure_url || '');
+            }
+        );
+        stream.end(buffer);
+    });
+}
+
+async function saveProductImage(file, item_name, item_code) {
+    const { buffer, fileName } = await prepareProductImageBuffer(file);
+    const relPath = `/product_images/products/${item_name}/${item_code}/${fileName}`;
+
+    if (useCloudinaryForProductImages()) {
+        const folder = `product_images/products/${safePathSegment(item_name)}/${safePathSegment(item_code)}`;
+        const url = await uploadBufferToCloudinary(buffer, folder);
+        if (!url) throw new Error('Cloudinary upload returned no URL');
+        return url;
+    }
+
+    const productDir = path.join(process.cwd(), 'public/product_images/products', item_name, item_code);
+    await fs.mkdir(productDir, { recursive: true });
+    await fs.writeFile(path.join(productDir, fileName), buffer);
+    return relPath;
+}
 
 export async function POST(request) {
     try {
@@ -50,49 +129,47 @@ export async function POST(request) {
         // Handle image upload if provided
         let imagePath = null;
         if (imageFile && imageFile.size > 0) {
-            const uploadDir = path.join(process.cwd(), 'public', 'ADMIN', 'PRODUCTS');
-            await fs.mkdir(uploadDir, { recursive: true });
-
-            const ext = path.extname(imageFile.name);
-            const safeFilename = `${item_code}_${Date.now()}${ext}`;
-            const finalPath = path.join(uploadDir, safeFilename);
-
-            const fileBuffer = Buffer.from(await imageFile.arrayBuffer());
-            await fs.writeFile(finalPath, fileBuffer);
-
-            imagePath = `/ADMIN/PRODUCTS/${safeFilename}`;
+            // First get the current product to get the item_name
+            const [currentProduct] = await db.execute('SELECT item_name FROM products_list WHERE item_code = ?', [item_code]);
+            const productName = currentProduct[0]?.item_name || item_code;
+            imagePath = await saveProductImage(imageFile, productName, item_code);
         }
 
         // Build update query dynamically
         const updates = [];
         const values = [];
 
-        if (item_name !== null) {
+        if (item_name !== null && item_name !== undefined) {
             updates.push('item_name = ?');
             values.push(item_name);
         }
-        if (product_number !== null) {
+        if (product_number !== null && product_number !== undefined) {
             updates.push('product_number = ?');
             values.push(product_number);
         }
-        if (min_qty !== null) {
+        if (min_qty !== null && min_qty !== undefined) {
             updates.push('min_qty = ?');
             values.push(min_qty);
         }
-        if (price_per_unit !== null) {
+        if (price_per_unit !== null && price_per_unit !== undefined) {
             updates.push('price_per_unit = ?');
             values.push(price_per_unit);
         }
-        if (last_negotiation_price !== null) {
+        if (last_negotiation_price !== null && last_negotiation_price !== undefined) {
             updates.push('last_negotiation_price = ?');
             values.push(last_negotiation_price);
         }
-        if (specification !== null) {
+        if (specification !== null && specification !== undefined) {
             updates.push('specification = ?');
             values.push(specification);
         }
 
-        if (updates.length === 0 && !imagePath) {
+        if (imagePath) {
+            updates.push('product_image = ?');
+            values.push(imagePath);
+        }
+
+        if (updates.length === 0) {
             return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
         }
 
@@ -101,18 +178,11 @@ export async function POST(request) {
         const query = `UPDATE products_list SET ${updates.join(', ')} WHERE item_code = ?`;
         await db.execute(query, values);
 
-        // Handle image update separately - update both tables
+        // Handle image update separately - add to product_images table
         if (imagePath) {
-            // Update product_image column in products_list table
-            await db.execute('UPDATE products_list SET product_image = ? WHERE item_code = ?', [imagePath, item_code]);
-            
-            // Also update product_images table
-            // First, delete existing images for this product
-            await db.execute('DELETE FROM product_images WHERE item_code = ?', [item_code]);
-            
-            // Then insert the new image
+            // Append new image to product_images table (don't delete existing)
             await db.execute(
-                'INSERT INTO product_images (item_code, image_path) VALUES (?, ?)',
+                'INSERT IGNORE INTO product_images (item_code, image_path) VALUES (?, ?)',
                 [item_code, imagePath]
             );
         }

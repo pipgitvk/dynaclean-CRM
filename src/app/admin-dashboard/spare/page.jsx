@@ -13,6 +13,8 @@ function SpareList() {
   const [savingPrice, setSavingPrice] = useState(false);
   const [editingSpare, setEditingSpare] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deletingSpare, setDeletingSpare] = useState(false);
+  const [userRole, setUserRole] = useState("");
 
   const handleSavePrice = async (row, field) => {
     const code = row.id;
@@ -97,7 +99,45 @@ function SpareList() {
     }
   };
 
+  const handleDeleteSpare = async (id) => {
+    if (!confirm('Are you sure you want to delete this spare? This action cannot be undone.')) return;
+
+    try {
+      setDeletingSpare(true);
+      const res = await fetch("/api/spare/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: id }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Failed to delete spare");
+        return;
+      }
+
+      // Refresh the list
+      fetch('/api/spare/list')
+        .then(r => r.json())
+        .then(d => setRows(Array.isArray(d) ? d : []))
+        .catch(() => setRows([]));
+
+      alert("Spare deleted successfully");
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting spare");
+    } finally {
+      setDeletingSpare(false);
+    }
+  };
+
   useEffect(() => {
+    // Fetch user role
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => setUserRole(d.userRole))
+      .catch(() => setUserRole(""));
+
     fetch('/api/spare/list')
       .then(r => r.json())
       .then(d => setRows(Array.isArray(d) ? d : []))
@@ -224,12 +264,23 @@ function SpareList() {
                     </td>
                     <td className="p-2">{r.specification}</td>
                     <td className="p-2">
-                      <button
-                        onClick={() => handleEditClick(r)}
-                        className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEditClick(r)}
+                          className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                        >
+                          Edit
+                        </button>
+                        {userRole === 'SUPERADMIN' && (
+                          <button
+                            onClick={() => handleDeleteSpare(r.id)}
+                            disabled={deletingSpare}
+                            className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </>
                 </tr>
@@ -272,12 +323,23 @@ function SpareList() {
 
                 <div className="flex-1">
                   <div className="text-sm font-semibold text-gray-800">{r.item_name}</div>
-                  <button
-                    onClick={() => handleEditClick(r)}
-                    className="mt-1 px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                  >
-                    Edit
-                  </button>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => handleEditClick(r)}
+                      className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                    >
+                      Edit
+                    </button>
+                    {userRole === 'SUPERADMIN' && (
+                      <button
+                        onClick={() => handleDeleteSpare(r.id)}
+                        disabled={deletingSpare}
+                        className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 

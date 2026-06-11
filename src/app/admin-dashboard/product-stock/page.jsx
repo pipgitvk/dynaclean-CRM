@@ -15,6 +15,9 @@ function ProductAndSpareLists({ type }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [deletingImage, setDeletingImage] = useState(false);
+  const [deletingProduct, setDeletingProduct] = useState(false);
+  const [userRole, setUserRole] = useState("");
   const [editFormData, setEditFormData] = useState({
     item_code: '',
     item_name: '',
@@ -23,8 +26,17 @@ function ProductAndSpareLists({ type }) {
     price_per_unit: '',
     last_negotiation_price: '',
     specification: '',
-    image: null
+    image: null,
+    productImages: [] // To store all product images
   });
+
+  const refreshProducts = () => {
+    const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
+    fetch(url)
+      .then(r => r.json())
+      .then(d => setRows(Array.isArray(d) ? d : []))
+      .catch(() => setRows([]));
+  };
 
   const handleSavePrice = async (row, field) => {
     const code = type === 'product' ? row.item_code : row.id;
@@ -68,6 +80,8 @@ function ProductAndSpareLists({ type }) {
 
   const handleOpenEditModal = (row) => {
     setEditingProduct(row);
+    // Get all images - use row.images if available, otherwise create an array with single image
+    const images = row.images || (row.image_path ? [row.image_path] : []);
     setEditFormData({
       item_code: row.item_code || '',
       item_name: row.item_name || '',
@@ -76,9 +90,107 @@ function ProductAndSpareLists({ type }) {
       price_per_unit: row.price_per_unit || row.price || '',
       last_negotiation_price: row.last_negotiation_price || '',
       specification: row.specification || '',
-      image: null
+      image: null,
+      productImages: images
     });
     setShowEditModal(true);
+  };
+
+  const handleDeleteImage = async (imagePath) => {
+    if (!editingProduct || deletingImage) return;
+    if (!confirm('Are you sure you want to delete this image?')) return;
+
+    try {
+      setDeletingImage(true);
+      const res = await fetch("/api/products/delete-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_code: editFormData.item_code,
+          image_path: imagePath
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Failed to delete image");
+        return;
+      }
+
+      // Update local state
+      setEditFormData(prev => ({
+        ...prev,
+        productImages: prev.productImages.filter(img => img !== imagePath)
+      }));
+
+      // Refresh the product list
+      refreshProducts();
+
+      alert("Image deleted successfully");
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting image");
+    } finally {
+      setDeletingImage(false);
+    }
+  };
+
+  const handleDeleteProduct = async (itemCode) => {
+    if (!confirm('Are you sure you want to delete this product? This action cannot be undone.')) return;
+
+    try {
+      setDeletingProduct(true);
+      const res = await fetch("/api/products/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_code: itemCode }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Failed to delete product");
+        return;
+      }
+
+      // Refresh the product list
+      refreshProducts();
+
+      alert("Product deleted successfully");
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting product");
+    } finally {
+      setDeletingProduct(false);
+    }
+  };
+
+  const handleDeleteSpare = async (id) => {
+    if (!confirm('Are you sure you want to delete this spare? This action cannot be undone.')) return;
+
+    try {
+      setDeletingProduct(true);
+      const res = await fetch("/api/spare/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: id }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Failed to delete spare");
+        return;
+      }
+
+      // Refresh the list
+      refreshProducts();
+
+      alert("Spare deleted successfully");
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting spare");
+    } finally {
+      setDeletingProduct(false);
+    }
   };
 
   const handleSaveProduct = async () => {
@@ -110,11 +222,7 @@ function ProductAndSpareLists({ type }) {
       }
 
       // Refresh the data
-      const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
-      fetch(url)
-        .then(r => r.json())
-        .then(d => setRows(Array.isArray(d) ? d : []))
-        .catch(() => setRows([]));
+      refreshProducts();
 
       setShowEditModal(false);
       setEditingProduct(null);
@@ -128,6 +236,12 @@ function ProductAndSpareLists({ type }) {
   };
 
   useEffect(() => {
+    // Fetch user role
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => setUserRole(d.userRole))
+      .catch(() => setUserRole(""));
+      
     const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
     fetch(url)
       .then(r => r.json())
@@ -281,12 +395,23 @@ function ProductAndSpareLists({ type }) {
                         </td>
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
-                          <button
-                            onClick={() => handleOpenEditModal(r)}
-                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                          >
-                            Edit
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleOpenEditModal(r)}
+                              className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            >
+                              Edit
+                            </button>
+                            {userRole === 'SUPERADMIN' && (
+                              <button
+                                onClick={() => handleDeleteProduct(r.item_code)}
+                                disabled={deletingProduct}
+                                className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </>
                     ) : (
@@ -334,12 +459,23 @@ function ProductAndSpareLists({ type }) {
                         </td>
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
-                          <button
-                            onClick={() => handleOpenEditModal(r)}
-                            className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                          >
-                            Edit
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleOpenEditModal(r)}
+                              className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                            >
+                              Edit
+                            </button>
+                            {userRole === 'SUPERADMIN' && (
+                              <button
+                                onClick={() => handleDeleteSpare(r.id)}
+                                disabled={deletingProduct}
+                                className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </>
                     )}
@@ -486,13 +622,31 @@ function ProductAndSpareLists({ type }) {
                     <p><span className="font-semibold">Specification:</span> {r.specification}</p>
                   </>
                 )}
-                <div className="mt-2 pt-2 border-t">
+                <div className="mt-2 pt-2 border-t space-y-2">
                   <button
                     onClick={() => handleOpenEditModal(r)}
                     className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 w-full"
                   >
                     Edit
                   </button>
+                  {type === 'product' && userRole === 'SUPERADMIN' && (
+                    <button
+                      onClick={() => handleDeleteProduct(r.item_code)}
+                      disabled={deletingProduct}
+                      className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 w-full disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  )}
+                  {type === 'spare' && userRole === 'SUPERADMIN' && (
+                    <button
+                      onClick={() => handleDeleteSpare(r.id)}
+                      disabled={deletingProduct}
+                      className="px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 w-full disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -515,16 +669,38 @@ function ProductAndSpareLists({ type }) {
             </div>
 
             <div className="p-4 space-y-4">
-              {/* Image */}
+              {/* Images */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Image</label>
-                {type === 'product' && (
-                  <img
-                    src={pickProductImageUrl(editingProduct.image_path, editingProduct.product_image)}
-                    alt="Current"
-                    className="w-20 h-20 object-cover rounded mb-2"
-                  />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Images</label>
+                
+                {/* Display all existing images */}
+                {type === 'product' && editFormData.productImages.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mb-3">
+                    {editFormData.productImages.map((imgUrl, idx) => {
+                      const fullUrl = imgUrl.startsWith('http') ? imgUrl : imgUrl;
+                      return (
+                        <div key={idx} className="relative">
+                          <img
+                            src={fullUrl}
+                            alt={`Product image ${idx + 1}`}
+                            className="w-24 h-24 object-cover rounded border"
+                          />
+                          {userRole === 'SUPERADMIN' && (
+                            <button
+                              onClick={() => handleDeleteImage(imgUrl)}
+                              disabled={deletingImage}
+                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 disabled:opacity-50"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
+
+                {/* Add new image */}
                 <input
                   type="file"
                   accept="image/*"
