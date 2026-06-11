@@ -24,6 +24,7 @@ export async function GET(request) {
 
     const [rows] = await db.query(
       `SELECT
+        username,
         date,
         checkin_time,
         checkout_time,

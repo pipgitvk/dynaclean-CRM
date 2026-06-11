@@ -83,9 +83,66 @@ const AttendancePage = () => {
   const [regModalLog, setRegModalLog] = useState(null);
   const [regModalDateKey, setRegModalDateKey] = useState("");
   const [regForUsername, setRegForUsername] = useState("");
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editModalLog, setEditModalLog] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteModalLog, setDeleteModalLog] = useState(null);
 
   const logDateKeyForReg = (log) =>
     log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
+
+  const openEditModal = (log) => {
+    setEditModalLog({ ...log });
+    setEditModalOpen(true);
+  };
+
+  const openDeleteDialog = (log) => {
+    setDeleteModalLog(log);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const dateKey = new Date(editModalLog.date).toLocaleDateString("en-CA");
+      const response = await fetch("/api/empcrm/attendance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...editModalLog, date: dateKey }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update log");
+      }
+
+      toast.success("Attendance log updated successfully!");
+      setEditModalOpen(false);
+      setEditModalLog(null);
+      fetchAttendance();
+    } catch (error) {
+      toast.error(error.message || "Failed to update attendance log");
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const dateKey = new Date(deleteModalLog.date).toLocaleDateString("en-CA");
+      const response = await fetch(`/api/empcrm/attendance?username=${deleteModalLog.username}&date=${dateKey}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete log");
+      }
+
+      toast.success("Attendance log deleted successfully!");
+      setDeleteDialogOpen(false);
+      setDeleteModalLog(null);
+      fetchAttendance();
+    } catch (error) {
+      toast.error(error.message || "Failed to delete attendance log");
+    }
+  };
 
   const openAbsentRegularizeModal = (log) => {
     setRegModalLog({ ...log, type: "absent" });
@@ -895,16 +952,34 @@ const AttendancePage = () => {
                           ) : null}
                         </span>
                       </div>
-                      <div className="pt-2 border-t border-gray-100">
-                        <button
-                          type="button"
-                          onClick={() => openBreakEditModal(log)}
-                          className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-                        >
-                          <Pencil className="h-4 w-4" aria-hidden />
-                          Edit break times
-                        </button>
-                      </div>
+                      <div className="pt-2 border-t border-gray-100 space-y-2">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(log)}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden />
+                              Edit Log
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openBreakEditModal(log)}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden />
+                              Edit Break Times
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openDeleteDialog(log)}
+                              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete Log
+                            </button>
+                          </div>
                     </>
                   ) : (
                     <div className="text-center py-4">
@@ -978,7 +1053,7 @@ const AttendancePage = () => {
                     Check-out Address
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Edit breaks
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -1107,20 +1182,42 @@ const AttendancePage = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <button
-                              type="button"
-                              onClick={() => openBreakEditModal(log)}
-                              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
-                              title="Edit morning, lunch, evening break times"
-                            >
-                              <Pencil className="h-3.5 w-3.5" aria-hidden />
-                              Edit
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEditModal(log)}
+                                className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                                title="Edit attendance log"
+                              >
+                                <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                Edit Log
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openBreakEditModal(log)}
+                                className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                                title="Edit morning, lunch, evening break times"
+                              >
+                                <Pencil className="h-3.5 w-3.5" aria-hidden />
+                                Edit Breaks
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openDeleteDialog(log)}
+                                className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                                title="Delete attendance log"
+                              >
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </>
                       ) : (
                         <td
-                          colSpan="8"
+                          colSpan="9"
                           className={`px-6 py-4 text-center ${log.type === "absent"
                             ? "bg-orange-50 text-orange-700"
                             : log.type === "leave"
@@ -1163,7 +1260,7 @@ const AttendancePage = () => {
                 ) : (
                   <tr>
                     <td
-                      colSpan="10"
+                      colSpan="11"
                       className="px-6 py-4 text-center text-gray-500"
                     >
                       No attendance logs found for the selected filter.
@@ -1299,6 +1396,203 @@ const AttendancePage = () => {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editModalOpen && editModalLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit Attendance Log</h3>
+              <button
+                onClick={() => {
+                  setEditModalOpen(false);
+                  setEditModalLog(null);
+                }}
+                className="text-gray-500 hover:text-gray-800 text-2xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={editModalLog.date ? new Date(editModalLog.date).toISOString().split('T')[0] : ''}
+                  disabled
+                  className="w-full px-3 py-2 border rounded-md bg-gray-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={editModalLog.username || ''}
+                  disabled
+                  className="w-full px-3 py-2 border rounded-md bg-gray-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Check-in Time
+                </label>
+                <input
+                  type="time"
+                  step="1"
+                  value={editModalLog.checkin_time ? editModalLog.checkin_time.slice(0, 8) : ''}
+                  onChange={(e) => setEditModalLog({ ...editModalLog, checkin_time: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Morning Break Start
+                </label>
+                <input
+                  type="time"
+                  step="1"
+                  value={editModalLog.break_morning_start ? editModalLog.break_morning_start.slice(0, 8) : ''}
+                  onChange={(e) => setEditModalLog({ ...editModalLog, break_morning_start: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Morning Break End
+                </label>
+                <input
+                  type="time"
+                  step="1"
+                  value={editModalLog.break_morning_end ? editModalLog.break_morning_end.slice(0, 8) : ''}
+                  onChange={(e) => setEditModalLog({ ...editModalLog, break_morning_end: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Lunch Break Start
+                </label>
+                <input
+                  type="time"
+                  step="1"
+                  value={editModalLog.break_lunch_start ? editModalLog.break_lunch_start.slice(0, 8) : ''}
+                  onChange={(e) => setEditModalLog({ ...editModalLog, break_lunch_start: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Lunch Break End
+                </label>
+                <input
+                  type="time"
+                  step="1"
+                  value={editModalLog.break_lunch_end ? editModalLog.break_lunch_end.slice(0, 8) : ''}
+                  onChange={(e) => setEditModalLog({ ...editModalLog, break_lunch_end: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Evening Break Start
+                </label>
+                <input
+                  type="time"
+                  step="1"
+                  value={editModalLog.break_evening_start ? editModalLog.break_evening_start.slice(0, 8) : ''}
+                  onChange={(e) => setEditModalLog({ ...editModalLog, break_evening_start: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Evening Break End
+                </label>
+                <input
+                  type="time"
+                  step="1"
+                  value={editModalLog.break_evening_end ? editModalLog.break_evening_end.slice(0, 8) : ''}
+                  onChange={(e) => setEditModalLog({ ...editModalLog, break_evening_end: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Check-out Time
+                </label>
+                <input
+                  type="time"
+                  step="1"
+                  value={editModalLog.checkout_time ? editModalLog.checkout_time.slice(0, 8) : ''}
+                  onChange={(e) => setEditModalLog({ ...editModalLog, checkout_time: e.target.value || null })}
+                  className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditModalOpen(false);
+                    setEditModalLog(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteDialogOpen && deleteModalLog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-sm p-6">
+            <h3 className="text-lg font-semibold mb-4">Delete Attendance Log</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the attendance log for {deleteModalLog.username} on {new Date(deleteModalLog.date).toLocaleDateString()}? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setDeleteModalLog(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}

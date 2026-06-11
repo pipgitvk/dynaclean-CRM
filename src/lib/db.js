@@ -23,7 +23,7 @@ function requiredEnv(name) {
 function createMysqlPool() {
   const DB_HOST = requiredEnv("DB_HOST");
   const DB_USER = requiredEnv("DB_USER");
-  const DB_PASSWORD = requiredEnv("DB_PASSWORD");
+  const DB_PASSWORD = process.env.DB_PASSWORD || "";
   const DB_NAME = requiredEnv("DB_NAME");
 
   const pool = mysql.createPool({
