@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const conn = await getDbConnection();
-    const testIds = [235178, 235175, 23518, 235335, 235329, 235299];
+    const testIds = [235178, 235175, 235181, 235335, 235329, 235299];
 
     // First, confirm they exist
     const [beforeDelete] = await conn.query(
