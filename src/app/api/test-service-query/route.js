@@ -10,14 +10,14 @@ export async function GET() {
     const testIds = [235178, 235175];
 
     // Check service_records
-    const [recordsRows] = await conn.execute(
+    const [recordsRows] = await conn.query(
       "SELECT * FROM service_records WHERE service_id IN (?)",
       [testIds]
     );
     console.log("✅ [TEST API] service_records found:", recordsRows.length, recordsRows);
 
     // Check service_reports
-    const [reportsRows] = await conn.execute(
+    const [reportsRows] = await conn.query(
       "SELECT * FROM service_reports WHERE service_id IN (?)",
       [testIds]
     );
@@ -42,7 +42,7 @@ export async function GET() {
       ORDER BY sr.service_id DESC;
     `;
 
-    const [finalRows] = await conn.execute(sql, [testIds]);
+    const [finalRows] = await conn.query(sql, [testIds]);
     console.log("✅ [TEST API] Full query results found:", finalRows.length, finalRows);
 
     return NextResponse.json({
