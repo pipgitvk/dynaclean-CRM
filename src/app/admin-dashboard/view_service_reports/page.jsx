@@ -6,6 +6,10 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { getSessionPayload } from "@/lib/auth";
 
+// ✅ Disable caching to always fetch fresh data from database
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
+
 export default async function AdminViewServiceReportsPage() {
   let serviceRecords = [];
 

@@ -4,6 +4,10 @@ import { getDbConnection } from "@/lib/db"; // DB connection utility
 import ServiceTable from "@/components/services/ServiceTable"; // Import the new Table Component
 import { getSessionPayload } from "@/lib/auth";
 
+// ✅ Disable caching to always fetch fresh data from database
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
+
 export default async function DirectorViewServiceReportsPage() {
   let serviceRecords = [];
 

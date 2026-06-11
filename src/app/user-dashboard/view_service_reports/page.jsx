@@ -4,6 +4,10 @@ import { getDbConnection } from "@/lib/db";
 import ServiceTable from "@/components/services/ServiceTable";
 import { getSessionPayload } from "@/lib/auth";
 
+// ✅ Disable caching to always fetch fresh data from database
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
+
 const PRIVILEGED_ROLES = ["ADMIN", "SUPERADMIN", "SERVICE HEAD", "TEAM LEADER"];
 
 export default async function ViewServiceReportsPage() {
