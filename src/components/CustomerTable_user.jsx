@@ -124,7 +124,7 @@ export default function CustomerTable({ customers, isLoading }) {
     const doc = new jsPDF();
     const tableData = filteredCustomers.map((c, i) => [
       i + 1,
-      dayjs.utc(c.date_created).format("DD-MMM-YYYY"),
+      dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm"),
       c.lead_campaign,
       c.first_name,
       c.company,
@@ -218,7 +218,7 @@ export default function CustomerTable({ customers, isLoading }) {
                 >
                   <td className="px-3 py-3">{i + 1}</td>
                   <td className="px-3 py-3 text-left">
-                    {dayjs.utc(c.date_created).format("DD-MMM-YYYY")}
+                    {dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm")}
                   </td>
                   <td className="px-3 py-3 text-left">{c.lead_campaign}</td>
                   <td className="px-3 py-3 text-left">{c.first_name}</td>
@@ -267,7 +267,7 @@ export default function CustomerTable({ customers, isLoading }) {
               <div className="flex justify-between items-center text-gray-500">
                 <span className="text-xs font-medium">#{i + 1}</span>
                 <span className="font-medium text-gray-800">
-                  {dayjs.utc(c.date_created).format("DD-MMM-YYYY")}
+                  {dayjs.utc(c.date_created).format("DD-MMM-YYYY HH:mm")}
                 </span>
               </div>
               <div className="space-y-1">
