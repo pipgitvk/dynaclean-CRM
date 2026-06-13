@@ -40,32 +40,32 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
     if (!statement) return;
 
     const isSelected = selectedIds.includes(id);
-    
-    if (isSelected) {
-      setSelectedIds([]);
-    } else {
-      const amount = Number(statement.amount || 0);
-      
-      if (Math.abs(amount - selectedApprovedAmount) > 0.01) {
-        toast.error(`Statement amount (₹${amount.toFixed(2)}) must exactly match selected expenses total (₹${selectedApprovedAmount.toFixed(2)})`);
+    const amount = Number(statement.amount || 0);
+
+    if (!isSelected) {
+      // Adding a statement - check total
+      const currentSelectedTotal = statements
+        .filter((s) => selectedIds.includes(s.id))
+        .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+
+      if (currentSelectedTotal + amount > selectedApprovedAmount + 0.01) { // 0.01 for floating point buffer
+        toast.error(`Total selected amount (₹${(currentSelectedTotal + amount).toFixed(2)}) cannot exceed selected expenses total (₹${selectedApprovedAmount.toFixed(2)})`);
         return;
       }
-      
-      setSelectedIds([id]);
     }
+
+    setSelectedIds((prev) =>
+      isSelected ? prev.filter((i) => i !== id) : [...prev, id]
+    );
   };
 
   const handleSave = async () => {
-    if (selectedIds.length !== 1) {
-      toast.error("Please select exactly one statement");
-      return;
-    }
+    const selectedTotal = statements
+      .filter((s) => selectedIds.includes(s.id))
+      .reduce((sum, s) => sum + Number(s.amount || 0), 0);
 
-    const selectedStatement = statements.find(s => s.id === selectedIds[0]);
-    if (!selectedStatement) return;
-
-    if (Math.abs(Number(selectedStatement.amount) - selectedApprovedAmount) > 0.01) {
-      toast.error(`Statement amount must exactly match selected expenses total`);
+    if (Math.abs(selectedTotal - selectedApprovedAmount) > 0.01) {
+      toast.error(`Total selected statements amount (₹${selectedTotal.toFixed(2)}) must exactly match selected expenses total (₹${selectedApprovedAmount.toFixed(2)})`);
       return;
     }
 
