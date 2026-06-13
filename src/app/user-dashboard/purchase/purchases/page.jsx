@@ -812,7 +812,34 @@ export default function PurchasesPage() {
       return 0;
     });
 
-    return filtered;
+    // Now group children under their parents
+    const parentMap = {};
+    const childMap = {};
+    filtered.forEach(p => {
+      if (p.parent_id) {
+        if (!childMap[p.parent_id]) childMap[p.parent_id] = [];
+        childMap[p.parent_id].push(p);
+      } else {
+        parentMap[p.id] = p;
+      }
+    });
+    const sortedFiltered = [];
+    // Add all parents first, sorted descending by id
+    Object.values(parentMap)
+      .sort((a, b) => b.id - a.id)
+      .forEach(parent => {
+        sortedFiltered.push(parent);
+        // Then add children of this parent
+        if (childMap[parent.id]) {
+          sortedFiltered.push(...childMap[parent.id].sort((a, b) => a.id - b.id));
+        }
+      });
+    // Then add any purchases without parent that weren't added yet, sorted descending
+    filtered
+      .filter(p => !sortedFiltered.find(sp => sp.id === p.id))
+      .sort((a, b) => b.id - a.id)
+      .forEach(p => sortedFiltered.push(p));
+    return sortedFiltered;
   }, [purchases, search, statusFilter, paymentTransByPurchaseId, startDate, endDate, sortColumn, sortDirection]);
 
   const totals = useMemo(() => {
@@ -836,10 +863,29 @@ export default function PurchasesPage() {
   const togglePurchaseSelection = (id) => {
     setSelectedPurchaseIds((prev) => {
       const newSet = new Set(prev);
+      const purchase = purchases.find(p => p.id === id);
       if (newSet.has(id)) {
         newSet.delete(id);
+        // If it's a parent, also deselect all its children
+        if (!purchase?.parent_id) {
+          purchases.filter(p => p.parent_id === id).forEach(child => newSet.delete(child.id));
+        }
+        // If it's a child, also deselect its parent and all siblings
+        if (purchase?.parent_id) {
+          newSet.delete(purchase.parent_id);
+          purchases.filter(p => p.parent_id === purchase.parent_id).forEach(child => newSet.delete(child.id));
+        }
       } else {
         newSet.add(id);
+        // If it's a parent, also select all its children
+        if (!purchase?.parent_id) {
+          purchases.filter(p => p.parent_id === id).forEach(child => newSet.add(child.id));
+        }
+        // If it's a child, also select its parent and all siblings
+        if (purchase?.parent_id) {
+          newSet.add(purchase.parent_id);
+          purchases.filter(p => p.parent_id === purchase.parent_id).forEach(child => newSet.add(child.id));
+        }
       }
       return newSet;
     });
@@ -1139,6 +1185,8 @@ export default function PurchasesPage() {
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('quantity')}>Qty {sortColumn === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('price_per_unit')}>Price/Unit {sortColumn === 'price_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('net_amount')}>Net Amount {sortColumn === 'net_amount' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200">Paid Amount</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200">Remaining Amount</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('invoice_number')}>Invoice No {sortColumn === 'invoice_number' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('invoice_date')}>Invoice Date {sortColumn === 'invoice_date' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('from_company')}>From Company {sortColumn === 'from_company' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -1152,89 +1200,112 @@ export default function PurchasesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredPurchases.map((purchase) => (
-                  <tr key={purchase.id} className="border-t hover:bg-gray-50">
-                    <td className="p-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedPurchaseIds.has(Number(purchase.id))}
-                        onChange={() => togglePurchaseSelection(Number(purchase.id))}
-                        className="w-4 h-4 cursor-pointer"
-                      />
-                    </td>
-                    <td className="p-3">#{purchase.id}</td>
-                    <td className="p-3 font-medium">{purchase.product_code}</td>
-                    <td className="p-3">{purchase.product_name}</td>
-                    <td className="p-3">{purchase.quantity}</td>
-                    <td className="p-3">₹{Number(purchase.price_per_unit).toFixed(2)}</td>
-                    <td className="p-3 font-semibold">₹{Number(purchase.net_amount).toFixed(2)}</td>
-                    <td className="p-3">{purchase.invoice_number || "—"}</td>
-                    <td className="p-3">{formatDisplayDate(purchase.invoice_date)}</td>
-                    <td className="p-3">{purchase.from_company || "—"}</td>
-                    <td className="p-3">{purchase.mode_of_transport || "—"}</td>
-                    <td className="p-3">{getStatusBadge(purchase.status)}</td>
-                    <td className="p-3">{purchase.created_by}</td>
-                    <td className="p-3">{new Date(purchase.created_at).toLocaleDateString('en-IN', { timeZone: 'UTC' })}</td>
-                    <td className="p-3 text-center">
-                      {purchase.product_image ? (
-                        <button
-                          onClick={() =>
-                            {
-                              const fileUrl = resolvePurchaseFileUrl(purchase.product_image);
-                              setPreviewImage({
-                                url: fileUrl,
-                                type: getFileType(fileUrl || purchase.product_image),
-                              });
-                            }
-                          }
-                          className="text-gray-600 hover:text-blue-700"
-                        >
-                          <Eye className="w-5 h-5 inline" />
-                        </button>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="p-3 font-mono text-xs">
-                      {paymentTransByPurchaseId?.[Number(purchase.id)] ? paymentTransByPurchaseId[Number(purchase.id)] : "—"}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex flex-col gap-1">
-                        {linkedPurchaseIds.has(Number(purchase.id)) ? (
+                {filteredPurchases.map((purchase) => {
+                  const isChild = !!purchase.parent_id;
+                  const isParent = purchases.some(p => p.parent_id === purchase.id);
+                  return (
+                    <tr key={purchase.id} className={`border-t hover:bg-gray-50 ${isChild ? 'bg-gray-50' : ''}`}>
+                      <td className="p-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedPurchaseIds.has(Number(purchase.id))}
+                          onChange={() => togglePurchaseSelection(Number(purchase.id))}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          {isChild && <span className="text-gray-400 text-xs pl-4">↳ Child of #{purchase.parent_id}</span>}
+                          <span className={`${isChild ? 'text-gray-500' : 'font-semibold'}`}>#{purchase.id}</span>
+                          {isParent && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">Parent</span>}
+                        </div>
+                      </td>
+                      <td className="p-3 font-medium">{purchase.product_code}</td>
+                      <td className="p-3">{purchase.product_name}</td>
+                      <td className="p-3">{purchase.quantity}</td>
+                      <td className="p-3">₹{Number(purchase.price_per_unit).toFixed(2)}</td>
+                      <td className="p-3 font-semibold">₹{Number(purchase.net_amount).toFixed(2)}</td>
+                      <td className="p-3 font-medium text-green-700">₹{Number(purchase.paid_amount || 0).toFixed(2)}</td>
+                      <td className="p-3 font-medium text-orange-600">₹{Number(purchase.remaining_amount || (Number(purchase.net_amount) - Number(purchase.paid_amount || 0))).toFixed(2)}</td>
+                      <td className="p-3">{purchase.invoice_number || "—"}</td>
+                      <td className="p-3">{formatDisplayDate(purchase.invoice_date)}</td>
+                      <td className="p-3">{purchase.from_company || "—"}</td>
+                      <td className="p-3">{purchase.mode_of_transport || "—"}</td>
+                      <td className="p-3">{getStatusBadge(purchase.status)}</td>
+                      <td className="p-3">{purchase.created_by}</td>
+                      <td className="p-3">{new Date(purchase.created_at).toLocaleDateString('en-IN', { timeZone: 'UTC' })}</td>
+                      <td className="p-3 text-center">
+                        {purchase.product_image ? (
                           <button
-                            type="button"
-                            onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
-                            className="text-emerald-700 hover:text-emerald-800 font-medium text-sm flex items-center gap-1"
+                            onClick={() =>
+                              {
+                                const fileUrl = resolvePurchaseFileUrl(purchase.product_image);
+                                setPreviewImage({
+                                  url: fileUrl,
+                                  type: getFileType(fileUrl || purchase.product_image),
+                                });
+                              }
+                            }
+                            className="text-gray-600 hover:text-blue-700"
                           >
-                            <Plus className="w-3 h-3" /> Edit/Add Payment
+                            <Eye className="w-5 h-5 inline" />
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
-                            className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1"
-                          >
-                            <Plus className="w-3 h-3" /> Link Payment
-                          </button>
+                          <span className="text-gray-400">—</span>
                         )}
-                        <div className="flex items-center gap-2 mt-1">
-                          <button
-                            onClick={() => setDetailPurchase(purchase)}
-                            className="text-gray-600 hover:text-gray-800 flex items-center gap-1 text-sm"
-                          >
-                            <Eye className="w-4 h-4" /> View
-                          </button>
-                          <button
-                            onClick={() => { setEditRecord(purchase); setEditOpen(true); }}
-                            className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
-                          >
-                            Edit
-                          </button>
+                      </td>
+                      <td className="p-3 font-mono text-xs">
+                        {paymentTransByPurchaseId?.[Number(purchase.id)] ? paymentTransByPurchaseId[Number(purchase.id)] : "—"}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-col gap-1">
+                          {(() => {
+                            const isParent = purchases.some(p => p.parent_id === purchase.id);
+                            if (isChild) {
+                              return <span className="text-xs text-gray-500">Managed via Parent #{purchase.parent_id}</span>;
+                            } else if (isParent) {
+                              return <span className="text-xs text-gray-500">Manage via Multi-Select</span>;
+                            } else if (linkedPurchaseIds.has(Number(purchase.id))) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
+                                  className="text-emerald-700 hover:text-emerald-800 font-medium text-sm flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" /> Edit/Add Payment
+                                </button>
+                              );
+                            } else {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => { setLinkPurchase(purchase); setLinkPaymentOpen(true); }}
+                                  className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1"
+                                >
+                                  <Plus className="w-3 h-3" /> Link Payment
+                                </button>
+                              );
+                            }
+                          })()}
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              onClick={() => setDetailPurchase(purchase)}
+                              className="text-gray-600 hover:text-gray-800 flex items-center gap-1 text-sm"
+                            >
+                              <Eye className="w-4 h-4" /> View
+                            </button>
+                            <button
+                              onClick={() => { setEditRecord(purchase); setEditOpen(true); }}
+                              className="flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700"
+                            >
+                              Edit
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1367,6 +1438,7 @@ export default function PurchasesPage() {
         closeModal={() => setIsMultiLinkModalOpen(false)}
         selectedPurchaseIds={selectedPurchaseIds}
         selectedNetAmount={selectedTotals.selectedNetAmount}
+        purchases={purchases}
         onLinkSuccess={() => { setSelectedPurchaseIds(new Set()); loadLinkedPurchaseIds(); }}
       />
 
