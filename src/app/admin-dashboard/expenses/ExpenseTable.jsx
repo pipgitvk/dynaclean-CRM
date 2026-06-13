@@ -165,9 +165,23 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
     return (va - vb) * dir;
   });
 
+  // Helper function to check if expense is settled
+  const isExpenseSettled = (row) => {
+    try {
+      const linkedIds = JSON.parse(row.linked_statement_ids || "[]");
+      return linkedIds.length > 0;
+    } catch (e) {
+      return false;
+    }
+  };
+
   const toggleExpenseSelection = (id, row) => {
     if (row.approval_status !== "Approved") {
       alert("Only approved expenses can be selected for linking");
+      return;
+    }
+    if (isExpenseSettled(row)) {
+      alert("Settled expenses cannot be selected");
       return;
     }
     setSelectedExpenseIds(prev => {
@@ -182,11 +196,24 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
   };
 
   const toggleSelectAll = () => {
-    const approvedRows = sortedRows.filter(row => row.approval_status === "Approved");
-    if (selectedExpenseIds.size === approvedRows.length && approvedRows.length > 0) {
-      setSelectedExpenseIds(new Set());
+    const eligibleRows = sortedRows.filter(row => 
+      row.approval_status === "Approved" && !isExpenseSettled(row)
+    );
+    const currentlySelectedEligible = eligibleRows.filter(row => selectedExpenseIds.has(row.ID));
+    if (currentlySelectedEligible.length === eligibleRows.length && eligibleRows.length > 0) {
+      // Deselect only eligible ones
+      setSelectedExpenseIds(prev => {
+        const newSet = new Set(prev);
+        eligibleRows.forEach(row => newSet.delete(row.ID));
+        return newSet;
+      });
     } else {
-      setSelectedExpenseIds(new Set(approvedRows.map(row => row.ID)));
+      // Select all eligible
+      setSelectedExpenseIds(prev => {
+        const newSet = new Set(prev);
+        eligibleRows.forEach(row => newSet.add(row.ID));
+        return newSet;
+      });
     }
   };
 
@@ -341,7 +368,13 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
               <th className="p-3">
                 <input
                   type="checkbox"
-                  checked={sortedRows.filter(row => row.approval_status === "Approved").length > 0 && selectedExpenseIds.size === sortedRows.filter(row => row.approval_status === "Approved").length}
+                  checked={sortedRows.filter(row => 
+                    row.approval_status === "Approved" && 
+                    !isExpenseSettled(row)
+                  ).length > 0 && selectedExpenseIds.size === sortedRows.filter(row => 
+                    row.approval_status === "Approved" && 
+                    !isExpenseSettled(row)
+                  ).length}
                   onChange={toggleSelectAll}
                   className="w-4 h-4 cursor-pointer"
                 />
@@ -375,7 +408,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
                         checked={selectedExpenseIds.has(row.ID)}
                         onChange={() => toggleExpenseSelection(row.ID, row)}
                         className="w-4 h-4 cursor-pointer"
-                        disabled={row.approval_status !== "Approved"}
+                        disabled={row.approval_status !== "Approved" || isExpenseSettled(row)}
                       />
                     </td>
                     <td className="p-3">{row.ID}</td>
@@ -497,7 +530,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
                   checked={selectedExpenseIds.has(row.ID)}
                   onChange={() => toggleExpenseSelection(row.ID, row)}
                   className="w-4 h-4 cursor-pointer"
-                  disabled={row.approval_status !== "Approved"}
+                  disabled={row.approval_status !== "Approved" || isExpenseSettled(row)}
                 />
                 <strong>ID:</strong> {row.ID}
               </div>
