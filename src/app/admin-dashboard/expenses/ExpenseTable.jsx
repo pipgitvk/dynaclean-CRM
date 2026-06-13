@@ -388,6 +388,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
               <th onClick={() => handleSort("approved_amount")} className="p-3 cursor-pointer select-none">Approved Amt<SortIcon column="approved_amount" /></th>
               <th onClick={() => handleSort("payment_date")} className="p-3 cursor-pointer select-none">Payment Date<SortIcon column="payment_date" /></th>
               <th onClick={() => handleSort("approval_status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="approval_status" /></th>
+              <th className="p-3">Linked Statements</th>
               <th className="p-3">Action</th>
             </tr>
           </thead>
@@ -433,6 +434,16 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
                         : "-"}
                     </td>
                     <td className="p-3">{row.approval_status}</td>
+                    <td className="p-3">
+                      {(() => {
+                        try {
+                          const linkedIds = JSON.parse(row.linked_statement_ids || "[]");
+                          return linkedIds.length > 0 ? linkedIds.join(", ") : "-";
+                        } catch (e) {
+                          return "-";
+                        }
+                      })()}
+                    </td>
                     <td className="p-3 flex gap-2 items-center">
                       <Link
                         href={`/admin-dashboard/expenses/${row.ID}`}
@@ -564,6 +575,17 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
               </div>
               <div>
                 <strong>Status:</strong> {row.approval_status}
+              </div>
+              <div>
+                <strong>Linked Statements:</strong>{" "}
+                {(() => {
+                  try {
+                    const linkedIds = JSON.parse(row.linked_statement_ids || "[]");
+                    return linkedIds.length > 0 ? linkedIds.join(", ") : "-";
+                  } catch (e) {
+                    return "-";
+                  }
+                })()}
               </div>
               <div className="flex items-center gap-4 pt-2">
                 <Link

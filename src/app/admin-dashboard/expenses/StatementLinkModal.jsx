@@ -79,6 +79,21 @@ const StatementLinkModal = ({ isOpen, closeModal, row, onLinkSuccess }) => {
   };
 
   const handleSave = async () => {
+    const expenseTotal =
+      Number(row.TicketCost || 0) +
+      Number(row.HotelCost || 0) +
+      Number(row.MealsCost || 0) +
+      Number(row.OtherExpenses || 0);
+
+    const selectedTotal = statements
+      .filter((s) => selectedIds.includes(s.id))
+      .reduce((sum, s) => sum + Number(s.amount || 0), 0);
+
+    if (Math.abs(selectedTotal - expenseTotal) > 0.01) {
+      toast.error(`Total selected statements amount (₹${selectedTotal.toFixed(2)}) must exactly match expense total (₹${expenseTotal.toFixed(2)})`);
+      return;
+    }
+
     try {
       const response = await fetch(`/api/expenses/${row.ID}`, {
         method: "PATCH",
@@ -125,6 +140,7 @@ const StatementLinkModal = ({ isOpen, closeModal, row, onLinkSuccess }) => {
           <div>
             <h2 className="text-xl font-semibold text-gray-800">Link Statements to Expense #{row?.ID}</h2>
             <p className="text-sm text-gray-500">Expense Total: <span className="font-bold text-gray-700">₹{expenseTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
+            <p className="text-sm text-gray-500">Selected Statements Total: <span className={`font-bold ${Math.abs(selectedTotal - expenseTotal) > 0.01 ? 'text-red-600' : 'text-green-600'}`}>₹{selectedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
           </div>
           <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
