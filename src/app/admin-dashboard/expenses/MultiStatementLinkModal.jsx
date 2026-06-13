@@ -113,6 +113,7 @@ const MultiStatementLinkModal = ({ isOpen, closeModal, selectedExpenseIds, selec
             <h2 className="text-xl font-semibold text-gray-800">Link Statements to Selected Expenses</h2>
             <p className="text-sm text-gray-500">Selected Expenses Count: <span className="font-bold text-gray-700">{selectedExpenseIds.size}</span></p>
             <p className="text-sm text-gray-500">Selected Expenses Total: <span className="font-bold text-gray-700">₹{selectedApprovedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
+            <p className="text-sm text-gray-500">Selected Statements Total: <span className={`font-bold ${Math.abs(selectedTotal - selectedApprovedAmount) > 0.01 ? 'text-red-600' : 'text-green-600'}`}>₹{selectedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
           </div>
           <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
