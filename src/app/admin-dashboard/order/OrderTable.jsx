@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import dayjs from "dayjs";
+import ExcelJS from "exceljs";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 import toast from "react-hot-toast";
@@ -115,6 +116,7 @@ export default function OrderTable({ orders, userRole }) {
   const [nukeLoading, setNukeLoading] = useState(false);
   const [nukeStep, setNukeStep] = useState(1); // 1=confirm dialog, 2=type confirm
   const [taxableClickCount, setTaxableClickCount] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -127,6 +129,90 @@ export default function OrderTable({ orders, userRole }) {
     setDateTo("");
     setCreatedByFilter("");
     setApprovalStatusFilter("");
+  };
+
+  const handleExportToExcel = async () => {
+    setIsExporting(true);
+    try {
+      if (filteredOrders.length === 0) {
+        alert("No data to export");
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Orders");
+
+      // Define columns
+      worksheet.columns = [
+        { header: "Order ID", key: "order_id", width: 15 },
+        { header: "Quotation Number", key: "quote_number", width: 20 },
+        { header: "Invoice Number", key: "invoice_number", width: 20 },
+        { header: "Client Name", key: "client_name", width: 25 },
+        { header: "Company Name", key: "company_name", width: 30 },
+        { header: "Contact", key: "contact", width: 15 },
+        { header: "State", key: "state", width: 15 },
+        { header: "Item Name", key: "item_name", width: 30 },
+        { header: "Item Code", key: "item_code", width: 20 },
+        { header: "Created By", key: "created_by", width: 15 },
+        { header: "Created At", key: "created_at", width: 20 },
+        { header: "Due Date", key: "duedate", width: 15 },
+        { header: "Payment Status", key: "payment_status", width: 15 },
+        { header: "Approval Status", key: "approval_status", width: 15 },
+        { header: "Taxable Amount", key: "baseAmount", width: 15 },
+        { header: "Tax Amount", key: "taxamt", width: 15 },
+        { header: "Total Amount", key: "totalamt", width: 15 },
+      ];
+
+      // Style the header row
+      worksheet.getRow(1).font = { bold: true, size: 12 };
+      worksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE0E0E0" },
+      };
+
+      // Add data rows
+      filteredOrders.forEach((order) => {
+        worksheet.addRow({
+          order_id: order.order_id,
+          quote_number: order.quote_number || "",
+          invoice_number: order.invoice_number || "",
+          client_name: order.client_name || "",
+          company_name: order.company_name || "",
+          contact: order.contact || "",
+          state: order.state || "",
+          item_name: order.item_name || "",
+          item_code: order.item_code || "",
+          created_by: order.created_by || "",
+          created_at: order.created_at ? dayjs(order.created_at).format("DD/MM/YYYY HH:mm:ss") : "",
+          duedate: order.duedate ? dayjs(order.duedate).format("DD/MM/YYYY") : "",
+          payment_status: order.payment_status || "",
+          approval_status: order.approval_status || "",
+          baseAmount: Number(order.baseAmount || 0),
+          taxamt: Number(order.taxamt || 0),
+          totalamt: Number(order.totalamt || 0),
+        });
+      });
+
+      // Generate buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      // Create download link
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `orders_${dayjs().format("YYYYMMDD")}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Failed to export data. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Filter orders based on search query, status filter, and date range
@@ -415,12 +501,21 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
-        <button
-          onClick={handleResetFilters}
-          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
-        >
-          Reset Filters
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleResetFilters}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
+          >
+            Reset Filters
+          </button>
+          <button
+            onClick={handleExportToExcel}
+            disabled={isExporting}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors w-full sm:w-auto"
+          >
+            {isExporting ? "Exporting..." : "Export Excel"}
+          </button>
+        </div>
       </div>
 
       {/* 🧰 Filters */}
@@ -513,6 +608,7 @@ export default function OrderTable({ orders, userRole }) {
               <th className="px-3 py-3 font-semibold text-left">Item</th>
               <th className="px-3 py-3 font-semibold text-center">Status</th>
               <th className="px-3 py-3 font-semibold text-center">Payment</th>
+              <th className="px-3 py-3 font-semibold text-center">Total Amount</th>
               <th className="px-3 py-3 font-semibold text-center">Approval</th>
               <th className="px-3 py-3 font-semibold text-center">Due Date</th>
               <th className="px-3 py-3 font-semibold text-center">Actions</th>
@@ -595,6 +691,14 @@ export default function OrderTable({ orders, userRole }) {
                       </div>
                     </td>
                     <td className="px-3 py-3">
+                      <div className="font-semibold text-sm">
+                        ₹{Number(r.totalamt || 0).toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
                       <div className="flex flex-col items-center gap-1">
                         <ApprovalActions r={r} userRole={userRole} />
                         {r.approval_remark && (
@@ -623,7 +727,7 @@ export default function OrderTable({ orders, userRole }) {
               })
             ) : (
               <tr>
-                <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
@@ -700,6 +804,12 @@ export default function OrderTable({ orders, userRole }) {
                 </div>
                 <div>
                   <strong>Due Date:</strong> {dayjs(r.duedate).format("DD/MM/YYYY")}
+                </div>
+                <div>
+                  <strong>Total Amount:</strong> ₹{Number(r.totalamt || 0).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </div>
 
                 {/* Approval Actions - Approve/Reject/Revert - visible on mobile */}

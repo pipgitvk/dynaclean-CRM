@@ -52,6 +52,7 @@ export default async function OrdersPage() {
                 no.baseAmount, no.taxamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
+                no.invoice_number,
                 qr.company_name, qr.emp_name, qr.state,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
                 GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code,
