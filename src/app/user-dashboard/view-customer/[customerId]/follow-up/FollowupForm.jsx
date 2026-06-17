@@ -328,7 +328,7 @@ export default function FollowupForm({ customerId }) {
   const [customerCurrentStage, setCustomerCurrentStage] = useState("New");
 
   const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
-  const tagOptions = ["Demo", "Prime", "Repeat order", "Mail", "Running Orders", "N/A"];
+  const tagOptions = ["Visiting factory", "Service Issue", "Payment Follow-Up", "Trucks Follow-Up", "Cancel Order", "Order received", "Prime", "Repeat Order", "Running Order", "Strong Follow-Up", "N/A"];
   const stageOptions = [
     "New",
     "Contacted",
