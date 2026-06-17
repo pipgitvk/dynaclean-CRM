@@ -12,6 +12,8 @@ import {
   MoreVertical,
   Truck,
   Trash2,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import dayjs from "dayjs";
@@ -117,9 +119,56 @@ export default function OrderTable({ orders, userRole }) {
   const [nukeStep, setNukeStep] = useState(1); // 1=confirm dialog, 2=type confirm
   const [taxableClickCount, setTaxableClickCount] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState("created_at");
+  const [sortDirection, setSortDirection] = useState("desc");
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
+  };
+
+  // Sorting handler
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  // Get value for sorting based on column
+  const getSortValue = (order, column) => {
+    switch (column) {
+      case "order_id":
+        return order.order_id?.toString().toLowerCase() || "";
+      case "created_by":
+        return order.created_by?.toString().toLowerCase() || "";
+      case "created_at":
+        return order.created_at ? new Date(order.created_at).getTime() : 0;
+      case "client_name":
+        return order.client_name?.toString().toLowerCase() || "";
+      case "company_name":
+        return order.company_name?.toString().toLowerCase() || "";
+      case "state":
+        return order.state?.toString().toLowerCase() || "";
+      case "item_name":
+        return order.item_name?.toString().toLowerCase() || "";
+      case "status":
+        return getStatusText(order).text.toLowerCase();
+      case "payment_status":
+        return order.payment_status?.toString().toLowerCase() || "";
+      case "totalamt":
+        return Number(order.totalamt) || 0;
+      case "approval_status":
+        return order.approval_status?.toString().toLowerCase() || "";
+      case "duedate":
+        return order.duedate ? new Date(order.duedate).getTime() : 0;
+      default:
+        return "";
+    }
   };
 
   const handleResetFilters = () => {
@@ -220,7 +269,7 @@ export default function OrderTable({ orders, userRole }) {
     if (!orders) return;
 
     const lowercasedQuery = searchQuery.toLowerCase();
-    const result = orders.filter((order) => {
+    let result = orders.filter((order) => {
       // Step 1: Filter by status
       if (statusFilter) {
         const orderStatus = getStatusText(order)
@@ -253,6 +302,21 @@ export default function OrderTable({ orders, userRole }) {
         order.state?.toLowerCase().includes(lowercasedQuery)
       );
     });
+
+    // Step 4: Sort the filtered results
+    result = [...result].sort((a, b) => {
+      const valA = getSortValue(a, sortColumn);
+      const valB = getSortValue(b, sortColumn);
+
+      if (typeof valA === "number" && typeof valB === "number") {
+        return sortDirection === "asc" ? valA - valB : valB - valA;
+      }
+
+      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+
     setFilteredOrders(result);
   }, [
     searchQuery,
@@ -262,6 +326,8 @@ export default function OrderTable({ orders, userRole }) {
     dateTo,
     createdByFilter,
     approvalStatusFilter,
+    sortColumn,
+    sortDirection,
   ]);
 
   const dispatchDoneTotals = useMemo(() => {
@@ -601,16 +667,116 @@ export default function OrderTable({ orders, userRole }) {
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
               <th className="px-3 py-3 font-semibold text-center">#</th>
-              <th className="px-3 py-3 font-semibold text-left">Order ID</th>
-              <th className="px-3 py-3 font-semibold text-left">Created By</th>
-              <th className="px-3 py-3 font-semibold text-left">Order Date</th>
-              <th className="px-3 py-3 font-semibold text-left">Company</th>
-              <th className="px-3 py-3 font-semibold text-left">Item</th>
-              <th className="px-3 py-3 font-semibold text-center">Status</th>
-              <th className="px-3 py-3 font-semibold text-center">Payment</th>
-              <th className="px-3 py-3 font-semibold text-center">Total Amount</th>
-              <th className="px-3 py-3 font-semibold text-center">Approval</th>
-              <th className="px-3 py-3 font-semibold text-center">Due Date</th>
+              <th 
+                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("order_id")}
+              >
+                <div className="flex items-center gap-1">
+                  Order ID
+                  {sortColumn === "order_id" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("created_by")}
+              >
+                <div className="flex items-center gap-1">
+                  Created By
+                  {sortColumn === "created_by" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("created_at")}
+              >
+                <div className="flex items-center gap-1">
+                  Order Date
+                  {sortColumn === "created_at" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("company_name")}
+              >
+                <div className="flex items-center gap-1">
+                  Company
+                  {sortColumn === "company_name" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-left cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("item_name")}
+              >
+                <div className="flex items-center gap-1">
+                  Item
+                  {sortColumn === "item_name" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("status")}
+              >
+                <div className="flex items-center gap-1 justify-center">
+                  Status
+                  {sortColumn === "status" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("payment_status")}
+              >
+                <div className="flex items-center gap-1 justify-center">
+                  Payment
+                  {sortColumn === "payment_status" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("totalamt")}
+              >
+                <div className="flex items-center gap-1 justify-center">
+                  Total Amount
+                  {sortColumn === "totalamt" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("approval_status")}
+              >
+                <div className="flex items-center gap-1 justify-center">
+                  Approval
+                  {sortColumn === "approval_status" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
+              <th 
+                className="px-3 py-3 font-semibold text-center cursor-pointer hover:bg-gray-700 transition-colors"
+                onClick={() => handleSort("duedate")}
+              >
+                <div className="flex items-center gap-1 justify-center">
+                  Due Date
+                  {sortColumn === "duedate" && (
+                    sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  )}
+                </div>
+              </th>
               <th className="px-3 py-3 font-semibold text-center">Actions</th>
             </tr>
           </thead>
