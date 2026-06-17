@@ -384,8 +384,8 @@ const fetchQuotationAndFill = async () => {
   quotation.items.map((it) => ({
     item_name: it.item_name || "",
     item_code: it.item_code || "",        
-    description: it.description || "",
-    hsn_code: it.hsn_code || "",
+    description: it.specification || it.description || "",
+    hsn_code: it.hsn_sac || it.hsn_code || "",
     quantity: it.quantity || 1,
     unit: it.unit || "",                  
     rate: it.rate || it.price_per_unit || 0,

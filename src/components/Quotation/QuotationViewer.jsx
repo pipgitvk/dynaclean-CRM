@@ -468,6 +468,7 @@ export default function QuotationViewer({
                 <th className="p-2">Image</th>
                 <th className="p-2">Item</th>
                 <th className="p-2">Code</th>
+                <th className="p-2">HSN</th>
                 <th className="p-2">Specification</th>
                 <th className="p-2">Qty</th>
                 <th className="p-2">Unit</th>
@@ -498,6 +499,7 @@ export default function QuotationViewer({
                   </td>
                   <td className="p-1 text-left">{it.item_name}</td>
                   <td className="p-1">{it.item_code}</td>
+                  <td className="p-1">{it.hsn_sac}</td>
                   <td className="p-1 text-left break-words">
                     {it.specification}
                   </td>
@@ -517,7 +519,7 @@ export default function QuotationViewer({
             </tbody>
             <tfoot className="bg-gray-100 font-semibold">
               <tr className="text-center">
-                <td colSpan={5} className="p-2 text-left sm:text-center">
+                <td colSpan={6} className="p-2 text-left sm:text-center">
                   Total
                 </td>
                 <td className="p-2">{totalQty}</td>
@@ -559,6 +561,9 @@ export default function QuotationViewer({
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
                 <div className="col-span-2">
                   <strong>Specification:</strong> {it.specification}
+                </div>
+                <div>
+                  <strong>HSN:</strong> {it.hsn_sac}
                 </div>
                 <div>
                   <strong>Qty:</strong> {it.quantity} {it.unit}
