@@ -46,7 +46,7 @@ export default async function AssignServicePage({ params, searchParams }) {
   try {
     connection = await getDbConnection();
     const [rows] = await connection.execute(
-      "SELECT username FROM rep_list WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE TECHNICIAN', 'SERVICE SUPPORT ENGINEER')"
+      "SELECT username FROM rep_list WHERE userRole IN ('SERVICE ENGINEER', 'SERVICE TECHNICIAN', 'SERVICE SUPPORT ')"
     );
     engineers = rows.map((row) => row.username);
   } catch (err) {

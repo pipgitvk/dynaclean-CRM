@@ -28,7 +28,7 @@ const QAPage = () => {
     "ACCOUNTANT",
     "SERVICE",
     "SERVICE ENGINEER",
-    "SERVICE SUPPORT ENGINEER",
+    "SERVICE SUPPORT ",
     "HR",
     "WELDER",
     "GRAPHIC DESIGNER",

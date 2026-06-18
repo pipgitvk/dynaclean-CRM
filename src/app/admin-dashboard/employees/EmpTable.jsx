@@ -422,7 +422,7 @@ const EmpTable = ({ employees }) => {
     "SERVICE ENGINEER",
     "SERVICE TECHNICIAN",
     "SERVICE HEAD",
-    "SERVICE SUPPORT ENGINEER",
+    "SERVICE SUPPORT ",
     "WELDER",
     "WELDER HELPER",
     "WAREHOUSE INCHARGE",
