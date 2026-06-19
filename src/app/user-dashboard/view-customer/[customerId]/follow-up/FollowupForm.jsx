@@ -355,6 +355,18 @@ export default function FollowupForm({ customerId }) {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
+  // ✅ Get min and max datetime for last 24 hours
+  const getFollowedDateLimits = () => {
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    return {
+      min: formatLocalDateTime(twentyFourHoursAgo),
+      max: formatLocalDateTime(now),
+    };
+  };
+
+  const followedDateLimits = getFollowedDateLimits();
+
   // Fetch customer's current stage from database
   useEffect(() => {
     const fetchCustomerStage = async () => {
@@ -470,16 +482,21 @@ export default function FollowupForm({ customerId }) {
     <form onSubmit={handleSubmit} className="space-y-4 text-gray-700">
       <div>
         <label className="block text-sm font-medium text-gray-700">
-          Followed Date (IST)
+          Followed Date (IST) <span className="text-red-500">*</span>
         </label>
         <input
           type="datetime-local"
           name="followed_date"
           value={formData.followed_date}
           onChange={handleChange}
+          min={followedDateLimits.min}
+          max={followedDateLimits.max}
           className="w-full px-4 py-2 border rounded-lg"
           required
         />
+        <p className="mt-1 text-xs text-gray-500">
+          You can only select dates from the last 24 hours
+        </p>
       </div>
 
       <div>
