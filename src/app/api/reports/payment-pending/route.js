@@ -107,6 +107,23 @@ export async function GET() {
             const paidAmount = paymentAmounts.reduce((sum, amt) => sum + amt, 0);
             const remaining = totalAmt - paidAmount;
 
+            // Get latest deduction for this order
+            let latestDeduction = null;
+            try {
+                const [deductions] = await pool.query(
+                    `SELECT deduction_type, recorded_date FROM payment_deductions 
+                     WHERE order_id = ? 
+                     ORDER BY recorded_date DESC 
+                     LIMIT 1`,
+                    [order.order_id]
+                );
+                if (deductions.length > 0) {
+                    latestDeduction = deductions[0].deduction_type;
+                }
+            } catch (err) {
+                console.error(`Error fetching deduction for order ${order.order_id}:`, err);
+            }
+
             return {
                 order_id: order.order_id,
                 client_name: order.client_name,
@@ -120,7 +137,8 @@ export async function GET() {
                 payment_status: order.payment_status || 'pending',
                 created_at: order.created_at,
                 is_partially_returned: order.is_returned === 2,
-                customer_id: order.customer_id
+                customer_id: order.customer_id,
+                latest_deduction: latestDeduction
             };
         }));
 

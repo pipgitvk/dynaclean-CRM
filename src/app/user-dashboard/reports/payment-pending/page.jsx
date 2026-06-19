@@ -185,7 +185,8 @@ export default function PaymentPendingReport() {
       } else {
         toast.error("Failed to load history");
       }
-    } catch {
+    } catch (error) {
+      console.error("Error fetching history:", error);
       toast.error("Error loading follow-up history");
     } finally {
       setHistoryLoading(false);

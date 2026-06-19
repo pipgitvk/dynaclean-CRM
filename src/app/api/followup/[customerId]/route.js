@@ -46,8 +46,8 @@ export async function GET(req, { params }) {
 
   let queryParams = [customerId];
 
-  // Team Leader can only see their own follow-up history for this customer
-  if (userRole === "TEAM LEADER") {
+  // Team Leader and Accountant can only see their own follow-up history for this customer
+  if (userRole === "TEAM LEADER" || userRole === "ACCOUNTANT") {
     sql += ` AND followed_by = ?`;
     queryParams.push(currentUser);
   }
@@ -56,7 +56,7 @@ export async function GET(req, { params }) {
 
   const [rows] = await conn.execute(sql, queryParams);
 
-  return new Response(JSON.stringify({ success: true, history: rows }), {
+  return new Response(JSON.stringify({ success: true, history: rows || [] }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
@@ -90,16 +90,29 @@ export async function POST(req, { params }) {
 
   const conn = await getDbConnection();
 
-  const [rows] = await conn.execute(
+  // First try to get from customers_followup (existing records), fallback to customers table
+  let [rows] = await conn.execute(
     "SELECT name, contact, email FROM customers_followup WHERE customer_id = ? ORDER BY followed_date DESC LIMIT 1",
     [customerId],
   );
 
-  if (rows.length === 0) {
-    return new Response("Customer data not found", { status: 404 });
-  }
+  let name, contact, email;
 
-  const { name, contact, email } = rows[0];
+  if (rows.length > 0) {
+    ({ name, contact, email } = rows[0]);
+  } else {
+    // Fallback to customers table
+    const [customerRows] = await conn.execute(
+      "SELECT name, phone, email FROM customers WHERE customer_id = ? LIMIT 1",
+      [customerId],
+    );
+
+    if (customerRows.length === 0) {
+      return new Response(JSON.stringify({ error: "Customer not found" }), { status: 404 });
+    }
+
+    ({ name, phone: contact, email } = customerRows[0]);
+  }
 
   // Convert IST datetime to UTC before storing
   const followedDateUTC = convertISTtoUTC(data.followed_date);
