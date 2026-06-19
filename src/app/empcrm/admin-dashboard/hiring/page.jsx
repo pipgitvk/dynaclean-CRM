@@ -291,8 +291,8 @@ export default function HiringPage() {
     if (stored) {
       setFilterCandidateName(stored.candidate_name || "");
       setFilterStatus(stored.status || "");
-      setFilterNextFollowupFrom(stored.next_follme || "");
-      setFilterEopContact(stored.wmp_contactup_from || "");
+      setFilterNextFollowupFrom(stored.next_followup_from || "");
+      setFilterEmpContact(stored.emp_contact || "");
       setFilterNextFollowupTo(stored.next_followup_to || "");
       setFilterMode(stored.interview_mode || "");
       setFilterDesignation(stored.designation || "");
