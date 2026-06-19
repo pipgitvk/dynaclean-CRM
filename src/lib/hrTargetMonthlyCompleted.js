@@ -65,19 +65,19 @@ export async function computeCompletedForDesignation(
     const [hireRows] = await conn.execute(
       `SELECT TRIM(c.designation) AS desig FROM candidates c
        WHERE LOWER(TRIM(c.created_by)) = LOWER(TRIM(?))
-         AND LOWER(TRIM(COALESCE(c.status, ''))) = 'hired'
+         AND LOWER(TRIM(COALESCE(c.status, ''))) IN ('hired', 'joined')
          ${citySql}
          AND (
            EXISTS (
              SELECT 1 FROM candidates_followups f
              WHERE f.entry_id = c.id
-               AND LOWER(TRIM(COALESCE(f.status, ''))) = 'hired'
+               AND LOWER(TRIM(COALESCE(f.status, ''))) IN ('hired', 'joined')
                AND YEAR(f.logged_at) = ? AND MONTH(f.logged_at) = ?
            )
            OR (
              NOT EXISTS (
                SELECT 1 FROM candidates_followups f
-               WHERE f.entry_id = c.id AND LOWER(TRIM(COALESCE(f.status, ''))) = 'hired'
+               WHERE f.entry_id = c.id AND LOWER(TRIM(COALESCE(f.status, ''))) IN ('hired', 'joined')
              )
              AND c.hire_date IS NOT NULL
              AND YEAR(c.hire_date) = ? AND MONTH(c.hire_date) = ?
@@ -99,7 +99,7 @@ export async function computeCompletedForDesignation(
         const [hireRowsLegacy] = await conn.execute(
           `SELECT TRIM(designation) AS desig FROM candidates
            WHERE LOWER(TRIM(created_by)) = LOWER(TRIM(?))
-             AND LOWER(TRIM(COALESCE(status, ''))) = 'hired'
+             AND LOWER(TRIM(COALESCE(status, ''))) IN ('hired', 'joined')
              ${legCitySql}
              AND hire_date IS NOT NULL
              AND YEAR(hire_date) = ? AND MONTH(hire_date) = ?`,
