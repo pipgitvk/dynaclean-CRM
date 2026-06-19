@@ -5,6 +5,63 @@ import { convertISTtoUTC } from "@/lib/timezone";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
+// GET: Fetch follow-up history for a customer
+export async function GET(req, { params }) {
+  const { customerId } = await params;
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  if (!token) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+    });
+  }
+
+  let currentUser = null;
+  let userRole = null;
+  try {
+    const { payload } = await jwtVerify(
+      token,
+      new TextEncoder().encode(JWT_SECRET),
+    );
+    currentUser = payload.username || null;
+    userRole = payload.role || null;
+  } catch (e) {
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401,
+    });
+  }
+
+  const conn = await getDbConnection();
+
+  let sql = `SELECT 
+      followed_date,
+      next_followup_date,
+      comm_mode,
+      notes,
+      followed_by,
+      time_stamp
+     FROM customers_followup
+     WHERE customer_id = ?`;
+
+  let queryParams = [customerId];
+
+  // Team Leader can only see their own follow-up history for this customer
+  if (userRole === "TEAM LEADER") {
+    sql += ` AND followed_by = ?`;
+    queryParams.push(currentUser);
+  }
+
+  sql += ` ORDER BY followed_date DESC`;
+
+  const [rows] = await conn.execute(sql, queryParams);
+
+  return new Response(JSON.stringify({ success: true, history: rows }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export async function POST(req, { params }) {
   const { customerId } = await params;
   const data = await req.json();

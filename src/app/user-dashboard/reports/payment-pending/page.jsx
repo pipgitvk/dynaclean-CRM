@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, X, History } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function PaymentPendingReport() {
@@ -23,6 +23,12 @@ export default function PaymentPendingReport() {
     communication_mode: ""
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // History modal state
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyOrder, setHistoryOrder] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     fetchReport();
@@ -164,6 +170,32 @@ export default function PaymentPendingReport() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedOrder(null);
+  };
+
+  const handleOpenHistory = async (order) => {
+    setHistoryOrder(order);
+    setIsHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryData([]);
+    try {
+      const res = await fetch(`/api/followup/${order.customer_id}`);
+      const data = await res.json();
+      if (data.success) {
+        setHistoryData(data.history || []);
+      } else {
+        toast.error("Failed to load history");
+      }
+    } catch {
+      toast.error("Error loading follow-up history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleCloseHistory = () => {
+    setIsHistoryOpen(false);
+    setHistoryOrder(null);
+    setHistoryData([]);
   };
 
   const handleChange = (e) => {
@@ -401,17 +433,32 @@ export default function PaymentPendingReport() {
                         </span>
                       </td>
                       <td className="px-4 py-3 border-b text-center">
-                        <button
-                          onClick={() => handleOpenModal(order)}
-                          disabled={!order.customer_id}
-                          className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                            order.customer_id 
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          Follow
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleOpenModal(order)}
+                            disabled={!order.customer_id}
+                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                              order.customer_id 
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            Follow
+                          </button>
+                          <button
+                            onClick={() => handleOpenHistory(order)}
+                            disabled={!order.customer_id}
+                            title="View Follow-up History"
+                            className={`px-3 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+                              order.customer_id
+                                ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            <History size={12} />
+                            History
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -524,6 +571,102 @@ export default function PaymentPendingReport() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* History Modal */}
+      {isHistoryOpen && historyOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <History size={20} className="text-purple-600" />
+                  Follow-up History
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  {historyOrder.client_name} — {historyOrder.order_id}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseHistory}
+                className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+              >
+                <X size={24} className="text-gray-600" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 p-4">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  <span className="ml-3 text-gray-500">Loading history...</span>
+                </div>
+              ) : historyData.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 italic">
+                  {userRole === "TEAM LEADER" 
+                    ? "No follow-ups added by you for this customer."
+                    : "No follow-up history found for this customer."}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyData.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-white transition-colors"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            item.comm_mode === "Call" ? "bg-blue-100 text-blue-700" :
+                            item.comm_mode === "WhatsApp" ? "bg-green-100 text-green-700" :
+                            item.comm_mode === "Visit" ? "bg-orange-100 text-orange-700" :
+                            item.comm_mode === "Email" ? "bg-yellow-100 text-yellow-700" :
+                            "bg-gray-100 text-gray-700"
+                          }`}>
+                            {item.comm_mode || "—"}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            by <span className="font-medium text-gray-700">{item.followed_by || "Unknown"}</span>
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {dayjs(item.followed_date).format("DD MMM YYYY, hh:mm A")}
+                        </div>
+                      </div>
+
+                      <p className="text-sm text-gray-800 leading-relaxed">
+                        {item.notes || <span className="italic text-gray-400">No notes</span>}
+                      </p>
+
+                      <div className="mt-2 text-xs text-gray-500">
+                        Next follow-up:{" "}
+                        <span className="font-medium text-gray-700">
+                          {item.next_followup_date
+                            ? dayjs(item.next_followup_date).format("DD MMM YYYY, hh:mm A")
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 flex-shrink-0 rounded-b-lg">
+              <span className="text-xs text-gray-500">
+                {historyData.length} record{historyData.length !== 1 ? "s" : ""} found
+              </span>
+              <button
+                onClick={handleCloseHistory}
+                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg text-sm transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
