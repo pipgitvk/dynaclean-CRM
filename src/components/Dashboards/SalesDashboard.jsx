@@ -4,6 +4,7 @@ import AttendanceTracker from "@/components/AttendanceTracker";
 import EmployeeTargetGraph from "@/components/targets/EmployeeTargetGraph";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
+import HotLeadsCards from "@/components/Leads/HotLeadsCards";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
@@ -54,6 +55,10 @@ export default function SalesDashboard({ user }) {
 
       {/* Leads + Tasks */}
       <div className="grid grid-cols-1 gap-4 md:gap-6">
+        <div className="bg-white rounded-xl shadow-md">
+          <HotLeadsCards leadSource={user.username} />
+        </div>
+
         <div className="bg-white rounded-xl shadow-md">
           <UpcomingLeads leadSource={user.username} />
         </div>
