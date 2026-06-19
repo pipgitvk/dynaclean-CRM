@@ -64,6 +64,16 @@ export default function EditBidPage({ params }) {
     customer_id: "",
   });
 
+  const handleViewFile = (filePath) => {
+    if (!filePath) return;
+    if (filePath.includes('cloudinary.com')) {
+      const proxyUrl = `/api/cloudinary-proxy?url=${encodeURIComponent(filePath)}`;
+      window.open(proxyUrl, "_blank");
+    } else {
+      window.open(filePath, "_blank");
+    }
+  };
+
   useEffect(() => {
     // Handle async params in Next.js 15+
     const resolveParams = async () => {
@@ -483,15 +493,13 @@ export default function EditBidPage({ params }) {
                   />
                   <Upload className="w-5 h-5 text-gray-400" />
                   {bid && bid.bid_document && (
-                    <a
-                      href={bid.bid_document}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => handleViewFile(bid.bid_document)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       title="View Document"
                     >
                       <Eye className="w-5 h-5" />
-                    </a>
+                    </button>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Leave empty to keep existing document</p>

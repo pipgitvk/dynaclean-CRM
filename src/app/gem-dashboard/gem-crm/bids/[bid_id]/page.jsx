@@ -55,6 +55,16 @@ export default function BidDetailsPage({ params }) {
   const [documentType, setDocumentType] = useState("");
   const [bidId, setBidId] = useState(null);
 
+  const handleViewFile = (filePath) => {
+    if (!filePath) return;
+    if (filePath.includes('cloudinary.com')) {
+      const proxyUrl = `/api/cloudinary-proxy?url=${encodeURIComponent(filePath)}`;
+      window.open(proxyUrl, "_blank");
+    } else {
+      window.open(filePath, "_blank");
+    }
+  };
+
   useEffect(() => {
     // Handle async params in Next.js 15+
     const resolveParams = async () => {
@@ -290,15 +300,13 @@ export default function BidDetailsPage({ params }) {
               <DetailRow
                 label="Bid Document"
                 value={
-                  <a
-                    href={bid.bid_document}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => handleViewFile(bid.bid_document)}
                     className="text-blue-600 hover:underline flex items-center gap-1"
                   >
                     <Download className="w-4 h-4" />
                     Download
-                  </a>
+                  </button>
                 }
               />
             )}
@@ -419,14 +427,12 @@ export default function BidDetailsPage({ params }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a
-                    href={doc.document_file}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => handleViewFile(doc.document_file)}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   >
                     <Download className="w-4 h-4" />
-                  </a>
+                  </button>
                   <button
                     onClick={() => handleDeleteDocument(doc.document_id)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
