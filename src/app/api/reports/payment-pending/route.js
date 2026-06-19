@@ -22,22 +22,25 @@ export async function GET() {
         // Build SQL query based on role
         let sql = `
       SELECT 
-        order_id,
-        quote_number,
-        client_name,
-        contact,
-        created_by,
-        totalamt,
-        payment_amount,
-        payment_status,
-        duedate,
-        created_at,
-        company_name,
-        is_returned
-      FROM neworder
-      WHERE (payment_status IS NULL OR payment_status != 'paid')
-        AND (is_returned = 0 OR is_returned = 2 OR is_returned IS NULL)
-        AND (is_cancelled = 0 or is_cancelled IS NULL)
+        o.order_id,
+        o.quote_number,
+        o.client_name,
+        o.contact,
+        o.created_by,
+        o.totalamt,
+        o.payment_amount,
+        o.payment_status,
+        o.duedate,
+        o.created_at,
+        o.company_name,
+        o.is_returned,
+        c.customer_id
+      FROM neworder AS o
+      LEFT JOIN customers AS c 
+        ON o.contact = c.phone COLLATE utf8mb4_unicode_ci
+      WHERE (o.payment_status IS NULL OR o.payment_status != 'paid')
+        AND (o.is_returned = 0 OR o.is_returned = 2 OR o.is_returned IS NULL)
+        AND (o.is_cancelled = 0 or o.is_cancelled IS NULL)
     `;
 
         // Filter for SALES and GEM roles - only their own orders
@@ -116,7 +119,8 @@ export async function GET() {
                 due_date: order.duedate,
                 payment_status: order.payment_status || 'pending',
                 created_at: order.created_at,
-                is_partially_returned: order.is_returned === 2
+                is_partially_returned: order.is_returned === 2,
+                customer_id: order.customer_id
             };
         }));
 

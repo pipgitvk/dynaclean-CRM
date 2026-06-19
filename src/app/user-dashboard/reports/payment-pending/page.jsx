@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, X } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
@@ -11,6 +12,17 @@ export default function PaymentPendingReport() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userRole, setUserRole] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [formData, setFormData] = useState({
+    followed_date: "",
+    next_followup_date: "",
+    notes: "",
+    communication_mode: ""
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchReport();
@@ -126,6 +138,87 @@ export default function PaymentPendingReport() {
   const totalPending = filteredOrders.reduce((sum, order) => sum + order.remaining_amount, 0);
   const totalAmount = filteredOrders.reduce((sum, order) => sum + order.total_amount, 0);
 
+  // Format datetime for <input type="datetime-local"> (IST/local)
+  const formatLocalDateTime = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const handleOpenModal = async (order) => {
+    setSelectedOrder(order);
+    
+    const now = new Date();
+    setFormData({
+      followed_date: formatLocalDateTime(now),
+      next_followup_date: formatLocalDateTime(now),
+      notes: "",
+      communication_mode: ""
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedOrder(null);
+  };
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedOrder || !selectedOrder.customer_id) {
+      toast.error("Customer not found for this order!");
+      return;
+    }
+    setIsSubmitting(true);
+
+    try {
+      // Get current customer status and stage
+      let currentStatus = "Average";
+      let currentStage = "New";
+      try {
+        const customerRes = await fetch(`/api/customers/${selectedOrder.customer_id}`);
+        if (customerRes.ok) {
+          const customerData = await customerRes.json();
+          currentStatus = customerData.status || "Average";
+          currentStage = customerData.stage || "New";
+        }
+      } catch (error) {
+        console.error("Error fetching customer data:", error);
+      }
+
+      const payload = {
+        ...formData,
+        status: currentStatus,
+        stage: currentStage,
+        multi_tag: null
+      };
+
+      const res = await fetch(`/api/followup/${selectedOrder.customer_id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        toast.success("Follow-up added successfully!");
+        handleCloseModal();
+      } else {
+        toast.error("Something went wrong.");
+      }
+    } catch (error) {
+      toast.error("Submission failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const SkeletonRow = () => (
     <tr className="animate-pulse">
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
@@ -136,6 +229,7 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
     </tr>
   );
 
@@ -265,6 +359,9 @@ export default function PaymentPendingReport() {
                 >
                   Due Date <SortIcon columnKey="due_date" />
                 </th>
+                <th className="px-4 py-3 text-center font-semibold">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -303,12 +400,25 @@ export default function PaymentPendingReport() {
                           {isOverdue && " ⚠️"}
                         </span>
                       </td>
+                      <td className="px-4 py-3 border-b text-center">
+                        <button
+                          onClick={() => handleOpenModal(order)}
+                          disabled={!order.customer_id}
+                          className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                            order.customer_id 
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          }`}
+                        >
+                          Follow
+                        </button>
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                     No pending payments found
                   </td>
                 </tr>
@@ -317,6 +427,106 @@ export default function PaymentPendingReport() {
           </table>
         </div>
       </div>
+
+      {/* Follow-up Modal */}
+      {isModalOpen && selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-xl font-bold text-gray-800">Add Follow-up for {selectedOrder.order_id}</h2>
+              <button
+                onClick={handleCloseModal}
+                className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+              >
+                <X size={24} className="text-gray-600" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 text-gray-700">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Followed Date (IST)
+                </label>
+                <input
+                  type="datetime-local"
+                  name="followed_date"
+                  value={formData.followed_date}
+                  onChange={handleChange}
+                  min={formatLocalDateTime(new Date(Date.now() - 24 * 60 * 60 * 1000))}
+                  max={formatLocalDateTime(new Date())}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  name="notes"
+                  rows={4}
+                  value={formData.notes}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Communication Mode
+                </label>
+                <select
+                  name="communication_mode"
+                  value={formData.communication_mode}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="" disabled>Select</option>
+                  <option value="Call">Call</option>
+                  <option value="WhatsApp">WhatsApp</option>
+                  <option value="Visit">Visit</option>
+                  <option value="Email">Email</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Next Follow-up Date (IST)
+                </label>
+                <input
+                  type="datetime-local"
+                  name="next_followup_date"
+                  value={formData.next_followup_date}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors ${
+                    isSubmitting
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit Follow-up"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
