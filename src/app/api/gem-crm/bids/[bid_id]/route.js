@@ -369,10 +369,26 @@ export async function PUT(req, { params }) {
     // Handle bid document upload if provided
     let bid_document = fields.bid_document || currentBid.bid_document;
     if (files.bid_document && files.bid_document[0]) {
-      // Delete old local file if it's a local path (PDFs)
-      if (currentBid.bid_document && currentBid.bid_document.startsWith('/uploads/')) {
-        const oldPath = path.join(process.cwd(), "public", currentBid.bid_document);
-        await fs.unlink(oldPath).catch(() => {});
+      // Delete old file
+      if (currentBid.bid_document) {
+        if (currentBid.bid_document.includes("cloudinary.com")) {
+          try {
+            const urlObj = new URL(currentBid.bid_document);
+            const pathname = urlObj.pathname;
+            const parts = pathname.split('/');
+            const versionIndex = parts.findIndex(p => p.startsWith('v'));
+            if (versionIndex !== -1 && versionIndex < parts.length - 1) {
+              const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
+              await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
+              console.log("✅ Deleted old bid document from Cloudinary:", publicIdWithFolder);
+            }
+          } catch (err) {
+            console.error("Failed to delete old document from Cloudinary:", err);
+          }
+        } else if (currentBid.bid_document.startsWith('/uploads/')) {
+          const oldPath = path.join(process.cwd(), "public", currentBid.bid_document);
+          await fs.unlink(oldPath).catch(() => {});
+        }
       }
       bid_document = await saveBidDocument(files.bid_document[0]);
     }
@@ -511,10 +527,58 @@ export async function DELETE(req, { params }) {
       return NextResponse.json({ error: "Bid not found" }, { status: 404 });
     }
 
-    // Delete local file if it's a local path (PDFs)
-    if (bids.length > 0 && bids[0].bid_document && bids[0].bid_document.startsWith('/uploads/')) {
-      const docPath = path.join(process.cwd(), "public", bids[0].bid_document);
-      await fs.unlink(docPath).catch(() => {});
+    // Get all bid documents to delete their files
+    const [documents] = await conn.execute(
+      "SELECT document_file FROM bid_documents WHERE bid_id = ?",
+      [bid_id]
+    );
+
+    // Delete main bid document
+    if (bids.length > 0 && bids[0].bid_document) {
+      const documentFile = bids[0].bid_document;
+      if (documentFile.includes("cloudinary.com")) {
+        try {
+          const urlObj = new URL(documentFile);
+          const pathname = urlObj.pathname;
+          const parts = pathname.split('/');
+          const versionIndex = parts.findIndex(p => p.startsWith('v'));
+          if (versionIndex !== -1 && versionIndex < parts.length - 1) {
+            const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
+            await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
+            console.log("✅ Deleted bid document from Cloudinary:", publicIdWithFolder);
+          }
+        } catch (err) {
+          console.error("Failed to delete bid document from Cloudinary:", err);
+        }
+      } else if (documentFile.startsWith('/uploads/')) {
+        const docPath = path.join(process.cwd(), "public", documentFile);
+        await fs.unlink(docPath).catch(() => {});
+      }
+    }
+
+    // Delete all additional bid documents' files
+    for (const doc of documents) {
+      const documentFile = doc.document_file;
+      if (documentFile) {
+        if (documentFile.includes("cloudinary.com")) {
+          try {
+            const urlObj = new URL(documentFile);
+            const pathname = urlObj.pathname;
+            const parts = pathname.split('/');
+            const versionIndex = parts.findIndex(p => p.startsWith('v'));
+            if (versionIndex !== -1 && versionIndex < parts.length - 1) {
+              const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
+              await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
+              console.log("✅ Deleted additional bid document from Cloudinary:", publicIdWithFolder);
+            }
+          } catch (err) {
+            console.error("Failed to delete additional bid document from Cloudinary:", err);
+          }
+        } else if (documentFile.startsWith('/uploads/')) {
+          const docPath = path.join(process.cwd(), "public", documentFile);
+          await fs.unlink(docPath).catch(() => {});
+        }
+      }
     }
 
     // Delete bid (cascade will delete documents and logs)
