@@ -360,6 +360,13 @@ const allMenuItems = [
         icon: "ShieldCheck",
       },
       {
+        path: "/user-dashboard/service-followups",
+        name: "Service Follow-ups",
+        moduleKey: "service-followups",
+        roles: ["ALL"],
+        icon: "Calendar",
+      },
+      {
         path: "/user-dashboard/view_service_reports",
         name: "Service Records",
         moduleKey: "service-records",
