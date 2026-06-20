@@ -37,14 +37,23 @@ export default function FollowupForm({ customerId }) {
     "Disqualified / Invalid Lead"
   ];
 
-  // ✅ Format datetime for <input type="datetime-local"> (IST/local)
-  const formatLocalDateTime = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  // ✅ Format datetime for <input type="datetime-local"> in IST (Asia/Kolkata)
+  const formatISTDateTime = (date) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(date);
+    const year = parts.find((p) => p.type === "year")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+    const day = parts.find((p) => p.type === "day")?.value;
+    const hour = parts.find((p) => p.type === "hour")?.value;
+    const minute = parts.find((p) => p.type === "minute")?.value;
+    return `${year}-${month}-${day}T${hour}:${minute}`;
   };
 
   // Fetch customer's current stage from database
@@ -75,8 +84,8 @@ export default function FollowupForm({ customerId }) {
     const now = new Date();
     setFormData((prevData) => ({
       ...prevData,
-      followed_date: formatLocalDateTime(now),
-      next_followup_date: formatLocalDateTime(now),
+      followed_date: formatISTDateTime(now),
+      next_followup_date: formatISTDateTime(now),
     }));
   }, []);
 

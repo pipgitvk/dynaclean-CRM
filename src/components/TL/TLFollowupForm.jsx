@@ -22,6 +22,25 @@ export default function TLFollowupForm({
   const [customerCurrentStage, setCustomerCurrentStage] = useState("New");
   console.log("customer Data in Tl follow", customerData);
 
+  // ✅ Format datetime for <input type="datetime-local"> in IST (Asia/Kolkata)
+  const formatISTDateTime = (date) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(date);
+    const year = parts.find((p) => p.type === "year")?.value;
+    const month = parts.find((p) => p.type === "month")?.value;
+    const day = parts.find((p) => p.type === "day")?.value;
+    const hour = parts.find((p) => p.type === "hour")?.value;
+    const minute = parts.find((p) => p.type === "minute")?.value;
+    return `${year}-${month}-${day}T${hour}:${minute}`;
+  };
+
   const [formData, setFormData] = useState({
     estimated_order_date: "",
     lead_quality_score: "",
@@ -29,15 +48,7 @@ export default function TLFollowupForm({
     multi_tag: [],
     status: "",
     notes: "",
-    followed_date: (() => {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, "0");
-      const day = String(now.getDate()).padStart(2, "0");
-      const hours = String(now.getHours()).padStart(2, "0");
-      const minutes = String(now.getMinutes()).padStart(2, "0");
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
-    })(),
+    followed_date: formatISTDateTime(new Date()),
     next_followup_date: "",
     assigned_employee: customerData?.lead_source || "",
     stage: "New",
