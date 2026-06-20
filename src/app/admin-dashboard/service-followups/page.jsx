@@ -114,15 +114,16 @@ export default function ServiceFollowupsPage() {
   const handleOpenModal = () => {
     const now = new Date();
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const maxTime = new Date(now.getTime() - 1 * 60 * 1000); // 1 minute earlier to avoid issues
     setMinFollowedAt(formatLocalDateTime(oneDayAgo));
-    setMaxFollowedAt(formatLocalDateTime(now));
+    setMaxFollowedAt(formatLocalDateTime(maxTime));
     setFormData({
       serial_number: "",
       product_model: "",
       notes: "",
       next_followup_date: "",
       image: null,
-      followed_at: formatLocalDateTime(now),
+      followed_at: formatLocalDateTime(maxTime),
       contact: ""
     });
     setSerialSearch("");

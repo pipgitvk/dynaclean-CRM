@@ -96,9 +96,16 @@ export async function POST(req) {
     const followedAt = formData.get("followed_at");
     const contact = formData.get("contact");
 
-    // Validate followed_at is within last 24 hours
+    // Validate followed_at is within last 24 hours (local timezone)
     const now = new Date();
-    const followedDate = followedAt ? new Date(followedAt) : now;
+    let followedDate;
+    if (followedAt) {
+      // Parse datetime-local string as local time
+      const [year, month, day, hours, minutes] = followedAt.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/).slice(1);
+      followedDate = new Date(year, month - 1, day, hours, minutes);
+    } else {
+      followedDate = now;
+    }
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     if (followedDate < oneDayAgo || followedDate > now) {
