@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 export default function ProductAccessoriesPage() {
@@ -16,6 +16,15 @@ export default function ProductAccessoriesPage() {
     const [filterMandatory, setFilterMandatory] = useState("all"); // all, mandatory, optional
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(20);
+
+    // Spare search state for Add New Accessory form
+    const [spareQuery, setSpareQuery] = useState("");
+    const [spareSuggestions, setSpareSuggestions] = useState([]);
+    const [spareLoading, setSpareLoading] = useState(false);
+    const [showSpareSuggestions, setShowSpareSuggestions] = useState(false);
+    const [spareSelected, setSpareSelected] = useState(false); // true only when picked from dropdown
+    const spareSearchRef = useRef(null);
+    const spareDebounceRef = useRef(null);
 
     // Form state for new accessory
     const [newAccessory, setNewAccessory] = useState({
@@ -73,6 +82,52 @@ export default function ProductAccessoriesPage() {
         }
     };
 
+    // Search spare parts by name or code
+    const searchSpares = useCallback(async (query) => {
+        if (!query || query.length < 2) {
+            setSpareSuggestions([]);
+            setShowSpareSuggestions(false);
+            return;
+        }
+        setSpareLoading(true);
+        try {
+            const res = await fetch(`/api/spare/search?q=${encodeURIComponent(query)}`);
+            if (res.ok) {
+                const data = await res.json();
+                setSpareSuggestions(data || []);
+                setShowSpareSuggestions(true);
+            }
+        } catch (err) {
+            console.error("Spare search error:", err);
+        } finally {
+            setSpareLoading(false);
+        }
+    }, []);
+
+    const handleSpareQueryChange = (e) => {
+        const val = e.target.value;
+        setSpareQuery(val);
+        setSpareSelected(false); // user is typing manually — not a valid selection
+        setNewAccessory((prev) => ({ ...prev, accessory_name: val }));
+        // debounce 300ms
+        if (spareDebounceRef.current) clearTimeout(spareDebounceRef.current);
+        spareDebounceRef.current = setTimeout(() => searchSpares(val), 300);
+    };
+
+    const handleSelectSpare = (spare) => {
+        const label = `${spare.item_name} (${spare.spare_number})`;
+        setSpareQuery(label);
+        setSpareSelected(true); // valid selection from dropdown
+        setNewAccessory((prev) => ({ ...prev, accessory_name: label }));
+        setSpareSuggestions([]);
+        setShowSpareSuggestions(false);
+    };
+
+    const handleSpareBlur = () => {
+        // slight delay so click on suggestion registers first
+        setTimeout(() => setShowSpareSuggestions(false), 150);
+    };
+
     const handleAddAccessory = async (e) => {
         e.preventDefault();
         if (!selectedProduct) {
@@ -81,6 +136,10 @@ export default function ProductAccessoriesPage() {
         }
         if (!newAccessory.accessory_name.trim()) {
             alert("Accessory name is required");
+            return;
+        }
+        if (!spareSelected) {
+            alert("Please select a spare part from the search results. Manual entry is not allowed.");
             return;
         }
 
@@ -99,6 +158,9 @@ export default function ProductAccessoriesPage() {
             if (json.success) {
                 alert("Accessory added successfully");
                 setNewAccessory({ accessory_name: "", description: "", is_mandatory: false });
+                setSpareQuery("");
+                setSpareSelected(false);
+                setSpareSuggestions([]);
                 loadAccessories(selectedProduct.item_code);
             } else {
                 alert(json.error || "Failed to add accessory");
@@ -249,16 +311,48 @@ export default function ProductAccessoriesPage() {
                             <form onSubmit={handleAddAccessory} className="mb-6 p-3 md:p-4 bg-gray-50 rounded">
                                 <h3 className="text-sm md:text-base font-medium mb-3">Add New Accessory</h3>
                                 <div className="space-y-3">
-                                    <input
-                                        type="text"
-                                        placeholder="Accessory Name *"
-                                        className="w-full px-3 py-2 text-sm border rounded"
-                                        value={newAccessory.accessory_name}
-                                        onChange={(e) =>
-                                            setNewAccessory({ ...newAccessory, accessory_name: e.target.value })
-                                        }
-                                        required
-                                    />
+                                    {/* Searchable spare input */}
+                                    <div className="relative" ref={spareSearchRef}>
+                                        <input
+                                            type="text"
+                                            placeholder="Search Spare Name or Code *"
+                                            className={`w-full px-3 py-2 text-sm border rounded ${spareSelected ? "border-green-500 bg-green-50" : ""}`}
+                                            value={spareQuery}
+                                            onChange={handleSpareQueryChange}
+                                            onBlur={handleSpareBlur}
+                                            onFocus={() => spareSuggestions.length > 0 && setShowSpareSuggestions(true)}
+                                            required
+                                            autoComplete="off"
+                                        />
+                                        {spareLoading && (
+                                            <span className="absolute right-3 top-2 text-xs text-gray-400">Searching...</span>
+                                        )}
+                                        {spareSelected && !spareLoading && (
+                                            <span className="absolute right-3 top-2 text-xs text-green-600 font-medium">✓ Selected</span>
+                                        )}
+                                        {!spareSelected && spareQuery.length > 0 && !spareLoading && (
+                                            <span className="absolute right-3 top-2 text-xs text-orange-500">Select from list</span>
+                                        )}
+                                        {showSpareSuggestions && spareSuggestions.length > 0 && (
+                                            <ul className="absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded shadow-lg max-h-52 overflow-y-auto mt-1">
+                                                {spareSuggestions.map((spare) => (
+                                                    <li
+                                                        key={spare.id}
+                                                        onMouseDown={() => handleSelectSpare(spare)}
+                                                        className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 flex flex-col"
+                                                    >
+                                                        <span className="font-medium">{spare.item_name}</span>
+                                                        <span className="text-xs text-gray-500">{spare.spare_number}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                        {showSpareSuggestions && !spareLoading && spareSuggestions.length === 0 && spareQuery.length >= 2 && (
+                                            <div className="absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded shadow mt-1 px-3 py-2 text-sm text-gray-500">
+                                                No spare parts found
+                                            </div>
+                                        )}
+                                    </div>
                                     <textarea
                                         placeholder="Description (optional)"
                                         className="w-full px-3 py-2 text-sm border rounded"
