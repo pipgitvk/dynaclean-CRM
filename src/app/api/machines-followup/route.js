@@ -96,19 +96,24 @@ export async function POST(req) {
     const followedAt = formData.get("followed_at");
     const contact = formData.get("contact");
 
-    // Validate followed_at is within last 24 hours (local timezone)
+    // Validate followed_at is within last 24 hours (Asia/Kolkata timezone)
     const now = new Date();
+    // Get current time in IST
+    const nowIST = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const oneDayAgoIST = new Date(nowIST.getTime() - 24 * 60 * 60 * 1000);
     let followedDate;
     if (followedAt) {
-      // Parse datetime-local string as local time
+      // Parse datetime-local string as IST time
       const [year, month, day, hours, minutes] = followedAt.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/).slice(1);
       followedDate = new Date(year, month - 1, day, hours, minutes);
     } else {
-      followedDate = now;
+      followedDate = nowIST;
     }
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Convert followedDate to IST for comparison
+    const followedDateIST = new Date(followedDate.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
-    if (followedDate < oneDayAgo || followedDate > now) {
+    if (followedDate < oneDayAgoIST || followedDate > nowIST) {
       return NextResponse.json({ success: false, error: "Follow-up date must be within the last 24 hours" }, { status: 400 });
     }
 

@@ -1,8 +1,13 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 import { Search, Plus, X, Calendar, Image as ImageIcon, Eye } from "lucide-react";
 import toast from "react-hot-toast";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 export default function ServiceFollowupsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -103,27 +108,34 @@ export default function ServiceFollowupsPage() {
   const [maxFollowedAt, setMaxFollowedAt] = useState("");
   
   const formatLocalDateTime = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    // Convert to Asia/Kolkata (IST) timezone
+    const istDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const year = istDate.getFullYear();
+    const month = String(istDate.getMonth() + 1).padStart(2, "0");
+    const day = String(istDate.getDate()).padStart(2, "0");
+    const hours = String(istDate.getHours()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:00`; // Only hours, 00 minutes in IST
+  };
+
+  const getISTDate = (date) => {
+    const istDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    return istDate;
   };
 
   const handleOpenModal = () => {
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const maxTime = new Date(now.getTime() - 1 * 60 * 1000); // 1 minute earlier to avoid issues
-    setMinFollowedAt(formatLocalDateTime(oneDayAgo));
-    setMaxFollowedAt(formatLocalDateTime(maxTime));
+    const nowIST = getISTDate(now);
+    const oneDayAgoIST = new Date(nowIST.getTime() - 24 * 60 * 60 * 1000);
+    const maxTimeIST = new Date(nowIST.getTime() - 1 * 60 * 1000); // 1 minute earlier to avoid issues
+    setMinFollowedAt(formatLocalDateTime(oneDayAgoIST));
+    setMaxFollowedAt(formatLocalDateTime(maxTimeIST));
     setFormData({
       serial_number: "",
       product_model: "",
       notes: "",
       next_followup_date: "",
       image: null,
-      followed_at: formatLocalDateTime(maxTime),
+      followed_at: formatLocalDateTime(maxTimeIST),
       contact: ""
     });
     setSerialSearch("");
@@ -233,10 +245,10 @@ export default function ServiceFollowupsPage() {
                       <td className="p-3 border-b border-gray-200">{fu.product_model || "-"}</td>
                       <td className="p-3 border-b border-gray-200">{fu.contact || "-"}</td>
                       <td className="p-3 border-b border-gray-200">
-                        {dayjs(fu.followed_at).format("DD/MM/YYYY HH:mm")}
+                        {dayjs(fu.followed_at).tz("Asia/Kolkata").format("DD/MM/YYYY HH:00")}
                       </td>
                       <td className="p-3 border-b border-gray-200">
-                        {fu.next_followup_date ? dayjs(fu.next_followup_date).format("DD/MM/YYYY HH:mm") : "-"}
+                        {fu.next_followup_date ? dayjs(fu.next_followup_date).tz("Asia/Kolkata").format("DD/MM/YYYY HH:00") : "-"}
                       </td>
                       <td className="p-3 border-b border-gray-200">{fu.added_by}</td>
                       <td className="p-3 border-b border-gray-200">
