@@ -1,26 +1,41 @@
-import AssetTypeCard from "@/components/models/AssetTypeCard";
-import CreateAssetTypeModal from "@/components/models/CreateAssetTypeModal";
-import { getDbConnection } from "@/lib/db";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useState } from "react";
+import AssetFormPage from "@/components/assets/addAssets";
+import AssetsTable from "@/components/assets/AssetsTable";
+import Link from "next/link";
 
-export default async function AssetsManagementPage() {
-  const conn = await getDbConnection();
-  const [types] = await conn.execute(`SELECT DISTINCT type FROM assets`);
-  // await conn.end();
+export default function AdminAssetsManagementPage() {
+  const [showForm, setShowForm] = useState(false);
 
   return (
-    <div className="p-4 space-y-4 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Assets Management</h1>
-        <CreateAssetTypeModal />
+    <>
+      <div className="space-y-4">
+        <div className="p-6 bg-white rounded-xl shadow-md space-y-4">
+          <h1 className="text-2xl font-semibold text-gray-700 tracking-tight">
+            Assets Management
+          </h1>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setShowForm((prev) => !prev)}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition w-full sm:w-auto"
+            >
+              {showForm ? "Hide Form" : "+ Add New Asset"}
+            </button>
+
+            <Link
+              href="/admin-dashboard/assets-management/assignments"
+              className="px-6 py-3 bg-blue-500 text-white rounded-md font-semibold hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-full sm:w-auto"
+            >
+              Assets Transactions
+            </Link>
+          </div>
+
+          {showForm && <AssetFormPage />}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {types.map(({ type }) => (
-          <AssetTypeCard key={type} type={type} />
-        ))}
-      </div>
-    </div>
+      <AssetsTable />
+    </>
   );
 }

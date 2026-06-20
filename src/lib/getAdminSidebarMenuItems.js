@@ -779,6 +779,26 @@ const allMenuItems = [
     ],
   },
   {
+    name: "Assets",
+    moduleKey: "assets",
+    roles: ["SUPERADMIN"],
+    icon: "Package",
+    children: [
+      {
+        path: "/admin-dashboard/assets-management",
+        name: "Assets Management",
+        roles: ["SUPERADMIN"],
+        icon: "Package",
+      },
+      {
+        path: "/admin-dashboard/add-assets",
+        name: "Add Asset",
+        roles: ["SUPERADMIN"],
+        icon: "PackagePlus",
+      },
+    ],
+  },
+  {
     name: "GEM CRM",
     moduleKey: "gem-crm",
     roles: ["SUPERADMIN"],
