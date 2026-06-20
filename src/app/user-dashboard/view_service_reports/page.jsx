@@ -8,7 +8,7 @@ import { getSessionPayload } from "@/lib/auth";
 export const revalidate = 0;
 export const dynamic = "force-dynamic";
 
-const PRIVILEGED_ROLES = ["ADMIN", "SUPERADMIN", "SERVICE HEAD", "TEAM LEADER"];
+const PRIVILEGED_ROLES = ["ADMIN", "SUPERADMIN", "SERVICE HEAD", "TEAM LEADER", "SERVICE SUPPORT"];
 
 export default async function ViewServiceReportsPage() {
   let serviceRecords = [];
