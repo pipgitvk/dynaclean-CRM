@@ -253,50 +253,68 @@ export default function MultiSparePurchaseLinkModal({
       if (newSet.has(stmtId)) {
         newSet.delete(stmtId);
       } else {
-        // Calculate how much we already have selected
-        let currentTotal = 0;
-        newSet.forEach(sid => {
-          const s = statements.find(ss => ss.id === sid);
-          if (s) currentTotal += Number(s.amount || 0);
-        });
+        // Simulate what remainingAmount would be with this new statement
+        const testSet = new Set(prev);
+        testSet.add(stmtId);
         
-        // Calculate how much we need
-        let simulatedPaidLocal = 0;
+        // Recalculate remaining with the new statement included
         const selectedPurchaseIdsList = Array.from(selectedPurchaseIds);
-        const selectedPurchaseTokens = new Set(selectedPurchaseIdsList.map(pid => `PS${pid}`));
-        const nonSelectedStatementsList = statements.filter(s => !newSet.has(s.id) && s.id !== stmtId);
+        const selectedPurchaseTokens = new Set(selectedPurchaseIdsList.map(id => `PS${id}`));
+        
+        // Split statements into selected and non-selected with the test set
+        const selectedStatementsList = statements.filter(s => testSet.has(s.id)).sort((a, b) => a.id - b.id);
+        const nonSelectedStatementsList = statements.filter(s => !testSet.has(s.id));
+
+        // Find non-selected statements that are still linked to selected purchases
         const nonSelectedStillLinked = nonSelectedStatementsList.filter(stmt => {
           const tokens = getLinkedKeys(stmt);
           return tokens.some(t => selectedPurchaseTokens.has(t));
         });
-        
-        const selectedPurchasesLocal = purchases.filter(p => selectedPurchaseIds.has(Number(p.id)));
-        const parentIdLocal = Math.max(...selectedPurchasesLocal.map(p => p.id));
-        const childrenLocal = selectedPurchasesLocal.filter(p => p.id !== parentIdLocal);
-        const sortedChildrenLocal = childrenLocal.sort((a, b) => a.id - b.id);
-        const selectedPurchasesSortedLocal = [...sortedChildrenLocal, ...selectedPurchasesLocal.filter(p => p.id === parentIdLocal)];
-        
-        const simPaid = {};
-        selectedPurchasesSortedLocal.forEach(p => simPaid[p.id] = 0);
+
+        // Get selected purchases sorted
+        const selectedPurchases = purchases.filter(p => selectedPurchaseIds.has(Number(p.id)));
+        const parentId = Math.max(...selectedPurchases.map(p => p.id));
+        const children = selectedPurchases.filter(p => p.id !== parentId);
+        const sortedChildren = children.sort((a, b) => a.id - b.id);
+        const selectedPurchasesSorted = [...sortedChildren, ...selectedPurchases.filter(p => p.id === parentId)];
+
+        // Simulate paid_amount with non-selected but linked statements
+        const simulatedPaid = {};
+        selectedPurchasesSorted.forEach(p => simulatedPaid[p.id] = 0);
         [...nonSelectedStillLinked].sort((a, b) => a.id - b.id).forEach(stmt => {
-          let remToAlloc = Number(stmt.amount || 0);
-          for (const purchase of selectedPurchasesSortedLocal) {
-            if (remToAlloc <= 0) break;
+          let remainingToAllocate = Number(stmt.amount || 0);
+          for (const purchase of selectedPurchasesSorted) {
+            if (remainingToAllocate <= 0) break;
             const net = Number(purchase.net_amount || 0);
-            const needed = net - simPaid[purchase.id];
+            const needed = net - simulatedPaid[purchase.id];
             if (needed <= 0) continue;
-            const apply = Math.min(needed, remToAlloc);
-            simPaid[purchase.id] += apply;
-            remToAlloc -= apply;
+            const apply = Math.min(needed, remainingToAllocate);
+            simulatedPaid[purchase.id] += apply;
+            remainingToAllocate -= apply;
           }
         });
+
+        // Calculate total simulatedPaid
+        let totalSimulatedPaid = 0;
+        Object.values(simulatedPaid).forEach(paid => totalSimulatedPaid += paid);
+        const remainingNeededFromSelected = Math.max(0, selectedNetAmount - totalSimulatedPaid);
         
-        Object.values(simPaid).forEach(paid => simulatedPaidLocal += paid);
-        const remainingNeeded = Math.max(0, selectedNetAmount - simulatedPaidLocal);
+        // Calculate selected statements distribution
+        let totalPaymentAvailable = 0;
+        let remainingToDistributeStatements = remainingNeededFromSelected;
+        selectedStatementsList.forEach(s => {
+          const stmtAmount = Number(s.amount || 0);
+          const toApply = Math.min(stmtAmount, remainingToDistributeStatements);
+          totalPaymentAvailable += toApply;
+          remainingToDistributeStatements -= toApply;
+        });
+
+        // Final remaining after this statement would be selected
+        const testRemainingAmount = Math.max(0, selectedNetAmount - (totalSimulatedPaid + totalPaymentAvailable));
         
-        const statementAmount = Number(statement.amount || 0);
-        if (currentTotal + statementAmount > remainingNeeded) {
-          toast.error(`Cannot select this statement! Selected total cannot exceed ₹${remainingNeeded.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+        // Check if remaining would go below 0 (meaning we're selecting more than available)
+        if (testRemainingAmount < 0) {
+          toast.error(`Cannot select this statement! Would exceed available amount by ₹${Math.abs(testRemainingAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
           return prev;
         }
         
