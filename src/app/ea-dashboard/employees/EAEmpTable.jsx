@@ -19,7 +19,6 @@ const EmployeeCard = ({
   maskEmail,
   maskNumber,
   maskStatus,
-  canViewActions,
 }) => (
   <div className="bg-white shadow-md rounded-lg p-4 mb-4 border border-gray-200">
     <div className="mb-2">
@@ -57,54 +56,53 @@ const EmployeeCard = ({
       <p className="text-gray-600">{maskStatus(employee.status)}</p>
     </div>
 
-    {canViewActions && (
-      <div className="flex flex-wrap gap-2 sm:gap-4 justify-between items-center pt-2 border-t border-gray-100">
-        <button
-          onClick={() => handleImpersonateLogin(employee.empId)}
-          className="text-blue-600 hover:text-blue-900 font-medium flex items-center space-x-1 text-sm"
-        >
-          <LogIn size={16} />
-          <span>Login</span>
-        </button>
+    <div className="flex flex-wrap gap-2 sm:gap-3 justify-between items-center pt-2 border-t border-gray-100">
+      <button
+        onClick={() => handleImpersonateLogin(employee.empId)}
+        className="text-blue-600 hover:text-blue-900 font-medium flex items-center space-x-1 text-sm"
+      >
+        <LogIn size={16} />
+        <span>Login</span>
+      </button>
 
-        <Link
-          href={`/admin-dashboard/password/${employee.username}`}
-          className="text-yellow-600 hover:text-yellow-900 font-medium flex items-center space-x-1 text-sm"
-        >
-          <Key size={16} />
-          <span>Password</span>
-        </Link>
+      <Link
+        href={`/admin-dashboard/password/${employee.username}`}
+        className="text-yellow-600 hover:text-yellow-900 font-medium flex items-center space-x-1 text-sm"
+      >
+        <Key size={16} />
+        <span>Password</span>
+      </Link>
 
-        <Link
-          href={`/admin-dashboard/quick-edit/${employee.username}`}
-          className="text-green-600 hover:text-green-900 font-medium flex items-center space-x-1 text-sm"
-        >
-          <Edit size={16} />
-          <span>Edit</span>
-        </Link>
+      <Link
+        href={`/admin-dashboard/quick-edit/${employee.username}`}
+        className="text-green-600 hover:text-green-900 font-medium flex items-center space-x-1 text-sm"
+      >
+        <Edit size={16} />
+        <span>Edit</span>
+      </Link>
 
-        <Link
-          href={`/admin-dashboard/ip-restrictions/${employee.username}`}
-          className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1 text-sm"
-        >
-          <Shield size={16} />
-          <span>IP</span>
-        </Link>
+      <Link
+        href={`/admin-dashboard/ip-restrictions/${employee.username}`}
+        className="text-purple-600 hover:text-purple-900 font-medium flex items-center space-x-1 text-sm"
+      >
+        <Shield size={16} />
+        <span>IP</span>
+      </Link>
 
-        <button
-          onClick={() => handleOpenReportingManagerModal(employee)}
-          className="text-indigo-600 hover:text-indigo-900 font-medium flex items-center space-x-1 text-sm"
-          title="Add Reporting Manager"
-        >
-          <UserPlus size={16} />
-          <span>Manager</span>
-        </button>
-      </div>
-    )}
+      <button
+        onClick={() => handleOpenReportingManagerModal(employee)}
+        className="text-indigo-600 hover:text-indigo-900 font-medium flex items-center space-x-1 text-sm"
+        title="Add Reporting Manager"
+      >
+        <UserPlus size={16} />
+        <span>Manager</span>
+      </button>
+
+    </div>
   </div>
 );
 
-const EmpTable = ({ employees, currentUserRole }) => {
+const EAEmpTable = ({ employees }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
   const [isMobile, setIsMobile] = useState(false);
@@ -114,8 +112,6 @@ const EmpTable = ({ employees, currentUserRole }) => {
   const [savingReportingManager, setSavingReportingManager] = useState(false);
   const [employeeList, setEmployeeList] = useState([]);
   const router = useRouter();
-
-  const canViewActions = currentUserRole === "SUPERADMIN" || currentUserRole === "EA";
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -237,16 +233,14 @@ const EmpTable = ({ employees, currentUserRole }) => {
         </div>
       </div>
 
-      {canViewActions && (
-        <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mb-4">
-          <Link
-            href="/admin-dashboard/create-employee"
-            className="text-white bg-blue-600 hover:bg-blue-700 whitespace-nowrap font-medium rounded-lg text-sm px-5 py-2.5 inline-flex items-center justify-center"
-          >
-            Add Employee
-          </Link>
-        </div>
-      )}
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mb-4">
+        <Link
+          href="/admin-dashboard/create-employee"
+          className="text-white bg-blue-600 hover:bg-blue-700 whitespace-nowrap font-medium rounded-lg text-sm px-5 py-2.5 inline-flex items-center justify-center"
+        >
+          Add Employee
+        </Link>
+      </div>
 
       {/* Add Reporting Manager Modal */}
       {showReportingManagerModal && (
@@ -348,7 +342,6 @@ const EmpTable = ({ employees, currentUserRole }) => {
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
-                canViewActions={canViewActions}
               />
             ))
           ) : (
@@ -383,11 +376,9 @@ const EmpTable = ({ employees, currentUserRole }) => {
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider whitespace-nowrap">
                   Status
                 </th>
-                {canViewActions && (
-                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider whitespace-nowrap">
-                    Actions
-                  </th>
-                )}
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                  Actions
+                </th>
               </tr>
             </thead>
 
@@ -404,53 +395,51 @@ const EmpTable = ({ employees, currentUserRole }) => {
                       {employee.reporting_manager || "-"}
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">{maskStatus(employee.status)}</td>
-                    {canViewActions && (
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <div className="flex flex-wrap gap-2 sm:gap-4">
-                          <button
-                            onClick={() => handleImpersonateLogin(employee.empId)}
-                            className="text-blue-600"
-                          >
-                            <LogIn size={20} />
-                          </button>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4">
+                      <div className="flex flex-wrap gap-2 sm:gap-4">
+                        <button
+                          onClick={() => handleImpersonateLogin(employee.empId)}
+                          className="text-blue-600"
+                        >
+                          <LogIn size={20} />
+                        </button>
 
-                          <Link
-                            href={`/admin-dashboard/password/${employee.username}`}
-                            className="text-yellow-600"
-                          >
-                            <Key size={20} />
-                          </Link>
+                        <Link
+                          href={`/admin-dashboard/password/${employee.username}`}
+                          className="text-yellow-600"
+                        >
+                          <Key size={20} />
+                        </Link>
 
-                          <Link
-                            href={`/admin-dashboard/quick-edit/${employee.username}`}
-                            className="text-green-600"
-                          >
-                            <Edit size={20} />
-                          </Link>
+                        <Link
+                          href={`/admin-dashboard/quick-edit/${employee.username}`}
+                          className="text-green-600"
+                        >
+                          <Edit size={20} />
+                        </Link>
 
-                          <Link
-                            href={`/admin-dashboard/ip-restrictions/${employee.username}`}
-                            className="text-purple-600"
-                            title="IP Restriction Settings"
-                          >
-                            <Shield size={20} />
-                          </Link>
+                        <Link
+                          href={`/admin-dashboard/ip-restrictions/${employee.username}`}
+                          className="text-purple-600"
+                          title="IP Restriction Settings"
+                        >
+                          <Shield size={20} />
+                        </Link>
 
-                          <button
-                            onClick={() => handleOpenReportingManagerModal(employee)}
-                            className="text-indigo-600 hover:text-indigo-800"
-                            title="Add Reporting Manager"
-                          >
-                            <UserPlus size={20} />
-                          </button>
-                        </div>
-                      </td>
-                    )}
+                        <button
+                          onClick={() => handleOpenReportingManagerModal(employee)}
+                          className="text-indigo-600 hover:text-indigo-800"
+                          title="Add Reporting Manager"
+                        >
+                          <UserPlus size={20} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={canViewActions ? 8 : 7} className="text-center py-4 text-gray-500">
+                  <td colSpan="8" className="text-center py-4 text-gray-500">
                     No employees found.
                   </td>
                 </tr>
@@ -463,4 +452,4 @@ const EmpTable = ({ employees, currentUserRole }) => {
   );
 };
 
-export default EmpTable;
+export default EAEmpTable;

@@ -607,14 +607,20 @@ const allMenuItems = [
   {
     name: "Employees",
     moduleKey: "employee",
-    roles: ["SUPERADMIN", "HR", "HR HEAD"],
+    roles: ["SUPERADMIN", "HR", "HR HEAD", "EA"],
     icon: "UserCircle",
     children: [
       {
         path: "/admin-dashboard/employees",
-        name: "Employee list",
-        roles: ["SUPERADMIN", "EA"],
+        name: "Employee list (Admin)",
+        roles: ["SUPERADMIN"],
         icon: "ShieldCheck",
+      },
+      {
+        path: "/user-dashboard/employees",
+        name: "Employee list (EA)",
+        roles: ["EA"],
+        icon: "User",
       },
       {
         path: "/empcrm",

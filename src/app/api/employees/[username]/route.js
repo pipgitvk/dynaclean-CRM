@@ -51,7 +51,7 @@ async function requireAdminOrSuperadmin() {
       new TextEncoder().encode(JWT_SECRET)
     );
     const role = payload?.role || "";
-    if (!["ADMIN", "SUPERADMIN"].includes(role)) {
+    if (!["ADMIN", "SUPERADMIN", "EA"].includes(role)) {
       return { error: NextResponse.json({ message: "Forbidden" }, { status: 403 }) };
     }
     return {};

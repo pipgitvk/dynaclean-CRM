@@ -108,8 +108,25 @@ export async function middleware(request) {
       }
 
       if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN" && roleNorm !== "DIRECTOR") {
-        // Allow EA only for /admin-dashboard/employees
-        if (roleNorm !== "EA" || !pathname.startsWith("/admin-dashboard/employees")) {
+        // Allow EA for employee-related admin routes
+        const eaAllowedRoutes = [
+          "/admin-dashboard/employees",
+          "/admin-dashboard/create-employee",
+          "/admin-dashboard/password",
+          "/admin-dashboard/quick-edit",
+          "/admin-dashboard/ip-restrictions"
+        ];
+        const isEaAllowed = eaAllowedRoutes.some(route => pathname.startsWith(route));
+        if (roleNorm !== "EA" || !isEaAllowed) {
+          const dest = new URL("/user-dashboard", request.url);
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
+      }
+      
+      // Allow EA access to /ea-dashboard
+      if (pathname.startsWith("/ea-dashboard")) {
+        if (roleNorm !== "EA" && role !== "SUPERADMIN" && roleNorm !== "DIRECTOR") {
           const dest = new URL("/user-dashboard", request.url);
           dest.search = request.nextUrl.search;
           return NextResponse.redirect(dest);

@@ -18,7 +18,7 @@ export async function PATCH(request) {
       new TextEncoder().encode(JWT_SECRET)
     );
     const role = payload?.role || payload?.userRole || "";
-    if (!["ADMIN", "SUPERADMIN", "HR", "HR HEAD", "HR Executive"].includes(role)) {
+    if (!["ADMIN", "SUPERADMIN", "HR", "HR HEAD", "HR Executive", "EA"].includes(role)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -7,6 +7,7 @@ const ALLOWED_USER_ROLES = new Set([
   "DIRECTOR",
   "JUNIOR HR EXECUTIVE",
   "HR RECRUITER",
+  "HR EXECUTIVE",
   "GEM",
   "ACCOUNTANT",
   "TEAM LEADER",
@@ -26,6 +27,7 @@ const ALLOWED_USER_ROLES = new Set([
   "WELDER",
   "WELDER HELPER",
   "WAREHOUSE INCHARGE",
+  "EA",
 ]);
 
 export async function POST(request) {
