@@ -185,13 +185,13 @@ export default function HotLeadsCards({ leadSource }) {
     }
 
     // Custom sort:
-    // 1. Leads with status "won" or "order received" go to bottom
+    // 1. Leads with stage "won" or "order received" go to bottom
     // 2. Others sorted by age (oldest first = most urgent)
     filtered.sort((a, b) => {
-      const aStatus = (a.status || "").toLowerCase();
-      const bStatus = (b.status || "").toLowerCase();
-      const aIsWonOrOrdered = aStatus === "won" || aStatus === "order received";
-      const bIsWonOrOrdered = bStatus === "won" || bStatus === "order received";
+      const aStage = (a.stage || "").toLowerCase();
+      const bStage = (b.stage || "").toLowerCase();
+      const aIsWonOrOrdered = aStage === "won" || aStage === "order received";
+      const bIsWonOrOrdered = bStage === "won" || bStage === "order received";
 
       if (aIsWonOrOrdered && !bIsWonOrOrdered) return 1;
       if (!aIsWonOrOrdered && bIsWonOrOrdered) return -1;
