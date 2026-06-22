@@ -185,13 +185,29 @@ export default function HotLeadsCards({ leadSource }) {
     }
 
     // Custom sort:
-    // 1. Leads with stage "won" or "order received" go to bottom
+    // 1. Leads with stage containing "won" or "order" go to bottom
     // 2. Others sorted by age (oldest first = most urgent)
     filtered.sort((a, b) => {
-      const aStage = (a.stage || "").toLowerCase();
-      const bStage = (b.stage || "").toLowerCase();
-      const aIsWonOrOrdered = aStage === "won" || aStage === "order received";
-      const bIsWonOrOrdered = bStage === "won" || bStage === "order received";
+      const aStageNorm = (a.stage || "").trim().toLowerCase();
+      const bStageNorm = (b.stage || "").trim().toLowerCase();
+      
+      // Check if stage contains "won" (case insensitive)
+      const aIsWonOrOrdered = aStageNorm.includes("won");
+      const bIsWonOrOrdered = bStageNorm.includes("won");
+
+      // Debug log
+      if (a.first_name === "Nikhil Agarwal" || b.first_name === "Nikhil Agarwal") {
+        console.log("Debug sort:", {
+          aName: a.first_name,
+          aStage: a.stage,
+          aStageNorm,
+          aIsWonOrOrdered,
+          bName: b.first_name,
+          bStage: b.stage,
+          bStageNorm,
+          bIsWonOrOrdered,
+        });
+      }
 
       if (aIsWonOrOrdered && !bIsWonOrOrdered) return 1;
       if (!aIsWonOrOrdered && bIsWonOrOrdered) return -1;
