@@ -379,20 +379,27 @@ export default function FollowupForm({ customerId }) {
 
   const followedDateLimits = getFollowedDateLimits();
 
-  // Calculate min/max for Next Follow-up Date based on lead age (from customer creation date)
-  // < 7 days old  → max 12 hours from now
+  // Calculate min/max for Next Follow-up Date based on lead age (from customer creation date) and stage
+  // If stage is "Won (Order Received)" → max 15 days from now
+  // < 7 days old  → max 24 hours from now
   // >= 7 days old → max 15 days from now
   const getNextFollowupDateLimits = () => {
     const now = new Date();
     const minDate = formatISTDateTime(now);
+
+    // If stage is "Won (Order Received)", allow 15 days
+    if (formData.stage === "Won (Order Received)") {
+      const maxDate = formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000));
+      return { min: minDate, max: maxDate, isNewLead: false };
+    }
 
     if (customerCreatedAt) {
       const createdDate = new Date(customerCreatedAt);
       const leadAgeInDays = (now - createdDate) / (1000 * 60 * 60 * 24);
 
       if (leadAgeInDays < 7) {
-        // Fresh lead: restrict to 12 hours max
-        const maxDate = formatISTDateTime(new Date(now.getTime() + 12 * 60 * 60 * 1000));
+        // Fresh lead: restrict to 24 hours max
+        const maxDate = formatISTDateTime(new Date(now.getTime() + 24 * 60 * 60 * 1000));
         return { min: minDate, max: maxDate, isNewLead: true };
       } else {
         // Old lead: allow up to 15 days
@@ -401,8 +408,8 @@ export default function FollowupForm({ customerId }) {
       }
     }
 
-    // Still loading — apply strict 12 hour fallback so no one can bypass during load
-    const maxDate = formatISTDateTime(new Date(now.getTime() + 12 * 60 * 60 * 1000));
+    // Still loading — apply strict 24 hour fallback so no one can bypass during load
+    const maxDate = formatISTDateTime(new Date(now.getTime() + 24 * 60 * 60 * 1000));
     return { min: minDate, max: maxDate, isNewLead: true };
   };
 
@@ -495,7 +502,7 @@ export default function FollowupForm({ customerId }) {
 
       if (maxDate && selected > maxDate) {
         if (limits.isNewLead) {
-          toast.error("This lead is less than 7 days old — you can only schedule a follow-up within the next 12 hours.");
+          toast.error("This lead is less than 7 days old — you can only schedule a follow-up within the next 24 hours.");
         } else {
           toast.error("You can schedule a follow-up for a maximum of 15 days from now.");
         }
@@ -546,7 +553,7 @@ export default function FollowupForm({ customerId }) {
 
       if (maxDate && selected > maxDate) {
         if (limits.isNewLead) {
-          toast.error("This lead is less than 7 days old — you can only schedule a follow-up within the next 12 hours.");
+          toast.error("This lead is less than 7 days old — you can only schedule a follow-up within the next 24 hours.");
         } else {
           toast.error("You can schedule a follow-up for a maximum of 15 days from now.");
         }
@@ -732,8 +739,10 @@ export default function FollowupForm({ customerId }) {
           <p className="mt-1 text-xs text-red-500">
             {isLoadingCustomer
               ? "Loading lead information..."
+              : formData.stage === "Won (Order Received)"
+              ? "Stage is Won (Order Received) — you can schedule a follow-up for a maximum of 15 days from now."
               : nextFollowupDateLimits.isNewLead
-              ? "This lead is less than 7 days old — you can only schedule a follow-up within the next 12 hours."
+              ? "This lead is less than 7 days old — you can only schedule a follow-up within the next 24 hours."
               : "This lead is older than 7 days — you can schedule a follow-up for a maximum of 15 days from now."}
           </p>
         </div>
