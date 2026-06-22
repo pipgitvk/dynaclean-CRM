@@ -506,12 +506,12 @@ export default function MultiSparePurchaseLinkModal({
                       <td className="p-3 max-w-[300px] truncate text-gray-600" title={s.description || ""}>{s.description || "—"}</td>
                       <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3 font-medium text-green-700">
-                        {isSelected && distribution ? 
-                          `₹${distribution.applied.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                        {isSelected && selectedGroups[s.trans_id || `_id_${s.id}`] ? 
+                          `₹${selectedGroups[s.trans_id || `_id_${s.id}`].totalApplied.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
                       </td>
                       <td className="p-3 font-medium text-orange-600">
-                        {isSelected && distribution ? 
-                          `₹${distribution.remaining.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+                        {isSelected ? 
+                          `₹${(Number(s.amount || 0) - (selectedGroups[s.trans_id || `_id_${s.id}`]?.totalApplied || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
                       </td>
                     </tr>
                   );
