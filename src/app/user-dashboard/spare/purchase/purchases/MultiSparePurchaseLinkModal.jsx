@@ -318,9 +318,10 @@ export default function MultiSparePurchaseLinkModal({
           return prev;
         }
         
-        // Check if statement amount is greater than current remaining amount
+        // Check if statement amount is greater than current remaining amount (with small tolerance for floating point)
         const statementAmount = Number(statement.amount || 0);
-        if (statementAmount > remainingAmount) {
+        const tolerance = 0.01;
+        if (statementAmount > remainingAmount + tolerance) {
           toast.error(`Cannot select this statement! Statement amount ₹${statementAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} exceeds remaining ₹${remainingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
           return prev;
         }
