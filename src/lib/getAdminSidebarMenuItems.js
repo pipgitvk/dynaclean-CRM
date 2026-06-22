@@ -612,13 +612,13 @@ const allMenuItems = [
     children: [
       {
         path: "/admin-dashboard/employees",
-        name: "Employee list (Admin)",
+        name: "Employee list",
         roles: ["SUPERADMIN"],
         icon: "ShieldCheck",
       },
       {
         path: "/user-dashboard/employees",
-        name: "Employee list (EA)",
+        name: "Employee list",
         roles: ["EA"],
         icon: "User",
       },
