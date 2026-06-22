@@ -45,25 +45,33 @@ export async function POST(request) {
         }
         const spare = spares[0];
 
-        // 4. Start transaction to handle cascading deletes
-        await db.beginTransaction();
+        // 4. Get a connection from pool to handle transactions
+        const conn = await db.getConnection();
 
         try {
-            // Delete related stock records first (cascade)
-            await db.execute('DELETE FROM stock_list WHERE spare_id = ?', [id]);
+            // Start transaction
+            await conn.beginTransaction();
 
-            // Delete from stock_summary if exists
-            await db.execute('DELETE FROM stock_summary WHERE spare_id = ?', [id]);
+            try {
+                // Delete related stock records first (cascade)
+                await conn.execute('DELETE FROM stock_list WHERE spare_id = ?', [id]);
 
-            // Delete the spare itself
-            await db.execute('DELETE FROM spare_list WHERE id = ?', [id]);
+                // Delete from stock_summary if exists
+                await conn.execute('DELETE FROM stock_summary WHERE spare_id = ?', [id]);
 
-            // Commit transaction
-            await db.commit();
-        } catch (err) {
-            // Rollback on error
-            await db.rollback();
-            throw err;
+                // Delete the spare itself
+                await conn.execute('DELETE FROM spare_list WHERE id = ?', [id]);
+
+                // Commit transaction
+                await conn.commit();
+            } catch (err) {
+                // Rollback on error
+                await conn.rollback();
+                throw err;
+            }
+        } finally {
+            // Always release connection back to pool
+            conn.release();
         }
 
         // 5. Try to delete local image file (if exists)
