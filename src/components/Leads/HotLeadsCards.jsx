@@ -142,6 +142,7 @@ export default function HotLeadsCards({ leadSource }) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [stageFilter, setStageFilter] = useState("ALL");
+  const [dateFilter, setDateFilter] = useState("");
 
   useEffect(() => {
     async function fetchHotLeads() {
@@ -159,9 +160,18 @@ export default function HotLeadsCards({ leadSource }) {
     fetchHotLeads();
   }, [leadSource]);
 
-  // Default sort: oldest first (highest ageHours first = most urgent)
+  // Process leads with date filter, status filter, and custom sorting
   const processedLeads = (() => {
     let filtered = [...leads];
+
+    // Apply date filter: exclude leads created on or after the selected date
+    if (dateFilter) {
+      const filterDate = new Date(dateFilter);
+      filtered = filtered.filter((lead) => {
+        const leadDate = new Date(lead.created_at || lead.date_created);
+        return leadDate < filterDate;
+      });
+    }
 
     if (statusFilter !== "ALL") {
       filtered = filtered.filter(
@@ -174,8 +184,21 @@ export default function HotLeadsCards({ leadSource }) {
       );
     }
 
-    // Oldest (most urgent) first
-    filtered.sort((a, b) => (b.lead_age_hours || 0) - (a.lead_age_hours || 0));
+    // Custom sort:
+    // 1. Leads with status "won" or "order received" go to bottom
+    // 2. Others sorted by age (oldest first = most urgent)
+    filtered.sort((a, b) => {
+      const aStatus = (a.status || "").toLowerCase();
+      const bStatus = (b.status || "").toLowerCase();
+      const aIsWonOrOrdered = aStatus === "won" || aStatus === "order received";
+      const bIsWonOrOrdered = bStatus === "won" || bStatus === "order received";
+
+      if (aIsWonOrOrdered && !bIsWonOrOrdered) return 1;
+      if (!aIsWonOrOrdered && bIsWonOrOrdered) return -1;
+      
+      // If both are won/ordered or both are not, sort by age (oldest first)
+      return (b.lead_age_hours || 0) - (a.lead_age_hours || 0);
+    });
 
     return filtered;
   })();
@@ -195,6 +218,15 @@ export default function HotLeadsCards({ leadSource }) {
 
         {/* Filters */}
         <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-500 mb-1">From Date</label>
+            <input
+              type="date"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-gray-300"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+            />
+          </div>
           <div className="flex flex-col">
             <label className="text-xs text-gray-500 mb-1">Status</label>
             <select
