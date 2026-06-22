@@ -312,9 +312,16 @@ export default function MultiSparePurchaseLinkModal({
         // Final remaining after this statement would be selected
         const testRemainingAmount = Math.max(0, selectedNetAmount - (totalSimulatedPaid + totalPaymentAvailable));
         
-        // Check if remaining would go below 0 (meaning we're selecting more than available)
-        if (testRemainingAmount < 0) {
-          toast.error(`Cannot select this statement! Would exceed available amount by ₹${Math.abs(testRemainingAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+        // Check if remaining is already 0
+        if (testRemainingAmount <= 0) {
+          toast.error(`Cannot select this statement! No remaining amount available.`);
+          return prev;
+        }
+        
+        // Check if statement amount is greater than remaining amount
+        const statementAmount = Number(statement.amount || 0);
+        if (statementAmount > testRemainingAmount) {
+          toast.error(`Cannot select this statement! Statement amount ₹${statementAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} exceeds remaining ₹${testRemainingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
           return prev;
         }
         
