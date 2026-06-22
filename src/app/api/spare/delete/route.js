@@ -39,14 +39,14 @@ export async function POST(request) {
         const db = await getDbConnection();
 
         // 3. Get the spare first to get the image path
-        const [spares] = await db.execute('SELECT image FROM spares WHERE id = ?', [id]);
+        const [spares] = await db.execute('SELECT image FROM spare_list WHERE id = ?', [id]);
         if (spares.length === 0) {
             return NextResponse.json({ error: 'Spare not found' }, { status: 404 });
         }
         const spare = spares[0];
 
         // 4. Delete from database
-        await db.execute('DELETE FROM spares WHERE id = ?', [id]);
+        await db.execute('DELETE FROM spare_list WHERE id = ?', [id]);
 
         // 5. Try to delete local image file (if exists)
         if (spare.image && !spare.image.startsWith('http')) {
