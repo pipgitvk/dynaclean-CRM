@@ -29,6 +29,7 @@ const USER_ROLE_OPTIONS = [
   "WELDER",
   "WELDER HELPER",
   "WAREHOUSE INCHARGE",
+  "EA",
 ];
 
 export default function CreateEmployeeForm() {

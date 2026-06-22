@@ -426,6 +426,7 @@ const EmpTable = ({ employees }) => {
     "WELDER",
     "WELDER HELPER",
     "WAREHOUSE INCHARGE",
+    "EA",
   ];
 
   const bulkModuleTree = useMemo(() => getModuleTreeForEmployeeBulkUi(), []);
