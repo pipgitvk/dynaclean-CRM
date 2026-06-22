@@ -95,37 +95,21 @@ function FollowUpModal({ fu, onClose, onSaved }) {
         </div>
         {/* form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* serial autocomplete */}
-          <div className="relative">
+          {/* serial number - non-editable in follow-up modal since it's already set */}
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number *</label>
-            <input type="text" value={serialSearch} required
-              onChange={(e) => { setSerialSearch(e.target.value); setForm(p => ({ ...p, serial_number: e.target.value })); }}
-              placeholder="Search serial number..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            {showSugg && suggestions.length > 0 && (
-              <div className="absolute z-30 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
-                {suggestions.map((p, i) => (
-                  <div key={i} className="p-2 hover:bg-gray-100 cursor-pointer" onClick={() => {
-                    setSerialSearch(p.serial_number);
-                    setForm(prev => ({ ...prev, serial_number: p.serial_number, product_model: p.model }));
-                    setShowSugg(false);
-                  }}>
-                    <div className="font-medium">{p.serial_number}</div>
-                    <div className="text-sm text-gray-500">{p.model} — {p.product_name}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <input type="text" value={form.serial_number} readOnly disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Product Model</label>
-            <input type="text" value={form.product_model} onChange={set("product_model")}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input type="text" value={form.product_model} readOnly disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Contact</label>
-            <input type="text" value={form.contact} onChange={set("contact")} placeholder="Email or phone"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input type="text" value={form.contact} readOnly disabled placeholder="Email or phone"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Followed At (within last 24h) *</label>
@@ -444,11 +428,12 @@ export default function ServiceFollowupsPage() {
                     {addSuggestions.map((p, i) => (
                       <div key={i} className="p-2 hover:bg-gray-100 cursor-pointer" onClick={() => {
                         setAddSerialSearch(p.serial_number);
-                        setAddForm(prev => ({ ...prev, serial_number: p.serial_number, product_model: p.model }));
+                        setAddForm(prev => ({ ...prev, serial_number: p.serial_number, product_model: p.model, contact: p.contact || p.email || "" }));
                         setAddShowSugg(false);
                       }}>
                         <div className="font-medium">{p.serial_number}</div>
                         <div className="text-sm text-gray-500">{p.model} — {p.product_name}</div>
+                        {(p.contact || p.email) && <div className="text-xs text-gray-400">{p.contact || p.email}</div>}
                       </div>
                     ))}
                   </div>
@@ -457,8 +442,8 @@ export default function ServiceFollowupsPage() {
               {[["Product Model","product_model","text"],["Contact","contact","text"]].map(([label, key, type]) => (
                 <div key={key}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                  <input type={type} value={addForm[key]} onChange={(e) => setAddForm(p => ({ ...p, [key]: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type={type} value={addForm[key]} readOnly disabled
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed" />
                 </div>
               ))}
               <div>

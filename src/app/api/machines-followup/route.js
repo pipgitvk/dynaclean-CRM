@@ -185,7 +185,7 @@ export async function PUT(req) {
     const pool = await getDbConnection();
     const searchTerm = `%${search}%`;
     const [rows] = await pool.execute(
-      `SELECT serial_number, model, product_name 
+      `SELECT serial_number, model, product_name, email, contact 
        FROM warranty_products 
        WHERE serial_number LIKE ? OR model LIKE ?
        LIMIT 10`,
