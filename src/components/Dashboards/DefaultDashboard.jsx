@@ -10,6 +10,7 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import HrTodayReportButton from "@/components/HrTodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
+import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
 
 export default function DefaultDashboard({ user, counts }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
@@ -67,17 +68,17 @@ export default function DefaultDashboard({ user, counts }) {
         </div>
       )}
 
-      {/* Tasks + Leads */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6">
+      {/* Tasks */}
+      <div className="bg-white rounded-xl shadow-md">
+        <UpcomingTasks leadSource={user.username} />
+      </div>
 
-        <div className="bg-white rounded-xl shadow-md">
-          <UpcomingTasks leadSource={user.username} />
-        </div>
+      {/* Upcoming Follow-ups */}
+      <UpcomingFollowupsWidget username={user.username} userRole={user.userRole} />
 
-        <div className="bg-white rounded-xl shadow-md">
-          <UpcomingLeads leadSource={user.username} />
-        </div>
-
+      {/* Leads */}
+      <div className="bg-white rounded-xl shadow-md">
+        <UpcomingLeads leadSource={user.username} />
       </div>
 
     </div>

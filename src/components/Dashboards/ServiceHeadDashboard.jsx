@@ -7,6 +7,7 @@ import InfoBox from "@/components/InfoBox";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
+import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
 
 export default function ServiceHeadDashboard({ user, counts }) {
   return (
@@ -85,6 +86,9 @@ export default function ServiceHeadDashboard({ user, counts }) {
         </h2>
         <UpcomingTasks leadSource={user.username} />
       </div>
+
+      {/* Upcoming Service Followups */}
+      <UpcomingFollowupsWidget username={user.username} userRole={user.userRole} />
     </div>
   );
 }

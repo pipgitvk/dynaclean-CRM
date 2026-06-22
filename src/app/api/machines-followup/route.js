@@ -11,68 +11,81 @@ export async function GET(req) {
     }
 
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const search = searchParams.get("search") || "";
-    const offset = (page - 1) * limit;
+    const page       = parseInt(searchParams.get("page")  || "1");
+    const limit      = parseInt(searchParams.get("limit") || "50");
+    const search     = searchParams.get("search")      || "";
+    const serial     = searchParams.get("serial")      || "";   // history mode
+    const latestOnly = searchParams.get("latest_only") === "1"; // one row per serial
+    const offset     = (page - 1) * limit;
 
-    const username = payload.username || "unknown";
-    const role = (payload.role || payload.userRole || "").toUpperCase();
+    const username     = payload.username || "unknown";
+    const role         = (payload.role || payload.userRole || "").toUpperCase();
     const isSuperAdmin = role === "SUPERADMIN";
 
     const pool = await getDbConnection();
 
-    const conditions = [];
+    /* ── HISTORY MODE: all rows for one serial number ── */
+    if (serial) {
+      const hCond   = [];
+      const hParams = [];
+      if (!isSuperAdmin) { hCond.push("added_by = ?"); hParams.push(username); }
+      hCond.push("serial_number = ?"); hParams.push(serial);
+
+      const [histRows] = await pool.execute(
+        `SELECT * FROM machines_followup WHERE ${hCond.join(" AND ")} ORDER BY id DESC`,
+        hParams
+      );
+      return NextResponse.json({ success: true, history: histRows });
+    }
+
+    /* ── build WHERE for both modes (no mf. alias needed inside subquery) ── */
+    const cond   = [];
     const params = [];
-
-    // Only superadmin sees all, others see only their own
-    if (!isSuperAdmin) {
-      conditions.push(`mf.added_by = ?`);
-      params.push(username);
-    }
-
+    if (!isSuperAdmin) { cond.push("added_by = ?");   params.push(username); }
     if (search) {
-      const searchTerm = `%${search}%`;
-      conditions.push(`(
-        mf.serial_number LIKE ? OR
-        mf.product_model LIKE ? OR
-        mf.added_by LIKE ? OR
-        mf.notes LIKE ? OR
-        mf.contact LIKE ?
-      )`);
-      params.push(...Array(5).fill(searchTerm));
+      const s = `%${search}%`;
+      cond.push("(serial_number LIKE ? OR product_model LIKE ? OR added_by LIKE ? OR notes LIKE ? OR contact LIKE ?)");
+      params.push(s, s, s, s, s);
+    }
+    const innerWhere = cond.length ? `WHERE ${cond.join(" AND ")}` : "";
+
+    /* ── LATEST-ONLY MODE: one row per serial_number ── */
+    if (latestOnly) {
+      const [allRows] = await pool.execute(
+        `SELECT mf.*
+         FROM machines_followup mf
+         INNER JOIN (
+           SELECT serial_number, MAX(id) AS max_id
+           FROM machines_followup
+           ${innerWhere}
+           GROUP BY serial_number
+         ) latest ON mf.serial_number = latest.serial_number AND mf.id = latest.max_id
+         ORDER BY mf.id DESC`,
+        params
+      );
+      const total      = allRows.length;
+      const totalPages = Math.ceil(total / limit);
+      return NextResponse.json({
+        success: true,
+        followups: allRows.slice(offset, offset + limit),
+        total, totalPages, currentPage: page, pageSize: limit
+      });
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    /* ── NORMAL PAGINATED MODE ── */
+    const mfCond   = cond.map(c => c.replace(/\b(serial_number|product_model|added_by|notes|contact)\b/g, "mf.$1"));
+    const mfWhere  = mfCond.length ? `WHERE ${mfCond.join(" AND ")}` : "";
 
-    // Get total count
-    const [countResult] = await pool.execute(
-      `SELECT COUNT(*) as total
-       FROM machines_followup mf
-       ${whereClause}`,
-      params
+    const [[{ total }]] = await pool.execute(
+      `SELECT COUNT(*) as total FROM machines_followup mf ${mfWhere}`, params
     );
-    const total = countResult[0].total;
     const totalPages = Math.ceil(total / limit);
-
-    // Get paginated data
     const [rows] = await pool.execute(
-      `SELECT *
-       FROM machines_followup mf
-       ${whereClause}
-       ORDER BY mf.id DESC
-       LIMIT ? OFFSET ?`,
+      `SELECT * FROM machines_followup mf ${mfWhere} ORDER BY mf.id DESC LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
+    return NextResponse.json({ success: true, followups: rows, total, totalPages, currentPage: page, pageSize: limit });
 
-    return NextResponse.json({
-      success: true,
-      followups: rows,
-      total,
-      totalPages,
-      currentPage: page,
-      pageSize: limit
-    });
   } catch (error) {
     console.error("Error fetching machines followups:", error);
     return NextResponse.json({ success: false, error: "Failed to fetch followups" }, { status: 500 });
