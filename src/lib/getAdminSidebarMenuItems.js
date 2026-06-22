@@ -613,7 +613,7 @@ const allMenuItems = [
       {
         path: "/admin-dashboard/employees",
         name: "Employee list",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "EA"],
         icon: "ShieldCheck",
       },
       {

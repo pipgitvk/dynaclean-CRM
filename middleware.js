@@ -108,9 +108,12 @@ export async function middleware(request) {
       }
 
       if (pathname.startsWith("/admin-dashboard") && role !== "SUPERADMIN" && roleNorm !== "DIRECTOR") {
-        const dest = new URL("/user-dashboard", request.url);
-        dest.search = request.nextUrl.search;
-        return NextResponse.redirect(dest);
+        // Allow EA only for /admin-dashboard/employees
+        if (roleNorm !== "EA" || !pathname.startsWith("/admin-dashboard/employees")) {
+          const dest = new URL("/user-dashboard", request.url);
+          dest.search = request.nextUrl.search;
+          return NextResponse.redirect(dest);
+        }
       }
 
       // SUPERADMIN-only modules (even if link is known)
