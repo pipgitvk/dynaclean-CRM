@@ -151,43 +151,62 @@ export default function QuotationForm() {
 
       const data = await res.json();
 
-      if (!data.success) throw new Error(data.error);
+      if (data.success) {
+        const customer = data.customer;
 
-      const customer = data.customer;
+        setOriginalCustomerData({
+          company: customer.company,
+          gstin: customer.gstin,
+          location: customer.location,
+          state: customer.state,
+        });
 
-      setOriginalCustomerData({
-        company: customer.company,
-        gstin: customer.gstin,
-        location: customer.location,
-        state: customer.state,
-      });
+        setEditableFields({
+          company: !customer.company,
+          company_location: !customer.location,
+          gstin_no: !customer.gstin,
+          state_name: !customer.state,
+        });
 
-      setEditableFields({
-        company: !customer.company,
-        company_location: !customer.location,
-        gstin_no: !customer.gstin,
-        state_name: !customer.state,
-      });
+        const customerName =
+          customer.company ||
+          `${customer.first_name} ${customer.last_name}`.trim();
 
-      const customerName =
-        customer.company ||
-        `${customer.first_name} ${customer.last_name}`.trim();
+        setForm((prev) => ({
+          ...prev,
+          customer_id: customer.customer_id,
+          company: customerName,
+          company_location: customer.location,
+          gstin_no: customer.gstin,
+          state_name: customer.state,
+        }));
 
-      setForm((prev) => ({
-        ...prev,
-        customer_id: customer.customer_id,
-        company: customerName,
-        company_location: customer.location,
-        gstin_no: customer.gstin,
-        state_name: customer.state,
-      }));
+        setCustomerIdInput(id);
+        setShowCustomerModal(false);
+        toast.success("Customer data loaded successfully");
+      } else {
+        // Customer not found - allow creation with provided customer ID
+        // All fields are editable since customer doesn't exist
+        setEditableFields({
+          company: true,
+          company_location: true,
+          gstin_no: true,
+          state_name: true,
+        });
 
-      setCustomerIdInput(id);
-      setShowCustomerModal(false);
-      toast.success("Customer data loaded successfully");
+        setForm((prev) => ({
+          ...prev,
+          customer_id: id,
+        }));
+
+        setCustomerIdInput(id);
+        setShowCustomerModal(false);
+        toast.success("You can now create a quotation for this customer ID");
+      }
     } catch (err) {
       setShowCustomerModal(true);
-      setCustomerError("Customer not found");
+      setCustomerError("Failed to fetch customer data. Please try again.");
+      toast.error("Failed to fetch customer data");
     } finally {
       setIsLoadingCustomer(false);
     }
@@ -398,8 +417,22 @@ export default function QuotationForm() {
         toast.success("Customer data loaded successfully");
         setShowCustomerModal(false);
       } else {
-        setCustomerError(data.error || "Customer not found");
-        toast.error(data.error || "Customer not found");
+        // Customer not found - allow creation with provided customer ID
+        // All fields are editable since customer doesn't exist
+        setEditableFields({
+          company: true,
+          company_location: true,
+          gstin_no: true,
+          state_name: true,
+        });
+
+        setForm({
+          ...form,
+          customer_id: customerIdInput.trim(),
+        });
+
+        toast.success("You can now create a quotation for this customer ID");
+        setShowCustomerModal(false);
       }
     } catch (error) {
       console.error("Error fetching customer:", error);
@@ -528,8 +561,7 @@ Thanks for doing business with us!`,
               Enter Customer ID
             </h2>
             <p className="text-sm text-gray-600 mb-6">
-              Please enter the customer ID to fetch customer details and create
-              a quotation.
+              Enter the customer ID to create a quotation. If the customer doesn't exist in the system, you can still proceed with their ID.
             </p>
 
             <div className="space-y-4">

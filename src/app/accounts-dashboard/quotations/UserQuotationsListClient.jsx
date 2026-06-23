@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
+import QuickQuotationModal from "@/components/Quotation/QuickQuotationModal";
 
-export default function UserQuotationsListClient({ quotations }) {
+export default function UserQuotationsListClient({ quotations, isServiceHead = false }) {
   const [modalQuote, setModalQuote] = useState(null);
+  const [showQuickModal, setShowQuickModal] = useState(false);
 
   return (
     <>
@@ -13,6 +15,23 @@ export default function UserQuotationsListClient({ quotations }) {
         onClose={() => setModalQuote(null)}
         showAddProspectLink
       />
+
+      <QuickQuotationModal
+        isOpen={showQuickModal}
+        onClose={() => setShowQuickModal(false)}
+        onSuccess={() => setShowQuickModal(false)}
+      />
+
+      {isServiceHead && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={() => setShowQuickModal(true)}
+            className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
+          >
+            + Quick Quotation
+          </button>
+        </div>
+      )}
 
       <div className="hidden md:block overflow-x-auto bg-white rounded shadow">
         <table className="min-w-full table-auto">
