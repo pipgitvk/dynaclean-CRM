@@ -670,7 +670,8 @@ export default function ServiceTable({ serviceRecords, role }) {
                           {record.status?.toUpperCase() !== "COMPLETED" ? (
                             <>
                               {(role === "ADMIN" ||
-                                role === "SERVICE HEAD") && (
+                                role === "SERVICE HEAD" ||
+                                role === "SERVICE SUPPORT") && (
                                 <Link
                                   href={`/${dashboardPath}/assign-service/${record.service_id}`}
                                   className="inline-block px-3 py-1 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-center"
@@ -736,7 +737,8 @@ export default function ServiceTable({ serviceRecords, role }) {
                           {(role === "ADMIN" ||
                             role === "SUPERADMIN" ||
                             role === "TEAM LEADER" ||
-                            role === "SERVICE HEAD") &&
+                            role === "SERVICE HEAD" ||
+                            role === "SERVICE SUPPORT") &&
                             record.status?.toUpperCase() !== "COMPLETED" && (
                               <button
                                 onClick={() => openStatusModal(record)}
