@@ -309,18 +309,12 @@ export default function MultiSparePurchaseLinkModal({
           remainingToDistributeStatements -= toApply;
         });
 
-        // Final remaining after this statement would be selected
-        const testRemainingAmount = Math.max(0, selectedNetAmount - (totalSimulatedPaid + totalPaymentAvailable));
-        
-        // Check if remaining is already 0
-        if (remainingAmount <= 0) {
-          toast.error(`Cannot select this statement! No remaining amount available.`);
-          return prev;
-        }
-        
-        // Check if statement amount is greater than current remaining amount (with small tolerance for floating point)
+        // Get statement amount
         const statementAmount = Number(statement.amount || 0);
         const tolerance = 0.01;
+        
+        // Check if statement amount is greater than the current remaining amount
+        // remainingAmount is calculated from useMemo and shown in the summary
         if (statementAmount > remainingAmount + tolerance) {
           toast.error(`Cannot select this statement! Statement amount ₹${statementAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} exceeds remaining ₹${remainingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
           return prev;
