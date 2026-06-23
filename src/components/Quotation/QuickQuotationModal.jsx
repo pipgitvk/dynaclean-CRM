@@ -18,7 +18,7 @@ export default function QuickQuotationModal({ isOpen, onClose, onSuccess, initia
     setError("");
 
     try {
-      // Verify customer exists
+      // Verify customer exists in database
       const verifyRes = await fetch("/api/customer-by-id", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -28,11 +28,12 @@ export default function QuickQuotationModal({ isOpen, onClose, onSuccess, initia
       const verifyData = await verifyRes.json();
 
       if (!verifyData.success) {
-        setError("Customer not found. You can still create a quotation by entering the ID.");
-        // Allow user to proceed even if customer doesn't exist
+        setError("Customer not found in system. Please enter a valid customer ID.");
+        toast.error("Customer not found");
+        return;
       }
 
-      // Redirect to quotation creation page with customer ID
+      // Customer exists - redirect to quotation creation page with customer ID
       window.location.href = `/user-dashboard/quotations/new?customerId=${encodeURIComponent(customerIdInput.trim())}`;
       
     } catch (err) {
@@ -53,7 +54,7 @@ export default function QuickQuotationModal({ isOpen, onClose, onSuccess, initia
           Create New Quotation
         </h2>
         <p className="text-sm text-gray-600 mb-6">
-          Enter the customer ID to create a new quotation. If the customer doesn't exist in the system, you can still proceed with their ID.
+          Enter the customer ID to create a quotation. The customer must exist in the system.
         </p>
 
         <div className="space-y-4">

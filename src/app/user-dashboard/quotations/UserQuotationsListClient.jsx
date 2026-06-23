@@ -4,7 +4,7 @@ import { useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 import QuickQuotationModal from "@/components/Quotation/QuickQuotationModal";
 
-export default function UserQuotationsListClient({ quotations, isServiceHead = false }) {
+export default function UserQuotationsListClient({ quotations, isServiceSupport = false }) {
   const [modalQuote, setModalQuote] = useState(null);
   const [showQuickModal, setShowQuickModal] = useState(false);
 
@@ -22,7 +22,7 @@ export default function UserQuotationsListClient({ quotations, isServiceHead = f
         onSuccess={() => setShowQuickModal(false)}
       />
 
-      {isServiceHead && (
+      {isServiceSupport && (
         <div className="mb-4 flex justify-end">
           <button
             onClick={() => setShowQuickModal(true)}

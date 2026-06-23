@@ -185,23 +185,10 @@ export default function QuotationForm() {
         setShowCustomerModal(false);
         toast.success("Customer data loaded successfully");
       } else {
-        // Customer not found - allow creation with provided customer ID
-        // All fields are editable since customer doesn't exist
-        setEditableFields({
-          company: true,
-          company_location: true,
-          gstin_no: true,
-          state_name: true,
-        });
-
-        setForm((prev) => ({
-          ...prev,
-          customer_id: id,
-        }));
-
-        setCustomerIdInput(id);
-        setShowCustomerModal(false);
-        toast.success("You can now create a quotation for this customer ID");
+        // Customer not found - show error and keep modal open
+        setShowCustomerModal(true);
+        setCustomerError("Customer not found in system. Please enter a valid customer ID.");
+        toast.error("Customer not found");
       }
     } catch (err) {
       setShowCustomerModal(true);
@@ -417,22 +404,8 @@ export default function QuotationForm() {
         toast.success("Customer data loaded successfully");
         setShowCustomerModal(false);
       } else {
-        // Customer not found - allow creation with provided customer ID
-        // All fields are editable since customer doesn't exist
-        setEditableFields({
-          company: true,
-          company_location: true,
-          gstin_no: true,
-          state_name: true,
-        });
-
-        setForm({
-          ...form,
-          customer_id: customerIdInput.trim(),
-        });
-
-        toast.success("You can now create a quotation for this customer ID");
-        setShowCustomerModal(false);
+        setCustomerError("Customer not found in system. Please enter a valid customer ID.");
+        toast.error("Customer not found");
       }
     } catch (error) {
       console.error("Error fetching customer:", error);
@@ -561,7 +534,7 @@ Thanks for doing business with us!`,
               Enter Customer ID
             </h2>
             <p className="text-sm text-gray-600 mb-6">
-              Enter the customer ID to create a quotation. If the customer doesn't exist in the system, you can still proceed with their ID.
+              Enter the customer ID to create a quotation. The customer must exist in the system.
             </p>
 
             <div className="space-y-4">

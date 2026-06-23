@@ -201,7 +201,7 @@ export default async function QuotationPage({ searchParams }) {
 
       <UserQuotationsListClient 
         quotations={quotations}
-        isServiceHead={role === "SERVICE HEAD"}
+        isServiceSupport={role === "SERVICE SUPPORT"}
       />
     </div>
   );
