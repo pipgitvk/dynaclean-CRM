@@ -8,6 +8,8 @@ import EditModal from "./modals/EditModal";
 import AssignModal from "./modals/AssignModal";
 import ReceiptModal from "./modals/ReceiptModal";
 import SubmitReportModal from "./SubmitReportModal";
+import LinkStatementModal from "./modals/LinkStatementModal";
+import BulkLinkStatementModal from "./modals/BulkLinkStatementModal";
 
 export default function AssetsTable() {
   const [assets, setAssets] = useState([]);
@@ -20,6 +22,9 @@ export default function AssetsTable() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "asset_id", direction: "asc" });
+  const [showLinkStatementModal, setShowLinkStatementModal] = useState(false);
+  const [selectedAssetIds, setSelectedAssetIds] = useState(new Set());
+  const [showBulkLinkModal, setShowBulkLinkModal] = useState(false);
 
   const handleSort = (key) => {
     setSortConfig((prev) => {
@@ -80,6 +85,86 @@ export default function AssetsTable() {
       default:
         return null;
     }
+  };
+
+  const openLinkStatementModal = (asset) => {
+    setSelectedAsset(asset);
+    setShowLinkStatementModal(true);
+  };
+
+  const handleStatementLinked = () => {
+    // Refresh assets data after linking statement
+    fetchAssets();
+  };
+
+  const toggleAssetSelection = (assetId) => {
+    setSelectedAssetIds((prev) => {
+      const next = new Set(prev);
+      const clickedAsset = assets.find(a => a.asset_id === assetId);
+      
+      if (next.has(assetId)) {
+        // Deselecting
+        next.delete(assetId);
+      } else {
+        // Selecting
+        next.add(assetId);
+        
+        // Check if this asset has linked statements
+        if (clickedAsset?.linked_trans_id) {
+          // Get all assets with same linked_trans_id
+          const linkedAssetIds = assets
+            .filter(a => a.linked_trans_id === clickedAsset.linked_trans_id)
+            .map(a => a.asset_id);
+          
+          // Find parent (highest purchase_price)
+          const linkedAssets = assets.filter(a => linkedAssetIds.includes(a.asset_id));
+          const parentAsset = linkedAssets.reduce((max, current) => 
+            Number(current.purchase_price || 0) > Number(max.purchase_price || 0) ? current : max
+          );
+          
+          // Auto-select parent if not already selected
+          if (!next.has(parentAsset.asset_id)) {
+            next.add(parentAsset.asset_id);
+          }
+          
+          // Auto-select all siblings (other assets with same linked statements)
+          linkedAssetIds.forEach(id => next.add(id));
+        }
+      }
+      
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedAssetIds.size === sortedAssets.length) {
+      setSelectedAssetIds(new Set());
+    } else {
+      const allIds = new Set();
+      sortedAssets.forEach((asset) => {
+        allIds.add(asset.asset_id);
+        
+        // If asset has linked statements, auto-add siblings
+        if (asset.linked_trans_id) {
+          const siblings = sortedAssets.filter(a => a.linked_trans_id === asset.linked_trans_id);
+          siblings.forEach(sibling => allIds.add(sibling.asset_id));
+        }
+      });
+      setSelectedAssetIds(allIds);
+    }
+  };
+
+  const getSelectedAssets = () => {
+    return assets.filter((a) => selectedAssetIds.has(a.asset_id));
+  };
+
+  const getTotalSelectedPrice = () => {
+    return getSelectedAssets().reduce((sum, a) => sum + Number(a.purchase_price || 0), 0);
+  };
+
+  const handleBulkLinkSuccess = () => {
+    fetchAssets();
+    setSelectedAssetIds(new Set());
   };
 
   if (loading)
@@ -152,11 +237,44 @@ export default function AssetsTable() {
         </div>
         </div>
       </div>
+
+      {/* Bulk Actions Toolbar */}
+      {selectedAssetIds.size > 0 && (
+        <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200 flex items-center justify-between">
+          <div className="text-sm font-medium text-gray-700">
+            <span className="font-bold text-blue-600">{selectedAssetIds.size}</span> asset(s) selected • Total: <span className="font-bold text-blue-600">₹{getTotalSelectedPrice().toLocaleString()}</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkLinkModal(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm"
+            >
+              Link Payment to Selected Assets
+            </button>
+            <button
+              onClick={() => setSelectedAssetIds(new Set())}
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-medium text-sm"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow-lg overflow-hidden max-h-[80vh] overflow-y-auto">
         <div className="hidden lg:block overflow-x-auto">
           <table className="min-w-full leading-normal" style={{ minWidth: '1200px' }}>
             <thead>
               <tr className="bg-gray-100 text-gray-600 uppercase text-sm">
+                <th className="py-3 px-4 text-center w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedAssetIds.size === sortedAssets.length && sortedAssets.length > 0}
+                    indeterminate={selectedAssetIds.size > 0 && selectedAssetIds.size < sortedAssets.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                  />
+                </th>
                 <th className="py-3 px-6 text-left cursor-pointer w-24" onClick={() => handleSort('asset_id')}>Asset ID {sortConfig.key==='asset_id' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
                 <th className="py-3 px-6 text-left cursor-pointer w-28" onClick={() => handleSort('asset_category')}>Category {sortConfig.key==='asset_category' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
                 <th className="py-3 px-6 text-left cursor-pointer w-40" onClick={() => handleSort('asset_name')}>Asset Name {sortConfig.key==='asset_name' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
@@ -166,6 +284,7 @@ export default function AssetsTable() {
                 <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('purchase_date')}>Purchase Date {sortConfig.key==='purchase_date' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
                 <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('Assigned_to')}>Assigned To {sortConfig.key==='Assigned_to' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
                 <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('Assigned_Date')}>Assigned Date {sortConfig.key==='Assigned_Date' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+                <th className="py-3 px-6 text-left w-32">Linked Trans ID</th>
                 <th className="py-3 px-6 text-left w-28">Receipt</th>
                 <th className="py-3 px-6 text-center w-40">Actions</th>
               </tr>
@@ -174,8 +293,16 @@ export default function AssetsTable() {
               {sortedAssets.map((asset) => (
                 <tr
                   key={asset.asset_id}
-                  className="border-b border-gray-200 hover:bg-gray-50"
+                  className={`border-b border-gray-200 hover:bg-gray-50 ${selectedAssetIds.has(asset.asset_id) ? 'bg-blue-50' : ''}`}
                 >
+                  <td className="py-3 px-4 text-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedAssetIds.has(asset.asset_id)}
+                      onChange={() => toggleAssetSelection(asset.asset_id)}
+                      className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                    />
+                  </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {asset.asset_id}
                   </td>
@@ -202,6 +329,19 @@ export default function AssetsTable() {
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {asset.Assigned_Date ? new Date(asset.Assigned_Date).toLocaleDateString() : "N/A"}
+                  </td>
+                  <td className="py-3 px-6 whitespace-nowrap">
+                    {asset.linked_trans_id ? (
+                      <div className="flex flex-wrap gap-1">
+                        {asset.linked_trans_id.split(', ').map((transId, idx) => (
+                          <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-mono rounded">
+                            {transId}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {asset.current_status === 'Assigned' ? (
@@ -254,6 +394,18 @@ export default function AssetsTable() {
                         Assign
                       </button>
                     )}
+                    <button
+                      onClick={() => openLinkStatementModal(asset)}
+                      disabled={!!asset.linked_trans_id}
+                      className={`mx-1 ${
+                        asset.linked_trans_id
+                          ? "text-gray-400 cursor-not-allowed"
+                          : "text-purple-600 hover:text-purple-900"
+                      }`}
+                      title={asset.linked_trans_id ? "Cannot link individual asset with parent-child relationship" : "Link Statement"}
+                    >
+                      Link Statement
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -328,30 +480,42 @@ export default function AssetsTable() {
                   "--"
                 )}
               </p>
-              <div className="mt-4 flex justify-between space-x-2">
+              <div className="mt-4 flex justify-between space-x-2 flex-wrap gap-2">
                 <button
                   onClick={() => openModal(asset, "view")}
-                  className="w-1/4 py-2 text-sm bg-gray-500 text-white rounded-md"
+                  className="flex-1 py-2 text-sm bg-gray-500 text-white rounded-md"
                 >
                   View
                 </button>
                 <button
                   onClick={() => openModal(asset, "edit")}
-                  className="w-1/4 py-2 text-sm bg-blue-500 text-white rounded-md"
+                  className="flex-1 py-2 text-sm bg-blue-500 text-white rounded-md"
                 >
                   Edit
+                </button>
+                <button
+                  onClick={() => openLinkStatementModal(asset)}
+                  disabled={!!asset.linked_trans_id}
+                  className={`flex-1 py-2 text-sm rounded-md ${
+                    asset.linked_trans_id
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-purple-500 text-white"
+                  }`}
+                  title={asset.linked_trans_id ? "Cannot link individual asset with parent-child relationship" : "Link Statement"}
+                >
+                  Link
                 </button>
                 {asset.Assigned_to && !asset.is_submit ? (
                   <button
                     onClick={() => openModal(asset, "submit")}
-                    className="w-1/2 py-2 text-sm bg-indigo-500 text-white rounded-md"
+                    className="w-full py-2 text-sm bg-indigo-500 text-white rounded-md"
                   >
                     Submit
                   </button>
                 ) : (
                   <button
                     onClick={() => openModal(asset, "assign")}
-                    className="w-1/2 py-2 text-sm bg-green-500 text-white rounded-md"
+                    className="w-full py-2 text-sm bg-green-500 text-white rounded-md"
                   >
                     Assign
                   </button>
@@ -364,6 +528,20 @@ export default function AssetsTable() {
       <Modal isOpen={isModalOpen} onClose={closeModal}>
         {renderModalContent()}
       </Modal>
+      <LinkStatementModal 
+        isOpen={showLinkStatementModal} 
+        onClose={() => setShowLinkStatementModal(false)}
+        asset={selectedAsset}
+        onLinked={handleStatementLinked}
+      />
+      <BulkLinkStatementModal
+        isOpen={showBulkLinkModal}
+        onClose={() => setShowBulkLinkModal(false)}
+        selectedAssets={getSelectedAssets()}
+        selectedAssetIds={selectedAssetIds}
+        totalSelectedPrice={getTotalSelectedPrice()}
+        onSuccess={handleBulkLinkSuccess}
+      />
     </div>
   );
 }

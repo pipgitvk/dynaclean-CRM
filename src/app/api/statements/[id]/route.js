@@ -349,6 +349,52 @@ export async function PATCH(req, { params }) {
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     
+    // Check if this is a linked_keys update (for assets)
+    const linkedKeysRaw = body?.linked_keys;
+    const linkedModuleType = body?.linked_module_type; // 'Assets', 'Invoice', etc
+    const linkedModuleId = body?.linked_module_id; // asset_id, invoice_id, etc
+    
+    if (linkedKeysRaw !== undefined || linkedModuleType !== undefined) {
+      const pool = await getDbConnection();
+      try {
+        await pool.execute("SELECT linked_keys FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await pool.execute("ALTER TABLE statements ADD COLUMN linked_keys TEXT NULL");
+        } catch (__) {}
+      }
+      try {
+        await pool.execute("SELECT linked_module_type FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await pool.execute("ALTER TABLE statements ADD COLUMN linked_module_type ENUM('Invoice', 'Purchases', 'DD', 'Expense', 'Assets') NULL");
+        } catch (__) {}
+      }
+      try {
+        await pool.execute("SELECT linked_module_id FROM statements LIMIT 1");
+      } catch (_) {
+        try {
+          await pool.execute("ALTER TABLE statements ADD COLUMN linked_module_id INT UNSIGNED NULL");
+        } catch (__) {}
+      }
+
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        await conn.execute(
+          "UPDATE statements SET linked_keys = ?, linked_module_type = ?, linked_module_id = ? WHERE id = ?",
+          [linkedKeysRaw || null, linkedModuleType || null, linkedModuleId || null, id]
+        );
+        await conn.commit();
+        return NextResponse.json({ success: true });
+      } catch (e) {
+        await conn.rollback();
+        throw e;
+      } finally {
+        conn.release();
+      }
+    }
+    
     // Check if this is a DD linking request
     const ddId = body?.dd_id;
     const invoiceStatus = body?.invoice_status;

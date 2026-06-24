@@ -141,6 +141,29 @@ export async function GET(request) {
   let conn = null;
   try {
     conn = await getDbConnection();
+    
+    // Ensure statement_asset_links table exists
+    try {
+      await conn.query("SELECT 1 FROM statement_asset_links LIMIT 1");
+    } catch (e) {
+      if (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146) {
+        try {
+          await conn.query(`
+            CREATE TABLE IF NOT EXISTS statement_asset_links (
+              id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+              statement_id INT UNSIGNED NOT NULL,
+              asset_id INT UNSIGNED NOT NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE KEY unique_statement_asset (statement_id, asset_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+          `);
+          console.log("✅ Created statement_asset_links table");
+        } catch (createError) {
+          console.error("Error creating statement_asset_links table:", createError);
+        }
+      }
+    }
+    
     const url = new URL(request.url);
     const statusFilter = url.searchParams.get('status'); // 'assigned' | 'available' | null
 
@@ -157,9 +180,12 @@ export async function GET(request) {
 
     let baseQuery = `
       SELECT a.*, la.Assigned_to, la.Assigned_by, la.Assigned_Date, la.is_submit, la.submit_date, la.receipt_path,
-             la.status AS current_status
+             la.status AS current_status, GROUP_CONCAT(DISTINCT s.trans_id SEPARATOR ', ') AS linked_trans_id
       FROM assets a
       LEFT JOIN (${latestAssignmentCte}) la ON la.asset_id = a.asset_id
+      LEFT JOIN statement_asset_links sal ON sal.asset_id = a.asset_id
+      LEFT JOIN statements s ON s.id = sal.statement_id
+      GROUP BY a.asset_id
     `;
 
     const whereClauses = [];

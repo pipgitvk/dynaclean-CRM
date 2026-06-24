@@ -19,6 +19,29 @@ export async function GET(req) {
     const currentExpenseId = searchParams.get("current_expense_id");
 
     const conn = await getDbConnection();
+    
+    // Ensure statement_asset_links table exists
+    try {
+      await conn.query("SELECT 1 FROM statement_asset_links LIMIT 1");
+    } catch (e) {
+      if (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146) {
+        try {
+          await conn.query(`
+            CREATE TABLE IF NOT EXISTS statement_asset_links (
+              id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+              statement_id INT UNSIGNED NOT NULL,
+              asset_id INT UNSIGNED NOT NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE KEY unique_statement_asset (statement_id, asset_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+          `);
+          console.log("✅ Created statement_asset_links table");
+        } catch (createError) {
+          console.error("Error creating statement_asset_links table:", createError);
+        }
+      }
+    }
+    
     try {
       await conn.execute("SELECT txn_posted_date FROM statements LIMIT 1");
     } catch (_) {
@@ -66,6 +89,20 @@ export async function GET(req) {
         await conn.execute("ALTER TABLE statements ADD COLUMN dd_id INT NULL");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT linked_module_type FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN linked_module_type ENUM('Invoice', 'Purchases', 'DD', 'Expense', 'Assets') NULL");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT linked_module_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN linked_module_id INT UNSIGNED NULL");
+      } catch (__) {}
+    }
 
     // Ensure expenses table has linked_statement_ids column
     try {
@@ -78,33 +115,41 @@ export async function GET(req) {
 
     if (expenseId) {
       [rows] = await conn.execute(
-        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, created_at
-         FROM statements
-         WHERE client_expense_id = ?
-         ORDER BY id DESC`,
+        `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.created_at,
+                GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
+         FROM statements s
+         LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
+         WHERE s.client_expense_id = ?
+         GROUP BY s.id
+         ORDER BY s.id DESC`,
         [expenseId]
       );
     } else if (status === "unsettled") {
-      let query = `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, created_at
-         FROM statements
-         WHERE (invoice_status IS NULL OR invoice_status = 'Unsettled' OR invoice_status = '')
-         AND (client_expense_id IS NULL`;
+      let query = `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.created_at,
+         GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
+         FROM statements s
+         LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
+         WHERE (s.invoice_status IS NULL OR s.invoice_status = 'Unsettled' OR s.invoice_status = '')
+         AND (s.client_expense_id IS NULL`;
       
       const params = [];
       if (currentExpenseId) {
-        query += ` OR client_expense_id = ?)`;
+        query += ` OR s.client_expense_id = ?)`;
         params.push(currentExpenseId);
       } else {
         query += `)`;
       }
       
-      query += ` ORDER BY date DESC, id DESC`;
+      query += ` GROUP BY s.id ORDER BY s.date DESC, s.id DESC`;
       [rows] = await conn.execute(query, params);
     } else {
       [rows] = await conn.execute(
-        `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, created_at
-         FROM statements
-         ORDER BY date DESC, id DESC`
+        `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.created_at,
+         GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
+         FROM statements s
+         LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
+         GROUP BY s.id
+         ORDER BY s.date DESC, s.id DESC`
       );
     }
 

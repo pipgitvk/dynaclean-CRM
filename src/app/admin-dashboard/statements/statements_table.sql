@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS statements (
   type ENUM('Credit', 'Debit') NOT NULL DEFAULT 'Credit',
   amount DECIMAL(15, 2) NOT NULL DEFAULT 0,
   client_expense_id INT UNSIGNED NULL,
+  linked_module_type ENUM('Invoice', 'Purchases', 'DD', 'Expense', 'Assets') NULL,
+  linked_module_id INT UNSIGNED NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

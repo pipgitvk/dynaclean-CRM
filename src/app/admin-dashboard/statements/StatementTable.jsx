@@ -126,6 +126,8 @@ export default function StatementTable({ rows }) {
     const inv = String(row?.invoice_status ?? "").trim();
     if (inv === "Settled") return true;
     if (row?.client_expense_id) return true;
+    if (row?.dd_id) return true;
+    if (row?.linked_module_id && row?.linked_module_type === 'Assets') return true;
     if (linked.length > 0) return true;
     return false;
   };
@@ -135,6 +137,8 @@ export default function StatementTable({ rows }) {
     const inv = row?.invoice_status != null ? String(row.invoice_status).trim() : "";
     if (linked.length > 0) return "Settled";
     if (row?.client_expense_id) return "Settled";
+    if (row?.dd_id) return "Settled";
+    if (row?.linked_module_id && row?.linked_module_type === 'Assets') return "Settled";
     if (inv) return inv;
     return "Unsettled";
   };
@@ -259,10 +263,12 @@ export default function StatementTable({ rows }) {
         const hasPurchases = getLinkedPurchaseRefs(row).length > 0;
         const hasDD = row.dd_id != null && String(row.dd_id).trim() !== "";
         const hasExpense = row.client_expense_id != null && String(row.client_expense_id).trim() !== "";
+        const hasAssets = row.linked_module_type === 'Assets' && row.linked_module_id != null;
         if (linkedTypeFilter === "Invoice" && !hasInvoice) return false;
         if (linkedTypeFilter === "Purchases" && !hasPurchases) return false;
         if (linkedTypeFilter === "DD" && !hasDD) return false;
         if (linkedTypeFilter === "Expense" && !hasExpense) return false;
+        if (linkedTypeFilter === "Assets" && !hasAssets) return false;
       }
 
       return true;
@@ -408,6 +414,13 @@ export default function StatementTable({ rows }) {
         getLinkedPurchaseRefs(row).map(x => `${x.prefix}${x.id}`).join(", ") || "-",
         row.dd_id ? `DD#${row.dd_id}` : "-",
         row.client_expense_id ? `EXP#${row.client_expense_id}` : "-",
+        row.linked_module_id && row.linked_module_type ? (
+          row.linked_module_type === 'Assets' ? `ASS#${row.linked_module_id}` :
+          row.linked_module_type === 'Invoice' ? `INV#${row.linked_module_id}` :
+          row.linked_module_type === 'Purchases' ? `PUR#${row.linked_module_id}` :
+          row.linked_module_type === 'DD' ? `DD#${row.linked_module_id}` :
+          row.linked_module_type === 'Expense' ? `EXP#${row.linked_module_id}` : "-"
+        ) : "-",
         formatPdfAmount(displayBalance(row)),
       ]),
       styles: { fontSize: 6 },
@@ -643,6 +656,7 @@ export default function StatementTable({ rows }) {
           <option value="Purchases">Purchases</option>
           <option value="DD">DD</option>
           <option value="Expense">Expense</option>
+          <option value="Assets">Assets</option>
         </select>
         <button
           onClick={handleReset}
@@ -802,8 +816,25 @@ export default function StatementTable({ rows }) {
                           </span>
                         </div>
                       )}
-                      {!row.invoice_number && !getLinkedPurchaseRefs(row).length && !row.dd_id && !row.client_expense_id && (
+                      {!row.invoice_number && !getLinkedPurchaseRefs(row).length && !row.dd_id && !row.client_expense_id && !row.linked_module_id && (
                         <span className="text-gray-300 text-xs">—</span>
+                      )}
+                      {row.linked_module_id && row.linked_module_type && (
+                        <div>
+                          <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
+                            row.linked_module_type === 'Assets' ? 'bg-indigo-100 text-indigo-700' :
+                            row.linked_module_type === 'Invoice' ? 'bg-blue-100 text-blue-700' :
+                            row.linked_module_type === 'Purchases' ? 'bg-green-100 text-green-700' :
+                            row.linked_module_type === 'DD' ? 'bg-purple-100 text-purple-700' :
+                            row.linked_module_type === 'Expense' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {row.linked_module_type === 'Assets' ? `ASS${row.linked_module_id}` :
+                             row.linked_module_type === 'Invoice' ? `INV${row.linked_module_id}` :
+                             row.linked_module_type === 'Purchases' ? `PUR${row.linked_module_id}` :
+                             row.linked_module_type === 'DD' ? `DD${row.linked_module_id}` :
+                             row.linked_module_type === 'Expense' ? `EXP${row.linked_module_id}` : `${row.linked_module_type}${row.linked_module_id}`}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </td>
@@ -885,36 +916,53 @@ export default function StatementTable({ rows }) {
               )}
             </div>
             <div>
-              <strong>Invoice No:</strong>{" "}
-              {row.invoice_number ? (
-                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
-                  {row.invoice_number}
-                </span>
-              ) : (
-                <span className="text-gray-400">—</span>
-              )}
-            </div>
-            <div>
-              <strong>Purchase IDs:</strong>{" "}
-              {(() => {
-                const refs = getLinkedPurchaseRefs(row);
-                if (!refs.length) return <span className="text-gray-400">—</span>;
-                return (
-                  <span className="text-xs font-mono text-slate-700">
-                    {refs.map((x) => `#${x.prefix}${x.id}`).join(", ")}
+              <strong>Linked Modules:</strong>{" "}
+              <div className="space-y-1 mt-1">
+                {row.invoice_number && (
+                  <span className="block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded w-fit">
+                    INV{row.invoice_number}
                   </span>
-                );
-              })()}
-            </div>
-            <div>
-              <strong>Expense ID:</strong>{" "}
-              {row.client_expense_id ? (
-                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">
-                  EXP#{row.client_expense_id}
-                </span>
-              ) : (
-                <span className="text-gray-400">—</span>
-              )}
+                )}
+                {(() => {
+                  const refs = getLinkedPurchaseRefs(row);
+                  if (refs.length > 0) {
+                    return (
+                      <span className="block text-xs font-mono text-slate-700">
+                        {refs.map((x) => `P${x.id}`).join(", ")}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+                {row.dd_id && (
+                  <span className="block px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold rounded w-fit">
+                    DD{row.dd_id}
+                  </span>
+                )}
+                {row.client_expense_id && (
+                  <span className="block px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded w-fit">
+                    EXP#{row.client_expense_id}
+                  </span>
+                )}
+                {row.linked_module_id && row.linked_module_type && (
+                  <span className={`block px-2 py-0.5 rounded text-xs font-bold w-fit ${
+                    row.linked_module_type === 'Assets' ? 'bg-indigo-100 text-indigo-700' :
+                    row.linked_module_type === 'Invoice' ? 'bg-blue-100 text-blue-700' :
+                    row.linked_module_type === 'Purchases' ? 'bg-green-100 text-green-700' :
+                    row.linked_module_type === 'DD' ? 'bg-purple-100 text-purple-700' :
+                    row.linked_module_type === 'Expense' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {row.linked_module_type === 'Assets' ? `ASS${row.linked_module_id}` :
+                     row.linked_module_type === 'Invoice' ? `INV${row.linked_module_id}` :
+                     row.linked_module_type === 'Purchases' ? `PUR${row.linked_module_id}` :
+                     row.linked_module_type === 'DD' ? `DD${row.linked_module_id}` :
+                     row.linked_module_type === 'Expense' ? `EXP${row.linked_module_id}` : `${row.linked_module_type}${row.linked_module_id}`}
+                  </span>
+                )}
+                {!row.invoice_number && !getLinkedPurchaseRefs(row).length && !row.dd_id && !row.client_expense_id && !row.linked_module_id && (
+                  <span className="text-gray-400">—</span>
+                )}
+              </div>
             </div>
             <div>
               <strong>Balance:</strong>{" "}

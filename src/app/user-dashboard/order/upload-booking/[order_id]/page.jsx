@@ -9,7 +9,7 @@ export default async function UploadBookingPage({ params }) {
   const conn = await getDbConnection();
 
   const [rows] = await conn.execute(
-    `SELECT order_id, client_name, contact, email, delivery_location, quote_number, client_delivery_date FROM neworder WHERE order_id = ?`,
+    `SELECT order_id, client_name, contact, email, delivery_location, quote_number, client_delivery_date, totalamt FROM neworder WHERE order_id = ?`,
     [orderId],
   );
 

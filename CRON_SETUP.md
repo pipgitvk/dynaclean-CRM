@@ -113,8 +113,55 @@ curl -s "https://app.dynacleanindustries.com/api/meta-backfill?mode=all&autoImpo
 
 ---
 
-## Verify
+## 3. Delivery Email Cron – Automatic delivery reminders (daily)
 
-1. **Test Cron Now** button — meta-backfill page par "Automatic Cron" section me click karo
-2. Hostinger / cron-job.org par **Last run** check karo
-3. Agar fail ho to Error logs / response check karo
+Har roz expected delivery date ke din customers ko automatic email jayega (sirf COD orders par).
+
+### Cron URL
+
+```
+https://app.dynacleanindustries.com/api/cron/delivery-email
+```
+
+Agar CRON_SECRET .env me set hai: `https://app.dynacleanindustries.com/api/cron/delivery-email?secret=YOUR_SECRET`
+
+### Schedule: Daily (any time, e.g., 8am)
+
+**Option 1: Vercel**
+```
+vercel.json me already configured hai
+```
+
+**Option 2: Hostinger VPS (crontab)**
+```bash
+crontab -e
+```
+Add:
+```
+0 8 * * * curl -s "https://app.dynacleanindustries.com/api/cron/delivery-email?secret=YOUR_CRON_SECRET"
+```
+
+**Option 3: Hostinger Shared (hPanel)**
+- **Advanced** → **Cron Jobs**
+- Schedule: `0 8 * * *` (daily 8am)
+- Command: `curl -s "https://app.dynacleanindustries.com/api/cron/delivery-email?secret=YOUR_SECRET"`
+
+**Option 4: cron-job.org**
+1. https://cron-job.org → **Create Cronjob**
+2. URL: `https://app.dynacleanindustries.com/api/cron/delivery-email`
+3. Schedule: **Daily** (any time)
+4. Add query param: `?secret=YOUR_CRON_SECRET` (if CRON_SECRET set)
+
+### Kya Email Mein Jayega:
+- Order ID
+- Delivery Date (Today)
+- Pending Amount (COD)
+- "Ready for Delivery" checklist
+- Contact information
+
+### Notes:
+- Email sirf COD orders (payment_term_days = 9) par jayegi
+- Sirf un orders ke liye email jayega jinke `booking_id` set hai (booking already uploaded)
+- Email address valid hona chahiye
+
+---

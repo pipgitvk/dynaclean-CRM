@@ -837,6 +837,13 @@ const allMenuItems = [
       },
     ],
   },
+  {
+    path: "/admin-dashboard/email-templates",
+    name: "Email Templates",
+    moduleKey: "email-templates",
+    roles: ["SUPERADMIN"],
+    icon: "Mail",
+  },
 ];
 
 function filterMenuItemsByRole(items, roleKeyNormalized) {

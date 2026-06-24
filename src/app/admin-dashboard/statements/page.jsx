@@ -68,8 +68,22 @@ export default async function StatementsPage() {
         await conn.execute("ALTER TABLE statements ADD COLUMN dd_id INT NULL");
       } catch (__) {}
     }
+    try {
+      await conn.execute("SELECT linked_module_type FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN linked_module_type ENUM('Invoice', 'Purchases', 'DD', 'Expense', 'Assets') NULL");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT linked_module_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN linked_module_id INT UNSIGNED NULL");
+      } catch (__) {}
+    }
     const [result] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, linked_module_type, linked_module_id, created_at
        FROM statements
        ORDER BY date DESC, id DESC`
     );

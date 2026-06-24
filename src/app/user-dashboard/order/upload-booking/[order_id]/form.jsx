@@ -15,6 +15,7 @@ export default function UploadBookingForm({ order }) {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,6 +25,7 @@ export default function UploadBookingForm({ order }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
     setLoading(true);
     const res = await fetch("/api/orders/upload-booking", {
@@ -42,7 +44,10 @@ export default function UploadBookingForm({ order }) {
 
     setLoading(false);
     if (res.ok) {
-      router.push("/user-dashboard/order");
+      setSuccess("✅ Booking uploaded successfully! Email sent to customer.");
+      setTimeout(() => {
+        router.push("/user-dashboard/order");
+      }, 2000);
     } else {
       const { error } = await res.json();
       setError(error || "Failed to upload booking.");
@@ -137,7 +142,13 @@ export default function UploadBookingForm({ order }) {
           rows={3}
         />
 
-        {error && <p className="text-red-600">{error}</p>}
+        {error && <p className="text-red-600 font-bold">{error}</p>}
+
+        {success && (
+          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md font-bold">
+            {success}
+          </div>
+        )}
 
         <button
           type="submit"

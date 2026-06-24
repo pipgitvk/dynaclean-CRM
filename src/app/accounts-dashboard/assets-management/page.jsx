@@ -3,10 +3,12 @@
 import { useState } from "react";
 import AssetFormPage from "@/components/assets/addAssets";
 import AssetsTable from "@/components/assets/AssetsTable";
+import UnsettledStatementsModal from "@/components/assets/UnsettledStatementsModal";
 import Link from "next/link";
 
 export default function Assets() {
   const [showForm, setShowForm] = useState(false);
+  const [showStatementsModal, setShowStatementsModal] = useState(false);
 
   const handleToggle = () => {
     setShowForm((prev) => !prev);
@@ -27,6 +29,13 @@ export default function Assets() {
               {showForm ? "Hide Form" : "+ Add New Asset"}
             </button>
 
+            <button
+              onClick={() => setShowStatementsModal(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition w-full sm:w-auto"
+            >
+              Actions
+            </button>
+
             <Link
               href="/user-dashboard/assets-management/assignments"
               className="px-6 py-3 bg-blue-500 text-white rounded-md font-semibold hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition w-full sm:w-auto"
@@ -40,6 +49,11 @@ export default function Assets() {
       </div>
 
       <AssetsTable />
+
+      <UnsettledStatementsModal 
+        isOpen={showStatementsModal}
+        onClose={() => setShowStatementsModal(false)}
+      />
     </>
   );
 }
