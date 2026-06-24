@@ -4,7 +4,5 @@ CREATE TABLE IF NOT EXISTS statement_asset_links (
   statement_id INT UNSIGNED NOT NULL,
   asset_id INT UNSIGNED NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_statement_asset (statement_id, asset_id),
-  FOREIGN KEY (statement_id) REFERENCES statements(id) ON DELETE CASCADE,
-  FOREIGN KEY (asset_id) REFERENCES assets(asset_id) ON DELETE CASCADE
+  UNIQUE KEY unique_statement_asset (statement_id, asset_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
