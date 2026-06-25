@@ -88,16 +88,17 @@ export async function middleware(request) {
         }
       }
 
+      // Allow accountants to access accounts-dashboard (all routes)
+      if (pathname.startsWith("/accounts-dashboard")) {
+        if (isJwtAccountingRole(role)) {
+          return NextResponse.next();
+        }
+        // If accountant role not found, fall through to generic checks
+      }
+
       // Prospects module is used by SALES roles too.
       if (pathname.startsWith("/admin-dashboard/prospects")) {
         if (["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"].includes(role) || roleNorm === "DIRECTOR") {
-          return NextResponse.next();
-        }
-      }
-
-      // Allow accountants to access invoices module
-      if (pathname.startsWith("/accounts-dashboard")) {
-        if (isJwtAccountingRole(role)) {
           return NextResponse.next();
         }
       }

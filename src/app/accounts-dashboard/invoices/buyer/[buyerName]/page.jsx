@@ -36,12 +36,15 @@ export default async function BuyerInvoicesPage({ params }) {
 
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
-  if (!token) return <p className="text-red-600 p-4">Unauthorized</p>;
+  if (!token) {
+    return <p className="text-red-600 p-4">Unauthorized - No token found</p>;
+  }
 
   try {
     await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
-  } catch {
-    return <p className="text-red-600 p-4">Invalid Token</p>;
+  } catch (err) {
+    console.error("[buyer page] Token verification failed:", err);
+    return <p className="text-red-600 p-4">Invalid Token - {err?.message}</p>;
   }
 
   let invoices = [];
