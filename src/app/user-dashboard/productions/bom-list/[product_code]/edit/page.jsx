@@ -7,6 +7,9 @@ export default function EditBomPage() {
   const { product_code } = useParams();
   const router = useRouter();
 
+  // Decode the product_code from URL params
+  const decodedProductCode = decodeURIComponent(product_code);
+
   const [product, setProduct] = useState(null);
   const [items, setItems] = useState([]);
   const [spareQuery, setSpareQuery] = useState("");
@@ -19,7 +22,7 @@ export default function EditBomPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/productions/bom/get?product_code=${encodeURIComponent(product_code)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/productions/bom/get?product_code=${encodeURIComponent(decodedProductCode)}`, { cache: 'no-store' });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || 'Failed to load BOM');
         const items = Array.isArray(data.items) ? data.items : [];
@@ -35,7 +38,7 @@ export default function EditBomPage() {
         setLoading(false);
       }
     })();
-  }, [product_code]);
+  }, [decodedProductCode]);
 
   // Search spares (to add new ones in edit mode)
   useEffect(() => {
