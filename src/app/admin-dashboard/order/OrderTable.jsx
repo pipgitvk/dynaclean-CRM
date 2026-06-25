@@ -410,6 +410,20 @@ export default function OrderTable({ orders, userRole }) {
     );
   }, [filteredOrders]);
 
+  const filteredAmountTotals = useMemo(() => {
+    if (!filteredOrders?.length) return { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 };
+    return filteredOrders.reduce(
+      (acc, o) => {
+        acc.totalAmount += getTotalAmount(o);
+        acc.paidAmount += getTotalPaidAmount(o);
+        acc.taxableAmount += getPaymentColumnAmount(o);
+        acc.balanceAmount += getBalanceAmount(o);
+        return acc;
+      },
+      { totalAmount: 0, paidAmount: 0, taxableAmount: 0, balanceAmount: 0 }
+    );
+  }, [filteredOrders]);
+
   const getStatusText = (order) => {
     if (order.approval_status === "pending") {
       return {
@@ -552,8 +566,81 @@ export default function OrderTable({ orders, userRole }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {/* Combined Amount Summary Card */}
+        <div className={`w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}>
+          <div className="flex items-start justify-between">
+            <div className="w-full">
+              <p className="text-xs text-emerald-700 mb-0.5 font-semibold uppercase tracking-wide">
+                Amount Summary
+              </p>
+              <p className="text-[10px] text-emerald-600/90 mb-2 leading-tight">
+                All orders overview
+              </p>
+              
+              {/* Total Amount */}
+              <div className="mb-2 pb-2 border-b border-emerald-100">
+                <p className="text-[10px] text-emerald-600 font-medium">Total Amount</p>
+                <p className="text-lg font-bold text-emerald-950 tabular-nums">
+                  ₹{filteredAmountTotals.totalAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+
+              {/* Paid Amount */}
+              <div>
+                <p className="text-[10px] text-blue-600 font-medium">Paid Amount</p>
+                <p className="text-lg font-bold text-blue-700 tabular-nums">
+                  ₹{filteredAmountTotals.paidAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Combined Balance & Taxable Amount Card */}
+        <div className={`w-full rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}>
+          <div className="flex items-start justify-between">
+            <div className="w-full">
+              <p className="text-xs text-purple-700 mb-0.5 font-semibold uppercase tracking-wide">
+                Balance & Taxable
+              </p>
+              <p className="text-[10px] text-purple-600/90 mb-2 leading-tight">
+                Summary details
+              </p>
+
+              {/* Balance Amount */}
+              <div className="mb-2 pb-2 border-b border-purple-100">
+                <p className="text-[10px] text-orange-600 font-medium">Balance Amount</p>
+                <p className="text-lg font-bold text-orange-700 tabular-nums">
+                  ₹{filteredAmountTotals.balanceAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+
+              {/* Taxable Amount */}
+              <div>
+                <p className="text-[10px] text-purple-600 font-medium">Taxable Amount</p>
+                <p className="text-lg font-bold text-purple-950 tabular-nums">
+                  ₹{filteredAmountTotals.taxableAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Original Taxable Card - COMMENTED OUT */}
+        {/* <div
           onClick={() => {
             if (userRole !== "SUPERADMIN") return;
             const next = taxableClickCount + 1;
@@ -568,7 +655,7 @@ export default function OrderTable({ orders, userRole }) {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs text-violet-700 mb-0.5 font-semibold uppercase tracking-wide">
-                Taxable
+                Dispatch Taxable
               </p>
               <p className="text-[10px] text-violet-600/90 mb-1 leading-tight">
                 Total amount without GST
@@ -584,18 +671,19 @@ export default function OrderTable({ orders, userRole }) {
           </div>
         </div>
 
-        <div
-          className={`w-full rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}
+        {/* Original Filtered Taxable Card - COMMENTED OUT */}
+        {/* <div
+          className={`w-full rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white shadow-sm p-3 sm:p-4 cursor-default hover:shadow-md transition-shadow`}
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs text-blue-700 mb-0.5 font-semibold uppercase tracking-wide">
+              <p className="text-xs text-indigo-700 mb-0.5 font-semibold uppercase tracking-wide">
                 Filtered Taxable
               </p>
-              <p className="text-[10px] text-blue-600/90 mb-1 leading-tight">
+              <p className="text-[10px] text-indigo-600/90 mb-1 leading-tight">
                 {createdByFilter ? `By ${createdByFilter}` : "All Users"}
               </p>
-              <p className="text-xl sm:text-2xl font-bold text-blue-950 tabular-nums">
+              <p className="text-xl sm:text-2xl font-bold text-indigo-950 tabular-nums">
                 ₹
                 {filteredTaxableTotals.taxableTotal.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
@@ -604,7 +692,7 @@ export default function OrderTable({ orders, userRole }) {
               </p>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* 🔍 Search and Quick Status Filter */}
@@ -792,7 +880,7 @@ export default function OrderTable({ orders, userRole }) {
                 onClick={() => handleSort("payment_status")}
               >
                 <div className="flex items-center gap-1 justify-center">
-                  Payment
+                  Taxable
                   {sortColumn === "payment_status" && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
