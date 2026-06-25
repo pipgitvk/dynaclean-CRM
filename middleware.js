@@ -75,6 +75,7 @@ export async function middleware(request) {
       const role = payload.role;
       const isImpersonated = payload.impersonated;
       const roleKey = normalizeRoleKey(role || "");
+      const roleNorm = String(role ?? "").trim().toUpperCase();
 
       // Same roles as getAdminSidebarMenuItems "Attendance rules" — must not block here,
       // otherwise ADMIN/HR see the link but middleware sends them to /user-dashboard.
@@ -90,6 +91,13 @@ export async function middleware(request) {
       // Prospects module is used by SALES roles too.
       if (pathname.startsWith("/admin-dashboard/prospects")) {
         if (["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"].includes(role) || roleNorm === "DIRECTOR") {
+          return NextResponse.next();
+        }
+      }
+
+      // Allow accountants to access invoices module
+      if (pathname.startsWith("/accounts-dashboard")) {
+        if (isJwtAccountingRole(role)) {
           return NextResponse.next();
         }
       }
