@@ -6,7 +6,8 @@ export async function POST(request, { params }) {
 
   try {
     const { assetId } = await request.json();
-    const stmtId = Number(params.id);
+    const resolvedParams = await params;
+    const stmtId = Number(resolvedParams.id);
 
     if (!assetId) {
       return new Response(
@@ -17,7 +18,7 @@ export async function POST(request, { params }) {
 
     if (isNaN(stmtId) || stmtId <= 0) {
       return new Response(
-        JSON.stringify({ error: "Invalid statement ID" }),
+        JSON.stringify({ error: "Invalid statement ID", received: resolvedParams.id, parsed: stmtId }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }

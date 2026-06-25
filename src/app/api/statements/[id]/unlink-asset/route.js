@@ -6,7 +6,8 @@ export async function DELETE(request, { params }) {
 
   try {
     const { assetId } = await request.json();
-    const stmtId = Number(params.id);
+    const resolvedParams = await params;
+    const stmtId = Number(resolvedParams.id);
 
     if (!assetId) {
       return new Response(
