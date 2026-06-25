@@ -885,14 +885,12 @@ export default function OrderTable({ orders, userRole }) {
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-center gap-1">
-                        {r.approval_status === "approved" && (
-                          <div className="font-semibold text-sm">
-                            ₹{amountWithoutGst(r).toLocaleString("en-IN", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </div>
-                        )}
+                        <div className="font-semibold text-sm">
+                          ₹{amountWithoutGst(r).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </div>
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${pay.cls}`}
                         >
