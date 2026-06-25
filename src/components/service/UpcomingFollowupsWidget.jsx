@@ -8,36 +8,42 @@ export default async function UpcomingFollowupsWidget({ username, userRole }) {
   const role = (userRole || "").toUpperCase();
   const canViewAll = role === "SERVICE HEAD" || role === "SUPERADMIN" || role === "DIRECTOR";
 
-  let rows;
+  let rows = [];
 
-  if (canViewAll) {
-    [rows] = await connection.execute(
-      `SELECT mf.*
-       FROM machines_followup mf
-       INNER JOIN (
-         SELECT serial_number, MAX(id) AS max_id
-         FROM machines_followup
-         GROUP BY serial_number
-       ) latest ON mf.serial_number = latest.serial_number AND mf.id = latest.max_id
-       WHERE mf.next_followup_date > NOW()
-       ORDER BY mf.next_followup_date ASC
-       LIMIT 60`
-    );
-  } else {
-    [rows] = await connection.execute(
-      `SELECT mf.*
-       FROM machines_followup mf
-       INNER JOIN (
-         SELECT serial_number, MAX(id) AS max_id
-         FROM machines_followup
-         WHERE added_by = ?
-         GROUP BY serial_number
-       ) latest ON mf.serial_number = latest.serial_number AND mf.id = latest.max_id
-       WHERE mf.next_followup_date > NOW()
-       ORDER BY mf.next_followup_date ASC
-       LIMIT 60`,
-      [username]
-    );
+  try {
+    if (canViewAll) {
+      [rows] = await connection.execute(
+        `SELECT mf.*
+         FROM machines_followup mf
+         INNER JOIN (
+           SELECT serial_number, MAX(id) AS max_id
+           FROM machines_followup
+           GROUP BY serial_number
+         ) latest ON mf.serial_number = latest.serial_number AND mf.id = latest.max_id
+         WHERE mf.next_followup_date > NOW()
+         ORDER BY mf.next_followup_date ASC
+         LIMIT 60`
+      );
+    } else {
+      [rows] = await connection.execute(
+        `SELECT mf.*
+         FROM machines_followup mf
+         INNER JOIN (
+           SELECT serial_number, MAX(id) AS max_id
+           FROM machines_followup
+           WHERE added_by = ?
+           GROUP BY serial_number
+         ) latest ON mf.serial_number = latest.serial_number AND mf.id = latest.max_id
+         WHERE mf.next_followup_date > NOW()
+         ORDER BY mf.next_followup_date ASC
+         LIMIT 60`,
+        [username]
+      );
+    }
+  } catch (error) {
+    console.error("Error fetching upcoming followups:", error);
+    // Return empty data if table doesn't exist
+    rows = [];
   }
 
   // Convert Date objects to ISO strings to make them serializable

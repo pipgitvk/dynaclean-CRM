@@ -16,6 +16,8 @@ export async function GET(req) {
         no.id,
         no.order_id,
         no.quote_number,
+        no.invoice_number,
+        GROUP_CONCAT(DISTINCT d.serial_no SEPARATOR ', ') AS serial_number,
         GROUP_CONCAT(DISTINCT d.item_code SEPARATOR ', ') AS model,
         GROUP_CONCAT(DISTINCT d.item_name SEPARATOR ', ') AS name,
         no.delivery_location AS delivery_address,

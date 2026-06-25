@@ -77,6 +77,25 @@ function amountWithoutGst(order) {
   return Math.max(0, total - tax);
 }
 
+/** Calculate total paid amount from comma-separated payment amounts */
+function getTotalPaidAmount(order) {
+  const paymentAmount = (order.payment_amount || "")
+    .toString()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((x) => Number(x))
+    .filter((n) => !isNaN(n));
+  return paymentAmount.reduce((sum, n) => sum + n, 0);
+}
+
+/** Calculate balance amount (total - paid) */
+function getBalanceAmount(order) {
+  const total = Number(order.totalamt) || 0;
+  const paid = getTotalPaidAmount(order);
+  return Math.max(0, total - paid);
+}
+
 /** Sum of quotation line taxable (same as invoice “Taxable” column); fallback base/total−tax. */
 function orderTaxableTotal(order) {
   const t = order.order_taxable_total;
@@ -162,6 +181,10 @@ export default function OrderTable({ orders, userRole }) {
         return order.payment_status?.toString().toLowerCase() || "";
       case "totalamt":
         return Number(order.totalamt) || 0;
+      case "paid_amount":
+        return getTotalPaidAmount(order);
+      case "balance_amount":
+        return getBalanceAmount(order);
       case "approval_status":
         return order.approval_status?.toString().toLowerCase() || "";
       case "duedate":
@@ -209,7 +232,7 @@ export default function OrderTable({ orders, userRole }) {
         { header: "Approval Status", key: "approval_status", width: 15 },
         { header: "Taxable Amount", key: "baseAmount", width: 15 },
         { header: "Tax Amount", key: "taxamt", width: 15 },
-        { header: "Total Amount", key: "totalamt", width: 15 },
+        { header: "Amount Details", key: "amount_details", width: 35 },
       ];
 
       // Style the header row
@@ -222,6 +245,11 @@ export default function OrderTable({ orders, userRole }) {
 
       // Add data rows
       filteredOrders.forEach((order) => {
+        const totalAmt = Number(order.totalamt || 0);
+        const paidAmt = getTotalPaidAmount(order);
+        const balanceAmt = getBalanceAmount(order);
+        const amountDetails = `Total: ₹${totalAmt.toFixed(2)}\nPaid: ₹${paidAmt.toFixed(2)}\nBalance: ₹${balanceAmt.toFixed(2)}`;
+        
         worksheet.addRow({
           order_id: order.order_id,
           quote_number: order.quote_number || "",
@@ -239,7 +267,7 @@ export default function OrderTable({ orders, userRole }) {
           approval_status: order.approval_status || "",
           baseAmount: Number(order.baseAmount || 0),
           taxamt: Number(order.taxamt || 0),
-          totalamt: Number(order.totalamt || 0),
+          amount_details: amountDetails,
         });
       });
 
@@ -749,8 +777,8 @@ export default function OrderTable({ orders, userRole }) {
                 onClick={() => handleSort("totalamt")}
               >
                 <div className="flex items-center gap-1 justify-center">
-                  Total Amount
-                  {sortColumn === "totalamt" && (
+                  Amount Details
+                  {(sortColumn === "totalamt" || sortColumn === "paid_amount" || sortColumn === "balance_amount") && (
                     sortDirection === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />
                   )}
                 </div>
@@ -857,11 +885,34 @@ export default function OrderTable({ orders, userRole }) {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="font-semibold text-sm">
-                        ₹{Number(r.totalamt || 0).toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between gap-4">
+                          <span className="font-semibold text-gray-700">Total:</span>
+                          <span className="font-bold text-gray-900">
+                            ₹{Number(r.totalamt || 0).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="font-semibold text-green-700">Paid:</span>
+                          <span className="font-bold text-green-600">
+                            ₹{getTotalPaidAmount(r).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="font-semibold text-orange-700">Balance:</span>
+                          <span className="font-bold text-orange-600">
+                            ₹{getBalanceAmount(r).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -893,7 +944,7 @@ export default function OrderTable({ orders, userRole }) {
               })
             ) : (
               <tr>
-                <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
@@ -976,6 +1027,18 @@ export default function OrderTable({ orders, userRole }) {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
+                </div>
+                <div>
+                  <strong>Paid Amount:</strong> <span className="text-green-600">₹{getTotalPaidAmount(r).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+                </div>
+                <div>
+                  <strong>Balance Amount:</strong> <span className="text-orange-600">₹{getBalanceAmount(r).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
                 </div>
 
                 {/* Approval Actions - Approve/Reject/Revert - visible on mobile */}

@@ -213,6 +213,15 @@ export default function UpcomingInstallationsPage() {
 
             <div className="space-y-1 text-sm">
               <p>
+                <b>Invoice #:</b> {r.invoice_number || "N/A"}
+              </p>
+              <p>
+                <b>Order #:</b> {r.order_id}
+              </p>
+              <p>
+                <b>Serial #:</b> {r.serial_number || "N/A"}
+              </p>
+              <p>
                 <b>Model:</b> {r.model}
               </p>
               <p>
@@ -275,13 +284,14 @@ export default function UpcomingInstallationsPage() {
         <table className="w-full text-sm table-auto border-collapse">
           <thead className="bg-gray-800 text-white">
             <tr>
-              <th className="p-3">Order ID</th>
+              <th className="p-3">Invoice # | Order ID | Serial #</th>
               <th className="p-3">Model</th>
               <th className="p-3">Name</th>
               <th className="p-3">Delivery Address</th>
               <th className="p-3">Company</th>
               <th className="p-3">Contact</th>
               <th className="p-3">Emp</th>
+              <th className="p-3">Delivery</th>
               <th className="p-3">Delivery</th>
               <th className="p-3">Days</th>
               <th className="p-3">Actions</th>
@@ -290,7 +300,13 @@ export default function UpcomingInstallationsPage() {
           <tbody>
             {records.map((r, i) => (
               <tr key={i} className={getRowClass(r.installation_status)}>
-                <td className="p-3">{r.order_id}</td>
+                <td className="p-3 font-semibold">
+                  <div className="space-y-1 text-xs">
+                    <div><span className="text-blue-600 font-bold">Inv:</span> {r.invoice_number || "N/A"}</div>
+                    <div><span className="text-green-600 font-bold">Ord:</span> {r.order_id}</div>
+                    <div><span className="text-purple-600 font-bold">Ser:</span> {r.serial_number || "N/A"}</div>
+                  </div>
+                </td>
                 <td className="p-3">{r.model}</td>
                 <td className="p-3">{r.name}</td>
                 <td className="p-3">{r.delivery_address}</td>

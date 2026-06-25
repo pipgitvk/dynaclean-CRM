@@ -297,14 +297,19 @@ export default function WarrantyForm() {
             placeholder="Model"
             className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
           />
-          <textarea
-            name="specification"
-            value={form.specification || ""}
+          <select
+            name="state"
+            value={form.state || ""}
             onChange={handleChange}
-            placeholder="Specification"
-            rows={1}
-            className="input-sleek resize-none border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
-          />
+            className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
+          >
+            <option value="">Select State</option>
+            {STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
           <input
             name="serial_number"
             value={form.serial_number || ""}
@@ -369,26 +374,21 @@ export default function WarrantyForm() {
             className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
           />
           <textarea
+            name="specification"
+            value={form.specification || ""}
+            onChange={handleChange}
+            placeholder="Specification"
+            rows={4}
+            className="input-sleek resize-none border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
+          />
+          <textarea
             name="customer_address"
             value={form.customer_address || ""}
             onChange={handleChange}
             placeholder="Company Address"
-            rows={1}
+            rows={4}
             className="input-sleek resize-none border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
           />
-          <select
-            name="state"
-            value={form.state || ""}
-            onChange={handleChange}
-            className="input-sleek border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-md p-2"
-          >
-            <option value="">Select State</option>
-            {STATES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
           <input
             name="invoice_number"
             value={form.invoice_number || ""}
