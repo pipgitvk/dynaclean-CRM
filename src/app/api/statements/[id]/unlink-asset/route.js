@@ -8,9 +8,9 @@ export async function DELETE(request, { params }) {
     const { assetId } = await request.json();
     const stmtId = Number(params.id);
 
-    if (!assetId) {
+    if (!assetId || isNaN(Number(assetId)) || Number(assetId) <= 0) {
       return new Response(
-        JSON.stringify({ error: "Asset ID required" }),
+        JSON.stringify({ error: "Valid Asset ID required" }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }

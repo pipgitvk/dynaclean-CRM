@@ -8,9 +8,11 @@ export async function POST(request, { params }) {
     const { assetId } = await request.json();
     const stmtId = Number(params.id);
 
-    if (!assetId) {
+    console.log("[link-asset] Received:", { stmtId, assetId, assetIdType: typeof assetId });
+
+    if (!assetId || isNaN(Number(assetId)) || Number(assetId) <= 0) {
       return new Response(
-        JSON.stringify({ error: "Asset ID required" }),
+        JSON.stringify({ error: "Valid Asset ID required", received: assetId }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
