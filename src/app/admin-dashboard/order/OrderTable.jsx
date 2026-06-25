@@ -89,9 +89,19 @@ function getTotalPaidAmount(order) {
   return paymentAmount.reduce((sum, n) => sum + n, 0);
 }
 
+/** Calculate total amount - fallback to baseAmount + taxamt if totalamt is 0 */
+function getTotalAmount(order) {
+  const total = Number(order.totalamt) || 0;
+  if (total > 0) return total;
+  // Fallback: use baseAmount + taxamt if totalamt is 0
+  const base = Number(order.baseAmount) || 0;
+  const tax = Number(order.taxamt) || 0;
+  return Math.max(total, base + tax);
+}
+
 /** Calculate balance amount (total - paid) */
 function getBalanceAmount(order) {
-  const total = Number(order.totalamt) || 0;
+  const total = getTotalAmount(order);
   const paid = getTotalPaidAmount(order);
   return Math.max(0, total - paid);
 }
@@ -245,7 +255,7 @@ export default function OrderTable({ orders, userRole }) {
 
       // Add data rows
       filteredOrders.forEach((order) => {
-        const totalAmt = Number(order.totalamt || 0);
+        const totalAmt = getTotalAmount(order);
         const paidAmt = getTotalPaidAmount(order);
         const balanceAmt = getBalanceAmount(order);
         const amountDetails = `Total: ₹${totalAmt.toFixed(2)}\nPaid: ₹${paidAmt.toFixed(2)}\nBalance: ₹${balanceAmt.toFixed(2)}`;
@@ -889,7 +899,7 @@ export default function OrderTable({ orders, userRole }) {
                         <div className="flex justify-between gap-4">
                           <span className="font-semibold text-gray-700">Total:</span>
                           <span className="font-bold text-gray-900">
-                            ₹{Number(r.totalamt || 0).toLocaleString("en-IN", {
+                            ₹{getTotalAmount(r).toLocaleString("en-IN", {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}
@@ -1023,7 +1033,7 @@ export default function OrderTable({ orders, userRole }) {
                   <strong>Due Date:</strong> {dayjs(r.duedate).format("DD/MM/YYYY")}
                 </div>
                 <div>
-                  <strong>Total Amount:</strong> ₹{Number(r.totalamt || 0).toLocaleString("en-IN", {
+                  <strong>Total Amount:</strong> ₹{getTotalAmount(r).toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
