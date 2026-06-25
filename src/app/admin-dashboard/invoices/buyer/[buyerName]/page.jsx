@@ -60,6 +60,7 @@ export default async function BuyerInvoicesPage({ params }) {
          (COALESCE(cgst,0) + COALESCE(sgst,0) + COALESCE(igst,0)) AS tax_amount,
          grand_total,
          linked_trans_ids,
+         billing_address,
          DATE(created_at) AS created_date,
          created_at
        FROM invoices
@@ -187,6 +188,9 @@ export default async function BuyerInvoicesPage({ params }) {
     console.error("[buyer invoices page] DB error:", err?.message);
   }
 
+  // Get buyer billing address from first invoice (if available)
+  const buyerBillingAddress = invoices.length > 0 ? invoices[0].billing_address : "";
+
   return (
     <div className="max-w-[1600px] mx-auto p-4 md:p-6 w-full space-y-6">
       {/* Back button */}
@@ -210,7 +214,7 @@ export default async function BuyerInvoicesPage({ params }) {
       <BuyerInvoiceTable invoices={invoices} buyerName={decodedBuyer} />
 
       {/* Ledger Table */}
-      <BuyerLedgerTable rows={ledgerEntries} buyerName={decodedBuyer} />
+      <BuyerLedgerTable rows={ledgerEntries} buyerName={decodedBuyer} billingAddress={buyerBillingAddress} />
     </div>
   );
 }

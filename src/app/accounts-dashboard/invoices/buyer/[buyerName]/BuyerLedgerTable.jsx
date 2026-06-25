@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Trash2, ArrowUp, ArrowDown, Download, FileText } from "lucide-react";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
@@ -9,11 +9,60 @@ import jsPDF from "jspdf";
 const fmt = (n) =>
   Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function BuyerLedgerTable({ rows: initialRows, buyerName }) {
+export default function BuyerLedgerTable({ rows: initialRows, buyerName, billingAddress = "" }) {
   const [rows, setRows] = useState(initialRows ?? []);
   const [sortCol, setSortCol] = useState("entry_date");
   const [sortDir, setSortDir] = useState("asc");
   const [deletingId, setDeletingId] = useState(null);
+  
+  // Calculate min/max dates from actual data
+  const minDate = useMemo(() => {
+    if (initialRows.length === 0) return dayjs().startOf("month").format("YYYY-MM-DD");
+    const dates = initialRows.map(r => String(r.entry_date).slice(0, 10)).sort();
+    return dates[0] || dayjs().startOf("month").format("YYYY-MM-DD");
+  }, [initialRows]);
+  
+  const maxDate = useMemo(() => {
+    if (initialRows.length === 0) return dayjs().endOf("month").format("YYYY-MM-DD");
+    const dates = initialRows.map(r => String(r.entry_date).slice(0, 10)).sort();
+    return dates[dates.length - 1] || dayjs().endOf("month").format("YYYY-MM-DD");
+  }, [initialRows]);
+
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [companySettings, setCompanySettings] = useState({
+    company_name: "Dynaclean Industries Pvt. Ltd.",
+    company_address_line1: "4th Floor, PLOT No-9, Block-B, Pocket-3, Sector-17",
+    company_address_line2: "Dwarka",
+    company_email: "sales@dynacleanindustries.com",
+  });
+
+  useEffect(() => {
+    // Set dates after component mounts (to use calculated min/max)
+    if (!dateFrom && minDate) setDateFrom(minDate);
+    if (!dateTo && maxDate) setDateTo(maxDate);
+  }, [minDate, maxDate, dateFrom, dateTo]);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/company-settings");
+        if (res.ok) {
+          const data = await res.json();
+          setCompanySettings((prev) => ({
+            ...prev,
+            company_name: data.company_name || prev.company_name,
+            company_address_line1: data.company_address_line1 || prev.company_address_line1,
+            company_address_line2: data.company_address_line2 || prev.company_address_line2,
+            company_email: data.company_email || prev.company_email,
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch company settings:", err);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const handleSort = (col) => {
     if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -37,8 +86,12 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName }) {
       if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-    return data;
-  }, [rows, sortCol, sortDir]);
+    // Filter by date range
+    return data.filter((r) => {
+      const entryDate = String(r.entry_date).slice(0, 10);
+      return entryDate >= dateFrom && entryDate <= dateTo;
+    });
+  }, [rows, sortCol, sortDir, dateFrom, dateTo]);
 
   const totals = useMemo(() => {
     const debit = filtered.reduce((s, r) => s + Number(r.debit || 0), 0);
@@ -206,8 +259,7 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName }) {
       pdf.line(x1, yy, x2, yy);
     };
 
-    const dateFrom = filtered.length > 0 ? filtered[0].entry_date : dayjs().format("YYYY-MM-DD");
-    const dateTo   = filtered.length > 0 ? filtered[filtered.length - 1].entry_date : dayjs().format("YYYY-MM-DD");
+    // Use state values for PDF header date range (reflects user's filter)
     const dateRangeStr = `${dayjs(dateFrom).format("D-MMM-YY")} to ${dayjs(dateTo).format("D-MMM-YY")}`;
 
     const totalDebit  = filtered.reduce((s, r) => s + Number(r.debit  || 0), 0);
@@ -244,14 +296,14 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName }) {
     const addHeader = (pageNo = 1) => {
       y = 42;
 
-      center("Dynaclean Industries Pvt. Ltd.", 11, true, 11);
-      center("4th Floor, PLOT No-9, Block-B, Pocket-3, Sector-17", 9, true, 10);
-      center("Dwarka,", 9, true, 12);
+      center(companySettings.company_name, 11, true, 11);
+      center(companySettings.company_address_line1, 9, true, 10);
+      center(companySettings.company_address_line2, 9, true, 12);
 
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
       pdf.text("E-Mail : ", pageW / 2 - 55, y);
-      pdf.text("sales@dynacleanindustries.com", pageW / 2 - 15, y);
+      pdf.text(companySettings.company_email, pageW / 2 - 15, y);
       line(pageW / 2 - 15, y + 1, pageW / 2 + 98, 0.4);
 
       y += 22;
@@ -261,8 +313,22 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName }) {
 
       y += 3;
 
-      center("Full Building, 37/537, Vasant Kunj Road,", 9, true, 11);
-      center("Mahipalpur, South West,", 9, true, 22);
+      if (billingAddress) {
+        const cleanAddress = safe(billingAddress)
+          .replace(/\s+/g, " ")
+          .trim();
+
+        const addressLines = pdf.splitTextToSize(cleanAddress, 260);
+
+        addressLines.slice(0, 3).forEach((addrLine) => {
+          center(addrLine, 9, true, 10);
+        });
+
+        y += 8;
+      } else {
+        center("Full Building, 37/537, Vasant Kunj Road,", 9, true, 10);
+        center("Mahipalpur, South West,", 9, true, 14);
+      }
 
       center(dateRangeStr, 10, true, 16);
 
@@ -382,6 +448,43 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName }) {
             <p className={`mt-1 text-xl font-bold ${color}`}>₹{fmt(value)}{suffix ?? ""}</p>
           </div>
         ))}
+      </div>
+
+      {/* Date Range Filter */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex items-end gap-4 flex-wrap">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              From Date
+            </label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              To Date
+            </label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+            />
+          </div>
+          <button
+            onClick={() => {
+              setDateFrom(dayjs().startOf("month").format("YYYY-MM-DD"));
+              setDateTo(dayjs().endOf("month").format("YYYY-MM-DD"));
+            }}
+            className="px-4 py-2 text-sm font-semibold text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Reset
+          </button>
+        </div>
       </div>
 
       {/* Desktop Table — white bg, black/gray text */}
