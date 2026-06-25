@@ -53,7 +53,7 @@ export default async function OrdersPage() {
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
                 no.invoice_number,
-                qr.company_name, qr.emp_name, qr.state,
+                qr.company_name, qr.emp_name, qr.state, qr.grand_total as quotation_grand_total,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
                 GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code,
                 COALESCE(SUM(COALESCE(qi.total_taxable_amt, qi.taxable_price, 0)), 0) AS order_taxable_total

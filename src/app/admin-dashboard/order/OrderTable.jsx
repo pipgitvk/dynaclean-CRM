@@ -89,11 +89,17 @@ function getTotalPaidAmount(order) {
   return paymentAmount.reduce((sum, n) => sum + n, 0);
 }
 
-/** Calculate total amount - fallback to baseAmount + taxamt if totalamt is 0 */
+/** Calculate total amount - use quotation grand_total as primary source */
 function getTotalAmount(order) {
+  // First priority: quotation grand_total (from quotations_records)
+  const quotationTotal = Number(order.quotation_grand_total) || 0;
+  if (quotationTotal > 0) return quotationTotal;
+  
+  // Second priority: order totalamt
   const total = Number(order.totalamt) || 0;
   if (total > 0) return total;
-  // Fallback: use baseAmount + taxamt if totalamt is 0
+  
+  // Fallback: use baseAmount + taxamt if both are 0
   const base = Number(order.baseAmount) || 0;
   const tax = Number(order.taxamt) || 0;
   return Math.max(total, base + tax);
