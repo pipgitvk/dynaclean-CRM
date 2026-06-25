@@ -150,7 +150,7 @@ export default function BuyerInvoiceTable({ invoices: initialInvoices, buyerName
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1.5">
                       <Link
-                        href={`/admin-dashboard/invoices/${encodeURIComponent(inv.invoice_number)}`}
+                        href={`/accounts-dashboard/invoices/${encodeURIComponent(inv.invoice_number)}`}
                         className="rounded px-3 py-1 bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-colors"
                       >
                         View
