@@ -122,6 +122,16 @@ function orderTaxableTotal(order) {
   return amountWithoutGst(order);
 }
 
+/** Get taxable amount for Payment column - use quotation subtotal as primary (₹40,000) */
+function getPaymentColumnAmount(order) {
+  // First priority: quotation subtotal (taxable amount without GST)
+  const quotationSubtotal = Number(order.quotation_subtotal) || 0;
+  if (quotationSubtotal > 0) return quotationSubtotal;
+  
+  // Second priority: use orderTaxableTotal (from quotation items sum)
+  return orderTaxableTotal(order);
+}
+
 /** Same rules as table filter: `created_at` within optional From/To (order date). */
 function orderCreatedInDateRange(order, dateFrom, dateTo) {
   if (!dateFrom && !dateTo) return true;
@@ -886,7 +896,7 @@ export default function OrderTable({ orders, userRole }) {
                     <td className="px-3 py-3">
                       <div className="flex flex-col items-center gap-1">
                         <div className="font-semibold text-sm">
-                          ₹{amountWithoutGst(r).toLocaleString("en-IN", {
+                          ₹{getPaymentColumnAmount(r).toLocaleString("en-IN", {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
