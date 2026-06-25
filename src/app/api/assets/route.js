@@ -167,25 +167,22 @@ export async function GET(request) {
     const url = new URL(request.url);
     const statusFilter = url.searchParams.get('status'); // 'assigned' | 'available' | null
 
-    // Latest assignment per asset (if any)
-    const latestAssignmentCte = `
-      SELECT t1.*
-      FROM asset_assignments t1
-      JOIN (
-        SELECT asset_id, MAX(created_at) AS max_created
-        FROM asset_assignments
-        GROUP BY asset_id
-      ) t2 ON t1.asset_id = t2.asset_id AND t1.created_at = t2.max_created
-    `;
-
     let baseQuery = `
+      WITH latest_assignment AS (
+        SELECT t1.*
+        FROM asset_assignments t1
+        JOIN (
+          SELECT asset_id, MAX(created_at) AS max_created
+          FROM asset_assignments
+          GROUP BY asset_id
+        ) t2 ON t1.asset_id = t2.asset_id AND t1.created_at = t2.max_created
+      )
       SELECT a.*, la.Assigned_to, la.Assigned_by, la.Assigned_Date, la.is_submit, la.submit_date, la.receipt_path,
              la.status AS current_status, GROUP_CONCAT(DISTINCT s.trans_id SEPARATOR ', ') AS linked_trans_id
       FROM assets a
-      LEFT JOIN (${latestAssignmentCte}) la ON la.asset_id = a.asset_id
+      LEFT JOIN latest_assignment la ON la.asset_id = a.asset_id
       LEFT JOIN statement_asset_links sal ON sal.asset_id = a.asset_id
       LEFT JOIN statements s ON s.id = sal.statement_id
-      GROUP BY a.asset_id
     `;
 
     const whereClauses = [];
@@ -194,13 +191,14 @@ export async function GET(request) {
     if (statusFilter === 'assigned') {
       whereClauses.push(`la.status = 'Assigned'`);
     } else if (statusFilter === 'available') {
-      whereClauses.push(`(la.assignment_id IS NULL OR la.status = 'Returned')`);
+      whereClauses.push(`(la.status IS NULL OR la.status = 'Returned')`);
     }
 
     if (whereClauses.length) {
       baseQuery += ` WHERE ${whereClauses.join(' AND ')}`;
     }
-    baseQuery += ` ORDER BY a.created_at DESC`;
+    
+    baseQuery += ` GROUP BY a.asset_id ORDER BY a.created_at DESC`;
 
     const [rows] = await conn.execute(baseQuery, params);
 
