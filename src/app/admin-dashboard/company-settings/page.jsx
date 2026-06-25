@@ -120,7 +120,7 @@ export default function CompanySettingsPage() {
             type="text"
             value={settings.company_address_line1}
             onChange={(e) => handleChange("company_address_line1", e.target.value)}
-            placeholder="e.g., 4th Floor, PLOT No-9, Block-B, Pocket-3, Sector-17"
+            placeholder="e.g., 1st Floor, 13-B, Kattabomman Street, Gandhi Nagar Main Road,"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
         </div>
@@ -134,7 +134,7 @@ export default function CompanySettingsPage() {
             type="text"
             value={settings.company_address_line2}
             onChange={(e) => handleChange("company_address_line2", e.target.value)}
-            placeholder="e.g., Dwarka"
+            placeholder="e.g., Gandhi Nagar, Ganapathy, Coimbatore, Tamil Nadu - 641006"
             className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
         </div>
