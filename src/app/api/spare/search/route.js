@@ -16,7 +16,7 @@ export async function GET(req) {
   try {
     const searchQuery = `%${q}%`;
     const [rows] = await conn.execute(
-      "SELECT id, spare_number, item_name, specification FROM `spare_list` WHERE item_name LIKE ? OR spare_number LIKE ? LIMIT 15",
+      "SELECT id, spare_number, item_name, specification, image, compatible_machine FROM `spare_list` WHERE item_name LIKE ? OR spare_number LIKE ? LIMIT 15",
       [searchQuery, searchQuery]
     );
 

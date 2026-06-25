@@ -16,20 +16,32 @@ export default function EditBomPage() {
   const [loading, setLoading] = useState(true);
   const [availabilityLoaded, setAvailabilityLoaded] = useState(false);
 
+  const [bomExists, setBomExists] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch(`/api/productions/bom/get?product_code=${encodeURIComponent(product_code)}`, { cache: 'no-store' });
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'Failed to load BOM');
-        const items = Array.isArray(data.items) ? data.items : [];
-        setProduct({
-          item_code: data.product?.item_code || data.product_code,
-          item_name: data.product?.item_name,
-          product_image: data.product?.product_image,
-        });
-        setItems(items);
+        
+        console.log("BOM fetch response:", { status: res.status, ok: res.ok, data });
+        
+        if (res.ok) {
+          // BOM exists - load it
+          setBomExists(true);
+          const items = Array.isArray(data.items) ? data.items : [];
+          setProduct({
+            item_code: data.product?.item_code || data.product_code,
+            item_name: data.product?.item_name,
+            product_image: data.product?.product_image,
+          });
+          setItems(items);
+        } else {
+          // BOM doesn't exist - show error
+          throw new Error(`BOM for product '${product_code}' does not exist. Please create a new BOM first or access it from the BOM list.`);
+        }
       } catch (e) {
+        console.error("BOM loading error:", e);
         setError(String(e.message||e));
       } finally {
         setLoading(false);
@@ -40,7 +52,10 @@ export default function EditBomPage() {
   // Search spares (to add new ones in edit mode)
   useEffect(() => {
     const t = setTimeout(async () => {
-      if (!spareQuery || !product) return;
+      if (!spareQuery || spareQuery.length < 2) {
+        setSpareResults([]);
+        return;
+      }
       try {
         const res = await fetch(`/api/spare/search?q=${encodeURIComponent(spareQuery)}`);
         const data = await res.json();
@@ -48,7 +63,7 @@ export default function EditBomPage() {
       } catch {}
     }, 250);
     return () => clearTimeout(t);
-  }, [spareQuery, product]);
+  }, [spareQuery]);
 
   // Calculate items with parsed values
   const computedItems = useMemo(() => {
@@ -132,11 +147,20 @@ export default function EditBomPage() {
           weight_percent: Number(weight_percent)||0,
         })),
       };
-      const res = await fetch("/api/productions/bom/update", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      
+      console.log("Saving BOM:", { bomExists, endpoint: bomExists ? "update" : "create", payload });
+      
+      // Use create endpoint if BOM doesn't exist, otherwise use update
+      const endpoint = bomExists ? "/api/productions/bom/update" : "/api/productions/bom/create";
+      const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
+      
+      console.log("Save response:", { status: res.status, data });
+      
       if (!res.ok) throw new Error(data?.error || "Failed to save");
       router.push("/admin-dashboard/productions/bom-list");
     } catch (e) {
+      console.error("Save error:", e);
       setError(String(e.message || e));
     } finally {
       setSaving(false);
