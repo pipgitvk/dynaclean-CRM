@@ -15,6 +15,13 @@ export async function DELETE(request, { params }) {
       );
     }
 
+    if (isNaN(stmtId) || stmtId <= 0) {
+      return new Response(
+        JSON.stringify({ error: "Invalid statement ID" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     await conn.beginTransaction();
 
     try {
