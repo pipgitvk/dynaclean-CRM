@@ -18,6 +18,9 @@ function ProductAndSpareLists({ type }) {
   const [deletingImage, setDeletingImage] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState(false);
   const [userRole, setUserRole] = useState("");
+  const [showSparesModal, setShowSparesModal] = useState(false);
+  const [selectedProductSpares, setSelectedProductSpares] = useState([]);
+  const [allSpares, setAllSpares] = useState([]);
   const [editFormData, setEditFormData] = useState({
     item_code: '',
     item_name: '',
@@ -36,6 +39,62 @@ function ProductAndSpareLists({ type }) {
       .then(r => r.json())
       .then(d => setRows(Array.isArray(d) ? d : []))
       .catch(() => setRows([]));
+  };
+
+  const handleViewSpares = (product) => {
+    // Filter spares based on product/machine compatibility
+    // Check multiple product identifiers
+    const searchTerms = [
+      String(product.product_number || '').trim(),
+      String(product.item_code || '').trim(),
+      String(product.item_name || '').trim()
+    ].filter(term => term !== '');
+    
+    console.log('=== SPARES MATCHING DEBUG ===');
+    console.log('Product:', product);
+    console.log('Search terms:', searchTerms);
+    console.log('Total spares loaded:', allSpares.length);
+    console.log('All spares:', allSpares);
+    
+    // Filter spares that have compatible_machine matching this product
+    const compatibleSpares = allSpares.filter(spare => {
+      if (!spare.compatible_machine) {
+        console.log('Spare skipped (no compatible_machine):', spare.item_name);
+        return false;
+      }
+      
+      // Handle JSON array or comma-separated string
+      try {
+        const machines = typeof spare.compatible_machine === 'string' 
+          ? spare.compatible_machine.split(',').map(m => m.trim().toLowerCase())
+          : Array.isArray(spare.compatible_machine) 
+            ? spare.compatible_machine.map(m => String(m).toLowerCase())
+            : [];
+        
+        console.log(`Spare: ${spare.item_name}, Compatible machines:`, machines);
+        
+        // Check if any machine matches any search term
+        const isMatch = machines.some(machine => 
+          searchTerms.some(term => {
+            const termLower = term.toLowerCase();
+            const matches = machine.includes(termLower) || termLower.includes(machine);
+            if (matches) {
+              console.log(`MATCH FOUND: "${machine}" <-> "${termLower}"`);
+            }
+            return matches;
+          })
+        );
+        return isMatch;
+      } catch (e) {
+        console.error('Error matching spare:', spare, e);
+        return false;
+      }
+    });
+    
+    console.log('Compatible spares found:', compatibleSpares.length);
+    console.log('=== END DEBUG ===');
+    setSelectedProductSpares(compatibleSpares);
+    setShowSparesModal(true);
   };
 
   const handleSavePrice = async (row, field) => {
@@ -248,6 +307,14 @@ function ProductAndSpareLists({ type }) {
       .then(d => setRows(Array.isArray(d) ? d : []))
       .catch(() => setRows([]));
 
+    // Load all spares for compatibility check
+    if (type === 'product') {
+      fetch('/api/spare/list')
+        .then(r => r.json())
+        .then(d => setAllSpares(Array.isArray(d) ? d : []))
+        .catch(() => setAllSpares([]));
+    }
+
     // Fetch actual stock totals
     if (type === 'product') {
       fetch('/api/stock/total-value')
@@ -316,6 +383,7 @@ function ProductAndSpareLists({ type }) {
                   <th className="p-2 text-left">Price</th>
                   <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
+                  <th className="p-2 text-left">Spares</th>
                   <th className="p-2 text-left">Actions</th>
                 </>
               ) : (
@@ -394,6 +462,15 @@ function ProductAndSpareLists({ type }) {
                           )}
                         </td>
                         <td className="p-2">{r.specification}</td>
+                        <td className="p-2">
+                          <button
+                            onClick={() => handleViewSpares(r)}
+                            className="p-1 hover:bg-blue-100 rounded"
+                            title="View compatible spares"
+                          >
+                            <Eye className="w-4 h-4 text-blue-600" />
+                          </button>
+                        </td>
                         <td className="p-2">
                           <div className="flex gap-2">
                             <button
@@ -486,7 +563,7 @@ function ProductAndSpareLists({ type }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={type === "product" ? 9 : 8}>
+                <td className="p-2 text-gray-500" colSpan={type === "product" ? 10 : 8}>
                   No data
                 </td>
               </tr>
@@ -623,6 +700,16 @@ function ProductAndSpareLists({ type }) {
                   </>
                 )}
                 <div className="mt-2 pt-2 border-t space-y-2">
+                  {type === 'product' && (
+                    <button
+                      onClick={() => handleViewSpares(r)}
+                      className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 w-full flex items-center justify-center gap-2"
+                      title="View compatible spares"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View Spares
+                    </button>
+                  )}
                   <button
                     onClick={() => handleOpenEditModal(r)}
                     className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 w-full"
@@ -807,6 +894,70 @@ function ProductAndSpareLists({ type }) {
               >
                 {savingProduct ? 'Saving...' : 'Save'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spares Modal */}
+      {showSparesModal && (
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-2">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
+              <h2 className="text-lg font-semibold text-gray-800">Compatible Spares</h2>
+              <button
+                onClick={() => setShowSparesModal(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              {selectedProductSpares.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 p-4">
+                  <p>No compatible spares found for this product</p>
+                </div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-100 sticky top-0">
+                    <tr>
+                      <th className="p-2 text-left">Image</th>
+                      <th className="p-2 text-left">Spare No</th>
+                      <th className="p-2 text-left">Name</th>
+                      <th className="p-2 text-left">Type</th>
+                      <th className="p-2 text-left">Model</th>
+                      <th className="p-2 text-left">Sale Price</th>
+                      <th className="p-2 text-left">Last Neg. Price</th>
+                      <th className="p-2 text-left">Specification</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedProductSpares.map((spare, idx) => (
+                      <tr key={idx} className="border-t hover:bg-blue-50">
+                        <td className="p-2">
+                          {spare.image ? (
+                            <img
+                              src={spare.image}
+                              alt={spare.item_name}
+                              className="w-10 h-10 object-cover rounded"
+                            />
+                          ) : (
+                            <span className="text-gray-400">No image</span>
+                          )}
+                        </td>
+                        <td className="p-2">{spare.spare_number}</td>
+                        <td className="p-2 font-semibold text-gray-800">{spare.item_name}</td>
+                        <td className="p-2">{spare.type || '-'}</td>
+                        <td className="p-2">{spare.model || '-'}</td>
+                        <td className="p-2">₹{spare.sale_price || 0}</td>
+                        <td className="p-2">₹{spare.last_negotiation_price || 0}</td>
+                        <td className="p-2">{spare.specification || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
