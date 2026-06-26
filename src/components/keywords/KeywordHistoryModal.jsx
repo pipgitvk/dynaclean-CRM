@@ -116,20 +116,10 @@ export default function KeywordHistoryModal({
                         <p className={`text-lg font-bold ${getRankColor(followup.rank)}`}>
                           Rank: {followup.rank !== null ? followup.rank : "-"}
                         </p>
+                        <p className="text-sm font-medium text-gray-600">
+                          Page: {followup.page || "-"}
+                        </p>
                       </div>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-semibold
-                          ${
-                            followup.status === "completed"
-                              ? "bg-green-100 text-green-800"
-                              : followup.status === "pending"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-blue-100 text-blue-800"
-                          }
-                        `}
-                      >
-                        {followup.status}
-                      </span>
                     </div>
                     {followup.notes && (
                       <p className="text-sm text-gray-600">

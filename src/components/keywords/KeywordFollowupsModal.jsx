@@ -138,7 +138,7 @@ export default function KeywordFollowupsModal({ open, onClose, keyword }) {
                     Rank
                   </th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                    Notes
+                    Page
                   </th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-700">
                     Actions
@@ -154,8 +154,8 @@ export default function KeywordFollowupsModal({ open, onClose, keyword }) {
                     <td className="px-4 py-3 text-gray-800">
                       {followup.rank || "-"}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
-                      {followup.notes || "-"}
+                    <td className="px-4 py-3 text-gray-600">
+                      {followup.page || "-"}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-2">

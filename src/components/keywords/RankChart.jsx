@@ -9,31 +9,50 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceLine,
 } from "recharts";
 
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0]?.payload;
+    return (
+      <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm">
+        <p className="text-gray-300 font-semibold mb-2">{label}</p>
+        <p className="text-blue-400">Rank : {data?.rank ?? "-"}</p>
+        <p className="text-green-400">Page : {data?.page ?? "-"}</p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function RankChart({ followups, keywordRank, keywordPage }) {
-  // Prepare data for chart - sort by date
-  const chartData = followups
+  // Latest followup values (sorted by date desc, then created_at desc)
+  const sortedDesc = [...followups].sort((a, b) => {
+    const d = new Date(b.followup_date) - new Date(a.followup_date);
+    if (d !== 0) return d;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  const latestRank = sortedDesc[0]?.rank != null ? Number(sortedDesc[0].rank) : keywordRank || "-";
+  const latestPage = sortedDesc[0]?.page != null && sortedDesc[0]?.page !== "" ? sortedDesc[0].page : keywordPage || "-";
+  // Each followup as its own point — use index + date as unique X label
+  const chartData = [...followups]
+    .sort((a, b) => {
+      if (!a.followup_date || !b.followup_date) return 0;
+      // sort by date asc, then created_at asc
+      const d = new Date(a.followup_date) - new Date(b.followup_date);
+      if (d !== 0) return d;
+      return new Date(a.created_at) - new Date(b.created_at);
+    })
     .map((followup, index) => ({
-      date: followup.followup_date
+      label: followup.followup_date
         ? new Date(followup.followup_date).toLocaleDateString("en-GB", {
             day: "2-digit",
             month: "short",
-          })
-        : "N/A",
-      rank: followup.rank !== null ? followup.rank : keywordRank || 0,
-      // Page length as numeric (0-10 scale based on URL length)
-      pageLength: keywordPage ? Math.min(Math.ceil((keywordPage.length / 50) * 10), 10) : 0,
-      status: followup.status,
-      fullDate: followup.followup_date,
-      index: index,
-    }))
-    .sort((a, b) => {
-      // Sort by date
-      if (!a.fullDate || !b.fullDate) return 0;
-      return new Date(a.fullDate) - new Date(b.fullDate);
-    });
+          }) + (followups.filter(f => f.followup_date === followup.followup_date).length > 1 ? ` #${index + 1}` : "")
+        : `Entry ${index + 1}`,
+      rank: followup.rank !== null ? Number(followup.rank) : 0,
+      page: followup.page !== null && followup.page !== "" ? Number(followup.page) : 0,
+    }));
 
   if (chartData.length === 0) {
     return (
@@ -50,8 +69,8 @@ export default function RankChart({ followups, keywordRank, keywordPage }) {
           Rank & Page Progression
         </h3>
         <p className="text-sm text-gray-600 mt-1">
-          Current Rank: <span className="font-semibold text-blue-600">{keywordRank || "-"}</span> | 
-          Page: <span className="font-semibold text-green-600">{keywordPage || "-"}</span>
+          Current Rank: <span className="font-semibold text-blue-600">{latestRank}</span> | 
+          Page: <span className="font-semibold text-green-600">{latestPage}</span>
         </p>
       </div>
       <ResponsiveContainer width="100%" height={400}>
@@ -75,75 +94,46 @@ export default function RankChart({ followups, keywordRank, keywordPage }) {
             vertical={false}
           />
           <XAxis
-            dataKey="date"
+            dataKey="label"
             stroke="#9CA3AF"
-            style={{ fontSize: "13px", fontWeight: "500" }}
+            style={{ fontSize: "12px", fontWeight: "500" }}
             tick={{ fill: "#6B7280" }}
           />
           <YAxis
-            domain={[0, 10]}
             stroke="#9CA3AF"
             style={{ fontSize: "13px", fontWeight: "500" }}
-            ticks={[0, 2, 4, 6, 8, 10]}
             tick={{ fill: "#6B7280" }}
             label={{ 
-              value: "Score (0-10)", 
+              value: "Value", 
               angle: -90, 
               position: "insideLeft",
               style: { fontSize: "13px", fill: "#6B7280" }
             }}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "#1F2937",
-              border: "1px solid #374151",
-              borderRadius: "8px",
-              padding: "12px",
-              color: "#fff",
-              fontSize: "13px",
-              fontWeight: "500",
-            }}
-            cursor={{ stroke: "#3B82F6", strokeWidth: 2, strokeDasharray: "0" }}
-            formatter={(value, name) => {
-              if (name === "rank") return [value.toFixed(1), "Rank"];
-              if (name === "pageLength") return [value.toFixed(1), "Page Score"];
-              return value;
-            }}
-            labelFormatter={(label) => (
-              <span className="text-gray-300">{label}</span>
-            )}
-          />
-          <ReferenceLine 
-            y={5} 
-            stroke="#D1D5DB" 
-            strokeDasharray="5 5" 
-            opacity={0.5}
-          />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#3B82F6", strokeWidth: 2 }} />
           <Legend 
             wrapperStyle={{ paddingTop: "20px" }}
             iconType="line"
           />
           <Line
-            type="natural"
+            type="monotone"
             dataKey="rank"
             stroke="#3B82F6"
             strokeWidth={3}
-            dot={false}
+            dot={{ r: 4, fill: "#3B82F6" }}
             activeDot={{ r: 8, fill: "#3B82F6" }}
-            fill="url(#colorRank)"
             name="Rank"
             isAnimationActive={true}
             animationDuration={800}
           />
           <Line
-            type="natural"
-            dataKey="pageLength"
+            type="monotone"
+            dataKey="page"
             stroke="#10B981"
             strokeWidth={3}
-            dot={false}
+            dot={{ r: 4, fill: "#10B981" }}
             activeDot={{ r: 8, fill: "#10B981" }}
-            fill="url(#colorPage)"
-            name="Page Score"
+            name="Page"
             isAnimationActive={true}
             animationDuration={800}
           />

@@ -63,7 +63,7 @@ export async function POST(request) {
     const [result] = await connection.execute(
       `INSERT INTO keywords_followups (keyword_id, followup_date, page, rank, status, notes, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [keyword_id, followup_date || null, page || null, rank || 0, status || "pending", notes || null]
+      [keyword_id, followup_date || null, page || null, rank != null ? parseInt(rank) : 0, status || "pending", notes || null]
     );
 
     return NextResponse.json(
@@ -112,7 +112,7 @@ export async function PUT(request) {
       `UPDATE keywords_followups 
        SET followup_date = ?, page = ?, rank = ?, status = ?, notes = ?, updated_at = NOW()
        WHERE id = ?`,
-      [followup_date || null, page || null, rank || 0, status || "pending", notes || null, id]
+      [followup_date || null, page || null, rank != null ? parseInt(rank) : 0, status || "pending", notes || null, id]
     );
 
     return NextResponse.json(

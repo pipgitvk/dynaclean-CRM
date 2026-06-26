@@ -14,7 +14,6 @@ export default function EditFollowupModal({
     followup_date: "",
     page: "",
     rank: "",
-    notes: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -24,7 +23,6 @@ export default function EditFollowupModal({
         followup_date: followup.followup_date || "",
         page: followup.page || "",
         rank: followup.rank || "",
-        notes: followup.notes || "",
       });
     }
   }, [followup]);
@@ -50,7 +48,6 @@ export default function EditFollowupModal({
           page: formData.page.trim() || null,
           rank: formData.rank ? parseInt(formData.rank) : null,
           status: "pending",
-          notes: formData.notes.trim() || null,
         }),
       });
 
@@ -121,32 +118,16 @@ export default function EditFollowupModal({
           {/* Rank Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Rank (0-10)
+              Rank
             </label>
             <input
               type="number"
               name="rank"
               min="0"
-              max="10"
               value={formData.rank}
               onChange={handleChange}
-              placeholder="Enter rank between 0-10"
+              placeholder="Enter rank (e.g. 1, 50, 300)"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Notes Textarea */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notes
-            </label>
-            <textarea
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              placeholder="Add any notes about this followup..."
-              rows="4"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
         </div>

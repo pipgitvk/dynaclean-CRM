@@ -32,8 +32,8 @@ export default function FollowKeywordModal({
     }
 
     const rankValue = parseInt(rank);
-    if (rankValue < 0 || rankValue > 10) {
-      return toast.error("Rank must be between 0 and 10.");
+    if (isNaN(rankValue) || rankValue < 0) {
+      return toast.error("Please enter a valid rank.");
     }
 
     setLoading(true);
@@ -132,15 +132,14 @@ export default function FollowKeywordModal({
           {/* Rank Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Rank (0-10) <span className="text-red-500">*</span>
+              Rank <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
               min="0"
-              max="10"
               value={rank}
               onChange={(e) => setRank(e.target.value)}
-              placeholder="Enter rank between 0-10"
+              placeholder="Enter rank (e.g. 1, 50, 300)"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="text-xs text-gray-500 mt-1">Enter a value between 0 and 10</p>

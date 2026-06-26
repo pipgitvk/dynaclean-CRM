@@ -6,12 +6,29 @@ export async function GET() {
   try {
     const connection = await getDbConnection();
     const [rows] = await connection.execute(
-      `SELECT id, keyword, page, rank, assigned_to, updated_at, created_at 
-       FROM keywords 
-       ORDER BY updated_at DESC`
+      `SELECT 
+         k.id, k.keyword, k.page, k.rank, k.assigned_to, k.updated_at, k.created_at,
+         lf.rank AS latest_followup_rank,
+         lf.page AS latest_followup_page,
+         lf.followup_date AS latest_followup_date
+       FROM keywords k
+       LEFT JOIN keywords_followups lf ON lf.id = (
+         SELECT id FROM keywords_followups
+         WHERE keyword_id = k.id
+         ORDER BY followup_date DESC, created_at DESC
+         LIMIT 1
+       )
+       ORDER BY k.updated_at DESC`
     );
 
-    return NextResponse.json(rows, { status: 200 });
+    // Ensure numeric fields are proper numbers, not strings
+    const normalized = rows.map((row) => ({
+      ...row,
+      rank: row.rank != null ? Number(row.rank) : null,
+      latest_followup_rank: row.latest_followup_rank != null ? Number(row.latest_followup_rank) : null,
+    }));
+
+    return NextResponse.json(normalized, { status: 200 });
   } catch (error) {
     console.error("Failed to fetch keywords:", error);
     return NextResponse.json(

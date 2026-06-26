@@ -132,11 +132,17 @@ const UserKeywordsTable = () => {
               <th className="px-6 py-3 text-left font-semibold text-gray-700">
                 Keyword
               </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+              {/* <th className="px-6 py-3 text-left font-semibold text-gray-700">
                 Page
               </th>
               <th className="px-6 py-3 text-left font-semibold text-gray-700">
                 Current Rank
+              </th> */}
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                Rank
+              </th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                Page
               </th>
               <th className="px-6 py-3 text-left font-semibold text-gray-700">
                 Updated Date
@@ -159,8 +165,14 @@ const UserKeywordsTable = () => {
                   <td className="px-6 py-3 font-medium text-gray-800">
                     {keyword.keyword}
                   </td>
-                  <td className="px-6 py-3 text-gray-700">{keyword.page || "-"}</td>
-                  <td className="px-6 py-3 text-gray-700">{keyword.rank || "-"}</td>
+                  {/* <td className="px-6 py-3 text-gray-700">{keyword.page || "-"}</td>
+                  <td className="px-6 py-3 text-gray-700">{keyword.rank || "-"}</td> */}
+                  <td className="px-6 py-3 font-semibold text-blue-700">
+                    {keyword.latest_followup_rank != null ? Number(keyword.latest_followup_rank) : "-"}
+                  </td>
+                  <td className="px-6 py-3 text-gray-700">
+                    {keyword.latest_followup_page || "-"}
+                  </td>
                   <td className="px-6 py-3 text-gray-700">
                     {formatDate(keyword.updated_at)}
                   </td>
@@ -205,11 +217,17 @@ const UserKeywordsTable = () => {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-gray-800">{keyword.keyword}</h3>
-                  <p className="text-sm text-gray-600">
+                  {/* <p className="text-sm text-gray-600">
                     Page: {keyword.page || "-"}
                   </p>
                   <p className="text-sm text-gray-600">
                     Current Rank: {keyword.rank || "-"}
+                  </p> */}
+                  <p className="text-sm font-semibold text-blue-700">
+                    Latest Rank: {keyword.latest_followup_rank != null ? Number(keyword.latest_followup_rank) : "-"}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Latest Page: {keyword.latest_followup_page || "-"}
                   </p>
                 </div>
               </div>
