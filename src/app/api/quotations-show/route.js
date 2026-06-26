@@ -87,25 +87,24 @@ export async function GET(req) {
   const conditions = [];
   const values = [];
 
+  // ✅ IF customer_id IS PROVIDED → SHOW ALL QUOTATIONS FOR THAT CUSTOMER
+  // (Regardless of other filters like username or emp_name)
+  if (customerId) {
+    conditions.push(`qr.customer_id = ?`);
+    values.push(customerId);
+  }
   // ✅ emp_name takes priority (even if username also exists)
-
-  if (onlyMe && username) {
-    query += ` WHERE qr.emp_name = ?`;
+  else if (onlyMe && username) {
+    conditions.push(`qr.emp_name = ?`);
     values.push(username);
   } else if (empName) {
     conditions.push(`qr.emp_name = ?`);
     values.push(empName);
   }
-  if (customerId) {
-    conditions.push(`qr.customer_id = ?`);
-    values.push(customerId);
-  }
-  if (customerName) {
-    query +=
-      values.length > 0
-        ? ` AND CONCAT(c.first_name, ' ', IFNULL(c.last_name, '')) LIKE ?`
-        : ` WHERE CONCAT(c.first_name, ' ', IFNULL(c.last_name, '')) LIKE ?`;
 
+  // ✅ Customer name filter
+  if (customerName) {
+    conditions.push(`CONCAT(c.first_name, ' ', IFNULL(c.last_name, '')) LIKE ?`);
     values.push(`%${customerName}%`);
   }
 
@@ -115,6 +114,7 @@ export async function GET(req) {
     values.push(fromDate, toDate);
   }
 
+  // Build WHERE clause
   if (conditions.length > 0) {
     query += ` WHERE ` + conditions.join(" AND ");
   }

@@ -9,66 +9,48 @@ export const dynamic = "force-dynamic";
 async function getQuotations(username, role, { search, date_from, date_to, customer_id }) {
   const conn = await getDbConnection();
 
-  let query = "";
+  let query = `
+    SELECT
+      qr.quote_number,
+      qr.quote_date,
+      qr.company_name,
+      qr.grand_total,
+      qr.emp_name AS created_by,
+      c.first_name AS client_name,
+      c.email,
+      c.phone
+    FROM quotations_records qr
+    LEFT JOIN customers c ON c.customer_id = qr.customer_id
+  `;
+  
+  let conditions = [];
   let values = [];
 
   // ---------------------------------------------------------
-  // ⭐ SERVICE HEAD → SEE ALL SERVICE TEAM QUOTATIONS
-  // ⭐ DIRECTOR → SEE ALL QUOTATIONS
+  // ⭐ IF customer_id IS PROVIDED → SHOW ALL QUOTATIONS FOR THAT CUSTOMER
+  // (Regardless of user role)
   // ---------------------------------------------------------
-  const roleUpper = String(role).toUpperCase();
-  if (roleUpper === "DIRECTOR") {
-    query = `
-      SELECT
-        qr.quote_number,
-        qr.quote_date,
-        qr.company_name,
-        qr.grand_total,
-        qr.emp_name AS created_by,
-        c.first_name AS client_name,
-        c.email,
-        c.phone
-      FROM quotations_records qr
-      LEFT JOIN customers c ON c.customer_id = qr.customer_id
-    `;
-  } else if (role === "SERVICE HEAD") {
-    query = `
-      SELECT 
-        qr.quote_number,
-        qr.quote_date,
-        qr.company_name,
-        qr.grand_total,
-        qr.emp_name AS created_by,
-        c.first_name AS client_name,
-        c.email,
-        c.phone
-      FROM quotations_records qr
-      LEFT JOIN customers c ON c.customer_id = qr.customer_id
-      WHERE qr.emp_name NOT IN (
-        SELECT username FROM rep_list
-        WHERE userRole LIKE '%SALES%'
-      )
-    `;
+  if (customer_id) {
+    conditions.push(`qr.customer_id = ?`);
+    values.push(customer_id);
   }
-
+  // ---------------------------------------------------------
+  // ⭐ SERVICE HEAD → SEE ALL SERVICE TEAM QUOTATIONS (skip this role check if customer_id present)
+  // ⭐ DIRECTOR → SEE ALL QUOTATIONS (skip this role check if customer_id present)
+  // ---------------------------------------------------------
+  else if (String(role).toUpperCase() === "DIRECTOR") {
+    // No conditions - see all
+  } else if (role === "SERVICE HEAD") {
+    conditions.push(`qr.emp_name NOT IN (
+      SELECT username FROM rep_list
+      WHERE userRole LIKE '%SALES%'
+    )`);
+  }
   // ---------------------------------------------------------
   // ⭐ NORMAL USERS (Sales, Service engineer, etc.)
   // ---------------------------------------------------------
   else {
-    query = `
-      SELECT 
-        qr.quote_number,
-        qr.quote_date,
-        qr.company_name,
-        qr.grand_total,
-        qr.emp_name AS created_by,
-        c.first_name AS client_name,
-        c.email,
-        c.phone
-      FROM quotations_records qr
-      JOIN customers c ON c.customer_id = qr.customer_id
-      WHERE qr.emp_name = ?
-    `;
+    conditions.push(`qr.emp_name = ?`);
     values.push(username);
   }
 
@@ -76,16 +58,14 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
   // ⭐ SEARCH FILTER
   // ---------------------------------------------------------
   if (search) {
-    query += `
-      AND (
-        qr.quote_number LIKE ?
-        OR qr.company_name LIKE ?
-        OR c.first_name LIKE ?
-        OR c.email LIKE ?
-        OR c.phone LIKE ?
-        OR qr.emp_name LIKE ?
-      )
-    `;
+    conditions.push(`(
+      qr.quote_number LIKE ?
+      OR qr.company_name LIKE ?
+      OR c.first_name LIKE ?
+      OR c.email LIKE ?
+      OR c.phone LIKE ?
+      OR qr.emp_name LIKE ?
+    )`);
     const like = `%${search}%`;
     values.push(like, like, like, like, like, like);
   }
@@ -94,19 +74,19 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
   // ⭐ DATE FILTER (full range, or open-ended if only one date)
   // ---------------------------------------------------------
   if (date_from && date_to) {
-    query += ` AND qr.quote_date BETWEEN ? AND ? `;
+    conditions.push(`qr.quote_date BETWEEN ? AND ?`);
     values.push(date_from, date_to);
   } else if (date_from) {
-    query += ` AND qr.quote_date >= ? `;
+    conditions.push(`qr.quote_date >= ?`);
     values.push(date_from);
   } else if (date_to) {
-    query += ` AND qr.quote_date <= ? `;
+    conditions.push(`qr.quote_date <= ?`);
     values.push(date_to);
   }
 
-  if (customer_id) {
-    query += ` AND qr.customer_id = ? `;
-    values.push(customer_id);
+  // Build WHERE clause
+  if (conditions.length > 0) {
+    query += ` WHERE ` + conditions.join(` AND `);
   }
 
   // ---------------------------------------------------------
