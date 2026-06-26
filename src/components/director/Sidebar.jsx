@@ -51,6 +51,7 @@ import {
   Newspaper,
   Box,
   Bell,
+  Globe,
 } from "lucide-react";
 
 // Icon map
@@ -97,6 +98,7 @@ const iconMap = {
   Newspaper,
   Box,
   Bell,
+  Globe,
 };
 
 export default function DirectorSidebar({

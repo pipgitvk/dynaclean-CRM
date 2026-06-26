@@ -116,6 +116,7 @@ import {
   ClipboardCheck,
   Target,
   Briefcase,
+  Globe,
 } from "lucide-react";
 
 // Icon map
@@ -155,6 +156,7 @@ const iconMap = {
   ClipboardCheck,
   Target,
   Briefcase,
+  Globe,
 };
 
 //this is test

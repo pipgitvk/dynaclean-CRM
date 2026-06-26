@@ -38,6 +38,14 @@ export const MODULE_TREE = [
     ],
   },
   {
+    key: "digital-marketing",
+    label: "DM",
+    children: [
+      { key: "keywords-management", label: "Keywords Management" },
+      { key: "backlinks-management", label: "Backlinks Management" },
+    ],
+  },
+  {
     key: "leads-management",
     label: "Leads Management",
     children: [{ key: "leads-upload", label: "Leads Upload" }],
@@ -224,6 +232,15 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "lead-distribution", label: "Lead Distribution" },
       { kind: "leaf", key: "bulk-reassign", label: "Bulk Reassign Leads" },
       { kind: "leaf", key: "leads-upload", label: "Leads Upload" },
+    ],
+  },
+  {
+    kind: "group",
+    id: "digital-marketing",
+    label: "DM",
+    children: [
+      { kind: "leaf", key: "keywords-management", label: "Keywords Management" },
+      { kind: "leaf", key: "backlinks-management", label: "Backlinks Management" },
     ],
   },
   {

@@ -218,6 +218,28 @@ const allMenuItems = [
     ],
   },
   {
+    name: "DM",
+    moduleKey: "digital-marketing",
+    roles: ["ALL"],
+    icon: "FileText",
+    children: [
+      {
+        path: "/user-dashboard/keywords",
+        name: "Keywords",
+        moduleKey: "keywords-management",
+        roles: ["ALL"],
+        icon: "FileText",
+      },
+      {
+        path: "/user-dashboard/backlinks",
+        name: "Backlinks",
+        moduleKey: "backlinks-management",
+        roles: ["ALL"],
+        icon: "Globe",
+      },
+    ],
+  },
+  {
     name: "Activities",
     moduleKey: "dashboard",
     roles: ["ALL"],
