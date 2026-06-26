@@ -52,6 +52,19 @@ export async function POST(request) {
 
     const connection = await getDbConnection();
 
+    // Check for duplicate keyword
+    const [existing] = await connection.execute(
+      "SELECT id FROM keywords WHERE LOWER(keyword) = LOWER(?)",
+      [keyword]
+    );
+
+    if (existing.length > 0) {
+      return NextResponse.json(
+        { message: "This keyword already exists." },
+        { status: 409 }
+      );
+    }
+
     const [result] = await connection.execute(
       `INSERT INTO keywords (keyword, page, rank, assigned_to, created_at, updated_at)
        VALUES (?, ?, ?, ?, NOW(), NOW())`,
