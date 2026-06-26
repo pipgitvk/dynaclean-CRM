@@ -51,7 +51,7 @@ function transformMenuItemPaths(item, roleKey) {
 }
 
 function stripSuperadminOnlyMenuItems(items, roleKey) {
-  if (roleKey === "SUPERADMIN") return items;
+  if (roleKey === "SUPERADMIN" || roleKey === "EA") return items;
   return (items || [])
     .map((item) => {
       if (item?.moduleKey && SUPERADMIN_ONLY_MODULE_KEYS.has(item.moduleKey)) {
@@ -968,8 +968,8 @@ export default async function getSidebarMenuItems() {
   // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
   items = stripSuperadminOnlyMenuItems(items, roleKey);
 
-  // Step 2: filter by module_access (SUPERADMIN bypasses this — sees everything)
-  if (roleKey !== "SUPERADMIN") {
+  // Step 2: filter by module_access (SUPERADMIN and EA bypass this — see everything)
+  if (roleKey !== "SUPERADMIN" && roleKey !== "EA") {
     const allowedModulesRaw = await getUserModuleAccess(username);
     const allowedModules1 = applySuperadminOnlyModuleRestrictions(
       allowedModulesRaw,
