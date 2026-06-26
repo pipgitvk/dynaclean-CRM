@@ -168,10 +168,10 @@ const UserKeywordsTable = () => {
                   {/* <td className="px-6 py-3 text-gray-700">{keyword.page || "-"}</td>
                   <td className="px-6 py-3 text-gray-700">{keyword.rank || "-"}</td> */}
                   <td className="px-6 py-3 font-semibold text-blue-700">
-                    {keyword.latest_followup_rank != null ? Number(keyword.latest_followup_rank) : "-"}
+                    {keyword.latest_followup_rank != null ? Number(keyword.latest_followup_rank) : (keyword.rank || "-")}
                   </td>
                   <td className="px-6 py-3 text-gray-700">
-                    {keyword.latest_followup_page || "-"}
+                    {keyword.latest_followup_page || keyword.page || "-"}
                   </td>
                   <td className="px-6 py-3 text-gray-700">
                     {formatDate(keyword.updated_at)}

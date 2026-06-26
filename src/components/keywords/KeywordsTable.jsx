@@ -241,11 +241,11 @@ const KeywordsTable = () => {
                         )}
                       </span>
                     ) : (
-                      <span className="text-gray-400">-</span>
+                      <span className="text-gray-700">{keyword.rank || "-"}</span>
                     )}
                   </td>
                   <td className="px-6 py-3 text-gray-700">
-                    {keyword.latest_followup_page || "-"}
+                    {keyword.latest_followup_page || keyword.page || "-"}
                   </td>
                   <td className="px-6 py-3 text-gray-700">
                     {formatDate(keyword.updated_at)}
@@ -300,10 +300,10 @@ const KeywordsTable = () => {
                     Rank: {keyword.rank || "-"}
                   </p> */}
                   <p className="text-sm text-blue-600 font-medium">
-                    Latest Page: {keyword.latest_followup_page || "-"}
+                    Latest Page: {keyword.latest_followup_page || keyword.page || "-"}
                   </p>
                   <p className="text-sm text-blue-600 font-medium">
-                    Latest Rank: {keyword.latest_followup_rank != null ? keyword.latest_followup_rank : "-"}
+                    Latest Rank: {keyword.latest_followup_rank != null ? keyword.latest_followup_rank : (keyword.rank || "-")}
                   </p>
                 </div>
                 <div className="flex gap-2">
