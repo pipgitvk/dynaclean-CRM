@@ -10,9 +10,20 @@ ADD COLUMN IF NOT EXISTS `tax` DECIMAL(5, 2) DEFAULT 0 COMMENT 'Tax percentage',
 ADD COLUMN IF NOT EXISTS `last_negotiation_price` DECIMAL(10, 2) DEFAULT NULL COMMENT 'Last negotiated price for the spare',
 ADD COLUMN IF NOT EXISTS `sale_price` DECIMAL(10, 2) DEFAULT NULL COMMENT 'Sale price for the spare';
 
--- Rename price column to purchase_price if it exists
-ALTER TABLE spare_list
-CHANGE COLUMN IF EXISTS `price` `purchase_price` DECIMAL(10, 2) NOT NULL COMMENT 'Purchase price of the spare';
+-- Rename price column to purchase_price if price column exists and purchase_price doesn't
+SET @column_exists = 0;
+SELECT COUNT(*) INTO @column_exists 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_NAME = 'spare_list' AND COLUMN_NAME = 'price' AND TABLE_SCHEMA = DATABASE();
+
+SET @purchase_price_exists = 0;
+SELECT COUNT(*) INTO @purchase_price_exists 
+FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_NAME = 'spare_list' AND COLUMN_NAME = 'purchase_price' AND TABLE_SCHEMA = DATABASE();
+
+-- Only rename if price exists and purchase_price doesn't
+-- Note: In MySQL, you may need to run this manually if the IF conditions don't work:
+-- ALTER TABLE spare_list CHANGE COLUMN price purchase_price DECIMAL(10, 2) NOT NULL COMMENT 'Purchase price of the spare';
 
 -- Add indexes for better search performance
 ALTER TABLE spare_list

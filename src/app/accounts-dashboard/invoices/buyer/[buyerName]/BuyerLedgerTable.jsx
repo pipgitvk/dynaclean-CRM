@@ -229,9 +229,8 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
 
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-
-    const marginL = 40;
-    const tableRight = 570;
+const marginL = 25;
+const tableRight = 570;
 
     let y = 42;
 
@@ -268,19 +267,19 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     const closingDebit  = totalCredit > totalDebit  ? totalCredit - totalDebit  : 0;
     const closingCredit = totalDebit  > totalCredit ? totalDebit  - totalCredit : 0;
     const finalTotal    = Math.max(totalDebit, totalCredit);
+const col = {
+  date:        marginL,
+  drcr:        marginL + 65,
+  particulars: marginL + 90,
+  vchType:     marginL + 280,
+  vchNoEnd:    marginL + 405,
 
-    const col = {
-      date:        marginL,
-      drcr:        marginL + 65,
-      particulars: marginL + 90,
-      vchType:     marginL + 280,
-      vchNoEnd:    marginL + 405,
-      debitStart:  marginL + 410,
-      debitEnd:    marginL + 480,
-      creditStart: marginL + 495,
-      creditEnd:   marginL + 535,
-    };
+  debitStart:  marginL + 385,
+  debitEnd:    marginL + 470,
 
+  creditStart: marginL + 505,
+  creditEnd:   marginL + 555,
+};
     const drawTableHeader = () => {
       line(marginL, y - 4, tableRight, 0.7);
       left("Date",        col.date,        y + 6, 9, true);
@@ -288,7 +287,7 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
       left("Vch Type",    col.vchType,     y + 6, 9, true);
       right("Vch No.",    col.vchNoEnd,    y + 6, 9, true);
       right("Debit",      col.debitEnd,    y + 6, 9, true);
-      right("Credit",     col.creditEnd,   y + 6, 9, true);
+   right("Credit", col.creditEnd - 12, y + 6, 9, true);
       line(marginL, y + 11, tableRight, 0.7);
       y += 22;
     };
@@ -389,12 +388,13 @@ export default function BuyerLedgerTable({ rows: initialRows, buyerName, billing
     if (closingCredit > 0) right(fmtAmt(closingCredit), col.creditEnd, y, 9, false);
 
     y += 16;
+y += 20;
 
-    line(col.debitStart,  y - 8, col.debitEnd,  0.7);
-    line(col.creditStart, y - 8, col.creditEnd, 0.7);
+line(col.debitStart,  y - 8, col.debitEnd,  0.7);
+line(col.creditStart, y - 8, col.creditEnd, 0.7);
 
-    right(fmtAmt(finalTotal), col.debitEnd,  y, 9, true);
-    right(fmtAmt(finalTotal), col.creditEnd, y, 9, true);
+right(fmtAmt(finalTotal), col.debitEnd,  y, 9, true);
+right(fmtAmt(finalTotal), col.creditEnd, y, 9, true);
 
     line(col.debitStart,  y + 5, col.debitEnd,  0.7);
     line(col.creditStart, y + 5, col.creditEnd, 0.7);
