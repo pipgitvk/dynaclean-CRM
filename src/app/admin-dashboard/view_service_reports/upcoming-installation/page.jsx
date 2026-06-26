@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Eye } from "lucide-react";
 
@@ -37,7 +37,7 @@ export default function UpcomingInstallationsPage() {
       } else {
         alert(data.message || "Action completed successfully");
       }
-      await fetchData(currentPage, searchQuery);
+      await fetchData(typeFilter);
     } catch (err) {
       console.error(err);
       alert("Failed to perform action");
@@ -108,7 +108,7 @@ export default function UpcomingInstallationsPage() {
       if (data.success) {
         alert(data.message || "Items returned successfully");
         setShowReturnModal(false);
-        await fetchData(currentPage, searchQuery);
+        await fetchData(typeFilter);
       } else {
         alert(data.error || "Failed to return items");
       }
@@ -120,10 +120,10 @@ export default function UpcomingInstallationsPage() {
   };
 
   // ========= FETCH DATA ==========
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (filter) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/installation/upcoming?type=${typeFilter}`);
+      const res = await fetch(`/api/installation/upcoming?type=${filter}`);
       const data = await res.json();
 
       setRecords(data.installations || []);
@@ -136,11 +136,22 @@ export default function UpcomingInstallationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter]);
-
-  useEffect(() => {
-    fetchData();
   }, []);
+
+  // Re-fetch whenever typeFilter changes
+  useEffect(() => {
+    fetchData(typeFilter);
+  }, [typeFilter, fetchData]);
+
+  // ========= CLIENT-SIDE SEARCH FILTER ==========
+  const filteredRecords = useMemo(() => {
+    if (!searchQuery.trim()) return records;
+    const q = searchQuery.toLowerCase();
+    return records.filter((r) =>
+      [r.model, r.name, r.company_name, r.emp_name, r.delivery_address, r.contact, String(r.order_id)]
+        .some((val) => val && String(val).toLowerCase().includes(q))
+    );
+  }, [records, searchQuery]);
 
   // ========= UI HELPERS ==========
   const getRowClass = (status) => {
@@ -171,14 +182,16 @@ export default function UpcomingInstallationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-bold">Upcoming Installations</h2>
-        <p className="text-sm text-gray-600">Total: {total} records</p>
+        <p className="text-sm text-gray-600">
+          Total: {filteredRecords.length}{searchQuery ? ` (filtered from ${total})` : ` records`}
+        </p>
       </div>
 
       {/* Search + Legend */}
       <div className="flex flex-col gap-4 mb-6">
         <input
           type="text"
-          placeholder="Search by model, company, employee..."
+          placeholder="Search by order ID, model, company, employee, contact..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="px-4 py-2 border rounded shadow-sm"
@@ -225,131 +238,144 @@ export default function UpcomingInstallationsPage() {
         </div>
       </div>
 
+      {/* Loading state */}
+      {loading && (
+        <div className="text-center py-10 text-gray-500">Loading...</div>
+      )}
+
+      {!loading && filteredRecords.length === 0 && (
+        <div className="text-center py-10 text-gray-500">No records found.</div>
+      )}
+
       {/** ================= MOBILE VIEW (CARDS) ================= */}
-      <div className="md:hidden space-y-4">
-        {records.map((r, i) => (
-          <div
-            key={i}
-            className={`rounded-xl shadow p-4 border ${getRowClass(
-              r.installation_status
-            )}`}
-          >
-            <div className="text-lg font-bold mb-2">Order #{r.order_id}</div>
+      {!loading && (
+        <div className="md:hidden space-y-4">
+          {filteredRecords.map((r, i) => (
+            <div
+              key={i}
+              className={`rounded-xl shadow p-4 border ${getRowClass(
+                r.installation_status
+              )}`}
+            >
+              <div className="text-lg font-bold mb-2">Order #{r.order_id}</div>
 
-            <div className="space-y-1 text-sm">
-              <p><b>Model:</b> {r.model}</p>
-              <p><b>Name:</b> {r.name}</p>
-              <p><b>Company:</b> {r.company_name}</p>
-              <p><b>Contact:</b> {r.contact}</p>
-              <p><b>Emp:</b> {r.emp_name}</p>
-              <p><b>Address:</b> {r.delivery_address}</p>
-              <p className={`${dateColor(r.installation_status)} mt-1`}>
-                <b>Delivery:</b> {r.delivery_date}
-              </p>
-              <p className={`${dateColor(r.installation_status)}`}>
-                <b>Days:</b> {formatDays(r.days_until_installation)}
-              </p>
-            </div>
+              <div className="space-y-1 text-sm">
+                <p><b>Model:</b> {r.model}</p>
+                <p><b>Name:</b> {r.name}</p>
+                <p><b>Company:</b> {r.company_name}</p>
+                <p><b>Contact:</b> {r.contact}</p>
+                <p><b>Emp:</b> {r.emp_name}</p>
+                <p><b>Address:</b> {r.delivery_address}</p>
+                <p className={`${dateColor(r.installation_status)} mt-1`}>
+                  <b>Delivery:</b> {r.delivery_date}
+                </p>
+                <p className={`${dateColor(r.installation_status)}`}>
+                  <b>Days:</b> {formatDays(r.days_until_installation)}
+                </p>
+              </div>
 
-            {/* Actions */}
-            <div className="flex flex-col gap-2 mt-3">
-              <Link
-                href={`/admin-dashboard/order/${r.order_id}`}
-                className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                title="View Report"
-              >
-                <Eye size={14} className="mr-1" /> View
-              </Link>
-              <button
-                onClick={() => handleAction(r.order_id, "INSTALLED")}
-                className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-              >
-                Installed
-              </button>
-              <button
-                onClick={() => openReturnModal(r.order_id)}
-                className="w-full px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700"
-              >
-                Partial Return
-              </button>
-              <button
-                onClick={() => handleAction(r.order_id, "RETURNED")}
-                className="w-full px-3 py-2 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-              >
-                Full Return
-              </button>
+              {/* Actions */}
+              <div className="flex flex-col gap-2 mt-3">
+                <Link
+                  href={`/admin-dashboard/order/${r.order_id}`}
+                  className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                  title="View Report"
+                >
+                  <Eye size={14} className="mr-1" /> View
+                </Link>
+                <button
+                  onClick={() => handleAction(r.order_id, "INSTALLED")}
+                  className="w-full px-3 py-2 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                >
+                  Installed
+                </button>
+                <button
+                  onClick={() => openReturnModal(r.order_id)}
+                  className="w-full px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700"
+                >
+                  Partial Return
+                </button>
+                <button
+                  onClick={() => handleAction(r.order_id, "RETURNED")}
+                  className="w-full px-3 py-2 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                >
+                  Full Return
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/** ================= DESKTOP TABLE VIEW ================= */}
-      <div className="hidden md:block overflow-x-auto shadow bg-white rounded">
-        <table className="w-full text-sm table-auto border-collapse">
-          <thead className="bg-gray-800 text-white">
-            <tr>
-              <th className="p-3">Order ID</th>
-              <th className="p-3">Model</th>
-              <th className="p-3">Name</th>
-              <th className="p-3">Delivery Address</th>
-              <th className="p-3">Company</th>
-              <th className="p-3">Contact</th>
-              <th className="p-3">Emp</th>
-              <th className="p-3">Delivery</th>
-              <th className="p-3">Days</th>
-              <th className="p-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {records.map((r, i) => (
-              <tr key={i} className={getRowClass(r.installation_status)}>
-                <td className="p-3">{r.order_id}</td>
-                <td className="p-3">{r.model}</td>
-                <td className="p-3">{r.name}</td>
-                <td className="p-3">{r.delivery_address}</td>
-                <td className="p-3">{r.company_name}</td>
-                <td className="p-3">{r.contact}</td>
-                <td className="p-3">{r.emp_name}</td>
-                <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                  {r.delivery_date}
-                </td>
-                <td className={`p-3 ${dateColor(r.installation_status)}`}>
-                  {formatDays(r.days_until_installation)}
-                </td>
-                <td className="p-3">
-                  <div className="flex flex-col gap-2 items-stretch">
-                    <Link
-                      href={`/admin-dashboard/order/${r.order_id}`}
-                      className="inline-flex justify-center items-center px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                      title="View Order / Report"
-                    >
-                      <Eye size={14} className="mr-1" /> View
-                    </Link>
-                    <button
-                      onClick={() => handleAction(r.order_id, "INSTALLED")}
-                      className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                    >
-                      Installed
-                    </button>
-                    <button
-                      onClick={() => openReturnModal(r.order_id)}
-                      className="px-3 py-1.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
-                    >
-                      Partial Return
-                    </button>
-                    <button
-                      onClick={() => handleAction(r.order_id, "RETURNED")}
-                      className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700"
-                    >
-                      Full Return
-                    </button>
-                  </div>
-                </td>
+      {!loading && (
+        <div className="hidden md:block overflow-x-auto shadow bg-white rounded">
+          <table className="w-full text-sm table-auto border-collapse">
+            <thead className="bg-gray-800 text-white">
+              <tr>
+                <th className="p-3">Order ID</th>
+                <th className="p-3">Model</th>
+                <th className="p-3">Name</th>
+                <th className="p-3">Delivery Address</th>
+                <th className="p-3">Company</th>
+                <th className="p-3">Contact</th>
+                <th className="p-3">Emp</th>
+                <th className="p-3">Delivery</th>
+                <th className="p-3">Days</th>
+                <th className="p-3">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {filteredRecords.map((r, i) => (
+                <tr key={i} className={getRowClass(r.installation_status)}>
+                  <td className="p-3">{r.order_id}</td>
+                  <td className="p-3">{r.model}</td>
+                  <td className="p-3">{r.name}</td>
+                  <td className="p-3">{r.delivery_address}</td>
+                  <td className="p-3">{r.company_name}</td>
+                  <td className="p-3">{r.contact}</td>
+                  <td className="p-3">{r.emp_name}</td>
+                  <td className={`p-3 ${dateColor(r.installation_status)}`}>
+                    {r.delivery_date}
+                  </td>
+                  <td className={`p-3 ${dateColor(r.installation_status)}`}>
+                    {formatDays(r.days_until_installation)}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex flex-col gap-2 items-stretch">
+                      <Link
+                        href={`/admin-dashboard/order/${r.order_id}`}
+                        className="inline-flex justify-center items-center px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                        title="View Order / Report"
+                      >
+                        <Eye size={14} className="mr-1" /> View
+                      </Link>
+                      <button
+                        onClick={() => handleAction(r.order_id, "INSTALLED")}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                      >
+                        Installed
+                      </button>
+                      <button
+                        onClick={() => openReturnModal(r.order_id)}
+                        className="px-3 py-1.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
+                      >
+                        Partial Return
+                      </button>
+                      <button
+                        onClick={() => handleAction(r.order_id, "RETURNED")}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+                      >
+                        Full Return
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* ================= MODAL ================= */}
       {showReturnModal && (

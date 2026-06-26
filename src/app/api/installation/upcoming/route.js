@@ -61,10 +61,6 @@ export async function GET(req) {
        AND (no.is_cancelled = 0 or no.is_cancelled IS NULL)
        AND no.delivery_date IS NOT NULL
        AND no.dispatch_status = 1
-      AND (
-        no.delivery_date < CURDATE() OR
-        no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY)
-      )
       ${typeFilter}
       GROUP BY no.id
       ORDER BY days_until_installation ASC;
