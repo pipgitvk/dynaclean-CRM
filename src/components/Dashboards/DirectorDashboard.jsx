@@ -23,7 +23,8 @@ import {
   CheckCircle2,
   AlertCircle,
   DollarSign,
-  FileText
+  FileText,
+  PackageX
 } from "lucide-react";
 import { 
   BarChart, 
@@ -162,6 +163,8 @@ export default function DirectorDashboard({ user }) {
   const [greeting, setGreeting] = useState("Day");
   const [totalAvailableStockPrice, setTotalAvailableStockPrice] = useState(0);
   const [totalAvailableStockQty, setTotalAvailableStockQty] = useState(0);
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const [zeroStockCount, setZeroStockCount] = useState(0);
   const [kpiData, setKpiData] = useState({
     taskPending: 0,
     stockValue: 0,
@@ -183,6 +186,7 @@ export default function DirectorDashboard({ user }) {
   useEffect(() => {
     fetchKpiData();
     fetchAvailableStockPrice();
+    fetchLowStockAlerts();
     
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("Morning");
@@ -221,6 +225,17 @@ export default function DirectorDashboard({ user }) {
       setTotalAvailableStockQty(totalQty);
     } catch (error) {
       console.error('Error fetching available stock price:', error);
+    }
+  };
+
+  const fetchLowStockAlerts = async () => {
+    try {
+      const res = await fetch('/api/stock/low-stock');
+      const data = await res.json();
+      setLowStockCount(data.lowStockCount || 0);
+      setZeroStockCount(data.zeroStockCount || 0);
+    } catch (error) {
+      console.error('Error fetching low stock alerts:', error);
     }
   };
 
@@ -284,6 +299,19 @@ export default function DirectorDashboard({ user }) {
           gradient="bg-green-600"
           buttonText="INVENTORY"
           subtext={`Total Qty: ${totalAvailableStockQty.toLocaleString('en-IN')}`}
+          onClick={() => router.push("/director-dashboard/product-stock")}
+        />
+        <KPICard
+          title="Low Stock Alerts"
+          isMultiValue={true}
+          multiValues={[
+            { label: "LOW STOCK", value: lowStockCount },
+            { label: "ZERO STOCK", value: zeroStockCount },
+          ]}
+          icon={PackageX}
+          gradient="bg-red-500"
+          buttonText="VIEW"
+          buttonOnSide={false}
           onClick={() => router.push("/director-dashboard/product-stock")}
         />
         {/* <KPICard

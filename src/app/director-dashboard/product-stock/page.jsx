@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Search, ArrowRightLeft, History, X } from "lucide-react";
+import { Eye, Search, ArrowRightLeft, History, X, PackageX, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 function ProductStockList() {
@@ -29,6 +29,9 @@ function ProductStockList() {
   const [showSparesModal, setShowSparesModal] = useState(false);
   const [selectedProductSpares, setSelectedProductSpares] = useState([]);
   const [allSpares, setAllSpares] = useState([]);
+  const [zeroStockProducts, setZeroStockProducts] = useState([]);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [showZeroStockCard, setShowZeroStockCard] = useState(true);
 
   const handleViewSpares = (product) => {
     // Filter spares based on product/machine compatibility
@@ -93,6 +96,7 @@ function ProductStockList() {
     fetchStockSummary();
     fetchPurchasePrices();
     fetchAllSpares();
+    fetchStockAlerts();
   }, []);
 
   const fetchAllSpares = async () => {
@@ -103,6 +107,17 @@ function ProductStockList() {
     } catch (err) {
       console.error('Error fetching spares:', err);
       setAllSpares([]);
+    }
+  };
+
+  const fetchStockAlerts = async () => {
+    try {
+      const res = await fetch('/api/stock/low-stock');
+      const data = await res.json();
+      setZeroStockProducts(Array.isArray(data.zeroStock) ? data.zeroStock : []);
+      setLowStockProducts(Array.isArray(data.lowStock) ? data.lowStock : []);
+    } catch (err) {
+      console.error('Error fetching stock alerts:', err);
     }
   };
 
@@ -393,6 +408,133 @@ function ProductStockList() {
           </button>
         </div>
       </div>
+
+      {/* ── Zero Stock Alert Card ─────────────────────────────────── */}
+      {showZeroStockCard && zeroStockProducts.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 shadow-sm overflow-hidden">
+          {/* Card Header */}
+          <div className="flex items-center justify-between px-5 py-4 bg-red-100 border-b border-red-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-red-500 text-white">
+                <PackageX size={18} />
+              </div>
+              <div>
+                <h2 className="font-bold text-red-800 text-sm uppercase tracking-wide">
+                  Zero Stock Products
+                </h2>
+                <p className="text-xs text-red-500 mt-0.5">
+                  {zeroStockProducts.length} product{zeroStockProducts.length !== 1 ? "s" : ""} with no stock available
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowZeroStockCard(false)}
+              className="p-1.5 rounded-lg hover:bg-red-200 text-red-500 transition-colors"
+              title="Dismiss"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Product List */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-red-100/60 text-red-700 uppercase text-[11px] tracking-wider">
+                  <th className="px-5 py-2 text-left font-semibold">Product Code</th>
+                  <th className="px-5 py-2 text-left font-semibold">Item Name</th>
+                  <th className="px-5 py-2 text-left font-semibold">Product No.</th>
+                  <th className="px-5 py-2 text-left font-semibold">Min Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Delhi</th>
+                  <th className="px-5 py-2 text-left font-semibold">South</th>
+                  <th className="px-5 py-2 text-left font-semibold">Total Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {zeroStockProducts.map((p, idx) => (
+                  <tr
+                    key={p.product_code || idx}
+                    className="border-t border-red-100 hover:bg-red-100/40 transition-colors"
+                  >
+                    <td className="px-5 py-3 font-bold text-red-800">{p.product_code}</td>
+                    <td className="px-5 py-3 font-semibold text-gray-800">{p.item_name || "—"}</td>
+                    <td className="px-5 py-3 text-gray-600">{p.product_number || "—"}</td>
+                    <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
+                    <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
+                    <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
+                    <td className="px-5 py-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white">
+                        <PackageX size={11} />
+                        {p.total_quantity ?? 0}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Low Stock Alert Card ──────────────────────────────────── */}
+      {lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length > 0 && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
+          {/* Card Header */}
+          <div className="flex items-center gap-3 px-5 py-4 bg-amber-100 border-b border-amber-200">
+            <div className="p-2 rounded-xl bg-amber-500 text-white">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <h2 className="font-bold text-amber-800 text-sm uppercase tracking-wide">
+                Low Stock Warning
+              </h2>
+              <p className="text-xs text-amber-600 mt-0.5">
+                {lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length} product{lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length !== 1 ? "s" : ""} below minimum quantity
+              </p>
+            </div>
+          </div>
+
+          {/* Product List */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-amber-100/60 text-amber-700 uppercase text-[11px] tracking-wider">
+                  <th className="px-5 py-2 text-left font-semibold">Product Code</th>
+                  <th className="px-5 py-2 text-left font-semibold">Item Name</th>
+                  <th className="px-5 py-2 text-left font-semibold">Product No.</th>
+                  <th className="px-5 py-2 text-left font-semibold">Current Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Min Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Delhi</th>
+                  <th className="px-5 py-2 text-left font-semibold">South</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lowStockProducts
+                  .filter(p => (p.total_quantity ?? 0) > 0)
+                  .map((p, idx) => (
+                    <tr
+                      key={p.product_code || idx}
+                      className="border-t border-amber-100 hover:bg-amber-100/40 transition-colors"
+                    >
+                      <td className="px-5 py-3 font-bold text-amber-800">{p.product_code}</td>
+                      <td className="px-5 py-3 font-semibold text-gray-800">{p.item_name || "—"}</td>
+                      <td className="px-5 py-3 text-gray-600">{p.product_number || "—"}</td>
+                      <td className="px-5 py-3">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
+                          <AlertTriangle size={11} />
+                          {p.total_quantity ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
+                      <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
+                      <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* List Section */}
       {openSection === "list" && (
