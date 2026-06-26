@@ -35,6 +35,7 @@ export default async function CustomersPage({ searchParams }) {
     sort,
     next_follow_date,
     employee,
+    tags,
     page = '1'
   } = searchParamsResolved;
 
@@ -76,26 +77,29 @@ export default async function CustomersPage({ searchParams }) {
   let joinClause = "";
   const followupConditions = [];
   const followupParams = [];
-  let followupSelectFields = ""; // NEW: To conditionally add fields from joined table
 
-  // --- Start: Build conditions for customers_followup table if next_follow_date is present ---
-  if (next_follow_date) {
-    // If filtering by next_follow_date, we must JOIN
+  // Build INNER JOIN for filtering by next_follow_date or tags
+  if (next_follow_date || tags) {
     joinClause = `
-      INNER JOIN customers_followup cf ON c.customer_id = cf.customer_id
+      INNER JOIN (
+        SELECT customer_id, multi_tag, next_followup_date
+        FROM customers_followup
+        WHERE time_stamp = (
+          SELECT MAX(time_stamp) FROM customers_followup cf2
+          WHERE cf2.customer_id = customers_followup.customer_id
+        )
+      ) cf_filter ON c.customer_id = cf_filter.customer_id
     `;
-    // Add the filter condition for the followup date
-    followupConditions.push("DATE(cf.next_followup_date) = ?"); // Confirmed column name
-    followupParams.push(next_follow_date);
 
-    // If joined, also select the fields from the joined table
-    followupSelectFields = `
-      , cf.next_followup_date AS next_follow_date
-      , cf.notes AS latest_followup_notes_from_followup_table -- Changed alias to avoid conflict, adjust as needed
-      -- You can add other fields from customers_followup here, like cf.followed_date, cf.followed_by, etc.
-    `;
-  } else {
-    followupSelectFields = ", c.next_follow_date"; // Assume customers table has this for initial display
+    if (next_follow_date) {
+      followupConditions.push("DATE(cf_filter.next_followup_date) = ?");
+      followupParams.push(next_follow_date);
+    }
+
+    if (tags) {
+      followupConditions.push("cf_filter.multi_tag LIKE ?");
+      followupParams.push(`%${tags}%`);
+    }
   }
 
   if (status) {
@@ -167,9 +171,20 @@ export default async function CustomersPage({ searchParams }) {
       c.notes,
       c.date_created,
       c.lead_campaign,
-      c.products_interest
-      ${followupSelectFields} -- This inserts the conditional select statement
+      c.products_interest,
+      COALESCE(cf.multi_tag, '') AS multi_tag,
+      cf.next_followup_date AS next_follow_date,
+      cf.notes AS latest_followup_notes
     FROM customers c
+    LEFT JOIN (
+      SELECT 
+        customer_id,
+        multi_tag,
+        next_followup_date,
+        notes,
+        ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY time_stamp DESC) AS rn
+      FROM customers_followup
+    ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     ${joinClause}
     WHERE ${whereClauseString}
   `;

@@ -8,9 +8,31 @@ import { getDbConnection } from "@/lib/db";
  *  - quotations (to get model(s) and item_name) via quote_number
  *
  * Highlights installations within 10 days and past expected delivery dates.
+ * Query parameter: ?type=products|spares|all
  */
 export async function GET(req) {
   try {
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get("type") || "products"; // Default to products
+
+    let typeFilter = "";
+    if (type === "products") {
+      typeFilter = `
+        AND EXISTS (
+          SELECT 1 FROM products_list pl 
+          WHERE pl.item_code = d.item_code
+        )
+      `;
+    } else if (type === "spares") {
+      typeFilter = `
+        AND EXISTS (
+          SELECT 1 FROM spare_list sl 
+          WHERE sl.spare_number = d.item_code
+        )
+      `;
+    }
+    // If type === "all", no filter needed
+
     const query = `
       SELECT
         no.id,
@@ -43,6 +65,7 @@ export async function GET(req) {
         no.delivery_date < CURDATE() OR
         no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY)
       )
+      ${typeFilter}
       GROUP BY no.id
       ORDER BY days_until_installation ASC;
     `;

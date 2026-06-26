@@ -934,7 +934,22 @@ export default function OrderTable({ orders, userRole }) {
                   >
                     <td className="px-3 py-3">{i + 1}</td>
                     <td className="px-3 py-3 font-medium text-gray-800">
-                      {r.order_id}
+                      <div className="space-y-1">
+                        {r.quote_number ? (
+                          <Link
+                            href={`/admin-dashboard/quotations/${r.quote_number}`}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-semibold text-sm break-words"
+                            title="View Quotation"
+                          >
+                            Q: {r.quote_number}
+                          </Link>
+                        ) : (
+                          <div className="text-gray-400 text-xs">No Quote</div>
+                        )}
+                        <div className="text-gray-800 font-medium">
+                          Ord: {r.order_id}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-3 py-3 font-medium text-gray-800">
                       {r.created_by}
@@ -1114,6 +1129,21 @@ export default function OrderTable({ orders, userRole }) {
                 </div>
                 <div>
                   <strong>Order Id:</strong> {r.order_id}
+                </div>
+                <div>
+                  {r.quote_number ? (
+                    <Link
+                      href={`/admin-dashboard/quotations/${r.quote_number}`}
+                      className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+                      title="View Quotation"
+                    >
+                      <strong>Quote #:</strong> {r.quote_number}
+                    </Link>
+                  ) : (
+                    <div className="text-gray-400 text-xs">
+                      <strong>Quote:</strong> Not available
+                    </div>
+                  )}
                 </div>
                 <div>
                   <strong>Created By:</strong> {r.created_by || "-"}

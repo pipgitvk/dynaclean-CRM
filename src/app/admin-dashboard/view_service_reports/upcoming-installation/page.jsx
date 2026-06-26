@@ -5,6 +5,7 @@ import { Eye } from "lucide-react";
 
 export default function UpcomingInstallationsPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState("products"); // Default to "products"
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -122,7 +123,7 @@ export default function UpcomingInstallationsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/installation/upcoming`);
+      const res = await fetch(`/api/installation/upcoming?type=${typeFilter}`);
       const data = await res.json();
 
       setRecords(data.installations || []);
@@ -135,7 +136,7 @@ export default function UpcomingInstallationsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [typeFilter]);
 
   useEffect(() => {
     fetchData();
@@ -182,6 +183,40 @@ export default function UpcomingInstallationsPage() {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="px-4 py-2 border rounded shadow-sm"
         />
+
+        {/* Type Filter */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => setTypeFilter("all")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "all"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setTypeFilter("products")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "products"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Products
+          </button>
+          <button
+            onClick={() => setTypeFilter("spares")}
+            className={`px-4 py-2 rounded font-medium transition ${
+              typeFilter === "spares"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+            }`}
+          >
+            Spares
+          </button>
+        </div>
 
         <div className="flex gap-6">
           <div className="flex items-center"><div className="w-4 h-4 bg-red-100 mr-2" />Overdue</div>

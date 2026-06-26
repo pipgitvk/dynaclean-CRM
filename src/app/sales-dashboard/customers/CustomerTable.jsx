@@ -42,6 +42,7 @@ export default function CustomerTable({
     lead_campaign: searchParams.lead_campaign ?? "",
     next_follow_date: searchParams.next_follow_date ?? "",
     employee: searchParams.employee ?? "",
+    tags: searchParams.tags ?? "",
   });
   const [isInputVisible, setIsInputVisible] = useState(false);
 
@@ -62,6 +63,7 @@ export default function CustomerTable({
       lead_campaign: searchParams.lead_campaign ?? "",
       next_follow_date: searchParams.next_follow_date ?? "",
       employee: searchParams.employee ?? "",
+      tags: searchParams.tags ?? "",
     }));
   }, [searchParams]);
 
@@ -76,6 +78,7 @@ export default function CustomerTable({
       lead_campaign: "",
       next_follow_date: "",
       employee: "",
+      tags: "",
     };
     setFilters(cleared);
     router.push("?");
@@ -203,6 +206,24 @@ export default function CustomerTable({
           <option value="google_ads">Google Ads</option>
           <option value="visit">Visit</option>
           <option value="reference">Reference</option>
+        </select>
+        <select
+          value={filters.tags}
+          onChange={(e) => update("tags", e.target.value)}
+          className="p-2 border rounded w-full"
+        >
+          <option value="">All Tags</option>
+          <option value="Visiting factory">Visiting factory</option>
+          <option value="Service Issue">Service Issue</option>
+          <option value="Payment Follow-Up">Payment Follow-Up</option>
+          <option value="Trucks Follow-Up">Trucks Follow-Up</option>
+          <option value="Cancel Order">Cancel Order</option>
+          <option value="Order received">Order received</option>
+          <option value="Prime">Prime</option>
+          <option value="Repeat Order">Repeat Order</option>
+          <option value="Running Order">Running Order</option>
+          <option value="Strong Follow-Up">Strong Follow-Up</option>
+          <option value="N/A">N/A</option>
         </select>
         <div className="relative">
           {/* Label */}

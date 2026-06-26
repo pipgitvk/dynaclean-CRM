@@ -25,6 +25,7 @@ export default function CustomerTable({
     stage: searchParams?.stage || "",
     from: searchParams?.from || "",
     to: searchParams?.to || "",
+    tags: searchParams?.tags || "",
   });
 
   const handleSearch = (e) => {
@@ -38,6 +39,7 @@ export default function CustomerTable({
       if (filters.stage) params.set("stage", filters.stage);
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
+      if (filters.tags) params.set("tags", filters.tags);
       router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
   };
@@ -52,6 +54,7 @@ export default function CustomerTable({
         stage: "",
         from: "",
         to: "",
+        tags: "",
       });
       router.push("/admin-dashboard/customers");
     });
@@ -67,6 +70,7 @@ export default function CustomerTable({
       if (filters.stage) params.set("stage", filters.stage);
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
+      if (filters.tags) params.set("tags", filters.tags);
       params.set("page", newPage.toString());
       router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
@@ -158,6 +162,25 @@ export default function CustomerTable({
             <option value="Won (Order Received)">Won (Order Received)</option>
             <option value="Lost">Lost</option>
             <option value="Disqualified / Invalid Lead">Disqualified / Invalid Lead</option>
+          </select>
+
+          <select
+            value={filters.tags}
+            onChange={(e) => setFilters({ ...filters, tags: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[140px] sm:min-w-0"
+          >
+            <option value="">All Tags</option>
+            <option value="Visiting factory">Visiting factory</option>
+            <option value="Service Issue">Service Issue</option>
+            <option value="Payment Follow-Up">Payment Follow-Up</option>
+            <option value="Trucks Follow-Up">Trucks Follow-Up</option>
+            <option value="Cancel Order">Cancel Order</option>
+            <option value="Order received">Order received</option>
+            <option value="Prime">Prime</option>
+            <option value="Repeat Order">Repeat Order</option>
+            <option value="Running Order">Running Order</option>
+            <option value="Strong Follow-Up">Strong Follow-Up</option>
+            <option value="N/A">N/A</option>
           </select>
           <input
             type="date"

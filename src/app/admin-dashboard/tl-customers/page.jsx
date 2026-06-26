@@ -47,10 +47,11 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       cf.followed_date as latest_followed_date,
       cf.notes as latest_notes,
       cf.followed_by as latest_followed_by,
+      cf.multi_tag as cf_multi_tag,
       tlf.id as tl_followup_id,
       tlf.estimated_order_date,
       tlf.lead_quality_score,
-      tlf.multi_tag,
+      COALESCE(tlf.multi_tag, cf.multi_tag) as multi_tag,
       tlf.notes as tl_notes,
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
@@ -58,7 +59,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       ${showTLOnly ? "fu.followup_start_at" : "NULL AS followup_start_at"}
     FROM customers c
     LEFT JOIN (
-      SELECT customer_id, next_followup_date, followed_date, notes, followed_by,
+      SELECT customer_id, next_followup_date, followed_date, notes, followed_by, multi_tag,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY time_stamp DESC) as rn
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
@@ -109,10 +110,10 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   // Filter by tag
   if (tag) {
     if (tag === "N/A") {
-      query += ` AND (tlf.multi_tag IS NULL OR tlf.multi_tag = '')`;
+      query += ` AND (tlf.multi_tag IS NULL OR tlf.multi_tag = '') AND (cf.multi_tag IS NULL OR cf.multi_tag = '')`;
     } else {
-      query += ` AND tlf.multi_tag LIKE ?`;
-      params.push(`%${tag}%`);
+      query += ` AND (tlf.multi_tag LIKE ? OR cf.multi_tag LIKE ?)`;
+      params.push(`%${tag}%`, `%${tag}%`);
     }
   }
 
@@ -182,7 +183,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       c.customer_id,
       c.status,
       c.stage,
-      tlf.multi_tag,
+      COALESCE(tlf.multi_tag, cf.multi_tag) as multi_tag,
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
       tlf.customer_id as tl_customer_id,
@@ -190,7 +191,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       cf.followed_date as latest_followed_date
     FROM customers c
     LEFT JOIN (
-      SELECT customer_id, next_followup_date, followed_date,
+      SELECT customer_id, next_followup_date, followed_date, multi_tag,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY time_stamp DESC) as rn
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
@@ -228,10 +229,10 @@ export default async function AdminTLCustomersPage({ searchParams }) {
 
   if (tag) {
     if (tag === "N/A") {
-      kpiQuery += ` AND (tlf.multi_tag IS NULL OR tlf.multi_tag = '')`;
+      kpiQuery += ` AND (tlf.multi_tag IS NULL OR tlf.multi_tag = '') AND (cf.multi_tag IS NULL OR cf.multi_tag = '')`;
     } else {
-      kpiQuery += ` AND tlf.multi_tag LIKE ?`;
-      kpiParams.push(`%${tag}%`);
+      kpiQuery += ` AND (tlf.multi_tag LIKE ? OR cf.multi_tag LIKE ?)`;
+      kpiParams.push(`%${tag}%`, `%${tag}%`);
     }
   }
 

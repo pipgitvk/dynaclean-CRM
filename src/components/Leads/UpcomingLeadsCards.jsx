@@ -21,6 +21,7 @@ export default function UpcomingLeadsCards({ leadSource }) {
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL"); // ALL or specific status
   const [stageFilter, setStageFilter] = useState("ALL"); // ALL or specific stage
+  const [tagFilter, setTagFilter] = useState("ALL"); // ALL or specific tag
 
   useEffect(() => {
     async function fetchLeads() {
@@ -57,6 +58,14 @@ export default function UpcomingLeadsCards({ leadSource }) {
       filtered = filtered.filter((cust) =>
         String(cust.stage || "").toLowerCase() === wantedStage
       );
+    }
+
+    // Tag filtering
+    if (tagFilter && tagFilter !== "ALL") {
+      filtered = filtered.filter((cust) => {
+        const tags = String(cust.multi_tag || "").split(",").map(t => t.trim());
+        return tags.some(t => t === tagFilter);
+      });
     }
 
     // Date filtering (by next_followup_date)
@@ -130,6 +139,31 @@ export default function UpcomingLeadsCards({ leadSource }) {
                 .map((s) => (
                   <option key={s} value={s}>
                     {s}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-600 mb-1">Tags</label>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+            >
+              <option value="ALL">All tags</option>
+              {[...new Set(
+                leads
+                  .flatMap((l) => 
+                    String(l.multi_tag || "")
+                      .split(",")
+                      .map(t => t.trim())
+                      .filter(Boolean)
+                  )
+              )]
+                .sort((a, b) => String(a).localeCompare(String(b)))
+                .map((t) => (
+                  <option key={t} value={t}>
+                    {t}
                   </option>
                 ))}
             </select>

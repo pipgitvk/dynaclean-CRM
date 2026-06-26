@@ -31,6 +31,7 @@ export default async function HomePage({ searchParams }) {
     stage,
     from,
     to,
+    tags,
     page = "1",
   } = searchParamsResolved;
 
@@ -59,6 +60,7 @@ export default async function HomePage({ searchParams }) {
       SELECT
         c.*,
         cf.notes AS latest_note,
+        cf.multi_tag AS latest_tags,
         IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers
       FROM
         customers c
@@ -66,6 +68,7 @@ export default async function HomePage({ searchParams }) {
         SELECT
           customer_id,
           notes,
+          multi_tag,
           ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY time_stamp DESC) AS rn
         FROM
           customers_followup
@@ -111,6 +114,11 @@ export default async function HomePage({ searchParams }) {
     if (to) {
       query += ` AND c.date_created <= ?`;
       params.push(to);
+    }
+
+    if (tags) {
+      query += ` AND cf.multi_tag LIKE ?`;
+      params.push(`%${tags}%`);
     }
 
     // Get total count
