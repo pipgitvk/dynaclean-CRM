@@ -1955,18 +1955,9 @@ function UpdateDeliveryMenuItem({ order }) {
   );
 }
 
-const REVERT_WINDOW_HOURS = 4;
-function canRevertOrder(approvalDate) {
-  if (!approvalDate) return false;
-  // Parse DB string as UTC
-  let dateStr = String(approvalDate);
-  if (!dateStr.includes('Z')) {
-    dateStr = dateStr.replace(' ', 'T') + 'Z';
-  }
-  const approvedAt = new Date(dateStr).getTime();
-  const now = Date.now();
-  const hoursPassed = (now - approvedAt) / (1000 * 60 * 60);
-  return hoursPassed < REVERT_WINDOW_HOURS;
+function canRevertOrder(dispatchStatus) {
+  // Cannot revert if order is dispatched
+  return !dispatchStatus;
 }
 
 function ApprovalActions({ r, userRole }) {
@@ -1976,7 +1967,7 @@ function ApprovalActions({ r, userRole }) {
   const [remark, setRemark] = useState("");
   const isSuperAdmin =
     (userRole || "").toString().trim().toUpperCase() === "SUPERADMIN";
-  const revertAllowed = canRevertOrder(r.approval_date);
+  const revertAllowed = canRevertOrder(r.dispatch_status);
 
   const submitAction = async (action, remarkVal) => {
     setLoading(true);
@@ -2009,8 +2000,8 @@ function ApprovalActions({ r, userRole }) {
 
   const handleAction = async (action) => {
     if (action === "pending") {
-      if (!revertAllowed) {
-        toast.error("Revert is only allowed within 4 hours of approval/rejection.");
+      if (r.dispatch_status) {
+        toast.error("Cannot revert: Order is already dispatched.");
         return;
       }
       if (!confirm("Reset this order to Pending approval?")) return;
@@ -2035,9 +2026,13 @@ function ApprovalActions({ r, userRole }) {
         {isSuperAdmin && (
           <button
             onClick={() => handleAction("pending")}
-            disabled={loading}
+            disabled={loading || !revertAllowed}
             className={`text-xs ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
-            title={revertAllowed ? "Reset to Pending (within 4 hours)" : "Revert disabled after 4 hours"}
+            title={
+              r.dispatch_status 
+                ? "Cannot revert: Order is already dispatched" 
+                : "Reset to Pending"
+            }
           >
             Revert
           </button>
@@ -2055,9 +2050,13 @@ function ApprovalActions({ r, userRole }) {
         {isSuperAdmin && (
           <button
             onClick={() => handleAction("pending")}
-            disabled={loading}
+            disabled={loading || !revertAllowed}
             className={`text-xs ${revertAllowed ? "text-gray-500 hover:text-orange-600 underline" : "text-gray-400 cursor-not-allowed"}`}
-            title={revertAllowed ? "Reset to Pending (within 4 hours)" : "Revert disabled after 4 hours"}
+            title={
+              r.dispatch_status 
+                ? "Cannot revert: Order is already dispatched" 
+                : "Reset to Pending"
+            }
           >
             Revert
           </button>

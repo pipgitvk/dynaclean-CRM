@@ -48,30 +48,18 @@ export async function POST(req) {
                 [remarkVal, orderId]
             );
         } else {
-            // Reset to pending (undo approve/reject) - only within 4 hours
+            // Reset to pending (undo approve/reject) - only if not dispatched
             const [orderRows] = await conn.execute(
-                "SELECT approval_date FROM neworder WHERE order_id = ?",
+                "SELECT dispatch_status FROM neworder WHERE order_id = ?",
                 [orderId]
             );
-            const approvalDate = orderRows[0]?.approval_date;
-            if (!approvalDate) {
+            const order = orderRows[0];
+            const dispatchStatus = order?.dispatch_status;
+
+            // Check if order is dispatched
+            if (dispatchStatus) {
                 return NextResponse.json(
-                    { success: false, error: "Revert is only allowed within 4 hours of approval/rejection." },
-                    { status: 400 }
-                );
-            }
-            
-            // Parse DB string as UTC
-            let dateStr = String(approvalDate);
-            if (!dateStr.includes('Z')) {
-              dateStr = dateStr.replace(' ', 'T') + 'Z';
-            }
-            const approvedAt = new Date(dateStr).getTime();
-            const hoursPassed = (Date.now() - approvedAt) / (1000 * 60 * 60);
-            
-            if (hoursPassed >= 4) {
-                return NextResponse.json(
-                    { success: false, error: "Revert is only allowed within 4 hours of approval/rejection." },
+                    { success: false, error: "Cannot revert: Order is already dispatched." },
                     { status: 400 }
                 );
             }
