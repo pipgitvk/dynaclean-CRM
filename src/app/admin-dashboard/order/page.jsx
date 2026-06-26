@@ -75,9 +75,37 @@ export default async function OrdersPage() {
 
   const [orders] = await conn.execute(sql, params);
 
-  // await conn.end();
+  // Fetch order_ids that are in payment-pending (not fully paid, remaining > 0)
+  // Only these orders should show actual paid amount; others show 0
+  const [pendingRows] = await conn.execute(`
+    SELECT order_id, payment_amount, totalamt
+    FROM neworder
+    WHERE (payment_status IS NULL OR payment_status != 'paid')
+      AND (is_returned = 0 OR is_returned = 2 OR is_returned IS NULL)
+      AND (is_cancelled = 0 OR is_cancelled IS NULL)
+  `);
 
-  console.log("fetched orders:", orders);
+  const pendingOrderIds = new Set(
+    pendingRows
+      .filter((o) => {
+        const paid = (o.payment_amount || "")
+          .toString()
+          .split(",")
+          .map((s) => parseFloat(s.trim()) || 0)
+          .reduce((a, b) => a + b, 0);
+        const total = parseFloat(o.totalamt || 0);
+        return total - paid > 0;
+      })
+      .map((o) => o.order_id)
+  );
+
+  // Mark each order: if not in pendingOrderIds, hide paid amount (set to 0)
+  const enrichedOrders = orders.map((o) => ({
+    ...o,
+    payment_amount: pendingOrderIds.has(o.order_id) ? o.payment_amount : "0",
+  }));
+
+  // await conn.end();
 
   return (
     <div className="mx-auto p-6">
@@ -109,7 +137,7 @@ export default async function OrdersPage() {
       </div>
 
 
-      <OrderTable orders={orders} userRole={userRole} />
+      <OrderTable orders={enrichedOrders} userRole={userRole} />
     </div>
   );
 }
