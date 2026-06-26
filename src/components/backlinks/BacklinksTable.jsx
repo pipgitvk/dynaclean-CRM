@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Plus, Edit, Trash2 } from "lucide-react";
+import { Search, Plus, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 import AddBacklinkModal from "./AddBacklinkModal";
 import EditBacklinkModal from "./EditBacklinkModal";
@@ -54,30 +54,6 @@ const BacklinksTable = () => {
       toast.error("Network error while fetching backlinks");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteBacklink = async (id) => {
-    if (!confirm("Are you sure you want to delete this backlink?")) return;
-
-    try {
-      const res = await fetch("/api/backlinks", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success("Backlink deleted successfully!");
-        fetchBacklinks();
-      } else {
-        toast.error(data.message || "Failed to delete backlink");
-      }
-    } catch (error) {
-      console.error("Error deleting backlink:", error);
-      toast.error("Network error while deleting backlink");
     }
   };
 
@@ -270,13 +246,6 @@ const BacklinksTable = () => {
                       >
                         <Edit size={18} />
                       </button>
-                      <button
-                        onClick={() => handleDeleteBacklink(backlink.id)}
-                        title="Delete"
-                        className="text-red-600 hover:text-red-800 transition"
-                      >
-                        <Trash2 size={18} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -318,12 +287,6 @@ const BacklinksTable = () => {
                     className="text-green-600"
                   >
                     <Edit size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteBacklink(backlink.id)}
-                    className="text-red-600"
-                  >
-                    <Trash2 size={18} />
                   </button>
                 </div>
               </div>

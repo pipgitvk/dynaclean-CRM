@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Plus, Edit, Trash2, Eye } from "lucide-react";
+import { Search, Plus, Edit, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import AddKeywordModal from "./AddKeywordModal";
 import EditKeywordModal from "./EditKeywordModal";
@@ -57,30 +57,6 @@ const KeywordsTable = () => {
       toast.error("Network error while fetching keywords");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeleteKeyword = async (id) => {
-    if (!confirm("Are you sure you want to delete this keyword?")) return;
-
-    try {
-      const res = await fetch("/api/keywords", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success("Keyword deleted successfully!");
-        fetchKeywords();
-      } else {
-        toast.error(data.message || "Failed to delete keyword");
-      }
-    } catch (error) {
-      console.error("Error deleting keyword:", error);
-      toast.error("Network error while deleting keyword");
     }
   };
 
@@ -269,13 +245,6 @@ const KeywordsTable = () => {
                       >
                         <Edit size={18} />
                       </button>
-                      <button
-                        onClick={() => handleDeleteKeyword(keyword.id)}
-                        title="Delete"
-                        className="text-red-600 hover:text-red-800 transition"
-                      >
-                        <Trash2 size={18} />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -319,12 +288,6 @@ const KeywordsTable = () => {
                     className="text-green-600"
                   >
                     <Edit size={18} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteKeyword(keyword.id)}
-                    className="text-red-600"
-                  >
-                    <Trash2 size={18} />
                   </button>
                 </div>
               </div>
