@@ -216,7 +216,9 @@ export default function Navbar({ onToggleSidebar }) {
       r === "ADMIN" ||
       r === "SALES" ||
       r === "SALES EXECUTIVE" ||
-      r === "SALES REPRESENTATIVE"
+      r === "SALES REPRESENTATIVE" ||
+      r === "DIRECTOR" ||
+      r === "EA"
     );
   };
 
