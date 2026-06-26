@@ -21,7 +21,8 @@ export default function UpcomingLeadsCards({ leadSource }) {
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL"); // ALL or specific status
   const [stageFilter, setStageFilter] = useState("ALL"); // ALL or specific stage
-  const [tagFilter, setTagFilter] = useState("ALL"); // ALL or specific tag
+  const [multiTagFilter, setMultiTagFilter] = useState("ALL"); // ALL or specific multi-tag
+  const [tagFilter, setTagFilter] = useState(""); // empty or specific tag
 
   useEffect(() => {
     async function fetchLeads() {
@@ -60,11 +61,18 @@ export default function UpcomingLeadsCards({ leadSource }) {
       );
     }
 
-    // Tag filtering
-    if (tagFilter && tagFilter !== "ALL") {
+    // Multi-tag filtering
+    if (multiTagFilter && multiTagFilter !== "ALL") {
       filtered = filtered.filter((cust) => {
         const tags = String(cust.multi_tag || "").split(",").map(t => t.trim());
-        return tags.some(t => t === tagFilter);
+        return tags.some(t => t === multiTagFilter);
+      });
+    }
+
+    // Tag filtering
+    if (tagFilter && tagFilter !== "") {
+      filtered = filtered.filter((cust) => {
+        return cust.tags === tagFilter;
       });
     }
 
@@ -144,28 +152,43 @@ export default function UpcomingLeadsCards({ leadSource }) {
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">Tags</label>
+            <label className="text-xs text-gray-600 mb-1">All Multi-tag</label>
+            <select
+              className="border rounded-md px-3 py-2 text-sm"
+              value={multiTagFilter}
+              onChange={(e) => setMultiTagFilter(e.target.value)}
+            >
+              <option value="ALL">All Multi-tags</option>
+              {[...new Set(
+                leads
+                  .flatMap((l) => String(l.multi_tag || "").split(",").map(t => t.trim()))
+                  .filter(Boolean)
+              )]
+                .sort((a, b) => String(a).localeCompare(String(b)))
+                .map((mt) => (
+                  <option key={mt} value={mt}>
+                    {mt}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-600 mb-1">All Tags</label>
             <select
               className="border rounded-md px-3 py-2 text-sm"
               value={tagFilter}
               onChange={(e) => setTagFilter(e.target.value)}
             >
-              <option value="ALL">All tags</option>
-              {[...new Set(
-                leads
-                  .flatMap((l) => 
-                    String(l.multi_tag || "")
-                      .split(",")
-                      .map(t => t.trim())
-                      .filter(Boolean)
-                  )
-              )]
-                .sort((a, b) => String(a).localeCompare(String(b)))
-                .map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
+              <option value="">All Tags</option>
+              <option value="Facilities Management Company">Facilities Management Company</option>
+              <option value="Industrial Facilities">Industrial Facilities</option>
+              <option value="Commercial Buildings">Commercial Buildings</option>
+              <option value="Healthcare Facilities">Healthcare Facilities</option>
+              <option value="Educational Institutions">Educational Institutions</option>
+              <option value="Government Facilities">Government Facilities</option>
+              <option value="Property Management Companies">Property Management Companies</option>
+              <option value="Construction Company">Construction Company</option>
+              <option value="Transportation Companies">Transportation Companies</option>
             </select>
           </div>
           <div className="flex flex-col">

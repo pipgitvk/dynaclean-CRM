@@ -43,6 +43,7 @@ export default function CustomerTable({
     next_follow_date: searchParams.next_follow_date ?? "",
     employee: searchParams.employee ?? "",
     tags: searchParams.tags ?? "",
+    tag_filter: searchParams.tag_filter ?? "", // New separate tag filter
   });
   const [isInputVisible, setIsInputVisible] = useState(false);
 
@@ -64,6 +65,7 @@ export default function CustomerTable({
       next_follow_date: searchParams.next_follow_date ?? "",
       employee: searchParams.employee ?? "",
       tags: searchParams.tags ?? "",
+      tag_filter: searchParams.tag_filter ?? "",
     }));
   }, [searchParams]);
 
@@ -79,6 +81,7 @@ export default function CustomerTable({
       next_follow_date: "",
       employee: "",
       tags: "",
+      tag_filter: "",
     };
     setFilters(cleared);
     router.push("?");
@@ -212,7 +215,7 @@ export default function CustomerTable({
           onChange={(e) => update("tags", e.target.value)}
           className="p-2 border rounded w-full"
         >
-          <option value="">All Tags</option>
+          <option value="">All Multi-tag</option>
           <option value="Visiting factory">Visiting factory</option>
           <option value="Service Issue">Service Issue</option>
           <option value="Payment Follow-Up">Payment Follow-Up</option>
@@ -224,6 +227,22 @@ export default function CustomerTable({
           <option value="Running Order">Running Order</option>
           <option value="Strong Follow-Up">Strong Follow-Up</option>
           <option value="N/A">N/A</option>
+        </select>
+        <select
+          value={filters.tag_filter}
+          onChange={(e) => update("tag_filter", e.target.value)}
+          className="p-2 border rounded w-full"
+        >
+          <option value="">All Tags</option>
+          <option value="Facilities Management Company">Facilities Management Company</option>
+          <option value="Industrial Facilities">Industrial Facilities</option>
+          <option value="Commercial Buildings">Commercial Buildings</option>
+          <option value="Healthcare Facilities">Healthcare Facilities</option>
+          <option value="Educational Institutions">Educational Institutions</option>
+          <option value="Government Facilities">Government Facilities</option>
+          <option value="Property Management Companies">Property Management Companies</option>
+          <option value="Construction Company">Construction Company</option>
+          <option value="Transportation Companies">Transportation Companies</option>
         </select>
         <div className="relative">
           {/* Label */}

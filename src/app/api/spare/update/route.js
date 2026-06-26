@@ -114,8 +114,14 @@ export async function POST(request) {
         const id = formData.get('id');
         const spare_number = formData.get('spare_number');
         const item_name = formData.get('item_name');
+        const type = formData.get('type');
+        const make = formData.get('make');
+        const model = formData.get('model');
+        const compatible_machine = formData.get('compatible_machine');
+        const tax = formData.get('tax');
         const min_qty = formData.get('min_qty');
-        const price = formData.get('price');
+        const purchase_price = formData.get('purchase_price');
+        const sale_price = formData.get('sale_price');
         const last_negotiation_price = formData.get('last_negotiation_price');
         const specification = formData.get('specification');
         const imageFile = formData.get('image');
@@ -152,13 +158,37 @@ export async function POST(request) {
             updates.push('item_name = ?');
             values.push(item_name);
         }
+        if (type !== null && type !== undefined) {
+            updates.push('type = ?');
+            values.push(type);
+        }
+        if (make !== null && make !== undefined) {
+            updates.push('make = ?');
+            values.push(make);
+        }
+        if (model !== null && model !== undefined) {
+            updates.push('model = ?');
+            values.push(model);
+        }
+        if (compatible_machine !== null && compatible_machine !== undefined) {
+            updates.push('compatible_machine = ?');
+            values.push(compatible_machine);
+        }
+        if (tax !== null && tax !== undefined) {
+            updates.push('tax = ?');
+            values.push(tax);
+        }
         if (min_qty !== null && min_qty !== undefined) {
             updates.push('min_qty = ?');
             values.push(min_qty);
         }
-        if (price !== null && price !== undefined) {
-            updates.push('price = ?');
-            values.push(price);
+        if (purchase_price !== null && purchase_price !== undefined) {
+            updates.push('purchase_price = ?');
+            values.push(purchase_price);
+        }
+        if (sale_price !== null && sale_price !== undefined) {
+            updates.push('sale_price = ?');
+            values.push(sale_price);
         }
         if (last_negotiation_price !== null && last_negotiation_price !== undefined) {
             updates.push('last_negotiation_price = ?');

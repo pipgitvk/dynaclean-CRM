@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Head from "next/head";
 import { toast } from "react-hot-toast";
@@ -13,14 +13,20 @@ export default function AddSparePage() {
     type: "",
     make: "",
     model: "",
-    compatible_machine: [], // Store as an array of strings
-    price: "",
+    compatible_machine: [], // Store as an array of product codes
+    purchase_price: "",
+    sale_price: "",
+    last_negotiation_price: "",
     tax: "",
   });
   const [imageFile, setImageFile] = useState(null);
   const [catalogFile, setCatalogFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [newMachine, setNewMachine] = useState("");
+
+  // Products dropdown state
+  const [products, setProducts] = useState([]);
+  const [machineSearch, setMachineSearch] = useState("");
+  const [showMachineDropdown, setShowMachineDropdown] = useState(false);
 
   // Search-first modal state (one-time fetch then client filter)
   const [showSearchModal, setShowSearchModal] = useState(true);
@@ -29,22 +35,57 @@ export default function AddSparePage() {
   const [spareIndex, setSpareIndex] = useState([]);
   const [loadedIndex, setLoadedIndex] = useState(false);
 
+  // Fetch products on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const res = await fetch("/api/products/list");
+        const data = await res.json();
+        setProducts(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+        toast.error("Failed to load products for compatible machines");
+      }
+    };
+    fetchProducts();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleMachineKeyPress = (e) => {
-    if (e.key === "Enter" && newMachine.trim() !== "") {
-      e.preventDefault();
-      setFormData((prev) => ({
-        ...prev,
-        compatible_machine: [...prev.compatible_machine, newMachine.trim()],
-      }));
-      setNewMachine("");
+  // Filter products based on search input
+  const filteredProducts = products.filter((p) => {
+    const query = machineSearch.toLowerCase();
+    if (!query) return true;
+    
+    const itemName = String(p.item_name || "").toLowerCase();
+    const itemCode = String(p.item_code || "").toLowerCase();
+    const productNumber = String(p.product_number || "").toLowerCase();
+    
+    return itemName.includes(query) || itemCode.includes(query) || productNumber.includes(query);
+  });
+
+  // Add machine (product code) to compatible machines
+  const addMachine = (product) => {
+    const machineId = product.product_number; // Store only product_number
+    
+    // Check if already added
+    if (formData.compatible_machine.includes(machineId)) {
+      toast.error("This machine is already added");
+      return;
     }
+
+    setFormData((prev) => ({
+      ...prev,
+      compatible_machine: [...prev.compatible_machine, machineId],
+    }));
+    setMachineSearch("");
+    setShowMachineDropdown(false);
   };
 
+  // Remove machine from compatible machines
   const removeMachine = (machineToRemove) => {
     setFormData((prev) => ({
       ...prev,
@@ -65,7 +106,9 @@ export default function AddSparePage() {
     data.append("type", formData.type);
     data.append("make", formData.make);
     data.append("model", formData.model);
-    data.append("price", formData.price);
+    data.append("purchase_price", formData.purchase_price);
+    data.append("sale_price", formData.sale_price);
+    data.append("last_negotiation_price", formData.last_negotiation_price);
     data.append("tax", formData.tax);
     if (imageFile) {
       data.append("image", imageFile);
@@ -89,7 +132,9 @@ export default function AddSparePage() {
           make: "",
           model: "",
           compatible_machine: [],
-          price: "",
+          purchase_price: "",
+          sale_price: "",
+          last_negotiation_price: "",
           tax: "",
         });
         setImageFile(null);
@@ -337,21 +382,59 @@ export default function AddSparePage() {
 
             <div className="flex flex-col">
               <label
-                htmlFor="price"
+                htmlFor="purchase_price"
                 className="text-sm font-semibold text-gray-700 mb-2"
               >
-                Price <span className="text-red-500">*</span>
+                Purchase Price <span className="text-red-500">*</span>
               </label>
               <input
-                id="price"
-                name="price"
+                id="purchase_price"
+                name="purchase_price"
                 type="number"
                 step="0.01"
-                value={formData.price}
+                value={formData.purchase_price}
                 onChange={handleChange}
                 placeholder="e.g., 5.99"
                 className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 required
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <label
+                htmlFor="sale_price"
+                className="text-sm font-semibold text-gray-700 mb-2"
+              >
+                Sale Price
+              </label>
+              <input
+                id="sale_price"
+                name="sale_price"
+                type="number"
+                step="0.01"
+                value={formData.sale_price}
+                onChange={handleChange}
+                placeholder="e.g., 7.99"
+                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+
+            <div className="flex flex-col">
+              <label
+                htmlFor="last_negotiation_price"
+                className="text-sm font-semibold text-gray-700 mb-2"
+              >
+                Last Neg. Price
+              </label>
+              <input
+                id="last_negotiation_price"
+                name="last_negotiation_price"
+                type="number"
+                step="0.01"
+                value={formData.last_negotiation_price}
+                onChange={handleChange}
+                placeholder="e.g., 4.99"
+                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               />
             </div>
 
@@ -382,33 +465,81 @@ export default function AddSparePage() {
               >
                 Compatible Machines
               </label>
-              <input
-                id="compatible_machine"
-                name="compatible_machine"
-                type="text"
-                value={newMachine}
-                onChange={(e) => setNewMachine(e.target.value)}
-                onKeyPress={handleMachineKeyPress}
-                placeholder="Type machine name and press Enter"
-                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                {formData.compatible_machine.map((machine, index) => (
-                  <span
-                    key={index}
-                    className="flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-                  >
-                    {machine}
-                    <button
-                      type="button"
-                      onClick={() => removeMachine(machine)}
-                      className="ml-2 text-blue-500 hover:text-blue-700"
-                    >
-                      &times;
-                    </button>
-                  </span>
-                ))}
+              
+              {/* Searchable dropdown */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={machineSearch}
+                  onChange={(e) => {
+                    setMachineSearch(e.target.value);
+                    setShowMachineDropdown(true);
+                  }}
+                  onFocus={() => setShowMachineDropdown(true)}
+                  placeholder="Search by product name or code (e.g., Scrubber, DSC-30)..."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                />
+
+                {/* Dropdown list */}
+                {showMachineDropdown && machineSearch && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
+                    {filteredProducts.length > 0 ? (
+                      filteredProducts.slice(0, 20).map((product) => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => addMachine(product)}
+                          className="w-full text-left px-4 py-3 border-b hover:bg-blue-50 transition-colors duration-150 flex items-center justify-between"
+                        >
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-800">
+                              {product.item_name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              Product #: {product.product_number}
+                            </div>
+                          </div>
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full ml-2">
+                            Add
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                        No products found
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Selected machines display */}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {formData.compatible_machine.map((machine, index) => {
+                  // Find product by product_number to get item_code for display
+                  const product = products.find(p => p.product_number === machine);
+                  const displayCode = product ? product.item_code : machine;
+                  return (
+                    <span
+                      key={index}
+                      className="flex items-center px-3 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                    >
+                      {displayCode}
+                      <button
+                        type="button"
+                        onClick={() => removeMachine(machine)}
+                        className="ml-2 text-blue-500 hover:text-blue-700 font-bold"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+              
+              {formData.compatible_machine.length === 0 && (
+                <p className="mt-2 text-xs text-gray-500">No machines selected yet</p>
+              )}
             </div>
           </div>
 

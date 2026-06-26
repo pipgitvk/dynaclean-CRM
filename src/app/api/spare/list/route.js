@@ -5,7 +5,7 @@ export async function GET() {
     try {
         const db = await getDbConnection();
         const [rows] = await db.execute(
-            'SELECT id, spare_number, item_name, specification, image, min_qty, price, last_negotiation_price FROM spare_list ORDER BY item_name ASC'
+            'SELECT id, spare_number, item_name, specification, type, make, model, compatible_machine, tax, image, min_qty, purchase_price, sale_price, last_negotiation_price FROM spare_list ORDER BY item_name ASC'
         );
         return NextResponse.json(rows, { status: 200 });
     } catch (error) {

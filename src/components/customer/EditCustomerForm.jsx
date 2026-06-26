@@ -19,6 +19,8 @@ export default function EditCustomerForm({ initialData }) {
     address: false,
   });
   const [saving, setSaving] = useState(false);
+  const [tagsFilter, setTagsFilter] = useState(""); // Add filter state
+  const [showTagsDropdown, setShowTagsDropdown] = useState(false); // Show/hide dropdown
 
   // Use useEffect to update the 'enabled' state based on whether data exists
   // for the tags and status fields, allowing them to be edited by default.
@@ -59,11 +61,22 @@ export default function EditCustomerForm({ initialData }) {
     "Disqualified / Invalid Lead"
   ];
 
+  // Filter tags based on search input
+  const filteredTags = tagsList.filter(tag =>
+    tag.toLowerCase().includes(tagsFilter.toLowerCase())
+  );
+
   const toggle = (field) =>
     setEnabled((prev) => ({ ...prev, [field]: !prev[field] }));
 
   const handleChange = (e) => {
     setData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleTagSelect = (tag) => {
+    setData((prev) => ({ ...prev, tags: tag }));
+    setShowTagsDropdown(false);
+    setTagsFilter("");
   };
 
   const handleSubmit = async (e) => {
@@ -111,8 +124,59 @@ export default function EditCustomerForm({ initialData }) {
                 <Pencil size={18} />
               </button>
             </div>
+          ) : field === "tags" ? (
+            // Filtered tags dropdown
+            <div className="relative flex-1">
+              <div
+                className={`w-full border px-3 py-2 rounded cursor-pointer ${
+                  enabled[field]
+                    ? "border-blue-400 bg-white"
+                    : "border-gray-200 bg-gray-100"
+                }`}
+                onClick={() => enabled[field] && setShowTagsDropdown(!showTagsDropdown)}
+              >
+                {data[field] || "Select"}
+              </div>
+              
+              {/* Dropdown with filter */}
+              {showTagsDropdown && enabled[field] && (
+                <div className="absolute top-full left-0 right-0 mt-1 border border-gray-300 rounded bg-white shadow-lg z-10">
+                  <input
+                    type="text"
+                    placeholder="Filter tags..."
+                    value={tagsFilter}
+                    onChange={(e) => setTagsFilter(e.target.value)}
+                    className="w-full border-b px-3 py-2 focus:outline-none"
+                    autoFocus
+                  />
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredTags.length > 0 ? (
+                      filteredTags.map((tag) => (
+                        <div
+                          key={tag}
+                          onClick={() => handleTagSelect(tag)}
+                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer"
+                        >
+                          {tag}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-gray-500">No tags found</div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <button
+                type="button"
+                onClick={() => toggle(field)}
+                className="absolute right-2 top-2 text-gray-500 hover:text-blue-600"
+              >
+                <Pencil size={18} />
+              </button>
+            </div>
           ) : (
-            // Select fields for tags/status
+            // Select fields for status and stage
             <div className="relative flex-1">
               <select
                 name={field}
@@ -128,7 +192,7 @@ export default function EditCustomerForm({ initialData }) {
                 <option value="" disabled>
                   Select
                 </option>
-                {(field === "tags" ? tagsList : field === "status" ? statusList : stageOptions).map((opt) => (
+                {(field === "status" ? statusList : stageOptions).map((opt) => (
                   <option value={opt} key={opt}>
                     {opt}
                   </option>

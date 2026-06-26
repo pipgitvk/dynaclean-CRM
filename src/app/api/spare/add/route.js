@@ -90,15 +90,21 @@ export async function POST(request) {
     const username = tokenPayload.username;
 
     const formData = await request.formData();
-    const data = Object.fromEntries(formData);
     
-    const {
-        item_name, specification, type, make, model, compatible_machine, price, tax
-    } = data;
+    const item_name = formData.get('item_name');
+    const specification = formData.get('specification');
+    const type = formData.get('type');
+    const make = formData.get('make');
+    const model = formData.get('model');
+    const compatible_machine = formData.get('compatible_machine');
+    const purchase_price = formData.get('purchase_price');
+    const sale_price = formData.get('sale_price');
+    const last_negotiation_price = formData.get('last_negotiation_price');
+    const tax = formData.get('tax');
 
     // Basic validation
-    if (!item_name || !price || !tax) {
-        return NextResponse.json({ error: 'Required fields are missing: Item Name, Price, Tax.' }, { status: 400 });
+    if (!item_name || !purchase_price || !tax) {
+        return NextResponse.json({ error: 'Required fields are missing: Item Name, Purchase Price, Tax.' }, { status: 400 });
     }
 
     try {
@@ -131,8 +137,8 @@ export async function POST(request) {
         // Insert into spare_list table
         const spareQuery = `
             INSERT INTO spare_list 
-            (item_name, specification, type, make, model, compatible_machine, price, tax, image, catalog , created_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (item_name, specification, type, make, model, compatible_machine, purchase_price, sale_price, last_negotiation_price, tax, image, catalog , created_by) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const spareValues = [
@@ -142,7 +148,9 @@ export async function POST(request) {
             make || null,
             model || null,
             compatible_machine, // Stored as a comma-separated string
-            parseFloat(price),
+            parseFloat(purchase_price),
+            sale_price ? parseFloat(sale_price) : null,
+            last_negotiation_price ? parseFloat(last_negotiation_price) : null,
             parseFloat(tax),
             imagePath,
             catalogPath,

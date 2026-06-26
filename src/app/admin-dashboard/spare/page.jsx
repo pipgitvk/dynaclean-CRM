@@ -15,6 +15,11 @@ function SpareList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deletingSpare, setDeletingSpare] = useState(false);
   const [userRole, setUserRole] = useState("");
+  
+  // Products for compatible machines dropdown
+  const [products, setProducts] = useState([]);
+  const [machineSearch, setMachineSearch] = useState("");
+  const [showMachineDropdown, setShowMachineDropdown] = useState(false);
 
   const handleSavePrice = async (row, field) => {
     const code = row.id;
@@ -66,8 +71,14 @@ function SpareList() {
       formData.append('id', editingSpare.id);
       formData.append('spare_number', editingSpare.spare_number);
       formData.append('item_name', editingSpare.item_name);
+      formData.append('type', editingSpare.type || '');
+      formData.append('make', editingSpare.make || '');
+      formData.append('model', editingSpare.model || '');
+      formData.append('compatible_machine', editingSpare.compatible_machine || '');
       formData.append('min_qty', editingSpare.min_qty);
-      formData.append('price', editingSpare.price);
+      formData.append('purchase_price', editingSpare.purchase_price);
+      formData.append('sale_price', editingSpare.sale_price);
+      formData.append('tax', editingSpare.tax || 0);
       formData.append('last_negotiation_price', editingSpare.last_negotiation_price);
       formData.append('specification', editingSpare.specification);
       if (editingSpare.newImageFile) {
@@ -131,12 +142,49 @@ function SpareList() {
     }
   };
 
+  // Filter products based on search input for modal dropdown
+  const filteredProducts = products.filter((p) => {
+    const query = machineSearch.toLowerCase();
+    if (!query) return true;
+    
+    const itemName = String(p.item_name || "").toLowerCase();
+    const itemCode = String(p.item_code || "").toLowerCase();
+    const productNumber = String(p.product_number || "").toLowerCase();
+    
+    return itemName.includes(query) || itemCode.includes(query) || productNumber.includes(query);
+  });
+
+  // Add machine to compatible machines in modal
+  const addMachineToModal = (product) => {
+    if (!editingSpare) return;
+    
+    const machineId = product.product_number; // Store only product_number
+    const currentMachines = String(editingSpare.compatible_machine || "").split(",").map(m => m.trim()).filter(m => m);
+    
+    // Check if already added
+    if (currentMachines.includes(machineId)) {
+      alert("This machine is already added");
+      return;
+    }
+
+    const updatedMachines = [...currentMachines, machineId].join(", ");
+    setEditingSpare({ ...editingSpare, compatible_machine: updatedMachines });
+    setMachineSearch("");
+    setShowMachineDropdown(false);
+  };
+
   useEffect(() => {
     // Fetch user role
     fetch("/api/me")
       .then((r) => r.json())
       .then((d) => setUserRole(d.userRole))
       .catch(() => setUserRole(""));
+
+    // Fetch products for compatible machines dropdown
+    fetch('/api/products/list')
+      .then(r => r.json())
+      .then(d => setProducts(Array.isArray(d) ? d : []))
+      .catch(() => setProducts([]));
 
     fetch('/api/spare/list')
       .then(r => r.json())
@@ -149,6 +197,17 @@ function SpareList() {
       .then(d => setStockTotals({ totalQty: d.totalQty || 0, totalValue: d.totalValue || 0 }))
       .catch(() => setStockTotals({ totalQty: 0, totalValue: 0 }));
   }, []);
+
+  // Create a map for fast product lookup
+  const productMap = useMemo(() => {
+    const map = {};
+    products.forEach(p => {
+      if (p.product_number) {
+        map[p.product_number] = p.item_code;
+      }
+    });
+    return map;
+  }, [products]);
 
   const view = useMemo(() => {
     const qt = q.trim().toLowerCase();
@@ -198,9 +257,15 @@ function SpareList() {
               <th className="p-2 text-left">Image</th>
               <th className="p-2 text-left">Spare No</th>
               <th className="p-2 text-left">Name</th>
+              <th className="p-2 text-left">Type</th>
+              <th className="p-2 text-left">Make</th>
+              <th className="p-2 text-left">Model</th>
+              <th className="p-2 text-left">Compatible Machines</th>
               <th className="p-2 text-left">Min Qty</th>
-              <th className="p-2 text-left">Price</th>
+              <th className="p-2 text-left">Purchase Price</th>
+              <th className="p-2 text-left">Sale Price</th>
               <th className="p-2 text-left">Last Neg. Price</th>
+              <th className="p-2 text-left">Tax %</th>
               <th className="p-2 text-left">Specification</th>
               <th className="p-2 text-left">Actions</th>
             </tr>
@@ -223,9 +288,29 @@ function SpareList() {
                     </td>
                     <td className="p-2">{r.spare_number}</td>
                     <td className="p-2">{r.item_name}</td>
+                    <td className="p-2 text-xs bg-blue-50">{r.type || "-"}</td>
+                    <td className="p-2 text-xs bg-green-50">{r.make || "-"}</td>
+                    <td className="p-2 text-xs bg-yellow-50">{r.model || "-"}</td>
+                    <td className="p-2 text-xs max-w-xs">
+                      {r.compatible_machine ? (
+                        <div className="space-y-1">
+                          {String(r.compatible_machine).split(",").map((machine, idx) => {
+                            const productNum = machine.trim();
+                            const displayCode = productMap[productNum] || productNum;
+                            return (
+                              <span key={idx} className="inline-block bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                                {displayCode}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td className="p-2">{r.min_qty}</td>
                     <td className="p-2">
-                      {editingPrice.key === r.id && editingPrice.field === 'price' ? (
+                      {editingPrice.key === r.id && editingPrice.field === 'purchase_price' ? (
                         <div className="flex gap-1 items-center">
                           <input
                             type="number"
@@ -233,13 +318,32 @@ function SpareList() {
                             value={editingPrice.value}
                             onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
                           />
-                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'price')} className="text-green-600 text-xs">Save</button>
+                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'purchase_price')} className="text-green-600 text-xs">Save</button>
                           <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 group">
-                          <span>{r.price || 0}</span>
-                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'price', value: r.price || 0 })} />
+                          <span>{r.purchase_price || 0}</span>
+                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'purchase_price', value: r.purchase_price || 0 })} />
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      {editingPrice.key === r.id && editingPrice.field === 'sale_price' ? (
+                        <div className="flex gap-1 items-center">
+                          <input
+                            type="number"
+                            className="w-20 border rounded px-1 text-xs"
+                            value={editingPrice.value}
+                            onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                          />
+                          <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'sale_price')} className="text-green-600 text-xs">Save</button>
+                          <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          <span>{r.sale_price || 0}</span>
+                          <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.id, field: 'sale_price', value: r.sale_price || 0 })} />
                         </div>
                       )}
                     </td>
@@ -262,6 +366,7 @@ function SpareList() {
                         </div>
                       )}
                     </td>
+                    <td className="p-2 text-xs bg-orange-50">{r.tax || 0}%</td>
                     <td className="p-2">{r.specification}</td>
                     <td className="p-2">
                       <div className="flex gap-2">
@@ -289,7 +394,7 @@ function SpareList() {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={8}>
+                <td className="p-2 text-gray-500" colSpan={15}>
                   No data
                 </td>
               </tr>
@@ -431,6 +536,129 @@ function SpareList() {
                   className="w-full border rounded px-3 py-2 text-sm"
                 />
               </div>
+              {/* Type */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Type</label>
+                <select
+                  value={editingSpare.type || ""}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, type: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                >
+                  <option value="">Select type</option>
+                  <option value="Raw Materials">Raw Materials</option>
+                  <option value="Consumables">Consumables</option>
+                  <option value="Spares">Spares</option>
+                </select>
+              </div>
+              {/* Make */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Make</label>
+                <input
+                  type="text"
+                  value={editingSpare.make || ""}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, make: e.target.value })}
+                  placeholder="e.g., Siemens"
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
+              {/* Model */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Model</label>
+                <input
+                  type="text"
+                  value={editingSpare.model || ""}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, model: e.target.value })}
+                  placeholder="e.g., 6ES7 214-1AG40-0XB0"
+                  className="w-full border rounded px-3 py-2 text-sm"
+                />
+              </div>
+              {/* Compatible Machines */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Compatible Machines</label>
+                
+                {/* Searchable Dropdown */}
+                <div className="relative mb-2">
+                  <input
+                    type="text"
+                    value={machineSearch}
+                    onChange={(e) => {
+                      setMachineSearch(e.target.value);
+                      setShowMachineDropdown(true);
+                    }}
+                    onFocus={() => setShowMachineDropdown(true)}
+                    placeholder="Search by product name or code (e.g., Scrubber, DSC-30)..."
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  />
+
+                  {/* Dropdown list */}
+                  {showMachineDropdown && machineSearch && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto z-50">
+                      {filteredProducts.length > 0 ? (
+                        filteredProducts.slice(0, 20).map((product) => (
+                          <button
+                            key={product.id}
+                            type="button"
+                            onClick={() => addMachineToModal(product)}
+                            className="w-full text-left px-4 py-3 border-b hover:bg-blue-50 transition-colors duration-150 flex items-center justify-between"
+                          >
+                            <div className="flex-1">
+                              <div className="font-semibold text-gray-800">
+                                {product.item_name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Product #: {product.product_number}
+                              </div>
+                            </div>
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full ml-2">
+                              Add
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                          No products found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected machines display */}
+                <div className="flex flex-wrap gap-2 p-2 border border-gray-200 rounded-lg bg-gray-50 min-h-12">
+                  {String(editingSpare.compatible_machine || "")
+                    .split(",")
+                    .map((machine, idx) => machine.trim())
+                    .filter((m) => m)
+                    .map((machine, idx) => {
+                      const displayCode = productMap[machine] || machine;
+                      return (
+                        <span
+                          key={idx}
+                          className="flex items-center px-3 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                        >
+                          {displayCode}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const machines = String(editingSpare.compatible_machine || "")
+                                .split(",")
+                                .map(m => m.trim())
+                                .filter(m => m && m !== machine)
+                                .join(", ");
+                              setEditingSpare({ ...editingSpare, compatible_machine: machines });
+                            }}
+                            className="ml-2 text-blue-500 hover:text-blue-700 font-bold"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      );
+                    })}
+                  {!String(editingSpare.compatible_machine || "").trim() && (
+                    <p className="text-xs text-gray-500 py-2">No machines selected yet</p>
+                  )}
+                </div>
+              </div>
               {/* Min Qty */}
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Min Qty</label>
@@ -443,11 +671,34 @@ function SpareList() {
               </div>
               {/* Price */}
               <div>
-                <label className="block text-sm text-gray-700 mb-1">Price</label>
+                <label className="block text-sm text-gray-700 mb-1">Purchase Price</label>
                 <input
                   type="number"
-                  value={editingSpare.price || 0}
-                  onChange={(e) => setEditingSpare({ ...editingSpare, price: e.target.value })}
+                  value={editingSpare.purchase_price || 0}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, purchase_price: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  step="0.01"
+                />
+              </div>
+              {/* Sale Price */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Sale Price</label>
+                <input
+                  type="number"
+                  value={editingSpare.sale_price || 0}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, sale_price: e.target.value })}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  step="0.01"
+                />
+              </div>
+              {/* Tax */}
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Tax %</label>
+                <input
+                  type="number"
+                  value={editingSpare.tax || 0}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, tax: e.target.value })}
+                  placeholder="e.g., 18"
                   className="w-full border rounded px-3 py-2 text-sm"
                   step="0.01"
                 />
