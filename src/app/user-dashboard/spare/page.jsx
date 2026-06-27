@@ -12,6 +12,7 @@ function ProductAndSpareLists({ type, userRole }) {
   const [filterMake, setFilterMake] = useState("");
   const [filterModel, setFilterModel] = useState("");
   const [filterCompatible, setFilterCompatible] = useState("");
+  const [openDropdown, setOpenDropdown] = useState(null); // 'model' | 'compatible' | null
   const [editingSpare, setEditingSpare] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -141,25 +142,61 @@ function ProductAndSpareLists({ type, userRole }) {
           </div>
           {/* Row 2: Model, Compatible Models, Clear */}
           <div className="flex gap-2 items-center">
-            <select
-              value={filterModel}
-              onChange={e => setFilterModel(e.target.value)}
-              className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
-            >
-              <option value="">All Models</option>
-              {uniqueModels.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <select
-              value={filterCompatible}
-              onChange={e => setFilterCompatible(e.target.value)}
-              className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
-            >
-              <option value="">Compatible</option>
-              {uniqueCompatibles.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
+            {/* Custom Model dropdown */}
+            <div className="relative flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => setOpenDropdown(openDropdown === 'model' ? null : 'model')}
+                className="w-full border rounded px-2 py-1.5 text-xs text-left bg-white flex justify-between items-center gap-1"
+              >
+                <span className="truncate">{filterModel || "All Models"}</span>
+                <span className="shrink-0">▾</span>
+              </button>
+              {openDropdown === 'model' && (
+                <div className="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-50 text-xs">
+                  <div
+                    onClick={() => { setFilterModel(""); setOpenDropdown(null); }}
+                    className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${!filterModel ? 'bg-blue-50 font-semibold' : ''}`}
+                  >All Models</div>
+                  {uniqueModels.map(m => (
+                    <div key={m}
+                      onClick={() => { setFilterModel(m); setOpenDropdown(null); }}
+                      className={`px-3 py-2 cursor-pointer hover:bg-blue-50 truncate ${filterModel === m ? 'bg-blue-100 font-semibold' : ''}`}
+                    >{m}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Custom Compatible dropdown */}
+            <div className="relative flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => setOpenDropdown(openDropdown === 'compatible' ? null : 'compatible')}
+                className="w-full border rounded px-2 py-1.5 text-xs text-left bg-white flex justify-between items-center gap-1"
+              >
+                <span className="truncate">{filterCompatible || "Compatible"}</span>
+                <span className="shrink-0">▾</span>
+              </button>
+              {openDropdown === 'compatible' && (
+                <div className="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-50 text-xs">
+                  <div
+                    onClick={() => { setFilterCompatible(""); setOpenDropdown(null); }}
+                    className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${!filterCompatible ? 'bg-blue-50 font-semibold' : ''}`}
+                  >All</div>
+                  {uniqueCompatibles.map(m => (
+                    <div key={m}
+                      onClick={() => { setFilterCompatible(m); setOpenDropdown(null); }}
+                      className={`px-3 py-2 cursor-pointer hover:bg-blue-50 truncate ${filterCompatible === m ? 'bg-blue-100 font-semibold' : ''}`}
+                    >{m}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {(filterType || filterMake || filterModel || filterCompatible) && (
               <button
-                onClick={() => { setFilterType(""); setFilterMake(""); setFilterModel(""); setFilterCompatible(""); }}
+                onClick={() => { setFilterType(""); setFilterMake(""); setFilterModel(""); setFilterCompatible(""); setOpenDropdown(null); }}
                 className="px-2 py-1.5 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 shrink-0"
               >
                 ✕
