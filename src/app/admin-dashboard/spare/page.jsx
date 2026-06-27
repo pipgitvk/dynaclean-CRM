@@ -303,7 +303,7 @@ function SpareList() {
               <span className="shrink-0">▾</span>
             </button>
             {openDropdown === 'model' && (
-              <div className="absolute left-0 top-full mt-1 w-48 max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-50 text-xs">
+              <div className="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-50 text-xs">
                 <div
                   onClick={() => { setFilterModel(""); setOpenDropdown(null); }}
                   className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${!filterModel ? 'bg-blue-50 font-semibold' : ''}`}
@@ -329,7 +329,7 @@ function SpareList() {
               <span className="shrink-0">▾</span>
             </button>
             {openDropdown === 'compatible' && (
-              <div className="absolute left-0 top-full mt-1 w-48 max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-50 text-xs">
+              <div className="absolute left-0 top-full mt-1 w-full max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-50 text-xs">
                 <div
                   onClick={() => { setFilterCompatible(""); setOpenDropdown(null); }}
                   className={`px-3 py-2 cursor-pointer hover:bg-blue-50 ${!filterCompatible ? 'bg-blue-50 font-semibold' : ''}`}
