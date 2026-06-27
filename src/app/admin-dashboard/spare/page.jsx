@@ -9,6 +9,10 @@ function SpareList() {
   const [rows, setRows] = useState([]);
   const [stockTotals, setStockTotals] = useState({ totalQty: 0, totalValue: 0 });
   const [q, setQ] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterMake, setFilterMake] = useState("");
+  const [filterModel, setFilterModel] = useState("");
+  const [filterCompatible, setFilterCompatible] = useState("");
   const [editingPrice, setEditingPrice] = useState({ key: null, field: null, value: "" });
   const [savingPrice, setSavingPrice] = useState(false);
   const [editingSpare, setEditingSpare] = useState(null);
@@ -211,11 +215,26 @@ function SpareList() {
 
   const view = useMemo(() => {
     const qt = q.trim().toLowerCase();
-    if (!qt) return rows;
-    return rows.filter(r =>
-      Object.values(r).some(v => String(v ?? '').toLowerCase().includes(qt))
-    );
-  }, [rows, q]);
+    return rows.filter(r => {
+      if (qt && !Object.values(r).some(v => String(v ?? '').toLowerCase().includes(qt))) return false;
+      if (filterType && String(r.type ?? '') !== filterType) return false;
+      if (filterMake && String(r.make ?? '').toLowerCase() !== filterMake.toLowerCase()) return false;
+      if (filterModel && String(r.model ?? '').toLowerCase() !== filterModel.toLowerCase()) return false;
+      if (filterCompatible && !String(r.compatible_machine ?? '').toLowerCase().includes(filterCompatible.toLowerCase())) return false;
+      return true;
+    });
+  }, [rows, q, filterType, filterMake, filterModel, filterCompatible]);
+
+  const uniqueTypes = useMemo(() => [...new Set(rows.map(r => r.type).filter(Boolean))].sort(), [rows]);
+  const uniqueMakes = useMemo(() => [...new Set(rows.map(r => r.make).filter(Boolean))].sort(), [rows]);
+  const uniqueModels = useMemo(() => [...new Set(rows.map(r => r.model).filter(Boolean))].sort(), [rows]);
+  const uniqueCompatibles = useMemo(() => {
+    const all = [];
+    rows.forEach(r => {
+      String(r.compatible_machine || '').split(',').forEach(m => { const t = m.trim(); if (t) all.push(t); });
+    });
+    return [...new Set(all)].sort();
+  }, [rows]);
 
   const totals = useMemo(() => {
     return { totalMinQty: stockTotals.totalQty, totalPrice: stockTotals.totalValue };
@@ -246,6 +265,56 @@ function SpareList() {
             placeholder="Search..."
             className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-full"
           />
+        </div>
+      </div>
+
+      {/* FILTERS */}
+      <div className="p-2 flex flex-col gap-1.5 border-b bg-gray-50">
+        {/* Row 1: Type, Make */}
+        <div className="flex gap-2 items-center">
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
+          >
+            <option value="">All Types</option>
+            {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select
+            value={filterMake}
+            onChange={e => setFilterMake(e.target.value)}
+            className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
+          >
+            <option value="">All Makes</option>
+            {uniqueMakes.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+        {/* Row 2: Model, Compatible Models, Clear */}
+        <div className="flex gap-2 items-center">
+          <select
+            value={filterModel}
+            onChange={e => setFilterModel(e.target.value)}
+            className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
+          >
+            <option value="">All Models</option>
+            {uniqueModels.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <select
+            value={filterCompatible}
+            onChange={e => setFilterCompatible(e.target.value)}
+            className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
+          >
+            <option value="">Compatible</option>
+            {uniqueCompatibles.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          {(filterType || filterMake || filterModel || filterCompatible) && (
+            <button
+              onClick={() => { setFilterType(""); setFilterMake(""); setFilterModel(""); setFilterCompatible(""); }}
+              className="px-2 py-1.5 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 shrink-0"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 

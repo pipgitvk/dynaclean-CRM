@@ -8,8 +8,14 @@ import { usePathname } from "next/navigation";
 function ProductAndSpareLists({ type, userRole }) {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterMake, setFilterMake] = useState("");
+  const [filterModel, setFilterModel] = useState("");
+  const [filterCompatible, setFilterCompatible] = useState("");
   const [editingSpare, setEditingSpare] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
 
   useEffect(() => {
     const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
@@ -31,9 +37,17 @@ function ProductAndSpareLists({ type, userRole }) {
       formData.append('spare_number', editingSpare.spare_number);
       formData.append('item_name', editingSpare.item_name);
       formData.append('min_qty', editingSpare.min_qty);
-      formData.append('price', editingSpare.price);
+      formData.append('sale_price', editingSpare.sale_price);
       formData.append('last_negotiation_price', editingSpare.last_negotiation_price);
       formData.append('specification', editingSpare.specification);
+      if (isPrivileged) {
+        formData.append('type', editingSpare.type || '');
+        formData.append('make', editingSpare.make || '');
+        formData.append('model', editingSpare.model || '');
+        formData.append('compatible_machine', editingSpare.compatible_machine || '');
+        formData.append('purchase_price', editingSpare.purchase_price || 0);
+        formData.append('tax', editingSpare.tax || 0);
+      }
       if (editingSpare.newImageFile) {
         formData.append('image', editingSpare.newImageFile);
       }
@@ -66,11 +80,26 @@ function ProductAndSpareLists({ type, userRole }) {
 
   const view = useMemo(() => {
     const qt = q.trim().toLowerCase();
-    if (!qt) return rows;
-    return rows.filter(r =>
-      Object.values(r).some(v => String(v ?? '').toLowerCase().includes(qt))
-    );
-  }, [rows, q]);
+    return rows.filter(r => {
+      if (qt && !Object.values(r).some(v => String(v ?? '').toLowerCase().includes(qt))) return false;
+      if (filterType && String(r.type ?? '') !== filterType) return false;
+      if (filterMake && String(r.make ?? '').toLowerCase() !== filterMake.toLowerCase()) return false;
+      if (filterModel && String(r.model ?? '').toLowerCase() !== filterModel.toLowerCase()) return false;
+      if (filterCompatible && !String(r.compatible_machine ?? '').toLowerCase().includes(filterCompatible.toLowerCase())) return false;
+      return true;
+    });
+  }, [rows, q, filterType, filterMake, filterModel, filterCompatible]);
+
+  const uniqueTypes = useMemo(() => [...new Set(rows.map(r => r.type).filter(Boolean))].sort(), [rows]);
+  const uniqueMakes = useMemo(() => [...new Set(rows.map(r => r.make).filter(Boolean))].sort(), [rows]);
+  const uniqueModels = useMemo(() => [...new Set(rows.map(r => r.model).filter(Boolean))].sort(), [rows]);
+  const uniqueCompatibles = useMemo(() => {
+    const all = [];
+    rows.forEach(r => {
+      String(r.compatible_machine || '').split(',').forEach(m => { const t = m.trim(); if (t) all.push(t); });
+    });
+    return [...new Set(all)].sort();
+  }, [rows]);
 
   return (
     <div className="border rounded-lg">
@@ -87,6 +116,58 @@ function ProductAndSpareLists({ type, userRole }) {
           />
         </div>
       </div>
+
+      {/* FILTERS — only for ADMIN / DIRECTOR / SUPERADMIN on spare tab */}
+      {type === 'spare' && isPrivileged && (
+        <div className="p-2 flex flex-col gap-1.5 border-b bg-gray-50">
+          {/* Row 1: Type, Make */}
+          <div className="flex gap-2 items-center">
+            <select
+              value={filterType}
+              onChange={e => setFilterType(e.target.value)}
+              className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
+            >
+              <option value="">All Types</option>
+              {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select
+              value={filterMake}
+              onChange={e => setFilterMake(e.target.value)}
+              className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
+            >
+              <option value="">All Makes</option>
+              {uniqueMakes.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          {/* Row 2: Model, Compatible Models, Clear */}
+          <div className="flex gap-2 items-center">
+            <select
+              value={filterModel}
+              onChange={e => setFilterModel(e.target.value)}
+              className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
+            >
+              <option value="">All Models</option>
+              {uniqueModels.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select
+              value={filterCompatible}
+              onChange={e => setFilterCompatible(e.target.value)}
+              className="border rounded px-2 py-1.5 text-xs flex-1 min-w-0"
+            >
+              <option value="">Compatible</option>
+              {uniqueCompatibles.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            {(filterType || filterMake || filterModel || filterCompatible) && (
+              <button
+                onClick={() => { setFilterType(""); setFilterMake(""); setFilterModel(""); setFilterCompatible(""); }}
+                className="px-2 py-1.5 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 shrink-0"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* DESKTOP TABLE VIEW */}
       <div className="overflow-auto hidden sm:block">
@@ -110,9 +191,15 @@ function ProductAndSpareLists({ type, userRole }) {
                   <th className="p-2 text-left">Image</th>
                   <th className="p-2 text-left">Spare No</th>
                   <th className="p-2 text-left">Name</th>
+                  {isPrivileged && <th className="p-2 text-left">Type</th>}
+                  {isPrivileged && <th className="p-2 text-left">Make</th>}
+                  {isPrivileged && <th className="p-2 text-left">Model</th>}
+                  {isPrivileged && <th className="p-2 text-left">Compatible Machines</th>}
                   <th className="p-2 text-left">Min Qty</th>
-                  <th className="p-2 text-left">Price</th>
+                  {isPrivileged && <th className="p-2 text-left">Purchase Price</th>}
+                  <th className="p-2 text-left">Sale Price</th>
                   <th className="p-2 text-left">Last Neg. Price</th>
+                  {isPrivileged && <th className="p-2 text-left">Tax %</th>}
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Actions</th>
                 </>
@@ -151,12 +238,30 @@ function ProductAndSpareLists({ type, userRole }) {
                       <>
                         <td className="p-2">{r.spare_number}</td>
                         <td className="p-2">{r.item_name}</td>
+                        {isPrivileged && <td className="p-2 text-xs bg-blue-50">{r.type || "-"}</td>}
+                        {isPrivileged && <td className="p-2 text-xs bg-green-50">{r.make || "-"}</td>}
+                        {isPrivileged && <td className="p-2 text-xs bg-yellow-50">{r.model || "-"}</td>}
+                        {isPrivileged && (
+                          <td className="p-2 text-xs max-w-xs">
+                            {r.compatible_machine ? (
+                              <div className="space-y-1">
+                                {String(r.compatible_machine).split(",").map((m, i) => (
+                                  <span key={i} className="inline-block bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                                    {m.trim()}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : <span className="text-gray-400">-</span>}
+                          </td>
+                        )}
                         <td className="p-2">{r.min_qty}</td>
-                        <td className="p-2">{r.price}</td>
+                        {isPrivileged && <td className="p-2">{r.purchase_price || 0}</td>}
+                        <td className="p-2">{r.sale_price || 0}</td>
                         <td className="p-2">{r.last_negotiation_price || 0}</td>
+                        {isPrivileged && <td className="p-2 text-xs bg-orange-50">{r.tax || 0}%</td>}
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
-                          {["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole) && (
+                          {isPrivileged && (
                             <button
                               onClick={() => handleEditClick(r)}
                               className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
@@ -236,8 +341,25 @@ function ProductAndSpareLists({ type, userRole }) {
                   <>
                     <p><span className="font-semibold">Spare No:</span> {r.spare_number}</p>
                     <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>
-                    <p><span className="font-semibold">Price:</span> {r.price}</p>
+                    {isPrivileged && <p><span className="font-semibold">Type:</span> {r.type || "-"}</p>}
+                    {isPrivileged && <p><span className="font-semibold">Make:</span> {r.make || "-"}</p>}
+                    {isPrivileged && <p><span className="font-semibold">Model:</span> {r.model || "-"}</p>}
+                    {isPrivileged && r.compatible_machine && (
+                      <div>
+                        <span className="font-semibold">Compatible Machines:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {String(r.compatible_machine).split(",").map((m, i) => (
+                            <span key={i} className="inline-block bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs">
+                              {m.trim()}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {isPrivileged && <p><span className="font-semibold">Purchase Price:</span> {r.purchase_price || 0}</p>}
+                    <p><span className="font-semibold">Sale Price:</span> {r.sale_price || 0}</p>
                     <p><span className="font-semibold">Last Neg. Price:</span> {r.last_negotiation_price || 0}</p>
+                    {isPrivileged && <p><span className="font-semibold">Tax:</span> {r.tax || 0}%</p>}
                     <p><span className="font-semibold">Specification:</span> {r.specification}</p>
                   </>
                 )}
@@ -284,6 +406,56 @@ function ProductAndSpareLists({ type, userRole }) {
                   className="w-full border rounded px-3 py-2 text-sm"
                 />
               </div>
+              {/* Privileged fields */}
+              {isPrivileged && (
+                <>
+                  {/* Type */}
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Type</label>
+                    <select
+                      value={editingSpare.type || ""}
+                      onChange={(e) => setEditingSpare({ ...editingSpare, type: e.target.value })}
+                      className="w-full border rounded px-3 py-2 text-sm"
+                    >
+                      <option value="">Select type</option>
+                      <option value="Raw Materials">Raw Materials</option>
+                      <option value="Consumables">Consumables</option>
+                      <option value="Spares">Spares</option>
+                    </select>
+                  </div>
+                  {/* Make */}
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Make</label>
+                    <input
+                      type="text"
+                      value={editingSpare.make || ""}
+                      onChange={(e) => setEditingSpare({ ...editingSpare, make: e.target.value })}
+                      className="w-full border rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                  {/* Model */}
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Model</label>
+                    <input
+                      type="text"
+                      value={editingSpare.model || ""}
+                      onChange={(e) => setEditingSpare({ ...editingSpare, model: e.target.value })}
+                      className="w-full border rounded px-3 py-2 text-sm"
+                    />
+                  </div>
+                  {/* Compatible Machine */}
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">Compatible Machine</label>
+                    <input
+                      type="text"
+                      value={editingSpare.compatible_machine || ""}
+                      onChange={(e) => setEditingSpare({ ...editingSpare, compatible_machine: e.target.value })}
+                      className="w-full border rounded px-3 py-2 text-sm"
+                      placeholder="Comma separated e.g. DSC-30, Dyna-40"
+                    />
+                  </div>
+                </>
+              )}
               {/* Min Qty */}
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Min Qty</label>
@@ -294,13 +466,26 @@ function ProductAndSpareLists({ type, userRole }) {
                   className="w-full border rounded px-3 py-2 text-sm"
                 />
               </div>
-              {/* Price */}
+              {/* Purchase Price — privileged only */}
+              {isPrivileged && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Purchase Price</label>
+                  <input
+                    type="number"
+                    value={editingSpare.purchase_price || 0}
+                    onChange={(e) => setEditingSpare({ ...editingSpare, purchase_price: e.target.value })}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                    step="0.01"
+                  />
+                </div>
+              )}
+              {/* Sale Price */}
               <div>
-                <label className="block text-sm text-gray-700 mb-1">Price</label>
+                <label className="block text-sm text-gray-700 mb-1">Sale Price</label>
                 <input
                   type="number"
-                  value={editingSpare.price || 0}
-                  onChange={(e) => setEditingSpare({ ...editingSpare, price: e.target.value })}
+                  value={editingSpare.sale_price || 0}
+                  onChange={(e) => setEditingSpare({ ...editingSpare, sale_price: e.target.value })}
                   className="w-full border rounded px-3 py-2 text-sm"
                   step="0.01"
                 />
@@ -316,6 +501,19 @@ function ProductAndSpareLists({ type, userRole }) {
                   step="0.01"
                 />
               </div>
+              {/* Tax — privileged only */}
+              {isPrivileged && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Tax %</label>
+                  <input
+                    type="number"
+                    value={editingSpare.tax || 0}
+                    onChange={(e) => setEditingSpare({ ...editingSpare, tax: e.target.value })}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                    step="0.01"
+                  />
+                </div>
+              )}
               {/* Specification */}
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Specification</label>
