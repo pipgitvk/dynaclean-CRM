@@ -12,9 +12,14 @@ function ProductAndSpareLists({ type, userRole }) {
   const [filterMake, setFilterMake] = useState("");
   const [filterModel, setFilterModel] = useState("");
   const [filterCompatible, setFilterCompatible] = useState("");
-  const [openDropdown, setOpenDropdown] = useState(null); // 'model' | 'compatible' | null
+  const [openDropdown, setOpenDropdown] = useState(null);
   const [editingSpare, setEditingSpare] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Products for compatible machines searchable dropdown
+  const [products, setProducts] = useState([]);
+  const [machineSearch, setMachineSearch] = useState("");
+  const [showMachineDropdown, setShowMachineDropdown] = useState(false);
 
   const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
 
@@ -24,7 +29,41 @@ function ProductAndSpareLists({ type, userRole }) {
       .then(r => r.json())
       .then(d => setRows(Array.isArray(d) ? d : []))
       .catch(() => setRows([]));
+
+    // Fetch products for compatible machines dropdown
+    fetch('/api/products/list')
+      .then(r => r.json())
+      .then(d => setProducts(Array.isArray(d) ? d : []))
+      .catch(() => setProducts([]));
   }, [type]);
+
+  // Filter products based on machineSearch
+  const filteredProducts = useMemo(() => {
+    const q = machineSearch.toLowerCase();
+    if (!q) return products;
+    return products.filter(p =>
+      String(p.item_name || "").toLowerCase().includes(q) ||
+      String(p.item_code || "").toLowerCase().includes(q) ||
+      String(p.product_number || "").toLowerCase().includes(q)
+    );
+  }, [products, machineSearch]);
+
+  // Product number → item_code map for display
+  const productMap = useMemo(() => {
+    const map = {};
+    products.forEach(p => { if (p.product_number) map[p.product_number] = p.item_code; });
+    return map;
+  }, [products]);
+
+  const addMachineToModal = (product) => {
+    if (!editingSpare) return;
+    const machineId = product.product_number;
+    const current = String(editingSpare.compatible_machine || "").split(",").map(m => m.trim()).filter(Boolean);
+    if (current.includes(machineId)) { alert("Already added"); return; }
+    setEditingSpare({ ...editingSpare, compatible_machine: [...current, machineId].join(", ") });
+    setMachineSearch("");
+    setShowMachineDropdown(false);
+  };
 
   const handleEditClick = (spare) => {
     setEditingSpare({ ...spare });
@@ -408,9 +447,9 @@ function ProductAndSpareLists({ type, userRole }) {
 
       {/* EDIT MODAL */}
       {isModalOpen && editingSpare && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-4 border-b flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[100]">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center shrink-0">
               <h3 className="text-lg font-semibold">Edit Spare</h3>
               <button
                 onClick={() => {
@@ -422,7 +461,7 @@ function ProductAndSpareLists({ type, userRole }) {
                 ×
               </button>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
               {/* Spare Number */}
               <div>
                 <label className="block text-sm text-gray-700 mb-1">Spare No</label>
@@ -482,14 +521,58 @@ function ProductAndSpareLists({ type, userRole }) {
                   </div>
                   {/* Compatible Machine */}
                   <div>
-                    <label className="block text-sm text-gray-700 mb-1">Compatible Machine</label>
-                    <input
-                      type="text"
-                      value={editingSpare.compatible_machine || ""}
-                      onChange={(e) => setEditingSpare({ ...editingSpare, compatible_machine: e.target.value })}
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      placeholder="Comma separated e.g. DSC-30, Dyna-40"
-                    />
+                    <label className="block text-sm text-gray-700 mb-1">Compatible Machines</label>
+                    {/* Searchable dropdown */}
+                    <div className="relative mb-2">
+                      <input
+                        type="text"
+                        value={machineSearch}
+                        onChange={(e) => { setMachineSearch(e.target.value); setShowMachineDropdown(true); }}
+                        onFocus={() => setShowMachineDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowMachineDropdown(false), 150)}
+                        placeholder="Search by product name or code..."
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      {showMachineDropdown && machineSearch && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto z-[200] text-sm">
+                          {filteredProducts.length > 0 ? (
+                            filteredProducts.slice(0, 20).map((product) => (
+                              <button
+                                key={product.id}
+                                type="button"
+                                onMouseDown={() => addMachineToModal(product)}
+                                className="w-full text-left px-3 py-2 border-b hover:bg-blue-50 flex items-center justify-between"
+                              >
+                                <div>
+                                  <div className="font-medium text-gray-800">{product.item_name}</div>
+                                  <div className="text-xs text-gray-500">Product #: {product.product_number}</div>
+                                </div>
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full ml-2 shrink-0">Add</span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-gray-500 text-center">No products found</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Selected machines */}
+                    <div className="flex flex-wrap gap-2 p-2 border border-gray-200 rounded-lg bg-gray-50 min-h-10">
+                      {String(editingSpare.compatible_machine || "").split(",").map(m => m.trim()).filter(Boolean).map((machine, i) => (
+                        <span key={i} className="flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                          {productMap[machine] || machine}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = String(editingSpare.compatible_machine || "").split(",").map(m => m.trim()).filter(m => m && m !== machine).join(", ");
+                              setEditingSpare({ ...editingSpare, compatible_machine: updated });
+                            }}
+                            className="ml-1 text-blue-500 hover:text-blue-700 font-bold"
+                          >✕</button>
+                        </span>
+                      ))}
+                      {!editingSpare.compatible_machine && <span className="text-xs text-gray-400">No machines selected</span>}
+                    </div>
                   </div>
                 </>
               )}
@@ -595,7 +678,7 @@ function ProductAndSpareLists({ type, userRole }) {
                 )}
               </div>
             </div>
-            <div className="p-4 border-t flex justify-end gap-2">
+            <div className="p-4 border-t flex justify-end gap-2 shrink-0">
               <button
                 onClick={() => {
                   setIsModalOpen(false);
