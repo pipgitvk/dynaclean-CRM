@@ -86,15 +86,22 @@ export async function GET(req) {
       : 0;
 
     // All performing salespeople (sorted by revenue, highest first)
+    // Uses same logic as modal: approved orders only, taxable amount from quotation_items
     const [topSalespeople] = await conn.execute(`
       SELECT 
-        created_by as salesperson,
-        COUNT(*) as orders_count,
-        SUM(COALESCE(totalamt, 0)) as revenue
-      FROM neworder
-      WHERE DATE(created_at) >= ? AND DATE(created_at) <= ?
-        AND created_by IS NOT NULL
-      GROUP BY created_by
+        CAST(qr.emp_name AS CHAR) COLLATE utf8mb4_unicode_ci as salesperson,
+        COUNT(DISTINCT no.order_id) as orders_count,
+        COALESCE(SUM(COALESCE(qi.total_taxable_amt, qi.taxable_price, qi.price_per_unit * qi.quantity, 0)), 0) as revenue
+      FROM quotations_records qr
+      LEFT JOIN neworder no 
+        ON no.quote_number = qr.quote_number
+        AND no.approval_status = 'approved'
+        AND DATE(no.created_at) >= ? AND DATE(no.created_at) <= ?
+      LEFT JOIN quotation_items qi 
+        ON qi.quote_number = no.quote_number
+      WHERE qr.emp_name IS NOT NULL
+        AND no.order_id IS NOT NULL
+      GROUP BY qr.emp_name
       ORDER BY revenue DESC
     `, [startDateStr, endDateStr]);
 
