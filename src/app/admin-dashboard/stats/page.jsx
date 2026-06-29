@@ -18,7 +18,8 @@ import {
     BarChart3,
     Calendar,
     BarChart2,
-    X
+    X,
+    Eye
 } from "lucide-react";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
@@ -35,6 +36,7 @@ import {
     Filler
 } from "chart.js";
 import toast from "react-hot-toast";
+import TopAchieversCard from "@/components/stats/TopAchieversCard";
 
 // Register ChartJS components
 ChartJS.register(
@@ -58,9 +60,27 @@ export default function AdminStatsDashboard() {
     const [topOrdersModalOpen, setTopOrdersModalOpen] = useState(false);
     const [topOrders, setTopOrders] = useState([]);
     const [topOrdersLoading, setTopOrdersLoading] = useState(false);
+    
+    // Get current month and year for Top Achievers
+    const [currentMonth] = useState(new Date().getMonth() + 1);
+    const [currentYear] = useState(new Date().getFullYear());
+    const [targetAchievedAmount, setTargetAchievedAmount] = useState(0);
+    const [activeTargetCount, setActiveTargetCount] = useState(0);
+    const [ordersTotalAmount, setOrdersTotalAmount] = useState(0);
+    const [ordersTaxableAmount, setOrdersTaxableAmount] = useState(0);
+
+    // Salesperson quotations modal
+    const [quotationsModalOpen, setQuotationsModalOpen] = useState(false);
+    const [selectedSalesperson, setSelectedSalesperson] = useState(null);
+    const [salespersonQuotations, setSalespersonQuotations] = useState([]);
+    const [quotationsLoading, setQuotationsLoading] = useState(false);
+    const [selectedSalespersonOrders, setSelectedSalespersonOrders] = useState(0);
+    const [selectedSalespersonTotal, setSelectedSalespersonTotal] = useState(0);
 
     useEffect(() => {
         fetchDashboardStats();
+        fetchTotalAchievedAmount();
+        fetchOrdersTotalAmount();
     }, [timeRange]);
 
     const fetchDashboardStats = async () => {
@@ -80,6 +100,93 @@ export default function AdminStatsDashboard() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchTotalAchievedAmount = async () => {
+        try {
+            const response = await fetch(
+                `/api/admin-dashboard-stats/top-achievers?month=${currentMonth}&year=${currentYear}`
+            );
+            const data = await response.json();
+
+            if (data.success && data.data.length > 0) {
+                // Sum all achieved amounts from all achievers
+                const totalAchieved = data.data.reduce((sum, achiever) => sum + achiever.achieved, 0);
+                setTargetAchievedAmount(totalAchieved);
+                // Count of active people = targets active in this month (same as monitor-targets)
+                setActiveTargetCount(data.data.length);
+            }
+        } catch (error) {
+            console.error("Error fetching achieved amount:", error);
+        }
+    };
+
+    const fetchOrdersTotalAmount = async () => {
+        try {
+            // Calculate date range based on timeRange (same as OrderTable default)
+            const now = new Date();
+            let dateFrom, dateTo;
+
+            if (timeRange === "today") {
+                dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                dateTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (timeRange === "thisWeek") {
+                const start = new Date(now);
+                start.setDate(now.getDate() - now.getDay());
+                dateFrom = start;
+                dateTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (timeRange === "lastMonth") {
+                dateFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                dateTo = new Date(now.getFullYear(), now.getMonth(), 0);
+            } else {
+                // thisMonth (default)
+                dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+                dateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            }
+
+            const pad = (n) => String(n).padStart(2, "0");
+            const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+            const response = await fetch(
+                `/api/admin-dashboard-stats/orders-total?dateFrom=${fmt(dateFrom)}&dateTo=${fmt(dateTo)}`
+            );
+            const data = await response.json();
+
+            if (data.success && data.data) {
+                setOrdersTotalAmount(data.data.total_amount);
+                setOrdersTaxableAmount(data.data.taxable_amount || 0);
+            }
+        } catch (error) {
+            console.error("Error fetching orders total amount:", error);
+        }
+    };
+
+    const fetchSalespersonQuotations = async (salesperson) => {
+        setQuotationsLoading(true);
+        setSalespersonQuotations([]);
+        setSelectedSalespersonOrders(0);
+        setSelectedSalespersonTotal(0);
+        try {
+            const res = await fetch(
+                `/api/admin-dashboard-stats/salesperson-quotations?salesperson=${encodeURIComponent(salesperson)}&timeRange=${timeRange}`
+            );
+            const data = await res.json();
+            if (data.success) {
+                setSalespersonQuotations(data.data || []);
+                setSelectedSalespersonOrders((data.data || []).length);
+                setSelectedSalespersonTotal(data.total_amount || 0);
+            }
+        } catch (err) {
+            console.error("Error fetching salesperson quotations:", err);
+        } finally {
+            setQuotationsLoading(false);
+        }
+    };
+
+    const openQuotationsModal = (salesperson) => {
+        setSelectedSalesperson(salesperson);
+        setQuotationsModalOpen(true);
+        fetchSalespersonQuotations(salesperson);
     };
 
     const fetchTopOrders = async () => {
@@ -342,18 +449,10 @@ export default function AdminStatsDashboard() {
                     </div>
                     <KPICard
                         title="Total Revenue"
-                        value={formatCurrency(stats?.sales?.totalRevenue)}
+                        value={formatCurrency(ordersTotalAmount)}
                         icon={DollarSign}
                         color="bg-gradient-to-br from-green-500 to-green-600"
-                        subtitle={
-                            (stats?.sales?.totalBaseAmount != null || stats?.sales?.totalTaxGst != null)
-                                ? (() => {
-                                    const base = parseFloat(stats?.sales?.totalBaseAmount) || 0;
-                                    const tax = parseFloat(stats?.sales?.totalTaxGst) || 0;
-                                    return `Base ${formatCurrency(base)} | Tax ${formatCurrency(tax)}`;
-                                })()
-                                : "Order total (totalamt)"
-                        }
+                        subtitle={ordersTaxableAmount > 0 ? `Base: ${formatCurrency(ordersTaxableAmount)} | Tax: ${formatCurrency(ordersTotalAmount - ordersTaxableAmount)}` : undefined}
                         onClick={() => router.push("/admin-dashboard/order")}
                     />
                     <KPICard
@@ -366,7 +465,7 @@ export default function AdminStatsDashboard() {
                     />
                     <KPICard
                         title="Active Salespeople"
-                        value={stats?.sales?.activeSalespeople || 0}
+                        value={activeTargetCount || stats?.sales?.activeSalespeople || 0}
                         icon={Users}
                         color="bg-gradient-to-br from-indigo-500 to-indigo-600"
                         subtitle="Team members"
@@ -572,7 +671,7 @@ export default function AdminStatsDashboard() {
                 </div>
             </div>
 
-            {/* Service Status Bar Chart */}
+            {/* Service Status Bar Chart + Top Achievers */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div className="bg-white rounded-xl shadow-md p-6">
                     <div className="h-80">
@@ -586,7 +685,17 @@ export default function AdminStatsDashboard() {
                     </div>
                 </div>
 
-                {/* Top Performers */}
+                {/* Top Achievers (Based on Target Achievement) */}
+                <TopAchieversCard 
+                    timeRange={timeRange} 
+                    month={currentMonth} 
+                    year={currentYear} 
+                />
+            </div>
+
+            {/* Top Sales Performers by Revenue */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div></div>
                 <div className="bg-white rounded-xl shadow-md p-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Sales Performers</h3>
                     <div className="space-y-3 max-h-80 overflow-y-auto">
@@ -605,8 +714,16 @@ export default function AdminStatsDashboard() {
                                             <p className="text-sm text-gray-500">{performer.orders_count} orders</p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="flex items-center gap-3">
                                         <p className="font-semibold text-green-600">{formatCurrency(performer.revenue)}</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => openQuotationsModal(performer.salesperson)}
+                                            className="p-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-600 transition-colors"
+                                            title="View quotations"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 </div>
                             ))
@@ -616,6 +733,103 @@ export default function AdminStatsDashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* Salesperson Quotations Modal */}
+            {quotationsModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                    onClick={() => setQuotationsModalOpen(false)}
+                    role="dialog"
+                    aria-modal="true"
+                >
+                    <div
+                        className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                                <Eye className="w-5 h-5 text-blue-600" />
+                                {selectedSalesperson}'s Quotations
+                            </h2>
+                            <button
+                                type="button"
+                                onClick={() => setQuotationsModalOpen(false)}
+                                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-auto flex-1">
+                            {quotationsLoading ? (
+                                <div className="flex justify-center py-12">
+                                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600" />
+                                </div>
+                            ) : salespersonQuotations.length === 0 ? (
+                                <p className="text-gray-500 text-center py-8">No quotations found for this period.</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-gray-200 text-left text-gray-600 bg-gray-50">
+                                                <th className="pb-2 pt-2 px-2">#</th>
+                                                <th className="pb-2 pt-2 px-2">Order ID</th>
+                                                <th className="pb-2 pt-2 px-2">Client</th>
+                                                <th className="pb-2 pt-2 px-2">Company</th>
+                                                <th className="pb-2 pt-2 px-2 text-right">Amount</th>
+                                                <th className="pb-2 pt-2 px-2 text-center">Payment</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {salespersonQuotations.map((q, idx) => (
+                                                <tr key={q.order_id || idx} className="border-b border-gray-100 hover:bg-gray-50">
+                                                    <td className="py-2 px-2 text-gray-500">{idx + 1}</td>
+                                                    <td className="py-2 px-2 font-medium text-blue-600">{q.order_id || "—"}</td>
+                                                    <td className="py-2 px-2">{q.client_name || "—"}</td>
+                                                    <td className="py-2 px-2 text-gray-600">{q.company_name || "—"}</td>
+                                                    <td className="py-2 px-2 text-right font-medium text-green-700">
+                                                        {formatCurrency(q.taxable_amount || 0)}
+                                                    </td>
+                                                    <td className="py-2 px-2 text-center">
+                                                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                                                            q.payment_status === "paid"
+                                                                ? "bg-green-100 text-green-700"
+                                                                : q.payment_status === "over due"
+                                                                ? "bg-red-100 text-red-700"
+                                                                : q.payment_status === "partially paid"
+                                                                ? "bg-yellow-100 text-yellow-700"
+                                                                : "bg-gray-100 text-gray-600"
+                                                        }`}>
+                                                            {q.payment_status || "pending"}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="bg-gray-50 font-semibold">
+                                                <td colSpan={4} className="py-2 px-2 text-gray-700">Total ({salespersonQuotations.length} orders)</td>
+                                                <td className="py-2 px-2 text-right text-green-700">
+                                                    {formatCurrency(selectedSalespersonTotal)}
+                                                </td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-gray-200 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setQuotationsModalOpen(false)}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium text-gray-700"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* All Products (Qty wise) - Modal */}
             {topOrdersModalOpen && (
