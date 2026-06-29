@@ -21,6 +21,8 @@ function ProductAndSpareLists({ type }) {
   const [showSparesModal, setShowSparesModal] = useState(false);
   const [selectedProductSpares, setSelectedProductSpares] = useState([]);
   const [allSpares, setAllSpares] = useState([]);
+  const [sparesSearchQuery, setSparesSearchQuery] = useState("");
+  const [sparesTypeFilter, setSparesTypeFilter] = useState("all");
   const [editFormData, setEditFormData] = useState({
     item_code: '',
     item_name: '',
@@ -912,11 +914,61 @@ function ProductAndSpareLists({ type }) {
             <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white z-10">
               <h2 className="text-lg font-semibold text-gray-800">Compatible Spares</h2>
               <button
-                onClick={() => setShowSparesModal(false)}
+                onClick={() => {
+                  setShowSparesModal(false);
+                  setSparesSearchQuery("");
+                  setSparesTypeFilter("all");
+                }}
                 className="p-1 hover:bg-gray-100 rounded"
               >
                 <X className="w-5 h-5 text-gray-600" />
               </button>
+            </div>
+
+            {/* Search and Filter Bar */}
+            <div className="p-3 border-b bg-gray-50 space-y-2">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search spares by name, number..."
+                  value={sparesSearchQuery}
+                  onChange={(e) => setSparesSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 border rounded-md text-sm"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setSparesTypeFilter("all")}
+                  className={`px-3 py-1.5 text-xs rounded transition ${
+                    sparesTypeFilter === "all" 
+                      ? "bg-blue-600 text-white" 
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  All
+                </button>
+                <button 
+                  onClick={() => setSparesTypeFilter("spares")}
+                  className={`px-3 py-1.5 text-xs rounded transition ${
+                    sparesTypeFilter === "spares" 
+                      ? "bg-blue-600 text-white" 
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Spares
+                </button>
+                <button 
+                  onClick={() => setSparesTypeFilter("consumables")}
+                  className={`px-3 py-1.5 text-xs rounded transition ${
+                    sparesTypeFilter === "consumables" 
+                      ? "bg-blue-600 text-white" 
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Consumables
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -939,7 +991,32 @@ function ProductAndSpareLists({ type }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedProductSpares.map((spare, idx) => (
+                    {selectedProductSpares
+                      .filter(spare => {
+                        const spareType = String(spare.type || '').toLowerCase();
+                        // Exclude Raw Materials always
+                        if (spareType === 'raw materials' || spareType === 'raw material') return false;
+                        
+                        // Filter by type button
+                        if (sparesTypeFilter === "spares") {
+                          return spareType === 'spares' || spareType === 'spare';
+                        } else if (sparesTypeFilter === "consumables") {
+                          return spareType === 'consumables' || spareType === 'consumable';
+                        }
+                        // "all" shows everything except raw materials
+                        return true;
+                      })
+                      .filter(spare => {
+                        // Search filter
+                        if (!sparesSearchQuery.trim()) return true;
+                        const q = sparesSearchQuery.toLowerCase();
+                        return (
+                          String(spare.item_name || '').toLowerCase().includes(q) ||
+                          String(spare.spare_number || '').toLowerCase().includes(q) ||
+                          String(spare.type || '').toLowerCase().includes(q)
+                        );
+                      })
+                      .map((spare, idx) => (
                       <tr key={idx} className="border-t hover:bg-blue-50">
                         <td className="p-2">
                           {spare.image ? (
