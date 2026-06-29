@@ -12,8 +12,10 @@ function ProductAndSpareLists({ type }) {
   const [showSparesModal, setShowSparesModal] = useState(false);
   const [selectedProductSpares, setSelectedProductSpares] = useState([]);
   const [allSpares, setAllSpares] = useState([]);
+  const [spareTypeFilter, setSpareTypeFilter] = useState(""); // New filter state
 
   const handleViewSpares = (product) => {
+    setSpareTypeFilter(""); // Reset filter when opening modal
     // Filter spares based on product/machine compatibility
     // Check multiple product identifiers
     const searchTerms = [
@@ -32,6 +34,12 @@ function ProductAndSpareLists({ type }) {
     const compatibleSpares = allSpares.filter(spare => {
       if (!spare.compatible_machine) {
         console.log('Spare skipped (no compatible_machine):', spare.item_name);
+        return false;
+      }
+      
+      // Filter by type: only show "Spares" and "Consumables", exclude "Raw Materials"
+      if (!spare.type || !['Spares', 'Consumables'].includes(spare.type)) {
+        console.log('Spare skipped (wrong type):', spare.item_name, 'Type:', spare.type);
         return false;
       }
       
@@ -317,6 +325,19 @@ function ProductAndSpareLists({ type }) {
               </button>
             </div>
 
+            {/* Filter Dropdown */}
+            <div className="px-4 py-2 border-b bg-gray-50">
+              <select
+                value={spareTypeFilter}
+                onChange={(e) => setSpareTypeFilter(e.target.value)}
+                className="px-3 py-2 border rounded-md text-sm w-full sm:w-48"
+              >
+                <option value="">All Types</option>
+                <option value="Spares">Spares</option>
+                <option value="Consumables">Consumables</option>
+              </select>
+            </div>
+
             <div className="overflow-x-auto">
               {selectedProductSpares.length === 0 ? (
                 <div className="text-center py-8 text-gray-500 p-4">
@@ -337,7 +358,9 @@ function ProductAndSpareLists({ type }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedProductSpares.map((spare, idx) => (
+                    {selectedProductSpares
+                      .filter(spare => spareTypeFilter === "" || spare.type === spareTypeFilter)
+                      .map((spare, idx) => (
                       <tr key={idx} className="border-t hover:bg-blue-50">
                         <td className="p-2">
                           {spare.image ? (
