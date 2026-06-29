@@ -34,52 +34,90 @@ export async function GET(req) {
     if (search) {
       whereClause += `
         AND (
-          invoice_number LIKE ? OR
-          buyer_name LIKE ?
+          i.invoice_number LIKE ? OR
+          i.customer_name LIKE ? OR
+          i.gst_number LIKE ? OR
+          i.employee_name LIKE ? OR
+          ii.item_code LIKE ? OR
+          ii.item_name LIKE ? OR
+          ii.hsn_code LIKE ?
         )
       `;
-      values.push(`%${search}%`, `%${search}%`);
+      const searchPattern = `%${search}%`;
+      values.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
     if (fromDate) {
-      whereClause += " AND order_date >= ?";
+      whereClause += " AND COALESCE(order_date, invoice_date) >= ?";
       values.push(fromDate);
     }
 
     if (toDate) {
-      whereClause += " AND order_date <= ?";
+      whereClause += " AND COALESCE(order_date, invoice_date) <= ?";
       values.push(toDate);
     }
 
     conn = await getDbConnection();
 
-    // Total count
+    // Total count with LEFT JOIN for search
     const [[{ total }]] = await conn.execute(
       `
-      SELECT COUNT(*) AS total
-      FROM invoice_details
+      SELECT COUNT(DISTINCT i.id) AS total
+      FROM invoices i
+      LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
       ${whereClause}
       `,
       values,
     );
 
-    // Paginated list data
+    // Paginated list data with LEFT JOIN
     const [rows] = await conn.execute(
       `
-      SELECT
-        id,
-        invoice_number,
-        order_date,
-        buyer_name,
-        tax_amount,
-        grand_total,
-        created_at
-      FROM invoice_details
+      SELECT DISTINCT
+        i.id,
+        i.invoice_number,
+        COALESCE(i.order_date, i.invoice_date) AS order_date,
+        i.customer_name as buyer_name,
+        i.gst_number,
+        i.employee_name,
+        COALESCE(i.cgst, 0) + COALESCE(i.sgst, 0) + COALESCE(i.igst, 0) AS tax_amount,
+        COALESCE(i.cgst, 0) AS cgst,
+        COALESCE(i.sgst, 0) AS sgst,
+        COALESCE(i.igst, 0) AS igst,
+        i.grand_total,
+        i.created_at
+      FROM invoices i
+      LEFT JOIN invoice_items ii ON i.id = ii.invoice_id
       ${whereClause}
       ORDER BY ${sort} ${order}
       LIMIT ? OFFSET ?
       `,
       [...values, limit, offset],
+    );
+
+    // Fetch items for each invoice
+    const invoicesWithItems = await Promise.all(
+      rows.map(async (invoice) => {
+        const [items] = await conn.execute(
+          `SELECT 
+            item_code, 
+            item_name, 
+            quantity, 
+            hsn_code, 
+            taxable_value, 
+            cgst_amount, 
+            sgst_amount, 
+            igst_amount,
+            rate as price_per_unit
+          FROM invoice_items 
+          WHERE invoice_id = ?`,
+          [invoice.id]
+        );
+        return {
+          ...invoice,
+          items: items || []
+        };
+      })
     );
 
     return NextResponse.json({
@@ -90,7 +128,7 @@ export async function GET(req) {
         total,
         totalPages: Math.ceil(total / limit),
       },
-      data: rows,
+      data: invoicesWithItems,
     });
   } catch (err) {
     console.error("Invoice list API error:", err);
