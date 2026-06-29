@@ -48,10 +48,10 @@ function ProductAndSpareLists({ type, userRole }) {
     );
   }, [products, machineSearch]);
 
-  // Product number → item_code map for display
+  // Product number → item_code map for display (String keys to avoid type mismatch)
   const productMap = useMemo(() => {
     const map = {};
-    products.forEach(p => { if (p.product_number) map[p.product_number] = p.item_code; });
+    products.forEach(p => { if (p.product_number != null) map[String(p.product_number)] = p.item_code; });
     return map;
   }, [products]);
 
@@ -321,11 +321,15 @@ function ProductAndSpareLists({ type, userRole }) {
                           <td className="p-2 text-xs max-w-xs">
                             {r.compatible_machine ? (
                               <div className="space-y-1">
-                                {String(r.compatible_machine).split(",").map((m, i) => (
-                                  <span key={i} className="inline-block bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs mr-1 mb-1">
-                                    {m.trim()}
-                                  </span>
-                                ))}
+                                {String(r.compatible_machine).split(",").map((m, i) => {
+                                  const key = m.trim();
+                                  const displayName = productMap[key] || key;
+                                  return (
+                                    <span key={i} className="inline-block bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                                      {displayName}
+                                    </span>
+                                  );
+                                })}
                               </div>
                             ) : <span className="text-gray-400">-</span>}
                           </td>
@@ -424,11 +428,15 @@ function ProductAndSpareLists({ type, userRole }) {
                       <div>
                         <span className="font-semibold">Compatible Machines:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {String(r.compatible_machine).split(",").map((m, i) => (
-                            <span key={i} className="inline-block bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs">
-                              {m.trim()}
-                            </span>
-                          ))}
+                          {String(r.compatible_machine).split(",").map((m, i) => {
+                            const key = m.trim();
+                            const displayName = productMap[key] || key;
+                            return (
+                              <span key={i} className="inline-block bg-purple-100 text-purple-800 px-2 py-0.5 rounded text-xs">
+                                {displayName}
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

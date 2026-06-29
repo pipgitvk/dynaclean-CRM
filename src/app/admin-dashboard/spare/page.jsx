@@ -203,12 +203,12 @@ function SpareList() {
       .catch(() => setStockTotals({ totalQty: 0, totalValue: 0 }));
   }, []);
 
-  // Create a map for fast product lookup
+  // Create a map for fast product lookup (String keys to avoid type mismatch)
   const productMap = useMemo(() => {
     const map = {};
     products.forEach(p => {
-      if (p.product_number) {
-        map[p.product_number] = p.item_code;
+      if (p.product_number != null) {
+        map[String(p.product_number)] = p.item_code;
       }
     });
     return map;

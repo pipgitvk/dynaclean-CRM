@@ -139,12 +139,12 @@ export async function GET(req) {
         [rows] = await conn.execute(
           `
           SELECT
-            T1.id AS item_code,
+            T1.spare_number AS item_code,
             T1.item_name,
             '84798999' AS hsn_sac,
             T1.specification,
             'Nos' AS unit,
-            T1.price AS price_per_unit,
+            T1.sale_price AS price_per_unit,
             T1.tax AS gst_rate,
             T1.last_negotiation_price,
             T1.image AS image_path
