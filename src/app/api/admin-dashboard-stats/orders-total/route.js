@@ -57,7 +57,7 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       data: {
-        total_orders: totalOrders,
+        total_orders: totalOrders,  
         total_amount: totalAmount,
         paid_amount: paidAmount,
         pending_amount: pendingAmount,

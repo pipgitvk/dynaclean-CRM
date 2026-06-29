@@ -301,7 +301,9 @@ export default function CustomerTable({
                     <td className="px-4 py-2">{row.bid_numbers || "-"}</td>
                     <td className="px-4 py-2">{row.products_interest}</td>
                     <td className="px-4 py-2">
-                      {format(new Date(row.date_created), "dd MMM yyyy HH:mm")}
+                      {row.date_created && !isNaN(new Date(row.date_created).getTime())
+                        ? format(new Date(row.date_created), "dd MMM yyyy HH:mm")
+                        : "---"}
                     </td>
                     <td className="px-4 py-2 flex items-center gap-2">
                       <button
