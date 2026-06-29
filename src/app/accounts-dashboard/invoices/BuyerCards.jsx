@@ -338,16 +338,19 @@ export default function BuyerCards() {
                         <tr>
                           <th className="border p-2 text-left">ID</th>
                           <th className="border p-2 text-left">Invoice #</th>
+                          <th className="border p-2 text-left">Buyer Name</th>
                           <th className="border p-2 text-left">GSTIN</th>
                           <th className="border p-2 text-left">Employee</th>
                           <th className="border p-2 text-left">Date</th>
+                          <th className="border p-2 text-left">Tax Amount</th>
+                          <th className="border p-2 text-left">Taxable Amt</th>
+                          <th className="border p-2 text-left">Grand Total</th>
                           <th className="border p-2 text-left">HSN</th>
                           <th className="border p-2 text-left">Qty</th>
-                          <th className="border p-2 text-left">Taxable Amt</th>
+                          <th className="border p-2 text-left">Taxable Value</th>
                           <th className="border p-2 text-left">CGST</th>
                           <th className="border p-2 text-left">SGST</th>
                           <th className="border p-2 text-left">IGST</th>
-                          <th className="border p-2 text-left">Total</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -359,9 +362,13 @@ export default function BuyerCards() {
                                   <>
                                     <td className="border p-2 text-blue-600 font-semibold" rowSpan={inv.items.length}>{inv.id}</td>
                                     <td className="border p-2 text-blue-600 font-semibold" rowSpan={inv.items.length}>{inv.invoice_number}</td>
+                                    <td className="border p-2" rowSpan={inv.items.length}>{inv.buyer_name || "-"}</td>
                                     <td className="border p-2" rowSpan={inv.items.length}>{inv.gst_number || "-"}</td>
                                     <td className="border p-2" rowSpan={inv.items.length}>{inv.employee_name || "-"}</td>
                                     <td className="border p-2" rowSpan={inv.items.length}>{inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-"}</td>
+                                    <td className="border p-2 text-right font-semibold" rowSpan={inv.items.length}>₹{Number(inv.tax_amount || 0).toLocaleString('en-IN')}</td>
+                                    <td className="border p-2 text-right" rowSpan={inv.items.length}>₹{Number(item.taxable_value || 0).toLocaleString('en-IN')}</td>
+                                    <td className="border p-2 text-right font-semibold text-green-600" rowSpan={inv.items.length}>₹{Number(inv.grand_total || 0).toLocaleString('en-IN')}</td>
                                   </>
                                 )}
                                 <td className="border p-2">{item.hsn_code || "-"}</td>
@@ -370,17 +377,20 @@ export default function BuyerCards() {
                                 <td className="border p-2 text-right">₹{Number(item.cgst_amount || 0).toLocaleString('en-IN')}</td>
                                 <td className="border p-2 text-right">₹{Number(item.sgst_amount || 0).toLocaleString('en-IN')}</td>
                                 <td className="border p-2 text-right">₹{Number(item.igst_amount || 0).toLocaleString('en-IN')}</td>
-                                <td className="border p-2 text-right font-semibold text-green-600">₹{Number(inv.grand_total || 0).toLocaleString('en-IN')}</td>
                               </tr>
                             ))
                           ) : (
                             <tr key={idx} className="border-t hover:bg-blue-50">
                               <td className="border p-2 text-blue-600 font-semibold">{inv.id}</td>
                               <td className="border p-2 text-blue-600 font-semibold">{inv.invoice_number}</td>
+                              <td className="border p-2">{inv.buyer_name || "-"}</td>
                               <td className="border p-2">{inv.gst_number || "-"}</td>
                               <td className="border p-2">{inv.employee_name || "-"}</td>
                               <td className="border p-2">{inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-"}</td>
-                              <td className="border p-2" colSpan="7" className="text-center text-gray-500">No items</td>
+                              <td className="border p-2 text-right font-semibold">₹{Number(inv.tax_amount || 0).toLocaleString('en-IN')}</td>
+                              <td className="border p-2 text-right">₹{Number(0).toLocaleString('en-IN')}</td>
+                              <td className="border p-2 text-right font-semibold text-green-600">₹{Number(inv.grand_total || 0).toLocaleString('en-IN')}</td>
+                              <td className="border p-2" colSpan="6" className="text-center text-gray-500">No items</td>
                             </tr>
                           )
                         ))}
