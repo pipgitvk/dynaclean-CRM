@@ -96,16 +96,19 @@ export async function GET(req) {
     worksheet.columns = [
       { header: "ID", key: "id", width: 8 },
       { header: "Invoice Number", key: "invoice_number", width: 15 },
+      { header: "Buyer Name", key: "buyer_name", width: 20 },
       { header: "GSTIN", key: "gst_number", width: 18 },
       { header: "Employee Name", key: "employee_name", width: 18 },
       { header: "Created At", key: "created_at", width: 15 },
+      { header: "Tax Amount", key: "tax_amount", width: 15 },
+      { header: "Taxable Amt", key: "taxable_amount", width: 15 },
+      { header: "Grand Total", key: "grand_total", width: 15 },
       { header: "HSN Code", key: "hsn_code", width: 12 },
       { header: "Quantity", key: "quantity", width: 10 },
-      { header: "Taxable Amount", key: "taxable_value", width: 15 },
+      { header: "Taxable Value", key: "taxable_value", width: 15 },
       { header: "CGST", key: "cgst_amount", width: 12 },
       { header: "SGST", key: "sgst_amount", width: 12 },
       { header: "IGST", key: "igst_amount", width: 12 },
-      { header: "Total Amount", key: "grand_total", width: 15 },
     ];
 
     // Style header
@@ -123,39 +126,45 @@ export async function GET(req) {
           worksheet.addRow({
             id: inv.id,
             invoice_number: inv.invoice_number || "-",
+            buyer_name: inv.buyer_name || "-",
             gst_number: inv.gst_number || "-",
             employee_name: inv.employee_name || "-",
             created_at: inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-",
+            tax_amount: inv.tax_amount || 0,
+            taxable_amount: item.taxable_value || 0,
+            grand_total: inv.grand_total || 0,
             hsn_code: item.hsn_code || "-",
             quantity: item.quantity || 0,
             taxable_value: item.taxable_value || 0,
             cgst_amount: item.cgst_amount || 0,
             sgst_amount: item.sgst_amount || 0,
             igst_amount: item.igst_amount || 0,
-            grand_total: inv.grand_total || 0,
           });
         });
       } else {
         worksheet.addRow({
           id: inv.id,
           invoice_number: inv.invoice_number || "-",
+          buyer_name: inv.buyer_name || "-",
           gst_number: inv.gst_number || "-",
           employee_name: inv.employee_name || "-",
           created_at: inv.created_at ? new Date(inv.created_at).toLocaleDateString("en-IN") : "-",
+          tax_amount: inv.tax_amount || 0,
+          taxable_amount: 0,
+          grand_total: inv.grand_total || 0,
           hsn_code: "-",
           quantity: 0,
           taxable_value: 0,
           cgst_amount: 0,
           sgst_amount: 0,
           igst_amount: 0,
-          grand_total: inv.grand_total || 0,
         });
       }
     });
 
     // Format numbers
     worksheet.columns.forEach((col) => {
-      if (["taxable_value", "cgst_amount", "sgst_amount", "igst_amount", "grand_total"].includes(col.key)) {
+      if (["tax_amount", "taxable_amount", "taxable_value", "cgst_amount", "sgst_amount", "igst_amount", "grand_total"].includes(col.key)) {
         col.numFmt = "₹#,##0.00";
       }
     });
