@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import toast from "react-hot-toast";
+import RankChart from "./RankChart";
 
 export default function KeywordHistoryModal({
   open,
@@ -60,7 +61,7 @@ export default function KeywordHistoryModal({
 
   return (
     <div className="fixed inset-0 backdrop-blur-lg flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6 sticky top-0 bg-white">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Follow History</h2>
@@ -87,50 +88,59 @@ export default function KeywordHistoryModal({
             No follow-up history found for this keyword.
           </div>
         ) : (
-          <div className="space-y-3">
+          <>
+            {/* Rank Chart */}
+            <RankChart 
+              followups={followups}
+              keywordRank={keyword.rank}
+              keywordPage={keyword.page}
+            />
+
             {/* Timeline View */}
-            {followups.map((followup, index) => (
-              <div
-                key={followup.id}
-                className="relative pb-6 last:pb-0"
-              >
-                {/* Timeline line */}
-                {index !== followups.length - 1 && (
-                  <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-gray-200"></div>
-                )}
+            <div className="space-y-3">
+              {followups.map((followup, index) => (
+                <div
+                  key={followup.id}
+                  className="relative pb-6 last:pb-0"
+                >
+                  {/* Timeline line */}
+                  {index !== followups.length - 1 && (
+                    <div className="absolute left-6 top-12 bottom-0 w-0.5 bg-gray-200"></div>
+                  )}
 
-                {/* Timeline item */}
-                <div className="flex gap-4">
-                  {/* Timeline dot */}
-                  <div className="flex-shrink-0 mt-1">
-                    <div className="w-4 h-4 rounded-full bg-blue-600 ring-4 ring-white shadow-md"></div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">
-                          {formatDate(followup.followup_date)}
-                        </p>
-                        <p className={`text-lg font-bold ${getRankColor(followup.rank)}`}>
-                          Rank: {followup.rank !== null ? followup.rank : "-"}
-                        </p>
-                        <p className="text-sm font-medium text-gray-600">
-                          Page: {followup.page || "-"}
-                        </p>
-                      </div>
+                  {/* Timeline item */}
+                  <div className="flex gap-4">
+                    {/* Timeline dot */}
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="w-4 h-4 rounded-full bg-blue-600 ring-4 ring-white shadow-md"></div>
                     </div>
-                    {followup.notes && (
-                      <p className="text-sm text-gray-600">
-                        Notes: {followup.notes}
-                      </p>
-                    )}
+
+                    {/* Content */}
+                    <div className="flex-1 bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">
+                            {formatDate(followup.followup_date)}
+                          </p>
+                          <p className={`text-lg font-bold ${getRankColor(followup.rank)}`}>
+                            Rank: {followup.rank !== null ? followup.rank : "-"}
+                          </p>
+                          <p className="text-sm font-medium text-gray-600">
+                            Page: {followup.page || "-"}
+                          </p>
+                        </div>
+                      </div>
+                      {followup.notes && (
+                        <p className="text-sm text-gray-600">
+                          Notes: {followup.notes}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
 
         {/* Summary Section */}
