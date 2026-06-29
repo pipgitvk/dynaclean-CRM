@@ -35,6 +35,7 @@ export const HR_TARGET_ALLOWED_DESIGNATIONS = [
   "Digital Marketing Executive",
   "GEM Tender Executive",
   "Field Sales and Service Executive",
+  "Graphic Designer",
 ];
 
 /**

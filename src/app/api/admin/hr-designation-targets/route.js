@@ -148,7 +148,7 @@ export async function POST(request) {
       await conn.execute(
         `INSERT INTO hr_designation_monthly_targets (designation, hr_username, ${withCity ? "city, " : ""}${withPriority ? "priority, " : ""}target_amount, month, year)
          VALUES (?, ?, ${withCity ? "?, " : ""}${withPriority ? "?, " : ""}?, ?, ?)
-         ON DUPLICATE KEY UPDATE ${withCity ? "" : ""}${withPriority ? "priority = VALUES(priority), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
+         ON DUPLICATE KEY UPDATE ${withCity ? "city = VALUES(city), " : ""}${withPriority ? "priority = VALUES(priority), " : ""}target_amount = VALUES(target_amount), updated_at = CURRENT_TIMESTAMP`,
         withCity
           ? [designation, hr_username, city, ...(withPriority ? [priority] : []), target_amount, month, year]
           : [designation, hr_username, ...(withPriority ? [priority] : []), target_amount, month, year]
