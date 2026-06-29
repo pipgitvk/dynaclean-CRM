@@ -479,6 +479,7 @@ function ProductAndSpareLists({ type }) {
                             >
                               Edit
                             </button>
+                            {/* Delete product button hidden
                             {userRole === 'SUPERADMIN' && (
                               <button
                                 onClick={() => handleDeleteProduct(r.item_code)}
@@ -488,6 +489,7 @@ function ProductAndSpareLists({ type }) {
                                 Delete
                               </button>
                             )}
+                            */}
                           </div>
                         </td>
                       </>
@@ -543,6 +545,7 @@ function ProductAndSpareLists({ type }) {
                             >
                               Edit
                             </button>
+                            {/* Delete spare button hidden
                             {userRole === 'SUPERADMIN' && (
                               <button
                                 onClick={() => handleDeleteSpare(r.id)}
@@ -552,6 +555,7 @@ function ProductAndSpareLists({ type }) {
                                 Delete
                               </button>
                             )}
+                            */}
                           </div>
                         </td>
                       </>
@@ -716,6 +720,7 @@ function ProductAndSpareLists({ type }) {
                   >
                     Edit
                   </button>
+                  {/* Delete product button hidden
                   {type === 'product' && userRole === 'SUPERADMIN' && (
                     <button
                       onClick={() => handleDeleteProduct(r.item_code)}
@@ -734,6 +739,7 @@ function ProductAndSpareLists({ type }) {
                       Delete
                     </button>
                   )}
+                  */}
                 </div>
               </div>
             </div>

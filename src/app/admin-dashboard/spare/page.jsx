@@ -482,6 +482,7 @@ function SpareList() {
                         >
                           Edit
                         </button>
+                        {/* Delete spare button hidden
                         {userRole === 'SUPERADMIN' && (
                           <button
                             onClick={() => handleDeleteSpare(r.id)}
@@ -491,6 +492,7 @@ function SpareList() {
                             Delete
                           </button>
                         )}
+                        */}
                       </div>
                     </td>
                   </>
@@ -541,6 +543,7 @@ function SpareList() {
                     >
                       Edit
                     </button>
+                    {/* Delete spare button hidden (mobile)
                     {userRole === 'SUPERADMIN' && (
                       <button
                         onClick={() => handleDeleteSpare(r.id)}
@@ -550,6 +553,7 @@ function SpareList() {
                         Delete
                       </button>
                     )}
+                    */}
                   </div>
                 </div>
               </div>
