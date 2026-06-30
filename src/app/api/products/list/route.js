@@ -16,7 +16,8 @@ export async function GET() {
          p.min_qty,
          p.price_per_unit,
          p.specification,
-         p.last_negotiation_price
+         p.last_negotiation_price,
+         p.gst_rate
        FROM products_list p
        ORDER BY p.item_name ASC`
         );

@@ -117,6 +117,7 @@ export async function POST(request) {
         const min_qty = formData.get('min_qty');
         const price_per_unit = formData.get('price_per_unit');
         const last_negotiation_price = formData.get('last_negotiation_price');
+        const gst_rate = formData.get('gst_rate');
         const specification = formData.get('specification');
         const imageFile = formData.get('image');
 
@@ -158,6 +159,10 @@ export async function POST(request) {
         if (last_negotiation_price !== null && last_negotiation_price !== undefined) {
             updates.push('last_negotiation_price = ?');
             values.push(last_negotiation_price);
+        }
+        if (gst_rate !== null && gst_rate !== undefined) {
+            updates.push('gst_rate = ?');
+            values.push(gst_rate);
         }
         if (specification !== null && specification !== undefined) {
             updates.push('specification = ?');
