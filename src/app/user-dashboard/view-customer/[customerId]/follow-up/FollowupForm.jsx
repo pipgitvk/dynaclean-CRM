@@ -470,8 +470,6 @@ export default function FollowupForm({ customerId }) {
           setFormData(prev => ({
             ...prev,
             stage: dbStage,
-            status: dbStatus,
-            communication_mode: latestCommMode || prev.communication_mode,
           }));
         }
       } catch (error) {
