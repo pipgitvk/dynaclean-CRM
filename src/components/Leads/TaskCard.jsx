@@ -62,7 +62,7 @@ const TaskCard = ({
           View
         </a>
         <a
-          href={`/user-dashboard/view-customer/${customerId}/follow-up`}
+          href={`/user-dashboard/view-customer/${customerId}/follow-up?source=upcoming`}
           className="flex items-center justify-center gap-1 text-s font-semibold text-gray-600 px-3 py-1.5 rounded-lg transition"
         >
           Follow

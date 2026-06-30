@@ -1,4 +1,4 @@
-// "use client";
+"use client";
 
 // import { useState, useEffect } from "react";
 // import { useRouter } from "next/navigation";
@@ -309,11 +309,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
 export default function FollowupForm({ customerId }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isFromUpcoming = searchParams.get("source") === "upcoming";
   const [formData, setFormData] = useState({
     followed_date: "",
     next_followup_date: "",
@@ -381,6 +383,7 @@ export default function FollowupForm({ customerId }) {
   const followedDateLimits = getFollowedDateLimits();
 
   // Calculate min/max for Next Follow-up Date based on lead age (from customer creation date) and stage
+  // If source=upcoming → always 15 days (bypass 7-day restriction)
   // If stage is "Won (Order Received)" → max 15 days from now
   // If customer has an order → max 15 days from now (skip validation)
   // < 7 days old  → max 48 hours from now
@@ -388,6 +391,12 @@ export default function FollowupForm({ customerId }) {
   const getNextFollowupDateLimits = () => {
     const now = new Date();
     const minDate = formatISTDateTime(now);
+
+    // If navigated from Upcoming Enquiry section, always allow 15 days
+    if (isFromUpcoming) {
+      const maxDate = formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000));
+      return { min: minDate, max: maxDate, isNewLead: false };
+    }
 
     // If customer already has an order, allow 15 days (skip the 7-day restriction)
     if (hasOrder) {
@@ -423,7 +432,7 @@ export default function FollowupForm({ customerId }) {
 
   const nextFollowupDateLimits = getNextFollowupDateLimits();
 
-  // Fetch customer's current stage and last followed_date from database
+  // Fetch customer's current stage, status, comm_mode from database
   useEffect(() => {
     const fetchCustomerData = async () => {
       try {
@@ -432,18 +441,9 @@ export default function FollowupForm({ customerId }) {
           fetch(`/api/followup/${customerId}`)
         ]);
 
-        if (stageResponse.ok) {
-          const stageData = await stageResponse.json();
-          setCustomerCurrentStage(stageData.stage || "New");
-          setCustomerCreatedAt(stageData.date_created || null);
-          setHasOrder(stageData.has_order === 1 || stageData.has_order === true);
-          setFormData(prev => ({
-            ...prev,
-            stage: stageData.stage || "New"
-          }));
-        }
+        let latestCommMode = "";
 
-        // Fetch last followed_date from followup history
+        // Fetch last comm_mode and followed_date from followup history
         if (followupResponse.ok) {
           const followupData = await followupResponse.json();
           if (followupData.history && followupData.history.length > 0) {
@@ -451,7 +451,28 @@ export default function FollowupForm({ customerId }) {
             if (lastFollowup.followed_date) {
               setLastFollowedDate(lastFollowup.followed_date);
             }
+            if (lastFollowup.comm_mode) {
+              latestCommMode = lastFollowup.comm_mode;
+            }
           }
+        }
+
+        if (stageResponse.ok) {
+          const stageData = await stageResponse.json();
+          const dbStage = stageData.stage || "New";
+          const dbStatus = stageData.status || "";
+
+          setCustomerCurrentStage(dbStage);
+          setCustomerCreatedAt(stageData.date_created || null);
+          setHasOrder(stageData.has_order === 1 || stageData.has_order === true);
+
+          // Set all fields from DB in one atomic update
+          setFormData(prev => ({
+            ...prev,
+            stage: dbStage,
+            status: dbStatus,
+            communication_mode: latestCommMode || prev.communication_mode,
+          }));
         }
       } catch (error) {
         console.error("Error fetching customer data:", error);
@@ -479,20 +500,25 @@ export default function FollowupForm({ customerId }) {
 
   // Filter stages based on customer's current stage from database
   const getAvailableStages = (currentStage) => {
-    if (!currentStage) return stageOptions;
+    // Use formData.stage as fallback if customerCurrentStage hasn't updated yet
+    const effectiveStage = currentStage || formData.stage || "New";
 
     const stageOrder = stageOptions;
-    const currentIndex = stageOrder.indexOf(currentStage);
+    const currentIndex = stageOrder.indexOf(effectiveStage);
 
-    // For final stages, only allow staying in the same stage or going back
-    if (currentStage === "Won (Order Received)" || currentStage === "Lost" || currentStage === "Disqualified / Invalid Lead") {
-      return [currentStage];
+    // For final stages, only allow staying in the same stage
+    if (effectiveStage === "Won (Order Received)" || effectiveStage === "Lost" || effectiveStage === "Disqualified / Invalid Lead") {
+      return [effectiveStage];
     }
+
+    // If stage not found in list, return all options
+    if (currentIndex === -1) return stageOptions;
 
     // Show current stage and all stages after it (progressive flow)
     return stageOrder.slice(currentIndex);
   };
 
+  // Recompute whenever customerCurrentStage OR formData.stage changes
   const availableStages = getAvailableStages(customerCurrentStage);
 
   const handleChange = (e) => {
@@ -682,16 +708,22 @@ export default function FollowupForm({ customerId }) {
           name="stage"
           value={formData.stage}
           onChange={handleChange}
-          className="w-full px-4 py-2 border rounded-lg"
+          disabled={isLoadingCustomer}
+          className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
           required
         >
-          <option value="">Select Stage</option>
+          <option value="">{isLoadingCustomer ? "Loading..." : "Select Stage"}</option>
           {availableStages.map((stage) => (
             <option key={stage} value={stage}>
               {stage}
             </option>
           ))}
         </select>
+        {!isLoadingCustomer && (
+          <p className="mt-1 text-xs text-gray-500">
+            Current stage: <strong>{customerCurrentStage}</strong>. Only forward progression allowed.
+          </p>
+        )}
       </div>
 
       {/* Multi-Tag Selection */}
@@ -748,6 +780,8 @@ export default function FollowupForm({ customerId }) {
           <p className="mt-1 text-xs text-red-500">
             {isLoadingCustomer
               ? "Loading lead information..."
+              : isFromUpcoming
+              ? "Upcoming lead — you can schedule a follow-up for a maximum of 15 days from now."
               : formData.stage === "Won (Order Received)"
               ? "Stage is Won (Order Received) — you can schedule a follow-up for a maximum of 15 days from now."
               : hasOrder

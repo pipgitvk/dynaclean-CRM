@@ -7,9 +7,13 @@ export async function GET(request, { params }) {
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      `SELECT c.*, IF(no.order_id IS NOT NULL, 1, 0) AS has_order
+      `SELECT c.*,
+        IF(EXISTS (
+          SELECT 1 FROM neworder no
+          INNER JOIN quotations_records qr ON no.quote_number = qr.quote_number
+          WHERE qr.customer_id = c.customer_id
+        ), 1, 0) AS has_order
        FROM customers c
-       LEFT JOIN neworder no ON no.customer_id = c.customer_id AND no.order_id IS NOT NULL
        WHERE c.customer_id = ?
        LIMIT 1`,
       [customerId]
