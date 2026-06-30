@@ -150,28 +150,40 @@ export default function QuotationForm() {
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
+    let totalTax = 0;
 
     items.forEach((item) => {
       const qty = item.quantity || 0;
       const price = item.price || 0;
-      subtotal += qty * price;
+      const taxable = qty * price;
+      const gstAmt = taxable * ((item.gst || 0) / 100);
+      subtotal += taxable;
+      totalTax += gstAmt;
     });
 
-    const cgst = (subtotal * cgstRate) / 100;
-    const sgst = (subtotal * sgstRate) / 100;
-    const igst = (subtotal * igstRate) / 100;
-    
-    const totalBeforeRound = subtotal + cgst + sgst + igst;
+    // For compatibility with submit payload: split tax into cgst/sgst or igst based on interstate flag
+    const isInterstate = (() => {
+      const gstinValue = form.gstin_no?.trim();
+      if (!gstinValue) return false;
+      const code = gstinValue.slice(0, 2);
+      return code !== SUPPLIER_STATE_CODE;
+    })();
+
+    const cgst = isInterstate ? 0 : totalTax / 2;
+    const sgst = isInterstate ? 0 : totalTax / 2;
+    const igst = isInterstate ? totalTax : 0;
+
+    const totalBeforeRound = subtotal + totalTax;
     let finalRoundOff = parseFloat(roundOff) || 0;
-    
+
     if (isAutoRoundOff) {
       finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
     }
-    
+
     const grandTotal = totalBeforeRound + finalRoundOff;
 
-    return { subtotal, cgst, sgst, igst, grandTotal, finalRoundOff };
-  }, [items, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff]);
+    return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -828,6 +840,7 @@ export default function QuotationForm() {
 
         {/* Tax Summary */}
         <TaxAndSummary
+          items={items}
           subtotal={taxSummary.subtotal}
           cgst={taxSummary.cgst}
           sgst={taxSummary.sgst}
