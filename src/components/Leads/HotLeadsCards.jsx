@@ -164,6 +164,11 @@ export default function HotLeadsCards({ leadSource }) {
   const processedLeads = (() => {
     let filtered = [...leads];
 
+    // Exclude Disqualified / Invalid Lead stage
+    filtered = filtered.filter(
+      (c) => (c.stage || "").trim().toLowerCase() !== "disqualified / invalid lead"
+    );
+
     // Apply date filter: exclude leads created on or after the selected date
     if (dateFilter) {
       const filterDate = new Date(dateFilter);

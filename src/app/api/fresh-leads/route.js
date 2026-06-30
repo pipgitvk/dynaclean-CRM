@@ -44,6 +44,7 @@ export async function GET(request) {
         (c.lead_source = ? OR c.assigned_to = ?)
         AND c.status != 'DENIED'
         AND c.status != 'Invalid'
+        AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
         AND c.date_created >= DATE_SUB(NOW(), INTERVAL 7 DAY)
       ORDER BY c.date_created DESC
       `,
