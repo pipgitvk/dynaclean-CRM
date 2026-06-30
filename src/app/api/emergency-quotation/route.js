@@ -46,6 +46,31 @@ export async function POST(req) {
 
     const pool = await getDbConnection();
     conn = await pool.getConnection();
+
+    // Auto-fix s_no schema issue (renamed from "S. NO." — may still be PK)
+    try {
+      const [keyInfo] = await conn.execute(
+        `SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'quotations_records' 
+         AND COLUMN_NAME = 's_no' AND CONSTRAINT_NAME = 'PRIMARY'`
+      );
+      if (keyInfo.length > 0) {
+        await conn.execute(`ALTER TABLE quotations_records DROP PRIMARY KEY`);
+        const [qc] = await conn.execute(
+          `SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'quotations_records' 
+           AND COLUMN_NAME = 'quote_number' AND CONSTRAINT_NAME != 'PRIMARY'`
+        );
+        if (qc.length === 0) {
+          await conn.execute(`ALTER TABLE quotations_records ADD UNIQUE KEY uk_quote_number (quote_number(100))`);
+        }
+        await conn.execute(`ALTER TABLE quotations_records MODIFY s_no INT NOT NULL AUTO_INCREMENT UNIQUE`);
+        console.log("✅ [emergency-quotation] s_no schema auto-fixed");
+      }
+    } catch (schemaErr) {
+      console.error("❌ [emergency-quotation] Schema fix failed:", schemaErr.message);
+    }
+
     await conn.beginTransaction();
 
     /* ---------------- Quote Number Generation ---------------- */

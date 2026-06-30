@@ -5,6 +5,45 @@ import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 
+/**
+ * Auto-fix: Drop s_no as PRIMARY KEY if it's blocking inserts.
+ * s_no was renamed from "S. NO." and may still be the PK.
+ * After fix, s_no becomes AUTO_INCREMENT UNIQUE (not PK).
+ */
+async function fixSnoSchemaIfNeeded(conn) {
+  try {
+    const [keyInfo] = await conn.execute(
+      `SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'quotations_records' 
+       AND COLUMN_NAME = 's_no' AND CONSTRAINT_NAME = 'PRIMARY'`
+    );
+
+    if (keyInfo.length === 0) return; // already fine
+
+    console.warn("⚠️ s_no is PRIMARY KEY — dropping PK to allow inserts without s_no...");
+    await conn.execute(`ALTER TABLE quotations_records DROP PRIMARY KEY`);
+    console.log("✅ Dropped s_no PRIMARY KEY");
+
+    // Add UNIQUE on quote_number if not already there
+    const [qConstraints] = await conn.execute(
+      `SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'quotations_records' 
+       AND COLUMN_NAME = 'quote_number' AND CONSTRAINT_NAME != 'PRIMARY'`
+    );
+    if (qConstraints.length === 0) {
+      await conn.execute(`ALTER TABLE quotations_records ADD UNIQUE KEY uk_quote_number (quote_number(100))`);
+      console.log("✅ Added UNIQUE constraint to quote_number");
+    }
+
+    // Make s_no AUTO_INCREMENT UNIQUE (not PK)
+    await conn.execute(`ALTER TABLE quotations_records MODIFY s_no INT NOT NULL AUTO_INCREMENT UNIQUE`);
+    console.log("✅ s_no is now AUTO_INCREMENT UNIQUE (not PK)");
+  } catch (err) {
+    console.error("❌ Schema auto-fix failed:", err.message);
+    // Don't throw — let the insert attempt proceed and surface its own error
+  }
+}
+
 export async function GET(req) {
   try {
     const token = req.cookies.get("token")?.value;
@@ -91,6 +130,9 @@ export async function POST(req) {
     const pool = await getDbConnection();
     conn = await pool.getConnection();
 
+    // Auto-fix s_no schema issue (renamed from "S. NO." — may still be PK)
+    await fixSnoSchemaIfNeeded(conn);
+
     await conn.beginTransaction();
 
     // Generate a unique quote number at submit time (no extra tables)
@@ -122,7 +164,8 @@ export async function POST(req) {
 
       try {
         // Try inserting the header row
-        await conn.execute(
+        // Don't specify s_no - let database handle AUTO_INCREMENT or let it be NULL
+        const result = await conn.execute(
           `INSERT INTO quotations_records 
            (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, created_at) 
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
