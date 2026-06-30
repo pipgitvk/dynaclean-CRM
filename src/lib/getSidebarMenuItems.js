@@ -359,6 +359,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "ListOrdered",
       },
+      {
+        path: "/user-dashboard/estimate-delivery",
+        name: "Estimate Delivery",
+        moduleKey: "estimate-delivery",
+        roles: ["ALL"],
+        icon: "Truck",
+      },
     ],
   },
   {

@@ -15,6 +15,7 @@ export const MODULE_TREE = [
       { key: "lead-distribution", label: "Lead Distribution" },
       { key: "orders-process", label: "Order Process" },
       { key: "orders-delay", label: "Delay Delivery" },
+      { key: "estimate-delivery", label: "Estimate Delivery" },
       { key: "bulk-reassign", label: "Bulk Reassign Leads" },
       { key: "my-leads", label: "My Leads" },
       { key: "dm-fresh-leads", label: "24h Fresh Leads (DM)" },
@@ -261,6 +262,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "invoices", label: "Invoices" },
       { kind: "leaf", key: "orders-process", label: "Order Process" },
       { kind: "leaf", key: "orders-delay", label: "Delay Delivery" },
+      { kind: "leaf", key: "estimate-delivery", label: "Estimate Delivery" },
     ],
   },
   {

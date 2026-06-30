@@ -387,6 +387,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "ListOrdered",
       },
+      {
+        path: "/admin-dashboard/estimate-delivery",
+        name: "Estimate Delivery",
+        accessKey: "estimate-delivery",
+        roles: ["SUPERADMIN"],
+        icon: "Truck",
+      },
     ],
   },
   {
