@@ -250,65 +250,147 @@ export async function POST(req) {
         );
       }
     } else {
-      const [rows] = await conn.execute(
-        `SELECT total_quantity, ${locationColumn} FROM stock_summary
-         WHERE spare_id = ?`,
+      // Verify the spare_id actually exists in spare_list before inserting into stock_list
+      const [spareCheck] = await conn.execute(
+        `SELECT id FROM spare_list WHERE id = ? LIMIT 1`,
         [itemCode]
       );
 
-      let totalDB = 0;
-      let locationDB = 0;
-      if (rows.length > 0) {
-        totalDB = rows[0].total_quantity;
-        locationDB = rows[0][locationColumn];
-      }
+      if (spareCheck.length === 0) {
+        // spare_id not found in spare_list — could be a product with a numeric code
+        // Fall back to product_stock deduction using item_name lookup
+        console.warn(`spare_id ${itemCode} not found in spare_list. Attempting product stock fallback.`);
 
-      let newLocationStock = locationDB - quantity;
-      const totalD = totalDB - quantity;
-
-      // Calculate both delhi and south for the INSERT (lowercase for stock_list table)
-      let delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
-      let southD = locationColumnLower === "south" ? newLocationStock : locationDB;
-
-      await conn.execute(
-        `INSERT INTO stock_list
-          (spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, to_company, delivery_address, quotation_id, order_id, added_by, godown, total, delhi, south)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          itemCode,
-          quantity,
-          total_price,
-          total_price,
-          "Dispatch Update",
-          "Dispatch",
-          "OUT",
-          companyName,
-          companyAddress,
-          quoteNumber,
-          orderNumber,
-          username,
-          godown,
-          totalD,
-          delhiD,
-          southD,
-        ]
-      );
-
-      const [summary] = await conn.execute(
-        `SELECT total_quantity, ${locationColumn} FROM stock_summary WHERE spare_id = ?`,
-        [itemCode]
-      );
-      if (summary.length > 0) {
-        const prevTotal = summary[0].total_quantity;
-        const newTotal = Math.max(prevTotal - quantity, 0);
-        const prev = summary[0][locationColumn];
-        const newv = Math.max(prev - quantity, 0);
-        await conn.execute(
-          `UPDATE stock_summary 
-            SET last_updated_quantity = ?, total_quantity = ?, last_status = ?, updated_at = NOW(), ${locationColumn} = ?
-            WHERE spare_id = ?`,
-          [quantity, newTotal, "OUT", newv, itemCode]
+        const [productFallback] = await conn.execute(
+          `SELECT product_code FROM products_list WHERE item_name LIKE ? LIMIT 1`,
+          [`%${dispatchRow.item_name}%`]
         );
+
+        if (productFallback.length > 0) {
+          const fallbackCode = productFallback[0].product_code;
+          console.log(`Fallback product_code found: ${fallbackCode} for item: ${dispatchRow.item_name}`);
+
+          const [fallbackStock] = await conn.execute(
+            `SELECT total_quantity, ${locationColumn} FROM product_stock_summary WHERE product_code = ?`,
+            [fallbackCode]
+          );
+
+          let totalDB = 0;
+          let locationDB = 0;
+          if (fallbackStock.length > 0) {
+            totalDB = fallbackStock[0].total_quantity;
+            locationDB = fallbackStock[0][locationColumn];
+          }
+
+          const newLocationStock = locationDB - quantity;
+          const totalD = totalDB - quantity;
+          const delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
+          const southD = locationColumnLower === "south" ? newLocationStock : locationDB;
+
+          await conn.execute(
+            `INSERT INTO product_stock
+              (product_code, quantity, amount_per_unit, net_amount, note, location, stock_status, gst, hs_code, to_company, delivery_address, quotation_id, order_id, added_by, godown, total, delhi, south)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              fallbackCode,
+              quantity,
+              total_price,
+              total_price,
+              "Dispatch Update",
+              "Dispatch",
+              "OUT",
+              gstin,
+              hsn_sac,
+              companyName,
+              companyAddress,
+              quoteNumber,
+              orderNumber,
+              username,
+              godown,
+              totalD,
+              delhiD,
+              southD,
+            ]
+          );
+
+          if (fallbackStock.length > 0) {
+            const prevTotal = fallbackStock[0].total_quantity;
+            const newTotal = Math.max(prevTotal - quantity, 0);
+            const prev = fallbackStock[0][locationColumn];
+            const newv = Math.max(prev - quantity, 0);
+            await conn.execute(
+              `UPDATE product_stock_summary 
+                SET last_updated_quantity = ?, total_quantity = ?, last_status = ?, updated_at = NOW(), ${locationColumn} = ?
+                WHERE product_code = ?`,
+              [quantity, newTotal, "OUT", newv, fallbackCode]
+            );
+          }
+        } else {
+          // No match found anywhere — skip stock deduction and log
+          console.warn(`No product or spare found for item_code=${itemCode}, item_name=${dispatchRow.item_name}. Skipping stock deduction.`);
+        }
+      } else {
+        // spare_id exists — proceed normally
+        const [rows] = await conn.execute(
+          `SELECT total_quantity, ${locationColumn} FROM stock_summary
+           WHERE spare_id = ?`,
+          [itemCode]
+        );
+
+        let totalDB = 0;
+        let locationDB = 0;
+        if (rows.length > 0) {
+          totalDB = rows[0].total_quantity;
+          locationDB = rows[0][locationColumn];
+        }
+
+        let newLocationStock = locationDB - quantity;
+        const totalD = totalDB - quantity;
+
+        // Calculate both delhi and south for the INSERT (lowercase for stock_list table)
+        let delhiD = locationColumnLower === "delhi" ? newLocationStock : locationDB;
+        let southD = locationColumnLower === "south" ? newLocationStock : locationDB;
+
+        await conn.execute(
+          `INSERT INTO stock_list
+            (spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, to_company, delivery_address, quotation_id, order_id, added_by, godown, total, delhi, south)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            itemCode,
+            quantity,
+            total_price,
+            total_price,
+            "Dispatch Update",
+            "Dispatch",
+            "OUT",
+            companyName,
+            companyAddress,
+            quoteNumber,
+            orderNumber,
+            username,
+            godown,
+            totalD,
+            delhiD,
+            southD,
+          ]
+        );
+
+        const [summary] = await conn.execute(
+          `SELECT total_quantity, ${locationColumn} FROM stock_summary WHERE spare_id = ?`,
+          [itemCode]
+        );
+        if (summary.length > 0) {
+          const prevTotal = summary[0].total_quantity;
+          const newTotal = Math.max(prevTotal - quantity, 0);
+          const prev = summary[0][locationColumn];
+          const newv = Math.max(prev - quantity, 0);
+          await conn.execute(
+            `UPDATE stock_summary 
+              SET last_updated_quantity = ?, total_quantity = ?, last_status = ?, updated_at = NOW(), ${locationColumn} = ?
+              WHERE spare_id = ?`,
+            [quantity, newTotal, "OUT", newv, itemCode]
+          );
+        }
       }
     }
 
