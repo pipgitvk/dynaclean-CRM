@@ -7,6 +7,13 @@ import QuickQuotationModal from "@/components/Quotation/QuickQuotationModal";
 export default function UserQuotationsListClient({ quotations, isServiceSupport = false }) {
   const [modalQuote, setModalQuote] = useState(null);
   const [showQuickModal, setShowQuickModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const displayed = statusFilter === "completed"
+    ? quotations.filter(q => q.has_order)
+    : statusFilter === "pending"
+    ? quotations.filter(q => !q.has_order)
+    : quotations;
 
   return (
     <>
@@ -33,6 +40,18 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
         </div>
       )}
 
+      <div className="flex gap-2 mb-3">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="border border-gray-300 rounded px-3 py-1 text-sm w-40"
+        >
+          <option value="">All Status</option>
+          <option value="completed">Completed</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+
       <div className="hidden md:block overflow-x-auto bg-white rounded shadow">
         <table className="min-w-full table-auto">
           <thead className="bg-gray-100 text-left text-sm text-gray-700">
@@ -43,12 +62,13 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Total Amount</th>
               <th className="px-4 py-3">Created By</th>
+              <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-center">Action</th>
             </tr>
           </thead>
           <tbody className="text-sm text-gray-800">
-            {quotations.length > 0 ? (
-              quotations.map((q) => (
+            {displayed.length > 0 ? (
+              displayed.map((q) => (
                 <tr
                   key={q.quote_number}
                   className="border-t hover:bg-gray-50 transition"
@@ -75,6 +95,19 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
                   </td>
                   <td className="px-4 py-2">₹{q.grand_total}</td>
                   <td className="px-4 py-2">{q.created_by}</td>
+                  <td className="px-4 py-2">
+                    {q.has_order ? (
+                      <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full border border-green-300">
+                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                        Completed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-medium px-2 py-1 rounded-full border border-gray-200">
+                        <span className="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+                        Pending
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-center">
                     <button
                       type="button"
@@ -101,8 +134,8 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
       </div>
 
       <div className="md:hidden space-y-4">
-        {quotations.length > 0 ? (
-          quotations.map((q) => (
+        {displayed.length > 0 ? (
+          displayed.map((q) => (
             <div
               key={q.quote_number}
               className="border rounded shadow-sm p-4 bg-white space-y-2"
@@ -129,7 +162,19 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
               <div>
                 <strong>Created By:</strong> {q.created_by}
               </div>
-
+              <div>
+                {q.has_order ? (
+                  <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full border border-green-300">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                    Completed
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-medium px-2 py-1 rounded-full border border-gray-200">
+                    <span className="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+                    Pending
+                  </span>
+                )}
+              </div>
               <div className="text-right">
                 <button
                   type="button"

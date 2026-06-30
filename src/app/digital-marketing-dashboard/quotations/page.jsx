@@ -25,9 +25,11 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
         qr.emp_name AS created_by,
         c.first_name AS client_name,
         c.email,
-        c.phone
+        c.phone,
+        IF(no.order_id IS NOT NULL, 1, 0) AS has_order
       FROM quotations_records qr
       LEFT JOIN customers c ON c.customer_id = qr.customer_id
+      LEFT JOIN neworder no ON no.quote_number = qr.quote_number
       WHERE qr.emp_name NOT IN (
         SELECT username FROM rep_list
         WHERE userRole LIKE '%SALES%'
@@ -48,9 +50,11 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
         qr.emp_name AS created_by,
         c.first_name AS client_name,
         c.email,
-        c.phone
+        c.phone,
+        IF(no.order_id IS NOT NULL, 1, 0) AS has_order
       FROM quotations_records qr
       JOIN customers c ON c.customer_id = qr.customer_id
+      LEFT JOIN neworder no ON no.quote_number = qr.quote_number
       WHERE (
           c.sales_representative = ?
           OR c.lead_source = ?
