@@ -123,16 +123,24 @@ export async function GET(req) {
 
   const [rows] = await conn.execute(query, values);
 
-  // Fetch items for each quotation
+  // For each quotation, check if an order exists in neworder table
   const quotationsWithItems = await Promise.all(
     rows.map(async (quote) => {
       const [items] = await conn.execute(
         "SELECT item_code as product_code, item_name, quantity, price_per_unit FROM quotation_items WHERE quote_number = ?",
         [quote.quote_number]
       );
+
+      const [orderRows] = await conn.execute(
+        "SELECT order_id FROM neworder WHERE quote_number = ? LIMIT 1",
+        [quote.quote_number]
+      );
+
       return {
         ...quote,
-        items: items || []
+        items: items || [],
+        has_order: orderRows.length > 0,
+        order_id: orderRows.length > 0 ? orderRows[0].order_id : null,
       };
     })
   );

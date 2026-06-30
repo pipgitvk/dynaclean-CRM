@@ -12,6 +12,7 @@ export default function QuotationTableClient({ username, customerId }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const employeeOptions = useMemo(() => {
     const names = new Set();
@@ -63,14 +64,13 @@ export default function QuotationTableClient({ username, customerId }) {
     const filteredData = quotations.filter((q) => {
       const empName = (q.emp_name || "").trim();
       const matchesEmployee = employeeFilter ? empName === employeeFilter : true;
+      if (!matchesEmployee) return false;
 
-      if (!matchesEmployee) {
-        return false;
-      }
+      // Status filter
+      if (statusFilter === "completed" && !q.has_order) return false;
+      if (statusFilter === "pending" && q.has_order) return false;
 
-      if (!keyword) {
-        return true;
-      }
+      if (!keyword) return true;
 
       const quoteNumber = q.quote_number?.toString().toLowerCase() || "";
       const companyName = q.company_name?.toLowerCase() || "";
@@ -88,13 +88,14 @@ export default function QuotationTableClient({ username, customerId }) {
     });
 
     setFiltered(filteredData);
-  }, [search, quotations, employeeFilter]);
+  }, [search, quotations, employeeFilter, statusFilter]);
 
   const handleReset = () => {
     setFromDate("");
     setToDate("");
-    setSearch(""); // Also clear search on reset
+    setSearch("");
     setEmployeeFilter("");
+    setStatusFilter("");
   };
 
   return (
@@ -138,6 +139,15 @@ export default function QuotationTableClient({ username, customerId }) {
               </option>
             ))}
           </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1 w-full sm:w-40"
+          >
+            <option value="">All Status</option>
+            <option value="completed">Completed</option>
+            <option value="pending">Pending</option>
+          </select>
         </div>
         <input
           type="text"
@@ -163,13 +173,14 @@ export default function QuotationTableClient({ username, customerId }) {
               <th className="px-4 py-2">Date</th>
               <th className="px-4 py-2">Total</th>
               <th className="px-4 py-2">Created By</th>
+              <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2 text-center">Action</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="8" className="text-center py-4 text-gray-500">
+                <td colSpan="9" className="text-center py-4 text-gray-500">
                   Loading...
                 </td>
               </tr>
@@ -185,6 +196,19 @@ export default function QuotationTableClient({ username, customerId }) {
                   </td>
                   <td className="px-4 py-2">₹{q.grand_total}</td>
                   <td className="px-4 py-2">{q.emp_name}</td>
+                  <td className="px-4 py-2">
+                    {q.has_order ? (
+                      <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full border border-green-300">
+                        <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                        Completed
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-medium px-2 py-1 rounded-full border border-gray-200">
+                        <span className="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+                        Pending
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-2 text-center">
                     <button
                       type="button"
@@ -199,7 +223,7 @@ export default function QuotationTableClient({ username, customerId }) {
             ) : (
               <tr>
                 <td
-                  colSpan="8"
+                  colSpan="9"
                   className="text-center text-gray-500 py-6 italic"
                 >
                   No quotations found.
@@ -245,7 +269,18 @@ export default function QuotationTableClient({ username, customerId }) {
                 <strong className="font-medium">Created By:</strong>{" "}
                 {q.emp_name}
               </p>
-              <div className="flex justify-end">
+              <div className="flex justify-between items-center">
+                {q.has_order ? (
+                  <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full border border-green-300">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                    Completed
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-medium px-2 py-1 rounded-full border border-gray-200">
+                    <span className="w-2 h-2 rounded-full bg-gray-400 inline-block"></span>
+                    Pending
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => setModalQuote(q.quote_number)}
