@@ -199,6 +199,7 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
             <th className="border px-2 py-2">Qty</th>
             <th className="border px-2 py-2">Unit</th>
             <th className="border px-2 py-2">Price/Unit</th>
+            <th className="border px-2 py-2">GST %</th>
             <th className="border px-2 py-2">GST Amt</th>
             <th className="border px-2 py-2">Total</th>
             <th className="border px-2 py-2"></th>
@@ -292,16 +293,19 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
                     className="border p-1 w-24 text-xs rounded"
                   />
                 </td>
-                <td className="border px-2 py-2 hidden">
+                {/* GST % — visible, editable, pre-filled from product */}
+                <td className="border px-2 py-2">
                   <input
                     type="number"
-                    value={item.gst ?? 0}
+                    value={item.gst ?? 18}
                     onChange={(e) => handleChange(idx, "gst", e.target.value)}
-                    className="border p-1 w-16 text-xs rounded"
+                    className="border p-1 w-16 text-xs rounded text-center"
+                    min="0"
+                    step="0.5"
                   />
                 </td>
                 <td className="border px-2 py-2">₹ {gstAmount.toFixed(2)}</td>
-                <td className="border px-2 py-2">₹ {total.toFixed(2)}</td>
+                <td className="border px-2 py-2 font-medium">₹ {total.toFixed(2)}</td>
                 <td className="border px-2 py-2 text-center">
                   <button
                     type="button"

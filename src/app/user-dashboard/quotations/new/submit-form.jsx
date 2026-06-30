@@ -214,28 +214,38 @@ export default function QuotationForm() {
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
+    let totalTax = 0;
 
     items.forEach((item) => {
       const taxable = (item.quantity || 0) * (item.price || 0);
+      const gstAmt = taxable * ((item.gst || 0) / 100);
       subtotal += taxable;
+      totalTax += gstAmt;
     });
 
-    // Calculate tax amounts based on current rates
-    const cgst = cgstRate > 0 ? subtotal * (cgstRate / 100) : 0;
-    const sgst = sgstRate > 0 ? subtotal * (sgstRate / 100) : 0;
-    const igst = igstRate > 0 ? subtotal * (igstRate / 100) : 0;
+    // Split tax into cgst/sgst or igst based on interstate flag
+    const isInterstate = (() => {
+      const gstinValue = form.gstin_no?.trim();
+      if (!gstinValue) return false;
+      const code = gstinValue.slice(0, 2);
+      return code !== SUPPLIER_STATE_CODE;
+    })();
 
-    const totalBeforeRound = subtotal + cgst + sgst + igst;
+    const cgst = isInterstate ? 0 : totalTax / 2;
+    const sgst = isInterstate ? 0 : totalTax / 2;
+    const igst = isInterstate ? totalTax : 0;
+
+    const totalBeforeRound = subtotal + totalTax;
     let finalRoundOff = parseFloat(roundOff) || 0;
-    
+
     if (isAutoRoundOff) {
       finalRoundOff = Math.round(totalBeforeRound) - totalBeforeRound;
     }
 
     const grandTotal = totalBeforeRound + finalRoundOff;
 
-    return { subtotal, cgst, sgst, igst, grandTotal, finalRoundOff };
-  }, [items, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff]);
+    return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -814,26 +824,16 @@ Thanks for doing business with us!`,
         </div>
         <QuotationItemsTable items={items} setItems={setItems} customerId={form.customer_id} />
         <TaxAndSummary
+          items={items}
           subtotal={taxSummary.subtotal}
-          cgst={taxSummary.cgst}
-          sgst={taxSummary.sgst}
-          igst={taxSummary.igst}
           roundOff={roundOff}
           setRoundOff={setRoundOff}
           isAutoRoundOff={isAutoRoundOff}
           setIsAutoRoundOff={setIsAutoRoundOff}
           grandTotal={taxSummary.grandTotal}
-          cgstRate={cgstRate}
-          sgstRate={sgstRate}
-          igstRate={igstRate}
-          setCgstRate={setCgstRate}
-          setSgstRate={setSgstRate}
-          setIgstRate={setIgstRate}
           interstate={(() => {
             const gstinValue = form.gstin_no?.trim();
-            // If GSTIN is empty, default to intrastate (CGST+SGST)
             if (!gstinValue) return false;
-
             const gstState = getStateFromGSTIN(gstinValue);
             const buyerCode =
               gstState?.code || parseCodeFromDisplay(form.state_name);
