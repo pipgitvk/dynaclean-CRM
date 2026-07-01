@@ -112,7 +112,8 @@ export async function GET(req) {
     return NextResponse.json({
       success: true,
       quotation: {
-        quotation_id: quotation["S.No."],
+        // quotation_id: use quote_number as reliable reference (s_no unreliable after rename)
+        quotation_id: quotation.quote_number,
         quotation_number: quotation.quote_number,
         quotation_date: quotation.quote_date,
 
