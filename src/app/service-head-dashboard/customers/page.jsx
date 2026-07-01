@@ -207,7 +207,7 @@ export default async function CustomersPage({ searchParams }) {
 
     // Fetch employees for employee filter (only for roles that can see it)
     let employees = [];
-    if (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER") {
+    if (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA") {
       const [employeeRows] = await conn.execute(
         `SELECT DISTINCT lead_source FROM customers WHERE lead_source IS NOT NULL ORDER BY lead_source`
       );

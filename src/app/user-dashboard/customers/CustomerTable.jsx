@@ -228,8 +228,8 @@ export default function CustomerTable({
           )}
         </div>
 
-        {/* Employee filter - only for ADMIN, SUPERADMIN, TEAM LEADER */}
-        {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER") && (
+        {/* Employee filter - only for ADMIN, SUPERADMIN, TEAM LEADER, EA */}
+        {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA") && (
           <select
             value={filters.employee}
             onChange={(e) => update("employee", e.target.value)}
@@ -302,7 +302,7 @@ export default function CustomerTable({
                   <td className="px-4 py-2">{r.products_interest}</td>
                   <td className="px-4 py-2">{r.service_lead_source || "-"}</td>
                   <td className="px-4 py-2 flex items-center gap-2 justify-center text-gray-600">
-                    {(userRole === "ADMIN" || userRole === "SUPERADMIN") && (
+                    {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA") && (
                       <>
                         <button
                           title="View"
@@ -391,7 +391,7 @@ export default function CustomerTable({
                 <span className="font-semibold">Service Lead Source:</span> {r.service_lead_source || "-"}
               </div>
               <div className="flex items-center gap-4 pt-2 cursor-pointer">
-                {(userRole === "ADMIN" || userRole === "SUPERADMIN") && (
+                {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA") && (
                   <>
                     <button
                       title="View"

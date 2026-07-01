@@ -268,8 +268,8 @@ export default function CustomerTable({
           )}
         </div>
 
-        {/* Employee filter - only for ADMIN, SUPERADMIN, TEAM LEADER */}
-        {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER") && (
+        {/* Employee filter - only for ADMIN, SUPERADMIN, TEAM LEADER, EA */}
+        {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA") && (
           <select
             value={filters.employee}
             onChange={(e) => update("employee", e.target.value)}

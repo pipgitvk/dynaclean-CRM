@@ -98,7 +98,7 @@ export default function CustomerTable({
         
         {/* Filters - wrap on small screens */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER") && (
+          {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA") && (
             <select
               value={filters.lead_source}
               onChange={(e) =>
@@ -244,7 +244,7 @@ export default function CustomerTable({
                 </div>
               </div>
               <div className="flex gap-2 flex-shrink-0">
-                {(userRole === "ADMIN" || userRole === "SUPERADMIN") && (
+                {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA") && (
                   <button
                     title="View"
                     onClick={() => router.push(`/admin-dashboard/view-customer/${row.customer_id}`)}
@@ -313,7 +313,7 @@ export default function CustomerTable({
                         : "---"}
                     </td>
                     <td className="px-4 py-2 flex items-center gap-2">
-                    {(userRole === "ADMIN" || userRole === "SUPERADMIN") && (
+                    {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA") && (
                       <button
                         title="View"
                         onClick={() =>

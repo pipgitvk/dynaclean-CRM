@@ -83,14 +83,14 @@ export default async function CustomersPage({ searchParams }) {
   const customerConditions = [];
   const customerParams = [];
 
-  // Only filter by assigned fields if user is not ADMIN, SUPERADMIN, or SERVICE HEAD or TEAM LEADER
-  if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER") {
+  // Only filter by assigned fields if user is not ADMIN, SUPERADMIN, or SERVICE HEAD or TEAM LEADER or EA
+  if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
     customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ? OR c.service_lead_source = ?)");
     customerParams.push(username, username, username, username);
   }
 
-  // Employee filter (only for ADMIN, SUPERADMIN, TEAM LEADER)
-  if (employee && (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER")) {
+  // Employee filter (only for ADMIN, SUPERADMIN, TEAM LEADER, EA)
+  if (employee && (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA")) {
     customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ? OR c.service_lead_source = ?)");
     customerParams.push(employee, employee, employee, employee);
   }
@@ -236,7 +236,7 @@ export default async function CustomersPage({ searchParams }) {
 
     // Fetch employees for employee filter (only for roles that can see it)
     let employees = [];
-    if (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER") {
+    if (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA") {
       const [employeeRows] = await conn.execute(
         `SELECT DISTINCT lead_source FROM customers WHERE lead_source IS NOT NULL ORDER BY lead_source`
       );

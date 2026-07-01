@@ -90,7 +90,7 @@ export default async function TLCustomersPage({ searchParams }) {
 
   // For non-admin users: only show their leads (manual + automatic)
   // Directors should see all data
-  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR"];
+  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR", "EA"];
   const roleUpper = String(payload?.role || "").trim().toUpperCase();
   const isPrivileged = privilegedRoles.includes(roleUpper);
   if (!isPrivileged) {

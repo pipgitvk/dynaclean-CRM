@@ -95,8 +95,9 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   // For non-admin users: only show their leads (manual + automatic)
-  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER"];
-  if (!privilegedRoles.includes(payload?.role || "")) {
+  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR", "EA"];
+  const roleUpper = String(payload?.role || "").trim().toUpperCase();
+  if (!privilegedRoles.includes(roleUpper)) {
     query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
     params.push(payload?.username || "", payload?.username || "");
   }
@@ -223,7 +224,7 @@ export default async function TLCustomersPage({ searchParams }) {
     kpiParams.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
-  if (!privilegedRoles.includes(payload?.role || "")) {
+  if (!privilegedRoles.includes(roleUpper)) {
     kpiQuery += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
     kpiParams.push(payload?.username || "", payload?.username || "");
   }
