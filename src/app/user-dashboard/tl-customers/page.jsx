@@ -95,16 +95,22 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   // For non-admin users: only show their leads (manual + automatic)
-  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR", "EA"];
-  if (!privilegedRoles.includes(String(payload?.role || "").toUpperCase())) {
+  // For EA: only show their own customers OR the selected employee when tlOnly is true
+  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR"];
+  const isEA = String(payload?.role || "").toUpperCase() === "EA";
+  const employeeToFilter = employee || payload?.username || "";
+  
+  const userRole = String(payload?.role || "").toUpperCase();
+  const isPrivileged = privilegedRoles.includes(userRole);
+  
+  if (!isPrivileged && !isEA) {
+    // Non-privileged, non-EA users always see only their own customers
     query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
     params.push(payload?.username || "", payload?.username || "");
-  }
-
-  // Filter by employee (lead_source or assigned_to)
-  if (employee) {
-    query += ` AND (c.lead_source = ? OR c.assigned_to = ?)`;
-    params.push(employee, employee);
+  } else if (isEA && showTLOnly) {
+    // EA users see only selected employee (or their own) customers when tlOnly is true
+    query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
+    params.push(employeeToFilter, employeeToFilter);
   }
 
   // Filter by status
@@ -223,14 +229,12 @@ export default async function TLCustomersPage({ searchParams }) {
     kpiParams.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
-  if (!privilegedRoles.includes(payload?.role || "")) {
+  if (!isPrivileged && !isEA) {
     kpiQuery += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
     kpiParams.push(payload?.username || "", payload?.username || "");
-  }
-
-  if (employee) {
-    kpiQuery += ` AND (c.lead_source = ? OR c.assigned_to = ?)`;
-    kpiParams.push(employee, employee);
+  } else if (isEA && showTLOnly) {
+    kpiQuery += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
+    kpiParams.push(employeeToFilter, employeeToFilter);
   }
 
   if (status) {

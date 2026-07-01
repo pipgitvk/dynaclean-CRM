@@ -89,6 +89,13 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     params.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
+  // For EA, when tlOnly is true: only show their own customers
+  const isEA = String(payload?.role || "").toUpperCase() === "EA";
+  if (isEA && showTLOnly) {
+    query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
+    params.push(payload?.username || "", payload?.username || "");
+  }
+
   // Filter by employee (lead_source or assigned_to)
   if (employee) {
     query += ` AND (c.lead_source = ? OR c.assigned_to = ?)`;
@@ -210,6 +217,11 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     kpiQuery += ` AND (c.customer_id = ? OR c.phone LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR c.company LIKE ?)`;
     const searchTerm = `%${search}%`;
     kpiParams.push(search, searchTerm, searchTerm, searchTerm, searchTerm);
+  }
+
+  if (isEA && showTLOnly) {
+    kpiQuery += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
+    kpiParams.push(payload?.username || "", payload?.username || "");
   }
 
   if (employee) {

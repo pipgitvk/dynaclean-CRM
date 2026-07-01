@@ -95,9 +95,11 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   // For non-admin users: only show their leads (manual + automatic)
-  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR", "EA"];
+  // For EA, when tlOnly is true: only show their own customers
+  const privilegedRoles = ["ADMIN", "SUPERADMIN", "TEAM LEADER", "DIRECTOR"];
   const roleUpper = String(payload?.role || "").trim().toUpperCase();
-  if (!privilegedRoles.includes(roleUpper)) {
+  const isEA = roleUpper === "EA";
+  if (!privilegedRoles.includes(roleUpper) || (isEA && showTLOnly)) {
     query += ` AND (c.assigned_to = ? OR c.lead_source = ?)`;
     params.push(payload?.username || "", payload?.username || "");
   }
