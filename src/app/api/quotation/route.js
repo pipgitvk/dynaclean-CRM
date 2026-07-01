@@ -6,23 +6,32 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 
 /**
- * Auto-fix: Drop s_no as PRIMARY KEY if it's blocking inserts.
- * s_no was renamed from "S. NO." and may still be the PK.
- * After fix, s_no becomes AUTO_INCREMENT UNIQUE (not PK).
+ * Ensures `S.No.` is AUTO_INCREMENT so it gets populated on every insert.
+ * Column name in DB is literally "S.No." (with dot and space).
  */
 async function fixSnoSchemaIfNeeded(conn) {
   try {
-    const [keyInfo] = await conn.execute(
-      `SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
-       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'quotations_records' 
-       AND COLUMN_NAME = 's_no' AND CONSTRAINT_NAME = 'PRIMARY'`
+    // Check current "S.No." column definition
+    const [colInfo] = await conn.execute(
+      `SELECT COLUMN_KEY, EXTRA 
+       FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'quotations_records' 
+         AND COLUMN_NAME = 'S.No.'`
     );
 
-    if (keyInfo.length === 0) return; // already fine
+    if (colInfo.length === 0) return; // column doesn't exist, nothing to fix
 
-    console.warn("⚠️ s_no is PRIMARY KEY — dropping PK to allow inserts without s_no...");
-    await conn.execute(`ALTER TABLE quotations_records DROP PRIMARY KEY`);
-    console.log("✅ Dropped s_no PRIMARY KEY");
+    const isPK = colInfo[0].COLUMN_KEY === 'PRI';
+    const hasAutoIncrement = (colInfo[0].EXTRA || '').toLowerCase().includes('auto_increment');
+
+    if (hasAutoIncrement) return; // already correct, skip
+
+    if (isPK) {
+      console.warn("⚠️ S.No. is PRIMARY KEY without AUTO_INCREMENT — fixing...");
+      await conn.execute(`ALTER TABLE quotations_records DROP PRIMARY KEY`);
+      console.log("✅ Dropped S.No. PRIMARY KEY");
+    }
 
     // Add UNIQUE on quote_number if not already there
     const [qConstraints] = await conn.execute(
@@ -35,9 +44,9 @@ async function fixSnoSchemaIfNeeded(conn) {
       console.log("✅ Added UNIQUE constraint to quote_number");
     }
 
-    // Make s_no AUTO_INCREMENT UNIQUE (not PK)
-    await conn.execute(`ALTER TABLE quotations_records MODIFY s_no INT NOT NULL AUTO_INCREMENT UNIQUE`);
-    console.log("✅ s_no is now AUTO_INCREMENT UNIQUE (not PK)");
+    // Make S.No. AUTO_INCREMENT UNIQUE (not PK)
+    await conn.execute("ALTER TABLE quotations_records MODIFY `S.No.` INT NOT NULL AUTO_INCREMENT UNIQUE");
+    console.log("✅ S.No. is now AUTO_INCREMENT UNIQUE");
   } catch (err) {
     console.error("❌ Schema auto-fix failed:", err.message);
     // Don't throw — let the insert attempt proceed and surface its own error

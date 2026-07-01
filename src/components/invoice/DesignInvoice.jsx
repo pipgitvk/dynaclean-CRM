@@ -2608,7 +2608,7 @@ const NewInvoice = ({ invoice }) => {
                 <div style={{ fontWeight: "bold", lineHeight: "1.3" }}>
                   Reference No. :{" "}
                   <span style={{ fontWeight: "normal" }}>
-                    {data.invoice.referenceNoSno || data.invoice.referenceNo || "-"}
+                    {data.invoice.referenceNo || "-"}
                   </span>
                 </div>
                 <div style={{ fontWeight: "bold", marginTop: "6px", lineHeight: "1.3" }}>
