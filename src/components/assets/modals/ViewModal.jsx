@@ -125,6 +125,19 @@ export default function ViewModal({ asset }) {
           </div>
         )}
 
+        {asset.asset_category === 'SIM' && (
+          <div className="p-4 bg-gray-50 rounded-md">
+            <p className="font-bold mb-2 text-gray-700">SIM</p>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div><span className="font-semibold">SIM Number:</span> {asset.sim_no_1 || '-'}</div>
+              <div><span className="font-semibold">Provider:</span> {asset.provider_1 || '-'}</div>
+              <div><span className="font-semibold">Plan:</span> {asset.sim_plan || '-'}</div>
+              <div><span className="font-semibold">Billing Cycle:</span> {asset.sim_billing_cycle || '-'}</div>
+              <div><span className="font-semibold">Billing Type:</span> {asset.sim_billing_type || '-'}</div>
+            </div>
+          </div>
+        )}
+
         {/* Assignment Info */}
         <div className="p-4 bg-gray-50 rounded-md">
           <p className="font-bold mb-2 text-gray-700">Assignment Details</p>

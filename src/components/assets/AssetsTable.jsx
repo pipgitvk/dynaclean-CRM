@@ -265,30 +265,31 @@ export default function AssetsTable() {
         <div className="hidden lg:block overflow-x-auto">
           <table className="min-w-full leading-normal" style={{ minWidth: '1200px' }}>
             <thead>
-              <tr className="bg-gray-100 text-gray-600 uppercase text-sm">
-                <th className="py-3 px-4 text-center w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedAssetIds.size === sortedAssets.length && sortedAssets.length > 0}
-                    indeterminate={selectedAssetIds.size > 0 && selectedAssetIds.size < sortedAssets.length}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                  />
-                </th>
-                <th className="py-3 px-6 text-left cursor-pointer w-24" onClick={() => handleSort('asset_id')}>Asset ID {sortConfig.key==='asset_id' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left cursor-pointer w-28" onClick={() => handleSort('asset_category')}>Category {sortConfig.key==='asset_category' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left cursor-pointer w-40" onClick={() => handleSort('asset_name')}>Asset Name {sortConfig.key==='asset_name' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left cursor-pointer w-48" onClick={() => handleSort('serial_number')}>Serial Number {sortConfig.key==='serial_number' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('brand_name')}>Brand {sortConfig.key==='brand_name' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('purchase_price')}>Purchase Price {sortConfig.key==='purchase_price' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('purchase_date')}>Purchase Date {sortConfig.key==='purchase_date' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('Assigned_to')}>Assigned To {sortConfig.key==='Assigned_to' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('Assigned_Date')}>Assigned Date {sortConfig.key==='Assigned_Date' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
-                <th className="py-3 px-6 text-left w-32">Linked Trans ID</th>
-                <th className="py-3 px-6 text-left w-28">Receipt</th>
-                <th className="py-3 px-6 text-center w-40">Actions</th>
-              </tr>
-            </thead>
+          <tr className="bg-gray-100 text-gray-600 uppercase text-sm">
+            <th className="py-3 px-4 text-center w-12">
+              <input
+                type="checkbox"
+                checked={selectedAssetIds.size === sortedAssets.length && sortedAssets.length > 0}
+                indeterminate={selectedAssetIds.size > 0 && selectedAssetIds.size < sortedAssets.length}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+              />
+            </th>
+            <th className="py-3 px-6 text-left cursor-pointer w-24" onClick={() => handleSort('asset_id')}>Asset ID {sortConfig.key==='asset_id' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-28" onClick={() => handleSort('asset_category')}>Category {sortConfig.key==='asset_category' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-40" onClick={() => handleSort('asset_name')}>Asset Name {sortConfig.key==='asset_name' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('sim_no_1')}>SIM Number {sortConfig.key==='sim_no_1' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-48" onClick={() => handleSort('serial_number')}>Serial Number {sortConfig.key==='serial_number' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('brand_name')}>Brand {sortConfig.key==='brand_name' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('purchase_price')}>Purchase Price {sortConfig.key==='purchase_price' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('purchase_date')}>Purchase Date {sortConfig.key==='purchase_date' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('Assigned_to')}>Assigned To {sortConfig.key==='Assigned_to' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('Assigned_Date')}>Assigned Date {sortConfig.key==='Assigned_Date' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-left w-32">Linked Trans ID</th>
+            <th className="py-3 px-6 text-left w-28">Receipt</th>
+            <th className="py-3 px-6 text-center w-40">Actions</th>
+          </tr>
+        </thead>
             <tbody className="text-gray-700 text-sm">
               {sortedAssets.map((asset) => (
                 <tr
@@ -311,6 +312,9 @@ export default function AssetsTable() {
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {asset.asset_name}
+                  </td>
+                  <td className="py-3 px-6 whitespace-nowrap">
+                    {asset.sim_no_1 || '-'}
                   </td>
                   <td className="py-3 px-6 break-words">
                     <div className="text-sm max-w-48">{asset.serial_number}</div>
@@ -435,6 +439,11 @@ export default function AssetsTable() {
               <p className="text-sm text-gray-600">
                 <strong>Brand:</strong> {asset.brand_name}
               </p>
+              {asset.sim_no_1 && (
+                <p className="text-sm text-gray-600">
+                  <strong>SIM Number:</strong> {asset.sim_no_1}
+                </p>
+              )}
               <p className="text-sm text-gray-600">
                 <strong>Price:</strong> Rs. {asset.purchase_price}
               </p>
