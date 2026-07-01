@@ -235,19 +235,24 @@ export default function CustomerTable({
                 {row.lead_source && (
                   <div className="text-xs text-gray-600 mt-1">Source: {row.lead_source}</div>
                 )}
+                {row.service_lead_source && (
+                  <div className="text-xs text-gray-600">Service Source: {row.service_lead_source}</div>
+                )}
                 <div className="flex flex-wrap gap-1 mt-2">
                   <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-800 rounded">{row.status}</span>
                   <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded">{row.stage}</span>
                 </div>
               </div>
               <div className="flex gap-2 flex-shrink-0">
-                <button
-                  title="View"
-                  onClick={() => router.push(`/admin-dashboard/view-customer/${row.customer_id}`)}
-                  className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
-                >
-                  <Eye className="w-5 h-5 text-gray-600" />
-                </button>
+                {(userRole === "ADMIN" || userRole === "SUPERADMIN") && (
+                  <button
+                    title="View"
+                    onClick={() => router.push(`/admin-dashboard/view-customer/${row.customer_id}`)}
+                    className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
+                  >
+                    <Eye className="w-5 h-5 text-gray-600" />
+                  </button>
+                )}
                 <button
                   title="Edit"
                   onClick={() => router.push(`/admin-dashboard/view-customer/${row.customer_id}/edit`)}
@@ -272,6 +277,7 @@ export default function CustomerTable({
                 <tr>
                   <th className="px-4 py-2 text-left">Customer</th>
                   <th className="px-4 py-2 text-left">Lead Source</th>
+                  <th className="px-4 py-2 text-left">Service Lead Source</th>
                   <th className="px-4 py-2 text-left">Tags</th>
                   <th className="px-4 py-2 text-left">notes</th>
                   <th className="px-4 py-2 text-left">Status</th>
@@ -292,6 +298,7 @@ export default function CustomerTable({
                       <div className="text-xs text-gray-500">{row.phone}</div>
                     </td>
                     <td className="px-4 py-2">{row.lead_source}</td>
+                    <td className="px-4 py-2">{row.service_lead_source || "-"}</td>
                     <td className="px-4 py-2">{row.tags}</td>
                     <td className="px-4 py-2">
                       {row.latest_note ? row.latest_note : "---"}
@@ -306,6 +313,7 @@ export default function CustomerTable({
                         : "---"}
                     </td>
                     <td className="px-4 py-2 flex items-center gap-2">
+                    {(userRole === "ADMIN" || userRole === "SUPERADMIN") && (
                       <button
                         title="View"
                         onClick={() =>
@@ -316,23 +324,24 @@ export default function CustomerTable({
                       >
                         <Eye className="w-5 h-5 hover:text-blue-600" />
                       </button>
-                      <button
-                        title="Edit"
-                        onClick={() =>
-                          router.push(
-                            `/admin-dashboard/view-customer/${row.customer_id}/edit`
-                          )
-                        }
-                      >
-                        <Pencil className="w-5 h-5 hover:text-green-600" />
-                      </button>
-                    </td>
+                    )}
+                    <button
+                      title="Edit"
+                      onClick={() =>
+                        router.push(
+                          `/admin-dashboard/view-customer/${row.customer_id}/edit`
+                        )
+                      }
+                    >
+                      <Pencil className="w-5 h-5 hover:text-green-600" />
+                    </button>
+                  </td>
                   </tr>
                 ))}
                 {data.length === 0 && (
                   <tr>
                     <td
-                      colSpan={9}
+                      colSpan={11}
                       className="px-4 py-4 text-center text-gray-400"
                     >
                       No results found.

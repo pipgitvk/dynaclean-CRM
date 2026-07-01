@@ -272,6 +272,7 @@ export default function CustomerTable({
                   "Created",
                   "Bid Numbers",
                   "Products Interest",
+                  "Service Lead Source",
                 ].map((h) => (
                   <th key={h} className="px-4 py-2 text-left whitespace-nowrap">
                     {h}
@@ -299,17 +300,32 @@ export default function CustomerTable({
                   </td>
                   <td className="px-4 py-2">{r.bid_numbers || "-"}</td>
                   <td className="px-4 py-2">{r.products_interest}</td>
+                  <td className="px-4 py-2">{r.service_lead_source || "-"}</td>
                   <td className="px-4 py-2 flex items-center gap-2 justify-center text-gray-600">
-                    <button
-                      title="View"
-                      onClick={() =>
-                        router.push(
-                          `/user-dashboard/view-customer/${r.customer_id}`
-                        )
-                      }
-                    >
-                      <Eye className="w-5 h-5 hover:text-blue-600" />
-                    </button>
+                    {(userRole === "ADMIN" || userRole === "SUPERADMIN") && (
+                      <>
+                        <button
+                          title="View"
+                          onClick={() =>
+                            router.push(
+                              `/user-dashboard/view-customer/${r.customer_id}`
+                            )
+                          }
+                        >
+                          <Eye className="w-5 h-5 hover:text-blue-600" />
+                        </button>
+                        <button
+                          title="Follow-up"
+                          onClick={() =>
+                            router.push(
+                              `/user-dashboard/view-customer/${r.customer_id}/follow-up`
+                            )
+                          }
+                        >
+                          <ArrowRightCircle className="w-5 h-5 hover:text-orange-600" />
+                        </button>
+                      </>
+                    )}
                     <button
                       title="Edit"
                       onClick={() =>
@@ -320,22 +336,12 @@ export default function CustomerTable({
                     >
                       <Pencil className="w-5 h-5 hover:text-green-600" />
                     </button>
-                    <button
-                      title="Follow-up"
-                      onClick={() =>
-                        router.push(
-                          `/user-dashboard/view-customer/${r.customer_id}/follow-up`
-                        )
-                      }
-                    >
-                      <ArrowRightCircle className="w-5 h-5 hover:text-orange-600" />
-                    </button>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center p-4">
+                  <td colSpan={10} className="text-center p-4">
                     No customers found.
                   </td>
                 </tr>
@@ -381,17 +387,34 @@ export default function CustomerTable({
               <div>
                 <span className="font-semibold">Products Interest:</span> {r.products_interest}
               </div>
+              <div>
+                <span className="font-semibold">Service Lead Source:</span> {r.service_lead_source || "-"}
+              </div>
               <div className="flex items-center gap-4 pt-2 cursor-pointer">
-                <button
-                  title="View"
-                  onClick={() =>
-                    router.push(
-                      `/user-dashboard/view-customer/${r.customer_id}`
-                    )
-                  }
-                >
-                  <Eye className="w-5 h-5 hover:text-blue-600" />
-                </button>
+                {(userRole === "ADMIN" || userRole === "SUPERADMIN") && (
+                  <>
+                    <button
+                      title="View"
+                      onClick={() =>
+                        router.push(
+                          `/user-dashboard/view-customer/${r.customer_id}`
+                        )
+                      }
+                    >
+                      <Eye className="w-5 h-5 hover:text-blue-600" />
+                    </button>
+                    <button
+                      title="Follow-up"
+                      onClick={() =>
+                        router.push(
+                          `/user-dashboard/view-customer/${r.customer_id}/follow-up`
+                        )
+                      }
+                    >
+                      <ArrowRightCircle className="w-5 h-5 hover:text-orange-600" />
+                    </button>
+                  </>
+                )}
                 <button
                   title="Edit"
                   onClick={() =>
@@ -401,16 +424,6 @@ export default function CustomerTable({
                   }
                 >
                   <Pencil className="w-5 h-5 hover:text-green-600" />
-                </button>
-                <button
-                  title="Follow-up"
-                  onClick={() =>
-                    router.push(
-                      `/user-dashboard/view-customer/${r.customer_id}/follow-up`
-                    )
-                  }
-                >
-                  <ArrowRightCircle className="w-5 h-5 hover:text-orange-600" />
                 </button>
               </div>
             </div>

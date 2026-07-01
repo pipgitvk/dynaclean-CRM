@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function UpdateLeadSourceForm({ initialData, leadSources }) {
+export default function UpdateLeadSourceForm({ initialData, leadSources, serviceEmployees = [], userRole }) {
   const router = useRouter();
   const [selectedLeadSource, setSelectedLeadSource] = useState(
     initialData.lead_source || ""
+  );
+  const [selectedServiceLeadSource, setSelectedServiceLeadSource] = useState(
+    initialData.service_lead_source || ""
   );
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -17,6 +20,11 @@ export default function UpdateLeadSourceForm({ initialData, leadSources }) {
     setStatusMessage("");
 
     try {
+      const requestBody = { service_lead_source: selectedServiceLeadSource };
+      if (!(userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD")) {
+        requestBody.lead_source = selectedLeadSource;
+      }
+
       const response = await fetch(
         `/api/customers/${initialData.customer_id}`,
         {
@@ -24,7 +32,7 @@ export default function UpdateLeadSourceForm({ initialData, leadSources }) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ lead_source: selectedLeadSource }),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -56,27 +64,55 @@ export default function UpdateLeadSourceForm({ initialData, leadSources }) {
       </div>
 
       <form onSubmit={handleUpdate} className="space-y-4">
-        <div>
-          <label
-            htmlFor="lead_source_select"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Select New Lead Source
-          </label>
-          <select
-            id="lead_source_select"
-            name="lead_source"
-            value={selectedLeadSource}
-            onChange={(e) => setSelectedLeadSource(e.target.value)}
-            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-          >
-            {leadSources.map((source, index) => (
-              <option key={index} value={source}>
-                {source}
-              </option>
-            ))}
-          </select>
-        </div>
+        <>
+          {!(userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD") && (
+            <div>
+              <label
+                htmlFor="lead_source_select"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Select New Lead Source
+              </label>
+              <select
+                id="lead_source_select"
+                name="lead_source"
+                value={selectedLeadSource}
+                onChange={(e) => setSelectedLeadSource(e.target.value)}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+              >
+                {leadSources.map((source, index) => (
+                  <option key={index} value={source}>
+                    {source}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {(userRole === "SUPERADMIN" || userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD") && (
+            <div>
+              <label
+                htmlFor="service_lead_source_select"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Select Service Lead Source
+              </label>
+              <select
+                id="service_lead_source_select"
+                name="service_lead_source"
+                value={selectedServiceLeadSource}
+                onChange={(e) => setSelectedServiceLeadSource(e.target.value)}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+              >
+                <option value="">Select</option>
+                {serviceEmployees.map((employee, index) => (
+                  <option key={index} value={employee}>
+                    {employee}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </>
 
         <div className="flex justify-end">
           <button

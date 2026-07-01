@@ -154,8 +154,21 @@ export async function GET(req) {
     const currentPage = Math.min(page, totalPages);
     const offset = (currentPage - 1) * pageSize;
 
+    // Check if service_lead_source column exists
+    let serviceLeadSourceColumn = null;
+    try {
+      const [columns] = await conn.execute("SHOW COLUMNS FROM customers LIKE 'service_lead_source'");
+      if (columns.length > 0) {
+        serviceLeadSourceColumn = "c.service_lead_source,";
+      } else {
+        serviceLeadSourceColumn = "";
+      }
+    } catch (e) {
+      serviceLeadSourceColumn = "";
+    }
+    
     const dataSql =
-      "SELECT c.customer_id, c.date_created, c.lead_campaign, c.first_name, c.company, c.status, c.lead_source, c.stage, " +
+      "SELECT c.customer_id, c.date_created, c.lead_campaign, c.first_name, c.company, c.status, c.lead_source, " + serviceLeadSourceColumn + " c.stage, " +
       "(SELECT MIN(cf.followed_date) FROM customers_followup cf WHERE cf.customer_id = c.customer_id) as contacted_time, " +
       "(SELECT cf.next_followup_date FROM customers_followup cf WHERE cf.customer_id = c.customer_id AND cf.next_followup_date IS NOT NULL ORDER BY cf.followed_date ASC LIMIT 1) as next_followup_time, " +
       "(SELECT COUNT(*) FROM customers_followup cf WHERE cf.customer_id = c.customer_id) as followup_count " +

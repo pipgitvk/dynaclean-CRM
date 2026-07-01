@@ -1,5 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { getSessionPayload } from "@/lib/auth";
+import { cookies } from "next/headers";
 
 export async function GET(request, { params }) {
   const { customerId } = await params;
@@ -38,19 +40,64 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   const { customerId } = await params;
-  const { lead_source } = await request.json();
+  const { lead_source, service_lead_source } = await request.json();
 
-  // Basic validation
-  if (!lead_source) {
+  const payload = await getSessionPayload();
+  const userRole = payload?.role;
+  const isServiceUser = userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD";
+
+  // Basic validation - only require lead_source if not a service user
+  if (!isServiceUser && !lead_source) {
     return NextResponse.json({ error: "Lead source is required." }, { status: 400 });
   }
 
   try {
     const conn = await getDbConnection();
-    const [result] = await conn.execute(
-      `UPDATE customers SET lead_source = ? , sales_representative = ? WHERE customer_id = ?`,
-      [lead_source, lead_source, customerId]
+    // Check if service_lead_source column exists
+    let serviceLeadSourceColumn = null;
+    try {
+      const [columns] = await conn.execute("SHOW COLUMNS FROM customers LIKE 'service_lead_source'");
+      if (columns.length > 0) {
+        serviceLeadSourceColumn = true;
+      }
+    } catch (e) {
+      serviceLeadSourceColumn = false;
+    }
+    
+    // First, get current customer data to preserve fields not being updated
+    const [currentRows] = await conn.execute(
+      `SELECT lead_source, service_lead_source FROM customers WHERE customer_id = ?`,
+      [customerId]
     );
+    const currentData = currentRows[0] || {};
+    
+    let result;
+    if (isServiceUser) {
+      // If service user, only update service_lead_source if provided
+      if (serviceLeadSourceColumn) {
+        const newServiceLeadSource = service_lead_source !== undefined ? service_lead_source : currentData.service_lead_source;
+        [result] = await conn.execute(
+          `UPDATE customers SET service_lead_source = ? WHERE customer_id = ?`,
+          [newServiceLeadSource === '' ? null : newServiceLeadSource, customerId]
+        );
+      } else {
+        return NextResponse.json({ message: "Service lead source column not available yet." }, { status: 200 });
+      }
+    } else {
+      // If non-service user, update lead_source (required) and service_lead_source if provided
+      if (serviceLeadSourceColumn) {
+        const newServiceLeadSource = service_lead_source !== undefined ? service_lead_source : currentData.service_lead_source;
+        [result] = await conn.execute(
+          `UPDATE customers SET lead_source = ?, sales_representative = ?, service_lead_source = ? WHERE customer_id = ?`,
+          [lead_source, lead_source, newServiceLeadSource === '' ? null : newServiceLeadSource, customerId]
+        );
+      } else {
+        [result] = await conn.execute(
+          `UPDATE customers SET lead_source = ?, sales_representative = ? WHERE customer_id = ?`,
+          [lead_source, lead_source, customerId]
+        );
+      }
+    }
     // await conn.end();
 
     if (result.affectedRows === 0) {

@@ -15,19 +15,21 @@ export default async function CustomerPage({ params }) {
   // Fetch current user info if needed
   // (e.g., role to conditionally render buttons)
 
-  // Fetch customer with parent info (for Add Contact / member customers)
+  // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
-    `SELECT c.*,
-       p.customer_id AS parent_id,
-       CONCAT(TRIM(p.first_name), ' ', TRIM(COALESCE(p.last_name, ''))) AS parent_name,
-       p.phone AS parent_phone,
-       p.company AS parent_company
+    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
+      p.customer_id AS parent_id,
+      CONCAT(TRIM(p.first_name), ' ', TRIM(COALESCE(p.last_name, ''))) AS parent_name,
+      p.phone AS parent_phone,
+      p.company AS parent_company
      FROM customers c
      LEFT JOIN customers p ON c.parent_customer_id = p.customer_id
      WHERE c.customer_id = ?`,
     [customerId],
   );
-  const customer = custs[0];
+  const customer = custs[0] || {};
+  // Log to verify we're getting service_lead_source
+  console.log("View customer page - customer data:", customer);
   if (!customer) {
     notFound();
   }
@@ -134,6 +136,13 @@ export default async function CustomerPage({ params }) {
         <dt className="text-sm font-medium text-gray-500">Lead Source</dt>
         <dd className="mt-1 text-gray-800">
           {customer.lead_source || "-"}
+        </dd>
+      </div>
+
+      <div>
+        <dt className="text-sm font-medium text-gray-500">Service Lead Source</dt>
+        <dd className="mt-1 text-gray-800">
+          {customer.service_lead_source || "-"}
         </dd>
       </div>
 

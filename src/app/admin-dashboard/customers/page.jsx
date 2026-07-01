@@ -58,7 +58,7 @@ export default async function HomePage({ searchParams }) {
     // Build query with filters
     let query = `
       SELECT
-        c.*,
+        c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
         cf.notes AS latest_note,
         cf.multi_tag AS latest_tags,
         IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers

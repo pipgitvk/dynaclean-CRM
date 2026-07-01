@@ -58,6 +58,15 @@ export default async function CustomersPage({ searchParams }) {
 
   const conn = await getDbConnection();
 
+  // First check if service_lead_source column exists in customers table
+  let hasServiceLeadSource = false;
+  try {
+    const [columns] = await conn.execute("SHOW COLUMNS FROM customers LIKE 'service_lead_source'");
+    hasServiceLeadSource = columns.length > 0;
+  } catch (e) {
+    hasServiceLeadSource = false;
+  }
+
   // Ensure customer_id column exists in bids table
   const [bidsTableInfo] = await conn.execute("DESCRIBE bids");
   const bidsExistingColumns = bidsTableInfo.map(row => row.Field);
@@ -76,14 +85,14 @@ export default async function CustomersPage({ searchParams }) {
 
   // Only filter by assigned fields if user is not ADMIN, SUPERADMIN, or SERVICE HEAD or TEAM LEADER
   if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER") {
-    customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
-    customerParams.push(username, username, username);
+    customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ? OR c.service_lead_source = ?)");
+    customerParams.push(username, username, username, username);
   }
 
   // Employee filter (only for ADMIN, SUPERADMIN, TEAM LEADER)
   if (employee && (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER")) {
-    customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
-    customerParams.push(employee, employee, employee);
+    customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ? OR c.service_lead_source = ?)");
+    customerParams.push(employee, employee, employee, employee);
   }
 
   let joinClause = "";
@@ -168,7 +177,7 @@ export default async function CustomersPage({ searchParams }) {
     ? allWhereConditions.join(" AND ") 
     : "1=1"; // Default to always true if no conditions
 
-  // Construct final SQL query
+  // Construct final SQL query - always include service_lead_source
   let sql = `
     SELECT
       c.customer_id,
@@ -181,6 +190,7 @@ export default async function CustomersPage({ searchParams }) {
       c.date_created,
       c.lead_campaign,
       c.products_interest,
+      c.service_lead_source,
       IFNULL(GROUP_CONCAT(b.bid_number), '') as bid_numbers
       ${followupSelectFields} -- This inserts the conditional select statement
     FROM customers c
@@ -218,6 +228,9 @@ export default async function CustomersPage({ searchParams }) {
     // Add ORDER BY and pagination
     sql += ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
     const paginatedParams = [...allParams, pageSize, offset];
+    // Log the query and data to debug
+    console.log("Customers page final SQL:", sql);
+    console.log("Customers page params:", paginatedParams);
 
     const [rows] = await conn.execute(sql, paginatedParams);
 

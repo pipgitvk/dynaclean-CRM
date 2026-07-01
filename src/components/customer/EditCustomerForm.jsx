@@ -5,7 +5,7 @@ import { Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
-export default function EditCustomerForm({ initialData }) {
+export default function EditCustomerForm({ initialData, userRole }) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
   const [enabled, setEnabled] = useState({
@@ -98,7 +98,9 @@ export default function EditCustomerForm({ initialData }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {["first_name", "company", "email", "tags", "status", "stage", "gstin", "address"].map((field) => (
+      {["first_name", "company", "email", "tags", "status", "stage", "gstin", "address"]
+        .filter(field => !(userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD") || !["tags", "status", "stage"].includes(field))
+        .map((field) => (
         <div key={field} className="flex items-center space-x-2">
           <label className="w-24 font-medium capitalize">
             {field.replace("_", " ")}:

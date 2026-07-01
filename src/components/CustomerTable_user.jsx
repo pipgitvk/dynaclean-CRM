@@ -206,6 +206,7 @@ export default function CustomerTable({ customers, isLoading }) {
               <th className="px-3 py-3 font-semibold text-left">Status</th>
               <th className="px-3 py-3 font-semibold text-left">Stage</th>
               <th className="px-3 py-3 font-semibold text-left">Source</th>
+              <th className="px-3 py-3 font-semibold text-left">Service Source</th>
               <th className="px-3 py-3 font-semibold text-left">Actions</th>
             </tr>
           </thead>
@@ -236,6 +237,7 @@ export default function CustomerTable({ customers, isLoading }) {
                     )}
                   </td>
                   <td className="px-3 py-3 text-left">{c.lead_source}</td>
+                  <td className="px-3 py-3 text-left">{c.service_lead_source || "-"}</td>
                   <td className="px-3 py-3 text-left">
                     <Link
                       href={`/user-dashboard/view-customer/${c.customer_id}`}
