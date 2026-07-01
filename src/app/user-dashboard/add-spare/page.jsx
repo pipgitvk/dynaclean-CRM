@@ -99,10 +99,12 @@ export default function AddSparePage() {
     data.append("type", formData.type);
     data.append("make", formData.make);
     data.append("model", formData.model);
-    data.append("purchase_price", formData.purchase_price);
-    data.append("sale_price", formData.sale_price);
-    data.append("last_negotiation_price", formData.last_negotiation_price);
-    data.append("tax", formData.tax);
+    if (isPrivileged) {
+      data.append("purchase_price", formData.purchase_price);
+      data.append("sale_price", formData.sale_price);
+      data.append("last_negotiation_price", formData.last_negotiation_price);
+      data.append("tax", formData.tax);
+    }
     if (imageFile) data.append("image", imageFile);
     if (catalogFile) data.append("catalog", catalogFile);
 
@@ -251,8 +253,12 @@ export default function AddSparePage() {
                 className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
                 <option value="">Select type</option>
                 <option value="Raw Materials">Raw Materials</option>
-                <option value="Consumables">Consumables</option>
-                <option value="Spares">Spares</option>
+                {userRole !== "DESIGN ENGINEER" && (
+                  <>
+                    <option value="Consumables">Consumables</option>
+                    <option value="Spares">Spares</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -279,25 +285,29 @@ export default function AddSparePage() {
                 <input id="purchase_price" name="purchase_price" type="number" step="0.01" value={formData.purchase_price} onChange={handleChange}
                   placeholder="e.g., 5.99"
                   className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  required />
+                  required={isPrivileged} />
               </div>
             )}
 
-            {/* Sale Price */}
-            <div className="flex flex-col">
-              <label htmlFor="sale_price" className="text-sm font-semibold text-gray-700 mb-2">Sale Price</label>
-              <input id="sale_price" name="sale_price" type="number" step="0.01" value={formData.sale_price} onChange={handleChange}
-                placeholder="e.g., 7.99"
-                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" />
-            </div>
+            {/* Sale Price — privileged only */}
+            {isPrivileged && (
+              <div className="flex flex-col">
+                <label htmlFor="sale_price" className="text-sm font-semibold text-gray-700 mb-2">Sale Price</label>
+                <input id="sale_price" name="sale_price" type="number" step="0.01" value={formData.sale_price} onChange={handleChange}
+                  placeholder="e.g., 7.99"
+                  className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" />
+              </div>
+            )}
 
-            {/* Last Negotiation Price */}
-            <div className="flex flex-col">
-              <label htmlFor="last_negotiation_price" className="text-sm font-semibold text-gray-700 mb-2">Last Neg. Price</label>
-              <input id="last_negotiation_price" name="last_negotiation_price" type="number" step="0.01" value={formData.last_negotiation_price} onChange={handleChange}
-                placeholder="e.g., 4.99"
-                className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" />
-            </div>
+            {/* Last Negotiation Price — privileged only */}
+            {isPrivileged && (
+              <div className="flex flex-col">
+                <label htmlFor="last_negotiation_price" className="text-sm font-semibold text-gray-700 mb-2">Last Neg. Price</label>
+                <input id="last_negotiation_price" name="last_negotiation_price" type="number" step="0.01" value={formData.last_negotiation_price} onChange={handleChange}
+                  placeholder="e.g., 4.99"
+                  className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" />
+              </div>
+            )}
 
             {/* Tax — privileged only */}
             {isPrivileged && (
@@ -306,15 +316,15 @@ export default function AddSparePage() {
                 <input id="tax" name="tax" type="number" step="0.01" value={formData.tax} onChange={handleChange}
                   placeholder="e.g., 18"
                   className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  required />
+                  required={isPrivileged} />
               </div>
             )}
 
-            {/* Compatible Machines — searchable dropdown for privileged, plain text for others */}
+            {/* Compatible Machines — searchable dropdown for privileged and design engineer */}
             <div className="flex flex-col md:col-span-2">
               <label className="text-sm font-semibold text-gray-700 mb-2">Compatible Machines</label>
 
-              {isPrivileged ? (
+              {(isPrivileged || userRole === "DESIGN ENGINEER") ? (
                 <>
                   <div className="relative">
                     <input

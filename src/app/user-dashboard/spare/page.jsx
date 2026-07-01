@@ -21,7 +21,8 @@ function ProductAndSpareLists({ type, userRole }) {
   const [machineSearch, setMachineSearch] = useState("");
   const [showMachineDropdown, setShowMachineDropdown] = useState(false);
 
-  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
+  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER"].includes(userRole);
+  const canSeePriceFields = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
 
   useEffect(() => {
     const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
@@ -120,15 +121,18 @@ function ProductAndSpareLists({ type, userRole }) {
 
   const view = useMemo(() => {
     const qt = q.trim().toLowerCase();
-    return rows.filter(r => {
+    let filtered = rows.filter(r => {
       if (qt && !Object.values(r).some(v => String(v ?? '').toLowerCase().includes(qt))) return false;
       if (filterType && String(r.type ?? '') !== filterType) return false;
       if (filterMake && String(r.make ?? '').toLowerCase() !== filterMake.toLowerCase()) return false;
       if (filterModel && String(r.model ?? '').toLowerCase() !== filterModel.toLowerCase()) return false;
       if (filterCompatible && !String(r.compatible_machine ?? '').toLowerCase().includes(filterCompatible.toLowerCase())) return false;
+      // For DESIGN ENGINEER, only show Raw Materials
+      if (userRole === "DESIGN ENGINEER" && type === "spare" && String(r.type ?? '') !== "Raw Materials") return false;
       return true;
     });
-  }, [rows, q, filterType, filterMake, filterModel, filterCompatible]);
+    return filtered;
+  }, [rows, q, filterType, filterMake, filterModel, filterCompatible, userRole, type]);
 
   const uniqueTypes = useMemo(() => [...new Set(rows.map(r => r.type).filter(Boolean))].sort(), [rows]);
   const uniqueMakes = useMemo(() => [...new Set(rows.map(r => r.make).filter(Boolean))].sort(), [rows]);
@@ -256,9 +260,9 @@ function ProductAndSpareLists({ type, userRole }) {
                   <th className="p-2 text-left">Code</th>
                   <th className="p-2 text-left">Name</th>
                   <th className="p-2 text-left">Product No</th>
-                  <th className="p-2 text-left">Min Qty</th>
-                  <th className="p-2 text-left">Price</th>
-                  <th className="p-2 text-left">Last Neg. Price</th>
+                  {canSeePriceFields && <th className="p-2 text-left">Min Qty</th>}
+                  {canSeePriceFields && <th className="p-2 text-left">Price</th>}
+                  {canSeePriceFields && <th className="p-2 text-left">Last Neg. Price</th>}
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Actions</th>
                 </>
@@ -271,11 +275,11 @@ function ProductAndSpareLists({ type, userRole }) {
                   {isPrivileged && <th className="p-2 text-left">Make</th>}
                   {isPrivileged && <th className="p-2 text-left">Model</th>}
                   {isPrivileged && <th className="p-2 text-left">Compatible Machines</th>}
-                  <th className="p-2 text-left">Min Qty</th>
-                  {isPrivileged && <th className="p-2 text-left">Purchase Price</th>}
-                  <th className="p-2 text-left">Sale Price</th>
-                  <th className="p-2 text-left">Last Neg. Price</th>
-                  {isPrivileged && <th className="p-2 text-left">Tax %</th>}
+                  {canSeePriceFields && <th className="p-2 text-left">Min Qty</th>}
+                  {canSeePriceFields && <th className="p-2 text-left">Purchase Price</th>}
+                  {canSeePriceFields && <th className="p-2 text-left">Sale Price</th>}
+                  {canSeePriceFields && <th className="p-2 text-left">Last Neg. Price</th>}
+                  {canSeePriceFields && <th className="p-2 text-left">Tax %</th>}
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Actions</th>
                 </>
@@ -302,13 +306,13 @@ function ProductAndSpareLists({ type, userRole }) {
                     {type === "product" ? (
                       <>
                         <td className="p-2">{r.item_code}</td>
-                        <td className="p-2">{r.item_name}</td>
-                        <td className="p-2">{r.product_number}</td>
-                        <td className="p-2">{r.min_qty}</td>
-                        <td className="p-2">{r.price_per_unit}</td>
-                        <td className="p-2">{r.last_negotiation_price || 0}</td>
-                        <td className="p-2">{r.specification}</td>
-                        <td className="p-2">-</td>
+                    <td className="p-2">{r.item_name}</td>
+                    <td className="p-2">{r.product_number}</td>
+                    {canSeePriceFields && <td className="p-2">{r.min_qty}</td>}
+                    {canSeePriceFields && <td className="p-2">{r.price_per_unit}</td>}
+                    {canSeePriceFields && <td className="p-2">{r.last_negotiation_price || 0}</td>}
+                    <td className="p-2">{r.specification}</td>
+                    <td className="p-2">-</td>
                       </>
                     ) : (
                       <>
@@ -334,11 +338,11 @@ function ProductAndSpareLists({ type, userRole }) {
                             ) : <span className="text-gray-400">-</span>}
                           </td>
                         )}
-                        <td className="p-2">{r.min_qty}</td>
-                        {isPrivileged && <td className="p-2">{r.purchase_price || 0}</td>}
-                        <td className="p-2">{r.sale_price || 0}</td>
-                        <td className="p-2">{r.last_negotiation_price || 0}</td>
-                        {isPrivileged && <td className="p-2 text-xs bg-orange-50">{r.tax || 0}%</td>}
+                        {canSeePriceFields && <td className="p-2">{r.min_qty}</td>}
+                        {canSeePriceFields && <td className="p-2">{r.purchase_price || 0}</td>}
+                        {canSeePriceFields && <td className="p-2">{r.sale_price || 0}</td>}
+                        {canSeePriceFields && <td className="p-2">{r.last_negotiation_price || 0}</td>}
+                        {canSeePriceFields && <td className="p-2 text-xs bg-orange-50">{r.tax || 0}%</td>}
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
                           {isPrivileged && (
@@ -412,15 +416,14 @@ function ProductAndSpareLists({ type, userRole }) {
                   <>
                     <p><span className="font-semibold">Code:</span> {r.item_code}</p>
                     <p><span className="font-semibold">Product No:</span> {r.product_number}</p>
-                    <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>
-                    <p><span className="font-semibold">Price:</span> {r.price_per_unit}</p>
-                    <p><span className="font-semibold">Last Neg. Price:</span> {r.last_negotiation_price || 0}</p>
+                    {canSeePriceFields && <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>}
+                    {canSeePriceFields && <p><span className="font-semibold">Price:</span> {r.price_per_unit}</p>}
+                    {canSeePriceFields && <p><span className="font-semibold">Last Neg. Price:</span> {r.last_negotiation_price || 0}</p>}
                     <p><span className="font-semibold">Specification:</span> {r.specification}</p>
                   </>
                 ) : (
                   <>
                     <p><span className="font-semibold">Spare No:</span> {r.spare_number}</p>
-                    <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>
                     {isPrivileged && <p><span className="font-semibold">Type:</span> {r.type || "-"}</p>}
                     {isPrivileged && <p><span className="font-semibold">Make:</span> {r.make || "-"}</p>}
                     {isPrivileged && <p><span className="font-semibold">Model:</span> {r.model || "-"}</p>}
@@ -440,10 +443,11 @@ function ProductAndSpareLists({ type, userRole }) {
                         </div>
                       </div>
                     )}
-                    {isPrivileged && <p><span className="font-semibold">Purchase Price:</span> {r.purchase_price || 0}</p>}
-                    <p><span className="font-semibold">Sale Price:</span> {r.sale_price || 0}</p>
-                    <p><span className="font-semibold">Last Neg. Price:</span> {r.last_negotiation_price || 0}</p>
-                    {isPrivileged && <p><span className="font-semibold">Tax:</span> {r.tax || 0}%</p>}
+                    {canSeePriceFields && <p><span className="font-semibold">Min Qty:</span> {r.min_qty}</p>}
+                    {canSeePriceFields && <p><span className="font-semibold">Purchase Price:</span> {r.purchase_price || 0}</p>}
+                    {canSeePriceFields && <p><span className="font-semibold">Sale Price:</span> {r.sale_price || 0}</p>}
+                    {canSeePriceFields && <p><span className="font-semibold">Last Neg. Price:</span> {r.last_negotiation_price || 0}</p>}
+                    {canSeePriceFields && <p><span className="font-semibold">Tax:</span> {r.tax || 0}%</p>}
                     <p><span className="font-semibold">Specification:</span> {r.specification}</p>
                   </>
                 )}
@@ -503,8 +507,12 @@ function ProductAndSpareLists({ type, userRole }) {
                     >
                       <option value="">Select type</option>
                       <option value="Raw Materials">Raw Materials</option>
-                      <option value="Consumables">Consumables</option>
-                      <option value="Spares">Spares</option>
+                      {userRole !== "DESIGN ENGINEER" && (
+                        <>
+                          <option value="Consumables">Consumables</option>
+                          <option value="Spares">Spares</option>
+                        </>
+                      )}
                     </select>
                   </div>
                   {/* Make */}
@@ -585,17 +593,19 @@ function ProductAndSpareLists({ type, userRole }) {
                 </>
               )}
               {/* Min Qty */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">Min Qty</label>
-                <input
-                  type="number"
-                  value={editingSpare.min_qty || 0}
-                  onChange={(e) => setEditingSpare({ ...editingSpare, min_qty: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                />
-              </div>
+              {canSeePriceFields && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Min Qty</label>
+                  <input
+                    type="number"
+                    value={editingSpare.min_qty || 0}
+                    onChange={(e) => setEditingSpare({ ...editingSpare, min_qty: e.target.value })}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
               {/* Purchase Price — privileged only */}
-              {isPrivileged && (
+              {canSeePriceFields && (
                 <div>
                   <label className="block text-sm text-gray-700 mb-1">Purchase Price</label>
                   <input
@@ -608,29 +618,33 @@ function ProductAndSpareLists({ type, userRole }) {
                 </div>
               )}
               {/* Sale Price */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">Sale Price</label>
-                <input
-                  type="number"
-                  value={editingSpare.sale_price || 0}
-                  onChange={(e) => setEditingSpare({ ...editingSpare, sale_price: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  step="0.01"
-                />
-              </div>
+              {canSeePriceFields && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Sale Price</label>
+                  <input
+                    type="number"
+                    value={editingSpare.sale_price || 0}
+                    onChange={(e) => setEditingSpare({ ...editingSpare, sale_price: e.target.value })}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                    step="0.01"
+                  />
+                </div>
+              )}
               {/* Last Negotiation Price */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">Last Neg. Price</label>
-                <input
-                  type="number"
-                  value={editingSpare.last_negotiation_price || 0}
-                  onChange={(e) => setEditingSpare({ ...editingSpare, last_negotiation_price: e.target.value })}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  step="0.01"
-                />
-              </div>
+              {canSeePriceFields && (
+                <div>
+                  <label className="block text-sm text-gray-700 mb-1">Last Neg. Price</label>
+                  <input
+                    type="number"
+                    value={editingSpare.last_negotiation_price || 0}
+                    onChange={(e) => setEditingSpare({ ...editingSpare, last_negotiation_price: e.target.value })}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                    step="0.01"
+                  />
+                </div>
+              )}
               {/* Tax — privileged only */}
-              {isPrivileged && (
+              {canSeePriceFields && (
                 <div>
                   <label className="block text-sm text-gray-700 mb-1">Tax %</label>
                   <input
@@ -807,7 +821,7 @@ export default function SpareStockPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Spare Stock Management</h2>
         <div className="flex flex-wrap items-center gap-2">
-          {userRole === "ADMIN" && ((() => {
+          {(userRole === "ADMIN" || userRole === "DESIGN ENGINEER") && ((() => {
             const pathname = usePathname(); const isAdmin = pathname?.startsWith('/admin-dashboard'); const addHref = `${isAdmin ? '/admin-dashboard' : '/user-dashboard'}/add-spare`; return (
               <Link href={addHref} className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">Add New Spare</Link>
             );

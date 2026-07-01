@@ -102,9 +102,14 @@ export async function POST(request) {
     const last_negotiation_price = formData.get('last_negotiation_price');
     const tax = formData.get('tax');
 
-    // Basic validation
-    if (!item_name || !purchase_price || !tax) {
-        return NextResponse.json({ error: 'Required fields are missing: Item Name, Purchase Price, Tax.' }, { status: 400 });
+    // Basic validation - only require purchase_price and tax if not DESIGN ENGINEER
+    const userRole = tokenPayload.role;
+    const isDesignEngineer = userRole === "DESIGN ENGINEER";
+    if (!item_name) {
+        return NextResponse.json({ error: 'Required field is missing: Item Name.' }, { status: 400 });
+    }
+    if (!isDesignEngineer && (!purchase_price || !tax)) {
+        return NextResponse.json({ error: 'Required fields are missing: Purchase Price, Tax.' }, { status: 400 });
     }
 
     try {
@@ -148,10 +153,10 @@ export async function POST(request) {
             make || null,
             model || null,
             compatible_machine, // Stored as a comma-separated string
-            parseFloat(purchase_price),
+            isDesignEngineer ? null : parseFloat(purchase_price),
             sale_price ? parseFloat(sale_price) : null,
             last_negotiation_price ? parseFloat(last_negotiation_price) : null,
-            parseFloat(tax),
+            isDesignEngineer ? null : parseFloat(tax),
             imagePath,
             catalogPath,
             username
