@@ -18,6 +18,7 @@ export default function EditBomPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [availabilityLoaded, setAvailabilityLoaded] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const [bomExists, setBomExists] = useState(false);
 
@@ -117,9 +118,9 @@ export default function EditBomPage() {
           qty_in_product: 1,
           weight_percent: 1,
           spare_image: s.image || null,
-          spare_type: null,
-          make: null,
-          model: null,
+          spare_type: s.type || null,
+          make: s.make || null,
+          model: s.model || null,
           spec: s.specification || null,
           total_available: undefined,
           delhi_available: undefined,
@@ -220,7 +221,10 @@ export default function EditBomPage() {
         <table className="w-full text-sm hidden md:table">
           <thead>
             <tr className="text-left text-gray-500">
+              <th className="p-2">Image</th>
               <th className="p-2">Spare</th>
+              <th className="p-2">Category</th>
+              <th className="p-2">Specifications</th>
               <th className="p-2">Qty</th>
               <th className="p-2">Weight %</th>
               <th className="p-2">Total</th>
@@ -232,7 +236,25 @@ export default function EditBomPage() {
           <tbody>
             {computedItems.map((it, idx)=>(
               <tr key={it.spare_id} className="border-t">
+                <td className="p-2">
+                  {it.spare_image ? (
+                    <img 
+                      src={it.spare_image} 
+                      alt={it.spare_name} 
+                      className="w-10 h-10 object-cover rounded cursor-pointer hover:opacity-80"
+                      onClick={() => setPreviewImage(it.spare_image)}
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">No</div>
+                  )}
+                </td>
                 <td className="p-2">{it.spare_name}</td>
+                <td className="p-2">
+                  {it.spare_type ? (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">{it.spare_type}</span>
+                  ) : '-'}
+                </td>
+                <td className="p-2 text-xs text-gray-600 max-w-xs truncate" title={it.spec}>{it.spec || '-'}</td>
                 <td className="p-2">
                   <input type="number" min={0} value={it.qty_in_product}
                     onChange={(e)=>{
@@ -263,7 +285,27 @@ export default function EditBomPage() {
         <div className="md:hidden p-2 grid grid-cols-1 gap-2">
           {computedItems.map((it, idx)=> (
             <div key={it.spare_id} className="border rounded p-3 bg-white">
-              <div className="font-medium text-sm">{it.spare_name}</div>
+              <div className="flex gap-3">
+                {it.spare_image ? (
+                  <img 
+                    src={it.spare_image} 
+                    alt={it.spare_name} 
+                    className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
+                    onClick={() => setPreviewImage(it.spare_image)}
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs">No</div>
+                )}
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{it.spare_name}</div>
+                  {it.spare_type && (
+                    <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">{it.spare_type}</span>
+                  )}
+                </div>
+              </div>
+              {it.spec && (
+                <div className="mt-2 text-xs text-gray-600">{it.spec}</div>
+              )}
               <div className="mt-2 flex items-end gap-3">
                 <div>
                   <label className="text-xs text-gray-500">Qty</label>
@@ -307,6 +349,19 @@ export default function EditBomPage() {
         <button className="px-3 py-2 rounded border" onClick={() => router.back()}>Cancel</button>
         <button disabled={saving} className="px-3 py-2 rounded bg-blue-600 text-white text-sm" onClick={save}>{saving?"Saving…":"Update BOM"}</button>
       </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60" onClick={() => setPreviewImage(null)}>
+          <div className="bg-white p-4 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-semibold">Image Preview</h4>
+              <button onClick={() => setPreviewImage(null)}>✕</button>
+            </div>
+            <img src={previewImage} alt="Preview" className="max-h-[70vh] object-contain mx-auto" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

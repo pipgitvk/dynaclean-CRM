@@ -171,6 +171,7 @@ function CreateBomModal({ onClose, onSaved, initialProduct = null, initialItems 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [availabilityLoaded, setAvailabilityLoaded] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   // Existing BOM product codes (to prevent duplicates)
   const [bomCodes, setBomCodes] = useState([]);
@@ -264,9 +265,9 @@ function CreateBomModal({ onClose, onSaved, initialProduct = null, initialItems 
           qty_in_product: 1,
           weight_percent: 1,
           spare_image: s.image || null,
-          spare_type: null,
-          make: null,
-          model: null,
+          spare_type: s.type || null,
+          make: s.make || null,
+          model: s.model || null,
           spec: s.specification || null,
           total_available: undefined,
           delhi_available: undefined,
@@ -380,7 +381,10 @@ function CreateBomModal({ onClose, onSaved, initialProduct = null, initialItems 
               <table className="w-full text-sm hidden md:table">
                 <thead>
                   <tr className="text-left text-gray-500">
+                    <th className="p-2">Image</th>
                     <th className="p-2">Spare</th>
+                    <th className="p-2">Category</th>
+                    <th className="p-2">Specification</th>
                     <th className="p-2">Qty</th>
                     <th className="p-2">Weight %</th>
                     <th className="p-2">Total</th>
@@ -392,7 +396,20 @@ function CreateBomModal({ onClose, onSaved, initialProduct = null, initialItems 
                 <tbody>
                   {computedItems.map((it, idx)=>(
                     <tr key={it.spare_id} className="border-t">
+                      <td className="p-2">
+                        {it.spare_image ? (
+                          <img src={it.spare_image} alt={it.spare_name} className="w-10 h-10 object-cover rounded cursor-pointer hover:opacity-80" onClick={() => setPreviewImage(it.spare_image)} />
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-100 rounded" />
+                        )}
+                      </td>
                       <td className="p-2">{it.spare_name}</td>
+                      <td className="p-2">
+                        {it.spare_type ? (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">{it.spare_type}</span>
+                        ) : "-"}
+                      </td>
+                      <td className="p-2 text-xs text-gray-600 max-w-[200px] truncate" title={it.spec}>{it.spec || "-"}</td>
                       <td className="p-2">
                         <input type="number" min={0} value={it.qty_in_product}
                           onChange={(e)=>{
@@ -423,7 +440,22 @@ function CreateBomModal({ onClose, onSaved, initialProduct = null, initialItems 
               <div className="md:hidden p-2 grid grid-cols-1 gap-2">
                 {computedItems.map((it, idx)=> (
                   <div key={it.spare_id} className="border rounded p-3 bg-white">
-                    <div className="font-medium text-sm">{it.spare_name}</div>
+                    <div className="flex items-center gap-2">
+                      {it.spare_image ? (
+                        <img src={it.spare_image} alt={it.spare_name} className="w-10 h-10 object-cover rounded cursor-pointer hover:opacity-80" onClick={() => setPreviewImage(it.spare_image)} />
+                      ) : (
+                        <div className="w-10 h-10 bg-gray-100 rounded" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">{it.spare_name}</div>
+                        {it.spare_type && (
+                          <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">{it.spare_type}</span>
+                        )}
+                      </div>
+                    </div>
+                    {it.spec && (
+                      <div className="mt-2 text-xs text-gray-600">{it.spec}</div>
+                    )}
                     <div className="mt-2 flex items-end gap-3">
                       <div>
                         <label className="text-xs text-gray-500">Qty</label>
@@ -470,6 +502,18 @@ function CreateBomModal({ onClose, onSaved, initialProduct = null, initialItems 
           </div>
         )}
       </div>
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900 bg-opacity-60" onClick={() => setPreviewImage(null)}>
+          <div className="bg-white p-4 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-semibold">Image Preview</h4>
+              <button onClick={() => setPreviewImage(null)}>✕</button>
+            </div>
+            <img src={previewImage} alt="Preview" className="max-h-[70vh] object-contain mx-auto" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -478,6 +522,7 @@ function ViewBomModal({ product_code, onClose }) {
   const [data, setData] = useState({ items: [], product: null });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -495,117 +540,134 @@ function ViewBomModal({ product_code, onClose }) {
   }, [product_code]);
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2" onClick={onClose}>
-      <div className="bg-white rounded shadow-lg w-[95vw] sm:w-full max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden p-4" onClick={(e)=>e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-lg font-semibold">BOM Details</div>
-          <button onClick={onClose} className="text-sm text-gray-500">Close</button>
-        </div>
-        {loading && <div className="text-sm text-gray-500">Loading…</div>}
-        {error && <div className="text-sm text-red-600">{error}</div>}
-        {!loading && !error && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {data.product?.product_image ? (
-                <img src={data.product.product_image} alt={data.product?.item_name || data.product_code} className="w-16 h-16 object-cover rounded"/>
-              ) : (
-                <div className="w-16 h-16 bg-gray-100 rounded" />
-              )}
-              <div>
-                <div className="font-medium">{data.product?.item_name || data.product_code}</div>
-                <div className="text-xs text-gray-500">{data.product_code}</div>
-                {data.product?.specification && (
-                  <div className="text-xs text-gray-500 max-w-[420px] truncate">{data.product.specification}</div>
+    <>
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2" onClick={onClose}>
+        <div className="bg-white rounded shadow-lg w-[95vw] sm:w-full max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden p-4" onClick={(e)=>e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-lg font-semibold">BOM Details</div>
+            <button onClick={onClose} className="text-sm text-gray-500">Close</button>
+          </div>
+          {loading && <div className="text-sm text-gray-500">Loading…</div>}
+          {error && <div className="text-sm text-red-600">{error}</div>}
+          {!loading && !error && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {data.product?.product_image ? (
+                  <img src={data.product.product_image} alt={data.product?.item_name || data.product_code} className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80" onClick={() => setPreviewImage(data.product.product_image)} />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-100 rounded" />
                 )}
+                <div>
+                  <div className="font-medium">{data.product?.item_name || data.product_code}</div>
+                  <div className="text-xs text-gray-500">{data.product_code}</div>
+                  {data.product?.specification && (
+                    <div className="text-xs text-gray-500 max-w-[420px] truncate">{data.product.specification}</div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="bg-white rounded border">
-              {/* Desktop table */}
-              <table className="w-full text-sm hidden md:table">
-                <thead>
-                  <tr className="text-left text-gray-500">
-                    <th className="p-2">Spare</th>
-                    <th className="p-2">Qty</th>
-                    <th className="p-2">Weight %</th>
-                    <th className="p-2">Total</th>
-                    <th className="p-2">Delhi</th>
-                    <th className="p-2">South</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.items||[]).map((it, idx) => (
-                    <tr key={`${it.spare_id}-${idx}`} className="border-t">
-                      <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
+              <div className="bg-white rounded border">
+                {/* Desktop table */}
+                <table className="w-full text-sm hidden md:table">
+                  <thead>
+                    <tr className="text-left text-gray-500">
+                      <th className="p-2">Image</th>
+                      <th className="p-2">Spare</th>
+                      <th className="p-2">Category</th>
+                      <th className="p-2">Specification</th>
+                      <th className="p-2">Qty</th>
+                      <th className="p-2">Weight %</th>
+                      <th className="p-2">Total</th>
+                      <th className="p-2">Delhi</th>
+                      <th className="p-2">South</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.items||[]).map((it, idx) => (
+                      <tr key={`${it.spare_id}-${idx}`} className="border-t">
+                        <td className="p-2">
                           {it.spare_image ? (
-                            <img src={it.spare_image} alt={it.spare_name || it.spare_id} className="w-10 h-10 object-cover rounded"/>
+                            <img src={it.spare_image} alt={it.spare_name || it.spare_id} className="w-10 h-10 object-cover rounded cursor-pointer hover:opacity-80" onClick={() => setPreviewImage(it.spare_image)} />
                           ) : (
                             <div className="w-10 h-10 bg-gray-100 rounded" />
                           )}
-                          <div>
-                            <div className="font-medium">{it.spare_name || `Spare #${it.spare_id}`}</div>
-                            {it.specification && (
-                              <div className="text-xs text-gray-500 max-w-[360px] truncate">{it.specification}</div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-2">{it.qty_in_product}</td>
-                      <td className="p-2">{it.weight_percent}</td>
-                      <td className="p-2">{typeof it.total_available === 'number' ? it.total_available : '-'}</td>
-                      <td className="p-2">{typeof it.delhi_available === 'number' ? it.delhi_available : '-'}</td>
-                      <td className="p-2">{typeof it.south_available === 'number' ? it.south_available : '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {/* Mobile cards */}
-              <div className="md:hidden p-2 grid grid-cols-1 gap-2">
-                {(data.items||[]).map((it, idx) => (
-                  <div key={`${it.spare_id}-${idx}`} className="rounded border bg-white p-3">
-                    <div className="flex items-center gap-2">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {it.spare_image ? (
-                        <img src={it.spare_image} alt={it.spare_name || it.spare_id} className="w-10 h-10 object-cover rounded"/>
-                      ) : (
-                        <div className="w-10 h-10 bg-gray-100 rounded" />
-                      )}
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{it.spare_name || `Spare #${it.spare_id}`}</div>
-                        {it.specification && (
-                          <div className="text-xs text-gray-500 truncate max-w-[220px]">{it.specification}</div>
+                        </td>
+                        <td className="p-2">{it.spare_name || `Spare #${it.spare_id}`}</td>
+                        <td className="p-2">
+                          {it.spare_type ? (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">{it.spare_type}</span>
+                          ) : "-"}
+                        </td>
+                        <td className="p-2 text-xs text-gray-600 max-w-[200px] truncate" title={it.specification}>{it.specification || "-"}</td>
+                        <td className="p-2">{it.qty_in_product}</td>
+                        <td className="p-2">{it.weight_percent}</td>
+                        <td className="p-2">{typeof it.total_available === 'number' ? it.total_available : '-'}</td>
+                        <td className="p-2">{typeof it.delhi_available === 'number' ? it.delhi_available : '-'}</td>
+                        <td className="p-2">{typeof it.south_available === 'number' ? it.south_available : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {/* Mobile cards */}
+                <div className="md:hidden p-2 grid grid-cols-1 gap-2">
+                  {(data.items||[]).map((it, idx) => (
+                    <div key={`${it.spare_id}-${idx}`} className="rounded border bg-white p-3">
+                      <div className="flex items-center gap-2">
+                        {it.spare_image ? (
+                          <img src={it.spare_image} alt={it.spare_name || it.spare_id} className="w-10 h-10 object-cover rounded cursor-pointer hover:opacity-80" onClick={() => setPreviewImage(it.spare_image)} />
+                        ) : (
+                          <div className="w-10 h-10 bg-gray-100 rounded" />
                         )}
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium truncate">{it.spare_name || `Spare #${it.spare_id}`}</div>
+                          {it.spare_type && (
+                            <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">{it.spare_type}</span>
+                          )}
+                        </div>
+                        <div className="ml-auto text-right">
+                          <div className="text-[10px] uppercase text-gray-500">Weight %</div>
+                          <div className="text-sm font-medium">{it.weight_percent}</div>
+                        </div>
                       </div>
-                      <div className="ml-auto text-right">
-                        <div className="text-[10px] uppercase text-gray-500">Weight %</div>
-                        <div className="text-sm font-medium">{it.weight_percent}</div>
+                      {it.specification && (
+                        <div className="mt-2 text-xs text-gray-600">{it.specification}</div>
+                      )}
+                      <div className="mt-2 text-xs text-gray-600">Qty: {it.qty_in_product}</div>
+                      <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded bg-gray-50 p-2 text-center">
+                          <div className="text-[10px] uppercase text-gray-500">Total</div>
+                          <div className="font-medium">{typeof it.total_available === 'number' ? it.total_available : '-'}</div>
+                        </div>
+                        <div className="rounded bg-gray-50 p-2 text-center">
+                          <div className="text-[10px] uppercase text-gray-500">Delhi</div>
+                          <div className="font-medium">{typeof it.delhi_available === 'number' ? it.delhi_available : '-'}</div>
+                        </div>
+                        <div className="rounded bg-gray-50 p-2 text-center">
+                          <div className="text-[10px] uppercase text-gray-500">South</div>
+                          <div className="font-medium">{typeof it.south_available === 'number' ? it.south_available : '-'}</div>
+                        </div>
                       </div>
                     </div>
-                    <div className="mt-2 text-xs text-gray-600">Qty: {it.qty_in_product}</div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                      <div className="rounded bg-gray-50 p-2 text-center">
-                        <div className="text-[10px] uppercase text-gray-500">Total</div>
-                        <div className="font-medium">{typeof it.total_available === 'number' ? it.total_available : '-'}</div>
-                      </div>
-                      <div className="rounded bg-gray-50 p-2 text-center">
-                        <div className="text-[10px] uppercase text-gray-500">Delhi</div>
-                        <div className="font-medium">{typeof it.delhi_available === 'number' ? it.delhi_available : '-'}</div>
-                      </div>
-                      <div className="rounded bg-gray-50 p-2 text-center">
-                        <div className="text-[10px] uppercase text-gray-500">South</div>
-                        <div className="font-medium">{typeof it.south_available === 'number' ? it.south_available : '-'}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-900 bg-opacity-60" onClick={() => setPreviewImage(null)}>
+          <div className="bg-white p-4 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-semibold">Image Preview</h4>
+              <button onClick={() => setPreviewImage(null)}>✕</button>
+            </div>
+            <img src={previewImage} alt="Preview" className="max-h-[70vh] object-contain mx-auto" />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
