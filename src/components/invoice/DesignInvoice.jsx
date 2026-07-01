@@ -1868,6 +1868,7 @@ const NewInvoice = ({ invoice }) => {
       eWayBill: invoice.eway_bill_no || "",
       deliveryChallanNo: invoice.delivery_challan_no || "",
       referenceNo: invoice.reference_quote_number || invoice.quotation_id || "",
+      referenceNoSno: invoice.reference_quote_sno != null ? String(invoice.reference_quote_sno) : "",
       stateCode:
         (invoice.state_code != null && String(invoice.state_code).trim() !== ""
           ? String(invoice.state_code).trim()
@@ -2607,7 +2608,7 @@ const NewInvoice = ({ invoice }) => {
                 <div style={{ fontWeight: "bold", lineHeight: "1.3" }}>
                   Reference No. :{" "}
                   <span style={{ fontWeight: "normal" }}>
-                    {data.invoice.referenceNo || "-"}
+                    {data.invoice.referenceNoSno || data.invoice.referenceNo || "-"}
                   </span>
                 </div>
                 <div style={{ fontWeight: "bold", marginTop: "6px", lineHeight: "1.3" }}>

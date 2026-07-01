@@ -25,11 +25,12 @@ async function getInvoiceWithItems(invoiceNumber) {
   // Resolve quotation number for reference field (supports both quote_number and internal quotation id)
   let resolvedQuoteNumber = invoice.quotation_id || null;
   let resolvedQuoteCreatedAt = null;
+  let resolvedQuoteSno = null;
   if (invoice.quotation_id) {
     try {
       const [[byQuoteNumber]] = await conn.execute(
         `
-        SELECT quote_number, created_at
+        SELECT quote_number, created_at, \`S.No.\` AS sno
         FROM quotations_records
         WHERE TRIM(quote_number) = TRIM(?)
         LIMIT 1
@@ -40,10 +41,11 @@ async function getInvoiceWithItems(invoiceNumber) {
       if (byQuoteNumber?.quote_number) {
         resolvedQuoteNumber = byQuoteNumber.quote_number;
         resolvedQuoteCreatedAt = byQuoteNumber.created_at || null;
+        resolvedQuoteSno = byQuoteNumber.sno ?? null;
       } else {
         const [[byLegacyId]] = await conn.execute(
           `
-          SELECT quote_number, created_at
+          SELECT quote_number, created_at, \`S.No.\` AS sno
           FROM quotations_records
           WHERE TRIM(CAST(\`S.No.\` AS CHAR)) = TRIM(?)
           LIMIT 1
@@ -53,6 +55,7 @@ async function getInvoiceWithItems(invoiceNumber) {
         if (byLegacyId?.quote_number) {
           resolvedQuoteNumber = byLegacyId.quote_number;
           resolvedQuoteCreatedAt = byLegacyId.created_at || null;
+          resolvedQuoteSno = byLegacyId.sno ?? null;
         }
       }
     } catch {
@@ -93,6 +96,7 @@ async function getInvoiceWithItems(invoiceNumber) {
     ...invoice,
     reference_quote_number: resolvedQuoteNumber,
     reference_quote_created_at: resolvedQuoteCreatedAt,
+    reference_quote_sno: resolvedQuoteSno,
     items,
   };
 }
