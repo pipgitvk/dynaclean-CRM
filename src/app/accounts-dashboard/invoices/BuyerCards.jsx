@@ -195,6 +195,13 @@ export default function BuyerCards() {
             <FileText size={16} />
             Add Invoice
           </a>
+          <a
+            href="/user-dashboard/invoices"
+            className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-purple-700 self-start sm:self-auto"
+          >
+            <FileText size={16} />
+            List
+          </a>
         </div>
       </div>
 
