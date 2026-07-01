@@ -25,6 +25,8 @@ function ProductAndSpareLists({ type }) {
   const [allSpares, setAllSpares] = useState([]);
   const [sparesSearchQuery, setSparesSearchQuery] = useState("");
   const [sparesTypeFilter, setSparesTypeFilter] = useState("all");
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
   const [editFormData, setEditFormData] = useState({
     item_code: '',
     item_name: '',
@@ -455,7 +457,12 @@ function ProductAndSpareLists({ type }) {
                   <>
                     <td className="p-2">
                       {imageUrl ? (
-                        <img src={imageUrl} className="w-12 h-12 object-cover rounded" />
+                        <img 
+                          src={imageUrl} 
+                          className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80" 
+                          onClick={() => { setSelectedImage(imageUrl); setShowImageModal(true); }}
+                          alt="Product"
+                        />
                       ) : (
                         <span className="text-gray-400">No image</span>
                       )}
@@ -658,7 +665,12 @@ function ProductAndSpareLists({ type }) {
               {/* TOP: IMAGE + NAME */}
               <div className="flex items-center gap-3">
                 {imageUrl ? (
-                  <img src={imageUrl} className="w-14 h-14 object-cover rounded" />
+                  <img 
+                    src={imageUrl} 
+                    className="w-14 h-14 object-cover rounded cursor-pointer hover:opacity-80" 
+                    onClick={() => { setSelectedImage(imageUrl); setShowImageModal(true); }}
+                    alt="Product"
+                  />
                 ) : (
                   <div className="w-14 h-14 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-xs">
                     No Image
@@ -986,6 +998,26 @@ function ProductAndSpareLists({ type }) {
                 {savingProduct ? 'Saving...' : 'Save'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Modal */}
+      {showImageModal && selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={() => setShowImageModal(false)}>
+          <div className="relative max-w-4xl max-h-full">
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowImageModal(false); }}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300"
+            >
+              <X className="w-8 h-8" />
+            </button>
+            <img
+              src={selectedImage}
+              alt="Full size product image"
+              className="max-w-full max-h-[85vh] object-contain rounded"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

@@ -5,7 +5,7 @@ import { Eye, Search, Pencil } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-function SpareList() {
+function SpareList({ userRole, previewImage, setPreviewImage }) {
   const [rows, setRows] = useState([]);
   const [stockTotals, setStockTotals] = useState({ totalQty: 0, totalValue: 0 });
   const [q, setQ] = useState("");
@@ -19,7 +19,6 @@ function SpareList() {
   const [editingSpare, setEditingSpare] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deletingSpare, setDeletingSpare] = useState(false);
-  const [userRole, setUserRole] = useState("");
   
   // Products for compatible machines dropdown
   const [products, setProducts] = useState([]);
@@ -179,12 +178,6 @@ function SpareList() {
   };
 
   useEffect(() => {
-    // Fetch user role
-    fetch("/api/me")
-      .then((r) => r.json())
-      .then((d) => setUserRole(d.userRole))
-      .catch(() => setUserRole(""));
-
     // Fetch products for compatible machines dropdown
     fetch('/api/products/list')
       .then(r => r.json())
@@ -387,7 +380,11 @@ function SpareList() {
                   <>
                     <td className="p-2">
                       {imageUrl ? (
-                        <img src={imageUrl} className="w-12 h-12 object-cover rounded" />
+                        <img 
+                          src={imageUrl} 
+                          className={`w-12 h-12 object-cover rounded ${userRole === 'SUPERADMIN' ? 'cursor-pointer hover:opacity-80' : ''}`}
+                          onClick={() => userRole === 'SUPERADMIN' && setPreviewImage(imageUrl)}
+                        />
                       ) : (
                         <span className="text-gray-400">No image</span>
                       )}
@@ -525,12 +522,16 @@ function SpareList() {
               {/* TOP: IMAGE + NAME */}
               <div className="flex items-center gap-3">
                 {imageUrl ? (
-                  <img src={imageUrl} className="w-14 h-14 object-cover rounded" />
-                ) : (
-                  <div className="w-14 h-14 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-xs">
-                    No Image
-                  </div>
-                )}
+                        <img 
+                          src={imageUrl} 
+                          className={`w-14 h-14 object-cover rounded ${userRole === 'SUPERADMIN' ? 'cursor-pointer hover:opacity-80' : ''}`}
+                          onClick={() => userRole === 'SUPERADMIN' && setPreviewImage(imageUrl)}
+                        />
+                      ) : (
+                        <div className="w-14 h-14 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-xs">
+                          No Image
+                        </div>
+                      )}
 
                 <div className="flex-1">
                   <div className="text-sm font-semibold text-gray-800">{r.item_name}</div>
@@ -893,6 +894,7 @@ export default function SpareStockPage() {
   const [availableData, setAvailableData] = useState([]);
   const [txData, setTxData] = useState([]);
   const [summaryData, setSummaryData] = useState([]);
+  const [userRole, setUserRole] = useState("");
 
   const [availableSearch, setAvailableSearch] = useState("");
   const [txSearch, setTxSearch] = useState("");
@@ -900,12 +902,14 @@ export default function SpareStockPage() {
   const [txStatusFilter, setTxStatusFilter] = useState(null);
   const [summaryStatusFilter, setSummaryStatusFilter] = useState(null);
   const [previewFile, setPreviewFile] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const [openSection, setOpenSection] = useState("list");
   const [editingLocation, setEditingLocation] = useState({ key: null, value: "" });
   const [savingLocation, setSavingLocation] = useState(false);
 
   useEffect(() => {
+    fetch("/api/me").then(r => r.json()).then(d => setUserRole(d.userRole)).catch(() => setUserRole(""));
     fetch("/api/spare/available-stock").then(r => r.json()).then(d => setAvailableData(Array.isArray(d) ? d : [])).catch(() => setAvailableData([]));
     fetch("/api/spare/modelsummary").then(r => r.json()).then(setTxData).catch(() => setTxData([]));
     fetch("/api/spare/modelsummaryspare").then(r => r.json()).then(setSummaryData).catch(() => setSummaryData([]));
@@ -998,7 +1002,7 @@ export default function SpareStockPage() {
         </div>
         {openSection === "list" && (
           <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
-            <SpareList />
+            <SpareList userRole={userRole} previewImage={previewImage} setPreviewImage={setPreviewImage} />
           </div>
         )}
       </div>
@@ -1037,7 +1041,8 @@ export default function SpareStockPage() {
                           <img
                             src={row.spare_image}
                             alt={row.spare_name || "Spare"}
-                            className="w-16 h-16 object-cover rounded"
+                            className={`w-16 h-16 object-cover rounded ${userRole === 'SUPERADMIN' ? 'cursor-pointer hover:opacity-80' : ''}`}
+                            onClick={() => userRole === 'SUPERADMIN' && setPreviewImage(row.spare_image)}
                           />
                         ) : (
                           <span className="text-[11px] text-gray-400">No image</span>
@@ -1139,7 +1144,16 @@ export default function SpareStockPage() {
                     filteredAvailable.map((row, idx) => (
                       <tr key={(row.spare_number || "spare") + "_" + idx} className="border-t hover:bg-gray-50">
                         <td className="p-2 sm:p-3">{row.spare_number}</td>
-                        <td className="p-2 sm:p-3">{row.spare_image ? (<img src={row.spare_image} alt={row.spare_name || "Spare"} className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded" />) : (<span className="text-gray-400">No image</span>)}</td>
+                        <td className="p-2 sm:p-3">{row.spare_image ? (
+                          <img 
+                            src={row.spare_image} 
+                            alt={row.spare_name || "Spare"} 
+                            className={`w-12 h-12 sm:w-16 sm:h-16 object-cover rounded ${userRole === 'SUPERADMIN' ? 'cursor-pointer hover:opacity-80' : ''}`}
+                            onClick={() => userRole === 'SUPERADMIN' && setPreviewImage(row.spare_image)}
+                          />
+                        ) : (
+                          <span className="text-gray-400">No image</span>
+                        )}</td>
                         <td className="p-2 sm:p-3">{row.spare_name}</td>
                         <td className="p-2 sm:p-3 font-semibold">{row.total}</td>
                         <td className="p-2 sm:p-3">{row.delhi}</td>
@@ -1507,6 +1521,15 @@ export default function SpareStockPage() {
           </div>
         )}
       </div>
+
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60" onClick={() => setPreviewImage(null)}>
+          <div className="bg-white p-4 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-2"><h4 className="font-semibold">Image Preview</h4><button onClick={() => setPreviewImage(null)}>✕</button></div>
+            <img src={previewImage} alt="Preview" className="max-h-[70vh] object-contain mx-auto" />
+          </div>
+        </div>
+      )}
 
       {previewFile && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60" onClick={() => setPreviewFile(null)}>
