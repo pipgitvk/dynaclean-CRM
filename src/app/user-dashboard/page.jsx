@@ -112,10 +112,18 @@ export default async function UserDashboardPage() {
       `
     );
 
-    // Fetch purchase price data
+    // Fetch purchase price data (latest per product)
     const [purchasePrices] = await connection.execute(
       `
-      SELECT product_code, price_per_unit FROM product_stock_request
+      SELECT product_code, price_per_unit 
+      FROM product_stock_request 
+      WHERE (product_code, created_at) IN (
+        SELECT product_code, MAX(created_at) AS latest_created 
+        FROM product_stock_request 
+        WHERE price_per_unit IS NOT NULL 
+        GROUP BY product_code
+      )
+      ORDER BY created_at DESC
       `
     );
 

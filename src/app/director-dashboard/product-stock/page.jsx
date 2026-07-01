@@ -297,7 +297,10 @@ function ProductStockList() {
     const map = {};
     purchasePriceData.forEach((p) => {
       if (p.product_code && p.price_per_unit) {
-        map[p.product_code] = Number(p.price_per_unit);
+        // Only update if we don't have a price yet (since data is already ordered by created_at DESC)
+        if (!map[p.product_code]) {
+          map[p.product_code] = Number(p.price_per_unit);
+        }
       }
     });
     return map;
