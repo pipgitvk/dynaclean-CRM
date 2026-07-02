@@ -115,7 +115,6 @@ export default function DeliveryChallanTable({ rows }) {
           ? row.products.reduce((sum, p) => sum + (parseInt(p.qty) || 0), 0)
           : 0}
       </td>
-      <td className="p-3 text-gray-600">{row.delivery_date ? dayjs(row.delivery_date).format("DD MMM YYYY") : "-"}</td>
       <td className="p-3 text-gray-600">{row.challan_no || "-"}</td>
       <td className="p-3 text-gray-600">{row.challan_date ? dayjs(row.challan_date).format("DD MMM YYYY") : "-"}</td>
       <td className="p-3 text-gray-600">{row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</td>
@@ -197,7 +196,6 @@ export default function DeliveryChallanTable({ rows }) {
               <th onClick={() => handleSort("ship_to")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Ship To<SortIcon column="ship_to" /></th>
               <th onClick={() => handleSort("product_code")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Product<SortIcon column="product_code" /></th>
               <th onClick={() => handleSort("product_quantity")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Qty<SortIcon column="product_quantity" /></th>
-              <th onClick={() => handleSort("delivery_date")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Delivery Date<SortIcon column="delivery_date" /></th>
               <th onClick={() => handleSort("challan_no")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Challan No<SortIcon column="challan_no" /></th>
               <th onClick={() => handleSort("challan_date")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Challan Date<SortIcon column="challan_date" /></th>
               <th onClick={() => handleSort("created_at")} className="p-3 cursor-pointer select-none hover:bg-slate-600/50 transition-colors">Created<SortIcon column="created_at" /></th>
@@ -211,7 +209,7 @@ export default function DeliveryChallanTable({ rows }) {
               </>
             ) : (
               <tr>
-                <td colSpan="10" className="p-12 text-center text-gray-500">
+                <td colSpan="9" className="p-12 text-center text-gray-500">
                   <div className="flex flex-col items-center gap-2">
                     <Inbox className="w-12 h-12 text-gray-300" />
                     <span className="font-medium">No delivery challans found.</span>
@@ -255,8 +253,8 @@ export default function DeliveryChallanTable({ rows }) {
               <div><span className="text-gray-500">Total Qty:</span> {row.products && row.products.length > 0
           ? row.products.reduce((sum, p) => sum + (parseInt(p.qty) || 0), 0)
           : 0}</div>
-              <div><span className="text-gray-500">Delivery Date:</span> {row.delivery_date ? dayjs(row.delivery_date).format("DD MMM YYYY") : "-"}</div>
               <div><span className="text-gray-500">Challan No:</span> {row.challan_no || "-"}</div>
+              <div><span className="text-gray-500">Challan Date:</span> {row.challan_date ? dayjs(row.challan_date).format("DD MMM YYYY") : "-"}</div>
               <div className="col-span-2"><span className="text-gray-500">Created:</span> {row.created_at ? dayjs(row.created_at).format("DD MMM YYYY") : "-"}</div>
             </div>
             <div className="pt-3 border-t border-gray-100 flex justify-end items-center">
