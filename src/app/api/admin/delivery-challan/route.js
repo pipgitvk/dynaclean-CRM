@@ -125,8 +125,8 @@ export async function POST(request) {
     // Insert delivery challan
     const [result] = await conn.execute(
       `INSERT INTO delivery_challans 
-        (delivery_challan_for, delivery_challan_for_address, delivery_challan_for_gstin, ship_to, ship_to_address, ship_to_gstin, transportation_details, expected_delivery_date, delivery_date, delivery_location, challan_no, challan_date, eway_bill, remarks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (delivery_challan_for, delivery_challan_for_address, delivery_challan_for_gstin, ship_to, ship_to_address, ship_to_gstin, transportation_details, expected_delivery_date, challan_no, challan_date, eway_bill, remarks)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         delivery_challan_for,
         delivery_challan_for_address,
@@ -136,8 +136,6 @@ export async function POST(request) {
         ship_to_gstin,
         transportation_details,
         expected_delivery_date,
-        delivery_date,
-        delivery_location,
         challan_no,
         challan_date,
         eway_bill,

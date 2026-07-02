@@ -229,8 +229,6 @@ export default function DeliveryChallanViewPage() {
                 <p><span className="font-medium">Driver Contact:</span> {driverContact || "-"}</p>
                 <p><span className="font-medium">LR/Bilty No.:</span> {lrNo || "-"}</p>
                 <p><span className="font-medium">Expected Delivery Date:</span> {expectedDeliveryDate ? new Date(expectedDeliveryDate).toLocaleDateString("en-GB") : "-"}</p>
-                <p><span className="font-medium">Delivery Date:</span> {challan.delivery_date ? new Date(challan.delivery_date).toLocaleDateString("en-GB") : "-"}</p>
-                <p className="leading-tight"><span className="font-medium">Delivery Location:</span> {challan.delivery_location || "-"}</p>
               </div>
             </div>
             <div className="p-3 text-right bg-[#ffffff]">

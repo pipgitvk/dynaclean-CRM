@@ -132,7 +132,7 @@ export async function PUT(request, { params }) {
     await conn.execute(
       `UPDATE delivery_challans 
         SET delivery_challan_for = ?, delivery_challan_for_address = ?, delivery_challan_for_gstin = ?, ship_to = ?, ship_to_address = ?, ship_to_gstin = ?, transportation_details = ?, 
-            expected_delivery_date = ?, delivery_date = ?, delivery_location = ?, challan_no = ?, 
+            expected_delivery_date = ?, challan_no = ?, 
             challan_date = ?, eway_bill = ?, remarks = ?
         WHERE id = ?`,
       [
@@ -144,8 +144,6 @@ export async function PUT(request, { params }) {
         ship_to_gstin,
         transportation_details,
         expected_delivery_date,
-        delivery_date,
-        delivery_location,
         challan_no,
         challan_date,
         eway_bill,

@@ -166,8 +166,6 @@ export default function AddDeliveryChallanPage() {
           ship_to_gstin: formData.ship_to_gstin,
           transportation_details,
           expected_delivery_date: formData.expected_delivery_date,
-          delivery_date: formData.delivery_date,
-          delivery_location: formData.delivery_location,
           challan_no: formData.challan_no,
           challan_date: formData.challan_date,
           eway_bill: formData.eway_bill,
@@ -425,37 +423,7 @@ export default function AddDeliveryChallanPage() {
           </div>
         </div>
 
-        {/* Delivery Date & Location */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Delivery Date *
-            </label>
-            <input
-              type="date"
-              name="delivery_date"
-              value={formData.delivery_date}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-            />
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Delivery Location *
-            </label>
-            <input
-              type="text"
-              name="delivery_location"
-              value={formData.delivery_location}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-              placeholder="Enter delivery location"
-            />
-          </div>
-        </div>
 
         {/* Challan Details Section */}
         <div className="border border-gray-200 rounded-lg p-4 space-y-4">
