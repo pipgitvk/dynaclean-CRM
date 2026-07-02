@@ -88,7 +88,7 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
               </select>
             </div>
           )}
-          {(userRole === "SUPERADMIN" || userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD") && (
+          {(userRole === "SUPERADMIN" || userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD" || userRole === "EA") && (
             <div>
               <label
                 htmlFor="service_lead_source_select"
