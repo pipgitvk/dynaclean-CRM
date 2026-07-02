@@ -22,8 +22,13 @@ export async function POST(request) {
     const body = await request.json();
     const {
       delivery_challan_for,
+      delivery_challan_for_address,
+      delivery_challan_for_gstin,
       ship_to,
+      ship_to_address,
+      ship_to_gstin,
       transportation_details,
+      expected_delivery_date,
       delivery_date,
       delivery_location,
       challan_no,
@@ -66,6 +71,41 @@ export async function POST(request) {
       // Column might already exist, ignore error
     }
 
+    // Add delivery_challan_for_address column if it doesn't exist
+    try {
+      await conn.execute(`ALTER TABLE delivery_challans ADD COLUMN delivery_challan_for_address TEXT`);
+    } catch (err) {
+      // Column might already exist, ignore error
+    }
+
+    // Add ship_to_address column if it doesn't exist
+    try {
+      await conn.execute(`ALTER TABLE delivery_challans ADD COLUMN ship_to_address TEXT`);
+    } catch (err) {
+      // Column might already exist, ignore error
+    }
+
+    // Add delivery_challan_for_gstin column if it doesn't exist
+    try {
+      await conn.execute(`ALTER TABLE delivery_challans ADD COLUMN delivery_challan_for_gstin VARCHAR(255)`);
+    } catch (err) {
+      // Column might already exist, ignore error
+    }
+
+    // Add ship_to_gstin column if it doesn't exist
+    try {
+      await conn.execute(`ALTER TABLE delivery_challans ADD COLUMN ship_to_gstin VARCHAR(255)`);
+    } catch (err) {
+      // Column might already exist, ignore error
+    }
+
+    // Add expected_delivery_date column if it doesn't exist
+    try {
+      await conn.execute(`ALTER TABLE delivery_challans ADD COLUMN expected_delivery_date DATE`);
+    } catch (err) {
+      // Column might already exist, ignore error
+    }
+
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS delivery_challan_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -85,12 +125,17 @@ export async function POST(request) {
     // Insert delivery challan
     const [result] = await conn.execute(
       `INSERT INTO delivery_challans 
-        (delivery_challan_for, ship_to, transportation_details, delivery_date, delivery_location, challan_no, challan_date, eway_bill, remarks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (delivery_challan_for, delivery_challan_for_address, delivery_challan_for_gstin, ship_to, ship_to_address, ship_to_gstin, transportation_details, expected_delivery_date, delivery_date, delivery_location, challan_no, challan_date, eway_bill, remarks)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         delivery_challan_for,
+        delivery_challan_for_address,
+        delivery_challan_for_gstin,
         ship_to,
+        ship_to_address,
+        ship_to_gstin,
         transportation_details,
+        expected_delivery_date,
         delivery_date,
         delivery_location,
         challan_no,

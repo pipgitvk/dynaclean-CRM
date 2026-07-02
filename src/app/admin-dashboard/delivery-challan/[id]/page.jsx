@@ -138,10 +138,14 @@ export default function DeliveryChallanViewPage() {
   }
 
   const {
+    transporter_name: transporterName,
+    transporter_gstin: transporterGstin,
+    lr_no: lrNo,
     mode: transportationMode,
     vehicle_no: vehicleNumber,
     driver_name: driverName,
     driver_contact: driverContact,
+    expected_delivery_date: expectedDeliveryDate,
   } = transportationDetails || {};
 
   const totalQuantity = challan.items?.reduce((sum, item) => sum + (item.product_quantity || 0), 0) || 0;
@@ -197,18 +201,34 @@ export default function DeliveryChallanViewPage() {
             <div className="border-r border-[#9ca3af] p-3 bg-[#ffffff]">
               <h3 className="font-bold mb-1 border-b border-[#e5e7eb] pb-0.5 text-[#000000]">Delivery Challan For</h3>
               <p className="font-bold text-[#000000] leading-snug whitespace-pre-wrap">{challan.delivery_challan_for || "-"}</p>
+              {challan.delivery_challan_for_address && (
+                <p className="text-[#000000] leading-snug whitespace-pre-wrap mt-1">{challan.delivery_challan_for_address}</p>
+              )}
+              {challan.delivery_challan_for_gstin && (
+                <p className="text-[#000000] leading-snug whitespace-pre-wrap mt-1">GSTIN: {challan.delivery_challan_for_gstin}</p>
+              )}
             </div>
             <div className="border-r border-[#9ca3af] p-3 bg-[#ffffff]">
               <h3 className="font-bold mb-1 border-b border-[#e5e7eb] pb-0.5 text-[#000000]">Ship To</h3>
-              <p className="font-medium text-[#000000] leading-snug whitespace-pre-wrap">{challan.ship_to || "-"}</p>
+              <p className="font-bold text-[#000000] leading-snug whitespace-pre-wrap">{challan.ship_to || "-"}</p>
+              {challan.ship_to_address && (
+                <p className="text-[#000000] leading-snug whitespace-pre-wrap mt-1">{challan.ship_to_address}</p>
+              )}
+              {challan.ship_to_gstin && (
+                <p className="text-[#000000] leading-snug whitespace-pre-wrap mt-1">GSTIN: {challan.ship_to_gstin}</p>
+              )}
             </div>
             <div className="border-r border-[#9ca3af] p-3 bg-[#ffffff]">
               <h3 className="font-bold mb-1 border-b border-[#e5e7eb] pb-0.5 text-[#000000]">Transportation Details</h3>
               <div className="space-y-1 mt-1 text-[#000000]">
-                <p><span className="font-medium">Mode:</span> {transportationMode ? transportationMode.toString().toUpperCase() : "-"}</p>
+                <p><span className="font-medium">Transporter Name:</span> {transporterName || "-"}</p>
+                <p><span className="font-medium">Transporter GSTIN:</span> {transporterGstin || "-"}</p>
+                <p><span className="font-medium">Mode of Transport:</span> {transportationMode ? transportationMode.toString().toUpperCase() : "-"}</p>
                 <p><span className="font-medium">Vehicle No:</span> {vehicleNumber || "-"}</p>
                 <p><span className="font-medium">Driver Name:</span> {driverName || "-"}</p>
                 <p><span className="font-medium">Driver Contact:</span> {driverContact || "-"}</p>
+                <p><span className="font-medium">LR/Bilty No.:</span> {lrNo || "-"}</p>
+                <p><span className="font-medium">Expected Delivery Date:</span> {expectedDeliveryDate ? new Date(expectedDeliveryDate).toLocaleDateString("en-GB") : "-"}</p>
                 <p><span className="font-medium">Delivery Date:</span> {challan.delivery_date ? new Date(challan.delivery_date).toLocaleDateString("en-GB") : "-"}</p>
                 <p className="leading-tight"><span className="font-medium">Delivery Location:</span> {challan.delivery_location || "-"}</p>
               </div>

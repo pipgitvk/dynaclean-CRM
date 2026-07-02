@@ -15,11 +15,19 @@ export default function EditDeliveryChallanPage() {
 
   const [formData, setFormData] = useState({
     delivery_challan_for: "",
+    delivery_challan_for_address: "",
+    delivery_challan_for_gstin: "",
     ship_to: "",
+    ship_to_address: "",
+    ship_to_gstin: "",
+    transporter_name: "",
+    transporter_gstin: "",
+    lr_no: "",
     transportation_mode: "",
     vehicle_no: "",
     driver_name: "",
     driver_contact: "",
+    expected_delivery_date: "",
     delivery_date: "",
     delivery_location: "",
     challan_no: "",
@@ -60,19 +68,27 @@ export default function EditDeliveryChallanPage() {
         }
 
         setFormData({
-          delivery_challan_for: challan.delivery_challan_for || "",
-          ship_to: challan.ship_to || "",
-          transportation_mode: transportationDetails.mode || "",
-          vehicle_no: transportationDetails.vehicle_no || "",
-          driver_name: transportationDetails.driver_name || "",
-          driver_contact: transportationDetails.driver_contact || "",
-          delivery_date: challan.delivery_date || "",
-          delivery_location: challan.delivery_location || "",
-          challan_no: challan.challan_no || "",
-          challan_date: challan.challan_date || "",
-          eway_bill: challan.eway_bill || "",
-          remarks: challan.remarks || "",
-        });
+      delivery_challan_for: challan.delivery_challan_for || "",
+      delivery_challan_for_address: challan.delivery_challan_for_address || "",
+      delivery_challan_for_gstin: challan.delivery_challan_for_gstin || "",
+      ship_to: challan.ship_to || "",
+      ship_to_address: challan.ship_to_address || "",
+      ship_to_gstin: challan.ship_to_gstin || "",
+      transporter_name: transportationDetails.transporter_name || "",
+      transporter_gstin: transportationDetails.transporter_gstin || "",
+      lr_no: transportationDetails.lr_no || "",
+      transportation_mode: transportationDetails.mode || "",
+      vehicle_no: transportationDetails.vehicle_no || "",
+      driver_name: transportationDetails.driver_name || "",
+      driver_contact: transportationDetails.driver_contact || "",
+      expected_delivery_date: transportationDetails.expected_delivery_date || challan.expected_delivery_date || "",
+      delivery_date: challan.delivery_date || "",
+      delivery_location: challan.delivery_location || "",
+      challan_no: challan.challan_no || "",
+      challan_date: challan.challan_date || "",
+      eway_bill: challan.eway_bill || "",
+      remarks: challan.remarks || "",
+    });
 
         // Set items
         if (challan.items && challan.items.length > 0) {
@@ -196,10 +212,14 @@ export default function EditDeliveryChallanPage() {
 
     try {
       const transportation_details = JSON.stringify({
+        transporter_name: formData.transporter_name,
+        transporter_gstin: formData.transporter_gstin,
+        lr_no: formData.lr_no,
         mode: formData.transportation_mode,
         vehicle_no: formData.vehicle_no,
         driver_name: formData.driver_name,
         driver_contact: formData.driver_contact,
+        expected_delivery_date: formData.expected_delivery_date,
       });
 
       const response = await fetch(`/api/admin/delivery-challan/${id}`, {
@@ -209,8 +229,13 @@ export default function EditDeliveryChallanPage() {
         },
         body: JSON.stringify({
           delivery_challan_for: formData.delivery_challan_for,
+          delivery_challan_for_address: formData.delivery_challan_for_address,
+          delivery_challan_for_gstin: formData.delivery_challan_for_gstin,
           ship_to: formData.ship_to,
+          ship_to_address: formData.ship_to_address,
+          ship_to_gstin: formData.ship_to_gstin,
           transportation_details,
+          expected_delivery_date: formData.expected_delivery_date,
           delivery_date: formData.delivery_date,
           delivery_location: formData.delivery_location,
           challan_no: formData.challan_no,
@@ -289,8 +314,69 @@ export default function EditDeliveryChallanPage() {
               onChange={handleChange}
               required
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-              placeholder="Enter ship to address"
+              placeholder="Enter ship to"
             />
+          </div>
+        </div>
+
+        {/* Addresses & GSTIN */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Delivery Challan For Address
+              </label>
+              <textarea
+                name="delivery_challan_for_address"
+                value={formData.delivery_challan_for_address}
+                onChange={handleChange}
+                rows="3"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
+                placeholder="Enter address"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Delivery Challan For GSTIN
+              </label>
+              <input
+                type="text"
+                name="delivery_challan_for_gstin"
+                value={formData.delivery_challan_for_gstin}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                placeholder="Enter GSTIN"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ship To Address
+              </label>
+              <textarea
+                name="ship_to_address"
+                value={formData.ship_to_address}
+                onChange={handleChange}
+                rows="3"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
+                placeholder="Enter address"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Ship To GSTIN
+              </label>
+              <input
+                type="text"
+                name="ship_to_gstin"
+                value={formData.ship_to_gstin}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                placeholder="Enter GSTIN"
+              />
+            </div>
           </div>
         </div>
 
@@ -301,7 +387,35 @@ export default function EditDeliveryChallanPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Transportation Mode
+                Transporter Name
+              </label>
+              <input
+                type="text"
+                name="transporter_name"
+                value={formData.transporter_name}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                placeholder="Enter transporter name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Transporter GSTIN
+              </label>
+              <input
+                type="text"
+                name="transporter_gstin"
+                value={formData.transporter_gstin}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                placeholder="Enter transporter GSTIN"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mode of Transport
               </label>
               <select
                 name="transportation_mode"
@@ -358,6 +472,32 @@ export default function EditDeliveryChallanPage() {
                 onChange={handleChange}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                 placeholder="Enter driver contact number"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Expected Delivery Date
+              </label>
+              <input
+                type="date"
+                name="expected_delivery_date"
+                value={formData.expected_delivery_date}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                LR/Bilty No.
+              </label>
+              <input
+                type="text"
+                name="lr_no"
+                value={formData.lr_no}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                placeholder="Enter LR/Bilty No."
               />
             </div>
           </div>
