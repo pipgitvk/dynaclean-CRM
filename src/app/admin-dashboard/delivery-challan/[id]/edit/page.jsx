@@ -422,12 +422,10 @@ export default function EditDeliveryChallanPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
               >
                 <option value="">Select Mode</option>
-                <option value="truck">Truck</option>
-                <option value="van">Van</option>
-                <option value="courier">Courier</option>
+                <option value="road">Road</option>
                 <option value="air">Air</option>
                 <option value="sea">Sea</option>
-                <option value="other">Other</option>
+                <option value="courier">Courier</option>
               </select>
             </div>
 
