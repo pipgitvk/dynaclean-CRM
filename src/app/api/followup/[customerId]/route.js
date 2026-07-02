@@ -116,7 +116,17 @@ export async function POST(req, { params }) {
 
   // Convert IST datetime to UTC before storing
   const followedDateUTC = convertISTtoUTC(data.followed_date);
-  const nextFollowupDateUTC = convertISTtoUTC(data.next_followup_date);
+  
+  let nextFollowupDateUTC;
+  
+  // If status is Denied, automatically set next follow-up date to 4 days from now (UTC)
+  if (data.status === "Denied") {
+    const now = new Date();
+    const fourDaysLater = new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000);
+    nextFollowupDateUTC = fourDaysLater.toISOString();
+  } else {
+    nextFollowupDateUTC = convertISTtoUTC(data.next_followup_date);
+  }
 
   await conn.execute(
     `INSERT INTO customers_followup 
