@@ -139,7 +139,7 @@ export default function AddSparePage() {
         });
         setImageFile(null);
         setCatalogFile(null);
-        setNewMachine("");
+        setMachineSearch("");
         setShowSearchModal(true);
         setSearchInput("");
       } else {

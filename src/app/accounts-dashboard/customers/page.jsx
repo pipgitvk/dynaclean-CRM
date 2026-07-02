@@ -36,7 +36,7 @@ export default async function CustomersPage({ searchParams }) {
     next_follow_date,
     employee,
     page = '1'
-  } = searchParamsResolved;
+  } = searchParamsResolved; 
 
   const status = resolveStatusForQuery(statusParam);
 
