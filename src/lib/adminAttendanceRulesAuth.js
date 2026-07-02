@@ -15,6 +15,7 @@ export const ATTENDANCE_RULES_ALLOWED_ROLES = [
   "HR Executive",
   "JUNIOR HR EXECUTIVE",
   "HR RECRUITER",
+  "DIRECTOR",
 ];
 
 const MANAGE_ATTENDANCE_RULES_ROLES = new Set(
@@ -29,6 +30,7 @@ const PROXY_ATTENDANCE_REG_ROLES = new Set(
     "HR",
     "HR HEAD",
     "HR Executive",
+    "DIRECTOR",
   ].map((r) => normalizeRoleKey(r))
 );
 

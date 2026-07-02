@@ -155,7 +155,7 @@ const KPICard = ({ title, value, icon: Icon, subtext, gradient, buttonText, onCl
   );
 };
 
-export default function DirectorDashboard({ user }) {
+export default function DirectorDashboard({ user, regTotal = 0, regPending = 0 }) {
   const router = useRouter();
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 7) + "-01");
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));
@@ -403,6 +403,15 @@ export default function DirectorDashboard({ user }) {
           buttonText="REPORTS"
           buttonOnSide={true}
           onClick={() => router.push("/director-dashboard/view_service_reports")}
+        />
+        <KPICard
+          title="Attendance Regularization"
+          value={regPending}
+          icon={Calendar}
+          gradient="bg-orange-600"
+          buttonText="VIEW ALL"
+          subtext={`Total: ${regTotal}`}
+          onClick={() => router.push("/director-dashboard/attendance-regularization")}
         />
       </div>
     </div>
