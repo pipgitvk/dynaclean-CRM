@@ -128,6 +128,8 @@ export async function POST(req, { params }) {
     nextFollowupDateUTC = convertISTtoUTC(data.next_followup_date);
   }
 
+  // Insert first follow-up row (normal entry)
+  const firstRowNextDate = data.status === "Denied" ? null : nextFollowupDateUTC;
   await conn.execute(
     `INSERT INTO customers_followup 
     (customer_id, name, contact, email, next_followup_date, followed_date, comm_mode, notes, followed_by, multi_tag)
@@ -137,7 +139,7 @@ export async function POST(req, { params }) {
       name,
       contact,
       email,
-      nextFollowupDateUTC,
+      firstRowNextDate,
       followedDateUTC,
       data.communication_mode,
       data.notes,
@@ -145,6 +147,29 @@ export async function POST(req, { params }) {
       data.multi_tag || null,
     ],
   );
+
+  // If status is Denied, insert second follow-up row with employee name + notes + client name + contact
+  if (data.status === "Denied") {
+    const currentDateTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    const secondRowNotes = `(${followedBy}) marked (${name}-${contact}) as Denied dated (${currentDateTime}), ${data.notes}`;
+    await conn.execute(
+      `INSERT INTO customers_followup 
+      (customer_id, name, contact, email, next_followup_date, followed_date, comm_mode, notes, followed_by, multi_tag)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        customerId,
+        name,
+        contact,
+        email,
+        nextFollowupDateUTC, // 4 days later date
+        followedDateUTC,
+        data.communication_mode,
+        secondRowNotes,
+        followedBy,
+        data.multi_tag || null,
+      ],
+    );
+  }
 
   await conn.execute(
     `UPDATE customers SET status=?, stage=? WHERE customer_id=?`,
