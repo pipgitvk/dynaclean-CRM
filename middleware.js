@@ -126,7 +126,12 @@ export async function middleware(request) {
           "/admin-dashboard/ip-restrictions"
         ];
         const isEaAllowed = eaAllowedRoutes.some(route => pathname.startsWith(route));
-        if (roleNorm !== "EA" || !isEaAllowed) {
+        
+        // Allow Team Leader for denied-leads
+        const isTeamLeader = roleNorm.includes("TEAM LEADER");
+        const isDeniedLeadsRoute = pathname.startsWith("/admin-dashboard/denied-leads");
+        
+        if (!(roleNorm === "EA" && isEaAllowed) && !(isTeamLeader && isDeniedLeadsRoute)) {
           const dest = new URL("/user-dashboard", request.url);
           dest.search = request.nextUrl.search;
           return NextResponse.redirect(dest);
