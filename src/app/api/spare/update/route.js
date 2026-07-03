@@ -104,7 +104,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
         }
 
-        if (!['SUPERADMIN', 'DIRECTOR', 'ADMIN', 'DIGITAL MARKETER', 'WAREHOUSE INCHARGE', 'ACCOUNTANT', 'DESIGN ENGINEER'].includes(String(role).toUpperCase())) {
+        if (!['SUPERADMIN', 'DIRECTOR', 'ADMIN', 'DIGITAL MARKETER', 'WAREHOUSE INCHARGE', 'ACCOUNTANT', 'DESIGN ENGINEER', 'SERVICE SUPPORT'].includes(String(role).toUpperCase())) {
             return NextResponse.json({ error: 'Forbidden: access denied' }, { status: 403 });
         }
 
