@@ -50,7 +50,7 @@ export default function AddSparePage() {
       .catch(() => setProducts([]));
   }, []);
 
-  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER", "SERVICE SUPPORT"].includes(userRole);
+  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER", "SERVICE SUPPORT", "EA"].includes(userRole);
   const canSeePriceFields = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
 
   const handleChange = (e) => {
@@ -253,7 +253,9 @@ export default function AddSparePage() {
               <select id="type" name="type" value={formData.type} onChange={handleChange}
                 className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
                 <option value="">Select type</option>
-                      <option value="Raw Materials">Raw Materials</option>
+                      {["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER"].includes(userRole) && (
+                        <option value="Raw Materials">Raw Materials</option>
+                      )}
                       {userRole !== "DESIGN ENGINEER" && (
                         <>
                           <option value="Consumables">Consumables</option>

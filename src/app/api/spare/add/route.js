@@ -102,9 +102,9 @@ export async function POST(request) {
     const last_negotiation_price = formData.get('last_negotiation_price');
     const tax = formData.get('tax');
 
-    // Basic validation - only require purchase_price and tax if not DESIGN ENGINEER or SERVICE SUPPORT
+    // Basic validation - only require purchase_price and tax if not DESIGN ENGINEER or SERVICE SUPPORT or EA
     const userRole = tokenPayload.role;
-    const canSkipPriceFields = userRole === "DESIGN ENGINEER" || userRole === "SERVICE SUPPORT";
+    const canSkipPriceFields = userRole === "DESIGN ENGINEER" || userRole === "SERVICE SUPPORT" || userRole === "EA";
     if (!item_name) {
         return NextResponse.json({ error: 'Required field is missing: Item Name.' }, { status: 400 });
     }

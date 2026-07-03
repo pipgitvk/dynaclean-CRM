@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Search, Pencil } from "lucide-react";
+import { Eye, Search, Pencil, PackageX, AlertTriangle, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -21,7 +21,7 @@ function ProductAndSpareLists({ type, userRole }) {
   const [machineSearch, setMachineSearch] = useState("");
   const [showMachineDropdown, setShowMachineDropdown] = useState(false);
 
-  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER", "SERVICE SUPPORT"].includes(userRole);
+  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER", "SERVICE SUPPORT", "EA"].includes(userRole);
   const canSeePriceFields = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
 
   useEffect(() => {
@@ -129,12 +129,19 @@ function ProductAndSpareLists({ type, userRole }) {
       if (filterCompatible && !String(r.compatible_machine ?? '').toLowerCase().includes(filterCompatible.toLowerCase())) return false;
       // For DESIGN ENGINEER, only show Raw Materials
       if (userRole === "DESIGN ENGINEER" && type === "spare" && String(r.type ?? '') !== "Raw Materials") return false;
+      if ((userRole === "EA" || userRole === "SERVICE SUPPORT") && type === "spare" && String(r.type ?? '') === "Raw Materials") return false;
       return true;
     });
     return filtered;
   }, [rows, q, filterType, filterMake, filterModel, filterCompatible, userRole, type]);
 
-  const uniqueTypes = useMemo(() => [...new Set(rows.map(r => r.type).filter(Boolean))].sort(), [rows]);
+  const uniqueTypes = useMemo(() => {
+    const types = [...new Set(rows.map(r => r.type).filter(Boolean))].sort();
+    if (type === 'spare' && (userRole === "EA" || userRole === "SERVICE SUPPORT")) {
+      return types.filter(t => t !== "Raw Materials");
+    }
+    return types;
+  }, [rows, type, userRole]);
   const uniqueMakes = useMemo(() => [...new Set(rows.map(r => r.make).filter(Boolean))].sort(), [rows]);
   const uniqueModels = useMemo(() => [...new Set(rows.map(r => r.model).filter(Boolean))].sort(), [rows]);
   const uniqueCompatibles = useMemo(() => {
@@ -506,7 +513,9 @@ function ProductAndSpareLists({ type, userRole }) {
                       className="w-full border rounded px-3 py-2 text-sm"
                     >
                       <option value="">Select type</option>
-                      <option value="Raw Materials">Raw Materials</option>
+                      {["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER"].includes(userRole) && (
+                        <option value="Raw Materials">Raw Materials</option>
+                      )}
                       {userRole !== "DESIGN ENGINEER" && (
                         <>
                           <option value="Consumables">Consumables</option>
@@ -730,6 +739,9 @@ export default function SpareStockPage() {
   const [availableData, setAvailableData] = useState([]);
   const [txData, setTxData] = useState([]);
   const [summaryData, setSummaryData] = useState([]);
+  const [zeroStockSpares, setZeroStockSpares] = useState([]);
+  const [lowStockSpares, setLowStockSpares] = useState([]);
+  const [showZeroStockCard, setShowZeroStockCard] = useState(true);
 
   const [availableSearch, setAvailableSearch] = useState("");
   const [txSearch, setTxSearch] = useState("");
@@ -752,6 +764,17 @@ export default function SpareStockPage() {
     fetch("/api/spare/available-stock").then(r => r.json()).then(d => setAvailableData(Array.isArray(d) ? d : [])).catch(() => setAvailableData([]));
     fetch("/api/spare/modelsummary").then(r => r.json()).then(setTxData).catch(() => setTxData([]));
     fetch("/api/spare/modelsummaryspare").then(r => r.json()).then(setSummaryData).catch(() => setSummaryData([]));
+    // Fetch low/zero stock alerts
+    fetch("/api/spare/low-stock")
+      .then(r => r.json())
+      .then(d => {
+        setZeroStockSpares(Array.isArray(d.zeroStock) ? d.zeroStock : []);
+        setLowStockSpares(Array.isArray(d.lowStock) ? d.lowStock : []);
+      })
+      .catch(() => {
+        setZeroStockSpares([]);
+        setLowStockSpares([]);
+      });
   }, []);
 
   const handleSaveLocation = async (row) => {
@@ -821,13 +844,13 @@ export default function SpareStockPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Spare Stock Management</h2>
         <div className="flex flex-wrap items-center gap-2">
-          {(userRole === "ADMIN" || userRole === "DESIGN ENGINEER" || userRole === "SERVICE SUPPORT") && ((() => {
+          {(userRole === "ADMIN" || userRole === "DESIGN ENGINEER" || userRole === "SERVICE SUPPORT" || userRole === "EA") && ((() => {
             const pathname = usePathname(); const isAdmin = pathname?.startsWith('/admin-dashboard'); const addHref = `${isAdmin ? '/admin-dashboard' : '/user-dashboard'}/add-spare`; return (
               <Link href={addHref} className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">Add New Spare</Link>
             );
           })())}
           <button onClick={() => setOpenSection("list")} className={`text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded text-white ${openSection === "list" ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"}`}>List</button>
-          {["ADMIN", "DIGITAL MARKETER", "WAREHOUSE INCHARGE", "ACCOUNTANT"].includes(userRole) && (
+          {["ADMIN", "DIGITAL MARKETER", "WAREHOUSE INCHARGE", "ACCOUNTANT", "EA"].includes(userRole) && (
             <>
               <button onClick={() => setOpenSection("available")} className={`text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded text-white ${openSection === "available" ? "bg-teal-600" : "bg-teal-500 hover:bg-teal-600"}`}>Available Stock</button>
               <button onClick={() => setOpenSection("transactions")} className={`text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 rounded text-white ${openSection === "transactions" ? "bg-indigo-600" : "bg-gray-500 hover:bg-gray-600"}`}>Stock Transactions</button>
@@ -836,6 +859,128 @@ export default function SpareStockPage() {
           )}
         </div>
       </div>
+
+      {/* Stock Alerts Section (ADMIN, DIRECTOR, SUPERADMIN, EA, SERVICE SUPPORT only) */}
+      {["ADMIN", "DIRECTOR", "SUPERADMIN", "EA", "SERVICE SUPPORT"].includes(userRole) && (
+        <>
+          {/* Zero Stock Alert Card */}
+          {showZeroStockCard && zeroStockSpares.length > 0 && (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 bg-red-100 border-b border-red-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-red-500 text-white">
+                    <PackageX size={18} />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-red-800 text-sm uppercase tracking-wide">
+                      Zero Stock Spares
+                    </h2>
+                    <p className="text-xs text-red-500 mt-0.5">
+                      {zeroStockSpares.length} spare{zeroStockSpares.length !== 1 ? "s" : ""} with no stock available
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowZeroStockCard(false)}
+                  className="p-1.5 rounded-lg hover:bg-red-200 text-red-500 transition-colors"
+                  title="Dismiss"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-red-100/60 text-red-700 uppercase text-[11px] tracking-wider">
+                      <th className="px-5 py-2 text-left font-semibold">Spare Number</th>
+                      <th className="px-5 py-2 text-left font-semibold">Item Name</th>
+                      <th className="px-5 py-2 text-left font-semibold">Min Qty</th>
+                      <th className="px-5 py-2 text-left font-semibold">Delhi</th>
+                      <th className="px-5 py-2 text-left font-semibold">South</th>
+                      <th className="px-5 py-2 text-left font-semibold">Total Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {zeroStockSpares.map((p, idx) => (
+                      <tr
+                        key={p.spare_id || idx}
+                        className="border-t border-red-100 hover:bg-red-100/40 transition-colors"
+                      >
+                        <td className="px-5 py-3 font-bold text-red-800">{p.spare_number}</td>
+                        <td className="px-5 py-3 font-semibold text-gray-800">{p.item_name || "—"}</td>
+                        <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
+                        <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
+                        <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
+                        <td className="px-5 py-3">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white">
+                            <PackageX size={11} />
+                            {p.total_quantity ?? 0}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Low Stock Alert Card */}
+          {lowStockSpares.filter(p => (p.total_quantity ?? 0) > 0).length > 0 && (
+            <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4 bg-amber-100 border-b border-amber-200">
+                <div className="p-2 rounded-xl bg-amber-500 text-white">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <h2 className="font-bold text-amber-800 text-sm uppercase tracking-wide">
+                    Low Stock Warning
+                  </h2>
+                  <p className="text-xs text-amber-600 mt-0.5">
+                    {lowStockSpares.filter(p => (p.total_quantity ?? 0) > 0).length} spare{lowStockSpares.filter(p => (p.total_quantity ?? 0) > 0).length !== 1 ? "s" : ""} below minimum quantity
+                  </p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-amber-100/60 text-amber-700 uppercase text-[11px] tracking-wider">
+                      <th className="px-5 py-2 text-left font-semibold">Spare Number</th>
+                      <th className="px-5 py-2 text-left font-semibold">Item Name</th>
+                      <th className="px-5 py-2 text-left font-semibold">Current Qty</th>
+                      <th className="px-5 py-2 text-left font-semibold">Min Qty</th>
+                      <th className="px-5 py-2 text-left font-semibold">Delhi</th>
+                      <th className="px-5 py-2 text-left font-semibold">South</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lowStockSpares
+                      .filter(p => (p.total_quantity ?? 0) > 0)
+                      .map((p, idx) => (
+                        <tr
+                          key={p.spare_id || idx}
+                          className="border-t border-amber-100 hover:bg-amber-100/40 transition-colors"
+                        >
+                          <td className="px-5 py-3 font-bold text-amber-800">{p.spare_number}</td>
+                          <td className="px-5 py-3 font-semibold text-gray-800">{p.item_name || "—"}</td>
+                          <td className="px-5 py-3">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white">
+                              <AlertTriangle size={11} />
+                              {p.total_quantity ?? 0}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
+                          <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
+                          <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* List Section (Spare) */}
       <div className={`bg-white border rounded-lg shadow-sm mt-6 ${openSection === "list" ? "" : "hidden"}`}>
@@ -849,7 +994,7 @@ export default function SpareStockPage() {
           </div>
         )}
       </div>
-      {["ADMIN", "DIGITAL MARKETER", "WAREHOUSE INCHARGE", "ACCOUNTANT"].includes(userRole) && (
+      {["ADMIN", "DIGITAL MARKETER", "WAREHOUSE INCHARGE", "ACCOUNTANT", "EA"].includes(userRole) && (
         <>
           <div className={`bg-white border rounded-lg shadow-sm mt-6 ${openSection === "available" ? "" : "hidden"}`}>
             <div className="flex items-center justify-between px-4 sm:px-6 py-4 cursor-pointer hover:bg-gray-50" onClick={() => setOpenSection(openSection === "available" ? null : "available")}>

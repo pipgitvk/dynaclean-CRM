@@ -444,6 +444,7 @@ const allMenuItems = [
       "SALES HEAD",
       "SALES_HEAD",
       "SERVICE SUPPORT",
+      "EA",
     ],
     icon: "Grid3x3",
     children: [
@@ -484,6 +485,7 @@ const allMenuItems = [
           "SALES HEAD",
           "SALES_HEAD",
           "SERVICE SUPPORT",
+          "EA",
         ],
         icon: "FileText",
       },
