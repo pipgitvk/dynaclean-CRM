@@ -50,7 +50,8 @@ export default function AddSparePage() {
       .catch(() => setProducts([]));
   }, []);
 
-  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
+  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER", "SERVICE SUPPORT"].includes(userRole);
+  const canSeePriceFields = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -99,7 +100,7 @@ export default function AddSparePage() {
     data.append("type", formData.type);
     data.append("make", formData.make);
     data.append("model", formData.model);
-    if (isPrivileged) {
+    if (canSeePriceFields) {
       data.append("purchase_price", formData.purchase_price);
       data.append("sale_price", formData.sale_price);
       data.append("last_negotiation_price", formData.last_negotiation_price);
@@ -252,13 +253,13 @@ export default function AddSparePage() {
               <select id="type" name="type" value={formData.type} onChange={handleChange}
                 className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
                 <option value="">Select type</option>
-                <option value="Raw Materials">Raw Materials</option>
-                {userRole !== "DESIGN ENGINEER" && (
-                  <>
-                    <option value="Consumables">Consumables</option>
-                    <option value="Spares">Spares</option>
-                  </>
-                )}
+                      <option value="Raw Materials">Raw Materials</option>
+                      {userRole !== "DESIGN ENGINEER" && (
+                        <>
+                          <option value="Consumables">Consumables</option>
+                          <option value="Spares">Spares</option>
+                        </>
+                      )}
               </select>
             </div>
 
@@ -279,18 +280,18 @@ export default function AddSparePage() {
             </div>
 
             {/* Purchase Price — privileged only */}
-            {isPrivileged && (
+            {canSeePriceFields && (
               <div className="flex flex-col">
                 <label htmlFor="purchase_price" className="text-sm font-semibold text-gray-700 mb-2">Purchase Price <span className="text-red-500">*</span></label>
                 <input id="purchase_price" name="purchase_price" type="number" step="0.01" value={formData.purchase_price} onChange={handleChange}
                   placeholder="e.g., 5.99"
                   className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  required={isPrivileged} />
+                  required={canSeePriceFields} />
               </div>
             )}
 
             {/* Sale Price — privileged only */}
-            {isPrivileged && (
+            {canSeePriceFields && (
               <div className="flex flex-col">
                 <label htmlFor="sale_price" className="text-sm font-semibold text-gray-700 mb-2">Sale Price</label>
                 <input id="sale_price" name="sale_price" type="number" step="0.01" value={formData.sale_price} onChange={handleChange}
@@ -300,7 +301,7 @@ export default function AddSparePage() {
             )}
 
             {/* Last Negotiation Price — privileged only */}
-            {isPrivileged && (
+            {canSeePriceFields && (
               <div className="flex flex-col">
                 <label htmlFor="last_negotiation_price" className="text-sm font-semibold text-gray-700 mb-2">Last Neg. Price</label>
                 <input id="last_negotiation_price" name="last_negotiation_price" type="number" step="0.01" value={formData.last_negotiation_price} onChange={handleChange}
@@ -310,13 +311,13 @@ export default function AddSparePage() {
             )}
 
             {/* Tax — privileged only */}
-            {isPrivileged && (
+            {canSeePriceFields && (
               <div className="flex flex-col">
                 <label htmlFor="tax" className="text-sm font-semibold text-gray-700 mb-2">Tax (%) <span className="text-red-500">*</span></label>
                 <input id="tax" name="tax" type="number" step="0.01" value={formData.tax} onChange={handleChange}
                   placeholder="e.g., 18"
                   className="p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                  required={isPrivileged} />
+                  required={canSeePriceFields} />
               </div>
             )}
 
@@ -324,7 +325,7 @@ export default function AddSparePage() {
             <div className="flex flex-col md:col-span-2">
               <label className="text-sm font-semibold text-gray-700 mb-2">Compatible Machines</label>
 
-              {(isPrivileged || userRole === "DESIGN ENGINEER") ? (
+              {(isPrivileged || userRole === "DESIGN ENGINEER" || userRole === "SERVICE SUPPORT") ? (
                 <>
                   <div className="relative">
                     <input

@@ -49,7 +49,10 @@ export const MODULE_TREE = [
   {
     key: "leads-management",
     label: "Leads Management",
-    children: [{ key: "leads-upload", label: "Leads Upload" }],
+    children: [
+      { key: "leads-upload", label: "Leads Upload" },
+      { key: "denied-leads", label: "Denied Leads" }
+    ],
   },
   {
     key: "targets",
@@ -233,6 +236,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "lead-distribution", label: "Lead Distribution" },
       { kind: "leaf", key: "bulk-reassign", label: "Bulk Reassign Leads" },
       { kind: "leaf", key: "leads-upload", label: "Leads Upload" },
+      { kind: "leaf", key: "denied-leads", label: "Denied Leads" },
     ],
   },
   {

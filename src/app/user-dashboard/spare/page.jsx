@@ -21,7 +21,7 @@ function ProductAndSpareLists({ type, userRole }) {
   const [machineSearch, setMachineSearch] = useState("");
   const [showMachineDropdown, setShowMachineDropdown] = useState(false);
 
-  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER"].includes(userRole);
+  const isPrivileged = ["ADMIN", "DIRECTOR", "SUPERADMIN", "DESIGN ENGINEER", "SERVICE SUPPORT"].includes(userRole);
   const canSeePriceFields = ["ADMIN", "DIRECTOR", "SUPERADMIN"].includes(userRole);
 
   useEffect(() => {
@@ -821,7 +821,7 @@ export default function SpareStockPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Spare Stock Management</h2>
         <div className="flex flex-wrap items-center gap-2">
-          {(userRole === "ADMIN" || userRole === "DESIGN ENGINEER") && ((() => {
+          {(userRole === "ADMIN" || userRole === "DESIGN ENGINEER" || userRole === "SERVICE SUPPORT") && ((() => {
             const pathname = usePathname(); const isAdmin = pathname?.startsWith('/admin-dashboard'); const addHref = `${isAdmin ? '/admin-dashboard' : '/user-dashboard'}/add-spare`; return (
               <Link href={addHref} className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">Add New Spare</Link>
             );

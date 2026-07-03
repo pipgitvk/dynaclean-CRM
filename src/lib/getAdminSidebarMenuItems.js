@@ -254,8 +254,8 @@ const allMenuItems = [
   },
   {
     name: "Leads Management",
-    moduleKey: "tl-management",
-    roles: ["SUPERADMIN", "DIGITAL MARKETER"],
+    moduleKey: "leads-management",
+    roles: ["ALL"],
     icon: "Users",
     children: [
       {
@@ -306,6 +306,13 @@ const allMenuItems = [
         name: "Ads management",
         roles: ["SUPERADMIN"],
         icon: "Settings",
+      },
+      {
+        path: "/admin-dashboard/denied-leads",
+        name: "Denied Leads",
+        accessKey: "denied-leads",
+        roles: ["ALL"],
+        icon: "ScrollText",
       },
     ],
   },
@@ -450,31 +457,31 @@ const allMenuItems = [
   {
     name: "Products & Inventory",
     moduleKey: "products",
-    roles: ["SUPERADMIN"],
+    roles: ["SUPERADMIN", "SERVICE SUPPORT"],
     icon: "Grid3x3",
     children: [
       {
         path: "/admin-dashboard/product-stock",
         name: "Products",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "SERVICE SUPPORT"],
         icon: "ClipboardList",
       },
       {
         path: "/admin-dashboard/products-new",
         name: "Products New",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "SERVICE SUPPORT"],
         icon: "ClipboardList",
       },
       {
         path: "/admin-dashboard/product-accessories",
         name: "Product Accessories",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "SERVICE SUPPORT"],
         icon: "ClipboardList",
       },
       {
         path: "/admin-dashboard/spare",
         name: "Spare Parts",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "SERVICE SUPPORT"],
         icon: "ClipboardList",
       },
     ],
@@ -482,67 +489,67 @@ const allMenuItems = [
   {
     name: "Procurement",
     moduleKey: "products",
-    roles: ["SUPERADMIN"],
+    roles: ["SUPERADMIN", "SERVICE SUPPORT"],
     icon: "ShoppingCart",
     children: [
       {
         name: "Purchase – Products",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "SERVICE SUPPORT"],
         icon: "ShoppingCart",
         children: [
           {
             path: "/admin-dashboard/purchase/direct-in",
             name: "Direct In",
-            roles: ["SUPERADMIN"],
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "PackageCheck",
           },
           {
             path: "/admin-dashboard/purchase/generate-request",
             name: "Generate Request",
-            roles: ["SUPERADMIN"],
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "FilePlus",
           },
           {
             path: "/admin-dashboard/purchase/warehouse-in",
             name: "Warehouse In",
-            roles: ["SUPERADMIN"],
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "PackageCheck",
           },
           {
             path: "/admin-dashboard/purchase/purchases",
             name: "Purchases",
-            roles: ["SUPERADMIN"],
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "ShoppingBag",
           },
         ],
       },
       {
         name: "Purchase – Spares",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "SERVICE SUPPORT"],
         icon: "ShoppingCart",
         children: [
           {
             path: "/admin-dashboard/spare/purchase/direct-in",
             name: "Direct In",
-            roles: ["SUPERADMIN"],
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "PackageCheck",
           },
           {
             path: "/admin-dashboard/spare/purchase/generate-request",
             name: "Generate Request",
-            roles: ["SUPERADMIN"],
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "FilePlus",
           },
           {
             path: "/admin-dashboard/spare/purchase/warehouse-in",
             name: "Warehouse In",
-            roles: ["SUPERADMIN"],
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "PackageCheck",
           },
           {
             path: "/admin-dashboard/spare/purchase/purchases",
             name: "Purchases",
-            roles: ["SUPERADMIN"],
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "ShoppingBag",
           },
         ],
@@ -552,19 +559,19 @@ const allMenuItems = [
   {
     name: "Production",
     moduleKey: "products",
-    roles: ["SUPERADMIN"],
+    roles: ["SUPERADMIN", "SERVICE SUPPORT"],
     icon: "PackageCheck",
     children: [
       {
         path: "/admin-dashboard/productions/status",
         name: "Production Status",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "SERVICE SUPPORT"],
         icon: "ListOrdered",
       },
       {
         path: "/admin-dashboard/productions/bom-list",
         name: "BOM List",
-        roles: ["SUPERADMIN"],
+        roles: ["SUPERADMIN", "SERVICE SUPPORT"],
         icon: "ClipboardList",
       },
     ],
@@ -636,19 +643,21 @@ const allMenuItems = [
   {
     name: "Employees",
     moduleKey: "employee",
-    roles: ["SUPERADMIN", "HR", "HR HEAD", "EA"],
+    roles: ["ALL"],
     icon: "UserCircle",
     children: [
       {
         path: "/admin-dashboard/employees",
         name: "Employee list",
-        roles: ["SUPERADMIN"],
+        accessKey: "employee-list",
+        roles: ["ALL"],
         icon: "ShieldCheck",
       },
       {
         path: "/user-dashboard/employees",
         name: "Employee list",
-        roles: ["EA"],
+        accessKey: "employee-list",
+        roles: ["ALL"],
         icon: "User",
       },
       {
