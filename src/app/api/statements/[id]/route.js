@@ -49,8 +49,24 @@ export async function GET(req, { params }) {
         await conn.execute("ALTER TABLE statements ADD COLUMN linked_purchase_ids TEXT NULL");
       } catch (__) {}
     }
+    // Ensure failed_transaction_id column exists
+    try {
+      await conn.execute("SELECT failed_transaction_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN failed_transaction_id INT UNSIGNED NULL");
+      } catch (__) {}
+    }
+    // Ensure cancelled_transaction_id column exists
+    try {
+      await conn.execute("SELECT cancelled_transaction_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN cancelled_transaction_id INT UNSIGNED NULL");
+      } catch (__) {}
+    }
     const [rows] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, invoice_status, expense_allocation, linked_purchase_ids, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, invoice_status, expense_allocation, linked_purchase_ids, failed_transaction_id, cancelled_transaction_id, created_at
        FROM statements WHERE id = ?`,
       [id]
     );
@@ -178,13 +194,24 @@ export async function PUT(req, { params }) {
         } catch (__) {}
       }
       const [prevRows] = await conn.execute(
-        `SELECT client_expense_id, trans_id, linked_purchase_ids FROM statements WHERE id = ?`,
+        `SELECT client_expense_id, trans_id, linked_purchase_ids, failed_transaction_id, cancelled_transaction_id FROM statements WHERE id = ?`,
         [id],
       );
       const prev = prevRows?.[0];
       if (!prev) {
         await conn.rollback();
         return NextResponse.json({ error: "Statement not found" }, { status: 404 });
+      }
+
+      // Block expense update if statement is already Failed or Cancelled
+      const isFailed = prev.failed_transaction_id != null && String(prev.failed_transaction_id).trim() !== "" && String(prev.failed_transaction_id) !== "0";
+      const isCancelled = prev.cancelled_transaction_id != null && String(prev.cancelled_transaction_id).trim() !== "" && String(prev.cancelled_transaction_id) !== "0";
+      if (isFailed || isCancelled) {
+        await conn.rollback();
+        return NextResponse.json(
+          { error: `Cannot update expense: statement is already marked as ${isFailed ? "Failed" : "Cancelled"}.` },
+          { status: 400 }
+        );
       }
 
       const prevEid =

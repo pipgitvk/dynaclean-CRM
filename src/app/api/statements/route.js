@@ -104,6 +104,24 @@ export async function GET(req) {
       } catch (__) {}
     }
 
+    // Ensure failed_transaction_id column exists
+    try {
+      await conn.execute("SELECT failed_transaction_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN failed_transaction_id INT UNSIGNED NULL AFTER linked_module_id");
+      } catch (__) {}
+    }
+
+    // Ensure cancelled_transaction_id column exists
+    try {
+      await conn.execute("SELECT cancelled_transaction_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN cancelled_transaction_id INT UNSIGNED NULL AFTER failed_transaction_id");
+      } catch (__) {}
+    }
+
     // Ensure expenses table has linked_statement_ids column
     try {
       await conn.execute("SELECT linked_statement_ids FROM expenses LIMIT 1");
@@ -115,7 +133,7 @@ export async function GET(req) {
 
     if (expenseId) {
       [rows] = await conn.execute(
-        `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.created_at,
+        `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.failed_transaction_id, s.cancelled_transaction_id, s.created_at,
                 GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
          FROM statements s
          LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
@@ -125,7 +143,7 @@ export async function GET(req) {
         [expenseId]
       );
     } else if (status === "unsettled") {
-      let query = `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.created_at,
+      let query = `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.failed_transaction_id, s.cancelled_transaction_id, s.created_at,
          GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
          FROM statements s
          LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
@@ -144,7 +162,7 @@ export async function GET(req) {
       [rows] = await conn.execute(query, params);
     } else {
       [rows] = await conn.execute(
-        `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.created_at,
+        `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.failed_transaction_id, s.cancelled_transaction_id, s.created_at,
          GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
          FROM statements s
          LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
@@ -326,11 +344,11 @@ export async function PATCH(req) {
     }
     await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
-    const { trans_ids, invoice_number, invoice_status } = await req.json();
+    const { trans_ids, invoice_number, invoice_status, failed_transaction_id, cancelled_transaction_id } = await req.json();
 
-    if (invoice_number === undefined || !Array.isArray(trans_ids) || trans_ids.length === 0) {
+    if (!trans_ids || !Array.isArray(trans_ids) || trans_ids.length === 0) {
       return NextResponse.json(
-        { error: "invoice_number and trans_ids array are required" },
+        { error: "trans_ids array is required" },
         { status: 400 }
       );
     }
@@ -354,14 +372,64 @@ export async function PATCH(req) {
       } catch (__) {}
     }
 
-    const placeholders = trans_ids.map(() => "?").join(", ");
-    const statusVal = invoice_status || "Unsettled";
-    const invNumVal = invoice_number && String(invoice_number).trim() !== "" ? invoice_number : null;
+    // Ensure failed_transaction_id column exists
+    try {
+      await conn.execute("SELECT failed_transaction_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN failed_transaction_id INT UNSIGNED NULL");
+      } catch (__) {}
+    }
 
-    await conn.execute(
-      `UPDATE statements SET invoice_number = ?, invoice_status = ? WHERE trans_id IN (${placeholders})`,
-      [invNumVal, statusVal, ...trans_ids]
-    );
+    // Ensure cancelled_transaction_id column exists
+    try {
+      await conn.execute("SELECT cancelled_transaction_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN cancelled_transaction_id INT UNSIGNED NULL");
+      } catch (__) {}
+    }
+
+    const placeholders = trans_ids.map(() => "?").join(", ");
+    let updateQuery = "UPDATE statements SET ";
+    const updateParams = [];
+
+    if (invoice_number !== undefined) {
+      const invNumVal = invoice_number && String(invoice_number).trim() !== "" ? invoice_number : null;
+      updateQuery += "invoice_number = ?, ";
+      updateParams.push(invNumVal);
+    }
+
+    if (invoice_status !== undefined) {
+      const statusVal = invoice_status || "Unsettled";
+      updateQuery += "invoice_status = ?, ";
+      updateParams.push(statusVal);
+    }
+
+    if (failed_transaction_id !== undefined) {
+      updateQuery += "failed_transaction_id = ?, ";
+      updateParams.push(failed_transaction_id);
+    }
+
+    if (cancelled_transaction_id !== undefined) {
+      updateQuery += "cancelled_transaction_id = ?, ";
+      updateParams.push(cancelled_transaction_id);
+    }
+
+    // Remove trailing comma and space
+    updateQuery = updateQuery.replace(/, $/, "");
+    
+    if (updateParams.length === 0) {
+      return NextResponse.json(
+        { error: "No update fields provided" },
+        { status: 400 }
+      );
+    }
+
+    updateQuery += ` WHERE id IN (${placeholders})`;
+    updateParams.push(...trans_ids);
+
+    await conn.execute(updateQuery, updateParams);
 
     return NextResponse.json({ success: true, updated: trans_ids.length });
   } catch (err) {

@@ -82,8 +82,24 @@ export default async function StatementsPage() {
         await conn.execute("ALTER TABLE statements ADD COLUMN linked_module_id INT UNSIGNED NULL");
       } catch (__) {}
     }
+    // Ensure failed_transaction_id column exists
+    try {
+      await conn.execute("SELECT failed_transaction_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN failed_transaction_id INT UNSIGNED NULL AFTER linked_module_id");
+      } catch (__) {}
+    }
+    // Ensure cancelled_transaction_id column exists
+    try {
+      await conn.execute("SELECT cancelled_transaction_id FROM statements LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE statements ADD COLUMN cancelled_transaction_id INT UNSIGNED NULL AFTER failed_transaction_id");
+      } catch (__) {}
+    }
     const [result] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, linked_module_type, linked_module_id, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, closing_balance, client_expense_id, invoice_number, invoice_status, linked_purchase_ids, dd_id, linked_module_type, linked_module_id, failed_transaction_id, cancelled_transaction_id, created_at
        FROM statements
        ORDER BY date DESC, id DESC`
     );

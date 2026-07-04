@@ -54,7 +54,6 @@ export default function StatementTable({ rows }) {
   const [expenseTxnForIdSearch, setExpenseTxnForIdSearch] = useState(null);
   const [expenseIdResolved, setExpenseIdResolved] = useState(null);
   const [purchaseTypeByLegacyId, setPurchaseTypeByLegacyId] = useState({});
-  const [settleLoading, setSettleLoading] = useState(false);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -130,12 +129,16 @@ export default function StatementTable({ rows }) {
     if (row?.dd_id) return true;
     if (row?.linked_module_id && row?.linked_module_type === 'Assets') return true;
     if (linked.length > 0) return true;
+    if (row?.failed_transaction_id != null && String(row.failed_transaction_id).trim() !== "") return true;
+    if (row?.cancelled_transaction_id != null && String(row.cancelled_transaction_id).trim() !== "") return true;
     return false;
   };
 
   const displayInvoiceStatus = (row) => {
     const linked = getLinkedPurchaseRefs(row);
     const inv = row?.invoice_status != null ? String(row.invoice_status).trim() : "";
+    if (row?.failed_transaction_id != null && String(row.failed_transaction_id).trim() !== "") return "Failed";
+    if (row?.cancelled_transaction_id != null && String(row.cancelled_transaction_id).trim() !== "") return "Cancelled";
     if (linked.length > 0) return "Settled";
     if (row?.client_expense_id) return "Settled";
     if (row?.dd_id) return "Settled";
@@ -539,68 +542,6 @@ export default function StatementTable({ rows }) {
     setForceResult(null);
   };
 
-  const handleSettleMatchingPair = async (debitRow, creditRow) => {
-    if (settleLoading) return;
-    
-    setSettleLoading(true);
-    try {
-      const res = await fetch("/api/statements/settle", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          debit_id: debitRow.id,
-          credit_id: creditRow.id,
-          amount: debitRow.amount,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to settle");
-      
-      toast.success(`Settled: Debit #${debitRow.id} & Credit #${creditRow.id}`);
-      router.refresh();
-    } catch (err) {
-      toast.error(err.message || "Failed to settle statements");
-    } finally {
-      setSettleLoading(false);
-    }
-  };
-
-  const getConsecutiveMatchingRow = (row, allRows) => {
-    // Check if this row has a matching debit/credit pair right before or after it
-    const rowIndex = allRows.findIndex(r => r.id === row.id);
-    if (rowIndex === -1) return null;
-
-    // Check row immediately before
-    if (rowIndex > 0) {
-      const prevRow = allRows[rowIndex - 1];
-      if (
-        !isSettledRow(prevRow) &&
-        !isSettledRow(row) &&
-        Math.abs(Number(prevRow.amount || 0) - Number(row.amount || 0)) < 0.01 &&
-        prevRow.type !== row.type
-      ) {
-        return prevRow;
-      }
-    }
-
-    // Check row immediately after
-    if (rowIndex < allRows.length - 1) {
-      const nextRow = allRows[rowIndex + 1];
-      if (
-        !isSettledRow(nextRow) &&
-        !isSettledRow(row) &&
-        Math.abs(Number(nextRow.amount || 0) - Number(row.amount || 0)) < 0.01 &&
-        nextRow.type !== row.type
-      ) {
-        return nextRow;
-      }
-    }
-
-    return null;
-  };
-
   const handleDownloadDemo = (format) => {
     window.open(`/api/statements/demo?format=${format}`, "_blank");
     toast.success(`Demo ${format.toUpperCase()} downloaded`);
@@ -833,6 +774,10 @@ export default function StatementTable({ rows }) {
                           ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"
                           : displayInvoiceStatus(row) === "Partial Paid"
                           ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"
+                          : displayInvoiceStatus(row) === "Failed"
+                          ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
+                          : displayInvoiceStatus(row) === "Cancelled"
+                          ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700"
                           : "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
                       }>
                         {displayInvoiceStatus(row)}
@@ -927,27 +872,6 @@ export default function StatementTable({ rows }) {
                     >
                       <Pencil size={16} />
                     </Link>
-                    {(() => {
-                      const matchingRow = getConsecutiveMatchingRow(row, sortedRows);
-                      if (matchingRow) {
-                        return (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const debitRow = row.type === "Debit" ? row : matchingRow;
-                              const creditRow = row.type === "Credit" ? row : matchingRow;
-                              handleSettleMatchingPair(debitRow, creditRow);
-                            }}
-                            disabled={settleLoading}
-                            className="text-green-600 hover:text-green-800 disabled:opacity-50"
-                            title="Settle matching debit & credit"
-                          >
-                            ✓
-                          </button>
-                        );
-                      }
-                      return null;
-                    })()}
                   </td>
                 </tr>
               ))
@@ -989,6 +913,10 @@ export default function StatementTable({ rows }) {
                     ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"
                     : displayInvoiceStatus(row) === "Partial Paid"
                     ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700"
+                    : displayInvoiceStatus(row) === "Failed"
+                    ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
+                    : displayInvoiceStatus(row) === "Cancelled"
+                    ? "px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700"
                     : "px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
                 }>
                   {displayInvoiceStatus(row)}
@@ -1061,27 +989,6 @@ export default function StatementTable({ rows }) {
               <Link href={`/admin-dashboard/statements/edit/${row.id}`} className="text-yellow-600 hover:text-yellow-800">
                 <Pencil size={16} /> Edit
               </Link>
-              {(() => {
-                const matchingRow = getConsecutiveMatchingRow(row, sortedRows);
-                if (matchingRow) {
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const debitRow = row.type === "Debit" ? row : matchingRow;
-                        const creditRow = row.type === "Credit" ? row : matchingRow;
-                        handleSettleMatchingPair(debitRow, creditRow);
-                      }}
-                      disabled={settleLoading}
-                      className="text-green-600 hover:text-green-800 disabled:opacity-50 text-sm"
-                      title="Settle matching debit & credit"
-                    >
-                      ✓ Settle
-                    </button>
-                  );
-                }
-                return null;
-              })()}
             </div>
           </div>
         ))}
