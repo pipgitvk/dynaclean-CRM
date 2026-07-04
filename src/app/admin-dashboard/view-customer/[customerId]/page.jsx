@@ -282,6 +282,12 @@ export default async function CustomerPage({ params }) {
               >
                 Special Price
               </Link>
+              <Link
+                href={`/admin-dashboard/invoices/buyer/${encodeURIComponent(customer.id || customer.first_name)}`}
+                className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md text-center transition duration-300"
+              >
+                View Ledger
+              </Link>
             </div>
           </div>
 

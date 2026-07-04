@@ -1,4 +1,5 @@
 import { getDbConnection } from '@/lib/db';
+import { getDbConnection } from '@/lib/db';
 import nodemailer from 'nodemailer';
 
 /**

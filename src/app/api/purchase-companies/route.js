@@ -16,12 +16,13 @@ export async function GET(req) {
     const [rows] = await conn.execute(`
       SELECT
         client_company_name                     AS company_name,
+        customer_id                             AS customer_id,
         COUNT(*)                                AS purchase_count,
         SUM(net_amount)                        AS total_amount,
         MAX(created_at)                        AS last_purchase_date
       FROM product_stock_request
       WHERE client_company_name IS NOT NULL AND client_company_name != ''
-      GROUP BY client_company_name
+      GROUP BY client_company_name, customer_id
       ORDER BY total_amount DESC
     `);
 
