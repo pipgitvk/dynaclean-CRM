@@ -49,7 +49,7 @@ export default function TLFollowupForm({
     status: "",
     notes: "",
     followed_date: formatISTDateTime(new Date()),
-    next_followup_date: "",
+    next_followup_date: formatISTDateTime(new Date()),
     assigned_employee: customerData?.lead_source || "",
     stage: "New",
   });
