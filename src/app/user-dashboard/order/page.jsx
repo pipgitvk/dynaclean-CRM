@@ -39,6 +39,15 @@ export default async function OrdersPage() {
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
+                COALESCE(no.payment_terms, CASE 
+                  WHEN qr.payment_term_days = 0 THEN 'Advance'
+                  WHEN qr.payment_term_days = 9 THEN 'COD'
+                  WHEN qr.payment_term_days = 15 THEN '15 Days'
+                  WHEN qr.payment_term_days = 30 THEN '30 Days'
+                  WHEN qr.payment_term_days = 45 THEN '45 Days'
+                  WHEN qr.payment_term_days = 60 THEN '60 Days'
+                  ELSE CONCAT(qr.payment_term_days, ' Days')
+                END) as payment_terms,
                 qr.company_name, qr.emp_name, qr.state,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
                 GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code

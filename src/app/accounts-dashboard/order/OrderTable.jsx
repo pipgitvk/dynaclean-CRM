@@ -54,6 +54,7 @@ export default function OrderTable({ orders, userRole }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
+  const [paymentTermsFilter, setPaymentTermsFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
@@ -102,6 +103,11 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
+      // Step 2.7: Filter by payment_terms
+      if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
+        return false;
+      }
+
       // Step 3: Search across multiple fields
       return (
         order.order_id?.toLowerCase().includes(lowercasedQuery) ||
@@ -112,7 +118,7 @@ export default function OrderTable({ orders, userRole }) {
       );
     });
     setFilteredOrders(result);
-  }, [searchQuery, orders, statusFilter, dateFrom, dateTo, createdByFilter]);
+  }, [searchQuery, orders, statusFilter, paymentTermsFilter, dateFrom, dateTo, createdByFilter]);
 
   const exportToCSV = () => {
     const headers = [
@@ -319,7 +325,7 @@ export default function OrderTable({ orders, userRole }) {
       </div>
 
       {/* 🧰 Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <div>
           <label className="block text-xs text-gray-600 mb-1">Status</label>
           <select
@@ -374,6 +380,23 @@ export default function OrderTable({ orders, userRole }) {
               ))}
           </select>
         </div>
+        <div>
+          <label className="block text-xs text-gray-600 mb-1">Payment Terms</label>
+          <select
+            value={paymentTermsFilter}
+            onChange={(e) => setPaymentTermsFilter(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          >
+            <option value="">All Terms</option>
+            {[...new Set(orders?.map((o) => o.payment_terms).filter(Boolean))]
+              .sort()
+              .map((term) => (
+                <option key={term} value={term}>
+                  {term}
+                </option>
+              ))}
+          </select>
+        </div>
       </div>
 
       {/* 👨‍💼 TABLE VIEW for large screens */}
@@ -387,6 +410,7 @@ export default function OrderTable({ orders, userRole }) {
               <th className="px-3 py-3 font-semibold text-left">Order Date</th>
               <th className="px-3 py-3 font-semibold text-left">Company</th>
               <th className="px-3 py-3 font-semibold text-left">Item</th>
+              <th className="px-3 py-3 font-semibold text-left">Payment Terms</th>
               <th className="px-3 py-3 font-semibold text-center">Status</th>
               <th className="px-3 py-3 font-semibold text-center">Payment</th>
               <th className="px-3 py-3 font-semibold text-center">Due Date</th>
@@ -457,6 +481,15 @@ export default function OrderTable({ orders, userRole }) {
                           <span className="font-semibold">Modal:</span> {r.item_code}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-3 py-3 text-left text-sm">
+                      {r.payment_terms ? (
+                        <span className="inline-block px-2.5 py-1 bg-blue-100 text-blue-800 rounded font-medium">
+                          {r.payment_terms}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="px-3 py-3">
                       <span
