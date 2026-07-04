@@ -127,11 +127,12 @@ export async function middleware(request) {
         ];
         const isEaAllowed = eaAllowedRoutes.some(route => pathname.startsWith(route));
         
-        // Allow Team Leader for denied-leads
+        // Allow Team Leader for denied-leads and view-customer pages
         const isTeamLeader = roleNorm.includes("TEAM LEADER");
         const isDeniedLeadsRoute = pathname.startsWith("/admin-dashboard/denied-leads");
+        const isViewCustomerRoute = pathname.startsWith("/admin-dashboard/view-customer");
         
-        if (!(roleNorm === "EA" && isEaAllowed) && !(isTeamLeader && isDeniedLeadsRoute)) {
+        if (!(roleNorm === "EA" && isEaAllowed) && !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute))) {
           const dest = new URL("/user-dashboard", request.url);
           dest.search = request.nextUrl.search;
           return NextResponse.redirect(dest);
