@@ -464,6 +464,9 @@ function BuyerCard({ buyer, onClick }) {
             {buyer.buyer_name}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
+            {buyer.customer_id ? `ID: ${buyer.customer_id}` : "ID: —"}
+          </p>
+          <p className="text-xs text-gray-400">
             Last: {lastDate}
           </p>
         </div>

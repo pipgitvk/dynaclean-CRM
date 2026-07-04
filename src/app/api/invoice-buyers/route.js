@@ -15,15 +15,18 @@ export async function GET(req) {
 
     const [rows] = await conn.execute(`
       SELECT
-        customer_name                           AS buyer_name,
-        COUNT(*)                                AS invoice_count,
-        SUM(grand_total)                        AS total_amount,
-        SUM(COALESCE(cgst,0) + COALESCE(sgst,0) + COALESCE(igst,0)) AS total_tax,
-        MAX(COALESCE(order_date, invoice_date)) AS last_invoice_date,
-        MIN(COALESCE(order_date, invoice_date)) AS first_invoice_date
-      FROM invoices
-      WHERE customer_name IS NOT NULL AND customer_name != ''
-      GROUP BY customer_name
+        COALESCE(i.customer_id, c.customer_id) AS customer_id,
+        i.customer_name AS buyer_name,
+        COUNT(*) AS invoice_count,
+        SUM(i.grand_total) AS total_amount,
+        SUM(COALESCE(i.cgst,0) + COALESCE(i.sgst,0) + COALESCE(i.igst,0)) AS total_tax,
+        MAX(COALESCE(i.order_date, i.invoice_date)) AS last_invoice_date,
+        MIN(COALESCE(i.order_date, i.invoice_date)) AS first_invoice_date
+      FROM invoices i
+      LEFT JOIN customers c ON LOWER(TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, '')))) = LOWER(TRIM(i.customer_name))
+        OR LOWER(TRIM(c.first_name)) = LOWER(TRIM(i.customer_name))
+      WHERE i.customer_name IS NOT NULL AND i.customer_name != ''
+      GROUP BY i.customer_name, COALESCE(i.customer_id, c.customer_id)
       ORDER BY total_amount DESC
     `);
 

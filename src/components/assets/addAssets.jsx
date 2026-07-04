@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 
@@ -8,6 +8,11 @@ export default function AssetFormPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [loginRows, setLoginRows] = useState([{ email: "", password: "" }]);
+  const [categories, setCategories] = useState([]);
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  
   const [formData, setFormData] = useState({
     // Add assetType here
     assetType: "Device",
@@ -38,6 +43,24 @@ export default function AssetFormPage() {
     assetPhotos: [],
     note: "",
   });
+
+  // Fetch asset categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch("/api/assets/categories", { credentials: "include" });
+        const data = await res.json();
+        if (data.success) {
+          setCategories(data.categories || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch categories:", err);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const [errors, setErrors] = useState({});
   const isSim = formData.assetType === "Accessory" && formData.assetCategory === "SIM";
@@ -170,6 +193,49 @@ export default function AssetFormPage() {
   };
   const removeLoginRow = (index) => {
     setLoginRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) {
+      toast.error("Please enter a category name");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/assets/categories", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryName: newCategory.trim(),
+          categoryType: formData.assetType,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success("Category added successfully!");
+        setCategories((prev) => [
+          ...prev,
+          {
+            id: data.category.id,
+            category_name: data.category.category_name,
+            category_type: data.category.category_type,
+          },
+        ]);
+        setFormData((prev) => ({
+          ...prev,
+          assetCategory: newCategory.trim(),
+        }));
+        setNewCategory("");
+        setShowAddCategory(false);
+      } else {
+        toast.error(data.error || "Failed to add category");
+      }
+    } catch (err) {
+      console.error("Error adding category:", err);
+      toast.error("An error occurred while adding category");
+    }
   };
 
   const validateStep = () => {
@@ -389,42 +455,68 @@ export default function AssetFormPage() {
               </div>
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-gray-700">Asset Category</label>
-                <select
-                  name="assetCategory"
-                  value={formData.assetCategory}
-                  onChange={handleChange}
-                  className="mt-1 p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select category</option>
-                  {formData.assetType === 'Device' ? (
-                    <>
-                      <optgroup label="Assets">
-                        <option value="Mobile">Mobile</option>
-                        <option value="Laptop">Laptop</option>
-                        <option value="Desktop">Desktop</option>
-                        <option value="Monitor">Monitor</option>
-                        <option value="CPU">CPU</option>
-                        <option value="Printer">Printer</option>
-                        <option value="Tablet">Tablet</option>
-                      </optgroup>
-                    </>
-                  ) : (
-                    <>
-                      <optgroup label="Accessories">
-                        <option value="SIM">SIM</option>
-                        <option value="Keyboard">Keyboard</option>
-                        <option value="Mouse">Mouse</option>
-                        <option value="Pendrive">Pendrive</option>
-                        <option value="Headphones">Headphones / Earphones</option>
-                        <option value="Charger">Charger / Adapter</option>
-                        <option value="ExternalHardDisk">External Hard Disk</option>
-                        <option value="UPS">UPS</option>
-                        <option value="Router">Router</option>
-                        <option value="Dongle">Dongle</option>
-                      </optgroup>
-                    </>
-                  )}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    name="assetCategory"
+                    value={formData.assetCategory}
+                    onChange={handleChange}
+                    className="mt-1 p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 flex-1"
+                  >
+                    <option value="">Select category</option>
+                    {loadingCategories ? (
+                      <option disabled>Loading categories...</option>
+                    ) : categories.length > 0 ? (
+                      categories
+                        .filter((cat) => cat.category_type === formData.assetType)
+                        .map((cat) => (
+                          <option key={cat.id} value={cat.category_name}>
+                            {cat.category_name}
+                          </option>
+                        ))
+                    ) : (
+                      <option disabled>No categories available</option>
+                    )}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCategory(!showAddCategory)}
+                    className="mt-1 px-3 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition"
+                    title="Add new category"
+                  >
+                    +
+                  </button>
+                </div>
+                {showAddCategory && (
+                  <div className="mt-2 p-3 border border-blue-300 rounded-md bg-blue-50">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newCategory}
+                        onChange={(e) => setNewCategory(e.target.value)}
+                        placeholder="Enter category name"
+                        className="flex-1 p-2 border border-gray-300 rounded-md"
+                        onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCategory}
+                        className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddCategory(false);
+                          setNewCategory("");
+                        }}
+                        className="px-3 py-2 bg-gray-400 text-white rounded-md hover:bg-gray-500"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-gray-700">
