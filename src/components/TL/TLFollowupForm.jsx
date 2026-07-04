@@ -119,9 +119,8 @@ export default function TLFollowupForm({
       model: latestfollowup.model || "",
       status: latestfollowup.status || "",
       notes: latestfollowup.notes || "",
-      next_followup_date: latestfollowup.next_followup_date
-        ? latestfollowup.next_followup_date
-        : "",
+      // Always set next_followup_date to today (current month/year with today's date)
+      next_followup_date: formatISTDateTime(new Date()),
       stage: latestfollowup.stage || prev.stage,
       multi_tag,
       assigned_employee:
