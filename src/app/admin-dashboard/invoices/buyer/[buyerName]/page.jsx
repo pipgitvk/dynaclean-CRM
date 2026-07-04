@@ -1,4 +1,4 @@
-import { getDbConnection } from "@/lib/db";
+  import { getDbConnection } from "@/lib/db";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import BuyerInvoiceTable from "./BuyerInvoiceTable";
@@ -32,7 +32,7 @@ function parseTransIds(raw) {
 
 export default async function BuyerInvoicesPage({ params }) {
   const { buyerName } = await params;
-  const decodedBuyer = decodeURIComponent(buyerName);
+  const decodedBuyer = decodeURIComponent(buyerName).trim();
 
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
@@ -46,6 +46,7 @@ export default async function BuyerInvoicesPage({ params }) {
 
   let invoices = [];
   let ledgerEntries = [];
+  let customerIdForBuyer = null;
 
   try {
     const conn = await getDbConnection();
@@ -61,14 +62,20 @@ export default async function BuyerInvoicesPage({ params }) {
          grand_total,
          linked_trans_ids,
          billing_address,
+         customer_id,
          DATE(created_at) AS created_date,
          created_at
        FROM invoices
-       WHERE customer_name = ?
+       WHERE TRIM(customer_name) = ? OR customer_name = ?
        ORDER BY COALESCE(order_date, invoice_date) DESC, id DESC`,
-      [decodedBuyer]
+      [decodedBuyer, decodedBuyer]
     );
     invoices = invRows;
+    
+    // Capture customer_id from first invoice (if available)
+    if (invoices.length > 0) {
+      customerIdForBuyer = invoices[0].customer_id;
+    }
 
     // ── 2. Collect all linked trans IDs from every invoice ──────
     const allTransIds = [];
@@ -91,6 +98,24 @@ export default async function BuyerInvoicesPage({ params }) {
         allTransIds
       );
       statementRows = stRows;
+    }
+
+    // ── 3b. Fetch purchases for this buyer (by customer_id) ──────
+    let purchaseRows = [];
+    if (customerIdForBuyer) {
+      const [pRows] = await conn.execute(
+        `SELECT 
+           id,
+           invoice_date,
+           invoice_number,
+           net_amount,
+           client_name
+         FROM product_stock_request
+         WHERE customer_id = ?
+         ORDER BY invoice_date DESC, id DESC`,
+        [customerIdForBuyer]
+      );
+      purchaseRows = pRows;
     }
 
     // ── 4. Build derived ledger rows ────────────────────────────
@@ -117,6 +142,23 @@ export default async function BuyerInvoicesPage({ params }) {
         debit: Number(inv.grand_total) || 0,
         credit: 0,
         source: "invoice",
+      });
+    }
+
+    // Add purchase entries
+    for (const purch of purchaseRows) {
+      const purchDate = purch.invoice_date ? String(purch.invoice_date).slice(0, 10) : null;
+      if (!purchDate) continue;
+
+      derivedLedger.push({
+        id: `purch-${purch.id}`,
+        entry_date: purchDate,
+        particulars: `Purchase – ${purch.invoice_number}`,
+        vch_type: "Purchase",
+        vch_no: purch.invoice_number,
+        debit: 0,
+        credit: Number(purch.net_amount) || 0,
+        source: "purchase",
       });
     }
 
@@ -177,9 +219,11 @@ export default async function BuyerInvoicesPage({ params }) {
       const db = String(b.entry_date).slice(0, 10);
       if (da < db) return -1;
       if (da > db) return 1;
-      // Sales before Receipt on same date
-      if (a.vch_type === "Sales" && b.vch_type !== "Sales") return -1;
-      if (b.vch_type === "Sales" && a.vch_type !== "Sales") return 1;
+      // Sales before Purchase before Receipt on same date
+      const orderMap = { "Sales": 0, "Purchase": 1, "Receipt": 2 };
+      const aOrder = orderMap[a.vch_type] !== undefined ? orderMap[a.vch_type] : 99;
+      const bOrder = orderMap[b.vch_type] !== undefined ? orderMap[b.vch_type] : 99;
+      if (aOrder !== bOrder) return aOrder - bOrder;
       return 0;
     });
 
