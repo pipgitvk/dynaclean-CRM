@@ -12,6 +12,8 @@ import {
   User,
   Building2,
   Calculator,
+  AlertCircle,
+  CheckCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -20,6 +22,9 @@ export default function NewBidPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const [bidNumberStatus, setBidNumberStatus] = useState(null); // null, 'checking', 'exists', 'available'
+  const [bidNumberMessage, setBidNumberMessage] = useState("");
+  const [checkingBidNumber, setCheckingBidNumber] = useState(false);
   const [formData, setFormData] = useState({
     bidding_platform: "",
     bid_number: "",
@@ -87,17 +92,59 @@ export default function NewBidPage() {
     }
   };
 
+  // Check if bid number already exists
+  const checkBidNumberAvailability = async (bidNumber) => {
+    if (!bidNumber || bidNumber.trim() === "") {
+      setBidNumberStatus(null);
+      setBidNumberMessage("");
+      return;
+    }
+
+    setCheckingBidNumber(true);
+    setBidNumberStatus("checking");
+    try {
+      const res = await fetch(`/api/gem-crm/bids/check-duplicate?bid_number=${encodeURIComponent(bidNumber)}`);
+      const data = await res.json();
+      
+      if (data.exists) {
+        setBidNumberStatus("exists");
+        setBidNumberMessage(`Bid number already exists in the system`);
+      } else {
+        setBidNumberStatus("available");
+        setBidNumberMessage("");
+      }
+    } catch (error) {
+      console.error("Error checking bid number:", error);
+      setBidNumberStatus(null);
+      setBidNumberMessage("");
+    } finally {
+      setCheckingBidNumber(false);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
     if (type === "file") {
       setFormData((prev) => ({ ...prev, [name]: files[0] }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
+      
+      // Check for duplicate bid number when it changes
+      if (name === "bid_number") {
+        checkBidNumberAvailability(value);
+      }
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Check if bid number is duplicate
+    if (bidNumberStatus === "exists") {
+      toast.error("This bid number already exists. Please use a different bid number.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -177,14 +224,39 @@ export default function NewBidPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bid Number *
                 </label>
-                <input
-                  type="text"
-                  name="bid_number"
-                  value={formData.bid_number}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    name="bid_number"
+                    value={formData.bid_number}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                      bidNumberStatus === "exists" 
+                        ? "border-red-500 focus:ring-red-500" 
+                        : bidNumberStatus === "available" 
+                        ? "border-green-500 focus:ring-green-500" 
+                        : "border-gray-300"
+                    }`}
+                    required
+                  />
+                  {checkingBidNumber && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    </div>
+                  )}
+                  {bidNumberStatus === "exists" && !checkingBidNumber && (
+                    <AlertCircle className="absolute right-3 top-2.5 w-5 h-5 text-red-500" />
+                  )}
+                  {bidNumberStatus === "available" && !checkingBidNumber && (
+                    <CheckCircle className="absolute right-3 top-2.5 w-5 h-5 text-green-500" />
+                  )}
+                </div>
+                {bidNumberStatus === "exists" && (
+                  <p className="text-sm text-red-600 mt-1">⚠️ {bidNumberMessage}</p>
+                )}
+                {bidNumberStatus === "available" && (
+                  <p className="text-sm text-green-600 mt-1">✓ Bid number is available</p>
+                )}
               </div>
 
               <div>
@@ -707,8 +779,9 @@ export default function NewBidPage() {
           </button>
           <button
             type="submit"
-            disabled={isLoading}
-            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            disabled={isLoading || bidNumberStatus === "exists"}
+            title={bidNumberStatus === "exists" ? "Cannot submit - bid number already exists" : ""}
+            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             {isLoading ? "Creating..." : "Create Bid"}
