@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Search, Download, Eye, Plus } from "lucide-react";
+import { Search, Download, Eye, Plus, Edit2 } from "lucide-react";
 import MultiPurchaseLinkModal from "./MultiPurchaseLinkModal";
 import { toast } from "react-hot-toast";
 import ExcelJS from "exceljs";
@@ -316,6 +316,157 @@ function EditTransportModal({ open, onClose, record, onSaved }) {
   );
 }
 
+function EditCustomerModal({ open, onClose, record, onSaved }) {
+  const [customerIdSearch, setCustomerIdSearch] = useState("");
+  const [customerSuggestions, setCustomerSuggestions] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+
+  useEffect(() => {
+    if (open) {
+      setCustomerIdSearch("");
+      setCustomerSuggestions([]);
+      if (record) {
+        setSelectedCustomer({
+          customer_id: record.customer_id,
+          first_name: record.client_name?.split(' ')[0] || '',
+          last_name: record.client_name?.split(' ').slice(1).join(' ') || '',
+          company: record.client_company_name,
+          phone: record.client_number,
+          email: record.client_email,
+          gstin: record.client_gstin,
+          address: record.customer_address
+        });
+      } else {
+        setSelectedCustomer(null);
+      }
+    }
+  }, [open, record]);
+
+  // Search customers by customer_id or name
+  useEffect(() => {
+    if (!customerIdSearch.trim()) {
+      setCustomerSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingCustomers(true);
+    fetch(`/api/customers/list?search=${encodeURIComponent(customerIdSearch)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setCustomerSuggestions(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Failed to search customers");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCustomers(false);
+      });
+    return () => { cancelled = true; };
+  }, [customerIdSearch]);
+
+  const handleCustomerSelect = (customer) => {
+    setSelectedCustomer(customer);
+    setCustomerIdSearch(`${customer.first_name} ${customer.last_name || ''} (ID: ${customer.customer_id})`);
+    setCustomerSuggestions([]);
+  };
+
+  async function save() {
+    if (!selectedCustomer) {
+      toast.error("Please select a customer first");
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append('id', String(record.id));
+      fd.append('customer_id', selectedCustomer.customer_id);
+      fd.append('client_name', `${selectedCustomer.first_name} ${selectedCustomer.last_name || ''}`.trim());
+      fd.append('client_company_name', selectedCustomer.company || '');
+      fd.append('client_number', selectedCustomer.phone || '');
+      fd.append('client_email', selectedCustomer.email || '');
+      fd.append('client_gstin', selectedCustomer.gstin || '');
+      fd.append('customer_address', selectedCustomer.address || '');
+      
+      const res = await fetch('/api/stock-request', { method: 'PATCH', body: fd });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || 'Failed');
+      }
+      onSaved?.();
+      onClose();
+      toast.success('Customer details updated');
+    } catch (e) {
+      toast.error(e.message || 'Update failed');
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold">Edit Customer (Req #{record?.id})</h3>
+          <button onClick={onClose} className="text-gray-500">✕</button>
+        </div>
+        <div className="space-y-3">
+          <div className="relative">
+            <label className="block mb-1">Search Customer</label>
+            <input
+              type="text"
+              placeholder="Search by Customer ID, Name, Phone, Email, GSTIN..."
+              className="w-full border p-2 rounded pr-10"
+              value={customerIdSearch}
+              onChange={(e) => setCustomerIdSearch(e.target.value)}
+            />
+            {loadingCustomers && (
+              <div className="absolute right-3 top-9">Loading...</div>
+            )}
+            {customerSuggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto">
+                {customerSuggestions.map((customer) => (
+                  <div
+                    key={customer.customer_id}
+                    className="p-2 hover:bg-gray-100 cursor-pointer"
+                    onClick={() => handleCustomerSelect(customer)}
+                  >
+                    <div className="font-medium">
+                      {customer.first_name} {customer.last_name || ''}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      ID: {customer.customer_id} | {customer.phone || 'No Phone'} | {customer.company || 'No Company'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedCustomer && (
+            <div className="border rounded p-3 bg-gray-50">
+              <h4 className="font-medium mb-2">Selected Customer</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="font-semibold">ID:</span> {selectedCustomer.customer_id}</div>
+                <div><span className="font-semibold">Name:</span> {selectedCustomer.first_name} {selectedCustomer.last_name || ''}</div>
+                <div><span className="font-semibold">Company:</span> {selectedCustomer.company || '—'}</div>
+                <div><span className="font-semibold">Phone:</span> {selectedCustomer.phone || '—'}</div>
+                <div><span className="font-semibold">Email:</span> {selectedCustomer.email || '—'}</div>
+                <div><span className="font-semibold">GSTIN:</span> {selectedCustomer.gstin || '—'}</div>
+                <div className="col-span-2"><span className="font-semibold">Address:</span> {selectedCustomer.address || '—'}</div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 rounded border">Cancel</button>
+          <button onClick={save} disabled={!selectedCustomer} className="px-3 py-1.5 rounded bg-green-600 text-white disabled:opacity-50">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementIds }) {
   const [loading, setLoading] = useState(false);
   const [statements, setStatements] = useState([]);
@@ -619,6 +770,8 @@ export default function PurchasesPage() {
   const [paymentStatementByPurchaseId, setPaymentStatementByPurchaseId] = useState(() => ({}));
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState(() => new Set());
   const [isMultiLinkModalOpen, setIsMultiLinkModalOpen] = useState(false);
+  const [editCustomerOpen, setEditCustomerOpen] = useState(false);
+  const [editCustomerRecord, setEditCustomerRecord] = useState(null);
 
   useEffect(() => {
     loadPurchases();
@@ -1182,6 +1335,7 @@ export default function PurchasesPage() {
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('id')}>ID {sortColumn === 'id' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_code')}>Product Code {sortColumn === 'product_code' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_name')}>Product Name {sortColumn === 'product_name' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold">Customer Details</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('quantity')}>Qty {sortColumn === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('price_per_unit')}>Price/Unit {sortColumn === 'price_per_unit' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('net_amount')}>Net Amount {sortColumn === 'net_amount' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -1222,6 +1376,33 @@ export default function PurchasesPage() {
                       </td>
                       <td className="p-3 font-medium">{purchase.product_code}</td>
                       <td className="p-3">{purchase.product_name}</td>
+                      <td className="p-3">
+                        <div className="flex items-start gap-2">
+                          <div className="space-y-1 flex-1">
+                            {purchase.customer_id && <div className="text-xs text-gray-600"><span className="font-semibold">ID:</span> {purchase.customer_id}</div>}
+                            {purchase.client_name && <div className="text-sm"><span className="font-semibold">Name:</span> {purchase.client_name}</div>}
+                            {purchase.client_company_name && <div className="text-sm"><span className="font-semibold">Company:</span> {purchase.client_company_name}</div>}
+                            {purchase.client_number && <div className="text-xs text-gray-600"><span className="font-semibold">Phone:</span> {purchase.client_number}</div>}
+                            {purchase.client_email && <div className="text-xs text-gray-600"><span className="font-semibold">Email:</span> {purchase.client_email}</div>}
+                            {purchase.client_gstin && <div className="text-xs text-gray-600"><span className="font-semibold">GSTIN:</span> {purchase.client_gstin}</div>}
+                            {!purchase.customer_id && !purchase.client_name && !purchase.client_company_name && !purchase.client_number && !purchase.client_email && !purchase.client_gstin && <span className="text-gray-400">—</span>}
+                          </div>
+                          {(() => {
+                            const isChild = !!purchase.parent_id;
+                            const isParent = purchases.some(p => p.parent_id === purchase.id);
+                            if (isChild) return null;
+                            return (
+                              <button
+                                onClick={() => { setEditCustomerRecord(purchase); setEditCustomerOpen(true); }}
+                                className="text-blue-600 hover:text-blue-800"
+                                title="Edit Customer"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                            );
+                          })()}
+                        </div>
+                      </td>
                       <td className="p-3">{purchase.quantity}</td>
                       <td className="p-3">₹{Number(purchase.price_per_unit).toFixed(2)}</td>
                       <td className="p-3 font-semibold">₹{Number(purchase.net_amount).toFixed(2)}</td>
@@ -1347,6 +1528,13 @@ export default function PurchasesPage() {
               {[
                 ["Product Code", detailPurchase.product_code],
                 ["Product Name", detailPurchase.product_name],
+                ["Customer ID", detailPurchase.customer_id],
+                ["Client Name", detailPurchase.client_name],
+                ["Client Company Name", detailPurchase.client_company_name],
+                ["Client Number", detailPurchase.client_number],
+                ["Client Email", detailPurchase.client_email],
+                ["GSTIN", detailPurchase.client_gstin],
+                ["Customer Address", detailPurchase.customer_address],
                 ["Quantity", detailPurchase.quantity],
                 ["Price/Unit", `₹${Number(detailPurchase.price_per_unit || 0).toFixed(2)}`],
                 ["Amount/Unit", detailPurchase.amount_per_unit],
@@ -1422,6 +1610,14 @@ export default function PurchasesPage() {
 
       {/* Edit Transport Modal */}
       <EditTransportModal open={editOpen} onClose={() => setEditOpen(false)} record={editRecord} onSaved={loadPurchases} />
+
+      {/* Edit Customer Modal */}
+      <EditCustomerModal 
+        open={editCustomerOpen} 
+        onClose={() => { setEditCustomerOpen(false); setEditCustomerRecord(null); }} 
+        record={editCustomerRecord} 
+        onSaved={loadPurchases} 
+      />
 
       {/* Link Payment Modal */}
       <LinkPaymentModal

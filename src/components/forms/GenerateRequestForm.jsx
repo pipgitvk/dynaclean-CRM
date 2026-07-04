@@ -7,6 +7,9 @@ export default function GenerateRequestForm() {
   const [search, setSearch] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [product, setProduct] = useState(null);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerSuggestions, setCustomerSuggestions] = useState([]);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [gstIncluded, setGstIncluded] = useState(true);
   const [createdBy, setCreatedBy] = useState("");
   const [formData, setFormData] = useState({
@@ -16,10 +19,7 @@ export default function GenerateRequestForm() {
     net_amount: "",
     tax_amount: "",
     gst_rate: "",
-    from_company: "",
-    from_address: "",
     delivery_location: "",
-    contact: "",
     transportation_charges: "",
     mode_of_transport: "",
     self_name: "",
@@ -30,6 +30,13 @@ export default function GenerateRequestForm() {
     truck_number: "",
     driver_name: "",
     driver_number: "",
+    customer_id: "",
+    client_name: "",
+    client_company_name: "",
+    client_number: "",
+    client_email: "",
+    client_gstin: "",
+    customer_address: "",
   });
   const [files, setFiles] = useState({
     quotation_upload: null,
@@ -69,6 +76,34 @@ export default function GenerateRequestForm() {
       setSuggestions([]);
     }
   }, [search]);
+
+  // Customer search
+  useEffect(() => {
+    if (customerSearch.length >= 2) {
+      fetch(`/api/customers/list?search=${encodeURIComponent(customerSearch)}`)
+        .then((res) => res.json())
+        .then(setCustomerSuggestions)
+        .catch(() => setCustomerSuggestions([]));
+    } else {
+      setCustomerSuggestions([]);
+    }
+  }, [customerSearch]);
+
+  const handleCustomerSelect = (customer) => {
+    setSelectedCustomer(customer);
+    setCustomerSearch(`${customer.first_name} ${customer.last_name || ''}`.trim());
+    setCustomerSuggestions([]);
+    setFormData((f) => ({
+      ...f,
+      customer_id: customer.customer_id || '',
+      client_name: `${customer.first_name} ${customer.last_name || ''}`.trim(),
+      client_company_name: customer.company || '',
+      client_number: customer.phone || '',
+      client_email: customer.email || '',
+      client_gstin: customer.gstin || '',
+      customer_address: customer.address || '',
+    }));
+  };
 
   const handleSelect = async (selectedProduct) => {
     setProduct(selectedProduct);
@@ -208,10 +243,7 @@ export default function GenerateRequestForm() {
           net_amount: "",
           tax_amount: "",
           gst_rate: "",
-          from_company: "",
-          from_address: "",
           delivery_location: "",
-          contact: "",
           transportation_charges: "",
           mode_of_transport: "",
           self_name: "",
@@ -222,7 +254,16 @@ export default function GenerateRequestForm() {
           truck_number: "",
           driver_name: "",
           driver_number: "",
+          customer_id: "",
+          client_name: "",
+          client_company_name: "",
+          client_number: "",
+          client_email: "",
+          client_gstin: "",
+          customer_address: "",
         });
+        setSelectedCustomer(null);
+        setCustomerSearch("");
         setFiles({
           quotation_upload: null,
           payment_proof_upload: null,
@@ -475,51 +516,108 @@ export default function GenerateRequestForm() {
           <h4 className="text-md font-semibold mt-6 mb-2">
             4. Company & Delivery
           </h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
+            {/* Customer Search */}
             <div>
-              <label className="block mb-1">From Company *</label>
+              <label className="block mb-1 font-medium">Search Customer</label>
               <input
                 type="text"
-                name="from_company"
-                value={formData.from_company}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-                required
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                className="w-full border rounded p-2"
+                placeholder="Search by Customer ID, Name, Phone, Email, GST..."
               />
+              {customerSuggestions.length > 0 && (
+                <ul className="border rounded mt-1 bg-white shadow max-h-40 overflow-auto">
+                  {customerSuggestions.map((cust) => (
+                    <li
+                      key={cust.customer_id}
+                      onClick={() => handleCustomerSelect(cust)}
+                      className="p-2 cursor-pointer hover:bg-gray-100"
+                    >
+                      <p>
+                        <span className="font-bold">Name:</span> {cust.first_name} {cust.last_name || ''}
+                      </p>
+                      {cust.company && <p><span className="font-bold">Company:</span> {cust.company}</p>}
+                      {cust.phone && <p><span className="font-bold">Phone:</span> {cust.phone}</p>}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
-            <div>
-              <label className="block mb-1">From Address *</label>
-              <textarea
-                name="from_address"
-                value={formData.from_address}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-                rows="2"
-                required
-              />
-            </div>
-            <div>
-              <label className="block mb-1">Contact *</label>
-              <input
-                type="text"
-                name="contact"
-                value={formData.contact}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-                placeholder="Contact person/number"
-                required
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block mb-1">Delivery Location *</label>
-              <textarea
-                name="delivery_location"
-                value={formData.delivery_location}
-                onChange={handleChange}
-                className="w-full border p-2 rounded"
-                rows="2"
-                required
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block mb-1">Client Name</label>
+                <input
+                  type="text"
+                  name="client_name"
+                  value={formData.client_name}
+                  className="w-full border p-2 rounded bg-gray-100"
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block mb-1">Client Company Name</label>
+                <input
+                  type="text"
+                  name="client_company_name"
+                  value={formData.client_company_name}
+                  className="w-full border p-2 rounded bg-gray-100"
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block mb-1">Client Number</label>
+                <input
+                  type="text"
+                  name="client_number"
+                  value={formData.client_number}
+                  className="w-full border p-2 rounded bg-gray-100"
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block mb-1">Client Email</label>
+                <input
+                  type="email"
+                  name="client_email"
+                  value={formData.client_email}
+                  className="w-full border p-2 rounded bg-gray-100"
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block mb-1">GSTIN</label>
+                <input
+                  type="text"
+                  name="client_gstin"
+                  value={formData.client_gstin}
+                  className="w-full border p-2 rounded bg-gray-100"
+                  disabled
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block mb-1">Customer Address</label>
+                <textarea
+                  name="customer_address"
+                  value={formData.customer_address}
+                  className="w-full border p-2 rounded bg-gray-100"
+                  rows="2"
+                  disabled
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block mb-1">Delivery Location *</label>
+                <textarea
+                  name="delivery_location"
+                  value={formData.delivery_location}
+                  onChange={handleChange}
+                  className="w-full border p-2 rounded"
+                  rows="2"
+                  required
+                />
+              </div>
             </div>
           </div>
 

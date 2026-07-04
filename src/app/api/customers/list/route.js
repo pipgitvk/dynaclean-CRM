@@ -21,7 +21,9 @@ export async function GET(req) {
         last_name,
         email,
         phone,
-        company
+        company,
+        gstin,
+        address
       FROM customers
     `;
 
@@ -34,10 +36,13 @@ export async function GET(req) {
           OR last_name LIKE ?
           OR phone LIKE ?
           OR email LIKE ?
+          OR company LIKE ?
+          OR gstin LIKE ?
+          OR CAST(customer_id AS CHAR) LIKE ?
       `;
 
       const searchValue = `%${search}%`;
-      params.push(searchValue, searchValue, searchValue, searchValue);
+      params.push(searchValue, searchValue, searchValue, searchValue, searchValue, searchValue, searchValue);
     }
 
     query += " ORDER BY first_name ASC LIMIT 20";

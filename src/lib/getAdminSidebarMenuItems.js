@@ -521,6 +521,13 @@ const allMenuItems = [
             roles: ["SUPERADMIN", "SERVICE SUPPORT"],
             icon: "ShoppingBag",
           },
+          {
+            path: "/admin-dashboard/purchase/ledger",
+            name: "Purchase Ledger",
+            accessKey: "purchase-ledger",
+            roles: ["SUPERADMIN", "SERVICE SUPPORT"],
+            icon: "ScrollText",
+          },
         ],
       },
       {
@@ -653,13 +660,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "ShieldCheck",
       },
-      {
-        path: "/user-dashboard/employees",
-        name: "Employee list",
-        accessKey: "employee-list",
-        roles: ["ALL"],
-        icon: "User",
-      },
+      // {
+      //   path: "/user-dashboard/employees",
+      //   name: "Employee list",
+      //   accessKey: "employee-list",
+      //   roles: ["ALL"],
+      //   icon: "User",
+      // },
       {
         path: "/empcrm",
         name: "Employee CRM",

@@ -31,6 +31,16 @@ export async function PATCH(req) {
       let created_at = formData.get('created_at');
       const invoice_number = formData.get('invoice_number');
       let invoice_date = formData.get('invoice_date');
+      
+      // Customer fields
+      const customer_id = formData.get('customer_id');
+      const client_name = formData.get('client_name');
+      const client_company_name = formData.get('client_company_name');
+      const client_number = formData.get('client_number');
+      const client_email = formData.get('client_email');
+      const client_gstin = formData.get('client_gstin');
+      const customer_address = formData.get('customer_address');
+      
       // Convert date format (YYYY-MM-DD) to MySQL datetime format (YYYY-MM-DD HH:MM:SS)
       if (created_at && created_at.includes('-') && !created_at.includes(' ')) {
         created_at = created_at + ' 00:00:00';
@@ -51,51 +61,70 @@ export async function PATCH(req) {
         driver_name: formData.get('driver_name'),
         driver_number: formData.get('driver_number'),
       };
-      if (!id || !mode_of_transport) {
-        return NextResponse.json({ error: 'id and mode_of_transport required' }, { status: 400 });
+      
+      // If we're just updating customer fields, we don't need mode_of_transport
+      const isCustomerUpdate = customer_id || client_name || client_company_name || client_number || client_email || client_gstin || customer_address;
+      
+      if (!id) {
+        return NextResponse.json({ error: 'id is required' }, { status: 400 });
       }
+      
       // Save any provided files
       const quotation_upload = await saveFile(formData.get('quotation_upload'));
       const payment_proof_upload = await saveFile(formData.get('payment_proof_upload'));
       const invoice_upload = await saveFile(formData.get('invoice_upload'));
       const eway_bill = await saveFile(formData.get('eway_bill'));
 
-      // Normalize subfields
-      const upd = { mode_of_transport, ...fields };
-      if (mode_of_transport === 'Self') {
-        upd.courier_tracking_id = upd.courier_company = upd.porter_tracking_id = upd.porter_contact = upd.truck_number = upd.driver_name = upd.driver_number = null;
-      } else if (mode_of_transport === 'Courier') {
-        upd.self_name = upd.porter_tracking_id = upd.porter_contact = upd.truck_number = upd.driver_name = upd.driver_number = null;
-      } else if (mode_of_transport === 'Porter') {
-        upd.self_name = upd.courier_tracking_id = upd.courier_company = upd.truck_number = upd.driver_name = upd.driver_number = null;
-      } else if (mode_of_transport === 'Truck') {
-        upd.self_name = upd.courier_tracking_id = upd.courier_company = upd.porter_tracking_id = upd.porter_contact = null;
+      // Normalize subfields if we have mode_of_transport
+      let upd = {};
+      if (mode_of_transport) {
+        upd = { mode_of_transport, ...fields };
+        if (mode_of_transport === 'Self') {
+          upd.courier_tracking_id = upd.courier_company = upd.porter_tracking_id = upd.porter_contact = upd.truck_number = upd.driver_name = upd.driver_number = null;
+        } else if (mode_of_transport === 'Courier') {
+          upd.self_name = upd.porter_tracking_id = upd.porter_contact = upd.truck_number = upd.driver_name = upd.driver_number = null;
+        } else if (mode_of_transport === 'Porter') {
+          upd.self_name = upd.courier_tracking_id = upd.courier_company = upd.truck_number = upd.driver_name = upd.driver_number = null;
+        } else if (mode_of_transport === 'Truck') {
+          upd.self_name = upd.courier_tracking_id = upd.courier_company = upd.porter_tracking_id = upd.porter_contact = null;
+        }
       }
 
       const db = await getDbConnection();
       // Build dynamic SET
-      const setParts = [
-        'mode_of_transport = ?',
-        'self_name = ?',
-        'courier_tracking_id = ?',
-        'courier_company = ?',
-        'porter_tracking_id = ?',
-        'porter_contact = ?',
-        'truck_number = ?',
-        'driver_name = ?',
-        'driver_number = ?',
-      ];
-      const values = [
-        upd.mode_of_transport,
-        upd.self_name,
-        upd.courier_tracking_id,
-        upd.courier_company,
-        upd.porter_tracking_id,
-        upd.porter_contact,
-        upd.truck_number,
-        upd.driver_name,
-        upd.driver_number,
-      ];
+      const setParts = [];
+      const values = [];
+      
+      if (mode_of_transport) {
+        setParts.push('mode_of_transport = ?');
+        values.push(upd.mode_of_transport);
+        setParts.push('self_name = ?');
+        values.push(upd.self_name);
+        setParts.push('courier_tracking_id = ?');
+        values.push(upd.courier_tracking_id);
+        setParts.push('courier_company = ?');
+        values.push(upd.courier_company);
+        setParts.push('porter_tracking_id = ?');
+        values.push(upd.porter_tracking_id);
+        setParts.push('porter_contact = ?');
+        values.push(upd.porter_contact);
+        setParts.push('truck_number = ?');
+        values.push(upd.truck_number);
+        setParts.push('driver_name = ?');
+        values.push(upd.driver_name);
+        setParts.push('driver_number = ?');
+        values.push(upd.driver_number);
+      }
+      
+      // Add customer fields
+      if (customer_id !== undefined) { setParts.push('customer_id = ?'); values.push(customer_id); }
+      if (client_name !== undefined) { setParts.push('client_name = ?'); values.push(client_name); }
+      if (client_company_name !== undefined) { setParts.push('client_company_name = ?'); values.push(client_company_name); }
+      if (client_number !== undefined) { setParts.push('client_number = ?'); values.push(client_number); }
+      if (client_email !== undefined) { setParts.push('client_email = ?'); values.push(client_email); }
+      if (client_gstin !== undefined) { setParts.push('client_gstin = ?'); values.push(client_gstin); }
+      if (customer_address !== undefined) { setParts.push('customer_address = ?'); values.push(customer_address); }
+      
       if (net_amount !== null && net_amount !== '') { setParts.push('net_amount = ?'); values.push(net_amount); }
       if (price_per_unit !== null && price_per_unit !== '') { setParts.push('price_per_unit = ?'); values.push(price_per_unit); }
       if (created_at !== null && created_at !== '') { setParts.push('created_at = ?'); values.push(created_at); }
@@ -105,7 +134,13 @@ export async function PATCH(req) {
       if (payment_proof_upload) { setParts.push('payment_proof_upload = ?'); values.push(payment_proof_upload); }
       if (invoice_upload) { setParts.push('invoice_upload = ?'); values.push(invoice_upload); }
       if (eway_bill) { setParts.push('eway_bill = ?'); values.push(eway_bill); }
+      
       values.push(id);
+      
+      if (setParts.length === 0) {
+        return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+      }
+      
       const [result] = await db.execute(
         `UPDATE product_stock_request SET ${setParts.join(', ')} WHERE id = ?`,
         values
@@ -316,6 +351,13 @@ export async function POST(req) {
     const contact = formData.get("contact");
     const mode_of_transport = formData.get("mode_of_transport");
     const transportation_charges = formData.get("transportation_charges");
+    const customer_id = formData.get("customer_id");
+    const client_name = formData.get("client_name");
+    const client_company_name = formData.get("client_company_name");
+    const client_number = formData.get("client_number");
+    const client_email = formData.get("client_email");
+    const client_gstin = formData.get("client_gstin");
+    const customer_address = formData.get("customer_address");
     
     // Conditional transport fields
     const self_name = formData.get("self_name");
@@ -387,11 +429,13 @@ export async function POST(req) {
         product_image, eway_bill, from_company, from_address, delivery_location, contact,
         mode_of_transport, self_name, courier_tracking_id, courier_company,
         porter_tracking_id, porter_contact, truck_number, driver_name, driver_number,
+        customer_id, client_name, client_company_name, client_number, client_email, client_gstin, customer_address,
         status, created_by
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?,
         'requested', ?
       )
     `;
@@ -403,6 +447,7 @@ export async function POST(req) {
       product_image, eway_bill, from_company, from_address, delivery_location, contact,
       mode_of_transport, self_name, courier_tracking_id, courier_company,
       porter_tracking_id, porter_contact, truck_number, driver_name, driver_number,
+      customer_id, client_name, client_company_name, client_number, client_email, client_gstin, customer_address,
       username
     ];
 

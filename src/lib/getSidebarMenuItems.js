@@ -531,6 +531,13 @@ const allMenuItems = [
             roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "SERVICE SUPPORT"],
             icon: "ShoppingBag",
           },
+          {
+            path: "/user-dashboard/purchase/ledger",
+            name: "Purchase Ledger",
+            moduleKey: "purchase-ledger",
+            roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "SERVICE SUPPORT"],
+            icon: "ScrollText",
+          },
         ],
       },
       {

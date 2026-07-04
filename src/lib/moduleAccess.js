@@ -88,6 +88,7 @@ export const MODULE_TREE = [
       { key: "purchase-request", label: "Purchase – Generate Request" },
       { key: "purchase-warehouse-in", label: "Purchase – Warehouse In" },
       { key: "purchases", label: "Purchases" },
+      { key: "purchase-ledger", label: "Purchase Ledger" },
       { key: "spare-parts", label: "Spare Parts" },
       { key: "spare-direct-in", label: "Spare – Direct In" },
       { key: "spare-request", label: "Spare – Generate Request" },
@@ -307,6 +308,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
           { kind: "leaf", key: "purchase-request", label: "Generate Request" },
           { kind: "leaf", key: "purchase-warehouse-in", label: "Warehouse In" },
           { kind: "leaf", key: "purchases", label: "Purchases" },
+          { kind: "leaf", key: "purchase-ledger", label: "Purchase Ledger" },
         ],
       },
       {
