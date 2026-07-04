@@ -116,7 +116,7 @@ export default function OrderTable({ orders, userRole }) {
 
   const exportToCSV = () => {
     const headers = [
-      "Order ID", "Created By", "Order Date", "Client Name", "Company Name", 
+      "Order ID", "Quotation", "Created By", "Order Date", "Client Name", "Company Name", 
       "Contact", "Location", "Item Name", "Item Code", "Status", "Payment Status", "Due Date", "Total Amount", "Paid Amount"
     ];
     const csvData = filteredOrders.map(order => {
@@ -132,6 +132,7 @@ export default function OrderTable({ orders, userRole }) {
       
       return [
         order.order_id,
+        order.quote_number,
         order.created_by,
         dayjs(order.created_at).format("DD/MM/YYYY"),
         order.client_name,
@@ -381,7 +382,7 @@ export default function OrderTable({ orders, userRole }) {
           <thead className="bg-gray-800 text-white sticky top-0 z-10">
             <tr>
               <th className="px-3 py-3 font-semibold text-center">#</th>
-              <th className="px-3 py-3 font-semibold text-left">Order ID</th>
+              <th className="px-3 py-3 font-semibold text-left">Order ID / Quotation</th>
               <th className="px-3 py-3 font-semibold text-left">Created By</th>
               <th className="px-3 py-3 font-semibold text-left">Order Date</th>
               <th className="px-3 py-3 font-semibold text-left">Company</th>
@@ -407,8 +408,19 @@ export default function OrderTable({ orders, userRole }) {
                     className="hover:bg-gray-50 text-center transition-colors duration-150"
                   >
                     <td className="px-3 py-3">{i + 1}</td>
-                    <td className="px-3 py-3 font-medium text-gray-800">
-                      {r.order_id}
+                    <td className="px-3 py-3 text-left">
+                      <div className="space-y-1">
+                        <div className="font-medium text-gray-800">
+                          {r.order_id}
+                        </div>
+                        <Link 
+                          href={`/accounts-dashboard/quotations/${r.quote_number}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm"
+                          title="View Quotation"
+                        >
+                          {r.quote_number}
+                        </Link>
+                      </div>
                     </td>
                     <td className="px-3 py-3 font-medium text-gray-800">
                       {r.created_by}
@@ -524,7 +536,16 @@ export default function OrderTable({ orders, userRole }) {
                   </div>
                 </div>
                 <div>
-                  <strong>Order Id:</strong> {r.order_id}
+                  <strong>Order ID:</strong> {r.order_id}
+                </div>
+                <div>
+                  <strong>Quotation:</strong>{" "}
+                  <Link 
+                    href={`/accounts-dashboard/quotations/${r.quote_number}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {r.quote_number}
+                  </Link>
                 </div>
 
                 <div>
