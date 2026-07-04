@@ -26,8 +26,8 @@ function transformMenuItemPaths(item, roleKey) {
   const dashboardPrefix = getDashboardPrefix(roleKey);
   const roleUpper = String(roleKey || "").toUpperCase();
 
-  // Don't transform admin-dashboard or empcrm paths
-  if (item.path?.startsWith("/admin-dashboard") || item.path?.startsWith("/empcrm")) {
+  // Don't transform admin-dashboard, accounts-dashboard or empcrm paths
+  if (item.path?.startsWith("/admin-dashboard") || item.path?.startsWith("/accounts-dashboard") || item.path?.startsWith("/empcrm")) {
     return item;
   }
 
@@ -641,6 +641,13 @@ const allMenuItems = [
         moduleKey: "dd-management",
         roles: ["ALL"],
         icon: "DollarSign",
+      },
+      {
+        path: "/accounts-dashboard/other-income",
+        name: "Other Income",
+        moduleKey: "other-income",
+        roles: ["ACCOUNTANT", "ADMIN", "SUPERADMIN"],
+        icon: "TrendingUp",
       },
       {
         path: "/admin-dashboard/import-crm/billing",

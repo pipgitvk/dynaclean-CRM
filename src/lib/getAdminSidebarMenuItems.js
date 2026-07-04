@@ -614,6 +614,12 @@ const allMenuItems = [
         icon: "Receipt",
       },
       {
+        path: "/admin-dashboard/other-income",
+        name: "Other Income",
+        roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
+        icon: "TrendingUp",
+      },
+      {
         path: "/admin-dashboard/import-crm/billing",
         name: "Billing",
         roles: ["SUPERADMIN"],

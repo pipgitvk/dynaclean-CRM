@@ -117,6 +117,7 @@ import {
   Target,
   Briefcase,
   Globe,
+  TrendingUp,
 } from "lucide-react";
 
 // Icon map
@@ -157,6 +158,7 @@ const iconMap = {
   Target,
   Briefcase,
   Globe,
+  TrendingUp,
 };
 
 //this is test

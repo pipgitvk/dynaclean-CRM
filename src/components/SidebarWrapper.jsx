@@ -71,6 +71,12 @@ const allMenuItems = [
     icon: "DollarSign",
   },
   {
+    path: "/accounts-dashboard/other-income",
+    name: "Other Income",
+    roles: ["ACCOUNTANT", "ADMIN"],
+    icon: "TrendingUp",
+  },
+  {
     path: "/view_service_reports",
     name: "Service History",
     roles: ["SERVICE ENGINEER"],
