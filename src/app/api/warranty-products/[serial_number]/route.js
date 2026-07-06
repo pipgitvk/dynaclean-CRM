@@ -74,6 +74,7 @@ export async function PUT(req, { params }) {
     const model = formData.get("model");
     const new_serial_number = formData.get("serial_number"); // The potentially new serial number from form
     const warranty_period = formData.get("warranty_period");
+    const service_type = formData.get("service_type");
     const quantity = formData.get("quantity");
     const customer_name = formData.get("customer_name");
     const email = formData.get("email");
@@ -97,6 +98,7 @@ export async function PUT(req, { params }) {
       !product_name ||
       !new_serial_number ||
       !warranty_period ||
+      !service_type ||
       !customer_name ||
       !email ||
       !contact ||
@@ -166,6 +168,7 @@ export async function PUT(req, { params }) {
         model = ?,
         serial_number = ?,
         warranty_period = ?,
+        service_type = ?,
         quantity = ?,
         customer_name = ?,
         email = ?,
@@ -196,6 +199,7 @@ export async function PUT(req, { params }) {
       model,
       new_serial_number, // Use the new serial number from the form for update
       warranty_period,
+      service_type,
       quantity,
       customer_name,
       email,

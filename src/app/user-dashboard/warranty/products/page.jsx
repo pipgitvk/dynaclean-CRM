@@ -72,6 +72,9 @@ export default function WarrantyPage() {
         <div className="h-4 bg-gray-300 rounded w-1/3"></div>
       </td>
       <td className="p-3 border-b border-gray-200">
+        <div className="h-4 bg-gray-300 rounded w-1/3"></div>
+      </td>
+      <td className="p-3 border-b border-gray-200">
         <div className="space-y-1">
           <div className="h-4 bg-gray-300 rounded w-full"></div>
           <div className="h-4 bg-gray-300 rounded w-3/4"></div>
@@ -146,6 +149,7 @@ export default function WarrantyPage() {
     "Spec",
     "Serial",
     "Warranty",
+    "Service Type",
     "State",
     "Company",
     "Installation",
@@ -291,6 +295,20 @@ export default function WarrantyPage() {
                   <div className="text-[11px] text-gray-700">
                     <span className="font-semibold">Spec:</span>{" "}
                     {r.specification}
+                  </div>
+                )}
+
+                {r.service_type && (
+                  <div className="text-[11px]">
+                    <span className={`font-semibold px-2 py-1 rounded ${
+                      r.service_type === 'CAMC' 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : r.service_type === 'AMC'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {r.service_type}
+                    </span>
                   </div>
                 )}
 
@@ -451,6 +469,17 @@ export default function WarrantyPage() {
                       <td className={`p-3 border-b border-gray-200 ${getWarrantyStatus(r.installation_date, r.warranty_period).color}`}>
                           {getWarrantyStatus(r.installation_date, r.warranty_period).status}
                         </td>
+                      <td className="p-3 border-b border-gray-200">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          r.service_type === 'CAMC' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : r.service_type === 'AMC'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {r.service_type || '—'}
+                        </span>
+                      </td>
                       {/* <td className="p-3 border-b border-gray-200">
                         {r.quantity}
                       </td>
@@ -621,7 +650,7 @@ export default function WarrantyPage() {
                 ) : (
                   // Render a "no records found" message if not loading and no products
                   <tr>
-                    <td colSpan={13} className="text-center p-4 text-gray-500">
+                    <td colSpan={12} className="text-center p-4 text-gray-500">
                       No matching records found.
                     </td>
                   </tr>
