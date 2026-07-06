@@ -74,8 +74,14 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
   if (norm.includes("service") && norm.includes("issue")) {
     return `${base} bg-pink-500 text-white`;
   }
+  if (norm.includes("truck") && norm.includes("follow")) {
+    return `${base} bg-orange-200 text-orange-900 border border-orange-300/90`;
+  }
   if (norm.includes("strong") && norm.includes("follow")) {
     return `${base} bg-yellow-100 text-yellow-900 border border-yellow-300/90`;
+  }
+  if (norm.includes("repeat") && norm.includes("order")) {
+    return `${base} bg-blue-200 text-blue-900 border border-blue-400/90 shadow-md`;
   }
   if (norm.includes("running") && norm.includes("order")) {
     return `${base} bg-emerald-200 text-emerald-900 border border-emerald-400/90`;
