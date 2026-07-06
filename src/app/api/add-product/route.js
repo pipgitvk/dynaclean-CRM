@@ -178,7 +178,7 @@ export async function POST(request) {
 
     const {
         item_name, item_code, category, specification, gst_rate, hsn_sac,
-        unit, price_per_unit
+        unit, price_per_unit, last_negotiation_price, gem_price
     } = data;
 
     // Basic validation
@@ -223,15 +223,15 @@ export async function POST(request) {
             const productQuery = `
                 INSERT INTO products_list 
                 (item_name, item_code, category, specification, gst_rate, hsn_sac, product_image, 
-                img_1, img_2, img_3, img_4, img_5, unit, price_per_unit, created_by) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                img_1, img_2, img_3, img_4, img_5, unit, price_per_unit, last_negotiation_price, gem_price, created_by) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             const productValues = [
                 item_name, item_code, category, specification, gst_rate, hsn_sac,
                 imagePaths.product_image, imagePaths.img_1, imagePaths.img_2,
                 imagePaths.img_3, imagePaths.img_4, imagePaths.img_5,
-                unit, price_per_unit,username
+                unit, price_per_unit, last_negotiation_price || null, gem_price || null, username
             ];
 
             await db.execute(productQuery, productValues);

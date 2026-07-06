@@ -1,4 +1,4 @@
-"use client";
+    "use client";
 
 import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
@@ -6,7 +6,7 @@ import { Eye, Search, Pencil, ArrowRightLeft, History, X } from "lucide-react";
 import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
 
-function ProductAndSpareLists({ type }) {
+function ProductAndSpareLists({ type, userRole }) {
   const [rows, setRows] = useState([]);
   const [q, setQ] = useState("");
   const [showSparesModal, setShowSparesModal] = useState(false);
@@ -135,6 +135,7 @@ function ProductAndSpareLists({ type }) {
                   <th className="p-2 text-left">Product No</th>
                   <th className="p-2 text-left">Min Qty</th>
                   <th className="p-2 text-left">Price</th>
+                  {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <th className="p-2 text-left">GEM Price</th>}
                   <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Spares</th>
@@ -183,6 +184,7 @@ function ProductAndSpareLists({ type }) {
                         <td className="p-2">{r.product_number}</td>
                         <td className="p-2">{r.min_qty}</td>
                         <td className="p-2">{r.price_per_unit}</td>
+                        {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <td className="p-2">{r.gem_price || 0}</td>}
                         <td className="p-2">{r.last_negotiation_price || 0}</td>
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
@@ -787,7 +789,7 @@ export default function ProductStockForm() {
         </div>
         {openSection === "list" && (
           <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
-            <ProductAndSpareLists type="product" />
+            <ProductAndSpareLists type="product" userRole={userRole} />
           </div>
         )}
       </div>

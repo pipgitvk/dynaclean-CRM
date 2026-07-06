@@ -33,6 +33,7 @@ function ProductAndSpareLists({ type }) {
     product_number: '',
     min_qty: '',
     price_per_unit: '',
+    gem_price: '',
     last_negotiation_price: '',
     gst_rate: '',
     specification: '',
@@ -190,6 +191,7 @@ function ProductAndSpareLists({ type }) {
       product_number: row.product_number || '',
       min_qty: row.min_qty || '',
       price_per_unit: row.price_per_unit || row.price || '',
+      gem_price: row.gem_price || '',
       last_negotiation_price: row.last_negotiation_price || '',
       gst_rate: row.gst_rate || '',
       specification: row.specification || '',
@@ -307,6 +309,7 @@ function ProductAndSpareLists({ type }) {
       formData.append('product_number', editFormData.product_number);
       formData.append('min_qty', editFormData.min_qty);
       formData.append('price_per_unit', editFormData.price_per_unit);
+      formData.append('gem_price', editFormData.gem_price);
       formData.append('last_negotiation_price', editFormData.last_negotiation_price);
       formData.append('gst_rate', editFormData.gst_rate);
       formData.append('specification', editFormData.specification);
@@ -426,6 +429,7 @@ function ProductAndSpareLists({ type }) {
                   <th className="p-2 text-left">Product No</th>
                   <th className="p-2 text-left">Min Qty</th>
                   <th className="p-2 text-left">Price</th>
+                  <th className="p-2 text-left">GEM Price</th>
                   <th className="p-2 text-left">GST Rate (%)</th>
                   <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
@@ -492,6 +496,11 @@ function ProductAndSpareLists({ type }) {
                               <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'price', value: r.price_per_unit || 0 })} />
                             </div>
                           )}
+                        </td>
+                        <td className="p-2">
+                          <div className="flex items-center gap-2">
+                            <span>{r.gem_price || 0}</span>
+                          </div>
                         </td>
                         <td className="p-2">
                           {editingGst.key === r.item_code ? (
@@ -638,7 +647,7 @@ function ProductAndSpareLists({ type }) {
 
             {view.length === 0 && (
               <tr>
-                <td className="p-2 text-gray-500" colSpan={type === "product" ? 11 : 8}>
+                <td className="p-2 text-gray-500" colSpan={type === "product" ? 12 : 8}>
                   No data
                 </td>
               </tr>
@@ -955,6 +964,17 @@ function ProductAndSpareLists({ type }) {
                   type="number"
                   value={editFormData.price_per_unit}
                   onChange={(e) => setEditFormData({ ...editFormData, price_per_unit: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+
+              {/* GEM Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GEM Price</label>
+                <input
+                  type="number"
+                  value={editFormData.gem_price}
+                  onChange={(e) => setEditFormData({ ...editFormData, gem_price: e.target.value })}
                   className="w-full border rounded p-2 text-sm"
                 />
               </div>

@@ -116,6 +116,7 @@ export async function POST(request) {
         const product_number = formData.get('product_number');
         const min_qty = formData.get('min_qty');
         const price_per_unit = formData.get('price_per_unit');
+        const gem_price = formData.get('gem_price');
         const last_negotiation_price = formData.get('last_negotiation_price');
         const gst_rate = formData.get('gst_rate');
         const specification = formData.get('specification');
@@ -155,6 +156,10 @@ export async function POST(request) {
         if (price_per_unit !== null && price_per_unit !== undefined) {
             updates.push('price_per_unit = ?');
             values.push(price_per_unit);
+        }
+        if (gem_price !== null && gem_price !== undefined) {
+            updates.push('gem_price = ?');
+            values.push(gem_price);
         }
         if (last_negotiation_price !== null && last_negotiation_price !== undefined) {
             updates.push('last_negotiation_price = ?');

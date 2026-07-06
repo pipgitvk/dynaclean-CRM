@@ -15,6 +15,8 @@ export default function AddProductPage() {
     hsn_sac: "",
     unit: "",
     price_per_unit: "",
+    last_negotiation_price: "",
+    gem_price: "",
   });
   const [images, setImages] = useState({
     product_image: null,
@@ -142,6 +144,8 @@ export default function AddProductPage() {
         hsn_sac: "",
         unit: "",
         price_per_unit: "",
+        last_negotiation_price: "",
+        gem_price: "",
       });
       setImages({
         product_image: null,
@@ -205,6 +209,18 @@ export default function AddProductPage() {
       type: "number",
       required: true,
       placeholder: "e.g., 999.99",
+    },
+    {
+      label: "Last Negotiation Price",
+      name: "last_negotiation_price",
+      type: "number",
+      placeholder: "e.g., 950.00",
+    },
+    {
+      label: "GEM Price",
+      name: "gem_price",
+      type: "number",
+      placeholder: "e.g., 899.99",
     },
   ];
 
