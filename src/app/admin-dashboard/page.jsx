@@ -273,6 +273,17 @@ export default async function UserDashboardPage() {
       console.warn("pending leave approvals count:", e.message);
     }
 
+    // Fetch pending AMC/CMC count
+    let pendingAmcCmcCount = 0;
+    try {
+      const [pendingAmcCmcRows] = await connection.execute(
+        `SELECT COUNT(*) AS c FROM amc_cmc WHERE status = 'pending'`,
+      );
+      pendingAmcCmcCount = Number(pendingAmcCmcRows[0]?.c ?? 0);
+    } catch (e) {
+      console.warn("pending AMC/CMC count:", e.message);
+    }
+
     if (!user) {
       return <p className="text-red-600">User not found</p>;
     }
@@ -449,6 +460,37 @@ export default async function UserDashboardPage() {
                   className="px-4 py-2 bg-white text-indigo-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
                 >
                   Review Leaves →
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* AMC/CMC Requests */}
+          <div className="bg-gradient-to-br from-pink-500 via-red-500 to-rose-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
+            <div className="flex flex-col h-full justify-between min-h-[160px]">
+              <div>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
+                    📝
+                  </span>
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
+                    <span className="block">AMC/CMC</span>
+                    <span className="block">Requests</span>
+                  </h2>
+                </div>
+                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+                  {pendingAmcCmcCount}
+                </p>
+                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
+                  Pending approvals
+                </p>
+              </div>
+              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
+                <a
+                  href="/admin-dashboard/amc-cmc"
+                  className="px-4 py-2 bg-white text-rose-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
+                >
+                  Review Requests →
                 </a>
               </div>
             </div>

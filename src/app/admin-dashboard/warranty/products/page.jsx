@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { CheckCircle, AlertTriangle } from "lucide-react";
 
 export default function WarrantyPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -139,6 +140,7 @@ export default function WarrantyPage() {
     "Serial",
     "Warranty",
     "State",
+    "AMC",
     "Company",
     "Installation",
     "Site",
@@ -286,6 +288,15 @@ export default function WarrantyPage() {
                     {r.specification}
                   </div>
                 )}
+
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="font-semibold">AMC:</span>
+                  {r.has_amc ? (
+                    <CheckCircle size={14} className="text-green-600" />
+                  ) : (
+                    <AlertTriangle size={14} className="text-yellow-500" />
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 gap-1">
                   <div>
@@ -454,6 +465,17 @@ export default function WarrantyPage() {
                       <td className="p-3 border-b border-gray-200">
                         {r.state || "—"}
                       </td>
+                      <td className="p-3 border-b border-gray-200 text-center">
+                        {r.has_amc ? (
+                          <div className="flex justify-center">
+                            <CheckCircle size={20} className="text-green-600" title="AMC/CMC Active" />
+                          </div>
+                        ) : (
+                          <div className="flex justify-center">
+                            <AlertTriangle size={20} className="text-yellow-500" title="No AMC/CMC" />
+                          </div>
+                        )}
+                      </td>
                       <td className="p-3 border-b border-gray-200">
                         <div className="space-y-1 text-xs">
                           <div>
@@ -615,7 +637,7 @@ export default function WarrantyPage() {
                 ) : (
                   // Render a "no records found" message if not loading and no products
                   <tr>
-                    <td colSpan={13} className="text-center p-4 text-gray-500">
+                    <td colSpan={12} className="text-center p-4 text-gray-500">
                       No matching records found.
                     </td>
                   </tr>

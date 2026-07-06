@@ -452,6 +452,12 @@ const allMenuItems = [
           roles: ["SUPERADMIN"],
           icon: "MapPin",
         },
+        {
+          path: "/admin-dashboard/amc-cmc",
+          name: "AMC/CMC Management",
+          roles: ["SUPERADMIN", "ADMIN", "SERVICE SUPPORT", "SERVICE HEAD", "EA"],
+          icon: "ClipboardList",
+        },
       ],
     },
   {

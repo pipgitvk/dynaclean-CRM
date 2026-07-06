@@ -76,8 +76,30 @@ export async function GET(req) {
       [...params, limit, offset]
     );
 
+    // Check AMC status for each product
+    const productsWithAMC = await Promise.all(
+      rows.map(async (product) => {
+        try {
+          const [amcRecords] = await pool.execute(
+            `SELECT id FROM amc_cmc WHERE serial_number = ? LIMIT 1`,
+            [product.serial_number]
+          );
+          return {
+            ...product,
+            has_amc: amcRecords && amcRecords.length > 0 ? true : false,
+          };
+        } catch (error) {
+          console.error(`Error checking AMC for ${product.serial_number}:`, error);
+          return {
+            ...product,
+            has_amc: false,
+          };
+        }
+      })
+    );
+
     return NextResponse.json({ 
-      products: rows, 
+      products: productsWithAMC, 
       total, 
       totalPages,
       currentPage: page,

@@ -430,6 +430,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "MapPin",
       },
+      {
+        path: "/user-dashboard/amc-cmc",
+        name: "AMC/CMC Management",
+        moduleKey: "amc-cmc",
+        roles: ["SERVICE SUPPORT", "ADMIN", "SERVICE HEAD", "EA"],
+        icon: "ClipboardList",
+      },
     ],
   },
   {

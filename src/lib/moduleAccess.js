@@ -76,6 +76,7 @@ export const MODULE_TREE = [
       { key: "service-records", label: "Service Records" },
       { key: "upcoming-installations", label: "Upcoming Installations" },
       { key: "service-map", label: "Service Map" },
+      { key: "amc-cmc", label: "AMC/CMC Management" },
     ],
   },
   {
@@ -283,6 +284,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "upcoming-installations", label: "Upcoming Installations" },
       { kind: "leaf", key: "service-map", label: "Service Map" },
       { kind: "leaf", key: "warranty-map", label: "Map View" },
+      { kind: "leaf", key: "amc-cmc", label: "AMC/CMC Management" },
     ],
   },
   {

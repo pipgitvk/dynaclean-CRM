@@ -1,0 +1,28 @@
+-- Create AMC/CMC Contract Table
+CREATE TABLE IF NOT EXISTS amc_cmc (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  serial_number VARCHAR(255) NOT NULL,
+  model VARCHAR(255),
+  image_at_the_time_of_amc VARCHAR(500),
+  company_name VARCHAR(255) NOT NULL,
+  contact VARCHAR(20),
+  email VARCHAR(255),
+  site_address TEXT,
+  site_contact VARCHAR(20),
+  site_email VARCHAR(255),
+  amc_start_datetime DATETIME NOT NULL,
+  amc_end_datetime DATETIME NOT NULL,
+  quotation_ref VARCHAR(255),
+  invoice VARCHAR(500),
+  payment_proof VARCHAR(500),
+  terms_and_conditions TEXT,
+  created_by VARCHAR(255),
+  created_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  approved_by VARCHAR(255) NULL,
+  approved_time DATETIME NULL,
+  status ENUM('pending', 'approved', 'rejected', 'expired') DEFAULT 'pending',
+  UNIQUE KEY unique_serial_amc (serial_number, amc_start_datetime),
+  INDEX idx_status (status),
+  INDEX idx_company (company_name),
+  INDEX idx_dates (amc_start_datetime, amc_end_datetime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

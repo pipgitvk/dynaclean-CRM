@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { CheckCircle, AlertTriangle } from "lucide-react";
 
 export default function WarrantyPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -150,6 +151,7 @@ export default function WarrantyPage() {
     "Serial",
     "Warranty",
     "State",
+    "AMC",
     "Company",
     "Installation",
     "Site",
@@ -297,19 +299,14 @@ export default function WarrantyPage() {
                   </div>
                 )}
 
-                {r.service_type && (
-                  <div className="text-[11px]">
-                    <span className={`font-semibold px-2 py-1 rounded ${
-                      r.service_type === 'CAMC' 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : r.service_type === 'AMC'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {r.service_type}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="font-semibold">AMC:</span>
+                  {r.has_amc ? (
+                    <CheckCircle size={14} className="text-green-600" />
+                  ) : (
+                    <AlertTriangle size={14} className="text-yellow-500" />
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 gap-1">
                   <div>
@@ -469,24 +466,18 @@ export default function WarrantyPage() {
                           {getWarrantyStatus(r.installation_date, r.warranty_period).status}
                         </td>
                       <td className="p-3 border-b border-gray-200">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          r.service_type === 'CAMC' 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : r.service_type === 'AMC'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {r.service_type || '—'}
-                        </span>
-                      </td>
-                      {/* <td className="p-3 border-b border-gray-200">
-                        {r.quantity}
-                      </td>
-                      <td className="p-3 border-b border-gray-200">
-                        {r.warranty_period}
-                      </td> */}
-                      <td className="p-3 border-b border-gray-200">
                         {r.state || "—"}
+                      </td>
+                      <td className="p-3 border-b border-gray-200 text-center">
+                        {r.has_amc ? (
+                          <div className="flex justify-center">
+                            <CheckCircle size={20} className="text-green-600" title="AMC/CMC Active" />
+                          </div>
+                        ) : (
+                          <div className="flex justify-center">
+                            <AlertTriangle size={20} className="text-yellow-500" title="No AMC/CMC" />
+                          </div>
+                        )}
                       </td>
                       <td className="p-3 border-b border-gray-200">
                         <div className="space-y-1 text-xs">
