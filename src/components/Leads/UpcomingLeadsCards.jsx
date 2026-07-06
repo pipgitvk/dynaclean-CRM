@@ -257,6 +257,7 @@ export default function UpcomingLeadsCards({ leadSource }) {
                     customerId={cust.customer_id}
                     name={cust.first_name}
                     contact={cust.phone}
+                    company={cust.company}
                     products_interest={cust.products_interest}
                     stage={cust.stage}
                     dueDate={

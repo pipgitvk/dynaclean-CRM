@@ -39,6 +39,7 @@ FROM (
     c.stage,
     c.first_name,
     c.phone,
+    c.company,
     c.products_interest,
     ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
   FROM customers_followup cf

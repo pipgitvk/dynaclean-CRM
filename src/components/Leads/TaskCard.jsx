@@ -4,6 +4,7 @@ const TaskCard = ({
   customerId,
   name,
   contact,
+  company,
   products_interest,
   stage,
   dueDate,
@@ -21,9 +22,14 @@ const TaskCard = ({
         <h3 className="text-s  mb-1 line-clamp-1 text-white">{name}</h3>
 
         {/* Contact */}
-        <div className="flex items-center gap-2 text-xs text-white-600 mb-3">
+        <div className="flex items-center gap-2 text-xs text-white-600 mb-1">
           <Phone size={14} className="text-gray-200" />
           <span>{contact}</span>
+        </div>
+
+        {/* Company Name */}
+        <div className="text-xs text-white mb-3 font-medium">
+          📍 {company || "Company not added"}
         </div>
 
         {/* Notes */}
