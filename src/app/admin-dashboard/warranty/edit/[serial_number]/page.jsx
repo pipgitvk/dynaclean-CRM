@@ -88,7 +88,6 @@ export default function EditWarrantyPage() {
           model: data.model || "",
           serial_number: data.serial_number || "", // Pre-fill with existing serial number
           warranty_period: data.warranty_period || "",
-          service_type: data.service_type || "",
           quantity: data.quantity || "",
           customer_name: data.customer_name || "",
           email: data.email || "",
@@ -323,23 +322,6 @@ export default function EditWarrantyPage() {
                     {errors.warranty_period.message}
                   </p>
                 )}
-              </div>
-              <div>
-                <label
-                  htmlFor="service_type"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Service Type:
-                </label>
-                <select
-                  id="service_type"
-                  {...register("service_type")}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-gray-900"
-                >
-                  <option value="">Select Service Type</option>
-                  <option value="CAMC">CAMC</option>
-                  <option value="AMC">AMC</option>
-                </select>
               </div>
               <div className="md:col-span-2">
                 <label

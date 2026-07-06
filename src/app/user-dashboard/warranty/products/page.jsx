@@ -149,7 +149,6 @@ export default function WarrantyPage() {
     "Spec",
     "Serial",
     "Warranty",
-    "Service Type",
     "State",
     "Company",
     "Installation",
