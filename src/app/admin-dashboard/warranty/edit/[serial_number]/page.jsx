@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -41,9 +41,10 @@ const STATES = [
   "Ladakh (38)"
 ];
 
-export default function EditWarrantyPage({ params }) {
+export default function EditWarrantyPage() {
   const router = useRouter();
-  const initialSerialNumber = params.serial_number; // Serial number from URL
+  const params = useParams();
+  const initialSerialNumber = params?.serial_number; // Serial number from URL
   const [productData, setProductData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
