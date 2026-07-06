@@ -622,7 +622,7 @@ function ProductStockList() {
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       ₹{row.last_negotiation_price?.toLocaleString() || 0}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs overflow-hidden text-ellipsis line-clamp-2">
                       {row.specification}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
