@@ -13,6 +13,8 @@ const BacklinksTable = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterAssignedTo, setFilterAssignedTo] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedBacklink, setSelectedBacklink] = useState(null);
@@ -63,13 +65,33 @@ const BacklinksTable = () => {
   };
 
   // Filter backlinks based on search term and filters
-  const filteredBacklinks = backlinks.filter(
-    (bl) =>
-      (bl.website.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bl.keyword.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (filterStatus === "" || bl.status === filterStatus) &&
-      (filterAssignedTo === "" || bl.assigned_to === filterAssignedTo)
-  );
+  const filteredBacklinks = backlinks.filter((bl) => {
+    const matchesSearch =
+      bl.website.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bl.keyword.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus = filterStatus === "" || bl.status === filterStatus;
+
+    const matchesAssignedTo =
+      filterAssignedTo === "" || bl.assigned_to === filterAssignedTo;
+
+    // Date range filter
+    let matchesDateRange = true;
+    if (dateFrom || dateTo) {
+      const blDate = new Date(bl.followup_date);
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        matchesDateRange = matchesDateRange && blDate >= fromDate;
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999); // Include entire day
+        matchesDateRange = matchesDateRange && blDate <= toDate;
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesAssignedTo && matchesDateRange;
+  });
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -132,7 +154,7 @@ const BacklinksTable = () => {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Filter by Status */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -167,6 +189,32 @@ const BacklinksTable = () => {
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Filter by Date From */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date From
+          </label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Filter by Date To */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date To
+          </label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
         </div>
       </div>
 
