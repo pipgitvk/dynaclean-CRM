@@ -17,6 +17,8 @@ export default function AddProductPage() {
     price_per_unit: "",
     last_negotiation_price: "",
     gem_price: "",
+    dp_no_warranty: "",
+    dp: "",
   });
   const [images, setImages] = useState({
     product_image: null,
@@ -146,6 +148,8 @@ export default function AddProductPage() {
         price_per_unit: "",
         last_negotiation_price: "",
         gem_price: "",
+        dp_no_warranty: "",
+        dp: "",
       });
       setImages({
         product_image: null,
@@ -221,6 +225,16 @@ export default function AddProductPage() {
       name: "gem_price",
       type: "number",
       placeholder: "e.g., 899.99",
+    },
+    {
+      label: "DP NO-warranty",
+      name: "dp_no_warranty",
+      placeholder: "e.g., DP-001",
+    },
+    {
+      label: "DP",
+      name: "dp",
+      placeholder: "e.g., DP-VALUE",
     },
   ];
 
