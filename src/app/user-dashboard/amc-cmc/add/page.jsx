@@ -6,25 +6,7 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { ArrowLeft } from "lucide-react";
 
-export default function AddUserAMCCMCPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [serialSuggestions, setSerialSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [formData, setFormData] = useState({
-    serial_number: "",
-    model: "",
-    company_name: "",
-    contact: "",
-    email: "",
-    company_address: "",
-    site_address: "",
-    site_contact: "",
-    site_email: "",
-    amc_start_datetime: "",
-    amc_end_datetime: "",
-    quotation_ref: "",
-    terms_and_conditions: `Terms & Conditions
+const DEFAULT_TERMS_AND_CONDITIONS = `Terms & Conditions
 
 100% Payment Advance With PO.
 
@@ -82,7 +64,27 @@ The contract can be terminated by either party with prior written notice.
 
 The company shall not be responsible for production loss or indirect damages due to machine downtime.
 
-All disputes shall be subject to jurisdiction of the courts at Delhi.`,
+All disputes shall be subject to jurisdiction of the courts at Delhi.`;
+
+export default function AddUserAMCCMCPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [serialSuggestions, setSerialSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [formData, setFormData] = useState({
+    serial_number: "",
+    model: "",
+    company_name: "",
+    contact: "",
+    email: "",
+    company_address: "",
+    site_address: "",
+    site_contact: "",
+    site_email: "",
+    amc_start_datetime: "",
+    amc_end_datetime: "",
+    quotation_ref: "",
+    terms_and_conditions: DEFAULT_TERMS_AND_CONDITIONS,
   });
 
   const [files, setFiles] = useState({
