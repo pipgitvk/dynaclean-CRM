@@ -24,7 +24,65 @@ export default function AddUserAMCCMCPage() {
     amc_start_datetime: "",
     amc_end_datetime: "",
     quotation_ref: "",
-    terms_and_conditions: "",
+    terms_and_conditions: `Terms & Conditions
+
+100% Payment Advance With PO.
+
+Late payment charges: Interest charges at the rate of 1.5% per month or as per MSME Act 2006, whichever is higher will be charged on overdue amounts from the invoice due date.
+
+CAMC includes preventive maintenance and breakdown service for cleaning machines.
+
+Service visits will be carried out as per quarterly preventive maintenance schedule and breakdown if any.
+
+All Electrical and Electronics parts are covered under CAMC i.e. Front brush motors, Center brush motor, controllers, drive motor, wiring harness, Switches, Lights, Water pump, Braking system.
+
+Consumables such as brushes, pads, rubber blades, filters, oils, batteries, and chemicals are excluded.
+
+Any damage due to misuse, negligence, accidents, unauthorized repair, voltage fluctuation, or natural calamities will not be covered.
+
+Replacement parts used during CAMC shall be genuine company-approved parts.
+
+The machine must be operated only by trained operators.
+
+CAMC charges are payable in advance unless otherwise agreed.
+
+CAMC validity will be for 12 months from the date of agreement.
+
+Transport, lodging, and outstation expenses may be charged extra for remote locations if applicable.
+
+The contract can be terminated by either party with prior written notice.
+
+The company shall not be responsible for production loss or indirect damages due to machine downtime.
+
+All disputes shall be subject to jurisdiction of the courts at Delhi.
+
+Above Rates are Valid for one month from the Date of Quotation.
+
+CAMC includes preventive maintenance and breakdown service for cleaning machines.
+
+Service visits will be carried out as per quarterly preventive maintenance schedule and breakdown if any.
+
+All Electrical and Electronics parts are covered under CAMC i.e. Front brush motors, Center brush motor, controllers, drive motor, wiring harness, Switches, Lights, Water pump, Braking system.
+
+Consumables such as brushes, pads, rubber blades, filters, oils, batteries, and chemicals are excluded.
+
+Any damage due to misuse, negligence, accidents, unauthorized repair, voltage fluctuation, or natural calamities will not be covered.
+
+Replacement parts used during CAMC shall be genuine company-approved parts.
+
+The machine must be operated only by trained operators.
+
+CAMC charges are payable in advance unless otherwise agreed.
+
+CAMC validity will be for 12 months from the date of agreement.
+
+Transport, lodging, and outstation expenses may be charged extra for remote locations if applicable.
+
+The contract can be terminated by either party with prior written notice.
+
+The company shall not be responsible for production loss or indirect damages due to machine downtime.
+
+All disputes shall be subject to jurisdiction of the courts at Delhi.`,
   });
 
   const [files, setFiles] = useState({
@@ -374,7 +432,7 @@ export default function AddUserAMCCMCPage() {
                   name="terms_and_conditions"
                   value={formData.terms_and_conditions}
                   onChange={handleInputChange}
-                  rows="4"
+                  rows="12"
                   className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 ></textarea>
               </div>
