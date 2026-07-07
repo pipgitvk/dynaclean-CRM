@@ -16,6 +16,7 @@ export default function DefaultDashboard({ user, counts }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
   const showHrCandidatesFollowUp = canAccessHiringModule(user?.userRole);
   const isHrRole = String(user?.userRole || "").trim() === "HR";
+  const isEaRole = String(user?.userRole || "").trim() === "EA";
   const welcomeNameClass = isHrRole ? "text-sky-600" : "text-green-700";
 
   return (
@@ -73,8 +74,10 @@ export default function DefaultDashboard({ user, counts }) {
         <UpcomingTasks leadSource={user.username} />
       </div>
 
-      {/* Upcoming Follow-ups */}
-      <UpcomingFollowupsWidget username={user.username} userRole={user.userRole} />
+      {/* Upcoming Follow-ups - Hidden for EA role */}
+      {!isEaRole && (
+        <UpcomingFollowupsWidget username={user.username} userRole={user.userRole} />
+      )}
 
       {/* Leads */}
       <div className="bg-white rounded-xl shadow-md">
