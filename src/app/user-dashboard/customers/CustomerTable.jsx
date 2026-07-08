@@ -302,7 +302,7 @@ export default function CustomerTable({
                   <td className="px-4 py-2">{r.products_interest}</td>
                   <td className="px-4 py-2">{r.service_lead_source || "-"}</td>
                   <td className="px-4 py-2 flex items-center gap-2 justify-center text-gray-600">
-                    {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA") && (
+                    {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA" || userRole === "GEM") && (
                       <>
                         <button
                           title="View"
@@ -391,7 +391,7 @@ export default function CustomerTable({
                 <span className="font-semibold">Service Lead Source:</span> {r.service_lead_source || "-"}
               </div>
               <div className="flex items-center gap-4 pt-2 cursor-pointer">
-                {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA") && (
+                {(userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "EA" || userRole === "GEM") && (
                   <>
                     <button
                       title="View"
