@@ -212,7 +212,7 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
         
         // Check if exceeds grand total
         if (newTotal > selectedGrandTotal) {
-          toast.error(`Cannot select this statement! Total would be ₹${newTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })} which exceeds invoice total of ₹${selectedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+          toast.error(`Cannot select this statement! Total would be ₹${newTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })} which exceeds balance amount of ₹${selectedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
           return prev;
         }
         
@@ -261,13 +261,13 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
           <div>
             <h3 className="text-lg font-semibold">Link Payment to Selected Invoices</h3>
             <div className="text-xs text-gray-500 mt-1">
-              Select multiple statements (total amount must be ≤ selected total)
+              Select multiple statements (total amount must be ≤ selected balance amount)
             </div>
             {/* Invoice Summary - Prominent Display */}
             <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded-md border-2 border-blue-300">
               <div className="grid grid-cols-4 gap-4 text-sm">
                 <div className="text-center">
-                  <span className="text-gray-600 block text-xs font-semibold">Invoice Total</span>
+                  <span className="text-gray-600 block text-xs font-semibold">Balance Amount</span>
                   <span className="text-xl font-bold text-blue-700">₹{selectedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="text-center">

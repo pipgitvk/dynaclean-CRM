@@ -275,6 +275,19 @@ export default function InvoiceEditModal({
       const amountPaid = Number(form.amount_paid || 0);
       const balanceAmount = Math.max(0, taxSummary.grandTotal - amountPaid);
 
+      // Auto-set payment status based on balance amount
+      let finalPaymentStatus = form.payment_status;
+      if (balanceAmount === 0 && taxSummary.grandTotal > 0) {
+        // If balance is 0, automatically mark as PAID
+        finalPaymentStatus = "PAID";
+      } else if (balanceAmount > 0 && balanceAmount < taxSummary.grandTotal) {
+        // If balance is between 0 and grand total, mark as PARTIAL
+        finalPaymentStatus = "PARTIAL";
+      } else if (balanceAmount === taxSummary.grandTotal) {
+        // If balance equals grand total, mark as UNPAID
+        finalPaymentStatus = "UNPAID";
+      }
+
       const qRef = String(form.quotation_id || "").trim();
       const qNum = Number(qRef);
       const payload = {
@@ -304,7 +317,7 @@ export default function InvoiceEditModal({
         grand_total: taxSummary.grandTotal,
         amount_paid: amountPaid,
         balance_amount: balanceAmount,
-        payment_status: form.payment_status,
+        payment_status: finalPaymentStatus,
         notes: notes || null,
         terms_conditions: editableTerms || null,
         buyers_order_no: form.buyers_order_no?.trim() || null,
@@ -333,9 +346,9 @@ export default function InvoiceEditModal({
       // Handle Linked Statements Update
       if (invoiceNumber.trim()) {
         const invoiceStatusForStmt =
-          form.payment_status === "PAID"
+          finalPaymentStatus === "PAID"
             ? "Settled"
-            : form.payment_status === "PARTIAL"
+            : finalPaymentStatus === "PARTIAL"
               ? "Partial Paid"
               : "Unsettled";
 

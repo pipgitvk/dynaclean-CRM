@@ -85,6 +85,8 @@ export async function GET(req) {
         COALESCE(order_date, invoice_date) AS order_date,
         (cgst + sgst + igst) AS tax_amount,
         grand_total,
+        amount_paid,
+        COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) AS balance_amount,
         created_at
       FROM invoices
       ${where}

@@ -286,7 +286,17 @@ Thanks for doing business with us!`,
         };
       });
       const amountPaid = Number(form.amount_paid || 0);
-const balanceAmount = taxSummary.grandTotal - amountPaid;
+      const balanceAmount = taxSummary.grandTotal - amountPaid;
+
+      // Auto-set payment status based on balance amount
+      let finalPaymentStatus = form.payment_status;
+      if (balanceAmount === 0 && taxSummary.grandTotal > 0) {
+        finalPaymentStatus = "PAID";
+      } else if (balanceAmount > 0 && balanceAmount < taxSummary.grandTotal) {
+        finalPaymentStatus = "PARTIAL";
+      } else if (balanceAmount === taxSummary.grandTotal || balanceAmount > taxSummary.grandTotal) {
+        finalPaymentStatus = "UNPAID";
+      }
 
       const dataToSend = {
         ...form,
@@ -301,8 +311,8 @@ const balanceAmount = taxSummary.grandTotal - amountPaid;
         round_off: parseFloat(roundOff) || 0,
         grand_total: taxSummary.grandTotal,
         amount_paid: amountPaid,
-        // balance_amount: taxSummary.grandTotal,
         balance_amount: balanceAmount < 0 ? 0 : balanceAmount,
+        payment_status: finalPaymentStatus,
         notes: notes,
         terms_conditions: editableTerms,
       };
