@@ -106,7 +106,12 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     const selectedInvoiceKeys = new Set(Array.from(selectedInvoiceIds).map(id => `IP${id}`));
 
     let rows = statements.filter((s) => {
-      if (!isDebit(s)) return false;
+      const isDebit = (s) => String(s.type || "").trim() === "Debit";
+      const isCredit = (s) => String(s.type || "").trim() === "Credit";
+      
+      // Include both Debit and Credit (unsettled)
+      if (!isDebit(s) && !isCredit(s)) return false;
+      
       const linked = getLinkedKeys(s);
       // Check if statement is either:
       // 1. Unsettled and not linked to any invoice
