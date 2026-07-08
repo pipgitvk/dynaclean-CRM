@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye } from "lucide-react";
 
 export default function EditUserAMCCMCPage() {
   const params = useParams();
@@ -129,6 +129,17 @@ export default function EditUserAMCCMCPage() {
     if (fileList && fileList[0]) {
       setFiles((prev) => ({ ...prev, [name]: fileList[0] }));
     }
+  };
+
+  const handleViewFile = (fileUrl) => {
+    // If it's a local filename, convert to full URL
+    let fullUrl = fileUrl;
+    if (!fileUrl.startsWith("http") && !fileUrl.startsWith("/")) {
+      fullUrl = `/public/amc_cmc/${fileUrl}`;
+    }
+    
+    // Open in new tab
+    window.open(fullUrl, "_blank");
   };
 
   const handleSubmit = async (e) => {
@@ -259,13 +270,26 @@ export default function EditUserAMCCMCPage() {
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-1">Image at time of AMC</label>
-                <input
-                  type="file"
-                  name="image_at_the_time_of_amc"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="w-full px-3 py-2 border rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    name="image_at_the_time_of_amc"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                  {record.image_at_the_time_of_amc && !files.image_at_the_time_of_amc && (
+                    <button
+                      type="button"
+                      onClick={() => handleViewFile(record.image_at_the_time_of_amc)}
+                      className="flex items-center gap-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-colors"
+                      title="View uploaded image"
+                    >
+                      <Eye size={18} />
+                      View
+                    </button>
+                  )}
+                </div>
                 {files.image_at_the_time_of_amc && (
                   <p className="text-sm text-green-600 mt-1">
                     New file selected: {files.image_at_the_time_of_amc.name}
@@ -409,26 +433,52 @@ export default function EditUserAMCCMCPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Invoice (PDF/Image)</label>
-                <input
-                  type="file"
-                  name="invoice"
-                  accept=".pdf,image/*"
-                  onChange={handleFileChange}
-                  className="w-full px-3 py-2 border rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    name="invoice"
+                    accept=".pdf,image/*"
+                    onChange={handleFileChange}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                  {record.invoice && !files.invoice && (
+                    <button
+                      type="button"
+                      onClick={() => handleViewFile(record.invoice)}
+                      className="flex items-center gap-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-colors whitespace-nowrap"
+                      title="View uploaded invoice"
+                    >
+                      <Eye size={18} />
+                      View
+                    </button>
+                  )}
+                </div>
                 {files.invoice && (
                   <p className="text-sm text-green-600 mt-1">New file selected: {files.invoice.name}</p>
                 )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Payment Proof (PDF/Image)</label>
-                <input
-                  type="file"
-                  name="payment_proof"
-                  accept=".pdf,image/*"
-                  onChange={handleFileChange}
-                  className="w-full px-3 py-2 border rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    name="payment_proof"
+                    accept=".pdf,image/*"
+                    onChange={handleFileChange}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                  {record.payment_proof && !files.payment_proof && (
+                    <button
+                      type="button"
+                      onClick={() => handleViewFile(record.payment_proof)}
+                      className="flex items-center gap-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-colors whitespace-nowrap"
+                      title="View uploaded payment proof"
+                    >
+                      <Eye size={18} />
+                      View
+                    </button>
+                  )}
+                </div>
                 {files.payment_proof && (
                   <p className="text-sm text-green-600 mt-1">
                     New file selected: {files.payment_proof.name}
