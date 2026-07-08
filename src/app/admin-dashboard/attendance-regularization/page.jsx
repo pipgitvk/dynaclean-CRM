@@ -72,8 +72,15 @@ export default function AdminAttendanceRegularizationPage() {
 
   const handleAction = useCallback(
     async (id, action) => {
-      const label = action === "approve" ? "Approve" : "Reject";
+      const labels = {
+        approve: "Approve",
+        reject: "Reject",
+        revert: "Revert"
+      };
+      const label = labels[action] || "Action";
+      
       if (!confirm(`${label} request #${id}?`)) return;
+      
       setActionLoading(`${id}-${action}`);
       try {
         const res = await fetch("/api/admin/attendance-regularization", {
@@ -83,7 +90,7 @@ export default function AdminAttendanceRegularizationPage() {
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.message || "Action failed");
-        toast.success(data.message || `${label}d successfully`);
+        toast.success(data.message || `${label}ed successfully`);
         await load();
       } catch (e) {
         toast.error(e.message);
@@ -308,6 +315,15 @@ export default function AdminAttendanceRegularizationPage() {
                             {actionLoading === `${req.id}-reject` ? "…" : "Reject"}
                           </button>
                         </div>
+                      ) : req.status === "approved" || req.status === "rejected" ? (
+                        <button
+                          onClick={() => handleAction(req.id, "revert")}
+                          disabled={actionLoading !== null}
+                          className="px-2 py-1 text-xs font-medium rounded bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={`Revert ${req.status} request to pending`}
+                        >
+                          {actionLoading === `${req.id}-revert` ? "…" : "Revert"}
+                        </button>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
                       )}

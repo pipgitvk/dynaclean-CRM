@@ -56,9 +56,9 @@ export async function PATCH(request) {
     const body = await request.json();
     const { id, action, reviewer_comment } = body;
 
-    if (!id || !["approve", "reject"].includes(action)) {
+    if (!id || !["approve", "reject", "revert"].includes(action)) {
       return NextResponse.json(
-        { success: false, message: "id and action (approve|reject) are required" },
+        { success: false, message: "id and action (approve|reject|revert) are required" },
         { status: 400 }
       );
     }
@@ -73,6 +73,29 @@ export async function PATCH(request) {
     }
 
     const reqRow = reqRows[0];
+    
+    // Handle revert action
+    if (action === "revert") {
+      if (!["approved", "rejected"].includes(reqRow.status)) {
+        return NextResponse.json(
+          { success: false, message: "Only approved or rejected requests can be reverted." },
+          { status: 409 }
+        );
+      }
+      
+      await conn.execute(
+        `UPDATE attendance_regularization_requests SET
+          status = 'pending',
+          reviewed_by = NULL,
+          reviewed_at = NULL,
+          reviewer_comment = NULL
+         WHERE id = ?`,
+        [id]
+      );
+      
+      return NextResponse.json({ success: true, message: "Request reverted to pending." });
+    }
+    
     if (reqRow.status !== "pending") {
       return NextResponse.json(
         { success: false, message: "This request is no longer pending." },
