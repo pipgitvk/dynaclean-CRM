@@ -25,7 +25,9 @@ export async function GET(req) {
       FROM invoices i
       LEFT JOIN customers c ON LOWER(TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, '')))) = LOWER(TRIM(i.customer_name))
         OR LOWER(TRIM(c.first_name)) = LOWER(TRIM(i.customer_name))
-      WHERE i.customer_name IS NOT NULL AND TRIM(i.customer_name) != ''
+      WHERE i.customer_name IS NOT NULL 
+        AND TRIM(i.customer_name) != ''
+        AND COALESCE(i.customer_id, c.customer_id) IS NOT NULL
       GROUP BY TRIM(i.customer_name), COALESCE(i.customer_id, c.customer_id)
       ORDER BY total_amount DESC
     `);

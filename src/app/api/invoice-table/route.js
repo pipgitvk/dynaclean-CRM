@@ -81,6 +81,7 @@ export async function GET(req) {
         customer_name AS buyer_name,
         gst_number,
         employee_name,
+        parent_id,
         COALESCE(order_date, invoice_date) AS order_date,
         (cgst + sgst + igst) AS tax_amount,
         grand_total,

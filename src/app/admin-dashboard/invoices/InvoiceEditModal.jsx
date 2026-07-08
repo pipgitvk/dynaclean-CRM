@@ -432,15 +432,7 @@ export default function InvoiceEditModal({
             <p className="text-center py-12 text-gray-600">Loading…</p>
           ) : (
             <form onSubmit={handleSave} className="space-y-4 text-sm">
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentLinkModal(true)}
-                  className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700"
-                >
-                  Payment Link
-                </button>
-              </div>
+
               {linkedTransIds.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 bg-blue-50 border border-blue-200 rounded p-3">
                   <span className="text-xs font-semibold text-blue-700 mr-1">

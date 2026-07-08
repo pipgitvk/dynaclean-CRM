@@ -63,16 +63,22 @@ export default function BuyerCards() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return buyers;
+    // First filter out buyers with null/undefined IDs
+    let result = buyers.filter(b => b.buyer_name != null && String(b.buyer_name).trim() !== "");
+    
+    if (!search.trim()) return result;
     const q = search.trim().toLowerCase();
-    return buyers.filter((b) => b.buyer_name?.toLowerCase().includes(q));
+    return result.filter((b) => b.buyer_name?.toLowerCase().includes(q));
   }, [buyers, search]);
 
-  const totals = useMemo(() => ({
-    buyers: buyers.length,
-    invoices: buyers.reduce((s, b) => s + Number(b.invoice_count || 0), 0),
-    amount: buyers.reduce((s, b) => s + Number(b.total_amount || 0), 0),
-  }), [buyers]);
+  const totals = useMemo(() => {
+    const validBuyers = buyers.filter(b => b.buyer_name != null && String(b.buyer_name).trim() !== "");
+    return {
+      buyers: validBuyers.length,
+      invoices: validBuyers.reduce((s, b) => s + Number(b.invoice_count || 0), 0),
+      amount: validBuyers.reduce((s, b) => s + Number(b.total_amount || 0), 0),
+    };
+  }, [buyers]);
 
   const handleCardClick = (buyerName) => {
     router.push(`/admin-dashboard/invoices/buyer/${encodeURIComponent(buyerName)}`);
@@ -194,6 +200,13 @@ export default function BuyerCards() {
           >
             <FileText size={16} />
             Add Invoice
+          </a>
+          <a
+            href="/admin-dashboard/invoices/list"
+            className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-purple-700 self-start sm:self-auto"
+          >
+            <FileText size={16} />
+            List
           </a>
         </div>
       </div>
