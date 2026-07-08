@@ -17,12 +17,7 @@ if (isCloudinaryConfigured) {
   });
 }
 
-const PDF_EXTENSIONS = [".pdf"];
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".heic", ".heif"];
-
-function isPdf(filename) {
-  return PDF_EXTENSIONS.includes(path.extname(filename).toLowerCase());
-}
 
 function isImage(filename) {
   return IMAGE_EXTENSIONS.includes(path.extname(filename).toLowerCase());
@@ -37,11 +32,10 @@ async function saveLocally(file, buffer, folder, filename) {
   }
   const filepath = path.join(uploadDir, filename);
   await fs.writeFile(filepath, buffer);
-  // Return relative path for DB storage
   return `/${folder}/${filename}`;
 }
 
-async function saveToCloudinary(file, buffer, folder, filename) {
+async function saveToCloudinary(file, buffer, folder, filename, resourceType = "auto") {
   const base64 = buffer.toString("base64");
   const dataUri = `data:${file.type};base64,${base64}`;
   const publicId = filename.replace(/\.[^/.]+$/, ""); // strip extension
@@ -49,7 +43,7 @@ async function saveToCloudinary(file, buffer, folder, filename) {
   const result = await cloudinary.uploader.upload(dataUri, {
     folder: `crm/${folder}`,
     public_id: publicId,
-    resource_type: "auto",
+    resource_type: resourceType,
     overwrite: false,
   });
 
@@ -72,18 +66,15 @@ export async function uploadFiles(files, folder = "uploads") {
 
       let storedPath;
 
-      if (isPdf(file.name)) {
-        // PDFs → always save locally
-        storedPath = await saveLocally(file, buffer, folder, filename);
-        console.log(`[fileUpload] PDF saved locally: ${storedPath}`);
-      } else if (isImage(file.name) && isCloudinaryConfigured) {
-        // Images → Cloudinary if configured
-        storedPath = await saveToCloudinary(file, buffer, folder, filename);
-        console.log(`[fileUpload] Image uploaded to Cloudinary: ${storedPath}`);
+      if (isCloudinaryConfigured) {
+        // Images → Cloudinary as image, PDFs/docs → Cloudinary as raw
+        const resourceType = isImage(file.name) ? "image" : "raw";
+        storedPath = await saveToCloudinary(file, buffer, folder, filename, resourceType);
+        console.log(`[fileUpload] Uploaded to Cloudinary (${resourceType}): ${storedPath}`);
       } else {
         // Fallback → local
         storedPath = await saveLocally(file, buffer, folder, filename);
-        console.log(`[fileUpload] File saved locally (fallback): ${storedPath}`);
+        console.log(`[fileUpload] Saved locally (fallback): ${storedPath}`);
       }
 
       results.push(storedPath);
