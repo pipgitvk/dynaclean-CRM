@@ -132,22 +132,20 @@ export default function EditUserAMCCMCPage() {
   };
 
   const handleViewFile = (fileUrl) => {
-    // If it's a Cloudinary URL, use the proxy API to handle CORS and PDF issues
+    if (!fileUrl) return;
+    // Cloudinary image URL → proxy
     if (fileUrl.includes("res.cloudinary.com")) {
-      const proxyUrl = `/api/cloudinary-proxy?url=${encodeURIComponent(fileUrl)}`;
-      window.open(proxyUrl, "_blank");
+      window.open(`/api/cloudinary-proxy?url=${encodeURIComponent(fileUrl)}`, "_blank");
       return;
     }
-    
-    // If it's a direct https/http URL, open as-is
+    // Already absolute URL
     if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
       window.open(fileUrl, "_blank");
       return;
     }
-    
-    // If it's a local filename, convert to full URL
-    let fullUrl = `/public/amc_cmc/${fileUrl}`;
-    window.open(fullUrl, "_blank");
+    // Local path (e.g. /amc_cmc/file.pdf) → open directly
+    const cleanPath = fileUrl.startsWith("/") ? fileUrl : `/${fileUrl}`;
+    window.open(cleanPath, "_blank");
   };
 
   const handleSubmit = async (e) => {

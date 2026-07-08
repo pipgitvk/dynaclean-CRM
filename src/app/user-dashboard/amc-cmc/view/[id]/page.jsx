@@ -39,25 +39,29 @@ export default function ViewUserAMCCMCPage() {
     }
   };
 
-  // Cloudinary URLs pass through as-is; local filenames get /uploads/ prefix
+  // Cloudinary URLs pass through as-is; local paths used directly
   const getFileUrl = (filePath) => {
     if (!filePath) return "";
     if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
-    return `/uploads/${filePath}`;
+    return filePath.startsWith("/") ? filePath : `/${filePath}`;
   };
 
-  // Cloudinary → proxy; other URLs → direct; local → /uploads/
+  // Cloudinary → proxy; local path → direct; other URLs → direct
   const handleViewFile = (fileUrl) => {
     if (!fileUrl) return;
+    // Cloudinary image URL → proxy
     if (fileUrl.includes("res.cloudinary.com")) {
       window.open(`/api/cloudinary-proxy?url=${encodeURIComponent(fileUrl)}`, "_blank");
       return;
     }
+    // Already absolute URL
     if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
       window.open(fileUrl, "_blank");
       return;
     }
-    window.open(`/uploads/${fileUrl}`, "_blank");
+    // Local path (e.g. /amc_cmc/file.pdf or /uploads/file.pdf) → open directly
+    const cleanPath = fileUrl.startsWith("/") ? fileUrl : `/${fileUrl}`;
+    window.open(cleanPath, "_blank");
   };
 
   if (loading) {

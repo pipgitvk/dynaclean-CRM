@@ -66,32 +66,27 @@ export default function ViewAMCCMCPage() {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "";
 
   const handleViewFile = (fileUrl) => {
-    // If it's a Cloudinary URL, use the proxy API to handle CORS and PDF issues
+    if (!fileUrl) return;
+    // Cloudinary image URL → proxy
     if (fileUrl.includes("res.cloudinary.com")) {
-      const proxyUrl = `/api/cloudinary-proxy?url=${encodeURIComponent(fileUrl)}`;
-      window.open(proxyUrl, "_blank");
+      window.open(`/api/cloudinary-proxy?url=${encodeURIComponent(fileUrl)}`, "_blank");
       return;
     }
-    
-    // If it's a direct https/http URL, open as-is
+    // Already absolute URL
     if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
       window.open(fileUrl, "_blank");
       return;
     }
-    
-    // If it's a local filename, convert to full URL
-    window.open(`${baseUrl}/uploads/${fileUrl}`, "_blank");
+    // Local path (e.g. /amc_cmc/file.pdf) → open directly
+    const cleanPath = fileUrl.startsWith("/") ? fileUrl : `/${fileUrl}`;
+    window.open(cleanPath, "_blank");
   };
 
-  // Returns the correct display URL for any file (Cloudinary or local)
+  // Returns correct URL for display (img src etc.)
   const getFileUrl = (filePath) => {
     if (!filePath) return "";
-    // Already a full URL (Cloudinary etc.)
-    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
-      return filePath;
-    }
-    // Local file
-    return `${baseUrl}/uploads/${filePath}`;
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
+    return filePath.startsWith("/") ? filePath : `/${filePath}`;
   };
 
   return (

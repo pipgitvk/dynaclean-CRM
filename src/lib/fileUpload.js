@@ -17,8 +17,47 @@ if (isCloudinaryConfigured) {
   });
 }
 
+const PDF_EXTENSIONS = [".pdf"];
+const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".heic", ".heif"];
+
+function isPdf(filename) {
+  return PDF_EXTENSIONS.includes(path.extname(filename).toLowerCase());
+}
+
+function isImage(filename) {
+  return IMAGE_EXTENSIONS.includes(path.extname(filename).toLowerCase());
+}
+
+async function saveLocally(file, buffer, folder, filename) {
+  const uploadDir = path.join(process.cwd(), "public", folder);
+  try {
+    await fs.mkdir(uploadDir, { recursive: true });
+  } catch (err) {
+    console.error("Error creating upload directory:", err);
+  }
+  const filepath = path.join(uploadDir, filename);
+  await fs.writeFile(filepath, buffer);
+  // Return relative path for DB storage
+  return `/${folder}/${filename}`;
+}
+
+async function saveToCloudinary(file, buffer, folder, filename) {
+  const base64 = buffer.toString("base64");
+  const dataUri = `data:${file.type};base64,${base64}`;
+  const publicId = filename.replace(/\.[^/.]+$/, ""); // strip extension
+
+  const result = await cloudinary.uploader.upload(dataUri, {
+    folder: `crm/${folder}`,
+    public_id: publicId,
+    resource_type: "auto",
+    overwrite: false,
+  });
+
+  return result.secure_url;
+}
+
 export async function uploadFiles(files, folder = "uploads") {
-  const filenames = [];
+  const results = [];
 
   for (const file of files) {
     if (!file || file.size === 0) continue;
@@ -31,38 +70,28 @@ export async function uploadFiles(files, folder = "uploads") {
       const basename = path.basename(file.name, ext);
       const filename = `${basename}_${timestamp}_${random}${ext}`;
 
-      // Upload to Cloudinary if configured
-      if (isCloudinaryConfigured) {
-        const base64 = buffer.toString("base64");
-        const dataUri = `data:${file.type};base64,${base64}`;
+      let storedPath;
 
-        const uploadResult = await cloudinary.uploader.upload(dataUri, {
-          folder: `crm/${folder}`,
-          public_id: filename.replace(/\.[^/.]+$/, ""), // Remove extension for public_id
-          resource_type: "auto",
-          overwrite: false,
-        });
-
-        filenames.push(uploadResult.secure_url);
+      if (isPdf(file.name)) {
+        // PDFs → always save locally
+        storedPath = await saveLocally(file, buffer, folder, filename);
+        console.log(`[fileUpload] PDF saved locally: ${storedPath}`);
+      } else if (isImage(file.name) && isCloudinaryConfigured) {
+        // Images → Cloudinary if configured
+        storedPath = await saveToCloudinary(file, buffer, folder, filename);
+        console.log(`[fileUpload] Image uploaded to Cloudinary: ${storedPath}`);
       } else {
-        // Fallback to local storage if Cloudinary is not configured
-        const uploadDir = path.join(process.cwd(), "public", folder);
-        
-        try {
-          await fs.mkdir(uploadDir, { recursive: true });
-        } catch (error) {
-          console.error("Error creating upload directory:", error);
-        }
-
-        const filepath = path.join(uploadDir, filename);
-        await fs.writeFile(filepath, buffer);
-        filenames.push(filename);
+        // Fallback → local
+        storedPath = await saveLocally(file, buffer, folder, filename);
+        console.log(`[fileUpload] File saved locally (fallback): ${storedPath}`);
       }
+
+      results.push(storedPath);
     } catch (error) {
-      console.error(`Error uploading file ${file.name}:`, error);
+      console.error(`[fileUpload] Error uploading file ${file.name}:`, error);
       throw error;
     }
   }
 
-  return filenames;
+  return results;
 }
