@@ -792,11 +792,40 @@ export default function StatementTable({ rows }) {
                     <div className="space-y-1">
                       {row.invoice_number && (
                         <div>
-                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
-                            INV{row.invoice_number}
+                          <span 
+                            className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded whitespace-nowrap"
+                            title={row.invoice_number}
+                          >
+                            {row.invoice_number}
                           </span>
                         </div>
                       )}
+                      {/* Show linked invoice IDs from linked_purchase_ids (IP prefix) */}
+                      {(() => {
+                        const raw = row?.linked_purchase_ids;
+                        if (!raw) return null;
+                        let arr = [];
+                        try {
+                          const parsed = JSON.parse(String(raw));
+                          if (Array.isArray(parsed)) arr = parsed;
+                        } catch {
+                          arr = String(raw).split(",").map(s => s.trim()).filter(Boolean);
+                        }
+                        const invIds = arr
+                          .map(v => String(v).trim().toUpperCase())
+                          .filter(v => /^IP\d+$/.test(v))
+                          .map(v => v.replace('IP', ''));
+                        if (invIds.length === 0) return null;
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            {invIds.map(id => (
+                              <span key={id} className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded">
+                                INV{id}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                       {(() => {
                         const refs = getLinkedPurchaseRefs(row);
                         if (refs.length > 0) {
@@ -932,9 +961,31 @@ export default function StatementTable({ rows }) {
               <div className="space-y-1 mt-1">
                 {row.invoice_number && (
                   <span className="block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded w-fit">
-                    INV{row.invoice_number}
+                    {row.invoice_number}
                   </span>
                 )}
+                {/* Show linked invoice IDs from linked_purchase_ids (IP prefix) */}
+                {(() => {
+                  const raw = row?.linked_purchase_ids;
+                  if (!raw) return null;
+                  let arr = [];
+                  try {
+                    const parsed = JSON.parse(String(raw));
+                    if (Array.isArray(parsed)) arr = parsed;
+                  } catch {
+                    arr = String(raw).split(",").map(s => s.trim()).filter(Boolean);
+                  }
+                  const invIds = arr
+                    .map(v => String(v).trim().toUpperCase())
+                    .filter(v => /^IP\d+$/.test(v))
+                    .map(v => v.replace('IP', ''));
+                  if (invIds.length === 0) return null;
+                  return invIds.map(id => (
+                    <span key={id} className="block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-mono rounded w-fit">
+                      INV{id}
+                    </span>
+                  ));
+                })()}
                 {(() => {
                   const refs = getLinkedPurchaseRefs(row);
                   if (refs.length > 0) {

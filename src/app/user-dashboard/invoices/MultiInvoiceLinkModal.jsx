@@ -100,23 +100,27 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     const isUnsettled = (s) =>
       (String(s.invoice_status || "").trim() === "Unsettled") ||
       (!s.invoice_status && !s.client_expense_id);
-    const isDebit = (s) => String(s.type || "").trim() === "Debit";
+    const isCredit = (s) => String(s.type || "").trim() === "Credit";
 
     // Get invoice keys for selected invoices (IP{id})
     const selectedInvoiceKeys = new Set(Array.from(selectedInvoiceIds).map(id => `IP${id}`));
 
     let rows = statements.filter((s) => {
-      const isDebit = (s) => String(s.type || "").trim() === "Debit";
       const isCredit = (s) => String(s.type || "").trim() === "Credit";
       
-      // Include both Debit and Credit (unsettled)
-      if (!isDebit(s) && !isCredit(s)) return false;
+      // ALWAYS show selected statements
+      if (selectedStatementIds.has(s.id)) return true;
+      
+      // Show ONLY Credit type statements that are unsettled
+      if (!isCredit(s)) return false;
+      if (!isUnsettled(s)) return false;
       
       const linked = getLinkedKeys(s);
       // Check if statement is either:
       // 1. Unsettled and not linked to any invoice
       // 2. Linked to at least one of our selected invoices
       const isLinkedToSelected = linked.some(key => selectedInvoiceKeys.has(key));
+      
       if ((isUnsettled(s) && linked.length === 0) || isLinkedToSelected) {
         // Date filter
         if (stmtStartDate && stmtEndDate) {
@@ -133,6 +137,14 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
       return false;
     });
 
+    // Sort: selected statements first
+    rows.sort((a, b) => {
+      const aSelected = selectedStatementIds.has(a.id) ? 0 : 1;
+      const bSelected = selectedStatementIds.has(b.id) ? 0 : 1;
+      if (aSelected !== bSelected) return aSelected - bSelected;
+      return a.id - b.id;
+    });
+
     if (q) {
       rows = rows.filter((s) => {
         const id = String(s.id ?? "").toLowerCase();
@@ -146,7 +158,7 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     }
 
     return rows;
-  }, [statements, search, stmtStartDate, stmtEndDate]);
+  }, [statements, search, stmtStartDate, stmtEndDate, selectedStatementIds, selectedInvoiceIds]);
 
   const { totalSelectedAmount, statementDistribution, selectedGroups, remainingAmount } = useMemo(() => {
     const selectedStatementsList = statements.filter(s => selectedStatementIds.has(s.id)).sort((a, b) => a.id - b.id);
@@ -362,13 +374,12 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                 <th className="p-3 border-b font-semibold text-gray-700">Description</th>
                 <th className="p-3 border-b font-semibold text-gray-700">Amount</th>
                 <th className="p-3 border-b font-semibold text-gray-700">Applied</th>
-                <th className="p-3 border-b font-semibold text-gray-700">Remaining</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center text-gray-500">
+                  <td colSpan={7} className="p-10 text-center text-gray-500">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                       <span>Loading statements...</span>
@@ -377,12 +388,41 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                 </tr>
               ) : eligibleStatements.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center text-gray-500">No matching unsettled statements found</td>
+                  <td colSpan={7} className="p-10 text-center text-gray-500">No matching unsettled statements found</td>
                 </tr>
               ) : (
                 eligibleStatements.map((s) => {
                   const isSelected = selectedStatementIds.has(s.id);
                   const distribution = statementDistribution[s.id];
+                  const linkedKeys = getLinkedKeys(s);
+                  
+                  // Build reference display
+                  const referenceDisplay = (() => {
+                    const refs = [];
+                    
+                    // Add linked purchase IDs
+                    linkedKeys.forEach(key => {
+                      refs.push(key);
+                    });
+                    
+                    // Add invoice number if exists
+                    if (s.invoice_number) {
+                      refs.push(`INV${s.invoice_number}`);
+                    }
+                    
+                    // Add DD ID if exists
+                    if (s.dd_id) {
+                      refs.push(`DD${s.dd_id}`);
+                    }
+                    
+                    // Add expense ID if exists
+                    if (s.client_expense_id) {
+                      refs.push(`EXP${s.client_expense_id}`);
+                    }
+                    
+                    return refs.length > 0 ? refs.join(', ') : '—';
+                  })();
+                  
                   return (
                     <tr key={s.id} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}>
                       <td className="p-3">
@@ -400,9 +440,6 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                       <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3 font-medium text-green-700">
                         {isSelected ? `₹${distribution?.applied?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}` : '—'}
-                      </td>
-                      <td className="p-3 font-medium text-orange-600">
-                        {isSelected ? `₹${distribution?.remaining?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
                       </td>
                     </tr>
                   );
