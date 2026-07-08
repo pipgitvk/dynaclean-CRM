@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function ViewAMCCMCPage() {
@@ -65,6 +65,35 @@ export default function ViewAMCCMCPage() {
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "";
 
+  const handleViewFile = (fileUrl) => {
+    // If it's a Cloudinary URL, use the proxy API to handle CORS and PDF issues
+    if (fileUrl.includes("res.cloudinary.com")) {
+      const proxyUrl = `/api/cloudinary-proxy?url=${encodeURIComponent(fileUrl)}`;
+      window.open(proxyUrl, "_blank");
+      return;
+    }
+    
+    // If it's a direct https/http URL, open as-is
+    if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+      window.open(fileUrl, "_blank");
+      return;
+    }
+    
+    // If it's a local filename, convert to full URL
+    window.open(`${baseUrl}/uploads/${fileUrl}`, "_blank");
+  };
+
+  // Returns the correct display URL for any file (Cloudinary or local)
+  const getFileUrl = (filePath) => {
+    if (!filePath) return "";
+    // Already a full URL (Cloudinary etc.)
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+      return filePath;
+    }
+    // Local file
+    return `${baseUrl}/uploads/${filePath}`;
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <Link
@@ -106,12 +135,20 @@ export default function ViewAMCCMCPage() {
               {record.image_at_the_time_of_amc && (
                 <div>
                   <label className="text-sm font-medium text-gray-600">Image</label>
-                  <div className="mt-1">
+                  <div className="mt-1 flex items-center gap-2">
                     <img
-                      src={`${baseUrl}/uploads/${record.image_at_the_time_of_amc}`}
+                      src={getFileUrl(record.image_at_the_time_of_amc)}
                       alt="AMC Image"
                       className="w-full rounded-lg max-h-48 object-cover"
                     />
+                    <button
+                      onClick={() => handleViewFile(record.image_at_the_time_of_amc)}
+                      className="flex items-center gap-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg transition-colors whitespace-nowrap h-fit"
+                      title="View image in full screen"
+                    >
+                      <Eye size={18} />
+                      View
+                    </button>
                   </div>
                 </div>
               )}
@@ -206,12 +243,20 @@ export default function ViewAMCCMCPage() {
               {record.invoice && (
                 <div>
                   <label className="text-sm font-medium text-gray-600">Invoice</label>
-                  <div className="mt-1">
+                  <div className="mt-1 flex gap-2">
+                    <button
+                      onClick={() => handleViewFile(record.invoice)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                      title="View invoice"
+                    >
+                      <Eye size={16} />
+                      View
+                    </button>
                     <a
-                      href={`${baseUrl}/uploads/${record.invoice}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline flex items-center gap-2"
+                      href={getFileUrl(record.invoice)}
+                      download
+                      className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                      title="Download invoice"
                     >
                       <Download size={16} />
                       Download
@@ -222,12 +267,20 @@ export default function ViewAMCCMCPage() {
               {record.payment_proof && (
                 <div>
                   <label className="text-sm font-medium text-gray-600">Payment Proof</label>
-                  <div className="mt-1">
+                  <div className="mt-1 flex gap-2">
+                    <button
+                      onClick={() => handleViewFile(record.payment_proof)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                      title="View payment proof"
+                    >
+                      <Eye size={16} />
+                      View
+                    </button>
                     <a
-                      href={`${baseUrl}/uploads/${record.payment_proof}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline flex items-center gap-2"
+                      href={getFileUrl(record.payment_proof)}
+                      download
+                      className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                      title="Download payment proof"
                     >
                       <Download size={16} />
                       Download
