@@ -6,6 +6,7 @@ import InvoiceEditModal from "@/app/admin-dashboard/invoices/InvoiceEditModal";
 import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 
 const SESSION_KEY = "invoice_selected_ids";
+const SESSION_DATA_KEY = "invoice_selected_data";
 
 export default function InvoiceTable() {
   const [invoices, setInvoices] = useState([]);
@@ -42,7 +43,14 @@ export default function InvoiceTable() {
     } catch (_) {}
     return new Set();
   });
-  const [selectedInvoices, setSelectedInvoices] = useState([]);
+  const [selectedInvoices, setSelectedInvoices] = useState(() => {
+    // Restore full invoice data from sessionStorage on mount
+    try {
+      const saved = sessionStorage.getItem(SESSION_DATA_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return [];
+  });
 
   // Persist selectedInvoiceIds to sessionStorage whenever it changes
   useEffect(() => {
@@ -51,8 +59,16 @@ export default function InvoiceTable() {
     } catch (_) {}
   }, [selectedInvoiceIds]);
 
+  // Persist selectedInvoices (full data) to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_DATA_KEY, JSON.stringify(selectedInvoices));
+    } catch (_) {}
+  }, [selectedInvoices]);
+
   const handleRemoveSelected = () => {
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_DATA_KEY);
     setSelectedInvoiceIds(new Set());
     setSelectedInvoices([]);
   };
@@ -127,17 +143,20 @@ export default function InvoiceTable() {
         setInvoices(sortedData);
         setMeta(response.meta);
 
-        // Re-sync selectedInvoices from restored selectedInvoiceIds
+        // Re-sync selectedInvoices — merge current page data with already-stored data
         setSelectedInvoices(prev => {
-          // Use functional form to get current selectedInvoiceIds from sessionStorage
-          try {
-            const saved = sessionStorage.getItem(SESSION_KEY);
-            if (saved) {
-              const restoredIds = new Set(JSON.parse(saved));
-              return sortedData.filter(inv => restoredIds.has(inv.id));
-            }
-          } catch (_) {}
-          return prev;
+          const existingIds = new Set(prev.map(inv => inv.id));
+          const toAdd = sortedData.filter(inv => {
+            try {
+              const saved = sessionStorage.getItem(SESSION_KEY);
+              if (saved) {
+                const restoredIds = new Set(JSON.parse(saved));
+                return restoredIds.has(inv.id) && !existingIds.has(inv.id);
+              }
+            } catch (_) {}
+            return false;
+          });
+          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
         });
       } else {
         setInvoices([]);
@@ -235,9 +254,22 @@ export default function InvoiceTable() {
     
     setSelectedInvoiceIds(newSelected);
     
-    // Update selected invoices data
-    const selected = invoices.filter(inv => newSelected.has(inv.id));
-    setSelectedInvoices(selected);
+    // Merge: keep previously selected invoices from other pages, update current page ones
+    setSelectedInvoices(prev => {
+      // Remove any invoices from current page that are no longer selected
+      const filtered = prev.filter(inv => {
+        const isOnCurrentPage = invoices.some(ci => ci.id === inv.id);
+        return !isOnCurrentPage || newSelected.has(inv.id);
+      });
+      // Add newly selected invoices from current page that aren't already in the list
+      const existingIds = new Set(filtered.map(inv => inv.id));
+      invoices.forEach(inv => {
+        if (newSelected.has(inv.id) && !existingIds.has(inv.id)) {
+          filtered.push(inv);
+        }
+      });
+      return filtered;
+    });
   };
 
   const handleLinkPaymentClick = () => {
@@ -322,15 +354,22 @@ export default function InvoiceTable() {
               <th className="px-4 py-2 w-12">
                 <input
                   type="checkbox"
-                  checked={selectedInvoiceIds.size > 0 && selectedInvoiceIds.size === invoices.length && invoices.length > 0}
+                  checked={invoices.length > 0 && invoices.every(inv => selectedInvoiceIds.has(inv.id))}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      const newSet = new Set(invoices.map(inv => inv.id));
+                      const newSet = new Set([...selectedInvoiceIds, ...invoices.map(inv => inv.id)]);
                       setSelectedInvoiceIds(newSet);
-                      setSelectedInvoices(invoices);
+                      setSelectedInvoices(prev => {
+                        const existingIds = new Set(prev.map(inv => inv.id));
+                        const toAdd = invoices.filter(inv => !existingIds.has(inv.id));
+                        return [...prev, ...toAdd];
+                      });
                     } else {
-                      setSelectedInvoiceIds(new Set());
-                      setSelectedInvoices([]);
+                      // Only deselect current page invoices
+                      const currentPageIds = new Set(invoices.map(inv => inv.id));
+                      const newSet = new Set([...selectedInvoiceIds].filter(id => !currentPageIds.has(id)));
+                      setSelectedInvoiceIds(newSet);
+                      setSelectedInvoices(prev => prev.filter(inv => !currentPageIds.has(inv.id)));
                     }
                   }}
                   className="w-4 h-4 cursor-pointer"
