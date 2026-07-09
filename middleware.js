@@ -111,7 +111,7 @@ export async function middleware(request) {
         "/admin-dashboard/delivery-challan",
       ];
       if (ACCOUNTANT_ADMIN_PREFIXES.some((p) => pathname.startsWith(p))) {
-        if (isJwtAccountingRole(role)) {
+        if (isJwtAccountingRole(role) || role === "ADMIN") {
           return NextResponse.next();
         }
       }
