@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import InvoiceEditModal from "@/app/admin-dashboard/invoices/InvoiceEditModal";
 import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
@@ -9,9 +8,6 @@ import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 const SESSION_KEY = "invoice_selected_ids";
 
 export default function InvoiceTable() {
-  const pathname = usePathname();
-  const prevPathname = useRef(pathname);
-
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -55,15 +51,11 @@ export default function InvoiceTable() {
     } catch (_) {}
   }, [selectedInvoiceIds]);
 
-  // Clear selection when path changes (navigation away and back resets it)
-  useEffect(() => {
-    if (prevPathname.current !== pathname) {
-      prevPathname.current = pathname;
-      sessionStorage.removeItem(SESSION_KEY);
-      setSelectedInvoiceIds(new Set());
-      setSelectedInvoices([]);
-    }
-  }, [pathname]);
+  const handleRemoveSelected = () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    setSelectedInvoiceIds(new Set());
+    setSelectedInvoices([]);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -311,6 +303,14 @@ export default function InvoiceTable() {
               Link Payment ({selectedInvoiceIds.size})
             </button>
           )}
+          {selectedInvoiceIds.size > 0 && (
+            <button
+              onClick={handleRemoveSelected}
+              className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 whitespace-nowrap font-semibold"
+            >
+              Remove Selected ({selectedInvoiceIds.size})
+            </button>
+          )}
         </div>
       </div>
 
@@ -501,8 +501,6 @@ export default function InvoiceTable() {
           isOpen={showLinkModal}
           closeModal={() => {
             setShowLinkModal(false);
-            setSelectedInvoiceIds(new Set());
-            setSelectedInvoices([]);
           }}
           selectedInvoiceIds={selectedInvoiceIds}
           selectedGrandTotal={selectedInvoices.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0)}
