@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import InvoiceEditModal from "@/app/admin-dashboard/invoices/InvoiceEditModal";
 import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 
+const SESSION_KEY = "invoice_selected_ids";
+
 export default function InvoiceTable() {
+  const pathname = usePathname();
+  const prevPathname = useRef(pathname);
+
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -27,11 +33,37 @@ export default function InvoiceTable() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [fetchError, setFetchError] = useState(null);
   const [editId, setEditId] = useState(null);
-  
+
   // Link payment modal
   const [showLinkModal, setShowLinkModal] = useState(false);
-  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(() => {
+    // Restore selection from sessionStorage on mount
+    try {
+      const saved = sessionStorage.getItem(SESSION_KEY);
+      if (saved) {
+        return new Set(JSON.parse(saved));
+      }
+    } catch (_) {}
+    return new Set();
+  });
   const [selectedInvoices, setSelectedInvoices] = useState([]);
+
+  // Persist selectedInvoiceIds to sessionStorage whenever it changes
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify([...selectedInvoiceIds]));
+    } catch (_) {}
+  }, [selectedInvoiceIds]);
+
+  // Clear selection when path changes (navigation away and back resets it)
+  useEffect(() => {
+    if (prevPathname.current !== pathname) {
+      prevPathname.current = pathname;
+      sessionStorage.removeItem(SESSION_KEY);
+      setSelectedInvoiceIds(new Set());
+      setSelectedInvoices([]);
+    }
+  }, [pathname]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -102,6 +134,19 @@ export default function InvoiceTable() {
 
         setInvoices(sortedData);
         setMeta(response.meta);
+
+        // Re-sync selectedInvoices from restored selectedInvoiceIds
+        setSelectedInvoices(prev => {
+          // Use functional form to get current selectedInvoiceIds from sessionStorage
+          try {
+            const saved = sessionStorage.getItem(SESSION_KEY);
+            if (saved) {
+              const restoredIds = new Set(JSON.parse(saved));
+              return sortedData.filter(inv => restoredIds.has(inv.id));
+            }
+          } catch (_) {}
+          return prev;
+        });
       } else {
         setInvoices([]);
         setFetchError(response.detail || response.error || "Failed to load invoices");
