@@ -123,7 +123,8 @@ export async function middleware(request) {
           "/admin-dashboard/create-employee",
           "/admin-dashboard/password",
           "/admin-dashboard/quick-edit",
-          "/admin-dashboard/ip-restrictions"
+          "/admin-dashboard/ip-restrictions",
+          "/admin-dashboard/customers",
         ];
         const isEaAllowed = eaAllowedRoutes.some(route => pathname.startsWith(route));
         

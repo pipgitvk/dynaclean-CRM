@@ -26,6 +26,11 @@ function transformMenuItemPaths(item, roleKey) {
   const dashboardPrefix = getDashboardPrefix(roleKey);
   const roleUpper = String(roleKey || "").toUpperCase();
 
+  // EA: View Customers → admin-dashboard/customers
+  if (roleUpper === "EA" && item.moduleKey === "view-customers") {
+    return { ...item, path: "/admin-dashboard/customers" };
+  }
+
   // Don't transform admin-dashboard, accounts-dashboard or empcrm paths
   if (item.path?.startsWith("/admin-dashboard") || item.path?.startsWith("/accounts-dashboard") || item.path?.startsWith("/empcrm")) {
     return item;
