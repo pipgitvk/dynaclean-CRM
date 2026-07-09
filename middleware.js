@@ -125,6 +125,8 @@ export async function middleware(request) {
           "/admin-dashboard/quick-edit",
           "/admin-dashboard/ip-restrictions",
           "/admin-dashboard/customers",
+          "/admin-dashboard/view-customer",
+          "/admin-dashboard/invoices",
         ];
         const isEaAllowed = eaAllowedRoutes.some(route => pathname.startsWith(route));
         

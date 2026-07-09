@@ -11,7 +11,7 @@ export async function POST(request) {
 
     const currentUsername = payload.username;
     const body = await request.json();
-    const { order_id, delivered_on, delivery_proof } = body;
+    const { order_id, delivered_on, delivery_proof, delivery_remark } = body;
 
     if (!order_id) {
       return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
@@ -57,8 +57,8 @@ export async function POST(request) {
 
     // Update delivery status
     await conn.execute(
-      "UPDATE neworder SET delivery_status = 1, delivered_on = ?, delivery_proof = ? WHERE order_id = ?",
-      [delivered_on || new Date(), delivery_proof || null, order_id]
+      "UPDATE neworder SET delivery_status = 1, delivered_on = ?, delivery_proof = ?, delivery_remark = ? WHERE order_id = ?",
+      [delivered_on || new Date(), delivery_proof || null, delivery_remark || null, order_id]
     );
 
     return NextResponse.json({

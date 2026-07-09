@@ -5,7 +5,7 @@ import { Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
-export default function EditCustomerForm({ initialData, userRole }) {
+export default function EditCustomerForm({ initialData, userRole, dashboardBase = "user-dashboard" }) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
   const [enabled, setEnabled] = useState({
@@ -90,7 +90,7 @@ export default function EditCustomerForm({ initialData, userRole }) {
     setSaving(false);
     if (res.ok) {
       toast.success("Customer updated successfully!");
-      router.push(`/user-dashboard/view-customer/${data.customer_id}`);
+      router.push(`/${dashboardBase}/view-customer/${data.customer_id}`);
     } else {
       toast.error("Failed to update customer.");
     }

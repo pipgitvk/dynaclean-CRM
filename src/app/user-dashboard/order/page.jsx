@@ -38,6 +38,7 @@ export default async function OrdersPage() {
                 no.invoice_date , no.account_by ,no.booking_by , no.dispatch_person,
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
+                COALESCE(no.delivery_remark, '') as delivery_remark,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
                 CASE 
                   WHEN qr.payment_term_days = 0 THEN 'Advance'

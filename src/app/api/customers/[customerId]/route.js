@@ -44,7 +44,7 @@ export async function PATCH(request, { params }) {
 
   const payload = await getSessionPayload();
   const userRole = payload?.role;
-  const isServiceUser = userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD" || userRole === "EA";
+  const isServiceUser = userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD";
 
   // Basic validation - only require lead_source if not a service user
   if (!isServiceUser && !lead_source) {

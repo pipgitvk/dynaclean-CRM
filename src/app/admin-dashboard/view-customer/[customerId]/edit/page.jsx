@@ -51,7 +51,7 @@ export default async function EditCustomerPage({ params }) {
         Edit Customere #{customerId}
       </h1>
       <UpdateLeadSourceForm initialData={customerData} leadSources={leadSources} serviceEmployees={serviceEmployees} userRole={userRole} />
-      <EditCustomerForm initialData={customerData} userRole={userRole} />
+      <EditCustomerForm initialData={customerData} userRole={userRole} dashboardBase="admin-dashboard" />
     </div>
   );
 }

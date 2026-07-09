@@ -930,6 +930,7 @@ function UpdateDeliveryMenuItem({ order }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [deliveredOn, setDeliveredOn] = useState("");
   const [deliveryProof, setDeliveryProof] = useState(null);
+  const [deliveryRemark, setDeliveryRemark] = useState("");
   const [uploading, setUploading] = useState(false);
 
   // Fetch current user
@@ -998,6 +999,7 @@ function UpdateDeliveryMenuItem({ order }) {
           order_id: order.order_id,
           delivered_on: deliveredOn,
           delivery_proof: deliveryProofUrl,
+          delivery_remark: deliveryRemark,
         }),
       });
 
@@ -1148,6 +1150,21 @@ function UpdateDeliveryMenuItem({ order }) {
                       </p>
                     )}
                   </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-700 font-medium mb-1">
+                      Delivery Remark:
+                    </label>
+                    {order.delivery_remark ? (
+                      <p className="text-sm text-gray-800 bg-gray-50 p-2 rounded">
+                        {order.delivery_remark}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic">
+                        No remark provided
+                      </p>
+                    )}
+                  </div>
                 </>
               ) : (
                 <>
@@ -1179,6 +1196,23 @@ function UpdateDeliveryMenuItem({ order }) {
                         Selected: {deliveryProof.name}
                       </p>
                     )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-700 font-medium mb-1">
+                      Delivery Remark (Optional)
+                    </label>
+                    <textarea
+                      value={deliveryRemark}
+                      onChange={(e) => setDeliveryRemark(e.target.value)}
+                      placeholder="Enter any remarks about the delivery..."
+                      maxLength="500"
+                      rows="3"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {deliveryRemark.length}/500 characters
+                    </p>
                   </div>
                 </>
               )}

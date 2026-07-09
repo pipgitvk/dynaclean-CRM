@@ -51,6 +51,7 @@ export default async function OrdersPage() {
                 no.payment_id, no.payment_date, no.payment_amount, no.payment_status,no.totalamt,
                 no.baseAmount, no.taxamt,
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
+                COALESCE(no.delivery_remark, '') as delivery_remark,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
                 no.invoice_number,
                 qr.company_name, qr.emp_name, qr.state, qr.grand_total as quotation_grand_total, qr.subtotal as quotation_subtotal, qr.gst as quotation_gst,

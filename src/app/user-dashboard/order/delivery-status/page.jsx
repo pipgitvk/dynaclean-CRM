@@ -33,6 +33,7 @@ export default async function DeliveryStatusPage() {
                 no.order_id, no.client_name, no.contact, 
                 no.created_at, no.created_by, no.booking_by,
                 no.delivery_date, no.delivered_on, no.delivery_status, no.delivery_proof,
+                COALESCE(no.delivery_remark, '') as delivery_remark,
                 qr.company_name, qr.state
             FROM 
                 neworder no
