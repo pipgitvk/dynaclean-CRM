@@ -645,6 +645,21 @@ const EmpTable = ({ employees }) => {
       "hr-daily-report",
       "attendance-log",
     ],
+    GEM: [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "quotations",
+      "orders-process",
+      "payment-pending",
+      "dd-management",
+      "employee-crm",
+      "gem-crm-dashboard",
+      "gem-crm-bids",
+      "gem-crm-reports",
+      "installation-videos",
+    ],
   };
 
   const applyDefaultModules = () => {

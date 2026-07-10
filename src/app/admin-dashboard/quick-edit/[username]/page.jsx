@@ -481,6 +481,30 @@ const QuickEditPage = () => {
     setSelectedModules(Array.isArray(effective) ? effective : []);
   };
 
+  const setGemDefaults = () => {
+    userEditedModulesRef.current = true;
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "quotations",
+      "orders-process",
+      "payment-pending",
+      "dd-management",
+      "employee-crm",
+      "gem-crm-dashboard",
+      "gem-crm-bids",
+      "gem-crm-reports",
+      "installation-videos",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -837,6 +861,16 @@ const QuickEditPage = () => {
                     title="Set recommended defaults for HR"
                   >
                     Set HR Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "GEM" && (
+                  <button
+                    type="button"
+                    onClick={setGemDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors"
+                    title="Set recommended defaults for GEM"
+                  >
+                    Set GEM Defaults
                   </button>
                 )}
                 <button
