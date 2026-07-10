@@ -150,6 +150,7 @@ const BacklinksTableReadOnly = () => {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="text-3xl font-bold text-gray-800">Backlinks Management</h1>
         <div className="flex gap-2">
+          {/* 
           <button
             onClick={() => setIsEmailModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
@@ -157,6 +158,8 @@ const BacklinksTableReadOnly = () => {
             <Mail size={20} />
             Manage Emails
           </button>
+          */}
+          {/* 
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -164,6 +167,7 @@ const BacklinksTableReadOnly = () => {
             <Plus size={20} />
             Add Backlink
           </button>
+          */}
         </div>
       </div>
 

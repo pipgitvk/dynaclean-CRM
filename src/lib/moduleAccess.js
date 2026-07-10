@@ -44,6 +44,7 @@ export const MODULE_TREE = [
     children: [
       { key: "keywords-management", label: "Keywords Management" },
       { key: "backlinks-management", label: "Backlinks Management" },
+      { key: "backlinks-excel-data", label: "Backlinks Excel Data" },
     ],
   },
   {
@@ -249,6 +250,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "keywords-management", label: "Keywords Management" },
       { kind: "leaf", key: "backlinks-management", label: "Backlinks Management" },
+      { kind: "leaf", key: "backlinks-excel-data", label: "Backlinks Excel Data" },
     ],
   },
   {

@@ -21,7 +21,13 @@ export default function EmailManagementModal({
   const fetchEmails = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/backlink-emails");
+      
+      // Get current user
+      const userRes = await fetch("/api/current-user");
+      const userData = await userRes.json();
+      const currentUser = userData.username || "Unknown";
+      
+      const res = await fetch(`/api/backlink-emails?username=${encodeURIComponent(currentUser)}`);
       const data = await res.json();
       if (res.ok && Array.isArray(data)) {
         setEmails(data);

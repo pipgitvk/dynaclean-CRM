@@ -336,6 +336,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Globe",
       },
+      {
+        path: "/admin-dashboard/backlinks-excel",
+        name: "Backlinks Excel",
+        accessKey: "backlinks-excel-data",
+        roles: ["SUPERADMIN"],
+        icon: "FileText",
+      },
     ],
   },
   {

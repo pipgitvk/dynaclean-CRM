@@ -132,6 +132,7 @@ const BacklinksTable = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="text-3xl font-bold text-gray-800">Backlinks Management</h1>
+        {/* 
         <button
           onClick={() => setIsAddModalOpen(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -139,6 +140,7 @@ const BacklinksTable = () => {
           <Plus size={20} />
           Add Backlink
         </button>
+        */}
       </div>
 
       {/* Search Box */}

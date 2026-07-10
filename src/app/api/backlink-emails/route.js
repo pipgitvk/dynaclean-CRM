@@ -1,14 +1,28 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 
-// GET all backlink emails
-export async function GET() {
+// GET all backlink emails - fetch emails from backlink_emails table for current user
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const username = searchParams.get("username");
+
+    if (!username) {
+      return NextResponse.json(
+        { message: "Username is required." },
+        { status: 400 }
+      );
+    }
+
     const connection = await getDbConnection();
+    
+    // Get emails from backlink_emails table where created_by matches current user
     const [rows] = await connection.execute(
       `SELECT id, email, created_by, created_at 
        FROM backlink_emails 
-       ORDER BY created_at DESC`
+       WHERE created_by = ?
+       ORDER BY created_at DESC`,
+      [username]
     );
 
     return NextResponse.json(rows, { status: 200 });

@@ -249,6 +249,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Globe",
       },
+      {
+        path: "/digital-marketing-dashboard/backlinks-excel",
+        name: "Backlinks Excel",
+        moduleKey: "backlinks-excel-data",
+        roles: ["SUPERADMIN", "DIGITAL MARKETER"],
+        icon: "FileText",
+      },
     ],
   },
   {
