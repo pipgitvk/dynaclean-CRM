@@ -694,6 +694,12 @@ const EmpTable = ({ employees }) => {
       "regularization-approvals",
       "employee-crm",
     ],
+    "SERVICE TECHNICIAN": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
     "SERVICE HEAD": [
       "dashboard-home",
       "task-manager",

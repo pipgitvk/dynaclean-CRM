@@ -575,6 +575,21 @@ const QuickEditPage = () => {
     setSelectedModules(Array.isArray(effective) ? effective : []);
   };
 
+  const setServiceTechnicianDefaults = () => {
+    userEditedModulesRef.current = true;
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
   const setServiceHeadDefaults = () => {
     userEditedModulesRef.current = true;
     const defaults = [
@@ -1029,6 +1044,16 @@ const QuickEditPage = () => {
                     title="Set recommended defaults for Service Engineer"
                   >
                     Set Service Eng Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "SERVICE TECHNICIAN" && (
+                  <button
+                    type="button"
+                    onClick={setServiceTechnicianDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    title="Set recommended defaults for Service Technician"
+                  >
+                    Set Service Tech Defaults
                   </button>
                 )}
                 {String(employee.userRole || "").trim().toUpperCase() === "SERVICE HEAD" && (
