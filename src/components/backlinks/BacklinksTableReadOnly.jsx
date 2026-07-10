@@ -64,6 +64,7 @@ const BacklinksTableReadOnly = () => {
       const data = await res.json();
 
       if (res.ok) {
+        console.log("Fetched backlinks:", data);
         setBacklinks(data);
         setError(null);
       } else {
@@ -96,7 +97,16 @@ const BacklinksTableReadOnly = () => {
       // If superadmin, show all; otherwise show only current user's backlinks
       const matchesUser = isSuperAdmin || bl.assigned_to === currentUser;
       
-      return matchesSearch && matchesStatus && matchesAssignedTo && matchesUser;
+      const passes = matchesSearch && matchesStatus && matchesAssignedTo && matchesUser;
+      if (!passes) {
+        console.log("Filtered out backlink:", {
+          website: bl.website,
+          reason: { matchesSearch, matchesStatus, matchesAssignedTo, matchesUser },
+          assigned_to: bl.assigned_to,
+          currentUser
+        });
+      }
+      return passes;
     }
   );
 
