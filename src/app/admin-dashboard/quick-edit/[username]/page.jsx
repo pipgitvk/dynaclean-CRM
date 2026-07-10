@@ -329,19 +329,25 @@ const QuickEditPage = () => {
   const setTeamLeaderDefaults = () => {
     userEditedModulesRef.current = true;
     const defaults = [
-      "tl-customers",
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
       "view-customers",
       "add-customer",
-      "employee-crm",
-      "lead-reports",
-      "quotations-report",
-      "order-report",
-      "demo-followups",
-      "item-wise-sales",
-      "customer-payment-behavior",
-      "payment-pending",
-      "leads-upload",
       "my-leads",
+      "daily-report",
+      "customer-payment-behavior",
+      "leads-upload",
+      "denied-leads",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "payment-pending",
+      "employee-crm",
     ]
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");

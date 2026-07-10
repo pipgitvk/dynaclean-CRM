@@ -557,6 +557,27 @@ const EmpTable = ({ employees }) => {
       "assets",
       "attendance-log",
     ],
+    "TEAM LEADER": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "view-customers",
+      "add-customer",
+      "my-leads",
+      "daily-report",
+      "customer-payment-behavior",
+      "leads-upload",
+      "denied-leads",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "payment-pending",
+      "employee-crm",
+    ],
   };
 
   const applyDefaultModules = () => {
