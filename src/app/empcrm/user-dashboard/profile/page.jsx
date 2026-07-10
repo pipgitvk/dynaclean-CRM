@@ -207,7 +207,7 @@ export default function UserProfileView() {
             {/* Personal Information */}
             <Section title="Personal Information" icon={User}>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <InfoField label="Full Name" value={profile.full_name} />
                   <InfoField label="Email" value={profile.email} />
                   <InfoField label="Contact Mobile" value={profile.contact_mobile} />
@@ -215,7 +215,7 @@ export default function UserProfileView() {
                   <InfoField label="Marital Status" value={profile.marital_status} />
                   <InfoField label="Blood Group" value={profile.blood_group} />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-gray-100 pt-4">
                   <InfoField label="Father's Name" value={profile.father_name} />
                   <InfoField label="Father's Phone" value={profile.father_phone} />
                   <InfoField label="Mother's Name" value={profile.mother_name} />
@@ -229,7 +229,7 @@ export default function UserProfileView() {
             {/* Employment Information */}
             <Section title="Employment Information" icon={Briefcase}>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <InfoField label="Employee Code" value={profile.employee_code} />
                   <InfoField label="Designation" value={profile.designation} />
                   <InfoField label="Department" value={profile.department} />
@@ -245,24 +245,26 @@ export default function UserProfileView() {
             {/* Address Information */}
             <Section title="Address Information" icon={MapPin}>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Correspondence Address</label>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">{profile.correspondence_address || "-"}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Correspondence Address</label>
+                    <p className="text-gray-900 bg-white p-3.5 rounded-lg border border-gray-300 hover:border-blue-400 transition-colors shadow-sm font-medium min-h-24 flex items-center">{profile.correspondence_address || "-"}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Permanent Address</label>
+                    <p className="text-gray-900 bg-white p-3.5 rounded-lg border border-gray-300 hover:border-blue-400 transition-colors shadow-sm font-medium min-h-24 flex items-center">{profile.permanent_address || "-"}</p>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Permanent Address</label>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">{profile.permanent_address || "-"}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Near Police Station</label>
-                  <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">{profile.near_police_station || "-"}</p>
+                  <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Near Police Station</label>
+                  <p className="text-gray-900 bg-white p-3.5 rounded-lg border border-gray-300 hover:border-blue-400 transition-colors shadow-sm font-medium">{profile.near_police_station || "-"}</p>
                 </div>
               </div>
             </Section>
 
             {/* Banking Information */}
             <Section title="Banking Information" icon={Building}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <InfoField label="Bank Name" value={profile.bank_name} />
                 <InfoField label="Account Number" value={profile.bank_account_number} />
                 <InfoField label="IFSC Code" value={profile.ifsc_code} />
@@ -277,25 +279,25 @@ export default function UserProfileView() {
             {/* Education */}
             {profile.education && profile.education.length > 0 && (
               <Section title="Education Qualifications" icon={GraduationCap}>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {profile.education.map((edu, idx) => (
-                    <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div key={idx} className="p-4 border border-gray-200 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-md transition-shadow">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Exam/Degree</p>
-                          <p className="text-gray-900 font-medium">{edu.exam_name}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Exam/Degree</p>
+                          <p className="text-gray-900 font-semibold">{edu.exam_name}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Board/University</p>
-                          <p className="text-gray-900 font-medium">{edu.board_university}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Board/University</p>
+                          <p className="text-gray-900 font-semibold">{edu.board_university}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Year of Passing</p>
-                          <p className="text-gray-900 font-medium">{edu.year_of_passing}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Year of Passing</p>
+                          <p className="text-gray-900 font-semibold">{edu.year_of_passing}</p>
                         </div>
-                        <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Grade/Percentage</p>
-                          <p className="text-gray-900 font-medium">{edu.grade_percentage}</p>
+                        <div className="md:col-span-3">
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Grade/Percentage</p>
+                          <p className="text-gray-900 font-semibold">{edu.grade_percentage}</p>
                         </div>
                       </div>
                     </div>
@@ -307,29 +309,29 @@ export default function UserProfileView() {
             {/* Work Experience */}
             {profile.experience && profile.experience.length > 0 && (
               <Section title="Work Experience" icon={Briefcase}>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {profile.experience.map((exp, idx) => (
-                    <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div key={idx} className="p-4 border border-gray-200 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 hover:shadow-md transition-shadow">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Company</p>
-                          <p className="text-gray-900 font-medium">{exp.company_name}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Company</p>
+                          <p className="text-gray-900 font-semibold">{exp.company_name}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Designation</p>
-                          <p className="text-gray-900 font-medium">{exp.designation}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Designation</p>
+                          <p className="text-gray-900 font-semibold">{exp.designation}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Period</p>
-                          <p className="text-gray-900 font-medium">{exp.period_from} - {exp.period_to}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Period</p>
+                          <p className="text-gray-900 font-semibold">{exp.period_from} - {exp.period_to}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Gross Salary (CTC)</p>
-                          <p className="text-gray-900 font-medium">{exp.gross_salary_ctc || "-"}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Gross Salary (CTC)</p>
+                          <p className="text-gray-900 font-semibold">{exp.gross_salary_ctc || "-"}</p>
                         </div>
-                        <div className="sm:col-span-2">
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Reason for Leaving</p>
-                          <p className="text-gray-900 font-medium">{exp.reason_for_leaving}</p>
+                        <div className="md:col-span-2">
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Reason for Leaving</p>
+                          <p className="text-gray-900 font-semibold">{exp.reason_for_leaving}</p>
                         </div>
                       </div>
                     </div>
@@ -341,28 +343,26 @@ export default function UserProfileView() {
             {/* References */}
             {profile.references && profile.references.length > 0 && (
               <Section title="References" icon={User}>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {profile.references.map((ref, idx) => (
-                    <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div key={idx} className="p-4 border border-gray-200 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 hover:shadow-md transition-shadow">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Name</p>
-                          <p className="text-gray-900 font-medium">{ref.name || ref.reference_name}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Name</p>
+                          <p className="text-gray-900 font-semibold">{ref.name || ref.reference_name}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Contact</p>
-                          <p className="text-gray-900 font-medium">{ref.contact || ref.reference_mobile}</p>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Contact</p>
+                          <p className="text-gray-900 font-semibold">{ref.contact || ref.reference_mobile}</p>
                         </div>
-                        <div className="sm:col-span-2">
-                          <p className="text-xs font-semibold text-gray-500 uppercase">Address</p>
-                          <p className="text-gray-900 font-medium">{ref.address || ref.reference_address}</p>
+                        <div>
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Relationship</p>
+                          <p className="text-gray-900 font-semibold">{ref.relationship || "-"}</p>
                         </div>
-                        {ref.relationship && (
-                          <div>
-                            <p className="text-xs font-semibold text-gray-500 uppercase">Relationship</p>
-                            <p className="text-gray-900 font-medium">{ref.relationship}</p>
-                          </div>
-                        )}
+                        <div className="md:col-span-3">
+                          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-1">Address</p>
+                          <p className="text-gray-900 font-semibold">{ref.address || ref.reference_address}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -377,14 +377,20 @@ export default function UserProfileView() {
 
             {/* Leave Policy */}
             <Section title="Leave Policy" icon={Calendar}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-xs font-semibold text-green-700 uppercase">Paid Leaves Allowed</p>
-                  <p className="text-2xl font-bold text-green-900 mt-1">{profile.leave_policy?.paid_allowed || 0}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-5 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-300 rounded-xl hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                    <p className="text-xs font-bold text-green-700 uppercase tracking-wide">Paid Leaves Allowed</p>
+                  </div>
+                  <p className="text-3xl font-bold text-green-900">{profile.leave_policy?.paid_allowed || 0}</p>
                 </div>
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs font-semibold text-blue-700 uppercase">Sick Leaves Allowed</p>
-                  <p className="text-2xl font-bold text-blue-900 mt-1">{profile.leave_policy?.sick_allowed || 0}</p>
+                <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-300 rounded-xl hover:shadow-md transition-shadow">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Sick Leaves Allowed</p>
+                  </div>
+                  <p className="text-3xl font-bold text-blue-900">{profile.leave_policy?.sick_allowed || 0}</p>
                 </div>
               </div>
             </Section>
@@ -396,7 +402,7 @@ export default function UserProfileView() {
                   <p className="text-sm text-gray-700 mb-4">
                     Configure leave policies for different employment statuses. These settings determine leave eligibility based on probation or permanent status.
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
                       <div className="mb-4 pb-4 border-b border-emerald-200">
                         <h4 className="font-semibold text-gray-900 mb-3">Sick Leave</h4>
@@ -456,10 +462,12 @@ export default function UserProfileView() {
 
 function Section({ title, icon: Icon, children }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200 flex items-center gap-3">
-        <Icon className="w-5 h-5 text-blue-600" />
-        <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+    <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 border-b border-blue-700 flex items-center gap-3">
+        <div className="bg-white bg-opacity-20 p-2 rounded-lg">
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        <h2 className="text-lg font-bold text-white">{title}</h2>
       </div>
       <div className="p-6">
         {children}
@@ -471,8 +479,8 @@ function Section({ title, icon: Icon, children }) {
 function InfoField({ label, value }) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
-      <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">{value || "-"}</p>
+      <label className="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">{label}</label>
+      <p className="text-gray-900 bg-white p-3.5 rounded-lg border border-gray-300 hover:border-blue-400 transition-colors shadow-sm font-medium">{value || "-"}</p>
     </div>
   );
 }
@@ -523,20 +531,29 @@ function DocList({ profile }) {
   }
 
   return (
-    <ul className="space-y-2">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {docItems.map((item, idx) => (
-        <li key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-100">
-          <span className="text-sm font-medium text-gray-700 truncate pr-2">{item.label}</span>
-          <div className="flex gap-2 shrink-0">
-            <a href={item.url} target="_blank" rel="noreferrer" className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="View">
-              <ExternalLink className="w-4 h-4" />
+        <div key={idx} className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all group">
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">{item.label}</p>
+            </div>
+            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-gray-200 ml-2 shrink-0">
+              <FileText className="w-4 h-4 text-gray-600" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <a href={item.url} target="_blank" rel="noreferrer" className="flex-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors flex items-center justify-center gap-1" title="View">
+              <ExternalLink className="w-3 h-3" />
+              View
             </a>
-            <a href={item.url} download className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors" title="Download">
-              <Download className="w-4 h-4" />
+            <a href={item.url} download className="flex-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white rounded-lg hover:bg-gray-100 border border-gray-200 transition-colors flex items-center justify-center gap-1" title="Download">
+              <Download className="w-3 h-3" />
+              Download
             </a>
           </div>
-        </li>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
