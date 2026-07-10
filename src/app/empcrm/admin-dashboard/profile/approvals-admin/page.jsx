@@ -24,6 +24,31 @@ function statusBadgeClass(status) {
   return "bg-gray-100 text-gray-800";
 }
 
+/** Parse field_changes count from submission payload */
+function getChangedFieldsCount(submission) {
+  try {
+    const payload = typeof submission.payload === "string"
+      ? JSON.parse(submission.payload)
+      : submission.payload;
+    return Array.isArray(payload?.field_changes) ? payload.field_changes.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Parse field_changes labels from submission payload */
+function getChangedFieldLabels(submission) {
+  try {
+    const payload = typeof submission.payload === "string"
+      ? JSON.parse(submission.payload)
+      : submission.payload;
+    if (!Array.isArray(payload?.field_changes)) return [];
+    return payload.field_changes.map((c) => c.label).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Super Admin — profile submissions: pending publish, approved, rejected.
  * API returns 403 for non–Super Admin.
@@ -202,6 +227,7 @@ export default function ProfileApprovalsAdminPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Changed Fields</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   {tab === "pending_admin" ? "HR reviewed" : "Reviewed at"}
                 </th>
@@ -249,6 +275,34 @@ export default function ProfileApprovalsAdminPage() {
                     <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${statusBadgeClass(s.status)}`}>
                       {displayStatus(s.status)}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm">
+                    {(() => {
+                      const changedCount = getChangedFieldsCount(s);
+                      const changedLabels = getChangedFieldLabels(s);
+                      if (changedCount > 0) {
+                        return (
+                          <div className="group relative w-fit">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-xs font-semibold cursor-default">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              {changedCount} field{changedCount > 1 ? "s" : ""} edited
+                            </span>
+                            {/* Tooltip with field names */}
+                            <div className="absolute left-0 top-full mt-1 z-20 hidden group-hover:block w-56 bg-gray-900 text-white text-xs rounded-lg shadow-lg p-3">
+                              <p className="font-semibold mb-1 text-indigo-300">Fields changed:</p>
+                              <ul className="space-y-0.5">
+                                {changedLabels.map((label, i) => (
+                                  <li key={i} className="text-gray-200">• {label}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return <span className="text-gray-400 text-xs">—</span>;
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {s.reviewed_at ? new Date(s.reviewed_at).toLocaleString() : "—"}

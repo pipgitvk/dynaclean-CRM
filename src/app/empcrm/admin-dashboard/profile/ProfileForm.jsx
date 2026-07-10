@@ -63,6 +63,7 @@ export default function ProfileForm({
   const [isExperienced, setIsExperienced] = useState(() =>
     initialData ? deriveIsExperiencedForForm(initialData) : false
   );
+  const [originalFormData, setOriginalFormData] = useState(null);
 
   const [formData, setFormData] = useState({
     username,
@@ -113,6 +114,18 @@ export default function ProfileForm({
       const derived = deriveIsExperiencedForForm(initialData);
       const impliedByHr = reassignFieldKeys?.length && reassignKeysImplyExperience(reassignFieldKeys);
       setIsExperienced(Boolean(derived || impliedByHr));
+      // Save original state for field change tracking (only on first mount via initialData)
+      setOriginalFormData(prev => prev === null ? JSON.parse(JSON.stringify({
+        ...initialData,
+        references: (initialData.references || []).map(ref => ({
+          name: ref.name || ref.reference_name || "",
+          contact: ref.contact || ref.reference_mobile || "",
+          address: ref.address || ref.reference_address || "",
+          relationship: ref.relationship || ""
+        })),
+        education: initialData.education || [],
+        experience: initialData.experience || [],
+      })) : prev);
     } else {
       setFormData(prev => ({
         ...prev,
@@ -211,6 +224,16 @@ export default function ProfileForm({
         setDocuments(docsSubmitted || {});
 
         setIsExperienced(deriveIsExperiencedForForm(data.profile));
+
+        // Save original state for field change tracking (only once, on first load)
+        setOriginalFormData(prev => prev === null ? JSON.parse(JSON.stringify({
+          ...data.profile,
+          joining_form_documents: joiningDocs,
+          documents_submitted: docsSubmitted,
+          references: data.profile.references || [],
+          education: data.profile.education || [],
+          experience: data.profile.experience || [],
+        })) : prev);
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -526,6 +549,74 @@ export default function ProfileForm({
     return true;
   };
 
+  /**
+   * Detect which fields have changed between original and current state
+   * Returns array of {fieldName, label, oldValue, newValue}
+   */
+  const detectFieldChanges = () => {
+    const changes = [];
+    
+    if (!originalFormData) return changes;
+
+    // Field labels for top-level profile fields only
+    const fieldLabels = {
+      full_name: "Full Name",
+      contact_mobile: "Mobile",
+      email: "Email",
+      designation: "Designation",
+      date_of_joining: "Date of Joining",
+      work_location: "Work Location",
+      probation_period: "Probation Period",
+      marital_status: "Marital Status",
+      father_name: "Father Name",
+      mother_name: "Mother Name",
+      reporting_manager: "Reporting Manager",
+      department: "Department",
+      correspondence_address: "Correspondence Address",
+      permanent_address: "Permanent Address",
+      near_police_station: "Near Police Station",
+      pan_number: "PAN Number",
+      aadhar_number: "Aadhar Number",
+      pf_uan: "PF UAN",
+      esic_number: "ESIC Number",
+      emergency_contact_name: "Emergency Contact Name",
+      emergency_contact_number: "Emergency Contact Number",
+      employment_status: "Employment Status",
+    };
+
+    // Check top-level fields only
+    Object.keys(fieldLabels).forEach(key => {
+      const oldVal = originalFormData[key];
+      const newVal = formData[key];
+      if (String(oldVal || "") !== String(newVal || "")) {
+        changes.push({
+          fieldName: key,
+          label: fieldLabels[key],
+          oldValue: String(oldVal || ""),
+          newValue: String(newVal || ""),
+        });
+      }
+    });
+
+    // Check leave policy
+    const oldLeavePolicy = originalFormData.leave_policy || {};
+    const newLeavePolicy = formData.leave_policy || {};
+    if (JSON.stringify(oldLeavePolicy) !== JSON.stringify(newLeavePolicy)) {
+      changes.push({
+        fieldName: "leave_policy",
+        label: "Leave Policy Configuration",
+        oldValue: JSON.stringify(oldLeavePolicy),
+        newValue: JSON.stringify(newLeavePolicy),
+      });
+    }
+
+    // NOTE: We do NOT track array changes (references, education, experience)
+    // because they are managed separately and can have formatting differences
+    // when loaded from the DB. Only individual profile field changes are tracked.
+
+    return changes;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -575,6 +666,12 @@ export default function ProfileForm({
       submitData.append("education", JSON.stringify(education));
       submitData.append("experience", JSON.stringify(experience));
       submitData.append("documents_submitted", JSON.stringify(documents));
+
+      // Add field change tracking
+      const fieldChanges = detectFieldChanges();
+      if (fieldChanges.length > 0) {
+        submitData.append("field_changes", JSON.stringify(fieldChanges));
+      }
 
       if (files.profile_photo) submitData.append("profile_photo", files.profile_photo);
       if (files.signature) submitData.append("signature", files.signature);
@@ -796,6 +893,117 @@ export default function ProfileForm({
         )}
 
         {!shouldShowPersonalBlock(fieldVisibilityKeys) && documentsSectionEl}
+
+        {/* Leave Policy Configuration Section - Only for Privileged Editors (Admin/HR) */}
+        {shouldShowPersonalBlock(fieldVisibilityKeys) && isPrivilegedEditor && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/85 p-5 md:p-6 space-y-4 shadow-sm">
+            <h3 className="text-lg font-semibold text-gray-800 pb-2 border-b border-emerald-200/80">
+              Leave Policy Configuration
+            </h3>
+            <p className="text-sm text-gray-700">
+              Leave benefits vary based on employment status. Probation period typically has limited benefits, while permanent employees get full benefits.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sick Leave Enabled</label>
+                <select
+                  name="leave_policy_sick_enabled"
+                  value={formData.leave_policy?.sick_enabled ? "true" : "false"}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      sick_enabled: e.target.value === "true"
+                    }
+                  }))}
+                  disabled={reviewMode}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${reviewMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sick Leave Allowed</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="leave_policy_sick_allowed"
+                  value={formData.leave_policy?.sick_allowed ?? 0}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      sick_allowed: Number(e.target.value || 0)
+                    }
+                  }))}
+                  disabled={reviewMode}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${reviewMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Paid Leave Enabled</label>
+                <select
+                  name="leave_policy_paid_enabled"
+                  value={formData.leave_policy?.paid_enabled ? "true" : "false"}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      paid_enabled: e.target.value === "true"
+                    }
+                  }))}
+                  disabled={reviewMode}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${reviewMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Paid Leave Allowed</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="leave_policy_paid_allowed"
+                  value={formData.leave_policy?.paid_allowed ?? 0}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      paid_allowed: Number(e.target.value || 0)
+                    }
+                  }))}
+                  disabled={reviewMode}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${reviewMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Leave Accrual Start Date</label>
+                <input
+                  type="date"
+                  name="leave_policy_accrual_start_date"
+                  value={formData.leave_policy?.accrual_start_date || ""}
+                  onChange={(e) => setFormData(prev => ({
+                    ...prev,
+                    leave_policy: {
+                      ...prev.leave_policy,
+                      accrual_start_date: e.target.value
+                    }
+                  }))}
+                  disabled={reviewMode}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${reviewMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                />
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs font-semibold text-blue-700 uppercase mb-2">Auto-Population Rule</p>
+              <p className="text-sm text-blue-900">
+                When employment status changes to <strong>Permanent</strong>, leave benefits are automatically set to: Sick Leave (7 days), Paid Leave (12 days)
+              </p>
+            </div>
+          </div>
+        )}
 
         {shouldShowEducationSection(fieldVisibilityKeys) && (
           <EducationSection

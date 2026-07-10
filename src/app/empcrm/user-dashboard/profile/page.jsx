@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { User, Mail, Phone, Calendar, MapPin, Briefcase, GraduationCap, Building, Loader2, Download, ExternalLink, FileText, AlertCircle, CheckCircle, Clock, XCircle } from "lucide-react";
+import { User, Calendar, MapPin, Briefcase, GraduationCap, Building, Loader2, Download, ExternalLink, FileText, AlertCircle, CheckCircle, Clock, XCircle, Edit, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { labelForReassignKey } from "@/lib/profileReassignFields";
-import { profileAssetViewUrl } from "@/lib/profileMediaUrl";
-
-const EDIT_PROFILE_HREF = "/empcrm/user-dashboard/profile/edit";
 
 function parseReassignedLabels(submission) {
   if (!submission?.reassigned_fields) return [];
@@ -22,10 +20,11 @@ function parseReassignedLabels(submission) {
 }
 
 export default function UserProfileView() {
+  const router = useRouter();
   const [profile, setProfile] = useState(null);
-  const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [latestSubmission, setLatestSubmission] = useState(null);
+  const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
     fetchUserAndProfile();
@@ -35,7 +34,9 @@ export default function UserProfileView() {
     try {
       const userResponse = await fetch("/api/me", { credentials: "include", cache: "no-store" });
       const userJson = await userResponse.json();
-      if (userJson?.username) setUserData(userJson);
+
+      // Store user role to check privileges
+      setUserRole(userJson?.role);
 
       const requestUrl = userJson?.username
         ? `/api/empcrm/profile?username=${encodeURIComponent(userJson.username)}`
@@ -68,378 +69,234 @@ export default function UserProfileView() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
-      </div>
-    );
-  }
-
-  const st = latestSubmission?.status;
-  const isReassign = st === "reassign" || st === "revision_requested";
-  const isPendingAdmin = st === "pending_admin";
-  const reassignedLabels = isReassign && latestSubmission ? parseReassignedLabels(latestSubmission) : [];
-
-  if (!profile) {
-    if (latestSubmission && isReassign) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-left border border-amber-200">
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center">
-                <AlertCircle className="w-8 h-8 text-amber-600" />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">HR requested corrections</h2>
-            <p className="text-gray-600 mb-4 text-center text-sm">
-              Please update the items below and submit again. Your profile will go back to HR for approval.
-            </p>
-            {reassignedLabels.length > 0 && (
-              <ul className="mb-4 list-disc pl-5 text-sm text-gray-800 space-y-1 bg-amber-50 rounded-lg p-4 border border-amber-100">
-                {reassignedLabels.map((label, idx) => (
-                  <li key={`${label}-${idx}`}>{label}</li>
-                ))}
-              </ul>
-            )}
-            {latestSubmission.reassignment_note && (
-              <p className="text-sm text-gray-700 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <span className="font-semibold">Note from HR: </span>
-                {latestSubmission.reassignment_note}
-              </p>
-            )}
-            <a
-              href={EDIT_PROFILE_HREF}
-              className="inline-block w-full text-center py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 font-medium transition-all shadow-md"
-            >
-              Update &amp; submit to HR
-            </a>
-          </div>
-        </div>
-      );
-    }
-
-    if (latestSubmission && st === "pending") {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-blue-200">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-8 h-8 text-blue-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Awaiting HR approval</h2>
-            <p className="text-gray-600 mb-6 text-sm">
-              Your profile has been submitted and is waiting for HR to review.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (latestSubmission && st === "pending_hr_docs") {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-indigo-200">
-            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-8 h-8 text-indigo-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">With HR — final paperwork</h2>
-            <p className="text-gray-600 mb-6 text-sm">
-              HR has approved your details and is completing internal employment and policy documents. Your request will
-              go to Super Admin next.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (latestSubmission && isPendingAdmin) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-violet-200">
-            <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-8 h-8 text-violet-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Awaiting final approval</h2>
-            <p className="text-gray-600 mb-6 text-sm">
-              HR has sent your submission for final review. Your profile will appear here after Super Admin publishes it.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (latestSubmission && st === "approved") {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-green-200">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Profile approved</h2>
-            <p className="text-gray-600 mb-2 text-sm">
-              Your profile was published
-              {latestSubmission.reviewed_at ? ` on ${new Date(latestSubmission.reviewed_at).toLocaleString()}` : ""}.
-            </p>
-            <p className="text-xs text-gray-500">Your details will appear here once they are synced to your profile.</p>
-          </div>
-        </div>
-      );
-    }
-
-    if (latestSubmission && st === "rejected") {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-          <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-left border border-red-200">
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <XCircle className="w-8 h-8 text-red-600" />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">Submission rejected</h2>
-            {latestSubmission.rejection_reason && (
-              <p className="text-sm text-gray-700 mb-4 p-3 bg-gray-50 rounded-lg">{latestSubmission.rejection_reason}</p>
-            )}
-            <a href={EDIT_PROFILE_HREF} className="inline-block w-full text-center py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-              Edit &amp; resubmit
-            </a>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <User className="w-8 h-8 text-yellow-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Profile Incomplete</h2>
-          <p className="text-gray-600 mb-6">
-            Your profile details are missing. Please complete your profile to proceed.
-          </p>
-          <a href={EDIT_PROFILE_HREF} className="inline-block w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all shadow-md hover:shadow-lg">
-            Create Profile
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  if (isPendingAdmin) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
-        <div className="max-w-lg w-full bg-white rounded-xl shadow-lg p-8 text-center border border-violet-200">
-          <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="w-8 h-8 text-violet-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Awaiting final approval</h2>
-          <p className="text-gray-600 mb-6 text-sm">
-            HR has approved your submission. Your profile will appear here after Super Admin publishes it.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Check if user is privileged (Admin/HR)
+  const isPrivilegedEditor = ["SUPERADMIN", "ADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].includes(userRole);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto space-y-8">
-        {(latestSubmission?.status === "reassign" || latestSubmission?.status === "revision_requested") && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5 text-amber-950 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div className="flex gap-3">
-                <AlertCircle className="w-6 h-6 shrink-0 text-amber-600 mt-0.5" />
-                <div>
-                  <h2 className="font-bold text-lg text-gray-900">HR requested corrections on your submission</h2>
-                  <p className="text-sm text-gray-700 mt-1">
-                    Update the fields below, then submit again. It will return to HR for approval.
-                  </p>
-                  {reassignedLabels.length > 0 && (
-                    <ul className="mt-3 list-disc pl-5 text-sm text-gray-800 space-y-0.5">
-                      {reassignedLabels.map((label, idx) => (
-                        <li key={`${label}-${idx}`}>{label}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {latestSubmission.reassignment_note && (
-                    <p className="mt-3 text-sm border-t border-amber-200 pt-3">
-                      <span className="font-semibold">Note from HR: </span>
-                      {latestSubmission.reassignment_note}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <a
-                href={EDIT_PROFILE_HREF}
-                className="shrink-0 inline-flex justify-center items-center py-2.5 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium text-sm whitespace-nowrap"
-              >
-                Update &amp; submit to HR
-              </a>
-            </div>
-          </div>
-        )}
-        {latestSubmission?.status === "pending" && (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 sm:p-5 text-blue-950 shadow-sm flex gap-3 items-start">
-            <Clock className="w-6 h-6 shrink-0 text-blue-600 mt-0.5" />
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <button 
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="font-bold text-lg">Awaiting HR approval</h2>
-              <p className="text-sm mt-1">Your latest profile submission is under review.</p>
+              <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
+              <p className="text-gray-600 mt-1">View and manage your profile information</p>
             </div>
-          </div>
-        )}
-        {latestSubmission?.status === "pending_hr_docs" && (
-          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 sm:p-5 text-indigo-950 shadow-sm flex gap-3 items-start">
-            <Clock className="w-6 h-6 shrink-0 text-indigo-600 mt-0.5" />
-            <div>
-              <h2 className="font-bold text-lg">HR completing documents</h2>
-              <p className="text-sm mt-1">
-                Your details are approved. HR is adding employment / policy documents before Super Admin reviews.
-              </p>
-            </div>
-          </div>
-        )}
-        {latestSubmission?.status === "approved" && (
-          <div className="rounded-xl border border-green-200 bg-green-50 p-4 sm:p-5 text-green-950 shadow-sm flex gap-3 items-start">
-            <CheckCircle className="w-6 h-6 shrink-0 text-green-600 mt-0.5" />
-            <div>
-              <h2 className="font-bold text-lg">Profile published</h2>
-              <p className="text-sm mt-1">
-                Your submission was approved and merged into your profile
-                {latestSubmission.reviewed_at ? ` on ${new Date(latestSubmission.reviewed_at).toLocaleString()}` : ""}.
-              </p>
-            </div>
-          </div>
-        )}
-        {latestSubmission?.status === "rejected" && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 sm:p-5 text-red-950 shadow-sm flex gap-3 items-start">
-            <XCircle className="w-6 h-6 shrink-0 text-red-600 mt-0.5" />
-            <div className="flex-1">
-              <h2 className="font-bold text-lg">Submission rejected</h2>
-              {latestSubmission.rejection_reason && (
-                <p className="text-sm mt-1">{latestSubmission.rejection_reason}</p>
-              )}
-              <a href={EDIT_PROFILE_HREF} className="inline-block mt-3 text-sm font-medium text-red-800 underline">
-                Edit &amp; resubmit
-              </a>
-            </div>
-          </div>
-        )}
-        {/* <div className="flex justify-end">
-          <a href={EDIT_PROFILE_HREF} className="py-3 px-4 bg-blue-600 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 font-medium transition-all shadow-md hover:shadow-lg text-right">
-            Edit Profile
-          </a>
-        </div> */}
-        {/* Header Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
-          <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-700"></div>
-          <div className="px-8 pb-8">
-            <div className="relative flex flex-col md:flex-row items-center md:items-end -mt-16 mb-6">
-              <div className="w-32 h-32 bg-white rounded-full p-2 shadow-lg mb-4 md:mb-0">
-                <div className="w-full h-full rounded-full overflow-hidden bg-gray-100">
-                  {profile.profile_photo ? (
-                    <img src={profileAssetViewUrl(profile.profile_photo)} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <User className="w-12 h-12" />
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="md:ml-6 flex-1 text-center md:text-left">
-                <h1 className="text-3xl font-bold text-gray-900">{profile.full_name}</h1>
-                <p className="text-lg text-gray-600 font-medium">{profile.designation || "N/A"}</p>
-                <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-3 text-sm text-gray-600">
-                  <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full">
-                    <MapPin className="w-4 h-4 text-blue-500" />
-                    {profile.work_location || "Location N/A"}
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 rounded-full">
-                    <Briefcase className="w-4 h-4 text-blue-500" />
-                    {profile.employee_code || "ID N/A"}
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full border border-blue-100 uppercase text-xs font-bold tracking-wide">
-                    {profile.employment_status || "PROBATION"}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-6 md:mt-0">
-                {/* Status Badge or Edit Action if needed */}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6 border-t border-gray-100">
-              <ContactItem icon={Mail} label="Email" value={profile.email} />
-              <ContactItem icon={Phone} label="Mobile" value={profile.contact_mobile} />
-              <ContactItem icon={Calendar} label="Joined" value={profile.date_of_joining} />
-            </div>
+            <button
+              onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
+              className="inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-md hover:shadow-lg"
+            >
+              <Edit className="w-4 h-4" />
+              Edit Profile
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column */}
-          <div className="space-y-8 lg:col-span-2">
-
-            {/* Personal Info */}
-            <Section title="Personal Information" icon={User}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <InfoBox label="Date of Birth" value={profile.date_of_birth} />
-                <InfoBox label="Blood Group" value={profile.blood_group} />
-                <InfoBox label="Marital Status" value={profile.marital_status} />
-                <InfoBox label="Father's Name" value={profile.father_name} />
-                <InfoBox label="Mother's Name" value={profile.mother_name} />
-                <InfoBox label="Emergency Contact" value={profile.emergency_contact_name} sub={profile.emergency_contact_number} />
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : !profile ? (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-lg font-bold text-gray-900 mb-2">Profile Not Found</h2>
+            <p className="text-gray-600 mb-6">Your profile hasn't been created yet.</p>
+            <button
+              onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
+              className="inline-flex items-center justify-center gap-2 py-2.5 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+            >
+              <Edit className="w-4 h-4" />
+              Create Profile
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Submission Status Alerts */}
+            {(latestSubmission?.status === "reassign" || latestSubmission?.status === "revision_requested") && (
+              <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:p-6">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-6 h-6 shrink-0 text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h2 className="font-bold text-lg text-amber-900">HR requested corrections</h2>
+                    <p className="text-sm text-amber-800 mt-1">
+                      Please update the following items and submit again for approval.
+                    </p>
+                    {parseReassignedLabels(latestSubmission).length > 0 && (
+                      <ul className="mt-3 list-disc pl-5 text-sm text-amber-900 space-y-1">
+                        {parseReassignedLabels(latestSubmission).map((label, idx) => (
+                          <li key={`${label}-${idx}`}>{label}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {latestSubmission.reassignment_note && (
+                      <p className="mt-3 text-sm border-t border-amber-200 pt-3">
+                        <span className="font-semibold">Note from HR: </span>
+                        {latestSubmission.reassignment_note}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
-            </Section>
-
-            {/* Address */}
-            <Section title="Address Details" icon={MapPin}>
-              <div className="grid grid-cols-1 gap-6">
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">Current Address</span>
-                  <p className="text-gray-800">{profile.correspondence_address || "N/A"}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">Permanent Address</span>
-                  <p className="text-gray-800">{profile.permanent_address || "N/A"}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">Near police station</span>
-                  <p className="text-gray-800">{profile.near_police_station || "N/A"}</p>
-                </div>
-              </div>
-            </Section>
-
-            {/* Experience */}
-            {profile.experience && profile.experience.length > 0 && (
-              <Section title="Work Experience" icon={Briefcase}>
-                <div className="space-y-4">
-                  {profile.experience.map((exp, i) => (
-                    <div key={i} className="flex relative pl-6 pb-6 border-l-2 border-gray-200 last:border-0 last:pb-0">
-                      <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-blue-100 border-2 border-blue-500"></div>
-                      <div>
-                        <h4 className="text-lg font-bold text-gray-900">{exp.designation}</h4>
-                        <p className="text-blue-600 font-medium">{exp.company_name}</p>
-                        <p className="text-sm text-gray-500 mt-1">{exp.period_from} - {exp.period_to}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Section>
             )}
+
+            {latestSubmission?.status === "pending" && (
+              <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 sm:p-6 flex gap-3">
+                <Clock className="w-6 h-6 shrink-0 text-blue-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-blue-900">Awaiting HR approval</h2>
+                  <p className="text-sm text-blue-800 mt-1">Your profile submission is under review.</p>
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "pending_hr_docs" && (
+              <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4 sm:p-6 flex gap-3">
+                <Clock className="w-6 h-6 shrink-0 text-indigo-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-indigo-900">HR completing documents</h2>
+                  <p className="text-sm text-indigo-800 mt-1">Your details are approved. HR is finalizing documents.</p>
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "approved" && (
+              <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 sm:p-6 flex gap-3">
+                <CheckCircle className="w-6 h-6 shrink-0 text-green-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-green-900">Profile approved</h2>
+                  <p className="text-sm text-green-800 mt-1">Your profile has been published successfully.</p>
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "rejected" && (
+              <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 sm:p-6 flex gap-3">
+                <XCircle className="w-6 h-6 shrink-0 text-red-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-red-900">Submission rejected</h2>
+                  {latestSubmission.rejection_reason && (
+                    <p className="text-sm text-red-800 mt-1">{latestSubmission.rejection_reason}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "pending_admin" && (
+              <div className="mb-6 rounded-lg border border-violet-200 bg-violet-50 p-4 sm:p-6 flex gap-3">
+                <Clock className="w-6 h-6 shrink-0 text-violet-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-violet-900">Awaiting final approval</h2>
+                  <p className="text-sm text-violet-800 mt-1">Super Admin is reviewing your profile.</p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Profile Content */}
+        {!loading && profile && (
+          <div className="space-y-6">
+            {/* Personal Information */}
+            <Section title="Personal Information" icon={User}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InfoField label="Full Name" value={profile.full_name} />
+                  <InfoField label="Email" value={profile.email} />
+                  <InfoField label="Contact Mobile" value={profile.contact_mobile} />
+                  <InfoField label="Date of Birth" value={profile.date_of_birth} />
+                  <InfoField label="Marital Status" value={profile.marital_status} />
+                  <InfoField label="Blood Group" value={profile.blood_group} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+                  <InfoField label="Father's Name" value={profile.father_name} />
+                  <InfoField label="Father's Phone" value={profile.father_phone} />
+                  <InfoField label="Mother's Name" value={profile.mother_name} />
+                  <InfoField label="Mother's Phone" value={profile.mother_phone} />
+                  <InfoField label="Emergency Contact" value={profile.emergency_contact_name} />
+                  <InfoField label="Emergency Phone" value={profile.emergency_contact_number} />
+                </div>
+              </div>
+            </Section>
+
+            {/* Employment Information */}
+            <Section title="Employment Information" icon={Briefcase}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InfoField label="Employee Code" value={profile.employee_code} />
+                  <InfoField label="Designation" value={profile.designation} />
+                  <InfoField label="Department" value={profile.department} />
+                  <InfoField label="Work Location" value={profile.work_location} />
+                  <InfoField label="Employment Status" value={profile.employment_status} />
+                  <InfoField label="Date of Joining" value={profile.date_of_joining} />
+                  <InfoField label="Probation Period" value={profile.probation_period} />
+                  <InfoField label="Reporting Manager" value={profile.reporting_manager} />
+                </div>
+              </div>
+            </Section>
+
+            {/* Address Information */}
+            <Section title="Address Information" icon={MapPin}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Correspondence Address</label>
+                  <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">{profile.correspondence_address || "-"}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Permanent Address</label>
+                  <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">{profile.permanent_address || "-"}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Near Police Station</label>
+                  <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">{profile.near_police_station || "-"}</p>
+                </div>
+              </div>
+            </Section>
+
+            {/* Banking Information */}
+            <Section title="Banking Information" icon={Building}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoField label="Bank Name" value={profile.bank_name} />
+                <InfoField label="Account Number" value={profile.bank_account_number} />
+                <InfoField label="IFSC Code" value={profile.ifsc_code} />
+                <InfoField label="Account Type" value={profile.account_type} />
+                <InfoField label="PAN Number" value={profile.pan_number} />
+                <InfoField label="Aadhaar Number" value={profile.aadhar_number} />
+                <InfoField label="PF UAN" value={profile.pf_uan} />
+                <InfoField label="ESIC Number" value={profile.esic_number} />
+              </div>
+            </Section>
 
             {/* Education */}
             {profile.education && profile.education.length > 0 && (
-              <Section title="Education" icon={GraduationCap}>
-                <div className="space-y-4">
-                  {profile.education.map((edu, i) => (
-                    <div key={i} className="bg-gray-50 p-4 rounded-lg border border-gray-100 flex justify-between items-center">
-                      <div>
-                        <h4 className="font-bold text-gray-900">{edu.exam_name}</h4>
-                        <p className="text-sm text-gray-600">{edu.board_university}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900">{edu.year_of_passing}</p>
-                        <p className="text-xs text-blue-600 font-medium">{edu.grade_percentage}</p>
+              <Section title="Education Qualifications" icon={GraduationCap}>
+                <div className="space-y-3">
+                  {profile.education.map((edu, idx) => (
+                    <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Exam/Degree</p>
+                          <p className="text-gray-900 font-medium">{edu.exam_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Board/University</p>
+                          <p className="text-gray-900 font-medium">{edu.board_university}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Year of Passing</p>
+                          <p className="text-gray-900 font-medium">{edu.year_of_passing}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Grade/Percentage</p>
+                          <p className="text-gray-900 font-medium">{edu.grade_percentage}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -447,43 +304,151 @@ export default function UserProfileView() {
               </Section>
             )}
 
-          </div>
+            {/* Work Experience */}
+            {profile.experience && profile.experience.length > 0 && (
+              <Section title="Work Experience" icon={Briefcase}>
+                <div className="space-y-3">
+                  {profile.experience.map((exp, idx) => (
+                    <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Company</p>
+                          <p className="text-gray-900 font-medium">{exp.company_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Designation</p>
+                          <p className="text-gray-900 font-medium">{exp.designation}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Period</p>
+                          <p className="text-gray-900 font-medium">{exp.period_from} - {exp.period_to}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Gross Salary (CTC)</p>
+                          <p className="text-gray-900 font-medium">{exp.gross_salary_ctc || "-"}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Reason for Leaving</p>
+                          <p className="text-gray-900 font-medium">{exp.reason_for_leaving}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
 
-          {/* Right Column */}
-          <div className="space-y-8">
-            {/* Banking */}
-            <Section title="Banking Info" icon={Building}>
-              <div className="space-y-4">
-                <InfoRow label="Bank Name" value={profile.bank_name} />
-                <InfoRow label="Account No." value={profile.bank_account_number} />
-                <InfoRow label="IFSC Code" value={profile.ifsc_code} />
-                <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
-                  <InfoRow label="PAN Number" value={profile.pan_number} />
-                  <InfoRow label="Aadhaar ID" value={profile.aadhar_number} />
+            {/* References */}
+            {profile.references && profile.references.length > 0 && (
+              <Section title="References" icon={User}>
+                <div className="space-y-3">
+                  {profile.references.map((ref, idx) => (
+                    <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Name</p>
+                          <p className="text-gray-900 font-medium">{ref.name || ref.reference_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Contact</p>
+                          <p className="text-gray-900 font-medium">{ref.contact || ref.reference_mobile}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <p className="text-xs font-semibold text-gray-500 uppercase">Address</p>
+                          <p className="text-gray-900 font-medium">{ref.address || ref.reference_address}</p>
+                        </div>
+                        {ref.relationship && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 uppercase">Relationship</p>
+                            <p className="text-gray-900 font-medium">{ref.relationship}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            </Section>
-
-            {/* Leave Policy */}
-            <Section title="Leave Balance" icon={Calendar}>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-green-50 p-3 rounded-lg text-center border border-green-100">
-                  <span className="block text-2xl font-bold text-green-700">{profile.leave_policy?.paid_allowed || 0}</span>
-                  <span className="text-xs font-medium text-green-600 uppercase">Paid Leaves</span>
-                </div>
-                <div className="bg-blue-50 p-3 rounded-lg text-center border border-blue-100">
-                  <span className="block text-2xl font-bold text-blue-700">{profile.leave_policy?.sick_allowed || 0}</span>
-                  <span className="text-xs font-medium text-blue-600 uppercase">Sick Leaves</span>
-                </div>
-              </div>
-            </Section>
+              </Section>
+            )}
 
             {/* Documents */}
             <Section title="Documents" icon={FileText}>
               <DocList profile={profile} />
             </Section>
+
+            {/* Leave Policy */}
+            <Section title="Leave Policy" icon={Calendar}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-xs font-semibold text-green-700 uppercase">Paid Leaves Allowed</p>
+                  <p className="text-2xl font-bold text-green-900 mt-1">{profile.leave_policy?.paid_allowed || 0}</p>
+                </div>
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs font-semibold text-blue-700 uppercase">Sick Leaves Allowed</p>
+                  <p className="text-2xl font-bold text-blue-900 mt-1">{profile.leave_policy?.sick_allowed || 0}</p>
+                </div>
+              </div>
+            </Section>
+
+            {/* Leave Policy Configuration Info - Only for Privileged Editors (Admin/HR) */}
+            {isPrivilegedEditor && (
+              <Section title="Leave Policy Configuration" icon={Calendar}>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 sm:p-6">
+                  <p className="text-sm text-gray-700 mb-4">
+                    Configure leave policies for different employment statuses. These settings determine leave eligibility based on probation or permanent status.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <div className="mb-4 pb-4 border-b border-emerald-200">
+                        <h4 className="font-semibold text-gray-900 mb-3">Sick Leave</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                            <span className="text-sm text-gray-700">Enabled</span>
+                            <span className="font-medium text-gray-900">{profile.leave_policy?.sick_enabled ? "✓ Yes" : "✗ No"}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                            <span className="text-sm text-gray-700">Allowed Days</span>
+                            <span className="font-medium text-gray-900">{profile.leave_policy?.sick_allowed || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-4 pb-4 border-b border-emerald-200">
+                        <h4 className="font-semibold text-gray-900 mb-3">Paid Leave</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                            <span className="text-sm text-gray-700">Enabled</span>
+                            <span className="font-medium text-gray-900">{profile.leave_policy?.paid_enabled ? "✓ Yes" : "✗ No"}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-white rounded border border-gray-200">
+                            <span className="text-sm text-gray-700">Allowed Days</span>
+                            <span className="font-medium text-gray-900">{profile.leave_policy?.paid_allowed || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {profile.leave_policy?.accrual_start_date && (
+                    <div className="mt-4 p-3 bg-white rounded border border-gray-200">
+                      <p className="text-xs font-semibold text-gray-600 uppercase">Leave Accrual Start Date</p>
+                      <p className="text-gray-900 font-medium mt-1">{profile.leave_policy.accrual_start_date}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs font-semibold text-blue-700 uppercase mb-2">About Leave Configuration</p>
+                  <ul className="text-sm text-blue-900 space-y-1 list-disc list-inside">
+                    <li><span className="font-medium">Probation Period:</span> Limited or no leave benefits during probation</li>
+                    <li><span className="font-medium">Permanent Status:</span> Full leave benefits after probation ends</li>
+                    <li><span className="font-medium">Sick Leave:</span> Unplanned absence with medical reasons</li>
+                    <li><span className="font-medium">Paid Leave:</span> Planned vacation and personal time off</li>
+                  </ul>
+                </div>
+              </Section>
+            )}
           </div>
-        </div>
+        )}
+
       </div>
     </div>
   );
@@ -491,45 +456,23 @@ export default function UserProfileView() {
 
 function Section({ title, icon: Icon, children }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 pb-2 border-b border-gray-50">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200 flex items-center gap-3">
         <Icon className="w-5 h-5 text-blue-600" />
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
-
-function ContactItem({ icon: Icon, label, value }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-        <Icon className="w-5 h-5 text-blue-600" />
+        <h2 className="text-lg font-bold text-gray-900">{title}</h2>
       </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase">{label}</p>
-        <p className="text-sm font-semibold text-gray-900">{value || "N/A"}</p>
+      <div className="p-6">
+        {children}
       </div>
     </div>
   );
 }
 
-function InfoBox({ label, value, sub }) {
+function InfoField({ label, value }) {
   return (
     <div>
-      <span className="text-xs font-medium text-gray-500 uppercase block mb-1">{label}</span>
-      <span className="text-sm font-semibold text-gray-900 block">{value || "N/A"}</span>
-      {sub && <span className="text-xs text-gray-500 block">{sub}</span>}
-    </div>
-  );
-}
-
-function InfoRow({ label, value }) {
-  return (
-    <div className="flex justify-between items-center py-1">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-medium text-gray-900">{value || "-"}</span>
+      <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
+      <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border border-gray-100">{value || "-"}</p>
     </div>
   );
 }
@@ -559,11 +502,9 @@ function DocList({ profile }) {
     doc_police_verification: "Police Verification"
   };
 
-  // const urls = Array.isArray(profile.joining_form_documents) ? profile.joining_form_documents : [];
   const urls = Array.isArray(profile.joining_form_documents)
-  ? profile.joining_form_documents.map(u => decodeURIComponent(u))
-  : [];
-
+    ? profile.joining_form_documents.map(u => decodeURIComponent(u))
+    : [];
 
   const docItems = urls.map(url => {
     const filename = url.split('/').pop();
@@ -577,18 +518,20 @@ function DocList({ profile }) {
     return { url, label };
   });
 
-  if (docItems.length === 0) return <p className="text-sm text-gray-400 italic text-center p-4">No documents uploaded</p>;
+  if (docItems.length === 0) {
+    return <p className="text-sm text-gray-500 italic">No documents uploaded</p>;
+  }
 
   return (
-    <ul className="space-y-3">
+    <ul className="space-y-2">
       {docItems.map((item, idx) => (
         <li key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-100">
-          <span className="text-sm font-medium text-gray-700 truncate pr-2" title={item.label}>{item.label}</span>
-          <div className="flex gap-2">
-            <a href={item.url} target="_blank" rel="noreferrer" className="p-1.5 text-blue-600 hover:bg-blue-100 rounded" title="View">
+          <span className="text-sm font-medium text-gray-700 truncate pr-2">{item.label}</span>
+          <div className="flex gap-2 shrink-0">
+            <a href={item.url} target="_blank" rel="noreferrer" className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors" title="View">
               <ExternalLink className="w-4 h-4" />
             </a>
-            <a href={item.url} download className="p-1.5 text-gray-600 hover:bg-gray-200 rounded" title="Download">
+            <a href={item.url} download className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors" title="Download">
               <Download className="w-4 h-4" />
             </a>
           </div>

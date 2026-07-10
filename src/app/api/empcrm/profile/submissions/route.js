@@ -388,7 +388,7 @@ export async function POST(request) {
         key.startsWith('reference[') ||
         key.startsWith('document_') ||
         key === 'references' || key === 'education' || key === 'experience' ||
-        key === 'resubmitSubmissionId'
+        key === 'resubmitSubmissionId' || key === 'field_changes'
       ) continue;
       data[key] = value;
     }
@@ -473,6 +473,9 @@ export async function POST(request) {
     let experience = parseMaybeJson(formData.get('experience'), []);
     if (!Array.isArray(experience) && experience && typeof experience === 'object') experience = [experience];
 
+    // Capture field changes
+    const fieldChanges = parseMaybeJson(formData.get('field_changes'), []);
+
     delete data.resubmitSubmissionId;
 
     const conn = await getDbConnection();
@@ -543,14 +546,14 @@ export async function POST(request) {
         `UPDATE employee_profile_submissions SET status = 'pending', payload = ?, uploaded_files = ?, submitted_by = ?, submitted_at = NOW(),
          reviewed_by = NULL, reviewed_at = NULL, rejection_reason = NULL, pending_assignee_username = NULL
          WHERE id = ?`,
-        [JSON.stringify({ data: mergedData, references: mergedReferences, education: mergedEducation, experience: mergedExperience }), JSON.stringify(mergedUploadedFiles), session.username, resubmitId]
+        [JSON.stringify({ data: mergedData, references: mergedReferences, education: mergedEducation, experience: mergedExperience, field_changes: fieldChanges }), JSON.stringify(mergedUploadedFiles), session.username, resubmitId]
       );
       return NextResponse.json({ success: true, message: "Profile resubmitted for HR approval", submissionId: resubmitId });
     }
 
     const [result] = await conn.execute(
       `INSERT INTO employee_profile_submissions (username, empId, status, payload, uploaded_files, submitted_by) VALUES (?, ?, 'pending', ?, ?, ?)`,
-      [username, empId, JSON.stringify({ data, references, education, experience }), JSON.stringify(uploadedFiles), session.username]
+      [username, empId, JSON.stringify({ data, references, education, experience, field_changes: fieldChanges }), JSON.stringify(uploadedFiles), session.username]
     );
 
     return NextResponse.json({ success: true, message: 'Profile submitted for HR approval', submissionId: result.insertId });
@@ -838,7 +841,9 @@ export async function PATCH(request) {
     }
 
     const mergedFlat = mergePayloadDataPreferNonEmpty(existingRow, data);
-    const upsertData = { ...mergedFlat, joining_form_documents: JSON.stringify(uniqueDocs) };
+    // Remove field_changes — it should only be stored in submission payload, not in employee_profiles table
+    const { field_changes, ...upsertWithoutChanges } = mergedFlat;
+    const upsertData = { ...upsertWithoutChanges, joining_form_documents: JSON.stringify(uniqueDocs) };
 
     if (existing.length > 0) {
       // Update
