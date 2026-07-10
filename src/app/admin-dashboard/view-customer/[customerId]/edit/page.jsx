@@ -21,7 +21,11 @@ export default async function EditCustomerPage({ params }) {
   console.log("Edit customer page - initial data:", customerData);
 
   const [leadSourceRows] = await conn.execute(
-    `SELECT DISTINCT lead_source FROM customers`
+    `SELECT DISTINCT c.lead_source FROM customers c 
+     LEFT JOIN rep_list r ON c.lead_source = r.username 
+     WHERE c.lead_source IS NOT NULL 
+     AND r.status = 1
+     ORDER BY c.lead_source ASC`
   );
   // Fetch employees with SERVICE HEAD or SERVICE SUPPORT roles
   let serviceEmployees = [];
