@@ -14,6 +14,7 @@ export default function AddBacklinkModal({
   ]);
   const [loading, setLoading] = useState(false);
   const [digitalMarketers, setDigitalMarketers] = useState([]);
+  const [keywords, setKeywords] = useState([]);
   const [currentUser, setCurrentUser] = useState("");
   const [currentRole, setCurrentRole] = useState("");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -23,6 +24,13 @@ export default function AddBacklinkModal({
     fetchDigitalMarketers();
     fetchCurrentUser();
   }, []);
+
+  useEffect(() => {
+    // Fetch keywords after currentUser is set
+    if (currentUser) {
+      fetchKeywords();
+    }
+  }, [currentUser, isSuperAdmin]);
 
   useEffect(() => {
     if (open) {
@@ -60,6 +68,22 @@ export default function AddBacklinkModal({
       }
     } catch (error) {
       console.error("Error fetching digital marketers:", error);
+    }
+  };
+
+  const fetchKeywords = async () => {
+    try {
+      const res = await fetch("/api/keywords");
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        // Filter keywords: if isSuperAdmin show all, otherwise only show assigned to current user
+        const filtered = isSuperAdmin 
+          ? data 
+          : data.filter(kw => kw.assigned_to === currentUser);
+        setKeywords(filtered);
+      }
+    } catch (error) {
+      console.error("Error fetching keywords:", error);
     }
   };
 
@@ -220,13 +244,18 @@ export default function AddBacklinkModal({
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <input
-                      type="text"
+                    <select
                       value={row.keyword}
                       onChange={(e) => handleRowChange(index, "keyword", e.target.value)}
-                      placeholder="Keyword"
                       className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 text-xs"
-                    />
+                    >
+                      <option value="">Select Keyword</option>
+                      {keywords.map((kw) => (
+                        <option key={kw.id} value={kw.keyword}>
+                          {kw.keyword}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-3">
                     <input
