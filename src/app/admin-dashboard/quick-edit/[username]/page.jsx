@@ -464,18 +464,15 @@ const QuickEditPage = () => {
   const setHrDefaults = () => {
     userEditedModulesRef.current = true;
     const defaults = [
-      // Dashboard essentials
       "dashboard-home",
-      "attendance-details",
+      "task-manager",
       "regularization-approvals",
-      "fast-card",
-      // Employee + EMPCRM
+      "salary-slips",
       "employee-list",
       "employee-crm",
-      // Attendance rules
-      "attendance-rules",
-      // Hiring (EMPCRM admin)
       "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
     ]
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");
@@ -830,7 +827,7 @@ const QuickEditPage = () => {
                     Set Admin Defaults
                   </button>
                 )}
-                {["HR", "HR HEAD", "HR EXECUTIVE"].includes(
+                {["HR", "HR HEAD", "HR EXECUTIVE", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].includes(
                   String(employee.userRole || "").trim().toUpperCase(),
                 ) && (
                   <button
