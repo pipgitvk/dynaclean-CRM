@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function EmailManagementModal({
@@ -55,10 +55,19 @@ export default function EmailManagementModal({
 
     try {
       setLoading(true);
+      
+      // Get current user
+      const userRes = await fetch("/api/current-user");
+      const userData = await userRes.json();
+      const currentUser = userData.username || "Unknown";
+      
       const res = await fetch("/api/backlink-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: newEmail.trim() }),
+        body: JSON.stringify({ 
+          email: newEmail.trim(),
+          created_by: currentUser 
+        }),
       });
 
       if (res.ok) {
@@ -159,17 +168,14 @@ export default function EmailManagementModal({
                   key={emailItem.id}
                   className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 hover:border-gray-300 transition"
                 >
-                  <span className="text-sm text-gray-800 truncate">
-                    {emailItem.email}
-                  </span>
-                  <button
-                    onClick={() => deleteEmail(emailItem.id)}
-                    disabled={loading}
-                    className="text-red-600 hover:text-red-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                    title="Delete email"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 truncate font-medium">
+                      {emailItem.email}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Added by: {emailItem.created_by || "Unknown"}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>

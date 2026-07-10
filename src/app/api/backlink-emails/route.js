@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const connection = await getDbConnection();
     const [rows] = await connection.execute(
-      `SELECT id, email, created_at 
+      `SELECT id, email, created_by, created_at 
        FROM backlink_emails 
        ORDER BY created_at DESC`
     );
@@ -24,7 +24,7 @@ export async function GET() {
 // POST - Create new backlink email
 export async function POST(request) {
   try {
-    const { email } = await request.json();
+    const { email, created_by } = await request.json();
 
     if (!email) {
       return NextResponse.json(
@@ -49,9 +49,9 @@ export async function POST(request) {
     }
 
     const [result] = await connection.execute(
-      `INSERT INTO backlink_emails (email, created_at)
-       VALUES (?, NOW())`,
-      [email]
+      `INSERT INTO backlink_emails (email, created_by, created_at)
+       VALUES (?, ?, NOW())`,
+      [email, created_by || null]
     );
 
     return NextResponse.json(
