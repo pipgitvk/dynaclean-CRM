@@ -89,13 +89,16 @@ export default function UserProfileView() {
               <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
               <p className="text-gray-600 mt-1">View and manage your profile information</p>
             </div>
-            <button
-              onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
-              className="inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-md hover:shadow-lg"
-            >
-              <Edit className="w-4 h-4" />
-              Edit Profile
-            </button>
+            {/* Show Edit only if user has no submission in employee_profile_submissions table */}
+            {(latestSubmission === null || isPrivilegedEditor) && (
+              <button
+                onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
+                className="inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-md hover:shadow-lg"
+              >
+                <Edit className="w-4 h-4" />
+                Edit Profile
+              </button>
+            )}
           </div>
         </div>
 
