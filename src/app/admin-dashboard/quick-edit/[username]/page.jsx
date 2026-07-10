@@ -523,6 +523,58 @@ const QuickEditPage = () => {
     setSelectedModules(Array.isArray(effective) ? effective : []);
   };
 
+  const setDesignEngineerDefaults = () => {
+    userEditedModulesRef.current = true;
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "spare-parts",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "production-status",
+      "bom-list",
+      "expenses",
+      "employee-crm",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
+  const setDeveloperDefaults = () => {
+    userEditedModulesRef.current = true;
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
+  const setServiceEngineerDefaults = () => {
+    userEditedModulesRef.current = true;
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -899,6 +951,26 @@ const QuickEditPage = () => {
                     title="Set recommended defaults for Graphic Designer"
                   >
                     Set Designer Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "DEVELOPER" && (
+                  <button
+                    type="button"
+                    onClick={setDeveloperDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                    title="Set recommended defaults for Developer"
+                  >
+                    Set Dev Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "SERVICE ENGINEER" && (
+                  <button
+                    type="button"
+                    onClick={setServiceEngineerDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                    title="Set recommended defaults for Service Engineer"
+                  >
+                    Set Service Eng Defaults
                   </button>
                 )}
                 <button

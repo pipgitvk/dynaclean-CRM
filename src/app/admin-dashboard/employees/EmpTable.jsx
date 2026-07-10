@@ -669,6 +669,31 @@ const EmpTable = ({ employees }) => {
       "installation-videos-manage",
       "assets",
     ],
+    "DESIGN ENGINEER": [
+      "dashboard-home",
+      "task-manager",
+      "spare-parts",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "production-status",
+      "bom-list",
+      "expenses",
+      "employee-crm",
+    ],
+    DEVELOPER: [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
+    "SERVICE ENGINEER": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
   };
 
   const applyDefaultModules = () => {
