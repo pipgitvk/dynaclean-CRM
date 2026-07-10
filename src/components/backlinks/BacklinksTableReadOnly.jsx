@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Edit, Plus } from "lucide-react";
+import { Search, Edit, Plus, Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import EditBacklinkModal from "./EditBacklinkModal";
 import AddBacklinkModal from "./AddBacklinkModal";
+import EmailManagementModal from "./EmailManagementModal";
 
 const BacklinksTableReadOnly = () => {
   const [backlinks, setBacklinks] = useState([]);
@@ -17,6 +18,7 @@ const BacklinksTableReadOnly = () => {
   const [selectedBacklink, setSelectedBacklink] = useState(null);
   const [digitalMarketers, setDigitalMarketers] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState("");
   const [currentRole, setCurrentRole] = useState("");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -137,13 +139,22 @@ const BacklinksTableReadOnly = () => {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h1 className="text-3xl font-bold text-gray-800">Backlinks Management</h1>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus size={20} />
-          Add Backlink
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setIsEmailModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+          >
+            <Mail size={20} />
+            Manage Emails
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus size={20} />
+            Add Backlink
+          </button>
+        </div>
       </div>
 
       {/* Search Box */}
@@ -345,6 +356,10 @@ const BacklinksTableReadOnly = () => {
         }}
         backlink={selectedBacklink}
         onSuccess={fetchBacklinks}
+      />
+      <EmailManagementModal
+        open={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
       />
     </div>
   );

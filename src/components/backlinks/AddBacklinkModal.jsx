@@ -15,6 +15,7 @@ export default function AddBacklinkModal({
   const [loading, setLoading] = useState(false);
   const [digitalMarketers, setDigitalMarketers] = useState([]);
   const [keywords, setKeywords] = useState([]);
+  const [emails, setEmails] = useState([]);
   const [currentUser, setCurrentUser] = useState("");
   const [currentRole, setCurrentRole] = useState("");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -29,6 +30,7 @@ export default function AddBacklinkModal({
     // Fetch keywords after currentUser is set
     if (currentUser) {
       fetchKeywords();
+      fetchEmails();
     }
   }, [currentUser, isSuperAdmin]);
 
@@ -84,6 +86,18 @@ export default function AddBacklinkModal({
       }
     } catch (error) {
       console.error("Error fetching keywords:", error);
+    }
+  };
+
+  const fetchEmails = async () => {
+    try {
+      const res = await fetch("/api/backlink-emails");
+      const data = await res.json();
+      if (res.ok && Array.isArray(data)) {
+        setEmails(data);
+      }
+    } catch (error) {
+      console.error("Error fetching emails:", error);
     }
   };
 
@@ -258,13 +272,18 @@ export default function AddBacklinkModal({
                     </select>
                   </td>
                   <td className="px-4 py-3">
-                    <input
-                      type="email"
+                    <select
                       value={row.email}
                       onChange={(e) => handleRowChange(index, "email", e.target.value)}
-                      placeholder="contact@example.com"
                       className="w-full px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 text-xs"
-                    />
+                    >
+                      <option value="">Select Email</option>
+                      {emails.map((emailItem) => (
+                        <option key={emailItem.id} value={emailItem.email}>
+                          {emailItem.email}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-3">
                     <input
