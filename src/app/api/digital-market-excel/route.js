@@ -127,6 +127,30 @@ export async function POST(request) {
     }
 
     const connection = await getDbConnection();
+
+    // Check for duplicate entry with same website and keyword (across ALL records, no filter)
+    const [duplicateRows] = await connection.execute(
+      `SELECT id, email, status, assigned_to FROM backlinks 
+       WHERE LOWER(TRIM(website)) = LOWER(TRIM(?)) AND LOWER(TRIM(keyword)) = LOWER(TRIM(?)) 
+       LIMIT 1`,
+      [website, keyword]
+    );
+
+    if (duplicateRows.length > 0) {
+      const existingEntry = duplicateRows[0];
+      return NextResponse.json(
+        { 
+          message: `Duplicate: Already exists with status "${existingEntry.status}" (by ${existingEntry.assigned_to})`,
+          isDuplicate: true,
+          existingId: existingEntry.id,
+          existingEmail: existingEntry.email,
+          existingStatus: existingEntry.status,
+          existingAssignedTo: existingEntry.assigned_to
+        },
+        { status: 409 }
+      );
+    }
+
     const [result] = await connection.execute(
       `INSERT INTO backlinks (website, keyword, email, followup_date, status, assigned_to, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,

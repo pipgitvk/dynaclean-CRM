@@ -122,11 +122,13 @@ const BacklinksTableReadOnly = () => {
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case "submitted":
+      case "pending":
         return "bg-yellow-100 text-yellow-800";
-      case "approved":
+      case "in_progress":
+        return "bg-blue-100 text-blue-800";
+      case "completed":
         return "bg-green-100 text-green-800";
-      case "deleted":
+      case "on_hold":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
@@ -196,9 +198,10 @@ const BacklinksTableReadOnly = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Status</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="deleted">Deleted</option>
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="on_hold">On Hold</option>
           </select>
         </div>
 

@@ -5,7 +5,20 @@ import { Trash2, Filter, Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import EmailManagementModal from "@/components/backlinks/EmailManagementModal";
 
+// Read persisted filters once at module level (before any render)
+const getPersistedFilters = () => {
+  if (typeof window === "undefined") return {};
+  try {
+    const saved = localStorage.getItem("backlinksExcelFilters_persistent");
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
 const BacklinksExcelTable = () => {
+  const persistedFilters = getPersistedFilters();
+
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState("");
@@ -13,33 +26,17 @@ const BacklinksExcelTable = () => {
   const [savingIds, setSavingIds] = useState(new Set());
   const [keywords, setKeywords] = useState([]);
   const [emails, setEmails] = useState([]);
-  const [filterKeyword, setFilterKeyword] = useState("");
-  const [filterEmail, setFilterEmail] = useState("");
-  const [filterDate, setFilterDate] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
+  const [filterKeyword, setFilterKeyword] = useState(persistedFilters.keyword || "");
+  const [filterEmail, setFilterEmail] = useState(persistedFilters.email || "");
+  const [filterDate, setFilterDate] = useState(persistedFilters.date || "");
+  const [filterStatus, setFilterStatus] = useState(persistedFilters.status || "");
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const saveTimeoutRef = useRef({});
 
   // Default empty rows to show at start
   const DEFAULT_EMPTY_ROWS = 50;
 
-  // Load filters from localStorage on mount
-  useEffect(() => {
-    const savedFilters = localStorage.getItem("backlinksExcelFilters");
-    if (savedFilters) {
-      try {
-        const filters = JSON.parse(savedFilters);
-        setFilterKeyword(filters.keyword || "");
-        setFilterEmail(filters.email || "");
-        setFilterDate(filters.date || "");
-        setFilterStatus(filters.status || "");
-      } catch (e) {
-        console.error("Error loading filters:", e);
-      }
-    }
-  }, []);
-
-  // Save filters to localStorage whenever they change
+  // Save filters to localStorage whenever they change (persists across logout & page navigation)
   useEffect(() => {
     const filters = {
       keyword: filterKeyword,
@@ -47,7 +44,7 @@ const BacklinksExcelTable = () => {
       date: filterDate,
       status: filterStatus,
     };
-    localStorage.setItem("backlinksExcelFilters", JSON.stringify(filters));
+    localStorage.setItem("backlinksExcelFilters_persistent", JSON.stringify(filters));
   }, [filterKeyword, filterEmail, filterDate, filterStatus]);
 
   useEffect(() => {
@@ -266,6 +263,11 @@ const BacklinksExcelTable = () => {
             isEmpty: true,
           };
           setRows((prevRows) => [...prevRows, newEmptyRow]);
+        } else if (res.status === 409 && result.isDuplicate) {
+          // Handle duplicate entry error
+          toast.error(result.message, { duration: 3000 });
+          // Remove the row that caused the duplicate
+          setRows((prevRows) => prevRows.filter((r) => r.id !== id));
         } else {
           toast.error(result.message || "Failed to save");
         }

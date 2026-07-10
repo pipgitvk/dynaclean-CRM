@@ -14,7 +14,7 @@ export default function EditBacklinkModal({
   const [keyword, setKeyword] = useState("");
   const [email, setEmail] = useState("");
   const [followupDate, setFollowupDate] = useState("");
-  const [status, setStatus] = useState("submitted");
+  const [status, setStatus] = useState("pending");
   const [assignedTo, setAssignedTo] = useState("");
   const [loading, setLoading] = useState(false);
   const [digitalMarketers, setDigitalMarketers] = useState([]);
@@ -80,7 +80,7 @@ export default function EditBacklinkModal({
           keyword: keyword.trim() || null,
           email: email.trim() || null,
           followup_date: followupDate || null,
-          status: status || "submitted",
+          status: status || "pending",
           assigned_to: assignedTo || null,
         }),
       });
@@ -185,9 +185,10 @@ export default function EditBacklinkModal({
               onChange={(e) => setStatus(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="submitted">Submitted</option>
-              <option value="approved">Approved</option>
-              <option value="deleted">Deleted</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="on_hold">On Hold</option>
             </select>
           </div>
 
