@@ -575,6 +575,64 @@ const QuickEditPage = () => {
     setSelectedModules(Array.isArray(effective) ? effective : []);
   };
 
+  const setServiceHeadDefaults = () => {
+    userEditedModulesRef.current = true;
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
+  const setServiceSupportDefaults = () => {
+    userEditedModulesRef.current = true;
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -971,6 +1029,26 @@ const QuickEditPage = () => {
                     title="Set recommended defaults for Service Engineer"
                   >
                     Set Service Eng Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "SERVICE HEAD" && (
+                  <button
+                    type="button"
+                    onClick={setServiceHeadDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-teal-300 bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
+                    title="Set recommended defaults for Service Head"
+                  >
+                    Set Service Head Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "SERVICE SUPPORT" && (
+                  <button
+                    type="button"
+                    onClick={setServiceSupportDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-lime-300 bg-lime-50 text-lime-700 hover:bg-lime-100 transition-colors"
+                    title="Set recommended defaults for Service Support"
+                  >
+                    Set Service Support Defaults
                   </button>
                 )}
                 <button

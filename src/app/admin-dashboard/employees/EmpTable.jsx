@@ -694,11 +694,52 @@ const EmpTable = ({ employees }) => {
       "regularization-approvals",
       "employee-crm",
     ],
+    "SERVICE HEAD": [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+    ],
+    "SERVICE SUPPORT": [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+    ],
   };
 
   const applyDefaultModules = () => {
     setBulkTouched(true);
-    const defaults = roleDefaultModules[bulkRole] || [];
+    const trimmedRole = String(bulkRole || "").trim();
+    const defaults = roleDefaultModules[trimmedRole] || [];
     setBulkSelectedModules(defaults);
   };
 
