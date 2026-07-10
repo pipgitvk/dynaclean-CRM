@@ -348,8 +348,22 @@ const QuickEditPage = () => {
   const setSalesDefaults = () => {
     userEditedModulesRef.current = true;
     const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "fast-card",
+      "view-customers",
+      "add-customer",
+      "daily-report",
+      "lead-reports",
+      "demo-details",
+      "quotations",
       "orders-process",
-      "orders-delay",
+      "product-stock",
+      "expenses",
+      "employee-crm",
+      "prospects-view",
+      "prospects-add",
+      "installation-videos",
     ]
       .filter((k) => ALL_MODULE_KEYS.includes(k))
       .filter((k) => k !== "dm-fresh-leads");

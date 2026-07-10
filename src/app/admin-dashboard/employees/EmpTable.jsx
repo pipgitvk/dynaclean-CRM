@@ -501,6 +501,33 @@ const EmpTable = ({ employees }) => {
     setBulkSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
   };
 
+  const roleDefaultModules = {
+    SALES: [
+      "dashboard-home",
+      "task-manager",
+      "fast-card",
+      "view-customers",
+      "add-customer",
+      "daily-report",
+      "lead-reports",
+      "demo-details",
+      "quotations",
+      "orders-process",
+      "product-stock",
+      "expenses",
+      "employee-crm",
+      "prospects-view",
+      "prospects-add",
+      "installation-videos",
+    ],
+  };
+
+  const applyDefaultModules = () => {
+    setBulkTouched(true);
+    const defaults = roleDefaultModules[bulkRole] || [];
+    setBulkSelectedModules(defaults);
+  };
+
   const submitBulkModules = async () => {
     const roles = [String(bulkRole || "").trim()].filter(Boolean);
     if (roles.length === 0) {
@@ -650,7 +677,7 @@ const EmpTable = ({ employees }) => {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={toggleBulkAll}
@@ -658,6 +685,14 @@ const EmpTable = ({ employees }) => {
                     className="text-xs font-medium px-3 py-2 rounded-md border bg-gray-50 hover:bg-gray-100"
                   >
                     Toggle All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyDefaultModules}
+                    disabled={bulkSaving || bulkRoleLoading}
+                    className="text-xs font-medium px-3 py-2 rounded-md border bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
+                  >
+                    Default
                   </button>
                   <div className="text-xs text-gray-500">
                     {bulkSelectedModules.length} selected
