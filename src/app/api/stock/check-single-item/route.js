@@ -65,6 +65,18 @@ export async function POST(req) {
       }
     } else {
       // Case 2: Spares
+      // First, resolve item_code (spare_number) to spare_id
+      let spare_id = item_code;
+      
+      const [spareMatch] = await conn.execute(
+        `SELECT id FROM spare_list WHERE spare_number = ? OR id = ? LIMIT 1`,
+        [item_code, item_code]
+      );
+      
+      if (spareMatch.length > 0) {
+        spare_id = spareMatch[0].id;
+      }
+      
       const query = `
         SELECT
           T1.${locationColumn} AS stock_count,
@@ -74,7 +86,7 @@ export async function POST(req) {
         LEFT JOIN spare_list AS T2 ON T1.spare_id = T2.id
         WHERE T1.spare_id = ?`;
 
-      const [summary] = await conn.execute(query, [item_code]);
+      const [summary] = await conn.execute(query, [spare_id]);
 
       if (summary.length > 0) {
         const result = summary[0];
