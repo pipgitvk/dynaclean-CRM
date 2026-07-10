@@ -578,6 +578,18 @@ const EmpTable = ({ employees }) => {
       "payment-pending",
       "employee-crm",
     ],
+    "DIGITAL MARKETER": [
+      "dashboard-home",
+      "task-manager",
+      "view-customers",
+      "my-leads",
+      "leads-upload",
+      "keywords-management",
+      "backlinks-management",
+      "daily-report",
+      "blog",
+      "employee-crm",
+    ],
   };
 
   const applyDefaultModules = () => {

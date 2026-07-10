@@ -386,13 +386,15 @@ const QuickEditPage = () => {
   const setDigitalMarketerDefaults = () => {
     userEditedModulesRef.current = true;
     const defaults = [
-      "leads-upload",
-      "blog",
+      "dashboard-home",
+      "task-manager",
+      "view-customers",
       "my-leads",
-      "quotations",
-      "email-templates",
-      "product-stock",
-      "spare-parts",
+      "leads-upload",
+      "keywords-management",
+      "backlinks-management",
+      "daily-report",
+      "blog",
       "employee-crm",
     ]
       .filter((k) => ALL_MODULE_KEYS.includes(k))
