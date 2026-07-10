@@ -660,6 +660,15 @@ const EmpTable = ({ employees }) => {
       "gem-crm-reports",
       "installation-videos",
     ],
+    "GRAPHIC DESIGNER": [
+      "dashboard-home",
+      "task-manager",
+      "daily-report",
+      "employee-crm",
+      "installation-videos",
+      "installation-videos-manage",
+      "assets",
+    ],
   };
 
   const applyDefaultModules = () => {

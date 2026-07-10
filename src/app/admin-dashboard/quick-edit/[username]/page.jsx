@@ -505,6 +505,24 @@ const QuickEditPage = () => {
     setSelectedModules(Array.isArray(effective) ? effective : []);
   };
 
+  const setGraphicDesignerDefaults = () => {
+    userEditedModulesRef.current = true;
+    const defaults = [
+      "dashboard-home",
+      "task-manager",
+      "daily-report",
+      "employee-crm",
+      "installation-videos",
+      "installation-videos-manage",
+      "assets",
+    ]
+      .filter((k) => ALL_MODULE_KEYS.includes(k))
+      .filter((k) => k !== "dm-fresh-leads");
+
+    const effective = applySuperadminOnlyModuleRestrictions(defaults, employee.userRole);
+    setSelectedModules(Array.isArray(effective) ? effective : []);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -871,6 +889,16 @@ const QuickEditPage = () => {
                     title="Set recommended defaults for GEM"
                   >
                     Set GEM Defaults
+                  </button>
+                )}
+                {String(employee.userRole || "").trim().toUpperCase() === "GRAPHIC DESIGNER" && (
+                  <button
+                    type="button"
+                    onClick={setGraphicDesignerDefaults}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-cyan-300 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition-colors"
+                    title="Set recommended defaults for Graphic Designer"
+                  >
+                    Set Designer Defaults
                   </button>
                 )}
                 <button
