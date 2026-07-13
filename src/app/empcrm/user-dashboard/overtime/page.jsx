@@ -17,36 +17,47 @@ function isAttendanceComplete(attendance) {
 
 // Helper function to check if attendance has issues
 function hasAttendanceIssues(attendance) {
-  if (!attendance) return true; // No record = issue
+  if (!attendance) return true;
   
   const hasCheckIn = attendance.checkin_time && attendance.checkin_time.trim() !== "";
   const hasCheckOut = attendance.checkout_time && attendance.checkout_time.trim() !== "";
   
-  // Show regularization if either check-in or check-out is missing
   return !hasCheckIn || !hasCheckOut;
 }
 
-// Helper function to check if employee has pending regularization
+// Helper function to check regularization status
 function hasPendingRegularization(regularization) {
   return regularization && regularization.status === 'pending';
 }
 
-// Helper function to check if employee has approved regularization
 function hasApprovedRegularization(regularization) {
   return regularization && regularization.status === 'approved';
 }
 
-// Helper function to check if employee has rejected regularization
 function hasRejectedRegularization(regularization) {
   return regularization && regularization.status === 'rejected';
 }
 
+// Format date for display
+function formatDateHeader(dateStr) {
+  const date = new Date(dateStr + 'T00:00:00');
+  const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+  return date.toLocaleDateString('en-IN', options);
+}
+
 export default function OvertimeManagementPage() {
-  const [employeesWithAttendance, setEmployeesWithAttendance] = useState([]);
+  const [attendanceByDate, setAttendanceByDate] = useState({});
+  const [datesSorted, setDatesSorted] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
+  const [fromDate, setFromDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 30);
+    return date.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(new Date().toISOString().split('T')[0]);
   const [regularizationForm, setRegularizationForm] = useState({
     checkin_time: "",
     checkout_time: "",
@@ -62,26 +73,45 @@ export default function OvertimeManagementPage() {
     setShowRemarksModal(true);
   };
 
-  const fetchEmployeesWithAttendance = useCallback(async () => {
+  const fetchAttendanceByDate = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/overtime/team-attendance?date=${selectedDate}`);
+      // Calculate days between from and to date
+      const from = new Date(fromDate);
+      const to = new Date(toDate);
+      const daysBack = Math.ceil((to - from) / (1000 * 60 * 60 * 24)) + 1;
+      
+      const res = await fetch(`/api/overtime/team-attendance?daysBack=${daysBack}`);
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch team attendance");
+        throw new Error(data.error || "Failed to fetch attendance");
       }
-      setEmployeesWithAttendance(data.employees || []);
+      
+      // Filter by date range
+      let filteredDates = data.datesSorted || [];
+      if (fromDate && toDate) {
+        filteredDates = filteredDates.filter(date => date >= fromDate && date <= toDate);
+      }
+      
+      const filteredAttendance = {};
+      filteredDates.forEach(date => {
+        filteredAttendance[date] = data.attendanceByDate[date];
+      });
+      
+      setAttendanceByDate(filteredAttendance);
+      setDatesSorted(filteredDates);
     } catch (error) {
       toast.error(error.message);
-      setEmployeesWithAttendance([]);
+      setAttendanceByDate({});
+      setDatesSorted([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [fromDate, toDate]);
 
   useEffect(() => {
-    fetchEmployeesWithAttendance();
-  }, [fetchEmployeesWithAttendance]);
+    fetchAttendanceByDate();
+  }, [fetchAttendanceByDate]);
 
   const handleSubmitRegularization = async (e) => {
     e.preventDefault();
@@ -127,21 +157,16 @@ export default function OvertimeManagementPage() {
         reason: "",
         attachment: null
       });
-      fetchEmployeesWithAttendance();
+      fetchAttendanceByDate();
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  // Filter employees based on the selected filter
-  const filteredEmployees = employeeFilter
-    ? employeesWithAttendance.filter(emp => emp.username === employeeFilter)
-    : employeesWithAttendance;
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading team attendance...</div>
+        <div className="text-gray-500">Loading attendance records...</div>
       </div>
     );
   }
@@ -151,30 +176,44 @@ export default function OvertimeManagementPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Overtime Management</h1>
-          <p className="mt-2 text-gray-600">Manage attendance regularization for your team members</p>
+          <p className="mt-2 text-gray-600">View assigned employees' attendance records organized by date</p>
         </div>
 
         {/* Navigation */}
         <div className="mb-6 flex space-x-4">
           <Link
             href="/empcrm/user-dashboard/attendance-regularization"
-            className="text-blue-600 hover:text-blue-800"
+            className="text-blue-600 hover:text-blue-800 font-medium"
           >
             View Approval Requests
           </Link>
         </div>
 
-        {/* Date and Employee Selection */}
+        {/* Controls */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Date
+                From Date
               </label>
               <input
                 type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                max={toDate}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                To Date
+              </label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                min={fromDate}
                 max={new Date().toISOString().split('T')[0]}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -189,18 +228,30 @@ export default function OvertimeManagementPage() {
                 onChange={(e) => setEmployeeFilter(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">All Employees</option>
-                {employeesWithAttendance.map((emp) => (
-                  <option key={emp.username} value={emp.username}>
-                    {emp.username} ({emp.empId})
-                  </option>
-                ))}
+                <option value="">All Assigned Employees</option>
+                {Object.values(attendanceByDate)
+                  .flat()
+                  .filter((v, i, a) => a.findIndex(t => t.username === v.username) === i)
+                  .map((emp) => (
+                    <option key={emp.username} value={emp.username}>
+                      {emp.username} ({emp.empId})
+                    </option>
+                  ))}
               </select>
+            </div>
+            
+            <div className="flex items-end">
+              <button
+                onClick={() => fetchAttendanceByDate()}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors"
+              >
+                Search
+              </button>
             </div>
           </div>
           
           {employeeFilter && (
-            <div className="mt-3 flex items-center justify-between">
+            <div className="mt-4 flex items-center justify-between">
               <span className="text-sm text-gray-600">
                 Showing: <strong>{employeeFilter}</strong>
               </span>
@@ -214,149 +265,162 @@ export default function OvertimeManagementPage() {
           )}
         </div>
 
-        {/* Employee List */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Team Attendance - {selectedDate}
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Showing {filteredEmployees.length} of {employeesWithAttendance.length} assigned employees
-            </p>
-          </div>
-
-          {filteredEmployees.length === 0 ? (
-            <div className="px-6 py-8 text-center text-gray-500">
-              {employeeFilter ? 'No employees found matching the filter' : 'No assigned employees found'}
+        {/* Date-wise Attendance */}
+        <div className="space-y-6">
+          {datesSorted.length === 0 ? (
+            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
+              No attendance records found
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Check-in
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Check-out
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredEmployees.map((employee) => (
-                    <tr key={employee.username}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {employee.username}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            ID: {employee.empId}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {employee.attendance?.checkin_time 
-                          ? formatTime(employee.attendance.checkin_time)
-                          : "Not recorded"
-                        }
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {employee.attendance?.checkout_time 
-                          ? formatTime(employee.attendance.checkout_time)
-                          : "Not recorded"
-                        }
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {hasPendingRegularization(employee.regularization) ? (
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                            Pending
-                          </span>
-                        ) : hasApprovedRegularization(employee.regularization) ? (
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                              Approved
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => showRemarks(employee.regularization.reviewer_comment)}
-                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                              title="View approval remarks"
-                            >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
-                        ) : hasRejectedRegularization(employee.regularization) ? (
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                              Rejected
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => showRemarks(employee.regularization.reviewer_comment)}
-                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                              title="View rejection remarks"
-                            >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
-                        ) : employee.attendance ? (
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                            Present
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                            Absent
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {hasPendingRegularization(employee.regularization) ? (
-                          <span className="text-yellow-600 text-sm">
-                            Regularization Pending
-                          </span>
-                        ) : hasApprovedRegularization(employee.regularization) ? (
-                          <span className="text-green-600 text-sm">
-                            Regularization Approved
-                          </span>
-                        ) : hasRejectedRegularization(employee.regularization) ? (
-                          <span className="text-red-600 text-sm">
-                            Regularization Rejected
-                          </span>
-                        ) : hasAttendanceIssues(employee.attendance) ? (
-                          <button
-                            onClick={() => {
-                              setSelectedEmployee(employee.username);
-                              setShowForm(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            Request Regularization
-                          </button>
-                        ) : (
-                          <span className="text-green-600 text-sm">
-                            Attendance Complete
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            datesSorted.map((date) => {
+              const employees = attendanceByDate[date];
+              const filteredEmployees = employeeFilter
+                ? employees.filter(e => e.username === employeeFilter)
+                : employees;
+
+              if (filteredEmployees.length === 0) return null;
+
+              return (
+                <div key={date} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                  {/* Date Header */}
+                  <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      📅 {formatDateHeader(date)}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {filteredEmployees.length} assigned employee(s)
+                    </p>
+                  </div>
+
+                  {/* Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 border-b border-gray-300">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">USER</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">CHECK-IN</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">MORNING BREAK</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">LUNCH BREAK</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">EVENING BREAK</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">CHECK-OUT</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">STATUS</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">ACTION</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredEmployees.map((employee, idx) => (
+                          <tr key={`${date}-${employee.username}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-3 py-2 border-b border-gray-200">
+                              <div>
+                                <div className="font-semibold text-gray-900">{employee.username}</div>
+                                <div className="text-xs text-gray-600">ID: {employee.empId}</div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 border-b border-gray-200 font-mono text-gray-900 bg-green-50">
+                              {employee.attendance?.checkin_time 
+                                ? formatTime(employee.attendance.checkin_time)
+                                : <span className="text-red-600">—</span>
+                              }
+                            </td>
+                            <td className="px-3 py-2 border-b border-gray-200 text-xs text-gray-900 bg-green-50">
+                              {employee.attendance?.break_morning_start && employee.attendance?.break_morning_end ? (
+                                `${formatTime(employee.attendance.break_morning_start)} - ${formatTime(employee.attendance.break_morning_end)}`
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 border-b border-gray-200 text-xs text-gray-900 bg-green-50">
+                              {employee.attendance?.break_lunch_start && employee.attendance?.break_lunch_end ? (
+                                `${formatTime(employee.attendance.break_lunch_start)} - ${formatTime(employee.attendance.break_lunch_end)}`
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 border-b border-gray-200 text-xs text-gray-900 bg-green-50">
+                              {employee.attendance?.break_evening_start && employee.attendance?.break_evening_end ? (
+                                `${formatTime(employee.attendance.break_evening_start)} - ${formatTime(employee.attendance.break_evening_end)}`
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 border-b border-gray-200 font-mono text-gray-900 bg-yellow-50">
+                              {employee.attendance?.checkout_time 
+                                ? formatTime(employee.attendance.checkout_time)
+                                : <span className="text-red-600">—</span>
+                              }
+                            </td>
+                            <td className="px-3 py-2 border-b border-gray-200">
+                              {hasPendingRegularization(employee.regularization) ? (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300">
+                                  Pending
+                                </span>
+                              ) : hasApprovedRegularization(employee.regularization) ? (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-300">
+                                  Approved
+                                </span>
+                              ) : hasRejectedRegularization(employee.regularization) ? (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-300">
+                                  Rejected
+                                </span>
+                              ) : employee.attendance && isAttendanceComplete(employee.attendance) ? (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 border border-green-300">
+                                  Complete
+                                </span>
+                              ) : employee.attendance ? (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800 border border-orange-300">
+                                  Incomplete
+                                </span>
+                              ) : (
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-300">
+                                  Absent
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 border-b border-gray-200 text-center">
+                              {hasPendingRegularization(employee.regularization) ? (
+                                <button
+                                  onClick={() => showRemarks(employee.regularization.reviewer_comment)}
+                                  className="text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                  View
+                                </button>
+                              ) : hasApprovedRegularization(employee.regularization) ? (
+                                <button
+                                  onClick={() => showRemarks(employee.regularization.reviewer_comment)}
+                                  className="text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                  View
+                                </button>
+                              ) : hasRejectedRegularization(employee.regularization) ? (
+                                <button
+                                  onClick={() => showRemarks(employee.regularization.reviewer_comment)}
+                                  className="text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                  View
+                                </button>
+                              ) : hasAttendanceIssues(employee.attendance) ? (
+                                <button
+                                  onClick={() => {
+                                    setSelectedEmployee(employee.username);
+                                    setSelectedDate(date);
+                                    setShowForm(true);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                  Regularize
+                                </button>
+                              ) : (
+                                <span className="text-gray-400 text-xs">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
 
@@ -369,7 +433,7 @@ export default function OvertimeManagementPage() {
                   Request Attendance Regularization
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Employee: {selectedEmployee} | Date: {selectedDate}
+                  Employee: <strong>{selectedEmployee}</strong> | Date: <strong>{selectedDate}</strong>
                 </p>
                 
                 <form onSubmit={handleSubmitRegularization} className="space-y-4">
@@ -417,7 +481,7 @@ export default function OvertimeManagementPage() {
                       }))}
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Please provide a reason for the regularization request..."
+                      placeholder="Please provide a reason..."
                       required
                     />
                   </div>
@@ -432,7 +496,7 @@ export default function OvertimeManagementPage() {
                         ...prev,
                         attachment: e.target.files[0]
                       }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
                       accept=".pdf,.jpg,.jpeg,.png,.webp"
                     />
                   </div>
