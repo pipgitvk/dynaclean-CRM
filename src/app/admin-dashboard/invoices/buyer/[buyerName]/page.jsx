@@ -73,8 +73,21 @@ export default async function BuyerInvoicesPage({ params }) {
     invoices = invRows;
     
     // Capture customer_id from first invoice (if available)
-    if (invoices.length > 0) {
+    if (invoices.length > 0 && invoices[0].customer_id) {
       customerIdForBuyer = invoices[0].customer_id;
+    }
+
+    // Fallback: if invoice has no customer_id, look it up from product_stock_request by client_name
+    if (!customerIdForBuyer) {
+      const [cRows] = await conn.execute(
+        `SELECT customer_id FROM product_stock_request 
+         WHERE TRIM(client_name) = ? AND customer_id IS NOT NULL AND customer_id != 0
+         LIMIT 1`,
+        [decodedBuyer]
+      );
+      if (cRows.length > 0) {
+        customerIdForBuyer = cRows[0].customer_id;
+      }
     }
 
     // ── 2. Collect all linked trans IDs from every invoice ──────
@@ -106,13 +119,13 @@ export default async function BuyerInvoicesPage({ params }) {
       const [pRows] = await conn.execute(
         `SELECT 
            id,
-           invoice_date,
+           COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
            invoice_number,
            net_amount,
            client_name
          FROM product_stock_request
          WHERE customer_id = ?
-         ORDER BY invoice_date DESC, id DESC`,
+         ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
         [customerIdForBuyer]
       );
       purchaseRows = pRows;
