@@ -340,7 +340,7 @@ const BacklinksTable = () => {
                   </button>
                 </div>
               </div>
-              <div className="text-sm text-gray-600 space-y-1">
+              <div className="text-sm text-gray-600 space-y-1 border-t pt-3">
                 <p>
                   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeColor(backlink.status)}`}>
                     {backlink.status}
