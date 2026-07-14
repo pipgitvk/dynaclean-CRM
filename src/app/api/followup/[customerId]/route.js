@@ -140,8 +140,40 @@ export async function POST(req, { params }) {
     gemNextFollowupUTC = convertISTtoUTC(data.gem_next_followup);
   }
 
-  // Insert first follow-up row (normal entry)
-  const firstRowNextDate = data.status === "Denied" ? null : (data.service_next_followup ? serviceNextFollowupUTC : (data.gem_next_followup ? gemNextFollowupUTC : nextFollowupDateUTC));
+  // Fetch the latest existing service_next_followup and gem_next_followup
+  // so that when Sales inserts, we preserve GEM/Service dates (don't NULL them out)
+  // and when SERVICE SUPPORT inserts, we preserve Sales next_followup_date, etc.
+  const [latestFollowup] = await conn.execute(
+    `SELECT next_followup_date, service_next_followup, gem_next_followup 
+     FROM customers_followup 
+     WHERE customer_id = ? 
+     AND (next_followup_date IS NOT NULL OR service_next_followup IS NOT NULL OR gem_next_followup IS NOT NULL)
+     ORDER BY followed_date DESC LIMIT 1`,
+    [customerId]
+  );
+  const latestDates = latestFollowup[0] || {};
+
+  let insertNextDate = null;
+  let insertServiceNext = null;
+  let insertGemNext = null;
+
+  if (data.service_next_followup) {
+    // SERVICE SUPPORT role - update service_next_followup, preserve others
+    insertServiceNext = serviceNextFollowupUTC;
+    insertNextDate = latestDates.next_followup_date || null;   // preserve Sales date
+    insertGemNext = latestDates.gem_next_followup || null;     // preserve GEM date
+  } else if (data.gem_next_followup) {
+    // GEM role - update gem_next_followup, preserve others
+    insertGemNext = gemNextFollowupUTC;
+    insertNextDate = latestDates.next_followup_date || null;   // preserve Sales date
+    insertServiceNext = latestDates.service_next_followup || null; // preserve Service date
+  } else {
+    // Sales / normal role - update next_followup_date, preserve others
+    insertNextDate = data.status === "Denied" ? null : nextFollowupDateUTC;
+    insertServiceNext = latestDates.service_next_followup || null; // preserve Service date
+    insertGemNext = latestDates.gem_next_followup || null;         // preserve GEM date
+  }
+
   await conn.execute(
     `INSERT INTO customers_followup 
     (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, followed_by, multi_tag)
@@ -151,9 +183,9 @@ export async function POST(req, { params }) {
       name,
       contact,
       email,
-      firstRowNextDate,
-      serviceNextFollowupUTC,
-      gemNextFollowupUTC,
+      insertNextDate,
+      insertServiceNext,
+      insertGemNext,
       followedDateUTC,
       data.communication_mode,
       data.notes,

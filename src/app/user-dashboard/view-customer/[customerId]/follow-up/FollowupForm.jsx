@@ -308,7 +308,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -393,26 +393,35 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   // If customer has an order → max 15 days from now (skip validation)
   // < 7 days old  → max 48 hours from now
   // >= 7 days old → max 15 days from now
-  const getNextFollowupDateLimits = () => {
+  const nextFollowupDateLimits = useMemo(() => {
     const now = new Date();
     const minDate = formatISTDateTime(now);
 
     // If navigated from Upcoming Enquiry section, always allow 15 days
     if (isFromUpcoming) {
-      const maxDate = formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000));
-      return { min: minDate, max: maxDate, isNewLead: false };
+      return {
+        min: minDate,
+        max: formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000)),
+        isNewLead: false,
+      };
     }
 
-    // If customer already has an order, allow 15 days (skip the 7-day restriction)
+    // If customer already has an order, allow 15 days
     if (hasOrder) {
-      const maxDate = formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000));
-      return { min: minDate, max: maxDate, isNewLead: false };
+      return {
+        min: minDate,
+        max: formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000)),
+        isNewLead: false,
+      };
     }
 
     // If stage is "Won (Order Received)", allow 15 days
     if (formData.stage === "Won (Order Received)") {
-      const maxDate = formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000));
-      return { min: minDate, max: maxDate, isNewLead: false };
+      return {
+        min: minDate,
+        max: formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000)),
+        isNewLead: false,
+      };
     }
 
     if (customerCreatedAt) {
@@ -421,21 +430,29 @@ export default function FollowupForm({ customerId, userRole = "" }) {
 
       if (leadAgeInDays < 7) {
         // Fresh lead: restrict to 48 hours max
-        const maxDate = formatISTDateTime(new Date(now.getTime() + 48 * 60 * 60 * 1000));
-        return { min: minDate, max: maxDate, isNewLead: true };
+        return {
+          min: minDate,
+          max: formatISTDateTime(new Date(now.getTime() + 48 * 60 * 60 * 1000)),
+          isNewLead: true,
+        };
       } else {
         // Old lead: allow up to 15 days
-        const maxDate = formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000));
-        return { min: minDate, max: maxDate, isNewLead: false };
+        return {
+          min: minDate,
+          max: formatISTDateTime(new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000)),
+          isNewLead: false,
+        };
       }
     }
 
-    // Still loading — apply strict 48 hour fallback so no one can bypass during load
-    const maxDate = formatISTDateTime(new Date(now.getTime() + 48 * 60 * 60 * 1000));
-    return { min: minDate, max: maxDate, isNewLead: true };
-  };
-
-  const nextFollowupDateLimits = getNextFollowupDateLimits();
+    // Still loading — strict 48 hour fallback
+    return {
+      min: minDate,
+      max: formatISTDateTime(new Date(now.getTime() + 48 * 60 * 60 * 1000)),
+      isNewLead: true,
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerCreatedAt, hasOrder, isFromUpcoming, formData.stage]);
 
   // Fetch customer's current stage, status, comm_mode from database
   useEffect(() => {
@@ -530,24 +547,16 @@ export default function FollowupForm({ customerId, userRole = "" }) {
     const { name, value } = e.target;
 
     if (name === "next_followup_date" && value) {
-      const limits = getNextFollowupDateLimits();
-      const selected = new Date(value);
-      const minDate = new Date(limits.min);
-      const maxDate = limits.max ? new Date(limits.max) : null;
+      const maxDate = nextFollowupDateLimits.max ? new Date(nextFollowupDateLimits.max) : null;
 
-      if (selected < minDate) {
-        toast.error("Cannot select a past date.");
-        return;
-      }
-
-      if (maxDate && selected > maxDate) {
-        if (limits.isNewLead) {
+      // Only block future dates beyond max
+      if (maxDate && new Date(value) > maxDate) {
+        if (nextFollowupDateLimits.isNewLead) {
           toast.error("This lead is less than 7 days old — you can only schedule a follow-up within the next 48 hours.");
         } else {
           toast.error("You can schedule a follow-up for a maximum of 15 days from now.");
         }
-        // Clamp to max allowed value
-        setFormData({ ...formData, [name]: limits.max });
+        setFormData({ ...formData, [name]: nextFollowupDateLimits.max });
         return;
       }
     }
@@ -587,12 +596,11 @@ export default function FollowupForm({ customerId, userRole = "" }) {
 
     // Final validation for next_followup_date before submitting
     if (formData.status !== "Denied" && formData.status !== "Invalid" && formData.next_followup_date) {
-      const limits = getNextFollowupDateLimits();
       const selected = new Date(formData.next_followup_date);
-      const maxDate = limits.max ? new Date(limits.max) : null;
+      const maxDate = nextFollowupDateLimits.max ? new Date(nextFollowupDateLimits.max) : null;
 
       if (maxDate && selected > maxDate) {
-        if (limits.isNewLead) {
+        if (nextFollowupDateLimits.isNewLead) {
           toast.error("This lead is less than 7 days old — you can only schedule a follow-up within the next 48 hours.");
         } else {
           toast.error("You can schedule a follow-up for a maximum of 15 days from now.");
@@ -626,6 +634,12 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         delete payload.stage;
         delete payload.multi_tag;
         delete payload.service_next_followup;
+      }
+
+      // Normal Sales / other roles - service_next_followup aur gem_next_followup nahi bhejna
+      if (!isServiceSupport && !isGEM) {
+        delete payload.service_next_followup;
+        delete payload.gem_next_followup;
       }
 
       const res = await fetch(`/api/followup/${customerId}`, {
