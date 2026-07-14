@@ -83,10 +83,22 @@ export default async function CustomersPage({ searchParams }) {
   const customerConditions = [];
   const customerParams = [];
 
-  // Only filter by assigned fields if user is not ADMIN, SUPERADMIN, or SERVICE HEAD or TEAM LEADER or EA
-  if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
-    customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ? OR c.service_lead_source = ?)");
-    customerParams.push(username, username, username, username);
+  // Only filter by assigned fields based on role
+  if (userRole === "SERVICE SUPPORT") {
+    // SERVICE SUPPORT: customers assigned to them OR customers they have followed up
+    customerConditions.push(`(c.service_lead_source = ? OR c.customer_id IN (
+      SELECT DISTINCT cf.customer_id FROM customers_followup cf WHERE cf.followed_by = ?
+    ))`);
+    customerParams.push(username, username);
+  } else if (userRole === "GEM") {
+    // GEM: customers assigned to them OR customers they have followed up
+    customerConditions.push(`(c.gem_lead_source = ? OR c.customer_id IN (
+      SELECT DISTINCT cf.customer_id FROM customers_followup cf WHERE cf.followed_by = ?
+    ))`);
+    customerParams.push(username, username);
+  } else if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
+    customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
+    customerParams.push(username, username, username);
   }
 
   // Employee filter (only for ADMIN, SUPERADMIN, TEAM LEADER, EA)
@@ -140,6 +152,7 @@ export default async function CustomersPage({ searchParams }) {
   if (search) {
     const term = `%${search}%`;
     const fields = [
+      "c.customer_id",
       "c.first_name",
       "c.last_name",
       "c.email",
