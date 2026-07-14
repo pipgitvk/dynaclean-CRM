@@ -168,6 +168,32 @@ export async function POST(request) {
       );
     }
 
+    // Get reporting manager email
+    let reportingManagerEmail = null;
+    try {
+      const conn = await getDbConnection();
+      const [profileData] = await conn.execute(
+        `SELECT reporting_manager FROM employee_profiles WHERE username = ?`,
+        [username]
+      );
+      
+      if (profileData.length > 0 && profileData[0].reporting_manager) {
+        const reportingManagerName = profileData[0].reporting_manager;
+        // Query to find reporting manager's email
+        const [managerData] = await conn.execute(
+          `SELECT email, professional_email FROM employee_profiles WHERE full_name = ? OR username = ? LIMIT 1`,
+          [reportingManagerName, reportingManagerName]
+        );
+        
+        if (managerData.length > 0) {
+          reportingManagerEmail = managerData[0].professional_email || managerData[0].email;
+          console.log(`✅ Found reporting manager email: ${reportingManagerEmail}`);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch reporting manager email:", err.message);
+    }
+
     // Prepare attachments
     const attachments = [];
     if (confirmationLetterPath) {
@@ -188,21 +214,29 @@ export async function POST(request) {
     const emailResults = [];
     for (const recipientEmail of recipientEmails) {
       try {
-        const result = await transporter.sendMail({
+        const mailOptions = {
           from: senderEmail,
           to: recipientEmail,
           subject: emailSubject,
           html: emailHTML,
           attachments: attachments,
-        });
+        };
+        
+        // Add reporting manager to CC if available
+        if (reportingManagerEmail && reportingManagerEmail !== recipientEmail) {
+          mailOptions.cc = reportingManagerEmail;
+        }
+        
+        const result = await transporter.sendMail(mailOptions);
 
         emailResults.push({
           email: recipientEmail,
           success: true,
           messageId: result.messageId,
+          cc: reportingManagerEmail || null,
         });
 
-        console.log(`✅ Confirmation email sent to ${recipientEmail}`);
+        console.log(`✅ Confirmation email sent to ${recipientEmail}${reportingManagerEmail ? ` (CC: ${reportingManagerEmail})` : ''}`);
       } catch (err) {
         console.error(`❌ Failed to send email to ${recipientEmail}:`, err);
         emailResults.push({

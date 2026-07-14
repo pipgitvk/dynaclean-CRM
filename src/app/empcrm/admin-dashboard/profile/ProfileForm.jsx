@@ -1158,15 +1158,22 @@ export default function ProfileForm({
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
               <p className="text-sm text-blue-900">
-                <strong>Email will be sent to:</strong><br />
-                • {formData.email}<br />
+                <strong>📧 Email Recipients:</strong><br />
+                <strong>To:</strong> {formData.email}<br />
                 {formData.professional_email && formData.professional_email !== formData.email && (
                   <>• {formData.professional_email}<br /></>
                 )}
-                <br />
-                The confirmation letter will be attached to the email.
+              </p>
+              {formData.reporting_manager && (
+                <p className="text-sm text-blue-900 border-t border-blue-200 pt-2">
+                  <strong>📋 CC:</strong> {formData.reporting_manager} (Reporting Manager)<br />
+                  <span className="text-xs text-blue-800">Will receive a copy for notification</span>
+                </p>
+              )}
+              <p className="text-sm text-blue-900 border-t border-blue-200 pt-2">
+                <strong>📎 Attachment:</strong> Employment Confirmation Letter
               </p>
             </div>
 
