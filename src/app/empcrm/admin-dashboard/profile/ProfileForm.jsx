@@ -64,6 +64,8 @@ export default function ProfileForm({
     initialData ? deriveIsExperiencedForForm(initialData) : false
   );
   const [originalFormData, setOriginalFormData] = useState(null);
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const [formData, setFormData] = useState({
     username,
@@ -73,6 +75,7 @@ export default function ProfileForm({
     full_name: "",
     contact_mobile: "",
     email: "",
+    professional_email: "",
     designation: "",
     date_of_joining: "",
     work_location: "",
@@ -262,8 +265,8 @@ export default function ProfileForm({
       "doc_12th_certificate",
     ];
     
-    // Only require Employment Confirmation Letter for admins (privileged editors)
-    if (isPrivilegedEditor) {
+    // Only require Employment Confirmation Letter for permanent employees (privileged editors only)
+    if (isPrivilegedEditor && formData.employment_status === "permanent") {
       MANDATORY_KEYS.push("doc_employment_confirmation_letter");
     }
 
@@ -563,6 +566,7 @@ export default function ProfileForm({
       full_name: "Full Name",
       contact_mobile: "Mobile",
       email: "Email",
+      professional_email: "Professional Email",
       designation: "Designation",
       date_of_joining: "Date of Joining",
       work_location: "Work Location",
@@ -624,6 +628,22 @@ export default function ProfileForm({
       return;
     }
 
+    // Check if employment status is being changed to permanent with confirmation letter
+    const isPermanentNow = formData.employment_status === "permanent";
+    const wasPermanentBefore = originalFormData?.employment_status === "permanent";
+    const hasConfirmationLetter = files.doc_employment_confirmation_letter || formData.fileUrls?.doc_employment_confirmation_letter;
+    
+    // Show confirmation dialog if changing to permanent with confirmation letter
+    if (isPermanentNow && !wasPermanentBefore && hasConfirmationLetter && !reviewMode) {
+      setShowConfirmationDialog(true);
+      return;
+    }
+
+    // Proceed with actual submission
+    await performProfileSave();
+  };
+
+  const performProfileSave = async () => {
     setLoading(true);
 
     try {
@@ -708,6 +728,14 @@ export default function ProfileForm({
 
       if (result.success) {
         toast.success(result.message || "Profile saved");
+        
+        // Send confirmation email if employment status changed to permanent
+        const isPermanentNow = formData.employment_status === "permanent";
+        const wasPermanentBefore = originalFormData?.employment_status === "permanent";
+        if (isPermanentNow && !wasPermanentBefore) {
+          await sendConfirmationEmail();
+        }
+        
         setTimeout(() => onBack(), 1500);
       } else {
         toast.error(result.error || "Failed to save profile");
@@ -717,6 +745,40 @@ export default function ProfileForm({
       toast.error("Error saving profile");
     } finally {
       setLoading(false);
+      setShowConfirmationDialog(false);
+    }
+  };
+
+  const sendConfirmationEmail = async () => {
+    setSendingEmail(true);
+    try {
+      const confirmationLetterPath = formData.fileUrls?.doc_employment_confirmation_letter || 
+                                     (files.doc_employment_confirmation_letter ? null : null);
+      
+      const response = await fetch("/api/empcrm/profile/send-confirmation-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          professional_email: formData.professional_email,
+          full_name: formData.full_name,
+          confirmationLetterPath: confirmationLetterPath,
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success("✓ Confirmation email sent to both email addresses");
+      } else {
+        console.warn("Email send warning:", result.error);
+        toast.success("Profile saved (Email send had issues, but profile is saved)");
+      }
+    } catch (error) {
+      console.error("Email send error:", error);
+      toast.success("Profile saved (Could not send email, but profile is saved)");
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -1077,6 +1139,63 @@ export default function ProfileForm({
           )}
         </div>
       </form>
+
+      {/* Confirmation Dialog for Permanent Status with Confirmation Letter */}
+      {showConfirmationDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-blue-100">
+                <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Send Confirmation Email?</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Employment status is being changed to <strong>Permanent</strong> with confirmation letter attached.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-900">
+                <strong>Email will be sent to:</strong><br />
+                • {formData.email}<br />
+                {formData.professional_email && formData.professional_email !== formData.email && (
+                  <>• {formData.professional_email}<br /></>
+                )}
+                <br />
+                The confirmation letter will be attached to the email.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowConfirmationDialog(false)}
+                disabled={sendingEmail}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performProfileSave}
+                disabled={sendingEmail}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium flex items-center justify-center gap-2"
+              >
+                {sendingEmail ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "✓ Send & Save"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -368,7 +368,7 @@ async function saveProfile(request, methodType) {
       const updateFields = [];
       const updateValues = [];
       for (const [key, value] of Object.entries(data)) {
-        if (key !== 'username' && key !== 'empId' && key !== 'id') {
+        if (key !== 'username' && key !== 'empId' && key !== 'id' && key !== 'field_changes') {
           const isFileObject = value && typeof value === 'object' && 'arrayBuffer' in value;
           if (isFileObject || key.startsWith('document_')) continue;
           updateFields.push(`\`${key}\` = ?`);
@@ -385,9 +385,9 @@ async function saveProfile(request, methodType) {
     } else {
       // INSERT
       data.created_by = currentUser;
-      const fields = Object.keys(data).map((k) => `\`${k}\``).join(', ');
-      const placeholders = Object.keys(data).map(() => '?').join(', ');
-      const values = Object.values(data);
+      const fields = Object.keys(data).filter(k => k !== 'field_changes').map((k) => `\`${k}\``).join(', ');
+      const placeholders = Object.keys(data).filter(k => k !== 'field_changes').map(() => '?').join(', ');
+      const values = Object.values(data).filter((_, i) => Object.keys(data)[i] !== 'field_changes');
       const [result] = await conn.execute(
         `INSERT INTO employee_profiles (${fields}) VALUES (${placeholders})`,
         values

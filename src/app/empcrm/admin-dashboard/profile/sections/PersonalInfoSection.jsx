@@ -51,6 +51,7 @@ export default function PersonalInfoSection({
     show("date_of_birth") ||
     show("contact_mobile") ||
     show("email") ||
+    show("professional_email") ||
     show("blood_group") ||
     show("marital_status") ||
     show("father_name") ||
@@ -451,6 +452,21 @@ export default function PersonalInfoSection({
             readOnly={ro}
             className={inactive(inputClass)}
             required={Boolean(rf && show("email"))}
+          />
+        </div>
+        )}
+
+        {show("professional_email") && (
+        <div>
+          <label className={labelClass}>Professional Email</label>
+          <input
+            type="email"
+            name="professional_email"
+            value={formData.professional_email || ""}
+            onChange={handleChange}
+            readOnly={ro}
+            className={inactive(inputClass)}
+            required={Boolean(rf && show("professional_email"))}
           />
         </div>
         )}
