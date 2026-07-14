@@ -188,19 +188,19 @@ export default function LedgerTable({ rows: initialRows }) {
 
   // ─── Render ────────────────────────────────────────────────────
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-white text-black">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Ledger</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          <h1 className="text-2xl font-bold text-gray-800">Ledger</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
             {filtered.length} entries
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
           >
             <Download size={16} />
             Export CSV
@@ -229,9 +229,9 @@ export default function LedgerTable({ rows: initialRows }) {
         ].map(({ label, value, color, suffix }) => (
           <div
             key={label}
-            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:bg-gray-800 dark:border-gray-700"
+            className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
           >
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
               {label}
             </p>
             <p className={`mt-1 text-xl font-bold ${color}`}>
@@ -250,26 +250,26 @@ export default function LedgerTable({ rows: initialRows }) {
             placeholder="Search particulars, vch no…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white w-56"
+            className="pl-8 pr-3 py-2 text-sm rounded-lg border border-gray-300 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black w-56"
           />
         </div>
         <input
           type="date"
           value={dateFrom}
           onChange={(e) => setDateFrom(e.target.value)}
-          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
         />
         <span className="text-gray-400 text-sm">to</span>
         <input
           type="date"
           value={dateTo}
           onChange={(e) => setDateTo(e.target.value)}
-          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
         />
         <select
           value={vchTypeFilter}
           onChange={(e) => setVchTypeFilter(e.target.value)}
-          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+          className="text-sm rounded-lg border border-gray-300 bg-white px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
         >
           <option value="">All Vch Types</option>
           {VCH_TYPES.map((t) => (
@@ -287,10 +287,10 @@ export default function LedgerTable({ rows: initialRows }) {
       </div>
 
       {/* Desktop Table */}
-      <div className="hidden lg:block overflow-x-auto rounded-xl border border-gray-200 shadow-sm dark:border-gray-700">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <tr className="bg-gray-50 border-b border-gray-200">
               {[
                 { label: "Date", col: "entry_date" },
                 { label: "Particulars", col: "particulars" },
@@ -302,18 +302,18 @@ export default function LedgerTable({ rows: initialRows }) {
                 <th
                   key={col}
                   onClick={() => handleSort(col)}
-                  className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 cursor-pointer select-none whitespace-nowrap hover:text-blue-600"
+                  className="px-4 py-3 text-left font-semibold text-gray-600 cursor-pointer select-none whitespace-nowrap hover:text-blue-600"
                 >
                   {label}
                   <SortIcon col={col} />
                 </th>
               ))}
-              <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">
                 Action
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+          <tbody className="divide-y divide-gray-100 bg-white text-black">
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
@@ -324,18 +324,18 @@ export default function LedgerTable({ rows: initialRows }) {
               filtered.map((row) => (
                 <tr
                   key={row.id}
-                  className="bg-white dark:bg-gray-900 hover:bg-blue-50 dark:hover:bg-gray-800 transition-colors"
+                  className="bg-white hover:bg-blue-50 transition-colors text-black"
                 >
-                  <td className="px-4 py-3 whitespace-nowrap text-gray-700 dark:text-gray-200">
+                  <td className="px-4 py-3 whitespace-nowrap text-gray-700">
                     {dayjs(row.entry_date).format("DD MMM YYYY")}
                   </td>
-                  <td className="px-4 py-3 text-gray-800 dark:text-gray-100 max-w-xs">
+                  <td className="px-4 py-3 text-gray-800 max-w-xs">
                     {row.particulars}
                   </td>
                   <td className="px-4 py-3">
                     <VchBadge type={row.vch_type} />
                   </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                     {row.vch_no || "—"}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-red-600 whitespace-nowrap">
@@ -360,8 +360,8 @@ export default function LedgerTable({ rows: initialRows }) {
           </tbody>
           {filtered.length > 0 && (
             <tfoot>
-              <tr className="bg-gray-50 dark:bg-gray-800 border-t-2 border-gray-300 dark:border-gray-600 font-semibold">
-                <td colSpan={4} className="px-4 py-3 text-gray-700 dark:text-gray-200">
+              <tr className="bg-gray-50 border-t-2 border-gray-300 font-semibold text-black">
+                <td colSpan={4} className="px-4 py-3 text-gray-700">
                   Total ({filtered.length} entries)
                 </td>
                 <td className="px-4 py-3 text-right font-mono text-red-600">
@@ -385,14 +385,14 @@ export default function LedgerTable({ rows: initialRows }) {
           filtered.map((row) => (
             <div
               key={row.id}
-              className="rounded-xl border border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700 p-4 shadow-sm"
+              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
             >
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div>
-                  <p className="font-semibold text-gray-800 dark:text-white">
+                  <p className="font-semibold text-gray-800">
                     {row.particulars}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  <p className="text-xs text-gray-500 mt-0.5">
                     {dayjs(row.entry_date).format("DD MMM YYYY")}
                   </p>
                 </div>
@@ -407,7 +407,7 @@ export default function LedgerTable({ rows: initialRows }) {
               <div className="flex flex-wrap gap-2 text-xs">
                 <VchBadge type={row.vch_type} />
                 {row.vch_no && (
-                  <span className="text-gray-500 dark:text-gray-400">#{row.vch_no}</span>
+                  <span className="text-gray-500">#{row.vch_no}</span>
                 )}
               </div>
               <div className="mt-3 flex gap-4 text-sm font-mono">
@@ -426,14 +426,14 @@ export default function LedgerTable({ rows: initialRows }) {
       {/* Add Entry Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 shadow-2xl p-6">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-gray-800 dark:text-white">
+              <h2 className="text-lg font-bold text-gray-800">
                 Add Ledger Entry
               </h2>
               <button
                 onClick={() => { setShowModal(false); setForm(EMPTY_FORM); }}
-                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500"
+                className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500"
               >
                 <X size={18} />
               </button>
@@ -442,20 +442,20 @@ export default function LedgerTable({ rows: initialRows }) {
             <div className="space-y-4">
               {/* Date */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
                   Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
                   value={form.entry_date}
                   onChange={(e) => setForm((f) => ({ ...f, entry_date: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
                 />
               </div>
 
               {/* Particulars */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
                   Particulars <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -463,20 +463,20 @@ export default function LedgerTable({ rows: initialRows }) {
                   placeholder="e.g. Cash received from XYZ"
                   value={form.particulars}
                   onChange={(e) => setForm((f) => ({ ...f, particulars: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
                 />
               </div>
 
               {/* Vch Type + Vch No */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
                     Vch Type <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={form.vch_type}
                     onChange={(e) => setForm((f) => ({ ...f, vch_type: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
                   >
                     <option value="">Select Type</option>
                     {VCH_TYPES.map((t) => (
@@ -485,7 +485,7 @@ export default function LedgerTable({ rows: initialRows }) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
                     Vch No
                   </label>
                   <input
@@ -493,7 +493,7 @@ export default function LedgerTable({ rows: initialRows }) {
                     placeholder="e.g. INV-001"
                     value={form.vch_no}
                     onChange={(e) => setForm((f) => ({ ...f, vch_no: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-black"
                   />
                 </div>
               </div>
@@ -501,7 +501,7 @@ export default function LedgerTable({ rows: initialRows }) {
               {/* Debit + Credit */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
                     Debit (₹)
                   </label>
                   <input
@@ -511,11 +511,11 @@ export default function LedgerTable({ rows: initialRows }) {
                     placeholder="0.00"
                     value={form.debit}
                     onChange={(e) => setForm((f) => ({ ...f, debit: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 text-black"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
                     Credit (₹)
                   </label>
                   <input
@@ -525,7 +525,7 @@ export default function LedgerTable({ rows: initialRows }) {
                     placeholder="0.00"
                     value={form.credit}
                     onChange={(e) => setForm((f) => ({ ...f, credit: e.target.value }))}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 text-black"
                   />
                 </div>
               </div>
@@ -534,7 +534,7 @@ export default function LedgerTable({ rows: initialRows }) {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => { setShowModal(false); setForm(EMPTY_FORM); }}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>

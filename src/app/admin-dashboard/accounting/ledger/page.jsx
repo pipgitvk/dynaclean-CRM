@@ -52,7 +52,7 @@ export default async function LedgerPage() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto p-4 md:p-6 w-full">
+    <div className="max-w-[1600px] mx-auto p-4 md:p-6 w-full bg-white text-black">
       <LedgerTable rows={rows} />
     </div>
   );
