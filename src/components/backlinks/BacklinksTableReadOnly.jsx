@@ -98,14 +98,6 @@ const BacklinksTableReadOnly = () => {
       const matchesUser = isSuperAdmin || bl.assigned_to === currentUser;
       
       const passes = matchesSearch && matchesStatus && matchesAssignedTo && matchesUser;
-      if (!passes) {
-        console.log("Filtered out backlink:", {
-          website: bl.website,
-          reason: { matchesSearch, matchesStatus, matchesAssignedTo, matchesUser },
-          assigned_to: bl.assigned_to,
-          currentUser
-        });
-      }
       return passes;
     }
   );
@@ -122,16 +114,31 @@ const BacklinksTableReadOnly = () => {
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "in_progress":
-        return "bg-blue-100 text-blue-800";
       case "completed":
         return "bg-green-100 text-green-800";
+      case "in_progress":
+        return "bg-blue-100 text-blue-800";
       case "on_hold":
-        return "bg-red-100 text-red-800";
+        return "bg-yellow-100 text-yellow-800";
+      case "pending":
+        return "bg-gray-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getStatusBadgeColorStyle = (status) => {
+    switch (status) {
+      case "completed":
+        return { backgroundColor: "#dcfce7", color: "#166534" };
+      case "in_progress":
+        return { backgroundColor: "#dbeafe", color: "#1e40af" };
+      case "on_hold":
+        return { backgroundColor: "#fef3c7", color: "#92400e" };
+      case "pending":
+        return { backgroundColor: "#f3f4f6", color: "#374151" };
+      default:
+        return { backgroundColor: "#f3f4f6", color: "#374151" };
     }
   };
 
@@ -233,29 +240,29 @@ const BacklinksTableReadOnly = () => {
       )}
 
       {/* Desktop Table View */}
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="hidden lg:block overflow-x-auto bg-white rounded-lg shadow">
+        <table className="w-full text-sm" style={{ tableLayout: "auto", minWidth: "100%" }}>
           <thead>
-            <tr className="bg-gray-100 border-b-2 border-gray-300">
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+            <tr style={{ backgroundColor: "#f3f4f6", borderBottom: "2px solid #d1d5db" }}>
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "25%" }}>
                 Website
               </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "15%" }}>
                 Keyword
               </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "20%" }}>
                 Email
               </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "12%" }}>
                 Date
               </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "12%" }}>
                 Status
               </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "15%" }}>
                 Submitted By
               </th>
-              <th className="px-6 py-3 text-center font-semibold text-gray-700">
+              <th style={{ padding: "12px 24px", textAlign: "center", fontWeight: "600", color: "#374151", width: "6%" }}>
                 Actions
               </th>
             </tr>
@@ -263,45 +270,47 @@ const BacklinksTableReadOnly = () => {
           <tbody>
             {filteredBacklinks.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="7" style={{ padding: "32px 24px", textAlign: "center", color: "#6b7280" }}>
                   No backlinks found.
                 </td>
               </tr>
             ) : (
               filteredBacklinks.map((backlink) => (
-                <tr key={backlink.id} className="border-b hover:bg-gray-50 transition">
-                  <td className="px-6 py-3 font-medium text-gray-800">
-                    <a href={backlink.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                <tr key={backlink.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: "12px 24px", fontWeight: "500", color: "#1f2937", wordBreak: "break-all" }}>
+                    <a href={backlink.website} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "none" }} onMouseOver={(e) => e.target.style.textDecoration = "underline"} onMouseOut={(e) => e.target.style.textDecoration = "none"}>
                       {backlink.website}
                     </a>
                   </td>
-                  <td className="px-6 py-3 text-gray-700">{backlink.keyword || "-"}</td>
-                  <td className="px-6 py-3 text-gray-700">{backlink.email || "-"}</td>
-                  <td className="px-6 py-3 text-gray-700">
+                  <td style={{ padding: "12px 24px", color: "#374151" }}>{backlink.keyword || "-"}</td>
+                  <td style={{ padding: "12px 24px", color: "#374151" }}>{backlink.email || "-"}</td>
+                  <td style={{ padding: "12px 24px", color: "#374151" }}>
                     {formatDate(backlink.followup_date)}
                   </td>
-                  <td className="px-6 py-3">
+                  <td style={{ padding: "12px 24px" }}>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeColor(
-                        backlink.status
-                      )}`}
+                      style={{
+                        padding: "4px 12px",
+                        borderRadius: "9999px",
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        ...getStatusBadgeColorStyle(backlink.status)
+                      }}
                     >
                       {backlink.status}
                     </span>
                   </td>
-                  <td className="px-6 py-3 text-gray-700">
+                  <td style={{ padding: "12px 24px", color: "#374151" }}>
                     {backlink.assigned_to || "-"}
                   </td>
-                  <td className="px-6 py-3">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => openEditModal(backlink)}
-                        title="Edit"
-                        className="text-green-600 hover:text-green-800 transition"
-                      >
-                        <Edit size={18} />
-                      </button>
-                    </div>
+                  <td style={{ padding: "12px 24px", textAlign: "center" }}>
+                    <button
+                      onClick={() => openEditModal(backlink)}
+                      title="Edit"
+                      style={{ color: "#16a34a", cursor: "pointer", border: "none", background: "none" }}
+                    >
+                      <Edit size={18} />
+                    </button>
                   </td>
                 </tr>
               ))
@@ -345,14 +354,14 @@ const BacklinksTableReadOnly = () => {
                   </button>
                 </div>
               </div>
-              <div className="text-sm text-gray-600 space-y-1">
+              <div className="text-sm text-gray-600 space-y-1 border-t pt-3">
                 <p>
                   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusBadgeColor(backlink.status)}`}>
                     {backlink.status}
                   </span>
                 </p>
                 <p>Date: {formatDate(backlink.followup_date)}</p>
-                <p>Submitted By: {backlink.assigned_to || "-"}</p>
+                <p>Assigned To: {backlink.assigned_to || "-"}</p>
               </div>
             </div>
           ))
