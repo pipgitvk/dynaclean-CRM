@@ -25,6 +25,10 @@ const BacklinksTable = () => {
     fetchDigitalMarketers();
   }, []);
 
+  useEffect(() => {
+    fetchBacklinks();
+  }, [filterStatus, filterAssignedTo, dateFrom, dateTo, searchTerm]);
+
   const fetchDigitalMarketers = async () => {
     try {
       const res = await fetch("/api/digital-marketers");
@@ -40,7 +44,14 @@ const BacklinksTable = () => {
   const fetchBacklinks = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/backlinks");
+      const params = new URLSearchParams();
+      if (filterAssignedTo) params.set("assigned_to", filterAssignedTo);
+      if (filterStatus) params.set("status", filterStatus);
+      if (dateFrom) params.set("date_from", dateFrom);
+      if (dateTo) params.set("date_to", dateTo);
+      if (searchTerm) params.set("search", searchTerm);
+
+      const res = await fetch(`/api/backlinks?${params.toString()}`);
       const data = await res.json();
 
       if (res.ok) {
@@ -64,34 +75,8 @@ const BacklinksTable = () => {
     setIsEditModalOpen(true);
   };
 
-  // Filter backlinks based on search term and filters
-  const filteredBacklinks = backlinks.filter((bl) => {
-    const matchesSearch =
-      bl.website.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      bl.keyword.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = filterStatus === "" || bl.status === filterStatus;
-
-    const matchesAssignedTo =
-      filterAssignedTo === "" || bl.assigned_to === filterAssignedTo;
-
-    // Date range filter
-    let matchesDateRange = true;
-    if (dateFrom || dateTo) {
-      const blDate = new Date(bl.followup_date);
-      if (dateFrom) {
-        const fromDate = new Date(dateFrom);
-        matchesDateRange = matchesDateRange && blDate >= fromDate;
-      }
-      if (dateTo) {
-        const toDate = new Date(dateTo);
-        toDate.setHours(23, 59, 59, 999); // Include entire day
-        matchesDateRange = matchesDateRange && blDate <= toDate;
-      }
-    }
-
-    return matchesSearch && matchesStatus && matchesAssignedTo && matchesDateRange;
-  });
+  // Data is already filtered server-side
+  const filteredBacklinks = backlinks;
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -105,12 +90,14 @@ const BacklinksTable = () => {
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case "submitted":
-        return "bg-yellow-100 text-yellow-800";
-      case "approved":
+      case "completed":
         return "bg-green-100 text-green-800";
-      case "deleted":
-        return "bg-red-100 text-red-800";
+      case "in_progress":
+        return "bg-blue-100 text-blue-800";
+      case "on_hold":
+        return "bg-yellow-100 text-yellow-800";
+      case "pending":
+        return "bg-gray-100 text-gray-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -118,12 +105,14 @@ const BacklinksTable = () => {
 
   const getStatusBadgeColorStyle = (status) => {
     switch (status) {
-      case "submitted":
-        return { backgroundColor: "#fef3c7", color: "#92400e" };
-      case "approved":
+      case "completed":
         return { backgroundColor: "#dcfce7", color: "#166534" };
-      case "deleted":
-        return { backgroundColor: "#fee2e2", color: "#991b1b" };
+      case "in_progress":
+        return { backgroundColor: "#dbeafe", color: "#1e40af" };
+      case "on_hold":
+        return { backgroundColor: "#fef3c7", color: "#92400e" };
+      case "pending":
+        return { backgroundColor: "#f3f4f6", color: "#374151" };
       default:
         return { backgroundColor: "#f3f4f6", color: "#374151" };
     }
@@ -181,16 +170,17 @@ const BacklinksTable = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Status</option>
-            <option value="submitted">Submitted</option>
-            <option value="approved">Approved</option>
-            <option value="deleted">Deleted</option>
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="on_hold">On Hold</option>
           </select>
         </div>
 
         {/* Filter by Assigned To */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Filter by Assigned To
+            Filter by Submitted By
           </label>
           <select
             value={filterAssignedTo}
@@ -261,7 +251,7 @@ const BacklinksTable = () => {
                 Status
               </th>
               <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "15%" }}>
-                Assigned To
+                Submitted By
               </th>
               <th style={{ padding: "12px 24px", textAlign: "center", fontWeight: "600", color: "#374151", width: "6%" }}>
                 Actions

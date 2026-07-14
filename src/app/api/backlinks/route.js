@@ -2,14 +2,49 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 
 // GET all backlinks
-export async function GET() {
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const assignedTo = searchParams.get("assigned_to") || "";
+    const status = searchParams.get("status") || "";
+    const dateFrom = searchParams.get("date_from") || "";
+    const dateTo = searchParams.get("date_to") || "";
+    const search = searchParams.get("search") || "";
+
     const connection = await getDbConnection();
-    const [rows] = await connection.execute(
-      `SELECT id, website, keyword, email, followup_date, status, assigned_to, updated_at, created_at 
-       FROM backlinks 
-       ORDER BY updated_at DESC`
-    );
+
+    let query = `SELECT id, website, keyword, email, followup_date, status, assigned_to, updated_at, created_at 
+       FROM backlinks WHERE 1=1`;
+    const params = [];
+
+    if (assignedTo.trim()) {
+      query += ` AND assigned_to = ?`;
+      params.push(assignedTo.trim());
+    }
+
+    if (status.trim()) {
+      query += ` AND status = ?`;
+      params.push(status.trim());
+    }
+
+    if (dateFrom.trim()) {
+      query += ` AND followup_date >= ?`;
+      params.push(dateFrom.trim());
+    }
+
+    if (dateTo.trim()) {
+      query += ` AND followup_date <= ?`;
+      params.push(dateTo.trim());
+    }
+
+    if (search.trim()) {
+      query += ` AND (website LIKE ? OR keyword LIKE ?)`;
+      params.push(`%${search.trim()}%`, `%${search.trim()}%`);
+    }
+
+    query += ` ORDER BY updated_at DESC`;
+
+    const [rows] = await connection.execute(query, params);
 
     return NextResponse.json(rows, { status: 200 });
   } catch (error) {
