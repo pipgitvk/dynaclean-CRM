@@ -262,7 +262,8 @@ export default async function CustomerPage({ params }) {
               Edit
             </a>
 
-            {/* Demo Registration - hidden for SERVICE SUPPORT and GEM */}
+            {/* Demo Registration - hidden for all EXCEPT specific roles */}
+            {/* Only show for non-restricted roles */}
             {!isRestrictedRole && (
               <a
                 href={`/user-dashboard/view-customer/${customerId}/demo`}
@@ -272,39 +273,39 @@ export default async function CustomerPage({ params }) {
               </a>
             )}
 
-            {/* View Contacts - hidden for SERVICE SUPPORT and GEM */}
-            {!isRestrictedRole && (
-              <CustomerContactsModal customerId={customerId} />
-            )}
+            {/* View Contacts - visible to all */}
+            <CustomerContactsModal customerId={customerId} />
 
-            {/* View All Quotations - hidden for SERVICE SUPPORT and GEM */}
-            {!isRestrictedRole && (
-              <ViewCustomerQuotationsLink
-                customerId={customerId}
-                dashboardBase="user-dashboard"
-                variant="user"
-              />
-            )}
+            {/* View All Quotations - visible to all */}
+            <ViewCustomerQuotationsLink
+              customerId={customerId}
+              dashboardBase="user-dashboard"
+              variant="user"
+            />
 
-            {/* Add Quotation - hidden for SERVICE SUPPORT and GEM */}
-            {!isRestrictedRole && (
-              <Link
-                href={`/user-dashboard/quotations/new?customerId=${customerId}`}
-                className="btn text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
-              >
-                add Quotation
-              </Link>
-            )}
+            {/* Add Quotation - visible to all */}
+            <Link
+              href={`/user-dashboard/quotations/new?customerId=${customerId}`}
+              className="btn text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+            >
+              add Quotation
+            </Link>
 
-            {/* Special Price - hidden for SERVICE SUPPORT and GEM */}
-            {!isRestrictedRole && (
-              <Link
-                href={`/user-dashboard/special-pricing/${customerId}`}
-                className="btn text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
-              >
-                Special Price
-              </Link>
-            )}
+            {/* Special Price - visible to all */}
+            <Link
+              href={`/user-dashboard/special-pricing/${customerId}`}
+              className="btn text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+            >
+              Special Price
+            </Link>
+
+            {/* View Ledger - visible to all */}
+            <Link
+              href={`/admin-dashboard/accounting/ledger?customerId=${customerId}`}
+              className="btn text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+            >
+              View Ledger
+            </Link>
           </div>
 
           <section>

@@ -69,10 +69,13 @@ export async function PATCH(request, { params }) {
     }
     
     // First, get current customer data to preserve fields not being updated
-    const [currentRows] = await conn.execute(
-      `SELECT lead_source, service_lead_source, gem_lead_source FROM customers WHERE customer_id = ?`,
-      [customerId]
-    );
+    let selectQuery = `SELECT lead_source, service_lead_source`;
+    if (gemLeadSourceColumn) {
+      selectQuery += `, gem_lead_source`;
+    }
+    selectQuery += ` FROM customers WHERE customer_id = ?`;
+    
+    const [currentRows] = await conn.execute(selectQuery, [customerId]);
     const currentData = currentRows[0] || {};
     
     let result;

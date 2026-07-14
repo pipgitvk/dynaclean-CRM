@@ -25,6 +25,11 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
       if (!(userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD")) {
         requestBody.lead_source = selectedLeadSource;
       }
+      
+      // Add GEM assignment if selected (SUPERADMIN and EA only)
+      if (selectedGemEmployee && (userRole === "SUPERADMIN" || userRole === "EA")) {
+        requestBody.gem_lead_source = selectedGemEmployee;
+      }
 
       const response = await fetch(
         `/api/customers/${initialData.customer_id}`,
@@ -41,6 +46,7 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
 
       if (response.ok) {
         setStatusMessage("✅ Lead source updated successfully!");
+        setSelectedGemEmployee("");
         router.refresh();
       } else {
         setStatusMessage(
@@ -55,46 +61,6 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
     }
   };
 
-  const handleAssignGEM = async (e) => {
-    e.preventDefault();
-    if (!selectedGemEmployee) {
-      setStatusMessage("❌ Please select a GEM employee to assign.");
-      return;
-    }
-
-    setIsUpdating(true);
-    setStatusMessage("");
-
-    try {
-      const response = await fetch(
-        `/api/customers/${initialData.customer_id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ gem_lead_source: selectedGemEmployee }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setStatusMessage(`✅ Lead assigned to ${selectedGemEmployee} successfully!`);
-        setSelectedGemEmployee("");
-        router.refresh();
-      } else {
-        setStatusMessage(
-          `❌ Error: ${result.error || "Failed to assign lead to GEM."}`
-        );
-      }
-    } catch (error) {
-      console.error("Failed to assign GEM:", error);
-      setStatusMessage("❌ Network error. Please try again.");
-    } finally {
-      setIsUpdating(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -182,7 +148,7 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
           )}
         </>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end">
           <button
             type="submit"
             disabled={isUpdating}
@@ -194,22 +160,6 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
           >
             {isUpdating ? "Saving..." : "Save New Lead Source"}
           </button>
-          
-          {/* Assign to GEM Button - alongside Save button */}
-          {(userRole === "SUPERADMIN" || userRole === "EA") && gemEmployees.length > 0 && selectedGemEmployee && (
-            <button
-              type="button"
-              disabled={isUpdating}
-              onClick={handleAssignGEM}
-              className={`px-4 py-2 rounded-md text-white font-semibold transition-colors duration-200 ${
-                isUpdating
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-purple-600 hover:bg-purple-700"
-              }`}
-            >
-              {isUpdating ? "Assigning..." : "Assign to GEM"}
-            </button>
-          )}
         </div>
       </form>
 
