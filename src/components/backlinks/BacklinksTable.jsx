@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, Plus, Edit } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Search, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 import AddBacklinkModal from "./AddBacklinkModal";
 import EditBacklinkModal from "./EditBacklinkModal";
@@ -20,15 +20,6 @@ const BacklinksTable = () => {
   const [selectedBacklink, setSelectedBacklink] = useState(null);
   const [digitalMarketers, setDigitalMarketers] = useState([]);
 
-  useEffect(() => {
-    fetchBacklinks();
-    fetchDigitalMarketers();
-  }, []);
-
-  useEffect(() => {
-    fetchBacklinks();
-  }, [filterStatus, filterAssignedTo, dateFrom, dateTo, searchTerm]);
-
   const fetchDigitalMarketers = async () => {
     try {
       const res = await fetch("/api/digital-marketers");
@@ -41,7 +32,7 @@ const BacklinksTable = () => {
     }
   };
 
-  const fetchBacklinks = async () => {
+  const fetchBacklinks = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -68,7 +59,15 @@ const BacklinksTable = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterAssignedTo, filterStatus, dateFrom, dateTo, searchTerm]);
+
+  useEffect(() => {
+    fetchDigitalMarketers();
+  }, []);
+
+  useEffect(() => {
+    fetchBacklinks();
+  }, [fetchBacklinks]);
 
   const openEditModal = (backlink) => {
     setSelectedBacklink(backlink);
