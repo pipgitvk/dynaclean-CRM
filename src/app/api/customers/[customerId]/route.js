@@ -40,39 +40,50 @@ export async function GET(request, { params }) {
 
 export async function PATCH(request, { params }) {
   const { customerId } = await params;
-  const { lead_source, service_lead_source } = await request.json();
+  const { lead_source, service_lead_source, gem_lead_source } = await request.json();
 
   const payload = await getSessionPayload();
   const userRole = payload?.role;
   const isServiceUser = userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD";
+  const isSuperAdminOrEA = userRole === "SUPERADMIN" || userRole === "EA";
 
   // Basic validation - only require lead_source if not a service user
-  if (!isServiceUser && !lead_source) {
+  if (!isServiceUser && !lead_source && !gem_lead_source) {
     return NextResponse.json({ error: "Lead source is required." }, { status: 400 });
   }
 
   try {
     const conn = await getDbConnection();
-    // Check if service_lead_source column exists
+    // Check if service_lead_source and gem_lead_source columns exist
     let serviceLeadSourceColumn = null;
+    let gemLeadSourceColumn = null;
     try {
-      const [columns] = await conn.execute("SHOW COLUMNS FROM customers LIKE 'service_lead_source'");
-      if (columns.length > 0) {
-        serviceLeadSourceColumn = true;
-      }
+      const [columns1] = await conn.execute("SHOW COLUMNS FROM customers LIKE 'service_lead_source'");
+      serviceLeadSourceColumn = columns1.length > 0;
+      
+      const [columns2] = await conn.execute("SHOW COLUMNS FROM customers LIKE 'gem_lead_source'");
+      gemLeadSourceColumn = columns2.length > 0;
     } catch (e) {
       serviceLeadSourceColumn = false;
+      gemLeadSourceColumn = false;
     }
     
     // First, get current customer data to preserve fields not being updated
     const [currentRows] = await conn.execute(
-      `SELECT lead_source, service_lead_source FROM customers WHERE customer_id = ?`,
+      `SELECT lead_source, service_lead_source, gem_lead_source FROM customers WHERE customer_id = ?`,
       [customerId]
     );
     const currentData = currentRows[0] || {};
     
     let result;
-    if (isServiceUser) {
+    
+    if (gem_lead_source !== undefined && isSuperAdminOrEA && gemLeadSourceColumn) {
+      // GEM assignment - only update gem_lead_source
+      [result] = await conn.execute(
+        `UPDATE customers SET gem_lead_source = ? WHERE customer_id = ?`,
+        [gem_lead_source === '' ? null : gem_lead_source, customerId]
+      );
+    } else if (isServiceUser) {
       // If service user, only update service_lead_source if provided
       if (serviceLeadSourceColumn) {
         const newServiceLeadSource = service_lead_source !== undefined ? service_lead_source : currentData.service_lead_source;
@@ -108,13 +119,13 @@ export async function PATCH(request, { params }) {
     }
 
     return NextResponse.json(
-      { message: "Lead source updated successfully." },
+      { message: "Customer updated successfully." },
       { status: 200 }
     );
   } catch (error) {
     console.error("Database update error:", error);
     return NextResponse.json(
-      { error: "Failed to update lead source." },
+      { error: "Failed to update customer." },
       { status: 500 }
     );
   }

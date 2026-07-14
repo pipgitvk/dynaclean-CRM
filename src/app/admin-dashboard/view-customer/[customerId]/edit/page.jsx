@@ -37,6 +37,17 @@ export default async function EditCustomerPage({ params }) {
   } catch (error) {
     console.error('Error fetching service employees:', error);
   }
+
+  // Fetch GEM employees
+  let gemEmployees = [];
+  try {
+    const [gemEmployeeRows] = await conn.execute(
+      `SELECT username FROM rep_list WHERE userRole = 'GEM' AND status = 1 ORDER BY username ASC`
+    );
+    gemEmployees = gemEmployeeRows.map(row => row.username);
+  } catch (error) {
+    console.error('Error fetching GEM employees:', error);
+  }
   // await conn.end();
 
   if (!rows.length) {
@@ -54,7 +65,7 @@ export default async function EditCustomerPage({ params }) {
       <h1 className="text-2xl font-bold mb-6 text-center text-blue-700">
         Edit Customere #{customerId}
       </h1>
-      <UpdateLeadSourceForm initialData={customerData} leadSources={leadSources} serviceEmployees={serviceEmployees} userRole={userRole} />
+      <UpdateLeadSourceForm initialData={customerData} leadSources={leadSources} serviceEmployees={serviceEmployees} gemEmployees={gemEmployees} userRole={userRole} />
       <EditCustomerForm initialData={customerData} userRole={userRole} dashboardBase="admin-dashboard" />
     </div>
   );

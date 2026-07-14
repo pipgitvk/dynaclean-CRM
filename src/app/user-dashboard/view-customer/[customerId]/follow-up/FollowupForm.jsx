@@ -312,13 +312,18 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
-export default function FollowupForm({ customerId }) {
+export default function FollowupForm({ customerId, userRole = "" }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isFromUpcoming = searchParams.get("source") === "upcoming";
+  const isServiceSupport = userRole === "SERVICE SUPPORT";
+  const isGEM = userRole === "GEM";
+  const isRestrictedRole = isServiceSupport || isGEM;
   const [formData, setFormData] = useState({
     followed_date: "",
     next_followup_date: "",
+    service_next_followup: "",
+    gem_next_followup: "",
     notes: "",
     communication_mode: "",
     status: "",
@@ -493,6 +498,8 @@ export default function FollowupForm({ customerId }) {
       ...prevData,
       followed_date: formatISTDateTime(now),
       next_followup_date: formatISTDateTime(now),
+      service_next_followup: formatISTDateTime(now),
+      gem_next_followup: formatISTDateTime(now),
     }));
   }, []);
 
@@ -603,6 +610,24 @@ export default function FollowupForm({ customerId }) {
         multi_tag: formData.multi_tag.join(", "), // Convert array to comma-separated string
       };
 
+      // SERVICE SUPPORT को next_followup_date की जरूरत नहीं, सिर्फ service_next_followup भेजेंगे
+      if (isServiceSupport) {
+        delete payload.next_followup_date;
+        delete payload.status;
+        delete payload.stage;
+        delete payload.multi_tag;
+        delete payload.gem_next_followup;
+      }
+
+      // GEM को next_followup_date की जरूरत नहीं, सिर्फ gem_next_followup भेजेंगे
+      if (isGEM) {
+        delete payload.next_followup_date;
+        delete payload.status;
+        delete payload.stage;
+        delete payload.multi_tag;
+        delete payload.service_next_followup;
+      }
+
       const res = await fetch(`/api/followup/${customerId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -683,11 +708,12 @@ export default function FollowupForm({ customerId }) {
           name="status"
           value={formData.status}
           onChange={handleChange}
-          className="w-full px-4 py-2 border rounded-lg"
+          disabled={isRestrictedRole}
+          className={`w-full px-4 py-2 border rounded-lg ${isRestrictedRole ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}`}
           required
         >
           <option value="" disabled>
-            Select Status
+            {isRestrictedRole ? "Not allowed" : "Select Status"}
           </option>
           {statusList.map((status) => (
             <option key={status} value={status}>
@@ -706,18 +732,18 @@ export default function FollowupForm({ customerId }) {
           name="stage"
           value={formData.stage}
           onChange={handleChange}
-          disabled={isLoadingCustomer}
-          className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
+          disabled={isLoadingCustomer || isRestrictedRole}
+          className={`w-full px-4 py-2 border rounded-lg ${(isLoadingCustomer || isRestrictedRole) ? "bg-gray-100 cursor-not-allowed opacity-60" : ""}`}
           required
         >
-          <option value="">{isLoadingCustomer ? "Loading..." : "Select Stage"}</option>
+          <option value="">{isLoadingCustomer ? "Loading..." : isRestrictedRole ? "Not allowed" : "Select Stage"}</option>
           {availableStages.map((stage) => (
             <option key={stage} value={stage}>
               {stage}
             </option>
           ))}
         </select>
-        {!isLoadingCustomer && (
+        {!isLoadingCustomer && !isRestrictedRole && (
           <p className="mt-1 text-xs text-gray-500">
             Current stage: <strong>{customerCurrentStage}</strong>. Only forward progression allowed.
           </p>
@@ -728,8 +754,9 @@ export default function FollowupForm({ customerId }) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Tags (Multiple Selection)
+          {isRestrictedRole && <span className="text-red-500 ml-1">- Not allowed</span>}
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2 ${isRestrictedRole ? "opacity-50 pointer-events-none" : ""}`}>
           {tagOptions.map((tag) => (
             <label
               key={tag}
@@ -744,7 +771,8 @@ export default function FollowupForm({ customerId }) {
               <input
                 type="checkbox"
                 checked={formData.multi_tag.includes(tag)}
-                onChange={() => handleTagChange(tag)}
+                onChange={() => !isRestrictedRole && handleTagChange(tag)}
+                disabled={isRestrictedRole}
                 className="hidden"
               />
               <span className="text-sm font-medium">{tag}</span>
@@ -758,8 +786,8 @@ export default function FollowupForm({ customerId }) {
         </p>
       </div>
 
-      {/* Next Follow-up Date - Hide when status is Denied or Invalid */}
-      {formData.status !== "Denied" && formData.status !== "Invalid" && (
+      {/* Next Follow-up Date - Hide when status is Denied or Invalid, OR for SERVICE SUPPORT/GEM */}
+      {!isRestrictedRole && formData.status !== "Denied" && formData.status !== "Invalid" && (
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Next Follow-up Date (IST)
@@ -787,6 +815,54 @@ export default function FollowupForm({ customerId }) {
               : nextFollowupDateLimits.isNewLead
               ? "This lead is less than 7 days old — you can only schedule a follow-up within the next 48 hours."
               : "This lead is older than 7 days — you can schedule a follow-up for a maximum of 15 days from now."}
+          </p>
+        </div>
+      )}
+
+      {/* Service Next Follow-up Date - Only for SERVICE SUPPORT */}
+      {isServiceSupport && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Service Next Follow-up Date (IST)
+          </label>
+          <input
+            type="datetime-local"
+            name="service_next_followup"
+            value={formData.service_next_followup}
+            onChange={handleChange}
+            min={nextFollowupDateLimits.min}
+            max={nextFollowupDateLimits.max}
+            disabled={isLoadingCustomer}
+            className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
+          />
+          <p className="mt-1 text-xs text-blue-600">
+            {isLoadingCustomer
+              ? "Loading lead information..."
+              : "Schedule your next service follow-up (maximum 15 days from now)."}
+          </p>
+        </div>
+      )}
+
+      {/* GEM Next Follow-up Date - Only for GEM */}
+      {isGEM && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            GEM Next Follow-up Date (IST)
+          </label>
+          <input
+            type="datetime-local"
+            name="gem_next_followup"
+            value={formData.gem_next_followup}
+            onChange={handleChange}
+            min={nextFollowupDateLimits.min}
+            max={nextFollowupDateLimits.max}
+            disabled={isLoadingCustomer}
+            className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
+          />
+          <p className="mt-1 text-xs text-purple-600">
+            {isLoadingCustomer
+              ? "Loading lead information..."
+              : "Schedule your next GEM follow-up (maximum 15 days from now)."}
           </p>
         </div>
       )}

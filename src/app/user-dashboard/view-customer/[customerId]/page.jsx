@@ -1,5 +1,6 @@
 // app/user-dashboard/view-customer/[customerId]/page.tsx
 import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
@@ -12,8 +13,10 @@ export default async function CustomerPage({ params }) {
   const { customerId } = await params;
   const conn = await getDbConnection();
 
-  // Fetch current user info if needed
-  // (e.g., role to conditionally render buttons)
+  // Fetch current user info
+  const payload = await getSessionPayload();
+  const userRole = payload?.role || "";
+  const isRestrictedRole = userRole === "SERVICE SUPPORT" || userRole === "GEM";
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
@@ -243,42 +246,65 @@ export default async function CustomerPage({ params }) {
         <div className="bg-white shadow-lg rounded-lg p-6 flex flex-col">
           <h2 className="text-2xl font-bold text-gray-800 mb-5">Actions</h2>
           <div className="flex flex-col gap-3 mb-10 w-full md:flex-row md:flex-wrap md:items-stretch md:gap-3">
+            {/* Follow-up button - visible to all */}
             <a
               href={`/user-dashboard/view-customer/${customerId}/follow-up`}
               className="btn text-white bg-green-600 hover:bg-green-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
             >
               Follow-up
             </a>
+
+            {/* Edit button - visible to all */}
             <a
               href={`/user-dashboard/view-customer/${customerId}/edit`}
               className="btn text-white bg-yellow-600 hover:bg-yellow-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
             >
               Edit
             </a>
-            <a
-              href={`/user-dashboard/view-customer/${customerId}/demo`}
-              className="btn text-white bg-blue-600 hover:bg-blue-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
-            >
-              Demo Registration
-            </a>
-            <CustomerContactsModal customerId={customerId} />
-            <ViewCustomerQuotationsLink
-              customerId={customerId}
-              dashboardBase="user-dashboard"
-              variant="user"
-            />
-            <Link
-              href={`/user-dashboard/quotations/new?customerId=${customerId}`}
-              className="btn text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
-            >
-              add Quotation
-            </Link>
-            <Link
-              href={`/user-dashboard/special-pricing/${customerId}`}
-              className="btn text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
-            >
-              Special Price
-            </Link>
+
+            {/* Demo Registration - hidden for SERVICE SUPPORT and GEM */}
+            {!isRestrictedRole && (
+              <a
+                href={`/user-dashboard/view-customer/${customerId}/demo`}
+                className="btn text-white bg-blue-600 hover:bg-blue-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                Demo Registration
+              </a>
+            )}
+
+            {/* View Contacts - hidden for SERVICE SUPPORT and GEM */}
+            {!isRestrictedRole && (
+              <CustomerContactsModal customerId={customerId} />
+            )}
+
+            {/* View All Quotations - hidden for SERVICE SUPPORT and GEM */}
+            {!isRestrictedRole && (
+              <ViewCustomerQuotationsLink
+                customerId={customerId}
+                dashboardBase="user-dashboard"
+                variant="user"
+              />
+            )}
+
+            {/* Add Quotation - hidden for SERVICE SUPPORT and GEM */}
+            {!isRestrictedRole && (
+              <Link
+                href={`/user-dashboard/quotations/new?customerId=${customerId}`}
+                className="btn text-white bg-amber-900 hover:bg-amber-950 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                add Quotation
+              </Link>
+            )}
+
+            {/* Special Price - hidden for SERVICE SUPPORT and GEM */}
+            {!isRestrictedRole && (
+              <Link
+                href={`/user-dashboard/special-pricing/${customerId}`}
+                className="btn text-white bg-pink-600 hover:bg-pink-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                Special Price
+              </Link>
+            )}
           </div>
 
           <section>

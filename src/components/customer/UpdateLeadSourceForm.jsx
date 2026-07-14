@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function UpdateLeadSourceForm({ initialData, leadSources, serviceEmployees = [], userRole }) {
+export default function UpdateLeadSourceForm({ initialData, leadSources, serviceEmployees = [], gemEmployees = [], userRole }) {
   const router = useRouter();
   const [selectedLeadSource, setSelectedLeadSource] = useState(
     initialData.lead_source || ""
@@ -11,6 +11,7 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
   const [selectedServiceLeadSource, setSelectedServiceLeadSource] = useState(
     initialData.service_lead_source || ""
   );
+  const [selectedGemEmployee, setSelectedGemEmployee] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -48,6 +49,47 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
       }
     } catch (error) {
       console.error("Failed to update lead source:", error);
+      setStatusMessage("❌ Network error. Please try again.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleAssignGEM = async (e) => {
+    e.preventDefault();
+    if (!selectedGemEmployee) {
+      setStatusMessage("❌ Please select a GEM employee to assign.");
+      return;
+    }
+
+    setIsUpdating(true);
+    setStatusMessage("");
+
+    try {
+      const response = await fetch(
+        `/api/customers/${initialData.customer_id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ gem_lead_source: selectedGemEmployee }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setStatusMessage(`✅ Lead assigned to ${selectedGemEmployee} successfully!`);
+        setSelectedGemEmployee("");
+        router.refresh();
+      } else {
+        setStatusMessage(
+          `❌ Error: ${result.error || "Failed to assign lead to GEM."}`
+        );
+      }
+    } catch (error) {
+      console.error("Failed to assign GEM:", error);
       setStatusMessage("❌ Network error. Please try again.");
     } finally {
       setIsUpdating(false);
@@ -112,13 +154,39 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
               </select>
             </div>
           )}
+          
+          {/* GEM Assignment - Only for SUPERADMIN and EA */}
+          {(userRole === "SUPERADMIN" || userRole === "EA") && gemEmployees.length > 0 && (
+            <div>
+              <label
+                htmlFor="gem_employee_select"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Assign Lead to GEM Employee
+              </label>
+              <select
+                id="gem_employee_select"
+                name="gem_employee"
+                value={selectedGemEmployee}
+                onChange={(e) => setSelectedGemEmployee(e.target.value)}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md"
+              >
+                <option value="">Select GEM Employee</option>
+                {gemEmployees.map((employee, index) => (
+                  <option key={index} value={employee}>
+                    {employee}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
           <button
             type="submit"
             disabled={isUpdating}
-            className={`px-4 py-2 mb-2 rounded-md text-white font-semibold transition-colors duration-200 ${
+            className={`px-4 py-2 rounded-md text-white font-semibold transition-colors duration-200 ${
               isUpdating
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700"
@@ -126,6 +194,22 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
           >
             {isUpdating ? "Saving..." : "Save New Lead Source"}
           </button>
+          
+          {/* Assign to GEM Button - alongside Save button */}
+          {(userRole === "SUPERADMIN" || userRole === "EA") && gemEmployees.length > 0 && selectedGemEmployee && (
+            <button
+              type="button"
+              disabled={isUpdating}
+              onClick={handleAssignGEM}
+              className={`px-4 py-2 rounded-md text-white font-semibold transition-colors duration-200 ${
+                isUpdating
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-purple-600 hover:bg-purple-700"
+              }`}
+            >
+              {isUpdating ? "Assigning..." : "Assign to GEM"}
+            </button>
+          )}
         </div>
       </form>
 

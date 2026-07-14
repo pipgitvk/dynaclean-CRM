@@ -1,10 +1,14 @@
 import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
 import FollowupForm from "./FollowupForm";
 import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
 
 export default async function FollowUpPage({ params }) {
   const { customerId } = await params;
+
+  const payload = await getSessionPayload();
+  const userRole = payload?.role || "";
 
   const conn = await getDbConnection();
 
@@ -83,7 +87,7 @@ export default async function FollowUpPage({ params }) {
         </p>
       </div>
 
-      <FollowupForm customerId={customerId} />
+      <FollowupForm customerId={customerId} userRole={userRole} />
     </div>
   );
 }

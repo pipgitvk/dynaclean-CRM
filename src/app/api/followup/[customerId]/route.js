@@ -118,6 +118,8 @@ export async function POST(req, { params }) {
   const followedDateUTC = convertISTtoUTC(data.followed_date);
   
   let nextFollowupDateUTC;
+  let serviceNextFollowupUTC = null;
+  let gemNextFollowupUTC = null;
   
   // If status is Denied, automatically set next follow-up date to 4 days from now (UTC)
   if (data.status === "Denied") {
@@ -128,18 +130,30 @@ export async function POST(req, { params }) {
     nextFollowupDateUTC = convertISTtoUTC(data.next_followup_date);
   }
 
+  // Convert service_next_followup if provided (SERVICE SUPPORT)
+  if (data.service_next_followup) {
+    serviceNextFollowupUTC = convertISTtoUTC(data.service_next_followup);
+  }
+
+  // Convert gem_next_followup if provided (GEM)
+  if (data.gem_next_followup) {
+    gemNextFollowupUTC = convertISTtoUTC(data.gem_next_followup);
+  }
+
   // Insert first follow-up row (normal entry)
-  const firstRowNextDate = data.status === "Denied" ? null : nextFollowupDateUTC;
+  const firstRowNextDate = data.status === "Denied" ? null : (data.service_next_followup ? serviceNextFollowupUTC : (data.gem_next_followup ? gemNextFollowupUTC : nextFollowupDateUTC));
   await conn.execute(
     `INSERT INTO customers_followup 
-    (customer_id, name, contact, email, next_followup_date, followed_date, comm_mode, notes, followed_by, multi_tag)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, followed_by, multi_tag)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       customerId,
       name,
       contact,
       email,
       firstRowNextDate,
+      serviceNextFollowupUTC,
+      gemNextFollowupUTC,
       followedDateUTC,
       data.communication_mode,
       data.notes,
@@ -154,14 +168,16 @@ export async function POST(req, { params }) {
     const secondRowNotes = `(${followedBy}) marked (${name}-${contact}) as Denied dated (${currentDateTime}), ${data.notes}`;
     await conn.execute(
       `INSERT INTO customers_followup 
-      (customer_id, name, contact, email, next_followup_date, followed_date, comm_mode, notes, followed_by, multi_tag)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, followed_by, multi_tag)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerId,
         name,
         contact,
         email,
         nextFollowupDateUTC, // 4 days later date
+        null, // no service_next_followup for Denied status
+        null, // no gem_next_followup for Denied status
         followedDateUTC,
         data.communication_mode,
         secondRowNotes,
@@ -171,10 +187,13 @@ export async function POST(req, { params }) {
     );
   }
 
-  await conn.execute(
-    `UPDATE customers SET status=?, stage=? WHERE customer_id=?`,
-    [data.status, data.stage || "New", customerId],
-  );
+  // Only update status and stage if they are provided (not SERVICE SUPPORT or GEM)
+  if (data.status || data.stage) {
+    await conn.execute(
+      `UPDATE customers SET status=?, stage=? WHERE customer_id=?`,
+      [data.status, data.stage || "New", customerId],
+    );
+  }
 
   return new Response(JSON.stringify({ success: true }), { status: 200 });
 }
