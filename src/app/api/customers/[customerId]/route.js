@@ -47,47 +47,56 @@ export async function PATCH(request, { params }) {
   const isServiceUser = userRole === "SERVICE SUPPORT" || userRole === "SERVICE HEAD";
   const isSuperAdminOrEA = userRole === "SUPERADMIN" || userRole === "EA";
 
-  // Basic validation - only require lead_source if not a service user
-  if (!isServiceUser && !lead_source && !gem_lead_source) {
+  // Basic validation
+  if (!isServiceUser && !isSuperAdminOrEA && !lead_source) {
     return NextResponse.json({ error: "Lead source is required." }, { status: 400 });
   }
 
   try {
     const conn = await getDbConnection();
-    // Check if service_lead_source and gem_lead_source columns exist
-    let serviceLeadSourceColumn = null;
-    let gemLeadSourceColumn = null;
+
+    // Check if optional columns exist
+    let serviceLeadSourceColumn = false;
+    let gemLeadSourceColumn = false;
     try {
       const [columns1] = await conn.execute("SHOW COLUMNS FROM customers LIKE 'service_lead_source'");
       serviceLeadSourceColumn = columns1.length > 0;
-      
       const [columns2] = await conn.execute("SHOW COLUMNS FROM customers LIKE 'gem_lead_source'");
       gemLeadSourceColumn = columns2.length > 0;
-    } catch (e) {
-      serviceLeadSourceColumn = false;
-      gemLeadSourceColumn = false;
-    }
-    
-    // First, get current customer data to preserve fields not being updated
+    } catch (e) {}
+
+    // Get current data to preserve fields not being updated
     let selectQuery = `SELECT lead_source, service_lead_source`;
-    if (gemLeadSourceColumn) {
-      selectQuery += `, gem_lead_source`;
-    }
+    if (gemLeadSourceColumn) selectQuery += `, gem_lead_source`;
     selectQuery += ` FROM customers WHERE customer_id = ?`;
-    
     const [currentRows] = await conn.execute(selectQuery, [customerId]);
     const currentData = currentRows[0] || {};
-    
+
     let result;
-    
-    if (gem_lead_source !== undefined && isSuperAdminOrEA && gemLeadSourceColumn) {
-      // GEM assignment - only update gem_lead_source
-      [result] = await conn.execute(
-        `UPDATE customers SET gem_lead_source = ? WHERE customer_id = ?`,
-        [gem_lead_source === '' ? null : gem_lead_source, customerId]
-      );
+
+    if (isSuperAdminOrEA) {
+      // SUPERADMIN / EA: update lead_source + service_lead_source + gem_lead_source all at once
+      const newLeadSource = lead_source !== undefined ? lead_source : currentData.lead_source;
+      const newServiceLeadSource = service_lead_source !== undefined
+        ? (service_lead_source === '' ? null : service_lead_source)
+        : currentData.service_lead_source;
+      const newGemLeadSource = gem_lead_source !== undefined
+        ? (gem_lead_source === '' ? null : gem_lead_source)
+        : (gemLeadSourceColumn ? currentData.gem_lead_source : null);
+
+      if (gemLeadSourceColumn) {
+        [result] = await conn.execute(
+          `UPDATE customers SET lead_source = ?, sales_representative = ?, service_lead_source = ?, gem_lead_source = ? WHERE customer_id = ?`,
+          [newLeadSource, newLeadSource, newServiceLeadSource, newGemLeadSource, customerId]
+        );
+      } else {
+        [result] = await conn.execute(
+          `UPDATE customers SET lead_source = ?, sales_representative = ?, service_lead_source = ? WHERE customer_id = ?`,
+          [newLeadSource, newLeadSource, newServiceLeadSource, customerId]
+        );
+      }
     } else if (isServiceUser) {
-      // If service user, only update service_lead_source if provided
+      // SERVICE SUPPORT / SERVICE HEAD: only update service_lead_source
       if (serviceLeadSourceColumn) {
         const newServiceLeadSource = service_lead_source !== undefined ? service_lead_source : currentData.service_lead_source;
         [result] = await conn.execute(
@@ -98,7 +107,7 @@ export async function PATCH(request, { params }) {
         return NextResponse.json({ message: "Service lead source column not available yet." }, { status: 200 });
       }
     } else {
-      // If non-service user, update lead_source (required) and service_lead_source if provided
+      // Other roles: update lead_source + service_lead_source
       if (serviceLeadSourceColumn) {
         const newServiceLeadSource = service_lead_source !== undefined ? service_lead_source : currentData.service_lead_source;
         [result] = await conn.execute(

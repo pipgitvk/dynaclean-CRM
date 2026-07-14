@@ -77,16 +77,38 @@ export async function GET(req) {
 
     // Data visibility:
     // SUPERADMIN + HR roles → all rows
+    // SERVICE SUPPORT → rows where service_lead_source = their username
+    // GEM → rows where gem_lead_source = their username
     // everyone else → only rows assigned/owned by them (or deny if username missing)
     if (!isSuperAdminRole(role) && !isHrPrivilegedCustomersRole(role)) {
-      const ownership = buildOwnershipWhere({
-        role,
-        username,
-        columns: ["lead_source", "sales_representative", "assigned_to"],
-      });
-      if (ownership.sql) {
-        whereClause += ` AND ${ownership.sql}`;
-        params.push(...ownership.params);
+      const normalizedRole = normalizeRoleKey(role);
+
+      if (normalizedRole === "SERVICE SUPPORT") {
+        // SERVICE SUPPORT sees only customers assigned to them via service_lead_source
+        if (username) {
+          whereClause += ` AND service_lead_source = ?`;
+          params.push(username);
+        } else {
+          whereClause += ` AND 1=0`;
+        }
+      } else if (normalizedRole === "GEM") {
+        // GEM sees only customers assigned to them via gem_lead_source
+        if (username) {
+          whereClause += ` AND gem_lead_source = ?`;
+          params.push(username);
+        } else {
+          whereClause += ` AND 1=0`;
+        }
+      } else {
+        const ownership = buildOwnershipWhere({
+          role,
+          username,
+          columns: ["lead_source", "sales_representative", "assigned_to"],
+        });
+        if (ownership.sql) {
+          whereClause += ` AND ${ownership.sql}`;
+          params.push(...ownership.params);
+        }
       }
     }
 

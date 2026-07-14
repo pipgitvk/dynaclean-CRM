@@ -12,9 +12,9 @@ export default async function EditCustomerPage({ params }) {
   const userRole = payload?.role;
 
   const conn = await getDbConnection();
-  // Explicitly select all columns including service_lead_source
+  // Explicitly select all columns including service_lead_source and gem_lead_source
   const [rows] = await conn.execute(
-    `SELECT customer_id, first_name, email, tags, status, phone, lead_source, service_lead_source, stage, company, address FROM customers WHERE customer_id = ?`,
+    `SELECT customer_id, first_name, email, tags, status, phone, lead_source, service_lead_source, gem_lead_source, stage, company, address FROM customers WHERE customer_id = ?`,
     [customerId]
   );
   const customerData = rows[0] || {};

@@ -11,7 +11,9 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
   const [selectedServiceLeadSource, setSelectedServiceLeadSource] = useState(
     initialData.service_lead_source || ""
   );
-  const [selectedGemEmployee, setSelectedGemEmployee] = useState("");
+  const [selectedGemEmployee, setSelectedGemEmployee] = useState(
+    initialData.gem_lead_source || ""
+  );
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
@@ -46,7 +48,6 @@ export default function UpdateLeadSourceForm({ initialData, leadSources, service
 
       if (response.ok) {
         setStatusMessage("✅ Lead source updated successfully!");
-        setSelectedGemEmployee("");
         router.refresh();
       } else {
         setStatusMessage(
