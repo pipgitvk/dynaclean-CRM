@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import EditBacklinkModal from "./EditBacklinkModal";
 import AddBacklinkModal from "./AddBacklinkModal";
 import EmailManagementModal from "./EmailManagementModal";
+import BacklinksStatsCards from "./BacklinksStatsCards";
 
 const BacklinksTableReadOnly = () => {
   const [backlinks, setBacklinks] = useState([]);
@@ -179,6 +180,9 @@ const BacklinksTableReadOnly = () => {
           */}
         </div>
       </div>
+
+      {/* Stats Cards */}
+      <BacklinksStatsCards backlinks={filteredBacklinks} />
 
       {/* Search Box */}
       <div className="relative">

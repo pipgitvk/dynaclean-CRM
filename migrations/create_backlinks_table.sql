@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS backlinks (
   keyword VARCHAR(255),
   email VARCHAR(255),
   followup_date DATE,
-  status ENUM('pending', 'submitted', 'approved', 'deleted') DEFAULT 'pending',
+  status ENUM('pending', 'submitted', 'approved', 'completed', 'in_progress', 'on_hold', 'deleted') DEFAULT 'pending',
   assigned_to VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

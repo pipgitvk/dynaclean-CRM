@@ -426,6 +426,7 @@ const BacklinksExcelTable = () => {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-blue-50 border-b sticky top-0">
+              <th className="px-4 py-3 text-left font-semibold text-gray-700 w-12">Sr No</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-700 w-32">Website</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-700 w-40">Keyword</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-700 w-32">Email</th>
@@ -436,13 +437,16 @@ const BacklinksExcelTable = () => {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {rows.map((row, index) => (
               <tr 
                 key={row.id} 
                 className={`border-b hover:bg-blue-50 transition ${
                   savingIds.has(row.id) ? "bg-yellow-50" : ""
                 } ${row.isEmpty ? "bg-gray-50" : ""}`}
               >
+                <td className="px-4 py-2 text-gray-600 font-medium text-center">
+                  {index + 1}
+                </td>
                 <td className="px-4 py-2">
                   <input
                     type="text"

@@ -5,6 +5,7 @@ import { Search, Edit } from "lucide-react";
 import toast from "react-hot-toast";
 import AddBacklinkModal from "./AddBacklinkModal";
 import EditBacklinkModal from "./EditBacklinkModal";
+import BacklinksStatsCards from "./BacklinksStatsCards";
 
 const BacklinksTable = () => {
   const [backlinks, setBacklinks] = useState([]);
@@ -143,6 +144,9 @@ const BacklinksTable = () => {
         </button>
         */}
       </div>
+
+      {/* Stats Cards */}
+      <BacklinksStatsCards backlinks={filteredBacklinks} />
 
       {/* Search Box */}
       <div className="relative">
