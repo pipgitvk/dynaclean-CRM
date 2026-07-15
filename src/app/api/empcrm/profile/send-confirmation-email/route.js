@@ -110,22 +110,25 @@ export async function POST(request) {
     let reportingManagerEmail = null;
     try {
       const conn = await getDbConnection();
-      const [profileData] = await conn.execute(
-        `SELECT reporting_manager FROM employee_profiles WHERE username = ?`,
+
+      // Step 1: Get reporting_manager username from rep_list
+      const [empRows] = await conn.execute(
+        `SELECT reporting_manager FROM rep_list WHERE username = ? LIMIT 1`,
         [username]
       );
-      
-      if (profileData.length > 0 && profileData[0].reporting_manager) {
-        const reportingManagerName = profileData[0].reporting_manager;
-        // Query to find reporting manager's email
-        const [managerData] = await conn.execute(
-          `SELECT email, professional_email FROM employee_profiles WHERE full_name = ? OR username = ? LIMIT 1`,
-          [reportingManagerName, reportingManagerName]
+
+      if (empRows.length > 0 && empRows[0].reporting_manager) {
+        const managerUsername = empRows[0].reporting_manager;
+
+        // Step 2: Get manager's email from rep_list
+        const [managerRows] = await conn.execute(
+          `SELECT email FROM rep_list WHERE username = ? LIMIT 1`,
+          [managerUsername]
         );
-        
-        if (managerData.length > 0) {
-          reportingManagerEmail = managerData[0].professional_email || managerData[0].email;
-          console.log(`✅ Found reporting manager email: ${reportingManagerEmail}`);
+
+        if (managerRows.length > 0 && managerRows[0].email) {
+          reportingManagerEmail = managerRows[0].email;
+          console.log(`✅ Found reporting manager (${managerUsername}) email: ${reportingManagerEmail}`);
         }
       }
     } catch (err) {

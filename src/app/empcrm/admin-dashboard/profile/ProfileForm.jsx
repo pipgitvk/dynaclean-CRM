@@ -66,6 +66,8 @@ export default function ProfileForm({
   const [originalFormData, setOriginalFormData] = useState(null);
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [reportingManagerEmail, setReportingManagerEmail] = useState(null);
+  const [reportingManagerName, setReportingManagerName] = useState(null);
 
   const [formData, setFormData] = useState({
     username,
@@ -139,6 +141,16 @@ export default function ProfileForm({
       fetchExistingProfile();
     }
   }, [username, empId, initialData, reassignFieldKeys]);
+
+  // Fetch reporting manager email whenever reporting manager name changes
+  useEffect(() => {
+    if (formData.reporting_manager) {
+      fetchReportingManagerEmail(formData.reporting_manager);
+    } else {
+      setReportingManagerEmail(null);
+      setReportingManagerName(null);
+    }
+  }, [formData.reporting_manager]);
 
   const fetchExistingProfile = async () => {
     // Only fetch if no initial data
@@ -240,6 +252,26 @@ export default function ProfileForm({
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
+    }
+  };
+
+  const fetchReportingManagerEmail = async (managerNameOrUsername) => {
+    if (!managerNameOrUsername) return;
+    try {
+      const res = await fetch(
+        `/api/empcrm/manager-email?username=${encodeURIComponent(username)}`
+      );
+      const data = await res.json();
+      if (data.success && data.email) {
+        setReportingManagerEmail(data.email);
+        setReportingManagerName(data.manager_name || data.manager_username || null);
+      } else {
+        setReportingManagerEmail(null);
+        setReportingManagerName(null);
+      }
+    } catch {
+      setReportingManagerEmail(null);
+      setReportingManagerName(null);
     }
   };
 
@@ -1180,7 +1212,10 @@ export default function ProfileForm({
               </p>
               {formData.reporting_manager && (
                 <p className="text-sm text-blue-900 border-t border-blue-200 pt-2">
-                  <strong>📋 CC:</strong> {formData.reporting_manager} (Reporting Manager)<br />
+                  <strong>📋 CC:</strong> {reportingManagerName || formData.reporting_manager} (Reporting Manager)
+                  {reportingManagerEmail && (
+                    <> — <span className="text-blue-700">{reportingManagerEmail}</span></>
+                  )}<br />
                   <span className="text-xs text-blue-800">Will receive a copy for notification</span>
                 </p>
               )}
