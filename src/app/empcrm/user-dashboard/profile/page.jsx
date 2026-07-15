@@ -108,18 +108,103 @@ export default function UserProfileView() {
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
           </div>
         ) : !profile ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-            <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Profile Not Found</h2>
-            <p className="text-gray-600 mb-6">Your profile hasn't been created yet.</p>
-            <button
-              onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
-              className="inline-flex items-center justify-center gap-2 py-2.5 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-            >
-              <Edit className="w-4 h-4" />
-              Create Profile
-            </button>
-          </div>
+          <>
+            {/* Submission Status Alerts - Even if profile doesn't exist yet */}
+            {(latestSubmission?.status === "reassign" || latestSubmission?.status === "revision_requested") && (
+              <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:p-6">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-6 h-6 shrink-0 text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h2 className="font-bold text-lg text-amber-900">HR requested corrections</h2>
+                    <p className="text-sm text-amber-800 mt-1">
+                      Please update the following items and submit again for approval.
+                    </p>
+                    {parseReassignedLabels(latestSubmission).length > 0 && (
+                      <ul className="mt-3 list-disc pl-5 text-sm text-amber-900 space-y-1">
+                        {parseReassignedLabels(latestSubmission).map((label, idx) => (
+                          <li key={`${label}-${idx}`}>{label}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {latestSubmission.reassignment_note && (
+                      <p className="mt-3 text-sm border-t border-amber-200 pt-3">
+                        <span className="font-semibold">Note from HR: </span>
+                        {latestSubmission.reassignment_note}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "pending" && (
+              <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 sm:p-6 flex gap-3">
+                <Clock className="w-6 h-6 shrink-0 text-blue-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-blue-900">Awaiting HR approval</h2>
+                  <p className="text-sm text-blue-800 mt-1">Your profile submission is under review.</p>
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "pending_hr_docs" && (
+              <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4 sm:p-6 flex gap-3">
+                <Clock className="w-6 h-6 shrink-0 text-indigo-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-indigo-900">HR Approval Pending</h2>
+                  <p className="text-sm text-indigo-800 mt-1">Your profile is awaiting final HR approval.</p>
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "approved" && (
+              <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 sm:p-6 flex gap-3">
+                <CheckCircle className="w-6 h-6 shrink-0 text-green-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-green-900">Profile approved</h2>
+                  <p className="text-sm text-green-800 mt-1">Your profile has been published successfully.</p>
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "rejected" && (
+              <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 sm:p-6 flex gap-3">
+                <XCircle className="w-6 h-6 shrink-0 text-red-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-red-900">Submission rejected</h2>
+                  {latestSubmission.rejection_reason && (
+                    <p className="text-sm text-red-800 mt-1">{latestSubmission.rejection_reason}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {latestSubmission?.status === "pending_admin" && (
+              <div className="mb-6 rounded-lg border border-violet-200 bg-violet-50 p-4 sm:p-6 flex gap-3">
+                <Clock className="w-6 h-6 shrink-0 text-violet-600 mt-0.5" />
+                <div>
+                  <h2 className="font-bold text-lg text-violet-900">Awaiting final approval</h2>
+                  <p className="text-sm text-violet-800 mt-1">Super Admin is reviewing your profile.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Show "Profile Not Found" only if no submission exists, or if rejected */}
+            {(!latestSubmission || latestSubmission?.status === "rejected") && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+                <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h2 className="text-lg font-bold text-gray-900 mb-2">Profile Not Found</h2>
+                <p className="text-gray-600 mb-6">Your profile hasn't been created yet.</p>
+                <button
+                  onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
+                  className="inline-flex items-center justify-center gap-2 py-2.5 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  <Edit className="w-4 h-4" />
+                  Create Profile
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <>
             {/* Submission Status Alerts */}
@@ -164,8 +249,8 @@ export default function UserProfileView() {
               <div className="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4 sm:p-6 flex gap-3">
                 <Clock className="w-6 h-6 shrink-0 text-indigo-600 mt-0.5" />
                 <div>
-                  <h2 className="font-bold text-lg text-indigo-900">HR completing documents</h2>
-                  <p className="text-sm text-indigo-800 mt-1">Your details are approved. HR is finalizing documents.</p>
+                  <h2 className="font-bold text-lg text-indigo-900">HR Approval Pending</h2>
+                  <p className="text-sm text-indigo-800 mt-1">Your profile is awaiting final HR approval.</p>
                 </div>
               </div>
             )}
