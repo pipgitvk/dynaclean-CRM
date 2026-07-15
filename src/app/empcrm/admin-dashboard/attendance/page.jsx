@@ -549,6 +549,7 @@ const AttendancePage = () => {
         { header: "User", key: "User", width: 20 },
         { header: "Type", key: "Type", width: 12 },
         { header: "Checkin", key: "Checkin", width: 12 },
+        { header: "Checkin Photo", key: "CheckinPhoto", width: 30 },
         { header: "Checkout", key: "Checkout", width: 12 },
         { header: "Morning Break", key: "MorningBreak", width: 20 },
         { header: "Lunch Break", key: "LunchBreak", width: 20 },
@@ -564,6 +565,7 @@ const AttendancePage = () => {
           User: log.username,
           Type: log.type === "present" ? "Present" : log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : "Holiday",
           Checkin: log.checkin_time ? formatTime(log.checkin_time) : "",
+          CheckinPhoto: log.checkin_photo || "",
           Checkout: log.checkout_time ? formatTime(log.checkout_time) : "",
           MorningBreak: log.break_morning_start
             ? `${formatTime(log.break_morning_start)} - ${formatTime(log.break_morning_end)}`
@@ -865,6 +867,28 @@ const AttendancePage = () => {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-semibold text-gray-900">
+                          Check-in Photo:
+                        </span>
+                        {log.checkin_photo ? (
+                          <a
+                            href={log.checkin_photo}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block"
+                          >
+                            <img
+                              src={log.checkin_photo}
+                              alt="Checkin Photo"
+                              className="h-12 w-12 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
+                              title="Click to view full image"
+                            />
+                          </a>
+                        ) : (
+                          <span className="text-gray-400 text-sm italic">No photo</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-gray-900">
                           Morning Break:
                         </span>
                         <span className="text-sm text-gray-700">
@@ -1035,6 +1059,9 @@ const AttendancePage = () => {
                     Check-in
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Check-in Photo
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check-in Address
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1084,6 +1111,25 @@ const AttendancePage = () => {
                               }`}
                           >
                             {formatTime(log.checkin_time)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {log.checkin_photo ? (
+                              <a
+                                href={log.checkin_photo}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block"
+                              >
+                                <img
+                                  src={log.checkin_photo}
+                                  alt="Checkin Photo"
+                                  className="h-16 w-16 object-cover rounded border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                  title="Click to view full image"
+                                />
+                              </a>
+                            ) : (
+                              <span className="text-gray-400 italic">No photo</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-500 relative group">
                             <span className="underline cursor-help">

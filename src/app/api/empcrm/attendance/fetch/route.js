@@ -32,7 +32,8 @@ export async function GET(request) {
         break_lunch_start,
         break_lunch_end,
         break_evening_start,
-        break_evening_end
+        break_evening_end,
+        checkin_photo
       FROM attendance_logs
       WHERE username = ?
       ORDER BY date DESC`,

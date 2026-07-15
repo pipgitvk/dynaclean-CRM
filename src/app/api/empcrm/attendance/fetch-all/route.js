@@ -55,7 +55,8 @@ export async function GET(request) {
       a.break_evening_start,
       a.break_evening_end,
       a.checkin_address,
-      a.checkout_address
+      a.checkout_address,
+      a.checkin_photo
    FROM attendance_logs a
    INNER JOIN rep_list r
       ON a.username COLLATE utf8mb4_unicode_ci = r.username COLLATE utf8mb4_unicode_ci
