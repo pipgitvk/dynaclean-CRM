@@ -752,8 +752,19 @@ export default function ProfileForm({
   const sendConfirmationEmail = async () => {
     setSendingEmail(true);
     try {
-      const confirmationLetterPath = formData.fileUrls?.doc_employment_confirmation_letter || 
-                                     (files.doc_employment_confirmation_letter ? null : null);
+      // Get confirmation letter path and build full URL
+      let confirmationLetterLink = null;
+      const letterPath = formData.fileUrls?.doc_employment_confirmation_letter || 
+                        (files.doc_employment_confirmation_letter ? null : null);
+      
+      if (letterPath) {
+        // If it's a file path, construct the full URL
+        if (letterPath.startsWith('/')) {
+          confirmationLetterLink = `${typeof window !== 'undefined' ? window.location.origin : ''}${letterPath}`;
+        } else {
+          confirmationLetterLink = letterPath;
+        }
+      }
       
       const response = await fetch("/api/empcrm/profile/send-confirmation-email", {
         method: "POST",
@@ -763,13 +774,14 @@ export default function ProfileForm({
           email: formData.email,
           professional_email: formData.professional_email,
           full_name: formData.full_name,
-          confirmationLetterPath: confirmationLetterPath,
+          confirmationLetterPath: letterPath, // For attachment
+          confirmation_letter_link: confirmationLetterLink, // For email template link
         }),
       });
 
       const result = await response.json();
       if (result.success) {
-        toast.success("✓ Confirmation email sent to both email addresses");
+        toast.success("✓ Confirmation email sent successfully");
       } else {
         console.warn("Email send warning:", result.error);
         toast.success("Profile saved (Email send had issues, but profile is saved)");

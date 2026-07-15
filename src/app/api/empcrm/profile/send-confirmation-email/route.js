@@ -3,6 +3,7 @@ import { getDbConnection } from "@/lib/db";
 import nodemailer from "nodemailer";
 import path from "path";
 import { readFile } from "fs/promises";
+import { buildEmploymentConfirmationEmail } from "@/lib/emailTemplates/employmentConfirmationBuilder";
 
 /**
  * Send employment confirmation letter email to both personal and professional email
@@ -11,7 +12,7 @@ import { readFile } from "fs/promises";
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { username, email, professional_email, full_name, confirmationLetterPath } = body;
+    const { username, email, professional_email, full_name, confirmationLetterPath, confirmation_letter_link } = body;
 
     if (!username || (!email && !professional_email)) {
       return NextResponse.json(
@@ -46,113 +47,50 @@ export async function POST(request) {
       },
     });
 
-    // Prepare email content
-    const emailSubject = `Employment Confirmation Letter - ${full_name || username}`;
+    // Fetch employee details from database
+    const conn = await getDbConnection();
+    const [employeeData] = await conn.execute(
+      `SELECT 
+        ep.designation, 
+        ep.department, 
+        ep.date_of_joining,
+        ep.reporting_manager 
+       FROM employee_profiles ep 
+       WHERE ep.username = ? LIMIT 1`,
+      [username]
+    );
+
+    if (!employeeData || employeeData.length === 0) {
+      console.warn(`Employee profile not found for username: ${username}`);
+    }
+
+    const employee = employeeData?.[0] || {};
     
-    const emailHTML = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Employment Confirmation</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f4f4f4;
-          }
-          .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          }
-          .header {
-            text-align: center;
-            border-bottom: 3px solid #0066cc;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-          }
-          .header h1 {
-            color: #0066cc;
-            margin: 0;
-            font-size: 24px;
-          }
-          .content {
-            margin-bottom: 20px;
-          }
-          .greeting {
-            font-size: 16px;
-            margin-bottom: 15px;
-          }
-          .message {
-            background-color: #e8f4f8;
-            border-left: 4px solid #0066cc;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
-          }
-          .footer {
-            text-align: center;
-            font-size: 12px;
-            color: #777;
-            border-top: 1px solid #ddd;
-            padding-top: 20px;
-            margin-top: 30px;
-          }
-          .attachment-notice {
-            background-color: #fff3cd;
-            border: 1px solid #ffc107;
-            padding: 12px;
-            border-radius: 4px;
-            margin: 15px 0;
-            font-size: 14px;
-          }
-          .company-name {
-            color: #0066cc;
-            font-weight: bold;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>✓ Employment Confirmation</h1>
-          </div>
-          
-          <div class="content">
-            <div class="greeting">
-              Dear <strong>${full_name || username}</strong>,
-            </div>
-            
-            <p>We are pleased to confirm that your employment status has been updated to <strong>Permanent</strong> in our system.</p>
-            
-            <div class="message">
-              <strong>Employment Status Update:</strong><br>
-              Your permanent employment confirmation letter is attached to this email. Please keep this for your records.
-            </div>
-            
-            <div class="attachment-notice">
-              📎 <strong>Attachment:</strong> Please review the attached Employment Confirmation Letter document. This document serves as official confirmation of your permanent employment.
-            </div>
-            
-            <p>If you have any questions regarding your employment status or the confirmation letter, please feel free to contact our HR department.</p>
-            
-            <p>Thank you for your continued dedication to <span class="company-name">Dynaclean Industries</span>.</p>
-          </div>
-          
-          <div class="footer">
-            <p>This is an automated email from HR Management System. Please do not reply directly to this email.</p>
-            <p>&copy; 2026 Dynaclean Industries. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    // Format dates
+    const formatDate = (dateStr) => {
+      if (!dateStr) return 'N/A';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-IN', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit' 
+      }).split('/').reverse().join('-');
+    };
+
+    // Build confirmation email using template
+    const confirmationData = {
+      employee_name: full_name || username,
+      employee_id: username,
+      designation: employee.designation || 'N/A',
+      department: employee.department || 'N/A',
+      joining_date: formatDate(employee.date_of_joining),
+      confirmation_date: formatDate(new Date()),
+      confirmation_letter_link: confirmation_letter_link || '#',
+      current_year: new Date().getFullYear(),
+    };
+
+    const emailHTML = buildEmploymentConfirmationEmail(confirmationData);
+    const emailSubject = `Employment Confirmation - DynaClean Industries`;
 
     // Collect emails to send to
     const recipientEmails = [];
