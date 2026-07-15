@@ -54,7 +54,8 @@ export async function POST(request) {
         ep.designation, 
         ep.department, 
         ep.date_of_joining,
-        ep.reporting_manager 
+        ep.reporting_manager,
+        ep.empId
        FROM employee_profiles ep 
        WHERE ep.username = ? LIMIT 1`,
       [username]
@@ -80,7 +81,7 @@ export async function POST(request) {
     // Build confirmation email using template
     const confirmationData = {
       employee_name: full_name || username,
-      employee_id: username,
+      employee_id: employee.empId || username,
       designation: employee.designation || 'N/A',
       department: employee.department || 'N/A',
       joining_date: formatDate(employee.date_of_joining),
