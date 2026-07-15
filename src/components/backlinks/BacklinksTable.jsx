@@ -238,13 +238,16 @@ const BacklinksTable = () => {
         <table className="w-full text-sm" style={{ tableLayout: "auto", minWidth: "100%" }}>
           <thead>
             <tr style={{ backgroundColor: "#f3f4f6", borderBottom: "2px solid #d1d5db" }}>
-              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "25%" }}>
+              <th style={{ padding: "12px 24px", textAlign: "center", fontWeight: "600", color: "#374151", width: "5%" }}>
+                Sr No
+              </th>
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "20%" }}>
                 Website
               </th>
               <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "15%" }}>
                 Keyword
               </th>
-              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "20%" }}>
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "18%" }}>
                 Email
               </th>
               <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "12%" }}>
@@ -253,7 +256,7 @@ const BacklinksTable = () => {
               <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "12%" }}>
                 Status
               </th>
-              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "15%" }}>
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "12%" }}>
                 Submitted By
               </th>
               <th style={{ padding: "12px 24px", textAlign: "center", fontWeight: "600", color: "#374151", width: "6%" }}>
@@ -264,13 +267,16 @@ const BacklinksTable = () => {
           <tbody>
             {filteredBacklinks.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ padding: "32px 24px", textAlign: "center", color: "#6b7280" }}>
+                <td colSpan="8" style={{ padding: "32px 24px", textAlign: "center", color: "#6b7280" }}>
                   No backlinks found. Add one to get started!
                 </td>
               </tr>
             ) : (
-              filteredBacklinks.map((backlink) => (
+              filteredBacklinks.map((backlink, index) => (
                 <tr key={backlink.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: "12px 24px", fontWeight: "600", color: "#374151", textAlign: "center" }}>
+                    {index + 1}
+                  </td>
                   <td style={{ padding: "12px 24px", fontWeight: "500", color: "#1f2937", wordBreak: "break-all" }}>
                     <a href={backlink.website} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "none" }} onMouseOver={(e) => e.target.style.textDecoration = "underline"} onMouseOut={(e) => e.target.style.textDecoration = "none"}>
                       {backlink.website}

@@ -15,6 +15,8 @@ const BacklinksTableReadOnly = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterAssignedTo, setFilterAssignedTo] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedBacklink, setSelectedBacklink] = useState(null);
   const [digitalMarketers, setDigitalMarketers] = useState([]);
@@ -95,10 +97,24 @@ const BacklinksTableReadOnly = () => {
       const matchesStatus = filterStatus === "" || bl.status === filterStatus;
       const matchesAssignedTo = filterAssignedTo === "" || bl.assigned_to === filterAssignedTo;
       
+      // Date range filter
+      let matchesDateRange = true;
+      if (dateFrom || dateTo) {
+        const blDate = new Date(bl.followup_date);
+        if (dateFrom) {
+          const fromDate = new Date(dateFrom);
+          matchesDateRange = matchesDateRange && blDate >= fromDate;
+        }
+        if (dateTo) {
+          const toDate = new Date(dateTo);
+          matchesDateRange = matchesDateRange && blDate <= toDate;
+        }
+      }
+      
       // If superadmin, show all; otherwise show only current user's backlinks
       const matchesUser = isSuperAdmin || bl.assigned_to === currentUser;
       
-      const passes = matchesSearch && matchesStatus && matchesAssignedTo && matchesUser;
+      const passes = matchesSearch && matchesStatus && matchesAssignedTo && matchesUser && matchesDateRange;
       return passes;
     }
   );
@@ -197,7 +213,7 @@ const BacklinksTableReadOnly = () => {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Filter by Status */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -234,6 +250,32 @@ const BacklinksTableReadOnly = () => {
             ))}
           </select>
         </div>
+
+        {/* Filter by Date From */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date From
+          </label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Filter by Date To */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Date To
+          </label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
       </div>
 
       {/* Error Message */}
@@ -248,13 +290,16 @@ const BacklinksTableReadOnly = () => {
         <table className="w-full text-sm" style={{ tableLayout: "auto", minWidth: "100%" }}>
           <thead>
             <tr style={{ backgroundColor: "#f3f4f6", borderBottom: "2px solid #d1d5db" }}>
-              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "25%" }}>
+              <th style={{ padding: "12px 24px", textAlign: "center", fontWeight: "600", color: "#374151", width: "5%" }}>
+                Sr No
+              </th>
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "20%" }}>
                 Website
               </th>
               <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "15%" }}>
                 Keyword
               </th>
-              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "20%" }}>
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "18%" }}>
                 Email
               </th>
               <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "12%" }}>
@@ -263,7 +308,7 @@ const BacklinksTableReadOnly = () => {
               <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "12%" }}>
                 Status
               </th>
-              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "15%" }}>
+              <th style={{ padding: "12px 24px", textAlign: "left", fontWeight: "600", color: "#374151", width: "12%" }}>
                 Submitted By
               </th>
               <th style={{ padding: "12px 24px", textAlign: "center", fontWeight: "600", color: "#374151", width: "6%" }}>
@@ -274,13 +319,16 @@ const BacklinksTableReadOnly = () => {
           <tbody>
             {filteredBacklinks.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ padding: "32px 24px", textAlign: "center", color: "#6b7280" }}>
+                <td colSpan="8" style={{ padding: "32px 24px", textAlign: "center", color: "#6b7280" }}>
                   No backlinks found.
                 </td>
               </tr>
             ) : (
-              filteredBacklinks.map((backlink) => (
+              filteredBacklinks.map((backlink, index) => (
                 <tr key={backlink.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: "12px 24px", fontWeight: "600", color: "#374151", textAlign: "center" }}>
+                    {index + 1}
+                  </td>
                   <td style={{ padding: "12px 24px", fontWeight: "500", color: "#1f2937", wordBreak: "break-all" }}>
                     <a href={backlink.website} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "none" }} onMouseOver={(e) => e.target.style.textDecoration = "underline"} onMouseOut={(e) => e.target.style.textDecoration = "none"}>
                       {backlink.website}
