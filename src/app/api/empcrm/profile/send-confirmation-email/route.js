@@ -22,11 +22,11 @@ export async function POST(request) {
     }
 
     // Get SMTP credentials from environment
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = Number(process.env.SMTP_PORT || 587);
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPassword = process.env.SMTP_PASSWORD;
-    const senderEmail = process.env.SMTP_FROM || smtpUser;
+    const smtpHost = process.env.IMPORT_CRM_SMTP_HOST;
+    const smtpPort = Number(process.env.IMPORT_CRM_SMTP_PORT || 587);
+    const smtpUser = process.env.IMPORT_CRM_SMTP_USER;
+    const smtpPassword = process.env.IMPORT_CRM_SMTP_PASS;
+    const senderEmail = process.env.IMPORT_CRM_SMTP_USER;
 
     if (!smtpHost || !smtpUser || !smtpPassword) {
       console.error("Missing SMTP configuration");
