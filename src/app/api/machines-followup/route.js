@@ -21,6 +21,7 @@ export async function GET(req) {
     const username     = payload.username || "unknown";
     const role         = (payload.role || payload.userRole || "").toUpperCase();
     const isSuperAdmin = role === "SUPERADMIN";
+    const isEA         = role === "EA"; // Add EA role check
 
     const pool = await getDbConnection();
 
@@ -28,7 +29,7 @@ export async function GET(req) {
     if (serial) {
       const hCond   = [];
       const hParams = [];
-      if (!isSuperAdmin) { hCond.push("added_by = ?"); hParams.push(username); }
+      if (!isSuperAdmin && !isEA) { hCond.push("added_by = ?"); hParams.push(username); } // EA sees all
       hCond.push("serial_number = ?"); hParams.push(serial);
 
       const [histRows] = await pool.execute(
@@ -41,7 +42,7 @@ export async function GET(req) {
     /* ── build WHERE for both modes (no mf. alias needed inside subquery) ── */
     const cond   = [];
     const params = [];
-    if (!isSuperAdmin) { cond.push("added_by = ?");   params.push(username); }
+    if (!isSuperAdmin && !isEA) { cond.push("added_by = ?");   params.push(username); } // EA sees all
     if (search) {
       const s = `%${search}%`;
       cond.push("(serial_number LIKE ? OR product_model LIKE ? OR added_by LIKE ? OR notes LIKE ? OR contact LIKE ?)");
