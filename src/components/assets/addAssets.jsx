@@ -46,6 +46,13 @@ export default function AssetFormPage() {
 
   // Fetch asset categories on mount
   useEffect(() => {
+    // Check if we just reloaded after form submission
+    const lastSubmit = localStorage.getItem('lastAssetSubmit');
+    if (lastSubmit) {
+      console.log('[DEBUG-RECOVERED] Last asset submit info:', JSON.parse(lastSubmit));
+      localStorage.removeItem('lastAssetSubmit'); // Clear after logging
+    }
+
     const fetchCategories = async () => {
       try {
         const res = await fetch("/api/assets/categories", { credentials: "include" });
@@ -196,7 +203,9 @@ export default function AssetFormPage() {
   };
 
   const handleAddCategory = async () => {
-    if (!newCategory.trim()) {
+    const trimmedCategory = newCategory.trim();
+    
+    if (!trimmedCategory) {
       toast.error("Please enter a category name");
       return;
     }
@@ -207,7 +216,7 @@ export default function AssetFormPage() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          categoryName: newCategory.trim(),
+          categoryName: trimmedCategory,
           categoryType: formData.assetType,
         }),
       });
@@ -223,9 +232,11 @@ export default function AssetFormPage() {
             category_type: data.category.category_type,
           },
         ]);
+        // IMPORTANT: Use the category_name returned from API (which is the actual DB value)
+        // NOT the user input, in case there's any case transformation or validation
         setFormData((prev) => ({
           ...prev,
-          assetCategory: newCategory.trim(),
+          assetCategory: data.category.category_name,
         }));
         setNewCategory("");
         setShowAddCategory(false);
@@ -247,6 +258,8 @@ export default function AssetFormPage() {
           stepErrors.assetName = "Asset Name is required.";
         if (!formData.brandName)
           stepErrors.brandName = "Brand Name is required.";
+        if (!formData.assetCategory)
+          stepErrors.assetCategory = "Asset Category is required.";
         if (!isSim && !formData.assetCondition)
           stepErrors.assetCondition = "Asset Condition is required.";
         // Mobile/SIM specific number validations on step 1 (when visible)
@@ -320,8 +333,17 @@ export default function AssetFormPage() {
       return;
     }
     if (!validateStep()) {
+      console.log('[DEBUG] Validation failed');
       return;
     }
+
+    console.log('[DEBUG] Form data before submission:', {
+      assetType: formData.assetType,
+      assetCategory: formData.assetCategory,
+      assetName: formData.assetName,
+      currentStep,
+      totalSteps,
+    });
 
     const submissionData = new FormData();
     // Whitelists
@@ -354,15 +376,38 @@ export default function AssetFormPage() {
     }
 
     // Append scalar fields from whitelist
+    let assetCategoryAppended = false;
     Object.entries(formData).forEach(([key, val]) => {
       if (!allowed.has(key)) return;
       if (key === "assetPhotos") return;
       // we'll append login_gmails and login_gmail_password after composing from table
       if (key === "login_gmails" || key === "login_gmail_password") return;
+      
+      if (key === "assetCategory") {
+        console.log('[DEBUG-LOOP] Found assetCategory in formData:', val);
+        assetCategoryAppended = true;
+      }
+      
       if (val !== null && val !== undefined && val !== "") {
         submissionData.append(key, val);
       }
     });
+
+    console.log('[DEBUG] assetCategoryAppended via loop:', assetCategoryAppended);
+
+    // CRITICAL: Ensure assetCategory is always sent, even if empty (frontend should have validated)
+    if (formData.assetCategory) {
+      submissionData.set("assetCategory", formData.assetCategory);
+      console.log('[DEBUG] Explicitly set assetCategory:', formData.assetCategory);
+    } else {
+      console.log('[DEBUG] WARNING: assetCategory is empty/null:', formData.assetCategory);
+    }
+
+    // DEBUG: Log what's being sent
+    console.log('[DEBUG-FORM] FormData entries:', Array.from(submissionData.entries()).map(([k, v]) => [k, typeof v === 'string' ? v : v.name]));
+    console.log('[DEBUG-FORM] assetCategory value:', formData.assetCategory);
+    console.log('[DEBUG-FORM] assetCategory in FormData:', submissionData.get('assetCategory'));
+    
     // Files
     if (Array.isArray(formData.assetPhotos)) {
       formData.assetPhotos.forEach((file) => { if (file) submissionData.append("assetPhotos", file); });
@@ -403,10 +448,27 @@ export default function AssetFormPage() {
     }
 
     try {
+      // Store debug info before reload
+      const debugInfo = {
+        formDataCategory: formData.assetCategory,
+        formDataCategoryType: typeof formData.assetCategory,
+        submissionDataHas: submissionData.has('assetCategory'),
+        submissionDataGet: submissionData.get('assetCategory'),
+        timestamp: new Date().toLocaleString(),
+      };
+      localStorage.setItem('lastAssetSubmit', JSON.stringify(debugInfo));
+      console.log('[DEBUG-STORE] Stored debug info:', debugInfo);
+
       const response = await fetch("/api/assets", {
         method: "POST",
         body: submissionData,
       });
+
+      // Log the FormData entries before sending
+      console.log('[DEBUG-FINAL] Submitting FormData with entries:');
+      for (let [key, value] of submissionData.entries()) {
+        console.log(`  ${key}: ${typeof value === 'string' ? value : value.name || '[File]'}`);
+      }
 
       if (!response.ok) {
         throw new Error("Failed to save asset.");
@@ -415,7 +477,11 @@ export default function AssetFormPage() {
       const result = await response.json();
       console.log("Success:", result);
       toast.success("Asset has been successfully created!");
-      window.location.reload();
+      
+      // Wait a moment before reload to ensure logs are flushed
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (error) {
       console.error("Error:", error);
       toast.error("An error occurred. Please try again.");
@@ -454,13 +520,19 @@ export default function AssetFormPage() {
                 </select>
               </div>
               <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700">Asset Category</label>
+                <label className="text-sm font-medium text-gray-700">
+                  Asset Category <span className="text-red-500">*</span>
+                </label>
                 <div className="flex gap-2">
                   <select
                     name="assetCategory"
                     value={formData.assetCategory}
                     onChange={handleChange}
-                    className="mt-1 p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 flex-1"
+                    className={`mt-1 p-3 border rounded-md shadow-sm focus:outline-none ${
+                      errors.assetCategory
+                        ? "border-red-500"
+                        : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                    } flex-1`}
                   >
                     <option value="">Select category</option>
                     {loadingCategories ? (
@@ -486,6 +558,9 @@ export default function AssetFormPage() {
                     +
                   </button>
                 </div>
+                {errors.assetCategory && (
+                  <p className="text-red-500 text-xs mt-1">{errors.assetCategory}</p>
+                )}
                 {showAddCategory && (
                   <div className="mt-2 p-3 border border-blue-300 rounded-md bg-blue-50">
                     <div className="flex gap-2">

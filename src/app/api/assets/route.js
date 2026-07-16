@@ -42,6 +42,10 @@ export async function POST(request) {
     conn = await getDbConnection();
 
     const fields = Object.fromEntries(formData.entries());
+    
+    // DEBUG: Log ALL fields being received
+    console.log('[DEBUG] ALL Form fields received:', JSON.stringify(fields, null, 2));
+    console.log('[DEBUG] assetCategory value:', fields.assetCategory, 'Type:', typeof fields.assetCategory);
 
     // Normalize/prepare complex fields
     const assetCategory = fields.assetCategory || null;
@@ -52,8 +56,64 @@ export async function POST(request) {
     const technicalSpecs = fields.technical_specs ? fields.technical_specs : null; // JSON string
     const loginCredentials = fields.login_credentials ? fields.login_credentials : null; // JSON string
 
-    await conn.execute(
-      `INSERT INTO assets (
+    // DEBUG: Log what we're saving
+    console.log('[DEBUG] About to save asset_category:', assetCategory, 'Will be passed as parameter #2');
+    
+    const insertParams = [
+      valueOr(fields.assetType, isSimAccessory ? 'Accessory' : null),
+      assetCategory,
+      fields.assetTagNumber || null,
+      valueOr(fields.assetName, isSimAccessory ? 'SIM' : null),
+      valueOr(fields.brandName, isSimAccessory ? 'SIM' : null),
+      fields.modelName || null,
+      fields.serialNumber || null,
+      fields.color || null,
+      valueOr(fields.assetCondition, isSimAccessory ? 'New' : null),
+      valueOr(fields.purchaseDate, isSimAccessory ? todayStr : null),
+      valueOr(fields.purchasedFrom, isSimAccessory ? 'N/A' : null),
+      valueOr(fields.purchasePrice, isSimAccessory ? 0 : null),
+      valueOr(fields.invoiceNumber, isSimAccessory ? 'N/A' : null),
+      valueOr(fields.warrantyPeriod, isSimAccessory ? 'N/A' : null),
+      fields.associatedEmail || null,
+      fields.emailPassword || null,
+      fields.devicePassword || null,
+      fields.phoneNumber || null,
+      invoiceAttachmentPath || null,
+      warrantyCardPath || null,
+      userManualPath || null,
+      photosPathsJson || JSON.stringify([]),
+      fields.note || null,
+      fields.sim_no_1 || null,
+      fields.sim_no_2 || null,
+      fields.provider_1 || null,
+      fields.provider_2 || null,
+      fields.imei_no_1 || null,
+      fields.imei_no_2 || null,
+      fields.login_gmails || null,
+      fields.login_gmail_password || null,
+      fields.device_lock_password || null,
+      fields.whatsapp_no_normal || null,
+      fields.whatsapp_no_business || null,
+      fields.backup_gmail_normal || null,
+      fields.backup_gmail_business || null,
+      fields.google_contact_gmail || null,
+      checklist,
+      technicalSpecs,
+      fields.sim_plan || null,
+      fields.sim_billing_cycle || null,
+      fields.sim_billing_type || null,
+      fields.accessory_type || null,
+      fields.capacity || null,
+      fields.imei_or_serial || null,
+      fields.network_provider || null,
+      fields.network_speed_plan || null,
+      loginCredentials,
+    ];
+
+    console.log('[DEBUG-INSERT] Parameter #2 (asset_category):', insertParams[1]);
+    console.log('[DEBUG-INSERT] All parameters:', JSON.stringify(insertParams.map(p => p === null ? 'NULL' : p), null, 2));
+
+    const insertSQL = `INSERT INTO assets (
         type, asset_category, asset_tag_number, asset_name, brand_name, model_name, serial_number, color, asset_condition,
         purchase_date, purchased_from, purchase_price, invoice_number, warranty_period,
         associated_email, email_password, device_password, phone_number,
@@ -73,58 +133,25 @@ export async function POST(request) {
         ?, ?, ?, ?, ?, ?,
         ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?
-      )`,
-      [
-        valueOr(fields.assetType, isSimAccessory ? 'Accessory' : null),
-        assetCategory,
-        fields.assetTagNumber || null,
-        valueOr(fields.assetName, isSimAccessory ? 'SIM' : null),
-        valueOr(fields.brandName, isSimAccessory ? 'SIM' : null),
-        fields.modelName || null,
-        fields.serialNumber || null,
-        fields.color || null,
-        valueOr(fields.assetCondition, isSimAccessory ? 'New' : null),
-        valueOr(fields.purchaseDate, isSimAccessory ? todayStr : null),
-        valueOr(fields.purchasedFrom, isSimAccessory ? 'N/A' : null),
-        valueOr(fields.purchasePrice, isSimAccessory ? 0 : null),
-        valueOr(fields.invoiceNumber, isSimAccessory ? 'N/A' : null),
-        valueOr(fields.warrantyPeriod, isSimAccessory ? 'N/A' : null),
-        fields.associatedEmail || null,
-        fields.emailPassword || null,
-        fields.devicePassword || null,
-        fields.phoneNumber || null,
-        invoiceAttachmentPath || null,
-        warrantyCardPath || null,
-        userManualPath || null,
-        photosPathsJson || JSON.stringify([]),
-        fields.note || null,
-        fields.sim_no_1 || null,
-        fields.sim_no_2 || null,
-        fields.provider_1 || null,
-        fields.provider_2 || null,
-        fields.imei_no_1 || null,
-        fields.imei_no_2 || null,
-        fields.login_gmails || null,
-        fields.login_gmail_password || null,
-        fields.device_lock_password || null,
-        fields.whatsapp_no_normal || null,
-        fields.whatsapp_no_business || null,
-        fields.backup_gmail_normal || null,
-        fields.backup_gmail_business || null,
-        fields.google_contact_gmail || null,
-        checklist,
-        technicalSpecs,
-        fields.sim_plan || null,
-        fields.sim_billing_cycle || null,
-        fields.sim_billing_type || null,
-        fields.accessory_type || null,
-        fields.capacity || null,
-        fields.imei_or_serial || null,
-        fields.network_provider || null,
-        fields.network_speed_plan || null,
-        loginCredentials,
-      ]
+      )`;
+
+    console.log('[DEBUG-INSERT] SQL:', insertSQL.substring(0, 100) + '...');
+    console.log('[DEBUG-INSERT] Executing INSERT with asset_category =', insertParams[1]);
+
+    await conn.execute(insertSQL, insertParams);
+    
+    console.log('[DEBUG-INSERT] INSERT executed successfully');
+    
+    // Verify the insert actually saved the value
+    const [checkResult] = await conn.execute(
+      `SELECT asset_id, asset_category, asset_name FROM assets WHERE asset_tag_number = ? ORDER BY asset_id DESC LIMIT 1`,
+      [insertParams[2]] // asset_tag_number
     );
+    
+    if (checkResult.length > 0) {
+      console.log('[DEBUG-VERIFY] Last inserted asset:', checkResult[0]);
+      console.log('[DEBUG-VERIFY] asset_category value in DB:', checkResult[0].asset_category);
+    }
     
         // await conn.end();
     console.log(`✅ Asset ${fields.assetTagNumber || fields.assetName} successfully submitted to database.`);

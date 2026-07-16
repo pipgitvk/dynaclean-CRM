@@ -269,8 +269,12 @@ export default function AssetsTable() {
             <th className="py-3 px-4 text-center w-12">
               <input
                 type="checkbox"
+                ref={(input) => {
+                  if (input) {
+                    input.indeterminate = selectedAssetIds.size > 0 && selectedAssetIds.size < sortedAssets.length;
+                  }
+                }}
                 checked={selectedAssetIds.size === sortedAssets.length && sortedAssets.length > 0}
-                indeterminate={selectedAssetIds.size > 0 && selectedAssetIds.size < sortedAssets.length}
                 onChange={toggleSelectAll}
                 className="w-4 h-4 text-blue-600 rounded cursor-pointer"
               />
