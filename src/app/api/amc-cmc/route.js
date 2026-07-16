@@ -13,10 +13,26 @@ export async function GET(request) {
 
   let conn;
   try {
+    const payload = await getSessionPayload();
+    if (!payload) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const username = payload.username || "unknown";
+    const role = (payload.role || payload.userRole || "").toUpperCase();
+    const isSuperAdmin = role === "SUPERADMIN";
+    const isEA = role === "EA";
+
     conn = await getDbConnection();
 
     let whereClause = "1=1";
     let params = [];
+
+    // If not SUPERADMIN or EA, only show their own records
+    if (!isSuperAdmin && !isEA) {
+      whereClause += " AND created_by = ?";
+      params.push(username);
+    }
 
     if (search) {
       whereClause += " AND (serial_number LIKE ? OR company_name LIKE ? OR email LIKE ? OR contact LIKE ?)";

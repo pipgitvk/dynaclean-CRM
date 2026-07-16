@@ -2,8 +2,178 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Search, Edit, Eye } from "lucide-react";
+import { Search, Edit, Eye, ClipboardList, History, X } from "lucide-react";
 import toast from "react-hot-toast";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+const IST = "Asia/Kolkata";
+
+/* ── FollowUpModal ────────────────────────────────────── */
+function FollowUpModal({ amc, onClose, onSaved }) {
+  const nowIST   = new Date(new Date().toLocaleString("en-US", { timeZone: IST }));
+  const minDT    = new Date(nowIST.getTime() - 24 * 3600 * 1000).toISOString().slice(0, 16);
+  const maxDT    = new Date(nowIST.getTime() - 60 * 1000).toISOString().slice(0, 16);
+
+  const [form, setForm] = useState({
+    serial_number: amc.serial_number || "",
+    product_model: amc.model || "",
+    contact: amc.contact || "",
+    followed_at: maxDT,
+    notes: "",
+    next_followup_date: "",
+    image: null,
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    const fd = new FormData();
+    fd.append("serial_number", form.serial_number);
+    fd.append("product_model", form.product_model);
+    fd.append("contact", form.contact);
+    fd.append("followed_at", form.followed_at);
+    fd.append("notes", form.notes);
+    fd.append("next_followup_date", form.next_followup_date);
+    if (form.image) fd.append("image", form.image);
+    try {
+      const res = await fetch("/api/machines-followup", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success) { toast.success("Follow-up added!"); onSaved(); onClose(); }
+      else toast.error(data.error || "Something went wrong");
+    } catch { toast.error("Submission failed"); }
+    finally { setSubmitting(false); }
+  };
+
+  const set = (key) => (e) => setForm(p => ({ ...p, [key]: e.target.value }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="text-xl font-bold text-gray-800">Add Follow-up</h3>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200"><X size={22} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number *</label>
+            <input type="text" value={form.serial_number} disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Followed At (within last 24h) *</label>
+            <input type="datetime-local" value={form.followed_at} min={minDT} max={maxDT} required onChange={set("followed_at")}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea rows={3} value={form.notes} onChange={set("notes")}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Next Follow-up Date *</label>
+            <input type="datetime-local" value={form.next_followup_date} required onChange={set("next_followup_date")}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Upload Image</label>
+            <input type="file" accept="image/*" onChange={(e) => setForm(p => ({ ...p, image: e.target.files[0] || null }))}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg" />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg transition-colors">Cancel</button>
+            <button type="submit" disabled={submitting}
+              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors">
+              {submitting ? "Submitting..." : "Submit Follow-up"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* ── HistoryModal ─────────────────────────────────────── */
+function HistoryModal({ serialNumber, onClose }) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/machines-followup?serial=${encodeURIComponent(serialNumber)}`);
+        const data = await res.json();
+        if (data.success) setRecords(data.history || []);
+        else toast.error(data.error || "Failed to load history");
+      } catch { toast.error("Failed to load history"); }
+      finally { setLoading(false); }
+    })();
+  }, [serialNumber]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
+          <div>
+            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <History size={20} className="text-purple-600" /> Follow-up History
+            </h3>
+            <p className="text-sm text-gray-400 mt-0.5">Serial: <span className="font-semibold text-gray-700">{serialNumber}</span></p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200"><X size={22} /></button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5">
+          {loading ? (
+            <div className="space-y-4">
+              {[1,2,3].map(i => (
+                <div key={i} className="animate-pulse flex gap-4">
+                  <div className="flex flex-col items-center">
+                    <div className="w-3 h-3 rounded-full bg-gray-300 mt-1" />
+                    {i < 3 && <div className="w-0.5 h-16 bg-gray-200 mt-1" />}
+                  </div>
+                  <div className="flex-1 pb-4 space-y-2">
+                    <div className="h-4 bg-gray-300 rounded w-1/3" />
+                    <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : records.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">No history found.</p>
+          ) : (
+            <ol className="relative border-l-2 border-purple-200 ml-3">
+              {records.map((rec, idx) => (
+                <li key={rec.id} className="mb-6 ml-5">
+                  <span className={`absolute -left-[11px] flex items-center justify-center w-5 h-5 rounded-full ring-4 ring-white ${idx === 0 ? "bg-purple-600" : "bg-gray-400"}`}>
+                    <span className="w-2 h-2 rounded-full bg-white" />
+                  </span>
+                  <div className={`p-4 rounded-lg border ${idx === 0 ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"}`}>
+                    <div className="text-xs text-gray-500">#{rec.id} by <span className="font-semibold">{rec.added_by}</span></div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm mt-2">
+                      <div><span className="text-gray-500">Followed At:</span> <span className="font-medium">{dayjs(rec.followed_at).tz(IST).format("DD/MM/YYYY HH:mm")}</span></div>
+                      <div><span className="text-gray-500">Next Follow-up:</span> <span className="font-medium">{rec.next_followup_date ? dayjs(rec.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm") : "—"}</span></div>
+                      {rec.notes && <div className="sm:col-span-2"><span className="text-gray-500">Notes:</span> <span className="font-medium">{rec.notes}</span></div>}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+
+        <div className="p-4 border-t flex-shrink-0">
+          <button onClick={onClose} className="w-full px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function UserAMCCMCPage() {
   const [records, setRecords] = useState([]);
@@ -13,6 +183,8 @@ export default function UserAMCCMCPage() {
   const [total, setTotal] = useState(0);
   const [pageSize] = useState(50);
   const [searchQuery, setSearchQuery] = useState("");
+  const [followUpTarget, setFollowUpTarget] = useState(null);
+  const [historySerial, setHistorySerial] = useState(null);
 
   const fetchRecords = useCallback(
     async (page, search = "") => {
@@ -168,6 +340,20 @@ export default function UserAMCCMCPage() {
                       >
                         <Eye size={18} />
                       </Link>
+                      <button
+                        onClick={() => setFollowUpTarget(record)}
+                        className="text-green-600 hover:text-green-800"
+                        title="Add Follow-up"
+                      >
+                        <ClipboardList size={18} />
+                      </button>
+                      <button
+                        onClick={() => setHistorySerial(record.serial_number)}
+                        className="text-purple-600 hover:text-purple-800"
+                        title="View History"
+                      >
+                        <History size={18} />
+                      </button>
                       {record.status === "pending" && (
                         <>
                           <Link
@@ -235,6 +421,26 @@ export default function UserAMCCMCPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── Follow Up Modal ── */}
+      {followUpTarget && (
+        <FollowUpModal
+          amc={followUpTarget}
+          onClose={() => setFollowUpTarget(null)}
+          onSaved={() => {
+            fetchRecords(currentPage, searchQuery);
+            setFollowUpTarget(null);
+          }}
+        />
+      )}
+
+      {/* ── History Modal ── */}
+      {historySerial && (
+        <HistoryModal
+          serialNumber={historySerial}
+          onClose={() => setHistorySerial(null)}
+        />
       )}
     </div>
   );

@@ -93,8 +93,29 @@ export async function PUT(req, { params }) {
     const site_contact = formData.get("site_contact");
     const gstin = formData.get("gstin"); // Added from PHP form
 
-    // No validation - allow updates with any fields
-    // The database will handle required columns if needed
+    // Debug: Log all received fields
+    console.log("Received fields:", {
+      product_name, warranty_period, customer_name, 
+      invoice_number, invoice_date, email, contact, quantity
+    });
+
+    // Validation: Check only the most critical fields
+    const criticalFields = {
+      product_name: product_name?.trim(),
+      customer_name: customer_name?.trim(),
+      warranty_period: warranty_period?.toString().trim(),
+    };
+
+    // Check if critical fields are empty
+    const missingFields = Object.keys(criticalFields).filter(key => !criticalFields[key]);
+    
+    if (missingFields.length > 0) {
+      console.error("Missing required fields:", missingFields);
+      return NextResponse.json(
+        { error: `Missing required fields: ${missingFields.join(", ")}` },
+        { status: 400 }
+      );
+    }
 
     conn = await getDbConnection();
 

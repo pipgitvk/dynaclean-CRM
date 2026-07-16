@@ -142,8 +142,10 @@ export async function middleware(request) {
         }
       }
 
-      // Allow EA to access service reports and service-followups in user-dashboard
-      if (pathname.startsWith("/user-dashboard/view_service_reports") || pathname.startsWith("/user-dashboard/service-followups")) {
+      // Allow EA to access service reports, service-followups, and amc-cmc in user-dashboard
+      if (pathname.startsWith("/user-dashboard/view_service_reports") || 
+          pathname.startsWith("/user-dashboard/service-followups") ||
+          pathname.startsWith("/user-dashboard/amc-cmc")) {
         if (roleNorm === "EA" || role === "SUPERADMIN" || roleNorm === "DIRECTOR") {
           return NextResponse.next();
         }
