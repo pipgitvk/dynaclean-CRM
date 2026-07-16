@@ -93,23 +93,8 @@ export async function PUT(req, { params }) {
     const site_contact = formData.get("site_contact");
     const gstin = formData.get("gstin"); // Added from PHP form
 
-    // Validate required fields
-    if (
-      !product_name ||
-      !new_serial_number ||
-      !warranty_period ||
-      !service_type ||
-      !customer_name ||
-      !email ||
-      !contact ||
-      !invoice_number ||
-      !invoice_date
-    ) {
-      return NextResponse.json(
-        { error: "Missing required fields." },
-        { status: 400 },
-      );
-    }
+    // No validation - allow updates with any fields
+    // The database will handle required columns if needed
 
     conn = await getDbConnection();
 
