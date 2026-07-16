@@ -43,6 +43,7 @@ export async function GET(request) {
     try {
       [attendanceRows] = await conn.execute(
         `SELECT id, username, date, checkin_time, checkout_time, checkin_address, checkout_address,
+                checkin_photo,
                 break_morning_start, break_morning_end, break_lunch_start, break_lunch_end,
                 break_evening_start, break_evening_end
          FROM attendance_logs 
@@ -54,6 +55,7 @@ export async function GET(request) {
       try {
         [attendanceRows] = await conn.execute(
           `SELECT id, username, attendance_date, checkin_time, checkout_time, checkin_address, checkout_address,
+                  checkin_photo,
                   break_morning_start, break_morning_end, break_lunch_start, break_lunch_end,
                   break_evening_start, break_evening_end
            FROM attendance_logs 
@@ -65,6 +67,7 @@ export async function GET(request) {
         try {
           [attendanceRows] = await conn.execute(
             `SELECT id, username, created_at, checkin_time, checkout_time, checkin_address, checkout_address,
+                    checkin_photo,
                     break_morning_start, break_morning_end, break_lunch_start, break_lunch_end,
                     break_evening_start, break_evening_end
              FROM attendance_logs 
@@ -76,6 +79,7 @@ export async function GET(request) {
           // If none work, get all records for the employees
           [attendanceRows] = await conn.execute(
             `SELECT id, username, checkin_time, checkout_time, checkin_address, checkout_address,
+                    checkin_photo,
                     break_morning_start, break_morning_end, break_lunch_start, break_lunch_end,
                     break_evening_start, break_evening_end
              FROM attendance_logs 
@@ -116,6 +120,7 @@ export async function GET(request) {
         checkout_time: row.checkout_time,
         checkin_address: row.checkin_address,
         checkout_address: row.checkout_address,
+        checkin_photo: row.checkin_photo,
         break_morning_start: row.break_morning_start,
         break_morning_end: row.break_morning_end,
         break_lunch_start: row.break_lunch_start,

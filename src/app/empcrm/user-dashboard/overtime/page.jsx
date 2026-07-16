@@ -67,10 +67,17 @@ export default function OvertimeManagementPage() {
   const [showForm, setShowForm] = useState(false);
   const [showRemarksModal, setShowRemarksModal] = useState(false);
   const [selectedRemarks, setSelectedRemarks] = useState("");
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState("");
 
   const showRemarks = (remarks) => {
     setSelectedRemarks(remarks);
     setShowRemarksModal(true);
+  };
+
+  const showPhoto = (photoUrl) => {
+    setSelectedPhoto(photoUrl);
+    setShowPhotoModal(true);
   };
 
   const fetchAttendanceByDate = useCallback(async () => {
@@ -298,6 +305,7 @@ export default function OvertimeManagementPage() {
                       <thead className="bg-gray-100 border-b border-gray-300">
                         <tr>
                           <th className="px-3 py-2 text-left font-semibold text-gray-700">USER</th>
+                          <th className="px-3 py-2 text-left font-semibold text-gray-700">CHECK-IN PHOTO</th>
                           <th className="px-3 py-2 text-left font-semibold text-gray-700">CHECK-IN</th>
                           <th className="px-3 py-2 text-left font-semibold text-gray-700">MORNING BREAK</th>
                           <th className="px-3 py-2 text-left font-semibold text-gray-700">LUNCH BREAK</th>
@@ -315,6 +323,19 @@ export default function OvertimeManagementPage() {
                                 <div className="font-semibold text-gray-900">{employee.username}</div>
                                 <div className="text-xs text-gray-600">ID: {employee.empId}</div>
                               </div>
+                            </td>
+                            <td className="px-3 py-2 border-b border-gray-200 text-center">
+                              {employee.attendance?.checkin_photo ? (
+                                <button
+                                  onClick={() => showPhoto(employee.attendance.checkin_photo)}
+                                  className="inline-flex items-center justify-center w-10 h-10 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
+                                  title="View check-in photo"
+                                >
+                                  📷
+                                </button>
+                              ) : (
+                                <span className="text-gray-400 text-xs">No photo</span>
+                              )}
                             </td>
                             <td className="px-3 py-2 border-b border-gray-200 font-mono text-gray-900 bg-green-50">
                               {employee.attendance?.checkin_time 
@@ -551,6 +572,51 @@ export default function OvertimeManagementPage() {
               <div className="mt-4 flex justify-end">
                 <button
                   onClick={() => setShowRemarksModal(false)}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Check-in Photo Modal */}
+        {showPhotoModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Check-in Photo</h3>
+                <button
+                  onClick={() => setShowPhotoModal(false)}
+                  className="text-gray-500 hover:text-gray-800 text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center min-h-96">
+                {selectedPhoto ? (
+                  <img 
+                    src={selectedPhoto} 
+                    alt="Check-in photo" 
+                    className="max-w-full max-h-96 object-contain rounded-lg"
+                  />
+                ) : (
+                  <span className="text-gray-400">No photo available</span>
+                )}
+              </div>
+              <div className="mt-4 flex justify-end gap-3">
+                {selectedPhoto && (
+                  <a
+                    href={selectedPhoto}
+                    download
+                    className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    Download
+                  </a>
+                )}
+                <button
+                  onClick={() => setShowPhotoModal(false)}
                   className="px-4 py-2 rounded-md text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300"
                 >
                   Close
