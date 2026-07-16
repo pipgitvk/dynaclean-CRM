@@ -81,7 +81,7 @@ export default function DefaultDashboard({ user, counts }) {
 
       {/* Leads */}
       <div className="bg-white rounded-xl shadow-md">
-        <UpcomingLeads leadSource={user.username} />
+        <UpcomingLeads leadSource={user.username} userRole={user.userRole} />
       </div>
 
     </div>

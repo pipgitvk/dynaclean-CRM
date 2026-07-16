@@ -4,11 +4,12 @@ import { useEffect, useState, useMemo } from "react";
 import { Eye, PenLine, Repeat, Search } from "lucide-react";
 import { formatCrmDatetimeForISTDisplay } from "@/lib/timezone";
 
-const TaskTable = ({ tasks = [] }) => {
+const TaskTable = ({ tasks = [], userRole = "" }) => {
   const [isClient, setIsClient] = useState(false);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
+  const isServiceSupport = userRole === "SERVICE SUPPORT";
 
   useEffect(() => {
     setIsClient(true);
@@ -64,7 +65,7 @@ const TaskTable = ({ tasks = [] }) => {
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Company</th>
               <th className="px-4 py-3">Contact</th>
-              <th className="px-4 py-3">Next Follow-up</th>
+              <th className="px-4 py-3">{isServiceSupport ? "Service Next Follow-up" : "Next Follow-up"}</th>
               <th className="px-4 py-3">Followed Date</th>
               <th className="px-4 py-3">Last Note</th>
               <th className="px-4 py-3">Status</th>
@@ -86,9 +87,13 @@ const TaskTable = ({ tasks = [] }) => {
                   <td className="px-4 py-3">{task.company || "-"}</td>
                   <td className="px-4 py-3">{task.phone || "-"}</td>
                   <td className="px-4 py-3">
-                    {task.next_followup_date
-                      ? formatCrmDatetimeForISTDisplay(task.next_followup_date)
-                      : "Not set"}
+                    {isServiceSupport
+                      ? task.service_next_followup
+                        ? formatCrmDatetimeForISTDisplay(task.service_next_followup)
+                        : "Not set"
+                      : task.next_followup_date
+                        ? formatCrmDatetimeForISTDisplay(task.next_followup_date)
+                        : "Not set"}
                   </td>
                   <td className="px-4 py-3">
                     {task.followed_date
@@ -159,10 +164,14 @@ const TaskTable = ({ tasks = [] }) => {
                 <strong>Contact:</strong> {task.phone || "-"}
               </div>
               <div className="text-sm text-gray-600">
-                <strong>Next Follow-up:</strong>{" "}
-                {task.next_followup_date
-                  ? formatCrmDatetimeForISTDisplay(task.next_followup_date)
-                  : "Not set"}
+                <strong>{isServiceSupport ? "Service Next Follow-up" : "Next Follow-up"}:</strong>{" "}
+                {isServiceSupport
+                  ? task.service_next_followup
+                    ? formatCrmDatetimeForISTDisplay(task.service_next_followup)
+                    : "Not set"
+                  : task.next_followup_date
+                    ? formatCrmDatetimeForISTDisplay(task.next_followup_date)
+                    : "Not set"}
               </div>
               <div className="text-sm text-gray-600">
                 <strong>Followed Date:</strong>{" "}

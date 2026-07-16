@@ -39,7 +39,7 @@ export default async function CustomerPage({ params }) {
 
   // Fetch followup history
   const [fups] = await conn.execute(
-    `SELECT next_followup_date, followed_date, followed_by, notes, comm_mode 
+    `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode 
      FROM customers_followup
      WHERE customer_id = ?
      ORDER BY time_stamp DESC`,
@@ -315,6 +315,7 @@ export default async function CustomerPage({ params }) {
             <FollowUpHistory
               entries={fups}
               cust_analysis_external={cust_analysis_external}
+              userRole={userRole}
             />
           </section>
         </div>

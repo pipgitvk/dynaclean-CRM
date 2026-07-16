@@ -272,10 +272,10 @@ import {
 export default function FollowUpHistory({
   entries = [],
   cust_analysis_external,
+  userRole = "",
 }) {
   const uploads = cust_analysis_external?.uploads || [];
-
-// Create grouped map (calendar day in IST matches how users think about follow-ups)
+  const isServiceSupport = userRole === "SERVICE SUPPORT";
 const mergedMap = {};
 
 // 1️⃣ Add followups (support multiple per date safely)
@@ -333,7 +333,7 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
           <tr>
-            <th className="px-4 py-3">Next Follow-up</th>
+            <th className="px-4 py-3">{isServiceSupport ? "Service Next Follow-up" : "Next Follow-up"}</th>
             <th className="px-4 py-3">Followed By</th>
             <th className="px-4 py-3">Followed Date</th>
             <th className="px-4 py-3">Mode</th>
@@ -361,9 +361,13 @@ const mergedData = Object.values(mergedMap).sort((a, b) => {
                   {row.followups.length > 0
                     ? row.followups.map((f, i) => (
                         <div key={i} className="mb-3">
-                          {f.next_followup_date
-                            ? formatCrmDatetimeForISTDisplay(f.next_followup_date)
-                            : "-"}
+                          {isServiceSupport
+                            ? f.service_next_followup
+                              ? formatCrmDatetimeForISTDisplay(f.service_next_followup)
+                              : "-"
+                            : f.next_followup_date
+                              ? formatCrmDatetimeForISTDisplay(f.next_followup_date)
+                              : "-"}
                         </div>
                       ))
                     : "-"}

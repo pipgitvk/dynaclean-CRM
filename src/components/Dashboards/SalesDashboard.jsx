@@ -60,7 +60,7 @@ export default function SalesDashboard({ user }) {
         </div>
 
         <div className="bg-white rounded-xl shadow-md">
-          <UpcomingLeads leadSource={user.username} />
+          <UpcomingLeads leadSource={user.username} userRole={user.userRole} />
         </div>
 
         <div className="bg-white rounded-xl shadow-md">

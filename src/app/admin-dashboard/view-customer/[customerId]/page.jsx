@@ -1,5 +1,6 @@
 // app/user-dashboard/view-customer/[customerId]/page.tsx
 import { getDbConnection } from "@/lib/db";
+import { getSessionPayload } from "@/lib/auth";
 import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
@@ -12,8 +13,9 @@ export default async function CustomerPage({ params }) {
   const { customerId } = await params;
   const conn = await getDbConnection();
 
-  // Fetch current user info if needed
-  // (e.g., role to conditionally render buttons)
+  // Fetch current user info
+  const payload = await getSessionPayload();
+  const userRole = payload?.role || "";
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
@@ -36,7 +38,7 @@ export default async function CustomerPage({ params }) {
 
   // Fetch followup history
   const [fups] = await conn.execute(
-    `SELECT next_followup_date, followed_date, followed_by, notes, comm_mode 
+    `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode 
      FROM customers_followup
      WHERE customer_id = ?
      ORDER BY time_stamp DESC`,
@@ -296,6 +298,7 @@ export default async function CustomerPage({ params }) {
             <FollowUpHistory
               entries={fups}
               cust_analysis_external={cust_analysis_external}
+              userRole={userRole}
             />
           </section>
         </div>

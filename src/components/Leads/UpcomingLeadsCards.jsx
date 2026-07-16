@@ -13,7 +13,7 @@ function SkeletonCard() {
   );
 }
 
-export default function UpcomingLeadsCards({ leadSource }) {
+export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState("soonest"); // soonest | latest | name
@@ -23,6 +23,7 @@ export default function UpcomingLeadsCards({ leadSource }) {
   const [stageFilter, setStageFilter] = useState("ALL"); // ALL or specific stage
   const [multiTagFilter, setMultiTagFilter] = useState("ALL"); // ALL or specific multi-tag
   const [tagFilter, setTagFilter] = useState(""); // empty or specific tag
+  const isServiceSupport = userRole === "SERVICE SUPPORT";
 
   useEffect(() => {
     async function fetchLeads() {
@@ -44,6 +45,11 @@ export default function UpcomingLeadsCards({ leadSource }) {
   // Prepare filtered and sorted leads
   const processedLeads = (() => {
     let filtered = [...leads];
+
+    // For SERVICE SUPPORT, only show leads with service_next_followup set
+    if (isServiceSupport) {
+      filtered = filtered.filter((cust) => cust.service_next_followup);
+    }
 
     // Status filtering
     if (statusFilter && statusFilter !== "ALL") {
@@ -76,13 +82,14 @@ export default function UpcomingLeadsCards({ leadSource }) {
       });
     }
 
-    // Date filtering (by next_followup_date)
+    // Date filtering (by next_followup_date or service_next_followup)
     if (startDate || endDate) {
       const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
       const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
+      const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
       filtered = filtered.filter((cust) => {
-        if (!cust.next_followup_date) return false; // hide if no date when filter applied
-        const ms = getCrmInstantMs(cust.next_followup_date);
+        if (!cust[dateField]) return false; // hide if no date when filter applied
+        const ms = getCrmInstantMs(cust[dateField]);
         if (!ms) return false;
         const d = new Date(ms);
         if (start && d < start) return false;
@@ -96,11 +103,12 @@ export default function UpcomingLeadsCards({ leadSource }) {
       if (sortOrder === "name") {
         return (a.first_name || "").localeCompare(b.first_name || "");
       }
-      const aTime = a.next_followup_date
-        ? getCrmInstantMs(a.next_followup_date)
+      const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
+      const aTime = a[dateField]
+        ? getCrmInstantMs(a[dateField])
         : Infinity;
-      const bTime = b.next_followup_date
-        ? getCrmInstantMs(b.next_followup_date)
+      const bTime = b[dateField]
+        ? getCrmInstantMs(b[dateField])
         : Infinity;
       if (sortOrder === "latest") return bTime - aTime; // latest first
       return aTime - bTime; // default soonest first
@@ -242,10 +250,11 @@ export default function UpcomingLeadsCards({ leadSource }) {
             [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
           ) : processedLeads.length > 0 ? (
             processedLeads.map((cust) => {
-              const hours = cust.next_followup_date
-                ? (getCrmInstantMs(cust.next_followup_date) - Date.now()) / 3600000
+              const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
+              const hours = cust[dateField]
+                ? (getCrmInstantMs(cust[dateField]) - Date.now()) / 3600000
                 : null;
-              const bgColor = cust.next_followup_date
+              const bgColor = cust[dateField]
                 ? getGradientColor(hours)
                 : "rgb(255, 165, 0)";
               return (
@@ -261,8 +270,8 @@ export default function UpcomingLeadsCards({ leadSource }) {
                     products_interest={cust.products_interest}
                     stage={cust.stage}
                     dueDate={
-                      cust.next_followup_date
-                        ? formatCrmDatetimeForISTDisplay(cust.next_followup_date)
+                      cust[dateField]
+                        ? formatCrmDatetimeForISTDisplay(cust[dateField])
                         : "Not set"
                     }
                     notes={cust.notes}

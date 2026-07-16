@@ -5,7 +5,7 @@ import UpcomingLeadsCards from "./UpcomingLeadsCards";
 import { Suspense } from "react";
 import Link from "next/link";
 
-export default async function UpcomingLeads({ leadSource }) {
+export default async function UpcomingLeads({ leadSource, userRole = "" }) {
   const connection = await getDbConnection();
   function getISTTime() {
     // Get current time in UTC
@@ -83,10 +83,10 @@ export default async function UpcomingLeads({ leadSource }) {
         <Suspense
           fallback={<div className="flex gap-4 py-5">Loading cards...</div>}
         >
-          <UpcomingLeadsCards leadSource={leadSource} />
+          <UpcomingLeadsCards leadSource={leadSource} userRole={userRole} />
         </Suspense>
       </div>
-      <TaskTable tasks={Tablerows} />
+      <TaskTable tasks={Tablerows} userRole={userRole} />
     </div>
   );
 }

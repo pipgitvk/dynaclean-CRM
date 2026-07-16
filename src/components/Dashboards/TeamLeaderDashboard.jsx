@@ -61,7 +61,7 @@ export default function TeamLeaderDashboard({ user }) {
         </div>
 
         <div className="bg-white rounded-xl shadow-md">
-          <UpcomingLeads leadSource={user.username} />
+          <UpcomingLeads leadSource={user.username} userRole={user.userRole} />
         </div>
 
       </div>

@@ -55,7 +55,7 @@ export default function GemPortalDashboard({ user }) {
       {/* Leads + Tasks */}
       <div className="grid grid-cols-1 gap-4 md:gap-6">
         <div className="bg-white rounded-xl shadow-md">
-          <UpcomingLeads leadSource={user.username} />
+          <UpcomingLeads leadSource={user.username} userRole={user.userRole} />
         </div>
 
         <div className="bg-white rounded-xl shadow-md">

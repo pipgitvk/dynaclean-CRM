@@ -218,7 +218,8 @@ export default function Navbar({ onToggleSidebar }) {
       r === "SALES EXECUTIVE" ||
       r === "SALES REPRESENTATIVE" ||
       r === "DIRECTOR" ||
-      r === "EA"
+      r === "EA" ||
+      r === "SERVICE SUPPORT"
     );
   };
 
@@ -331,7 +332,7 @@ export default function Navbar({ onToggleSidebar }) {
             <div className="flex items-center gap-1 min-[1100px]:gap-2 border rounded-lg px-2 min-[1100px]:px-3 py-2 min-[1100px]:py-2.5 w-full bg-white min-h-[44px] min-[1100px]:min-h-0 min-[1100px]:h-10">
               <input
                 type="text"
-                placeholder="Search customer..."
+                placeholder="Search customers by name, phone, company, or ID..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onFocus={() => {
