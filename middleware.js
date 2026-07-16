@@ -141,6 +141,13 @@ export async function middleware(request) {
           return NextResponse.redirect(dest);
         }
       }
+
+      // Allow EA to access service reports in user-dashboard
+      if (pathname.startsWith("/user-dashboard/view_service_reports")) {
+        if (roleNorm === "EA" || role === "SUPERADMIN" || roleNorm === "DIRECTOR") {
+          return NextResponse.next();
+        }
+      }
       
       // Allow EA access to /ea-dashboard
       if (pathname.startsWith("/ea-dashboard")) {
