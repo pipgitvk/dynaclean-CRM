@@ -3,166 +3,103 @@
 import { useState } from "react";
 import Image from "next/image";
 
-
-export default function QuotationItemsTable({ items, setItems ,customerId}) {
+export default function QuotationTable({ items, setItems, customerId }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
 
-
   const handleChange = (index, field, value) => {
-    const updated = [...items];
-    let newValue = value;
-
-    if (field === "quantity" || field === "price" || field === "gst") {
-      newValue = parseFloat(value) || 0;
-    }
-
-    updated[index][field] = newValue;
-    setItems(updated);
+    setItems(prev => {
+      const updated = [...prev];
+      if (field === "quantity" || field === "price" || field === "gst") {
+        updated[index][field] = parseFloat(value) || 0;
+      } else {
+        updated[index][field] = value;
+      }
+      return updated;
+    });
   };
 
   const handleBlur = (index, field, value) => {
-    const updated = [...items];
-    let newValue = parseFloat(value) || 0;
-
-    // Validation
-    if (field === "price") {
-      const lastNegPrice = updated[index].last_negotiation_price || 0;
-      if (newValue < lastNegPrice) {
-        alert(`Price cannot be lower than the Last Negotiation Price: ₹${lastNegPrice}`);
-        newValue = lastNegPrice;
-        updated[index][field] = newValue;
-        setItems(updated);
+    setItems(prev => {
+      const updated = [...prev];
+      if (field === "price") {
+        const newValue = parseFloat(value) || 0;
+        const lastNegPrice = updated[index].last_negotiation_price || 0;
+        if (newValue < lastNegPrice) {
+          alert(`Price cannot be lower than the Last Negotiation Price: ₹${lastNegPrice}`);
+          updated[index][field] = lastNegPrice;
+        }
       }
+      return updated;
+    });
+  };
+
+  const fetchProductDetails = async (code, index, isSuggestion = false) => {
+    try {
+      const res = await fetch(
+        `/api/get-product-details?code=${code}&mode=${isSuggestion ? "suggestion" : "full"}`
+      );
+      const data = await res.json();
+      if (!data || data.length === 0) return;
+
+      if (isSuggestion) {
+        setProductSuggestions(data);
+        setActiveRowIndex(index);
+        return;
+      }
+
+      const item = data[0];
+      let finalPrice = parseFloat(item.price_per_unit) || 0;
+      let specialPrice = null;
+
+      try {
+        const specialRes = await fetch("/api/special-price/check", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customer_id: customerId,
+            product_code: item.item_code || code,
+          }),
+        });
+
+        const specialData = await specialRes.json();
+        if (specialData?.special_price) {
+          specialPrice = parseFloat(specialData.special_price);
+          finalPrice = specialPrice;
+        }
+      } catch (err) {
+        console.error("❌ Special price fetch error", err);
+      }
+
+      const imageUrl = item.image_path || "";
+
+      setItems(prev => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          productCode: item.item_code || code,
+          name: item.item_name || "",
+          hsn: item.hsn_sac || "",
+          specification: item.specification || "",
+          unit: item.unit || "",
+          price: finalPrice,
+          original_price: parseFloat(item.price_per_unit) || 0,
+          special_price: specialPrice,
+          last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
+          gst: parseFloat(item.gst_rate) || 18,
+          imageUrl,
+        };
+        return updated;
+      });
+      setProductSuggestions([]);
+    } catch (err) {
+      console.error("❌ Product fetch error", err);
     }
   };
 
-  // const fetchProductDetails = async (code, index, isSuggestion = false) => {
-  //   try {
-  //     const res = await fetch(
-  //       `/api/get-product-details?code=${code}&mode=${isSuggestion ? "suggestion" : "full"
-  //       }`
-  //     );
-  //     const data = await res.json();
-
-  //     if (!data || data.length === 0) return;
-
-  //     if (isSuggestion) {
-  //       setProductSuggestions(data);
-  //       setActiveRowIndex(index);
-  //       return;
-  //     }
-      
-      
-      
-  //     const item = data[0];
-
-     
-      
-     
-
-  //     const imageUrl = item.image_path || item.product_image || "";
-
-  //     let updated = [...items];
-  //     updated[index] = {
-  //       ...updated[index],
-  //       productCode: item.item_code || code,
-  //       name: item.item_name || "",
-  //       hsn: item.hsn_sac || "",
-  //       specification: item.specification || "",
-  //       unit: item.unit || "",
-  //       quantity: updated[index].quantity,
-  //       price: parseFloat(item.price_per_unit) || 0,
-  //       last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
-  //       gst: parseFloat(item.gst_rate) || 18,
-  //       imageUrl,
-  //     };
-  //     setItems(updated);
-  //     setProductSuggestions([]);
-  //   } catch (err) {
-  //     console.error("❌ Product fetch error", err);
-  //   }
-  // };
-
-
-  const fetchProductDetails = async (code, index, isSuggestion = false) => {
-  try {
-    const res = await fetch(
-      `/api/get-product-details?code=${code}&mode=${
-        isSuggestion ? "suggestion" : "full"
-      }`
-    );
-
-    const data = await res.json();
-    if (!data || data.length === 0) return;
-
-    if (isSuggestion) {
-      setProductSuggestions(data);
-      setActiveRowIndex(index);
-      return;
-    }
-
-    const item = data[0];
-
-
-    let finalPrice = parseFloat(item.price_per_unit) || 0;
-    let specialPrice = null;
-
-    try {
-      const specialRes = await fetch("/api/special-price/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer_id: customerId, 
-          product_code: item.item_code || code,
-        }),
-      });
-
-      const specialData = await specialRes.json();
-      console.log("Special Data",specialData);
-      
-
-      if (specialData?.special_price) {
-        specialPrice = parseFloat(specialData.special_price);
-        finalPrice = specialPrice;
-      }
-    } catch (err) {
-      console.error("❌ Special price fetch error", err);
-    }
-
-    /* =============================== */
-
-    const imageUrl = item.image_path || item.product_image || "";
-
-    let updated = [...items];
-
-    updated[index] = {
-      ...updated[index],
-      productCode: item.item_code || code,
-      name: item.item_name || "",
-      hsn: item.hsn_sac || "",
-      specification: item.specification || "",
-      unit: item.unit || "",
-      quantity: updated[index].quantity,
-      price: finalPrice, // 🔥 overridden price
-      original_price: parseFloat(item.price_per_unit) || 0,
-      special_price: specialPrice,
-      last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
-      gst: parseFloat(item.gst_rate) || 18,
-      imageUrl,
-    };
-
-    setItems(updated);
-    setProductSuggestions([]);
-
-  } catch (err) {
-    console.error("❌ Product fetch error", err);
-  }
-};
-
   const addRow = () => {
-    setItems([
-      ...items,
+    setItems(prev => [
+      ...prev,
       {
         productCode: "",
         imageUrl: "",
@@ -177,17 +114,26 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
     ]);
   };
 
-  
-  
-
   const removeRow = (index) => {
-    const updated = items.filter((_, i) => i !== index);
-    setItems(updated);
+    setItems(prev => prev.filter((_, i) => i !== index));
   };
+
+  const totals = items.reduce(
+    (acc, item) => {
+      const taxable = (item.quantity || 0) * (item.price || 0);
+      const gstAmt = taxable * ((item.gst || 0) / 100);
+      acc.totalQty += item.quantity || 0;
+      acc.totalTaxable += taxable;
+      acc.totalGst += gstAmt;
+      acc.grandTotal += taxable + gstAmt;
+      return acc;
+    },
+    { totalQty: 0, totalTaxable: 0, totalGst: 0, grandTotal: 0 }
+  );
 
   return (
     <div className="overflow-x-auto border mt-4 rounded">
-      <table className="min-w-[800px] w-full text-sm text-left border">
+      <table className="min-w-[900px] w-full text-sm text-left border">
         <thead className="bg-gray-100 text-xs font-semibold text-gray-700">
           <tr>
             <th className="border px-2 py-2">#</th>
@@ -200,6 +146,7 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
             <th className="border px-2 py-2">Unit</th>
             <th className="border px-2 py-2">Price/Unit</th>
             <th className="border px-2 py-2">GST %</th>
+            <th className="border px-2 py-2">Taxable</th>
             <th className="border px-2 py-2">GST Amt</th>
             <th className="border px-2 py-2">Total</th>
             <th className="border px-2 py-2"></th>
@@ -207,9 +154,9 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
         </thead>
         <tbody>
           {items.map((item, idx) => {
-            const taxable = item.quantity * item.price;
-            const gstAmount = taxable * (item.gst / 100);
-            const total = taxable + gstAmount;
+            const taxable = (item.quantity || 0) * (item.price || 0);
+            const gstAmt = taxable * ((item.gst || 0) / 100);
+            const total = taxable + gstAmt;
 
             return (
               <tr key={idx} className="border-t">
@@ -222,6 +169,7 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
                       width={40}
                       height={40}
                       className="rounded object-cover"
+                      unoptimized
                     />
                   ) : (
                     "-"
@@ -293,7 +241,6 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
                     className="border p-1 w-24 text-xs rounded"
                   />
                 </td>
-                {/* GST % — visible, editable, pre-filled from product */}
                 <td className="border px-2 py-2">
                   <input
                     type="number"
@@ -304,7 +251,8 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
                     step="0.5"
                   />
                 </td>
-                <td className="border px-2 py-2">₹ {gstAmount.toFixed(2)}</td>
+                <td className="border px-2 py-2">₹ {taxable.toFixed(2)}</td>
+                <td className="border px-2 py-2">₹ {gstAmt.toFixed(2)}</td>
                 <td className="border px-2 py-2 font-medium">₹ {total.toFixed(2)}</td>
                 <td className="border px-2 py-2 text-center">
                   <button
@@ -318,8 +266,21 @@ export default function QuotationItemsTable({ items, setItems ,customerId}) {
               </tr>
             );
           })}
+
+          <tr className="font-semibold bg-gray-100 text-xs">
+            <td className="border px-2 py-2 text-center" colSpan={6}>Total</td>
+            <td className="border px-2 py-2">{totals.totalQty}</td>
+            <td className="border px-2 py-2"></td>
+            <td className="border px-2 py-2"></td>
+            <td className="border px-2 py-2"></td>
+            <td className="border px-2 py-2">₹ {totals.totalTaxable.toFixed(2)}</td>
+            <td className="border px-2 py-2">₹ {totals.totalGst.toFixed(2)}</td>
+            <td className="border px-2 py-2">₹ {totals.grandTotal.toFixed(2)}</td>
+            <td className="border px-2 py-2"></td>
+          </tr>
         </tbody>
       </table>
+
       <div className="mt-3 text-center">
         <button
           type="button"

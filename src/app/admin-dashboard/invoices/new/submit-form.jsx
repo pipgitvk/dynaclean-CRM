@@ -141,19 +141,24 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
 
   const taxSummary = useMemo(() => {
     let subtotal = 0;
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
     items.forEach((item) => {
       const qty = item.quantity || 0;
       const rate = item.rate || 0;
       const discountAmount = item.discount_amount || 0;
-      const itemTotal = qty * rate - discountAmount;
-      subtotal += itemTotal;
+      const itemSubtotal = qty * rate - discountAmount;
+      subtotal += itemSubtotal;
+
+      // Use per-item tax rates, not global rates
+      cgst += (itemSubtotal * (item.cgst_percent || 0)) / 100;
+      sgst += (itemSubtotal * (item.sgst_percent || 0)) / 100;
+      igst += (itemSubtotal * (item.igst_percent || 0)) / 100;
     });
 
-    const cgst = (subtotal * cgstRate) / 100;
-    const sgst = (subtotal * sgstRate) / 100;
-    const igst = (subtotal * igstRate) / 100;
     const totalTax = cgst + sgst + igst;
-    
     const totalBeforeRound = subtotal + totalTax;
     let finalRoundOff = parseFloat(roundOff) || 0;
     
@@ -164,7 +169,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
     const grandTotal = totalBeforeRound + finalRoundOff;
 
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff]);
+  }, [items, roundOff, isAutoRoundOff]);
 
   useEffect(() => {
     if (isAutoRoundOff) {

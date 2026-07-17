@@ -2,6 +2,7 @@
 
 import React from "react";
 
+// Convert number to words (Indian numeral system)
 const convertNumberToWords = (num) => {
   if (!num || isNaN(num) || num === 0) return "Zero Rupees Only.";
   const s = num.toFixed(2).split(".");
@@ -51,7 +52,7 @@ export default function TaxAndSummary({
   grandTotal,
   interstate,
 }) {
-  // Group items by GST rate
+  // Group items by GST rate and compute per-rate taxable amounts
   const gstGroups = React.useMemo(() => {
     const map = {};
     items.forEach((item) => {
@@ -60,10 +61,12 @@ export default function TaxAndSummary({
       if (!map[rate]) map[rate] = { taxable: 0 };
       map[rate].taxable += taxable;
     });
+
     return Object.entries(map)
       .map(([rate, { taxable }]) => {
         const r = parseFloat(rate);
-        return { rate: r, taxable, taxAmt: (taxable * r) / 100 };
+        const taxAmt = (taxable * r) / 100;
+        return { rate: r, taxable, taxAmt };
       })
       .sort((a, b) => a.rate - b.rate);
   }, [items]);
@@ -85,6 +88,7 @@ export default function TaxAndSummary({
           )}
         </div>
 
+        {/* Per-rate GST rows */}
         {gstGroups.length === 0 && (
           <div className="text-xs text-gray-400 italic">No items added yet</div>
         )}
@@ -114,6 +118,7 @@ export default function TaxAndSummary({
           </div>
         ))}
 
+        {/* Total Tax */}
         {gstGroups.length > 0 && (
           <div className="flex justify-between items-center text-gray-700 font-semibold pt-1 border-t">
             <span>Total Tax</span>

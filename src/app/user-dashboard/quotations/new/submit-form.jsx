@@ -6,7 +6,7 @@ import TaxAndSummary from "./TaxAndSummary";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { Select } from "@headlessui/react";
+import { set } from "date-fns";
 
 // Remove local generation - will fetch from API
 
@@ -14,6 +14,8 @@ export default function QuotationForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const customerIdFromUrl = searchParams.get("customerId");
+
+  // console.log("customer id from url:", customerIdFromUrl);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCustomerModal, setShowCustomerModal] =
@@ -39,7 +41,7 @@ export default function QuotationForm() {
       unit: "",
       quantity: 1,
       price: 0,
-      gst: 18,
+      gst: 5, // Default GST rate
     },
   ]);
 
@@ -492,6 +494,29 @@ Thanks for doing business with us!`,
       const totalGST = taxSummary.cgst + taxSummary.sgst + taxSummary.igst;
       const grandTotal = taxSummary.grandTotal;
 
+      // Calculate actual GST rates from items (for multi-rate quotations)
+      let finalCgstRate = 0, finalSgstRate = 0, finalIgstRate = 0;
+      
+      if (items.length > 0 && items[0].gst) {
+        // Get the GST rate from the first item (all items should have same rate ideally)
+        const itemGstRate = parseFloat(items[0].gst) || 0;
+        
+        // Determine if interstate or intrastate
+        const gstinValue = form.gstin_no?.trim();
+        let isInterstate = false;
+        if (gstinValue) {
+          const code = gstinValue.slice(0, 2);
+          isInterstate = code !== SUPPLIER_STATE_CODE;
+        }
+        
+        if (isInterstate) {
+          finalIgstRate = itemGstRate;
+        } else {
+          finalCgstRate = itemGstRate / 2;
+          finalSgstRate = itemGstRate / 2;
+        }
+      }
+
       const dataToSend = {
         ...form,
         quote_number: quoteNumber,
@@ -503,9 +528,9 @@ Thanks for doing business with us!`,
         igst: taxSummary.igst,
         round_off: parseFloat(roundOff) || 0,
         grand_total: grandTotal,
-        cgstRate,
-        sgstRate,
-        igstRate,
+        cgstRate: finalCgstRate,
+        sgstRate: finalSgstRate,
+        igstRate: finalIgstRate,
         terms: editableTerms,
       };
 
@@ -822,7 +847,7 @@ Thanks for doing business with us!`,
             </select>
           </div>
         </div>
-        <QuotationItemsTable items={items} setItems={setItems} customerId={form.customer_id} />
+        <QuotationItemsTable items={items} setItems={setItems} customerId={form.customer_id} cgstRate={cgstRate} sgstRate={sgstRate} igstRate={igstRate} />
         <TaxAndSummary
           items={items}
           subtotal={taxSummary.subtotal}
@@ -833,7 +858,9 @@ Thanks for doing business with us!`,
           grandTotal={taxSummary.grandTotal}
           interstate={(() => {
             const gstinValue = form.gstin_no?.trim();
+            // If GSTIN is empty, default to intrastate (CGST+SGST)
             if (!gstinValue) return false;
+
             const gstState = getStateFromGSTIN(gstinValue);
             const buyerCode =
               gstState?.code || parseCodeFromDisplay(form.state_name);

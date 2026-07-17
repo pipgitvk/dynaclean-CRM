@@ -50,18 +50,7 @@ export default function TaxAndSummary({
     <tr className="border">
       <td className="px-3 py-2 border">CGST</td>
       <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-      <td className="px-3 py-2 border text-center">
-        <input
-          type="number"
-          value={cgstRate}
-          onChange={(e) => setCgstRate(parseFloat(e.target.value) || 0)}
-          className="w-16 p-1 border rounded text-center"
-          step="0.01"
-          min="0"
-          max="100"
-        />
-        %
-      </td>
+      <td className="px-3 py-2 border text-center">{cgstRate}%</td>
       <td className="px-3 py-2 border">₹ {cgst.toFixed(2)}</td>
     </tr>
   )}
@@ -71,18 +60,7 @@ export default function TaxAndSummary({
     <tr className="border">
       <td className="px-3 py-2 border">SGST</td>
       <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-      <td className="px-3 py-2 border text-center">
-        <input
-          type="number"
-          value={sgstRate}
-          onChange={(e) => setSgstRate(parseFloat(e.target.value) || 0)}
-          className="w-16 p-1 border rounded text-center"
-          step="0.01"
-          min="0"
-          max="100"
-        />
-        %
-      </td>
+      <td className="px-3 py-2 border text-center">{sgstRate}%</td>
       <td className="px-3 py-2 border">₹ {sgst.toFixed(2)}</td>
     </tr>
   )}
@@ -92,18 +70,7 @@ export default function TaxAndSummary({
     <tr className="border">
       <td className="px-3 py-2 border">IGST</td>
       <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-      <td className="px-3 py-2 border text-center">
-        <input
-          type="number"
-          value={igstRate}
-          onChange={(e) => setIgstRate(parseFloat(e.target.value) || 0)}
-          className="w-16 p-1 border rounded text-center"
-          step="0.01"
-          min="0"
-          max="100"
-        />
-        %
-      </td>
+      <td className="px-3 py-2 border text-center">{igstRate}%</td>
       <td className="px-3 py-2 border">₹ {igst.toFixed(2)}</td>
     </tr>
   )}

@@ -45,67 +45,69 @@ export default function TaxAndSummary({
             </tr>
           </thead>
           <tbody>
-  {/* IGST – Interstate */}
-  {igstRate > 0 && (
-    <tr className="border">
-      <td className="px-3 py-2 border">IGST</td>
-      <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-      <td className="px-3 py-2 border text-center">
-        {igstRate}%
-      </td>
-      <td className="px-3 py-2 border">₹ {igst.toFixed(2)}</td>
-    </tr>
-  )}
-
-  {/* CGST + SGST – Intrastate */}
-  {igstRate === 0 && (
-    <>
-      <tr className="border">
-        <td className="px-3 py-2 border">CGST</td>
-        <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-        <td className="px-3 py-2 border text-center">
-          {cgstRate}%
-        </td>
-        <td className="px-3 py-2 border">₹ {cgst.toFixed(2)}</td>
-      </tr>
-
-      <tr className="border">
-        <td className="px-3 py-2 border">SGST</td>
-        <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-        <td className="px-3 py-2 border text-center">
-          {sgstRate}%
-        </td>
-        <td className="px-3 py-2 border">₹ {sgst.toFixed(2)}</td>
-      </tr>
-    </>
-  )}
-</tbody>
-
+            {cgstRate > 0 && (
+              <tr className="border">
+                <td className="px-3 py-2 border">CGST</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border text-center">{cgstRate}%</td>
+                <td className="px-3 py-2 border">₹ {cgst.toFixed(2)}</td>
+              </tr>
+            )}
+            {sgstRate > 0 && (
+              <tr className="border">
+                <td className="px-3 py-2 border">SGST</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border text-center">{sgstRate}%</td>
+                <td className="px-3 py-2 border">₹ {sgst.toFixed(2)}</td>
+              </tr>
+            )}
+            {igstRate > 0 && (
+              <tr className="border">
+                <td className="px-3 py-2 border">IGST</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border text-center">{igstRate}%</td>
+                <td className="px-3 py-2 border">₹ {igst.toFixed(2)}</td>
+              </tr>
+            )}
+          </tbody>
         </table>
       </div>
 
       {/* Summary */}
       <div className="bg-gray-50 p-4 rounded shadow-sm text-sm border flex flex-col justify-between">
         <div>
-          <h3 className="text-lg font-semibold mb-4 text-center">
-            Invoice Summary
-          </h3>
+          <h3 className="text-lg font-semibold mb-4 text-center">Invoice Summary</h3>
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Subtotal:</span>
             <span>₹ {subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">CGST ({cgstRate}%):</span>
-            <span>₹ {cgst.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">SGST ({sgstRate}%):</span>
-            <span>₹ {sgst.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">IGST ({igstRate}%):</span>
-            <span>₹ {igst.toFixed(2)}</span>
-          </div>
+          {igstRate > 0 ? (
+            <>
+              <div className="flex justify-between py-1 border-b">
+                <span className="font-medium">CGST ({cgstRate}%):</span>
+                <span>₹ {cgst.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b">
+                <span className="font-medium">IGST ({igstRate}%):</span>
+                <span>₹ {igst.toFixed(2)}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              {cgstRate > 0 && (
+                <div className="flex justify-between py-1 border-b">
+                  <span className="font-medium">CGST ({cgstRate}%):</span>
+                  <span>₹ {cgst.toFixed(2)}</span>
+                </div>
+              )}
+              {sgstRate > 0 && (
+                <div className="flex justify-between py-1 border-b">
+                  <span className="font-medium">SGST ({sgstRate}%):</span>
+                  <span>₹ {sgst.toFixed(2)}</span>
+                </div>
+              )}
+            </>
+          )}
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Total Tax:</span>
             <span>₹ {(cgst + sgst + igst).toFixed(2)}</span>
@@ -127,7 +129,7 @@ export default function TaxAndSummary({
               type="number"
               value={roundOff}
               onChange={(e) => setRoundOff(parseFloat(e.target.value) || 0)}
-              className={`w-24 p-1 border rounded text-right ${isAutoRoundOff ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              className={`w-24 p-1 border rounded text-right ${isAutoRoundOff ? "bg-gray-100 cursor-not-allowed" : ""}`}
               step="0.01"
               disabled={isAutoRoundOff}
             />
@@ -140,9 +142,7 @@ export default function TaxAndSummary({
         <div className="mt-3 text-xs text-center text-gray-700 border-t pt-2 italic">
           Total Amount in Words:
           <br />
-          <span className="text-sm font-medium text-black">
-            {amountInWords}
-          </span>
+          <span className="text-sm font-medium text-black">{amountInWords}</span>
         </div>
       </div>
     </div>
