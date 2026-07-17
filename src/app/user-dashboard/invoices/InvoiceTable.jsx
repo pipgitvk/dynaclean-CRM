@@ -15,14 +15,8 @@ export default function InvoiceTable() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [limit, setLimit] = useState(20);
   const [meta, setMeta] = useState({
-    page: 1,
-    limit: 20,
     total: 0,
-    totalPages: 1,
   });
 
   // Sorting
@@ -77,8 +71,8 @@ export default function InvoiceTable() {
     setLoading(true);
 
     const params = new URLSearchParams();
-    params.append("page", currentPage);
-    params.append("limit", limit);
+    params.append("page", 1);
+    params.append("limit", 99999);
     params.append("sort", sortBy);
     params.append("order", sortOrder);
 
@@ -141,7 +135,7 @@ export default function InvoiceTable() {
         });
 
         setInvoices(sortedData);
-        setMeta(response.meta);
+        setMeta({ total: response.meta?.total || sortedData.length });
 
         // Re-sync selectedInvoices — merge current page data with already-stored data
         setSelectedInvoices(prev => {
@@ -173,11 +167,10 @@ export default function InvoiceTable() {
 
   useEffect(() => {
     fetchData();
-  }, [currentPage, limit, fromDate, toDate, sortBy, sortOrder]);
+  }, [fromDate, toDate, sortBy, sortOrder]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setCurrentPage(1);
       fetchData();
     }, 500);
     return () => clearTimeout(t);
@@ -189,7 +182,6 @@ export default function InvoiceTable() {
     setToDate("");
     setSortBy("created_at");
     setSortOrder("desc");
-    setCurrentPage(1);
     setFetchError(null);
   };
 
@@ -200,7 +192,6 @@ export default function InvoiceTable() {
       setSortBy(column);
       setSortOrder("desc");
     }
-    setCurrentPage(1);
   };
 
   const handleSelectInvoice = (invoiceId) => {
@@ -277,16 +268,7 @@ export default function InvoiceTable() {
     setShowLinkModal(true);
   };
 
-  const getPageNumbers = () => {
-    const pages = [];
-    const max = 5;
-    let start = Math.max(1, currentPage - Math.floor(max / 2));
-    let end = Math.min(meta.totalPages, start + max - 1);
-    for (let i = start; i <= end; i++) pages.push(i);
-    return pages;
-  };
-
-  const SortIcon = ({ column }) =>
+const SortIcon = ({ column }) =>
     sortBy !== column ? (
       <span className="ml-1 text-gray-400">↕</span>
     ) : sortOrder === "asc" ? (
@@ -347,6 +329,11 @@ export default function InvoiceTable() {
       </div>
 
       {/* Table */}
+      {!loading && !fetchError && invoices.length > 0 && (
+        <p className="text-sm text-gray-500 mb-2">
+          Showing {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
+        </p>
+      )}
       <div className="overflow-x-auto hidden md:block border rounded">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100">
@@ -509,21 +496,6 @@ export default function InvoiceTable() {
           </tbody>
         </table>
       </div>
-
-      {/* Pagination */}
-      {meta.totalPages > 1 && (
-        <div className="flex justify-center mt-6 gap-1">
-          {getPageNumbers().map((p) => (
-            <button
-              key={p}
-              onClick={() => setCurrentPage(p)}
-              className={`px-3 py-1 rounded ${p === currentPage ? "bg-green-600 text-white" : "bg-gray-100"}`}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      )}
 
       {editId != null && (
         <InvoiceEditModal
