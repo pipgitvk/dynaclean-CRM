@@ -63,9 +63,6 @@ export async function PATCH(req) {
         console.log(`[invoices-bulk-link] Set parent_id: ${parentId} is parent of ${childIds.join(", ")}`);
       }
 
-      // 1. Link selected statements to selected invoices
-      const selectedInvoiceTokens = new Set(invoice_ids.map(id => `IP${id}`));
-
       // Now, process ALL statements (selected + non-selected) that are linked to these invoices
       const relevantStatementIds = new Set([
         ...(statement_ids || []),
@@ -73,10 +70,47 @@ export async function PATCH(req) {
       ]);
 
       // Get all relevant statements
-      const [relevantStatements] = await conn.query(
-        "SELECT id, amount, linked_purchase_ids FROM statements WHERE id IN (?)",
-        [[...relevantStatementIds]]
-      );
+      const [relevantStatements] = relevantStatementIds.size > 0
+        ? await conn.query(
+            "SELECT id, amount, linked_purchase_ids FROM statements WHERE id IN (?)",
+            [[...relevantStatementIds]]
+          )
+        : [[]];
+
+      const selectedStatementIdsSet = new Set(statement_ids || []);
+      const noStatementsSelected = selectedStatementIdsSet.size === 0;
+      const selectedInvoiceTokens = new Set(invoice_ids.map(id => `IP${id}`));
+
+      // If NO statements are selected at all, reset everything and break parent-child relationship
+      if (noStatementsSelected) {
+        console.log(`[invoices-bulk-link] No statements selected — resetting all invoices and removing parent-child links`);
+
+        // Unlink any initial_linked statements from these invoices
+        for (const stmt of relevantStatements) {
+          const tokens = parseLinkedPurchaseTokens(stmt.linked_purchase_ids);
+          const nextTokens = tokens.filter(t => !selectedInvoiceTokens.has(t));
+          const nextLinkedIds = nextTokens.length > 0 ? JSON.stringify(nextTokens) : null;
+          const nextStatus = nextTokens.length > 0 ? "Settled" : "Unsettled";
+          await conn.execute(
+            "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ? WHERE id = ?",
+            [nextLinkedIds, nextStatus, stmt.id]
+          );
+        }
+
+        // Reset all invoices: amount_paid=0, balance_amount=grand_total, status=UNPAID, parent_id=NULL, linked_trans_ids=NULL
+        for (const invId of invoice_ids) {
+          await conn.execute(
+            "UPDATE invoices SET amount_paid = 0, balance_amount = grand_total, payment_status = 'UNPAID', linked_trans_ids = NULL, parent_id = NULL WHERE id = ?",
+            [invId]
+          );
+        }
+
+        await conn.commit();
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       if (!relevantStatements || relevantStatements.length === 0) {
         console.log(`[invoices-bulk-link] No relevant statements found for IDs:`, [...relevantStatementIds]);
@@ -86,11 +120,6 @@ export async function PATCH(req) {
           headers: { "Content-Type": "application/json" },
         });
       }
-
-      // Split into:
-      // A) Selected statements (should be linked to all selected invoices)
-      // B) Non-selected statements that were initially linked (should be unlinked from selected invoices)
-      const selectedStatementIdsSet = new Set(statement_ids || []);
 
       for (const stmt of relevantStatements) {
         const tokens = parseLinkedPurchaseTokens(stmt.linked_purchase_ids);

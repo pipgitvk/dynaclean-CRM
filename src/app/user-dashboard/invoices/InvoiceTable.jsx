@@ -517,6 +517,7 @@ const SortIcon = ({ column }) =>
           selectedGrandTotal={selectedInvoices.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0)}
           invoices={invoices}
           onLinkSuccess={() => {
+            handleRemoveSelected();
             fetchData();
           }}
         />

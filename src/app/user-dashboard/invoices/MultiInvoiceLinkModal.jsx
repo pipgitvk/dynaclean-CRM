@@ -3,10 +3,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Search } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
 
 const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selectedGrandTotal, invoices, onLinkSuccess }) => {
-  const router = useRouter();
   const [statements, setStatements] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -249,9 +247,8 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
 
       if (response.ok) {
         toast.success("Payments updated successfully to all selected invoices!");
-        if (onLinkSuccess) onLinkSuccess();
-        router.refresh();
         closeModal();
+        if (onLinkSuccess) onLinkSuccess();
       } else {
         const errorData = await response.json();
         toast.error(errorData.error || "Failed to update payments");
