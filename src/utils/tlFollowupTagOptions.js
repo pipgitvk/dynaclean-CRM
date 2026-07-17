@@ -17,6 +17,7 @@ export const BASE_TL_TAG_OPTIONS = [
   "cancel order",
   "Delhi-Visiting",
   "Tamilnadu-Visiting",
+  "Municipal",
 ];
 
 export function getTlTagOptions() {
@@ -40,6 +41,7 @@ export const TL_CUSTOMERS_TABLE_BASE_TAGS = [
   "cancel order",
   "Delhi-Visiting",
   "Tamilnadu-Visiting",
+  "Municipal",
 ];
 
 export function getTlCustomersTableTagOptions() {
@@ -110,6 +112,9 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
   }
   if (norm.includes("tamilnadu") && norm.includes("visiting")) {
     return `${base} bg-gradient-to-r from-rose-400 to-pink-500 text-white font-bold shadow-lg`;
+  }
+  if (norm === "municipal") {
+    return `${base} bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold shadow-lg`;
   }
 
   return `${base} bg-slate-500 text-white`;
