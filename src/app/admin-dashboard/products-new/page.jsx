@@ -621,7 +621,7 @@ export default function ProductsNewPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            
 
             {/* Combined Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
