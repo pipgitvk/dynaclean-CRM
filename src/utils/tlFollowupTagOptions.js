@@ -15,6 +15,8 @@ export const BASE_TL_TAG_OPTIONS = [
   "Clear",
   "order-recieved",
   "cancel order",
+  "Delhi-Visiting",
+  "Tamilnadu-Visiting",
 ];
 
 export function getTlTagOptions() {
@@ -36,6 +38,8 @@ export const TL_CUSTOMERS_TABLE_BASE_TAGS = [
   "Clear",
   "order-recieved",
   "cancel order",
+  "Delhi-Visiting",
+  "Tamilnadu-Visiting",
 ];
 
 export function getTlCustomersTableTagOptions() {
@@ -78,7 +82,7 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
     return `${base} bg-orange-200 text-orange-900 border border-orange-300/90`;
   }
   if (norm.includes("strong") && norm.includes("follow")) {
-    return `${base} bg-yellow-100 text-yellow-900 border border-yellow-300/90`;
+    return `${base} bg-yellow-600 text-white border border-yellow-700/90 font-semibold`;
   }
   if (norm.includes("repeat") && norm.includes("order")) {
     return `${base} bg-blue-200 text-blue-900 border border-blue-400/90 shadow-md`;
@@ -100,6 +104,12 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
   }
   if (norm === "postponding/declined" || norm === "postponing") {
     return `${base} bg-orange-100 text-orange-900 border border-orange-300/90`;
+  }
+  if (norm.includes("delhi") && norm.includes("visiting")) {
+    return `${base} bg-gradient-to-r from-rose-400 to-pink-500 text-white font-bold shadow-lg`;
+  }
+  if (norm.includes("tamilnadu") && norm.includes("visiting")) {
+    return `${base} bg-gradient-to-r from-rose-400 to-pink-500 text-white font-bold shadow-lg`;
   }
 
   return `${base} bg-slate-500 text-white`;
