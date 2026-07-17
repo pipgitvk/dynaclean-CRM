@@ -544,6 +544,59 @@ export default function ProductsNewPage() {
                 </div>
               </div>
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
+                <h3 className="text-base font-semibold text-gray-800 mb-3">Pricing Details</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">GEM Price:</span>
+                    <span className="font-semibold">₹{parseFloat(selectedProduct.gem_price) || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">GEM Last Neg. Price:</span>
+                    <span className="font-semibold">₹{parseFloat(selectedProduct.gem_last_negotiation_price) || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Dealer Price:</span>
+                    <span className="font-semibold">₹{parseFloat(selectedProduct.dealer_price) || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t pt-2">
+                    <span className="text-gray-600">Last Neg. Price:</span>
+                    <span className="font-semibold">₹{parseFloat(selectedProduct.last_negotiation_price) || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Product Information Card */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6 max-w-4xl">
+              <h3 className="text-base font-semibold text-gray-800 mb-4">Product Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">Item Code</p>
+                  <p className="text-gray-900 font-semibold">{selectedProduct.item_code}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">Item Name</p>
+                  <p className="text-gray-900 font-semibold">{selectedProduct.item_name}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">GST Rate</p>
+                  <p className="text-gray-900 font-semibold">{selectedProduct.gst_rate}%</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">DP NO-warranty</p>
+                  <p className="text-gray-900 font-semibold">{selectedProduct.dp_no_warranty || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">DP</p>
+                  <p className="text-gray-900 font-semibold">{selectedProduct.dp || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm font-medium">Min Qty</p>
+                  <p className="text-gray-900 font-semibold">{selectedProduct.min_qty || '0'}</p>
+                </div>
+              </div>
+            </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3 md:p-4">
                 <h3 className="text-base font-semibold text-gray-800 mb-3">Stock</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

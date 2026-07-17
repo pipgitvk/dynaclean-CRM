@@ -136,6 +136,8 @@ function ProductAndSpareLists({ type, userRole }) {
                   <th className="p-2 text-left">Min Qty</th>
                   <th className="p-2 text-left">Price</th>
                   {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <th className="p-2 text-left">GEM Price</th>}
+                  {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <th className="p-2 text-left">GEM Last Neg. Price</th>}
+                  {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <th className="p-2 text-left">Dealer Price</th>}
                   <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Spares</th>
@@ -185,6 +187,8 @@ function ProductAndSpareLists({ type, userRole }) {
                         <td className="p-2">{r.min_qty}</td>
                         <td className="p-2">{r.price_per_unit}</td>
                         {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <td className="p-2">{r.gem_price || 0}</td>}
+                        {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <td className="p-2">{parseFloat(r.gem_last_negotiation_price) || 0}</td>}
+                        {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <td className="p-2">{parseFloat(r.dealer_price) || 0}</td>}
                         <td className="p-2">{r.last_negotiation_price || 0}</td>
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
@@ -277,6 +281,22 @@ function ProductAndSpareLists({ type, userRole }) {
                       <span className="font-semibold">Price:</span>{" "}
                       {r.price_per_unit}
                     </p>
+                    {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && (
+                      <>
+                        <p>
+                          <span className="font-semibold">GEM Price:</span>{" "}
+                          {r.gem_price || 0}
+                        </p>
+                        <p>
+                          <span className="font-semibold">GEM Last Neg. Price:</span>{" "}
+                          {parseFloat(r.gem_last_negotiation_price) || 0}
+                        </p>
+                        <p>
+                          <span className="font-semibold">Dealer Price:</span>{" "}
+                          {parseFloat(r.dealer_price) || 0}
+                        </p>
+                      </>
+                    )}
                     <p>
                       <span className="font-semibold">Last Neg. Price:</span>{" "}
                       {r.last_negotiation_price || 0}
