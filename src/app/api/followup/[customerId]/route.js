@@ -103,7 +103,7 @@ export async function POST(req, { params }) {
   } else {
     // Fallback to customers table
     const [customerRows] = await conn.execute(
-      "SELECT name, phone, email FROM customers WHERE customer_id = ? LIMIT 1",
+      "SELECT first_name, phone, email FROM customers WHERE customer_id = ? LIMIT 1",
       [customerId],
     );
 
@@ -111,7 +111,7 @@ export async function POST(req, { params }) {
       return new Response(JSON.stringify({ error: "Customer not found" }), { status: 404 });
     }
 
-    ({ name, phone: contact, email } = customerRows[0]);
+    ({ first_name: name, phone: contact, email } = customerRows[0]);
   }
 
   // Convert IST datetime to UTC before storing

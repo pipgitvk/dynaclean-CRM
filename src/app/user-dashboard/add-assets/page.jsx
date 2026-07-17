@@ -17,6 +17,8 @@ export default function AddProductPage() {
     price_per_unit: "",
     last_negotiation_price: "",
     gem_price: "",
+    gem_last_negotiation_price: "",
+    dealer_price: "",
     dp_no_warranty: "",
     dp: "",
   });
@@ -148,6 +150,8 @@ export default function AddProductPage() {
         price_per_unit: "",
         last_negotiation_price: "",
         gem_price: "",
+        gem_last_negotiation_price: "",
+        dealer_price: "",
         dp_no_warranty: "",
         dp: "",
       });
@@ -225,6 +229,18 @@ export default function AddProductPage() {
       name: "gem_price",
       type: "number",
       placeholder: "e.g., 899.99",
+    },
+    {
+      label: "GEM Last Negotiation Price",
+      name: "gem_last_negotiation_price",
+      type: "number",
+      placeholder: "e.g., 850.00",
+    },
+    {
+      label: "Dealer Price",
+      name: "dealer_price",
+      type: "number",
+      placeholder: "e.g., 850.00",
     },
     {
       label: "DP NO-warranty",

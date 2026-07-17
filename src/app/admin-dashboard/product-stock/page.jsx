@@ -36,6 +36,8 @@ function ProductAndSpareLists({ type }) {
     min_qty: '',
     price_per_unit: '',
     gem_price: '',
+    gem_last_negotiation_price: '',
+    dealer_price: '',
     dp_no_warranty: '',
     dp: '',
     last_negotiation_price: '',
@@ -191,13 +193,16 @@ function ProductAndSpareLists({ type }) {
 
     try {
       setSavingField(true);
+      // Convert to number for numeric fields, ensuring empty values become 0
+      const numValue = editingField.value === '' ? 0 : parseFloat(editingField.value) || 0;
+      
       const res = await fetch("/api/products/update-field", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           item_code: code,
           field: fieldName,
-          value: editingField.value
+          value: numValue
         }),
       });
       const data = await res.json();
@@ -207,12 +212,17 @@ function ProductAndSpareLists({ type }) {
         return;
       }
 
+      // Update local state
       setRows(prev => prev.map(r => {
         if (r.item_code === code) {
-          return { ...r, [fieldName]: editingField.value };
+          return { ...r, [fieldName]: numValue };
         }
         return r;
       }));
+      
+      // Refresh the products to get the latest data from database
+      refreshProducts();
+      
       setEditingField({ key: null, field: null, value: "" });
     } catch (err) {
       console.error(err);
@@ -233,6 +243,8 @@ function ProductAndSpareLists({ type }) {
       min_qty: row.min_qty || '',
       price_per_unit: row.price_per_unit || row.price || '',
       gem_price: row.gem_price || '',
+      gem_last_negotiation_price: row.gem_last_negotiation_price || '',
+      dealer_price: row.dealer_price || '',
       dp_no_warranty: row.dp_no_warranty || '',
       dp: row.dp || '',
       last_negotiation_price: row.last_negotiation_price || '',
@@ -353,6 +365,8 @@ function ProductAndSpareLists({ type }) {
       formData.append('min_qty', editFormData.min_qty);
       formData.append('price_per_unit', editFormData.price_per_unit);
       formData.append('gem_price', editFormData.gem_price);
+      formData.append('gem_last_negotiation_price', editFormData.gem_last_negotiation_price);
+      formData.append('dealer_price', editFormData.dealer_price);
       formData.append('dp_no_warranty', editFormData.dp_no_warranty);
       formData.append('dp', editFormData.dp);
       formData.append('last_negotiation_price', editFormData.last_negotiation_price);
@@ -475,6 +489,8 @@ function ProductAndSpareLists({ type }) {
                   <th className="p-2 text-left">Min Qty</th>
                   <th className="p-2 text-left">Price</th>
                   <th className="p-2 text-left">GEM Price</th>
+                  <th className="p-2 text-left">GEM Last Neg. Price</th>
+                  <th className="p-2 text-left">Dealer Price</th>
                   <th className="p-2 text-left">DP NO-warranty</th>
                   <th className="p-2 text-left">DP</th>
                   <th className="p-2 text-left">GST Rate (%)</th>
@@ -558,8 +574,46 @@ function ProductAndSpareLists({ type }) {
                             </div>
                           ) : (
                             <div className="flex items-center gap-2 group">
-                              <span>{r.gem_price || 0}</span>
-                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'gem_price', value: r.gem_price || 0 })} />
+                              <span>{parseFloat(r.gem_price) || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'gem_price', value: r.gem_price !== undefined && r.gem_price !== null ? r.gem_price : '' })} />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingField.key === r.item_code && editingField.field === 'gem_last_negotiation_price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingField.value}
+                                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingField} onClick={() => handleSaveField(r, 'gem_last_negotiation_price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{parseFloat(r.gem_last_negotiation_price) || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'gem_last_negotiation_price', value: r.gem_last_negotiation_price !== undefined && r.gem_last_negotiation_price !== null ? r.gem_last_negotiation_price : '' })} />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingField.key === r.item_code && editingField.field === 'dealer_price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingField.value}
+                                onChange={(e) => setEditingField(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingField} onClick={() => handleSaveField(r, 'dealer_price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingField} onClick={() => setEditingField({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{parseFloat(r.dealer_price) || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingField({ key: r.item_code, field: 'dealer_price', value: r.dealer_price !== undefined && r.dealer_price !== null ? r.dealer_price : '' })} />
                             </div>
                           )}
                         </td>
@@ -1074,6 +1128,28 @@ function ProductAndSpareLists({ type }) {
                   type="number"
                   value={editFormData.gem_price}
                   onChange={(e) => setEditFormData({ ...editFormData, gem_price: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+
+              {/* GEM Last Negotiation Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">GEM Last Neg. Price</label>
+                <input
+                  type="number"
+                  value={editFormData.gem_last_negotiation_price}
+                  onChange={(e) => setEditFormData({ ...editFormData, gem_last_negotiation_price: e.target.value })}
+                  className="w-full border rounded p-2 text-sm"
+                />
+              </div>
+
+              {/* Dealer Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Dealer Price</label>
+                <input
+                  type="number"
+                  value={editFormData.dealer_price}
+                  onChange={(e) => setEditFormData({ ...editFormData, dealer_price: e.target.value })}
                   className="w-full border rounded p-2 text-sm"
                 />
               </div>

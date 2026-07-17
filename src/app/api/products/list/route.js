@@ -16,6 +16,8 @@ export async function GET() {
          p.min_qty,
          p.price_per_unit,
          p.gem_price,
+         p.gem_last_negotiation_price,
+         p.dealer_price,
          p.dp_no_warranty,
          p.dp,
          p.specification,

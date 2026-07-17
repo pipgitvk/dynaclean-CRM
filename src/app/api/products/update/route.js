@@ -117,6 +117,8 @@ export async function POST(request) {
         const min_qty = formData.get('min_qty');
         const price_per_unit = formData.get('price_per_unit');
         const gem_price = formData.get('gem_price');
+        const gem_last_negotiation_price = formData.get('gem_last_negotiation_price');
+        const dealer_price = formData.get('dealer_price');
         const dp_no_warranty = formData.get('dp_no_warranty');
         const dp = formData.get('dp');
         const last_negotiation_price = formData.get('last_negotiation_price');
@@ -162,6 +164,14 @@ export async function POST(request) {
         if (gem_price !== null && gem_price !== undefined) {
             updates.push('gem_price = ?');
             values.push(gem_price);
+        }
+        if (gem_last_negotiation_price !== null && gem_last_negotiation_price !== undefined) {
+            updates.push('gem_last_negotiation_price = ?');
+            values.push(gem_last_negotiation_price);
+        }
+        if (dealer_price !== null && dealer_price !== undefined) {
+            updates.push('dealer_price = ?');
+            values.push(dealer_price);
         }
         if (dp_no_warranty !== null && dp_no_warranty !== undefined) {
             updates.push('dp_no_warranty = ?');

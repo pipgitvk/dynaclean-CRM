@@ -36,7 +36,7 @@ export async function POST(request) {
         }
 
         // Validate field
-        const allowedFields = ['gem_price', 'dp_no_warranty', 'dp'];
+        const allowedFields = ['gem_price', 'gem_last_negotiation_price', 'dealer_price', 'dp_no_warranty', 'dp'];
         if (!allowedFields.includes(field)) {
             return NextResponse.json({ error: 'Invalid field' }, { status: 400 });
         }
