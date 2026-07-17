@@ -6,6 +6,58 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 
 /**
+ * Extract state code from GSTIN and return state info
+ * GSTIN format: 2-digit state code + 2-digit PAN + 5 zeros
+ */
+function getStateFromGSTIN(gstin) {
+  if (!gstin || gstin.length < 2) return null;
+  const stateCode = parseInt(gstin.substring(0, 2), 10);
+  
+  // Map of state codes to state info
+  const stateMap = {
+    1: { name: 'Jammu & Kashmir', code: '01' },
+    2: { name: 'Himachal Pradesh', code: '02' },
+    3: { name: 'Punjab', code: '03' },
+    4: { name: 'Chandigarh', code: '04' },
+    5: { name: 'Uttarakhand', code: '05' },
+    6: { name: 'Haryana', code: '06' },
+    7: { name: 'Delhi', code: '07' },
+    8: { name: 'Rajasthan', code: '08' },
+    9: { name: 'Uttar Pradesh', code: '09' },
+    10: { name: 'Bihar', code: '10' },
+    11: { name: 'Jharkhand', code: '11' },
+    12: { name: 'Odisha', code: '12' },
+    13: { name: 'West Bengal', code: '13' },
+    14: { name: 'Assam', code: '14' },
+    15: { name: 'Meghalaya', code: '15' },
+    16: { name: 'Manipur', code: '16' },
+    17: { name: 'Mizoram', code: '17' },
+    18: { name: 'Nagaland', code: '18' },
+    19: { name: 'Tripura', code: '19' },
+    20: { name: 'Sikkim', code: '20' },
+    21: { name: 'Arunachal Pradesh', code: '21' },
+    22: { name: 'Telangana', code: '22' },
+    23: { name: 'Andhra Pradesh', code: '23' },
+    24: { name: 'Karnataka', code: '24' },
+    25: { name: 'Tamil Nadu', code: '25' },
+    26: { name: 'Telangana', code: '26' },
+    27: { name: 'Kerala', code: '27' },
+    28: { name: 'Maharashtra', code: '28' },
+    29: { name: 'Gujarat', code: '29' },
+    30: { name: 'Goa', code: '30' },
+    31: { name: 'Lakshadweep', code: '31' },
+    32: { name: 'Puducherry', code: '32' },
+    33: { name: 'Andaman & Nicobar', code: '33' },
+    34: { name: 'Telangana', code: '34' },
+    35: { name: 'Ladakh', code: '35' },
+    36: { name: 'Dadra & Nagar Haveli', code: '36' },
+    37: { name: 'Daman & Diu', code: '37' },
+  };
+  
+  return stateMap[stateCode] || null;
+}
+
+/**
  * Ensures `S.No.` is AUTO_INCREMENT so it gets populated on every insert.
  * Column name in DB is literally "S.No." (with dot and space).
  */
@@ -172,12 +224,48 @@ export async function POST(req) {
       finalQuoteNumber = `${todayPrefix}${increment.toString().padStart(3, "0")}`;
 
       try {
+        // First calculate rates from items if needed
+        let headerCgstRate = cgstRate || 0;
+        let headerSgstRate = sgstRate || 0;
+        let headerIgstRate = igstRate || 0;
+        
+        // If form rates are all 0, derive from first item's GST
+        if ((cgstRate === 0 || cgstRate === undefined) && (sgstRate === 0 || sgstRate === undefined) && (igstRate === 0 || igstRate === undefined)) {
+          if (items.length > 0 && items[0].gst) {
+            const itemGst = items[0].gst;
+            const hasGstin = gstin_no?.trim();
+            
+            if (hasGstin) {
+              // Extract state code from GSTIN (first 2 digits)
+              const gstinStateCode = gstin_no.substring(0, 2);
+              const supplierStateCode = "07"; // Delhi - hardcoded from company info
+              
+              // Compare state codes to determine if interstate or intrastate
+              if (gstinStateCode === supplierStateCode) {
+                // Same state - intrastate: split CGST and SGST (each 50%)
+                headerCgstRate = itemGst / 2;
+                headerSgstRate = itemGst / 2;
+                headerIgstRate = 0;
+              } else {
+                // Different state - interstate: IGST only (full tax %)
+                headerCgstRate = 0;
+                headerSgstRate = 0;
+                headerIgstRate = itemGst;
+              }
+            } else {
+              // No GSTIN - intrastate: split CGST and SGST (each 50%)
+              headerCgstRate = itemGst / 2;
+              headerSgstRate = itemGst / 2;
+              headerIgstRate = 0;
+            }
+          }
+        }
+
         // Try inserting the header row
-        // Don't specify s_no - let database handle AUTO_INCREMENT or let it be NULL
-        const result = await conn.execute(
+        await conn.execute(
           `INSERT INTO quotations_records 
-           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
             finalQuoteNumber,
             serverQuoteDate,
@@ -189,6 +277,9 @@ export async function POST(req) {
             ship_to,
             items.length,
             cgst + sgst + igst,
+            headerCgstRate,
+            headerSgstRate,
+            headerIgstRate,
             username,
             subtotal,
             round_off || 0,
@@ -224,7 +315,38 @@ export async function POST(req) {
       const price_per_unit = item.price ?? 0;
       const taxable_price = item.taxable_amount;
       const gstItem = item.gst ?? 0;
-      const igsttamt = (igst || 0) > 0 ? (item.IGSTamt ?? 0) : 0;
+      
+      // Calculate split GST rates and amounts
+      let calcCgstRate = 0, calcSgstRate = 0, calcIgstRate = 0;
+      let cgstAmt = 0, sgstAmt = 0, igstAmt = 0;
+      
+      // Check if GSTIN is provided from request body
+      const hasGstin = gstin_no?.trim();
+      
+      if (hasGstin) {
+        // With GSTIN: Check if intrastate or interstate using state code comparison
+        const gstinStateCode = gstin_no.substring(0, 2);
+        const supplierStateCode = "07"; // Delhi
+        
+        if (gstinStateCode === supplierStateCode) {
+          // Intrastate: Split CGST and SGST (each 50%)
+          calcCgstRate = gstItem / 2;
+          calcSgstRate = gstItem / 2;
+          cgstAmt = (taxable_price * calcCgstRate) / 100;
+          sgstAmt = (taxable_price * calcSgstRate) / 100;
+        } else {
+          // Interstate: IGST only (full tax %)
+          calcIgstRate = gstItem;
+          igstAmt = (taxable_price * calcIgstRate) / 100;
+        }
+      } else {
+        // Without GSTIN: Split CGST and SGST (each 50%)
+        calcCgstRate = gstItem / 2;
+        calcSgstRate = gstItem / 2;
+        cgstAmt = (taxable_price * calcCgstRate) / 100;
+        sgstAmt = (taxable_price * calcSgstRate) / 100;
+      }
+      
       const total_taxable_amt = item.taxable_amount;
       const total_price = item.total_amount;
       const img_url = item.imageUrl ?? null;
@@ -246,12 +368,12 @@ export async function POST(req) {
           total_taxable_amt,
           gstItem,
           total_price,
-          cgstRate,
-          cgst,
-          sgstRate,
-          sgst,
-          igstRate,
-          igsttamt,
+          calcCgstRate,
+          cgstAmt,
+          calcSgstRate,
+          sgstAmt,
+          calcIgstRate,
+          igstAmt,
           img_url,
         ]
       );

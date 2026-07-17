@@ -187,11 +187,19 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
     setShowStateSuggestions(false);
   }, [form.gst_number]);
 
-
+  // State-based rate setting - only when NOT from quotation
   useEffect(() => {
-    const code = form.state_code || parseCodeFromDisplay(form.state);
+    console.log("[State Effect]", { isFromQuotation, state: form.state, state_code: form.state_code });
+    
+    if (isFromQuotation) {
+      console.log("[State Effect] Skipping because isFromQuotation=true");
+      return; // Skip entirely if from quotation
+    }
 
+    const code = form.state_code || parseCodeFromDisplay(form.state);
     if (!code) return;
+
+    console.log("[State Effect] Setting rates based on state code:", code);
 
     if (code === SUPPLIER_STATE_CODE) {
       setCgstRate(9);
@@ -207,6 +215,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
         })),
       );
     } else {
+      console.log("[State Effect] State code", code, "!= SUPPLIER_STATE_CODE", SUPPLIER_STATE_CODE, "-> setting 18%");
       setCgstRate(0);
       setSgstRate(0);
       setIgstRate(18);
@@ -220,7 +229,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
         })),
       );
     }
-  }, [form.state, form.state_code]);
+  }, [form.state, form.state_code, isFromQuotation, SUPPLIER_STATE_CODE]);
 
   const [editableTerms, setEditableTerms] = useState(
     `1. Payment due within specified due date.
@@ -343,7 +352,8 @@ Thanks for doing business with us!`,
   // handle with this 
   useEffect(() => {
   if (!quotationNumber && !showQuotationModal) {
-    setIsFromQuotation(false);
+    // Don't reset isFromQuotation - let it persist until user manually creates a new invoice
+    // setIsFromQuotation(false);
   }
 }, [quotationNumber, showQuotationModal]);
 
@@ -369,6 +379,29 @@ const fetchQuotationAndFill = async () => {
 
     const quotation = data.quotation;
 
+    // Set GST rates FIRST (before form updates that trigger state effect)
+    console.log("Setting rates from quotation:", {
+      cgstRate: quotation.cgstRate,
+      sgstRate: quotation.sgstRate,
+      igstRate: quotation.igstRate,
+    });
+
+    if (quotation.cgstRate !== undefined && quotation.cgstRate !== null) {
+      console.log("Setting CGST to", Number(quotation.cgstRate));
+      setCgstRate(Number(quotation.cgstRate));
+    }
+    if (quotation.sgstRate !== undefined && quotation.sgstRate !== null) {
+      console.log("Setting SGST to", Number(quotation.sgstRate));
+      setSgstRate(Number(quotation.sgstRate));
+    }
+    if (quotation.igstRate !== undefined && quotation.igstRate !== null) {
+      console.log("Setting IGST to", Number(quotation.igstRate));
+      setIgstRate(Number(quotation.igstRate));
+    }
+
+    // Set flag BEFORE form update (so state effect knows not to override)
+    setIsFromQuotation(true);
+
     // Fill only available quotation fields
     setForm((prev) => ({
       ...prev,
@@ -386,8 +419,6 @@ const fetchQuotationAndFill = async () => {
   ? quotation.due_date.split("T")[0]
   : "",
     }));
-
-    setIsFromQuotation(true);
 
     // Fill items from quotation
    setItems(
@@ -415,10 +446,16 @@ const fetchQuotationAndFill = async () => {
       // setIsAutoRoundOff(false); // Keep true by default
     }
 
+    console.log("Quotation loaded with rates:", {
+      cgstRate: quotation.cgstRate,
+      sgstRate: quotation.sgstRate,
+      igstRate: quotation.igstRate,
+    });
 
     toast.success("Quotation loaded successfully");
-    setQuotationNumber("");
     setShowQuotationModal(false);
+    // Clear the input field but keep isFromQuotation flag for rate logic
+    setTimeout(() => setQuotationNumber(""), 500);
   } catch (err) {
     console.error(err);
     toast.error("Failed to load quotation");

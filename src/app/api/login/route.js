@@ -49,7 +49,7 @@ export async function POST(request) {
     // --- Superadmin default credentials check ---
     if (
       username.trim().toLowerCase() === "admin" &&
-      password.trim() === "Admgnfttrfvy@te"
+      password.trim() === "Adcdefghi@"
     ) {
       const token = jwt.sign(
         { id: 0, username: "admin", role: "SUPERADMIN" },

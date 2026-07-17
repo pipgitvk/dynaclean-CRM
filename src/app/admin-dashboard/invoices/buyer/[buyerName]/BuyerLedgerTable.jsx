@@ -15,7 +15,6 @@ import toast from "react-hot-toast";
 import jsPDF from "jspdf";
 
 const VCH_TYPES = [
-  "Payment",
   "Receipt",
   "Journal",
   "Sales",
@@ -24,6 +23,7 @@ const VCH_TYPES = [
   "Credit Note",
   "Debit Note",
   "Opening",
+  "Return",
   "Other",
 ];
 

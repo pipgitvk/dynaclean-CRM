@@ -223,10 +223,30 @@ export default async function BuyerInvoicesPage({ params }) {
       [decodedBuyer]
     );
 
+    // Get only the latest return entry for each invoice (to avoid duplicates)
+    const returnEntriesMap = {};
+    for (const row of manualRows) {
+      if (row.vch_type === 'Return') {
+        const invoiceNo = row.vch_no;
+        // Keep only the latest return entry per invoice
+        if (!returnEntriesMap[invoiceNo] || new Date(row.created_at) > new Date(returnEntriesMap[invoiceNo].created_at)) {
+          returnEntriesMap[invoiceNo] = row;
+        }
+      }
+    }
+
+    // Filter manual rows to include only non-return entries + latest return entries
+    const filteredManualRows = manualRows.filter(row => {
+      if (row.vch_type === 'Return') {
+        return returnEntriesMap[row.vch_no]?.id === row.id;
+      }
+      return true;
+    });
+
     // ── 6. Merge + sort by date asc ─────────────────────────────
     const combined = [
       ...derivedLedger,
-      ...manualRows.map((r) => ({ ...r, source: "manual" })),
+      ...filteredManualRows.map((r) => ({ ...r, source: "manual" })),
     ].sort((a, b) => {
       const da = String(a.entry_date).slice(0, 10);
       const db = String(b.entry_date).slice(0, 10);

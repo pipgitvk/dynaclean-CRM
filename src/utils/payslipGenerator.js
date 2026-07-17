@@ -325,6 +325,7 @@ export const buildTemplatePayslipHTML = (opts) => {
     presentDays,
     overtimeHours,
     calculation,
+    totalSalary = null,
   } = opts;
 
   const c = calculation;
@@ -403,10 +404,12 @@ export const buildTemplatePayslipHTML = (opts) => {
   const monthLabel = getMonthYearLabel(monthStr);
   const co = company;
 
+  // Use totalSalary if provided, otherwise use calculated totalEarnings
+  const displaySalary = totalSalary != null && totalSalary > 0 ? floorInr(totalSalary) : floorInr(c.totalEarnings);
   const displayTotalDeductions = floorInr(Number(c.totalDeductions) || 0);
   const displayNetSalary = Math.max(
     0,
-    floorInr(Number(c.netSalary) || 0),
+    floorInr(displaySalary - displayTotalDeductions),
   );
 
   return `<!DOCTYPE html>
@@ -476,7 +479,7 @@ export const buildTemplatePayslipHTML = (opts) => {
     ${rowsHtml.join("")}
     <tr>
       <td style="border:1px solid #666;background:#a9c4e3;font-weight:700;padding:7px 7px;font-size:14px;">Salary</td>
-      <td style="border:1px solid #666;background:#fff;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">${fmtInr(c.totalEarnings)}</td>
+      <td style="border:1px solid #666;background:#fff;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">${fmtInr(displaySalary)}</td>
       <td style="border:1px solid #666;background:#a9c4e3;font-weight:700;padding:7px 7px;font-size:14px;">Total Deduction</td>
       <td style="border:1px solid #666;background:#fff;font-weight:700;padding:7px 7px;font-size:14px;text-align:right;">${fmtInr(displayTotalDeductions)}</td>
     </tr>

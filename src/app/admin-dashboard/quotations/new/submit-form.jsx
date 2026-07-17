@@ -41,7 +41,7 @@ export default function QuotationForm() {
       unit: "",
       quantity: 1,
       price: 0,
-      gst: 18,
+      gst: 5, // Default GST rate
     },
   ]);
 
@@ -235,21 +235,22 @@ export default function QuotationForm() {
         // Set tax rates based on interstate vs intrastate
         if (result.code === SUPPLIER_STATE_CODE) {
           // Same state → CGST+SGST, no IGST
-          setCgstRate(9);
-          setSgstRate(9);
+          // Don't set fixed rates - let items define their own GST
+          setCgstRate(0);
+          setSgstRate(0);
           setIgstRate(0);
         } else {
           // Different state → IGST only
           setCgstRate(0);
           setSgstRate(0);
-          setIgstRate(18);
+          setIgstRate(0);
         }
       }
     }
     // Case 2: No GSTIN - always use CGST+SGST (regardless of state)
     else {
-      setCgstRate(9);
-      setSgstRate(9);
+      setCgstRate(0);
+      setSgstRate(0);
       setIgstRate(0);
     }
   }, [form.gstin_no]);
@@ -836,7 +837,7 @@ export default function QuotationForm() {
         </div>
 
         {/* Quotation Items Table */}
-        <QuotationItemsTable items={items} setItems={setItems} />
+        <QuotationItemsTable items={items} setItems={setItems} cgstRate={cgstRate} sgstRate={sgstRate} igstRate={igstRate} />
 
         {/* Tax Summary */}
         <TaxAndSummary

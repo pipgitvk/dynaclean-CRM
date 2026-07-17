@@ -374,12 +374,13 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                 <th className="p-3 border-b font-semibold text-gray-700">Description</th>
                 <th className="p-3 border-b font-semibold text-gray-700">Amount</th>
                 <th className="p-3 border-b font-semibold text-gray-700">Applied</th>
+                <th className="p-3 border-b font-semibold text-gray-700">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-gray-500">
+                  <td colSpan={8} className="p-10 text-center text-gray-500">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                       <span>Loading statements...</span>
@@ -388,13 +389,14 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                 </tr>
               ) : eligibleStatements.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-10 text-center text-gray-500">No matching unsettled statements found</td>
+                  <td colSpan={8} className="p-10 text-center text-gray-500">No matching unsettled statements found</td>
                 </tr>
               ) : (
                 eligibleStatements.map((s) => {
                   const isSelected = selectedStatementIds.has(s.id);
                   const distribution = statementDistribution[s.id];
                   const linkedKeys = getLinkedKeys(s);
+                  const isInitiallyLinked = initialLinkedStatementIds.has(s.id);
                   
                   // Build reference display
                   const referenceDisplay = (() => {
@@ -440,6 +442,20 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                       <td className="p-3 font-bold text-red-600">₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                       <td className="p-3 font-medium text-green-700">
                         {isSelected ? `₹${distribution?.applied?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}` : '—'}
+                      </td>
+                      <td className="p-3">
+                        {isInitiallyLinked && !isSelected && (
+                          <button
+                            onClick={() => handleSelectStatement(s.id)}
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 font-medium"
+                            title="Unlink this payment from the selected invoices"
+                          >
+                            Unlink
+                          </button>
+                        )}
+                        {!isInitiallyLinked && (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
                     </tr>
                   );

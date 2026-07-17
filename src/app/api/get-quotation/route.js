@@ -131,6 +131,11 @@ export async function GET(req) {
         due_date: dueDate,
         round_off: quotation.round_off || 0,
 
+        // Add overall GST rates from quotation
+        cgstRate: Number(quotation.cgst_rate) || 0,
+        sgstRate: Number(quotation.sgst_rate) || 0,
+        igstRate: Number(quotation.igst_rate) || 0,
+
         terms_conditions: quotation.term_con || "",
 
         items: itemRows.map((item) => ({

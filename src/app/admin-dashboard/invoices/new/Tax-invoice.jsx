@@ -45,39 +45,67 @@ export default function TaxAndSummary({
             </tr>
           </thead>
           <tbody>
-  {/* IGST – Interstate */}
+  {/* CGST – Show if rate > 0 */}
+  {cgstRate > 0 && (
+    <tr className="border">
+      <td className="px-3 py-2 border">CGST</td>
+      <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+      <td className="px-3 py-2 border text-center">
+        <input
+          type="number"
+          value={cgstRate}
+          onChange={(e) => setCgstRate(parseFloat(e.target.value) || 0)}
+          className="w-16 p-1 border rounded text-center"
+          step="0.01"
+          min="0"
+          max="100"
+        />
+        %
+      </td>
+      <td className="px-3 py-2 border">₹ {cgst.toFixed(2)}</td>
+    </tr>
+  )}
+
+  {/* SGST – Show if rate > 0 */}
+  {sgstRate > 0 && (
+    <tr className="border">
+      <td className="px-3 py-2 border">SGST</td>
+      <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+      <td className="px-3 py-2 border text-center">
+        <input
+          type="number"
+          value={sgstRate}
+          onChange={(e) => setSgstRate(parseFloat(e.target.value) || 0)}
+          className="w-16 p-1 border rounded text-center"
+          step="0.01"
+          min="0"
+          max="100"
+        />
+        %
+      </td>
+      <td className="px-3 py-2 border">₹ {sgst.toFixed(2)}</td>
+    </tr>
+  )}
+
+  {/* IGST – Show if rate > 0 */}
   {igstRate > 0 && (
     <tr className="border">
       <td className="px-3 py-2 border">IGST</td>
       <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
       <td className="px-3 py-2 border text-center">
-        {igstRate}%
+        <input
+          type="number"
+          value={igstRate}
+          onChange={(e) => setIgstRate(parseFloat(e.target.value) || 0)}
+          className="w-16 p-1 border rounded text-center"
+          step="0.01"
+          min="0"
+          max="100"
+        />
+        %
       </td>
       <td className="px-3 py-2 border">₹ {igst.toFixed(2)}</td>
     </tr>
-  )}
-
-  {/* CGST + SGST – Intrastate */}
-  {igstRate === 0 && (
-    <>
-      <tr className="border">
-        <td className="px-3 py-2 border">CGST</td>
-        <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-        <td className="px-3 py-2 border text-center">
-          {cgstRate}%
-        </td>
-        <td className="px-3 py-2 border">₹ {cgst.toFixed(2)}</td>
-      </tr>
-
-      <tr className="border">
-        <td className="px-3 py-2 border">SGST</td>
-        <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-        <td className="px-3 py-2 border text-center">
-          {sgstRate}%
-        </td>
-        <td className="px-3 py-2 border">₹ {sgst.toFixed(2)}</td>
-      </tr>
-    </>
   )}
 </tbody>
 
@@ -94,18 +122,27 @@ export default function TaxAndSummary({
             <span className="font-medium">Subtotal:</span>
             <span>₹ {subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">CGST ({cgstRate}%):</span>
-            <span>₹ {cgst.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">SGST ({sgstRate}%):</span>
-            <span>₹ {sgst.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">IGST ({igstRate}%):</span>
-            <span>₹ {igst.toFixed(2)}</span>
-          </div>
+
+          {/* Interstate - Show CGST + IGST only */}
+          {igstRate > 0 ? (
+            <>
+              <div className="flex justify-between py-1 border-b">
+                <span className="font-medium">CGST ({cgstRate}%):</span>
+                <span>₹ {cgst.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b">
+                <span className="font-medium">IGST ({igstRate}%):</span>
+                <span>₹ {igst.toFixed(2)}</span>
+              </div>
+            </>
+          ) : (
+            /* Intrastate - Show SGST only */
+            <div className="flex justify-between py-1 border-b">
+              <span className="font-medium">SGST ({sgstRate}%):</span>
+              <span>₹ {sgst.toFixed(2)}</span>
+            </div>
+          )}
+
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Total Tax:</span>
             <span>₹ {(cgst + sgst + igst).toFixed(2)}</span>

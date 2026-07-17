@@ -68,6 +68,9 @@ export default function QuotationTable({ items, setItems }) {
   };
 
   const addRow = () => {
+    // Use combined rate from form (cgstRate + sgstRate for intrastate, or igstRate for interstate)
+    const itemGstRate = igstRate > 0 ? igstRate : (cgstRate + sgstRate);
+    
     setItems([
       ...items,
       {
@@ -79,7 +82,7 @@ export default function QuotationTable({ items, setItems }) {
         unit: "",
         quantity: 1,
         price: 0,
-        gst: 18,
+        gst: itemGstRate, // Use form's rate instead of hardcoded 5
       },
     ]);
   };

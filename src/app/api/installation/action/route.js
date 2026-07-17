@@ -7,7 +7,7 @@ export async function POST(req) {
     const tokenPayload = await getSessionPayload();
     if (!tokenPayload) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    } 
 
     const { order_id, action, items_to_return } = await req.json();
 
@@ -49,6 +49,8 @@ export async function POST(req) {
 
       return NextResponse.json({ success: true, message: "Installation marked as completed" });
     }
+
+    const currentTimestamp = new Date();
 
     // PARTIAL_RETURN logic
     if (action === "PARTIAL_RETURN") {
@@ -195,9 +197,9 @@ export async function POST(req) {
           }
         }
 
-        // Mark dispatch item as stock_deducted = 0
+        // Mark dispatch item as stock_deducted = 0 and set returned_date
         await conn.execute(
-          `UPDATE dispatch SET stock_deducted = 0, updated_at = NOW() WHERE id = ?`,
+          `UPDATE dispatch SET stock_deducted = 0, returned_date = NOW(), updated_at = NOW() WHERE id = ?`,
           [dispatch_id]
         );
 
@@ -218,6 +220,46 @@ export async function POST(req) {
         `UPDATE neworder SET installation_status = 0, is_returned = ? WHERE order_id = ?`,
         [isFullyReturned ? 1 : 2, order_id]
       );
+
+      // Update invoices with returned_date and returned_status
+      // First get the quotation_id from quotations_records using quote_number
+      const [quotationData] = await conn.execute(
+        `SELECT \`S.No.\` as quotation_id FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+        [quoteNumber]
+      );
+      
+      if (quotationData && quotationData.length > 0) {
+        const quotationId = quotationData[0].quotation_id;
+        const returnedStatus = isFullyReturned ? 'full' : 'partial';
+        
+        // Update invoices table
+        await conn.execute(
+          `UPDATE invoices 
+           SET returned_date = NOW(), returned_status = ?
+           WHERE quotation_id = ?`,
+          [returnedStatus, quotationId]
+        );
+
+        // Get invoice details for ledger entry
+        const [invoiceData] = await conn.execute(
+          `SELECT invoice_number, customer_name, grand_total FROM invoices WHERE quotation_id = ? LIMIT 1`,
+          [quotationId]
+        );
+
+        if (invoiceData && invoiceData.length > 0) {
+          const inv = invoiceData[0];
+          // Always create NEW ledger entry (don't update, always insert)
+          const ledgerParticulars = returnedStatus === 'full' 
+            ? `Return (Full) – ${inv.invoice_number}`
+            : `Return (Partial) – ${inv.invoice_number}`;
+          
+          await conn.execute(
+            `INSERT INTO ledger_entries (entry_date, particulars, vch_type, vch_no, debit, credit, buyer_name, created_at, updated_at)
+             VALUES (NOW(), ?, 'Return', ?, 0, ?, ?, NOW(), NOW())`,
+            [ledgerParticulars, inv.invoice_number, Number(inv.grand_total) || 0, inv.customer_name]
+          );
+        }
+      }
 
       return NextResponse.json({
         success: true,
@@ -406,9 +448,9 @@ export async function POST(req) {
         }
       }
 
-      // Mark this dispatch row as stock_deducted = 0 so it won't be reversed again
+      // Mark this dispatch row as stock_deducted = 0 and set returned_date
       await conn.execute(
-        `UPDATE dispatch SET stock_deducted = 0, updated_at = NOW() WHERE id = ?`,
+        `UPDATE dispatch SET stock_deducted = 0, returned_date = NOW(), updated_at = NOW() WHERE id = ?`,
         [row.id]
       );
     }
@@ -418,6 +460,41 @@ export async function POST(req) {
       `UPDATE neworder SET installation_status = 0, is_returned = 1 WHERE order_id = ?`,
       [order_id]
     );
+
+    // Update invoices with returned_date and returned_status (full return = 'full')
+    // First get the quotation_id from quotations_records using quote_number
+    const [quotationData] = await conn.execute(
+      `SELECT \`S.No.\` as quotation_id FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+      [quoteNumber]
+    );
+    
+    if (quotationData && quotationData.length > 0) {
+      const quotationId = quotationData[0].quotation_id;
+      await conn.execute(
+        `UPDATE invoices 
+         SET returned_date = NOW(), returned_status = 'full'
+         WHERE quotation_id = ?`,
+        [quotationId]
+      );
+
+      // Get invoice details for ledger entry
+      const [invoiceData] = await conn.execute(
+        `SELECT invoice_number, customer_name, grand_total FROM invoices WHERE quotation_id = ? LIMIT 1`,
+        [quotationId]
+      );
+
+      if (invoiceData && invoiceData.length > 0) {
+        const inv = invoiceData[0];
+        // Create ledger entry for full return
+        const ledgerParticulars = `Return (Full) – ${inv.invoice_number}`;
+        
+        await conn.execute(
+          `INSERT INTO ledger_entries (entry_date, particulars, vch_type, vch_no, debit, credit, buyer_name, created_at, updated_at)
+           VALUES (NOW(), ?, 'Return', ?, 0, ?, ?, NOW(), NOW())`,
+          [ledgerParticulars, inv.invoice_number, Number(inv.grand_total) || 0, inv.customer_name]
+        );
+      }
+    }
 
     return NextResponse.json({ success: true, message: "Order marked as returned and stock reversed" });
   } catch (e) {

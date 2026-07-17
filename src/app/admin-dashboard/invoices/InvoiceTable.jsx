@@ -309,6 +309,7 @@ export default function InvoiceTable() {
               </th>
               <th className="px-4 py-2">Tax</th>
               <th className="px-4 py-2">Grand Total</th>
+              <th className="px-4 py-2">Balance Amount</th>
               <th
                 onClick={() => handleSort("created_at")}
                 className="px-4 py-2 cursor-pointer"
@@ -321,13 +322,13 @@ export default function InvoiceTable() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="9" className="text-center py-4">
+                <td colSpan="10" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="9" className="text-center py-6 text-red-600">
+                <td colSpan="10" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -361,6 +362,11 @@ export default function InvoiceTable() {
                   </td>
                   <td className="px-4 py-2 font-semibold">
                     ₹{Number(i.grand_total).toLocaleString("en-IN")}
+                  </td>
+                  <td className="px-4 py-2 font-semibold">
+                    <span className={Number(i.balance_amount) > 0 ? 'text-red-600' : 'text-green-600'}>
+                      ₹{Number(i.balance_amount || 0).toLocaleString("en-IN")}
+                    </span>
                   </td>
                   <td className="px-4 py-2">
                     {new Date(i.created_at).toLocaleDateString("en-IN")}
@@ -411,7 +417,7 @@ export default function InvoiceTable() {
               ))
             ) : (
               <tr>
-                <td colSpan="9" className="text-center py-6 text-gray-500">
+                <td colSpan="10" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>

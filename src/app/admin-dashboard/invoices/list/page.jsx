@@ -1,6 +1,6 @@
 "use client";
 
-import InvoiceTable from "@/app/user-dashboard/invoices/InvoiceTable";
+import InvoiceTable from "@/app/admin-dashboard/invoices/InvoiceTable";
 
 export const dynamic = "force-dynamic";
 
