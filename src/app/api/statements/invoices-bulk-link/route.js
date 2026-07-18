@@ -69,15 +69,22 @@ export async function PATCH(req) {
         ...(initial_linked_statement_ids || [])
       ]);
 
-      // Get all relevant statements
+      // Get all relevant statements AND PRESERVE ORIGINAL DATA
       const [relevantStatements] = relevantStatementIds.size > 0
         ? await conn.query(
-            "SELECT id, amount, linked_purchase_ids FROM statements WHERE id IN (?)",
+            "SELECT id, trans_id, amount, linked_purchase_ids FROM statements WHERE id IN (?)",
             [[...relevantStatementIds]]
           )
         : [[]];
 
+      // Store original linked_purchase_ids before modifying!
+      const originalLinkedPurchaseIdsMap = {};
+      for (const stmt of relevantStatements) {
+        originalLinkedPurchaseIdsMap[stmt.id] = stmt.linked_purchase_ids;
+      }
+
       const selectedStatementIdsSet = new Set(statement_ids || []);
+      const initialLinkedStatementIdsSet = new Set(initial_linked_statement_ids || []);
       const noStatementsSelected = selectedStatementIdsSet.size === 0;
       const selectedInvoiceTokens = new Set(invoice_ids.map(id => `IP${id}`));
 
@@ -85,14 +92,14 @@ export async function PATCH(req) {
       if (noStatementsSelected) {
         console.log(`[invoices-bulk-link] No statements selected — resetting all invoices and removing parent-child links`);
 
-        // Unlink any initial_linked statements from these invoices
+        // Unlink any initial_linked statements from these invoices — also clear invoice_number
         for (const stmt of relevantStatements) {
           const tokens = parseLinkedPurchaseTokens(stmt.linked_purchase_ids);
           const nextTokens = tokens.filter(t => !selectedInvoiceTokens.has(t));
           const nextLinkedIds = nextTokens.length > 0 ? JSON.stringify(nextTokens) : null;
           const nextStatus = nextTokens.length > 0 ? "Settled" : "Unsettled";
           await conn.execute(
-            "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ? WHERE id = ?",
+            "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ?, invoice_number = NULL WHERE id = ?",
             [nextLinkedIds, nextStatus, stmt.id]
           );
         }
@@ -121,36 +128,79 @@ export async function PATCH(req) {
         });
       }
 
+      // Fetch invoices early so we have invoice_number for statement linking
+      const [invoices] = await conn.query(
+        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number FROM invoices WHERE id IN (?)",
+        [invoice_ids]
+      );
+
+      // Build invoice_number label for linking (e.g. "DYN/2026-27/100" or combined if multiple)
+      const linkedInvoiceNumbers = invoices
+        .sort((a, b) => a.id - b.id)
+        .map(inv => inv.invoice_number)
+        .filter(Boolean)
+        .join(", ");
+
       for (const stmt of relevantStatements) {
         const tokens = parseLinkedPurchaseTokens(stmt.linked_purchase_ids);
         let nextTokens = [...tokens];
         
         if (selectedStatementIdsSet.has(stmt.id)) {
-          // Selected statement: add all selected invoices if not already present
-          invoice_ids.forEach(id => {
-            const token = `IP${id}`;
-            if (!nextTokens.includes(token)) {
-              nextTokens.push(token);
-            }
-          });
+          // Only add all selected invoices if this is a NEW statement (NOT initially linked)
+          if (!initialLinkedStatementIdsSet.has(stmt.id)) {
+            // New statement: add all selected invoices if not already present
+            invoice_ids.forEach(id => {
+              const token = `IP${id}`;
+              if (!nextTokens.includes(token)) {
+                nextTokens.push(token);
+              }
+            });
+          }
+          // For initially linked statements that are still selected: leave their tokens as they were!
         } else {
           // Non-selected statement: remove all selected invoices
           nextTokens = nextTokens.filter(t => !selectedInvoiceTokens.has(t));
         }
 
-        // Update statement
+        // Update statement — don't change invoice_number for initially linked statements!
         const nextLinkedIds = nextTokens.length > 0 ? JSON.stringify(nextTokens) : null;
         const nextStatus = nextTokens.length > 0 ? "Settled" : "Unsettled";
+        
+        // Get original invoice_number from DB
+        const [[originalStmtRow]] = await conn.execute(
+          "SELECT invoice_number FROM statements WHERE id = ?",
+          [stmt.id]
+        );
+        const originalInvoiceNumber = originalStmtRow?.invoice_number || null;
+        
+        let nextInvoiceNumber;
+        if (initialLinkedStatementIdsSet.has(stmt.id) && selectedStatementIdsSet.has(stmt.id)) {
+          // Keep original invoice number for existing linked statements
+          nextInvoiceNumber = originalInvoiceNumber;
+        } else if (selectedStatementIdsSet.has(stmt.id) && !initialLinkedStatementIdsSet.has(stmt.id)) {
+          // Set new invoice number only for NEW statements
+          nextInvoiceNumber = linkedInvoiceNumbers || null;
+        } else {
+          // Clear invoice number if unlinked
+          nextInvoiceNumber = null;
+        }
+        
         await conn.execute(
-          "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ? WHERE id = ?",
-          [nextLinkedIds, nextStatus, stmt.id]
+          "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ?, invoice_number = ? WHERE id = ?",
+          [nextLinkedIds, nextStatus, nextInvoiceNumber, stmt.id]
         );
       }
 
-      // Now recalculate paid_amount FRESH from scratch — only statements still selected/linked count
+      // First, get the CURRENT state of the invoices before any changes!
+      const [currentInvoices] = await conn.query(
+        "SELECT id, grand_total, amount_paid, linked_trans_ids, invoice_number FROM invoices WHERE id IN (?)",
+        [invoice_ids]
+      );
+
+      // Now recalculate paid_amount — preserve existing amounts plus add new!
       console.log(`[invoices-bulk-link] selectedStatementIdsSet has ${selectedStatementIdsSet.size} statements: ${JSON.stringify(Array.from(selectedStatementIdsSet))}`);
       
-      // Only distribute SELECTED (currently linked) statements — NOT initial_linked ones that may have been unlinked
+      // All statements: initial linked (that are still selected) + new selected!
       const allStatementIdsToDistribute = new Set([...selectedStatementIdsSet]);
       
       console.log(`[invoices-bulk-link] Statements to distribute: ${allStatementIdsToDistribute.size}: ${JSON.stringify(Array.from(allStatementIdsToDistribute))}`);
@@ -158,7 +208,7 @@ export async function PATCH(req) {
       let statementsToDistribute = [];
       if (allStatementIdsToDistribute.size > 0) {
         const [selectedStatements] = await conn.query(
-          "SELECT id, amount, linked_purchase_ids FROM statements WHERE id IN (?)",
+          "SELECT id, trans_id, amount, linked_purchase_ids FROM statements WHERE id IN (?)",
           [[...allStatementIdsToDistribute]]
         );
         statementsToDistribute = selectedStatements.sort((a, b) => a.id - b.id);
@@ -166,35 +216,72 @@ export async function PATCH(req) {
 
       console.log(`[invoices-bulk-link] Found ${statementsToDistribute.length} statements to distribute`);
 
-      // Get all selected invoices with their grand_total
-      const [invoices] = await conn.query(
-        "SELECT id, grand_total, amount_paid, linked_trans_ids FROM invoices WHERE id IN (?)",
-        [invoice_ids]
-      );
+      const sortedInvoices = currentInvoices.sort((a, b) => a.id - b.id);
 
-      const sortedInvoices = invoices.sort((a, b) => a.id - b.id);
-
-      // START FROM ZERO — recalculate amount_paid fresh from currently linked statements only
+      // START WITH EXISTING AMOUNT PAID!
       const invoicePaidMap = {};
+      const invoiceTransIdsMap = {};
       sortedInvoices.forEach(inv => {
-        invoicePaidMap[inv.id] = 0; // reset to 0, not from DB
+        invoicePaidMap[inv.id] = Number(inv.amount_paid || 0);
+        invoiceTransIdsMap[inv.id] = new Set(parseLinkedPurchaseTokens(inv.linked_trans_ids)); // preserve existing trans_ids!
       });
 
-      // Distribute selected statements across invoices
-      for (const stmt of statementsToDistribute) {
-        let remainingToAllocate = Number(stmt.amount || 0);
-        
-        const stmtTokens = parseLinkedPurchaseTokens(stmt.linked_purchase_ids);
-        console.log(`[invoices-bulk-link] Statement ${stmt.id}: amount=₹${remainingToAllocate}, tokens=${JSON.stringify(stmtTokens)}`);
-        
-        const linkedInvoiceIds = stmtTokens
+      // Add initially linked statements (that are still selected) to invoiceTransIdsMap!
+      for (const stmt of relevantStatements) {
+        if (!initialLinkedStatementIdsSet.has(stmt.id) || !selectedStatementIdsSet.has(stmt.id)) continue;
+
+        // Get which invoices this statement was originally linked to!
+        const originalTokens = parseLinkedPurchaseTokens(originalLinkedPurchaseIdsMap[stmt.id]);
+        const originalLinkedIds = originalTokens
           .filter(token => token.startsWith('IP'))
           .map(token => parseInt(token.substring(2)))
           .filter(id => invoice_ids.includes(id));
         
-        const targetInvoices = linkedInvoiceIds.length > 0
-          ? sortedInvoices.filter(inv => linkedInvoiceIds.includes(inv.id))
-          : sortedInvoices;
+        // Add this statement's trans_id to those invoices' linked_trans_ids!
+        if (stmt.trans_id) {
+          originalLinkedIds.forEach(invId => {
+            if (invoiceTransIdsMap[invId]) {
+              invoiceTransIdsMap[invId].add(stmt.trans_id);
+            }
+          });
+        }
+      }
+
+      // First, handle UNLINKED statements! Remove their trans_id and subtract their amount!
+      const unlinkedStatements = relevantStatements.filter(
+        stmt => initialLinkedStatementIdsSet.has(stmt.id) && !selectedStatementIdsSet.has(stmt.id)
+      );
+      console.log(`[invoices-bulk-link] Statements to UNLINK: ${unlinkedStatements.map(s => s.id)}`);
+
+      for (const stmt of unlinkedStatements) {
+        const originalTokens = parseLinkedPurchaseTokens(originalLinkedPurchaseIdsMap[stmt.id]); // use original!
+        const originalLinkedIds = originalTokens
+          .filter(token => token.startsWith('IP'))
+          .map(token => parseInt(token.substring(2)))
+          .filter(id => invoice_ids.includes(id));
+        
+        // Subtract the amount (we'll recalculate after, but let's first remove trans_id!)
+        // Also remove trans_id from linked_trans_ids!
+        if (stmt.trans_id) {
+          originalLinkedIds.forEach(invId => {
+            if (invoiceTransIdsMap[invId]) {
+              invoiceTransIdsMap[invId].delete(stmt.trans_id);
+            }
+          });
+        }
+      }
+
+      // Now, process NEW statements only! Don't re-distribute existing ones!
+      const newStatementsOnly = statementsToDistribute.filter(stmt => !initialLinkedStatementIdsSet.has(stmt.id));
+      console.log(`[invoices-bulk-link] New statements to add: ${newStatementsOnly.map(s => s.id)}`);
+
+      // Distribute NEW statements across invoices
+      for (const stmt of newStatementsOnly) {
+        let remainingToAllocate = Number(stmt.amount || 0);
+        
+        let targetInvoices = sortedInvoices;
+        
+        console.log(`[invoices-bulk-link] Statement ${stmt.id} (new=true): amount=₹${remainingToAllocate}, targetInvoices=${targetInvoices.map(i => i.id)}`);
         
         for (const invoice of targetInvoices) {
           if (remainingToAllocate <= 0) break;
@@ -208,29 +295,74 @@ export async function PATCH(req) {
             remainingToAllocate -= toAllocate;
           }
         }
-      }
 
-      // Update invoices with new amount_paid and balance_amount
-      // Build map: invoiceId -> Set of trans_ids from SELECTED (linked) statements
-      const invoiceTransIdsMap = {};
-      invoice_ids.forEach(id => { invoiceTransIdsMap[id] = new Set(); });
-
-      // For each selected statement, get its trans_id and add to ALL selected invoices
-      for (const stmt of statementsToDistribute) {
-        if (!selectedStatementIdsSet.has(stmt.id)) continue; // skip unlinked
-
-        const [[stmtRow]] = await conn.execute(
-          "SELECT trans_id FROM statements WHERE id = ?",
-          [stmt.id]
-        );
-        const transId = stmtRow?.trans_id;
-        console.log(`[invoices-bulk-link] Statement ${stmt.id} trans_id=${transId}`);
+        // Add trans_id to all target invoices' linked_trans_ids
+        const transId = stmt.trans_id;
         if (transId) {
           invoice_ids.forEach(invId => {
-            invoiceTransIdsMap[invId].add(transId);
+            if (invoiceTransIdsMap[invId]) {
+              invoiceTransIdsMap[invId].add(transId);
+            }
           });
         }
       }
+
+      // Now, RECALCULATE amount_paid from scratch using ALL linked statements (original - unlinked + new)!
+      // Because the existing amount_paid might have been calculated differently before!
+      // First, get ALL linked statements for each invoice!
+      const [allStatements] = await conn.query(
+        "SELECT id, trans_id, amount, linked_purchase_ids, invoice_number FROM statements"
+      );
+
+      // Build a map of invoice_id -> list of statements linked to it
+      const invoiceToStatementsMap = {};
+      sortedInvoices.forEach(inv => invoiceToStatementsMap[inv.id] = []);
+
+      for (const stmt of allStatements) {
+        // Check if this statement is linked to any of our invoices!
+        const linkedTokens = parseLinkedPurchaseTokens(stmt.linked_purchase_ids);
+        const linkedIdsFromToken = linkedTokens
+          .filter(t => t.startsWith('IP'))
+          .map(t => parseInt(t.substring(2)));
+        
+        const linkedIdsFromInvoiceNumber = [];
+        if (stmt.invoice_number) {
+          const invWithMatchingNumber = sortedInvoices.find(i => i.invoice_number === stmt.invoice_number);
+          if (invWithMatchingNumber) {
+            linkedIdsFromInvoiceNumber.push(invWithMatchingNumber.id);
+          }
+        }
+
+        const allLinkedIds = [...new Set([...linkedIdsFromToken, ...linkedIdsFromInvoiceNumber])];
+        
+        for (const invId of allLinkedIds) {
+          if (invoiceToStatementsMap[invId]) {
+            invoiceToStatementsMap[invId].push(stmt);
+          }
+        }
+      }
+
+      // Now, recalculate amount_paid properly for each invoice!
+      sortedInvoices.forEach(inv => {
+        const invGrandTotal = Number(inv.grand_total || 0);
+        let totalPaid = 0;
+        
+        // Sort statements to process in consistent order!
+        const stmtList = invoiceToStatementsMap[inv.id] || [];
+        stmtList.sort((a, b) => a.id - b.id);
+        
+        for (const stmt of stmtList) {
+          if (totalPaid >= invGrandTotal) break;
+          
+          const stmtAmount = Math.abs(Number(stmt.amount || 0));
+          const remaining = Math.max(0, invGrandTotal - totalPaid);
+          const toAdd = Math.min(remaining, stmtAmount);
+          
+          totalPaid += toAdd;
+        }
+        
+        invoicePaidMap[inv.id] = totalPaid;
+      });
 
       for (const invoice of sortedInvoices) {
         const newAmountPaid = invoicePaidMap[invoice.id];

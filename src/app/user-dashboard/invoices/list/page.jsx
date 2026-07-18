@@ -1,6 +1,6 @@
 "use client";
 
-import InvoiceTable from "./InvoiceTable";
+import InvoiceTable from "../InvoiceTable";
 
 export const dynamic = "force-dynamic";
 

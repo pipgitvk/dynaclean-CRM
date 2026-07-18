@@ -5,7 +5,7 @@ import { getDbConnection } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// Fetch invoice + items
+// Fetch invoice + items + linked statements
 async function getInvoiceWithItems(invoiceNumber) {
   const conn = await getDbConnection();
 
@@ -88,12 +88,69 @@ async function getInvoiceWithItems(invoiceNumber) {
     `,
     [invoice.id],
   );
+  
+  // Get all related invoice IDs and numbers: this invoice, parent, and children
+  let relatedInvoices = [{id: invoice.id, number: invoice.invoice_number}];
+  if (invoice.parent_id) {
+    // If this invoice has a parent, get parent and all siblings
+    const [parent] = await conn.execute(
+      "SELECT id, invoice_number FROM invoices WHERE id = ?",
+      [invoice.parent_id]
+    );
+    if (parent.length > 0) {
+      relatedInvoices.push({id: parent[0].id, number: parent[0].invoice_number});
+    }
+    // Get all siblings (invoices with same parent)
+    const [siblings] = await conn.execute(
+      "SELECT id, invoice_number FROM invoices WHERE parent_id = ?",
+      [invoice.parent_id]
+    );
+    siblings.forEach(s => relatedInvoices.push({id: s.id, number: s.invoice_number}));
+  } else {
+    // If this invoice is a parent, get all its children
+    const [children] = await conn.execute(
+      "SELECT id, invoice_number FROM invoices WHERE parent_id = ?",
+      [invoice.id]
+    );
+    children.forEach(c => relatedInvoices.push({id: c.id, number: c.invoice_number}));
+  }
+  // Remove duplicates
+  const uniqueRelatedInvoices = [];
+  const seenInvoiceIds = new Set();
+  for (const inv of relatedInvoices) {
+    if (!seenInvoiceIds.has(inv.id)) {
+      seenInvoiceIds.add(inv.id);
+      uniqueRelatedInvoices.push(inv);
+    }
+  }
+  
+  // Linked statements
+  let linkedStatements = [];
+  for (const inv of uniqueRelatedInvoices) {
+    const [stmts] = await conn.execute(
+      "SELECT id, trans_id, date, description, amount, invoice_status FROM statements WHERE linked_purchase_ids LIKE ? OR invoice_number = ?",
+      [`%IP${inv.id}%`, inv.number]
+    );
+    linkedStatements.push(...stmts);
+  }
+  
+  // Remove duplicate statements
+  const uniqueLinkedStatements = [];
+  const seenStmtIds = new Set();
+  for (const stmt of linkedStatements) {
+    if (!seenStmtIds.has(stmt.id)) {
+      seenStmtIds.add(stmt.id);
+      uniqueLinkedStatements.push(stmt);
+    }
+  }
+  linkedStatements = uniqueLinkedStatements;
 
   return {
     ...invoice,
     reference_quote_number: resolvedQuoteNumber,
     reference_quote_created_at: resolvedQuoteCreatedAt,
     items,
+    linkedStatements,
   };
 }
 

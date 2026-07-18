@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import InvoiceEditModal from "@/app/admin-dashboard/invoices/InvoiceEditModal";
 import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 
-const SESSION_KEY = "invoice_selected_ids";
-const SESSION_DATA_KEY = "invoice_selected_data";
+const InvoiceEditModal = dynamic(() => import("@/app/admin-dashboard/invoices/InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable() {
   const [invoices, setInvoices] = useState([]);
@@ -15,8 +14,14 @@ export default function InvoiceTable() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
+  // Single page — fetch all records
+  const [currentPage] = useState(1);
+  const limit = 10000;
   const [meta, setMeta] = useState({
+    page: 1,
+    limit: 10000,
     total: 0,
+    totalPages: 1,
   });
 
   // Sorting
@@ -24,55 +29,18 @@ export default function InvoiceTable() {
   const [sortOrder, setSortOrder] = useState("desc");
   const [fetchError, setFetchError] = useState(null);
   const [editId, setEditId] = useState(null);
-
+  
   // Link payment modal
   const [showLinkModal, setShowLinkModal] = useState(false);
-  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(() => {
-    // Restore selection from sessionStorage on mount
-    try {
-      const saved = sessionStorage.getItem(SESSION_KEY);
-      if (saved) {
-        return new Set(JSON.parse(saved));
-      }
-    } catch (_) {}
-    return new Set();
-  });
-  const [selectedInvoices, setSelectedInvoices] = useState(() => {
-    // Restore full invoice data from sessionStorage on mount
-    try {
-      const saved = sessionStorage.getItem(SESSION_DATA_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (_) {}
-    return [];
-  });
-
-  // Persist selectedInvoiceIds to sessionStorage whenever it changes
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify([...selectedInvoiceIds]));
-    } catch (_) {}
-  }, [selectedInvoiceIds]);
-
-  // Persist selectedInvoices (full data) to sessionStorage whenever it changes
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(SESSION_DATA_KEY, JSON.stringify(selectedInvoices));
-    } catch (_) {}
-  }, [selectedInvoices]);
-
-  const handleRemoveSelected = () => {
-    sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem(SESSION_DATA_KEY);
-    setSelectedInvoiceIds(new Set());
-    setSelectedInvoices([]);
-  };
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState(new Set());
+  const [selectedInvoices, setSelectedInvoices] = useState([]);
 
   const fetchData = async () => {
     setLoading(true);
 
     const params = new URLSearchParams();
-    params.append("page", 1);
-    params.append("limit", 99999);
+    params.append("page", currentPage);
+    params.append("limit", limit);
     params.append("sort", sortBy);
     params.append("order", sortOrder);
 
@@ -91,7 +59,6 @@ export default function InvoiceTable() {
         
         // Group invoices by parent_id and sort so parent appears first, then children
         const grouped = {};
-        const standalone = [];
         
         // First pass: organize by parent
         data.forEach(invoice => {
@@ -108,6 +75,14 @@ export default function InvoiceTable() {
             }
             grouped[invoice.id].parent = invoice;
           }
+        });
+
+        // Calculate per invoice linked amount (for display only)
+        data.forEach(inv => {
+          inv.totalLinkedAmount = inv.linkedStatements?.reduce(
+            (sum, stmt) => sum + Number(stmt.amount || 0),
+            0
+          ) || 0;
         });
 
         // Build final sorted array: parent followed by its children
@@ -135,23 +110,7 @@ export default function InvoiceTable() {
         });
 
         setInvoices(sortedData);
-        setMeta({ total: response.meta?.total || sortedData.length });
-
-        // Re-sync selectedInvoices — merge current page data with already-stored data
-        setSelectedInvoices(prev => {
-          const existingIds = new Set(prev.map(inv => inv.id));
-          const toAdd = sortedData.filter(inv => {
-            try {
-              const saved = sessionStorage.getItem(SESSION_KEY);
-              if (saved) {
-                const restoredIds = new Set(JSON.parse(saved));
-                return restoredIds.has(inv.id) && !existingIds.has(inv.id);
-              }
-            } catch (_) {}
-            return false;
-          });
-          return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
-        });
+        setMeta(response.meta);
       } else {
         setInvoices([]);
         setFetchError(response.detail || response.error || "Failed to load invoices");
@@ -215,9 +174,7 @@ export default function InvoiceTable() {
         // If it's a child, deselect parent AND all sibling children
         const parentId = clickedInvoice.parent_id;
         invoices.forEach(inv => {
-          if (inv.parent_id === parentId || inv.id === parentId) {
-            newSelected.delete(inv.id);
-          }
+          if (inv.parent_id === parentId || inv.id === parentId) {newSelected.delete(inv.id);}
         });
       }
     } else {
@@ -245,22 +202,9 @@ export default function InvoiceTable() {
     
     setSelectedInvoiceIds(newSelected);
     
-    // Merge: keep previously selected invoices from other pages, update current page ones
-    setSelectedInvoices(prev => {
-      // Remove any invoices from current page that are no longer selected
-      const filtered = prev.filter(inv => {
-        const isOnCurrentPage = invoices.some(ci => ci.id === inv.id);
-        return !isOnCurrentPage || newSelected.has(inv.id);
-      });
-      // Add newly selected invoices from current page that aren't already in the list
-      const existingIds = new Set(filtered.map(inv => inv.id));
-      invoices.forEach(inv => {
-        if (newSelected.has(inv.id) && !existingIds.has(inv.id)) {
-          filtered.push(inv);
-        }
-      });
-      return filtered;
-    });
+    // Update selected invoices data
+    const selected = invoices.filter(inv => newSelected.has(inv.id));
+    setSelectedInvoices(selected);
   };
 
   const handleLinkPaymentClick = () => {
@@ -268,7 +212,7 @@ export default function InvoiceTable() {
     setShowLinkModal(true);
   };
 
-const SortIcon = ({ column }) =>
+  const SortIcon = ({ column }) =>
     sortBy !== column ? (
       <span className="ml-1 text-gray-400">↕</span>
     ) : sortOrder === "asc" ? (
@@ -276,6 +220,9 @@ const SortIcon = ({ column }) =>
     ) : (
       <span className="ml-1">↓</span>
     );
+
+  // State to track expanded invoices for showing linked statements
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
 
   return (
     <div className="bg-white rounded shadow p-4">
@@ -317,46 +264,27 @@ const SortIcon = ({ column }) =>
               Link Payment ({selectedInvoiceIds.size})
             </button>
           )}
-          {selectedInvoiceIds.size > 0 && (
-            <button
-              onClick={handleRemoveSelected}
-              className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-600 whitespace-nowrap font-semibold"
-            >
-              Remove Selected ({selectedInvoiceIds.size})
-            </button>
-          )}
         </div>
       </div>
 
       {/* Table */}
-      {!loading && !fetchError && invoices.length > 0 && (
-        <p className="text-sm text-gray-500 mb-2">
-          Showing {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
-        </p>
-      )}
       <div className="overflow-x-auto hidden md:block border rounded">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100">
             <tr>
+              <th className="px-4 py-2 w-12"></th>
               <th className="px-4 py-2 w-12">
                 <input
                   type="checkbox"
-                  checked={invoices.length > 0 && invoices.every(inv => selectedInvoiceIds.has(inv.id))}
+                  checked={selectedInvoiceIds.size > 0 && selectedInvoiceIds.size === invoices.length && invoices.length > 0}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      const newSet = new Set([...selectedInvoiceIds, ...invoices.map(inv => inv.id)]);
+                      const newSet = new Set(invoices.map(inv => inv.id));
                       setSelectedInvoiceIds(newSet);
-                      setSelectedInvoices(prev => {
-                        const existingIds = new Set(prev.map(inv => inv.id));
-                        const toAdd = invoices.filter(inv => !existingIds.has(inv.id));
-                        return [...prev, ...toAdd];
-                      });
+                      setSelectedInvoices(invoices);
                     } else {
-                      // Only deselect current page invoices
-                      const currentPageIds = new Set(invoices.map(inv => inv.id));
-                      const newSet = new Set([...selectedInvoiceIds].filter(id => !currentPageIds.has(id)));
-                      setSelectedInvoiceIds(newSet);
-                      setSelectedInvoices(prev => prev.filter(inv => !currentPageIds.has(inv.id)));
+                      setSelectedInvoiceIds(new Set());
+                      setSelectedInvoices([]);
                     }
                   }}
                   className="w-4 h-4 cursor-pointer"
@@ -391,104 +319,181 @@ const SortIcon = ({ column }) =>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="10" className="text-center py-4">
+                <td colSpan="11" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="10" className="text-center py-6 text-red-600">
+                <td colSpan="11" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
             ) : invoices.length ? (
               invoices.map((i) => (
-                <tr key={i.id} className={`border-t hover:bg-gray-50 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : ''}`}>
-                  <td className="px-4 py-2 w-12">
-                    <input
-                      type="checkbox"
-                      checked={selectedInvoiceIds.has(i.id)}
-                      onChange={() => handleSelectInvoice(i.id)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </td>
-                  <td className="px-4 py-2 font-medium">
-                    {i.parent_id && (
-                      <span className="text-gray-400 mr-2">└─</span>
-                    )}
-                    {i.invoice_number}
-                    {!i.parent_id && invoices.some(inv => inv.parent_id === i.id) && (
-                      <span className="text-xs bg-blue-100 text-blue-700 ml-2 px-2 py-0.5 rounded">Parent</span>
-                    )}
-                  </td>
-                  <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.buyer_name}</td>
-                  <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.employee_name || "-"}</td>
-                  <td className="px-4 py-2">
-                    {new Date(i.order_date).toLocaleDateString("en-IN")}
-                  </td>
-                  <td className="px-4 py-2">
-                    ₹{Number(i.tax_amount).toLocaleString("en-IN")}
-                  </td>
-                  <td className="px-4 py-2 font-semibold">
-                    ₹{Number(i.grand_total).toLocaleString("en-IN")}
-                  </td>
-                  <td className="px-4 py-2">
-                    ₹{Number(i.balance_amount || 0).toLocaleString("en-IN")}
-                  </td>
-                  <td className="px-4 py-2">
-                    {new Date(i.created_at).toLocaleDateString("en-IN")}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    <div className="flex flex-wrap items-center justify-center gap-1.5">
-                      <Link
-                        href={`/user-dashboard/invoices/${encodeURIComponent(i.invoice_number)}`}
-                        className="bg-green-600 text-white px-3 py-1 rounded inline-block"
-                      >
-                        View
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => setEditId(i.id)}
-                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // If already have a link modal open with these invoices selected
-                          if (selectedInvoiceIds.size > 0) {
-                            // Open with all selected invoices
-                            setShowLinkModal(true);
-                          } else {
-                            // First time - select this invoice and find related ones
-                            // Parent = highest ID, children = lower IDs with same parent_id or not yet assigned
-                            const newSelected = new Set([i.id]);
-                            
-                            // For now, just select this one invoice
-                            // Parent-child relationship will be set when saving
-                            setSelectedInvoiceIds(newSelected);
-                            setSelectedInvoices([i]);
-                            setShowLinkModal(true);
-                          }
-                        }}
-                        disabled={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)}
-                        className={`text-white px-3 py-1 rounded ${
-                          selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)
-                            ? 'bg-gray-400 cursor-not-allowed opacity-50'
-                            : 'bg-purple-600 hover:bg-purple-700'
-                        }`}
-                        title={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
-                      >
-                        Link Payment
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                <React.Fragment key={i.id}>
+                  <tr className={`border-t hover:bg-gray-50 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-4 py-2 w-12">
+                      {i.linkedStatements && i.linkedStatements.length > 0 && (
+                        <button
+                          onClick={() => setExpandedInvoiceId(expandedInvoiceId === i.id ? null : i.id)}
+                          className="text-gray-600 hover:text-blue-600"
+                        >
+                          {expandedInvoiceId === i.id ? '▼' : '▶'}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedInvoiceIds.has(i.id)}
+                        onChange={() => handleSelectInvoice(i.id)}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-4 py-2 font-medium">
+                      {i.parent_id && (
+                        <span className="text-gray-400 mr-2">└─</span>
+                      )}
+                      {i.invoice_number}
+                      {!i.parent_id && invoices.some(inv => inv.parent_id === i.id) && (
+                        <span className="text-xs bg-blue-100 text-blue-700 ml-2 px-2 py-0.5 rounded">Parent</span>
+                      )}
+                      {i.linkedStatements && i.linkedStatements.length > 0 && (
+                        <span className="text-xs bg-green-100 text-green-700 ml-2 px-2 py-0.5 rounded">
+                          {i.linkedStatements.length} Linked Payment{i.linkedStatements.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </td>
+                    <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.buyer_name}</td>
+                    <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.employee_name || "-"}</td>
+                    <td className="px-4 py-2">
+                      {new Date(i.order_date).toLocaleDateString("en-IN")}
+                    </td>
+                    <td className="px-4 py-2">
+                      ₹{Number(i.tax_amount).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-2 font-semibold">
+                      ₹{Number(i.grand_total).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-2 font-semibold">
+                      <span className={Number(i.balance_amount) > 0 ? 'text-red-600' : 'text-green-600'}>
+                        ₹{Number(i.balance_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </span>
+                      {i.totalLinkedAmount > 0 && (
+                        <div className="text-xs text-gray-500">
+                          (-₹{Number(i.totalLinkedAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {new Date(i.created_at).toLocaleDateString("en-IN")}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        <Link
+                          href={`/user-dashboard/invoices/${encodeURIComponent(i.invoice_number)}`}
+                          className="bg-green-600 text-white px-3 py-1 rounded inline-block"
+                        >
+                          View
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setEditId(i.id)}
+                          className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // If already have a link modal open with these invoices selected
+                            if (selectedInvoiceIds.size > 0) {
+                              // Open with all selected invoices
+                              setShowLinkModal(true);
+                            } else {
+                              // First time - select this invoice and find related ones
+                              const newSelected = new Set([i.id]);
+                              setSelectedInvoiceIds(newSelected);
+                              setSelectedInvoices([i]);
+                              setShowLinkModal(true);
+                            }
+                          }}
+                          disabled={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)}
+                          className={`text-white px-3 py-1 rounded ${
+                            selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)
+                              ? 'bg-gray-400 cursor-not-allowed opacity-50'
+                              : 'bg-purple-600 hover:bg-purple-700'
+                          }`}
+                          title={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
+                        >
+                          Link Payment
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
+                    <tr>
+                      <td colSpan="11" className="px-8 py-4 bg-gray-50">
+                        <div className="flex justify-between items-center mb-3">
+                          <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
+                          <div className="text-right">
+                            <span className="text-sm text-gray-600">Total Linked: </span>
+                            <span className="text-lg font-bold text-red-600">
+                              ₹{Number(i.totalLinkedAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm border rounded">
+                            <thead className="bg-gray-200">
+                              <tr>
+                                <th className="px-4 py-2 text-left">ID</th>
+                                <th className="px-4 py-2 text-left">Trans ID</th>
+                                <th className="px-4 py-2 text-left">Date</th>
+                                <th className="px-4 py-2 text-left">Description</th>
+                                <th className="px-4 py-2 text-right">Amount</th>
+                                <th className="px-4 py-2 text-left">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {i.linkedStatements.map((stmt) => (
+                                <tr key={stmt.id} className="border-t">
+                                  <td className="px-4 py-2">{stmt.id}</td>
+                                  <td className="px-4 py-2 font-mono">{stmt.trans_id || "-"}</td>
+                                  <td className="px-4 py-2">
+                                    {stmt.date ? new Date(stmt.date).toLocaleDateString("en-IN") : "-"}
+                                  </td>
+                                  <td className="px-4 py-2 max-w-xs truncate" title={stmt.description}>
+                                    {stmt.description || "-"}
+                                  </td>
+                                  <td className="px-4 py-2 text-right font-semibold text-red-600">
+                                    ₹{Number(stmt.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                      stmt.invoice_status === "Settled" 
+                                        ? "bg-green-100 text-green-800" 
+                                        : stmt.invoice_status === "Partial Paid" 
+                                          ? "bg-yellow-100 text-yellow-800" 
+                                          : "bg-gray-100 text-gray-800"
+                                    }`}>
+                                      {stmt.invoice_status || "Unsettled"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))
             ) : (
               <tr>
-                <td colSpan="10" className="text-center py-6 text-gray-500">
+                <td colSpan="11" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>
@@ -512,12 +517,13 @@ const SortIcon = ({ column }) =>
           isOpen={showLinkModal}
           closeModal={() => {
             setShowLinkModal(false);
+            setSelectedInvoiceIds(new Set());
+            setSelectedInvoices([]);
           }}
           selectedInvoiceIds={selectedInvoiceIds}
-          selectedGrandTotal={selectedInvoices.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0)}
+          selectedGrandTotal={selectedInvoices.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0)}
           invoices={invoices}
           onLinkSuccess={() => {
-            handleRemoveSelected();
             fetchData();
           }}
         />

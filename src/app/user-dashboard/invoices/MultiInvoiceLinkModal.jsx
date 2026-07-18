@@ -10,6 +10,7 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
   const [loading, setLoading] = useState(false);
   const [selectedStatementIds, setSelectedStatementIds] = useState(new Set());
   const [initialLinkedStatementIds, setInitialLinkedStatementIds] = useState(new Set());
+  const [initialLinkedTotal, setInitialLinkedTotal] = useState(0);
   const [saving, setSaving] = useState(false);
   
   const getLinkedKeys = (stmt) => {
@@ -36,10 +37,10 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     return keys;
   };
   
-  const getCurrentMonthStart = () => {
+  const getOneYearAgo = () => {
     const now = new Date();
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    return firstDay.toISOString().split('T')[0];
+    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+    return oneYearAgo.toISOString().split('T')[0];
   };
   
   const getCurrentMonthEnd = () => {
@@ -48,7 +49,7 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     return lastDay.toISOString().split('T')[0];
   };
   
-  const [stmtStartDate, setStmtStartDate] = useState(getCurrentMonthStart());
+  const [stmtStartDate, setStmtStartDate] = useState(getOneYearAgo());
   const [stmtEndDate, setStmtEndDate] = useState(getCurrentMonthEnd());
 
   useEffect(() => {
@@ -58,7 +59,7 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     // Initialize selected statements with those already linked to our selected invoices
     const initialSelected = new Set();
     const initialLinked = new Set();
-    setStmtStartDate(getCurrentMonthStart());
+    setStmtStartDate(getOneYearAgo());
     setStmtEndDate(getCurrentMonthEnd());
     let cancelled = false;
     setLoading(true);
@@ -69,18 +70,27 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
         const rows = Array.isArray(data?.statements) ? data.statements : [];
         setStatements(rows);
         
-        // Auto-select statements already linked to selected invoices
-        const selectedInvoiceKeys = new Set(Array.from(selectedInvoiceIds).map(id => `IP${id}`));
+        // Get selected invoice IDs and their invoice numbers
+        const selectedInvoicesList = invoices.filter(p => selectedInvoiceIds.has(Number(p.id)));
+        const selectedInvoiceKeys = new Set(selectedInvoicesList.map(p => `IP${p.id}`));
+        const selectedInvoiceNumbers = new Set(selectedInvoicesList.map(p => p.invoice_number));
+        
+        // Auto-select statements already linked to selected invoices (by ID or number)
+        let initialLinkedTotalVal = 0;
         rows.forEach(stmt => {
           const linkedKeys = getLinkedKeys(stmt);
-          const isLinkedToSelected = linkedKeys.some(key => selectedInvoiceKeys.has(key));
+          const isLinkedById = linkedKeys.some(key => selectedInvoiceKeys.has(key));
+          const isLinkedByNumber = stmt.invoice_number && selectedInvoiceNumbers.has(stmt.invoice_number);
+          const isLinkedToSelected = isLinkedById || isLinkedByNumber;
           if (isLinkedToSelected) {
             initialSelected.add(stmt.id);
             initialLinked.add(stmt.id);
+            initialLinkedTotalVal += Number(stmt.amount || 0);
           }
         });
         setSelectedStatementIds(initialSelected);
         setInitialLinkedStatementIds(initialLinked);
+        setInitialLinkedTotal(initialLinkedTotalVal);
       })
       .catch(() => {
         if (!cancelled) toast.error("Failed to load statements");
@@ -100,26 +110,41 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
       (!s.invoice_status && !s.client_expense_id);
     const isCredit = (s) => String(s.type || "").trim() === "Credit";
 
-    // Get invoice keys for selected invoices (IP{id})
-    const selectedInvoiceKeys = new Set(Array.from(selectedInvoiceIds).map(id => `IP${id}`));
+    // Get selected invoice keys and numbers
+    const selectedInvoicesList = invoices.filter(p => selectedInvoiceIds.has(Number(p.id)));
+    const selectedInvoiceKeys = new Set(selectedInvoicesList.map(p => `IP${p.id}`));
+    const selectedInvoiceNumbers = new Set(selectedInvoicesList.map(p => p.invoice_number));
 
     let rows = statements.filter((s) => {
       const isCredit = (s) => String(s.type || "").trim() === "Credit";
+      const linked = getLinkedKeys(s);
+      const isLinkedById = linked.some(key => selectedInvoiceKeys.has(key));
+      const isLinkedByNumber = s.invoice_number && selectedInvoiceNumbers.has(s.invoice_number);
+      const isLinkedToSelected = isLinkedById || isLinkedByNumber;
       
-      // ALWAYS show selected statements
-      if (selectedStatementIds.has(s.id)) return true;
+      // ALWAYS show selected statements OR statements linked to selected invoices
+      if (selectedStatementIds.has(s.id) || isLinkedToSelected) {
+        // Date filter for these statements too, to keep consistency
+        if (stmtStartDate && stmtEndDate) {
+          const stmtDate = new Date(s.date);
+          const start = new Date(stmtStartDate);
+          const end = new Date(stmtEndDate);
+          end.setHours(23, 59, 59, 999);
+          if (stmtDate < start || stmtDate > end) {
+            // But wait, if it's linked or selected, maybe we should ignore date filter?
+            // Let's not apply date filter for linked/selected statements!
+            // So just return true here
+          }
+        }
+        return true;
+      }
       
-      // Show ONLY Credit type statements that are unsettled
+      // For other statements: Show ONLY Credit type statements that are unsettled
       if (!isCredit(s)) return false;
       if (!isUnsettled(s)) return false;
       
-      const linked = getLinkedKeys(s);
-      // Check if statement is either:
-      // 1. Unsettled and not linked to any invoice
-      // 2. Linked to at least one of our selected invoices
-      const isLinkedToSelected = linked.some(key => selectedInvoiceKeys.has(key));
-      
-      if ((isUnsettled(s) && linked.length === 0) || isLinkedToSelected) {
+      // Check if statement is unsettled and not linked to any invoice
+      if (isUnsettled(s) && linked.length === 0) {
         // Date filter
         if (stmtStartDate && stmtEndDate) {
           const stmtDate = new Date(s.date);
@@ -156,14 +181,16 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
     }
 
     return rows;
-  }, [statements, search, stmtStartDate, stmtEndDate, selectedStatementIds, selectedInvoiceIds]);
+  }, [statements, search, stmtStartDate, stmtEndDate, selectedStatementIds, selectedInvoiceIds, invoices]);
 
-  const { totalSelectedAmount, statementDistribution, selectedGroups, remainingAmount } = useMemo(() => {
+  const { totalSelectedAmount, statementDistribution, selectedGroups, remainingAmount, totalNewSelectedAmount } = useMemo(() => {
     const selectedStatementsList = statements.filter(s => selectedStatementIds.has(s.id)).sort((a, b) => a.id - b.id);
+    const newSelectedStatementsList = selectedStatementsList.filter(s => !initialLinkedStatementIds.has(s.id));
 
     // Now, process selected statements distribution!
     const distribution = {};
     let totalSelectedAmountVal = 0;
+    let totalNewSelectedAmountVal = 0;
 
     selectedStatementsList.forEach(s => {
       const stmtAmount = Number(s.amount || 0);
@@ -172,6 +199,9 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
         remaining: 0
       };
       totalSelectedAmountVal += stmtAmount;
+      if (!initialLinkedStatementIds.has(s.id)) {
+        totalNewSelectedAmountVal += stmtAmount;
+      }
     });
 
     // Group selected statements by trans_id for top section display
@@ -191,39 +221,50 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
       }
     });
 
-    const remaining = Math.max(0, selectedGrandTotal - totalSelectedAmountVal);
+    // Remaining to select is (total invoice grand total) - (initial linked total)
+    const maxAllowedToSelect = Math.max(0, selectedGrandTotal - initialLinkedTotal);
+    // Remaining amount is maxAllowedToSelect - totalNewSelectedAmountVal
+    const remaining = Math.max(0, maxAllowedToSelect - totalNewSelectedAmountVal);
 
     return {
       totalSelectedAmount: totalSelectedAmountVal,
+      totalNewSelectedAmount: totalNewSelectedAmountVal,
       statementDistribution: distribution,
       selectedGroups: groups,
       remainingAmount: remaining
     };
-  }, [statements, selectedStatementIds, selectedGrandTotal]);
+  }, [statements, selectedStatementIds, selectedGrandTotal, initialLinkedTotal, initialLinkedStatementIds]);
 
   const handleSelectStatement = (id) => {
     const statement = statements.find((s) => s.id === id);
     if (!statement) return;
+
+    const isInitiallyLinked = initialLinkedStatementIds.has(id);
 
     setSelectedStatementIds(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
         newSet.delete(id);
       } else {
-        // Calculate current total
-        let currentTotal = 0;
+        // Calculate current new total (only non-initial linked statements)
+        let currentNewTotal = 0;
         prev.forEach(sid => {
-          const s = statements.find(ss => ss.id === sid);
-          if (s) currentTotal += Number(s.amount || 0);
+          if (!initialLinkedStatementIds.has(sid)) {
+            const s = statements.find(ss => ss.id === sid);
+            if (s) currentNewTotal += Number(s.amount || 0);
+          }
         });
         
         const statementAmount = Number(statement.amount || 0);
-        const newTotal = currentTotal + statementAmount;
-        
-        // Check if exceeds grand total
-        if (newTotal > selectedGrandTotal) {
-          toast.error(`Cannot select this statement! Total would be ₹${newTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })} which exceeds balance amount of ₹${selectedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-          return prev;
+        const maxAllowedToSelect = Math.max(0, selectedGrandTotal - initialLinkedTotal);
+
+        // If it's not initially linked, check if adding it would exceed max allowed
+        if (!isInitiallyLinked) {
+          const newTotal = currentNewTotal + statementAmount;
+          if (newTotal > maxAllowedToSelect) {
+            toast.error(`Cannot select this statement! Adding this would exceed remaining amount of ₹${maxAllowedToSelect.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+            return prev;
+          }
         }
         
         newSet.add(id);
@@ -274,14 +315,18 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
             </div>
             {/* Invoice Summary - Prominent Display */}
             <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded-md border-2 border-blue-300">
-              <div className="grid grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-5 gap-4 text-sm">
                 <div className="text-center">
-                  <span className="text-gray-600 block text-xs font-semibold">Balance Amount</span>
+                  <span className="text-gray-600 block text-xs font-semibold">Total Invoice Amount</span>
                   <span className="text-xl font-bold text-blue-700">₹{selectedGrandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="text-center">
-                  <span className="text-gray-600 block text-xs font-semibold">Payments Selected</span>
-                  <span className="text-xl font-bold text-purple-700">₹{totalSelectedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-gray-600 block text-xs font-semibold">Already Linked</span>
+                  <span className="text-xl font-bold text-green-700">₹{initialLinkedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="text-center">
+                  <span className="text-gray-600 block text-xs font-semibold">Newly Selected</span>
+                  <span className="text-xl font-bold text-purple-700">₹{totalNewSelectedAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="text-center border-l-2 border-r-2 border-gray-300">
                   <span className="text-gray-600 block text-xs font-semibold">Remaining to Select</span>
@@ -306,6 +351,71 @@ const MultiInvoiceLinkModal = ({ isOpen, closeModal, selectedInvoiceIds, selecte
                 </div>
               </div>
             </div>
+            {/* Currently Linked Statements */}
+            {initialLinkedStatementIds.size > 0 && (
+              <div className="mt-3 p-3 bg-green-50 rounded-md border border-green-300">
+                <h4 className="text-sm font-semibold text-green-800 mb-2 flex items-center gap-1">
+                  <span>✓</span> Currently Linked Statements ({initialLinkedStatementIds.size})
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs">
+                    <thead>
+                      <tr className="text-left text-gray-600 border-b border-green-200">
+                        <th className="pb-1 pr-3 font-semibold">ID</th>
+                        <th className="pb-1 pr-3 font-semibold">Trans ID</th>
+                        <th className="pb-1 pr-3 font-semibold">Date</th>
+                        <th className="pb-1 pr-3 font-semibold">Description</th>
+                        <th className="pb-1 pr-3 font-semibold text-right">Amount</th>
+                        <th className="pb-1 font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statements
+                        .filter(s => initialLinkedStatementIds.has(s.id))
+                        .sort((a, b) => a.id - b.id)
+                        .map(s => {
+                          const stillSelected = selectedStatementIds.has(s.id);
+                          return (
+                            <tr key={s.id} className={`border-b border-green-100 ${!stillSelected ? 'opacity-60' : ''}`}>
+                              <td className="py-1 pr-3 font-medium text-gray-600">#{s.id}</td>
+                              <td className="py-1 pr-3 font-mono text-gray-500">{s.trans_id || '—'}</td>
+                              <td className="py-1 pr-3 text-gray-600 whitespace-nowrap">
+                                {s.date ? new Date(s.date).toLocaleDateString('en-IN') : '—'}
+                              </td>
+                              <td className="py-1 pr-3 text-gray-600 max-w-[220px] truncate" title={s.description || ''}>
+                                {s.description || '—'}
+                              </td>
+                              <td className="py-1 pr-3 font-bold text-red-600 text-right whitespace-nowrap">
+                                ₹{Number(s.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-1">
+                                {stillSelected ? (
+                                  <span className="inline-block px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">Linked</span>
+                                ) : (
+                                  <span className="inline-block px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-xs font-medium">Will Unlink</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-green-300">
+                        <td colSpan={4} className="pt-1.5 text-xs font-semibold text-gray-600 text-right pr-3">Total Linked:</td>
+                        <td className="pt-1.5 font-bold text-red-700 text-right pr-3 whitespace-nowrap text-xs">
+                          ₹{statements
+                            .filter(s => initialLinkedStatementIds.has(s.id))
+                            .reduce((sum, s) => sum + Number(s.amount || 0), 0)
+                            .toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Show grouped totals for selected payments */}
             {Object.keys(selectedGroups).length > 0 && (
               <div className="mt-3 p-2 bg-gray-50 rounded-md">

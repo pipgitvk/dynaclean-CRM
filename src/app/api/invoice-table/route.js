@@ -3,6 +3,50 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 // import { cookies } from "next/headers";
 
+/** Parse linked_trans_ids JSON or plain string → array of strings */
+function parseTransIds(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
+  if (typeof raw === "string") {
+    try {
+      const p = JSON.parse(raw);
+      return Array.isArray(p) ? p.filter(Boolean).map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/** Parse linked_purchase_ids (JSON, comma-separated, or single token) → array of strings */
+function parseLinkedPurchaseIds(raw) {
+  if (!raw) return [];
+  let arr = null;
+  if (Array.isArray(raw)) {
+    arr = raw;
+  } else if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      arr = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      arr = raw.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+  if (!arr) return [];
+  const keys = [];
+  for (const v of arr) {
+    if (v == null) continue;
+    const s = String(v).trim().toUpperCase();
+    if (!s) continue;
+    if (/^(IP|PP|PS|SP)\d+$/.test(s)) {
+      keys.push(s);
+    } else if (/^\d+$/.test(s)) {
+      keys.push(`IP${s}`);
+    }
+  }
+  return keys;
+}
+
 export async function GET(req) {
   try {
     // const cookieStore = cookies();
@@ -105,19 +149,187 @@ export async function GET(req) {
       } catch (__) {}
     }
 
-    // Fetch items for each invoice from invoice_items table (now with item_code column)
-    const invoicesWithItems = await Promise.all(
-      rows.map(async (invoice) => {
-        const [items] = await conn.execute(
-          "SELECT item_code as product_code, item_name, quantity, rate as price_per_unit, image_url as imageUrl, hsn_code, taxable_value, cgst_amount, sgst_amount, igst_amount FROM invoice_items WHERE invoice_id = ?",
+    // First, fetch ALL statements that are linked to ANY of the invoices (for allocation)
+    const allInvoiceIds = rows.map(inv => inv.id);
+    const [allLinkedStatements] = await conn.execute(
+      "SELECT id, trans_id, date, description, amount, invoice_status, linked_purchase_ids, invoice_number FROM statements"
+    );
+    
+    // Build invoice map
+    const invoiceMap = {};
+    const invoiceNumberToIdMap = {};
+    rows.forEach(inv => {
+      invoiceMap[inv.id] = inv;
+      if (inv.invoice_number) invoiceNumberToIdMap[inv.invoice_number] = inv.id;
+    });
+    
+    // Also get parent/child invoices for allocation completeness
+    const allRelatedInvoiceIds = new Set(allInvoiceIds);
+    for (const inv of rows) {
+      if (inv.parent_id) allRelatedInvoiceIds.add(inv.parent_id);
+      const [children] = await conn.execute("SELECT id FROM invoices WHERE parent_id = ?", [inv.id]);
+      children.forEach(c => allRelatedInvoiceIds.add(c.id));
+    }
+    let allRelatedInvoices = [];
+    const relatedInvoiceIdsArr = [...allRelatedInvoiceIds];
+    if (relatedInvoiceIdsArr.length > 0) {
+      const placeholders = relatedInvoiceIdsArr.map(() => '?').join(',');
+      const [result] = await conn.execute(
+        `SELECT id, grand_total, invoice_number FROM invoices WHERE id IN (${placeholders})`,
+        relatedInvoiceIdsArr
+      );
+      allRelatedInvoices = result;
+    }
+    allRelatedInvoices.forEach(inv => {
+      if (!invoiceMap[inv.id]) invoiceMap[inv.id] = inv;
+      if (inv.invoice_number) invoiceNumberToIdMap[inv.invoice_number] = inv.id;
+    });
+    
+    // Build transToInvoiceIdsMap for all statements (PRESERVING ORDER from linked_purchase_ids)
+    const transToInvoiceIdsMap = {};
+    for (const stmt of allLinkedStatements) {
+      const linkedIds = [];
+      const seenIds = new Set();
+      // Add from linked_purchase_ids (IN ORDER)
+      const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
+      for (const token of tokens) {
+        if (token.startsWith("IP")) {
+          const invId = parseInt(token.replace("IP", ""));
+          if (invoiceMap[invId] && !seenIds.has(invId)) {
+            linkedIds.push(invId);
+            seenIds.add(invId);
+          }
+        }
+      }
+      // Add from invoice_number (at the end, if not already added)
+      if (stmt.invoice_number && invoiceNumberToIdMap[stmt.invoice_number]) {
+        const invId = invoiceNumberToIdMap[stmt.invoice_number];
+        if (!seenIds.has(invId)) {
+          linkedIds.push(invId);
+          seenIds.add(invId);
+        }
+      }
+      transToInvoiceIdsMap[stmt.trans_id] = linkedIds;
+    }
+    
+    // Calculate allocation map
+    const allocationMap = {};
+    const invoiceRemainingMap = {};
+    for (const invId in invoiceMap) {
+      invoiceRemainingMap[invId] = Number(invoiceMap[invId].grand_total) || 0;
+    }
+    
+    // Process all statements for allocation
+    for (const stmt of allLinkedStatements) {
+      const linkedInvIds = transToInvoiceIdsMap[stmt.trans_id] || [];
+      if (linkedInvIds.length === 0) continue;
+      
+      let remainingToAllocate = Math.abs(Number(stmt.amount) || 0);
+      const invoicePaidForStmt = {};
+      for (const invId of linkedInvIds) {
+        if (remainingToAllocate <= 0) break;
+        const invRemaining = invoiceRemainingMap[invId] || 0;
+        if (invRemaining <= 0) continue;
+        const toAllocate = Math.min(invRemaining, remainingToAllocate);
+        if (toAllocate > 0) {
+          invoicePaidForStmt[invId] = toAllocate;
+          invoiceRemainingMap[invId] -= toAllocate;
+          remainingToAllocate -= toAllocate;
+        }
+      }
+      // Save to allocation map
+      for (const invId of linkedInvIds) {
+        const key = `${invId}-${stmt.trans_id}`;
+        allocationMap[key] = invoicePaidForStmt[invId] || 0;
+      }
+    }
+    
+    // Fetch items and linked statements for each invoice
+  const invoicesWithItems = await Promise.all(
+    rows.map(async (invoice) => {
+      const [items] = await conn.execute(
+        "SELECT item_code as product_code, item_name, quantity, rate as price_per_unit, image_url as imageUrl, hsn_code, taxable_value, cgst_amount, sgst_amount, igst_amount FROM invoice_items WHERE invoice_id = ?",
+        [invoice.id]
+      );
+      
+      // Get all related invoice IDs and invoice numbers: this invoice, parent, and children
+      let relatedInvoices = [{id: invoice.id, number: invoice.invoice_number}];
+      if (invoice.parent_id) {
+        // If this invoice has a parent, get parent and all siblings
+        const [parent] = await conn.execute(
+          "SELECT id, invoice_number FROM invoices WHERE id = ?",
+          [invoice.parent_id]
+        );
+        if (parent.length > 0) {
+          relatedInvoices.push({id: parent[0].id, number: parent[0].invoice_number});
+        }
+        // Get all siblings (invoices with same parent)
+        const [siblings] = await conn.execute(
+          "SELECT id, invoice_number FROM invoices WHERE parent_id = ?",
+          [invoice.parent_id]
+        );
+        siblings.forEach(s => relatedInvoices.push({id: s.id, number: s.invoice_number}));
+      } else {
+        // If this invoice is a parent, get all its children
+        const [children] = await conn.execute(
+          "SELECT id, invoice_number FROM invoices WHERE parent_id = ?",
           [invoice.id]
         );
-        return {
-          ...invoice,
-          items: items || []
-        };
-      })
-    );
+        children.forEach(c => relatedInvoices.push({id: c.id, number: c.invoice_number}));
+      }
+      // Remove duplicates
+      const uniqueRelatedInvoices = [];
+      const seenInvoiceIds = new Set();
+      for (const inv of relatedInvoices) {
+        if (!seenInvoiceIds.has(inv.id)) {
+          seenInvoiceIds.add(inv.id);
+          uniqueRelatedInvoices.push(inv);
+        }
+      }
+      
+      // Fetch linked statements for all related invoices (by ID or number)
+      let linkedStatements = [];
+      for (const inv of uniqueRelatedInvoices) {
+        const [stmts] = await conn.execute(
+          "SELECT id, trans_id, date, description, amount, invoice_status, linked_purchase_ids FROM statements WHERE linked_purchase_ids LIKE ? OR invoice_number = ?",
+          [`%IP${inv.id}%`, inv.number]
+        );
+        linkedStatements.push(...stmts);
+      }
+      
+      // Remove duplicate statements (in case a statement is linked to multiple related invoices)
+      const uniqueLinkedStatements = [];
+      const seenStmtIds = new Set();
+      for (const stmt of linkedStatements) {
+        if (!seenStmtIds.has(stmt.id)) {
+          seenStmtIds.add(stmt.id);
+          uniqueLinkedStatements.push(stmt);
+        }
+      }
+      linkedStatements = uniqueLinkedStatements;
+      
+      // Calculate total linked amount using allocation map
+      const totalLinkedAmount = linkedStatements.reduce(
+        (sum, stmt) => {
+          const key = `${invoice.id}-${stmt.trans_id}`;
+          return sum + (allocationMap[key] || 0);
+        },
+        0
+      );
+      const newBalanceAmount = Math.max(0, Number(invoice.grand_total) - totalLinkedAmount);
+      
+      // Log for debugging
+      console.log(`Invoice ${invoice.id} (${invoice.invoice_number}) related invoices:`, uniqueRelatedInvoices);
+      console.log(`Linked statements:`, linkedStatements.map(s => ({id: s.id, trans_id: s.trans_id, invoice_number: s.invoice_number})));
+      
+      return {
+        ...invoice,
+        items: items || [],
+        linkedStatements: linkedStatements || [],
+        balance_amount: newBalanceAmount
+      };
+    })
+  );
 
     return NextResponse.json({
       success: true,
