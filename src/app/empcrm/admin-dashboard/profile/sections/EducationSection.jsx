@@ -2,7 +2,9 @@ import { Plus, Trash2 } from "lucide-react";
 import {
   shouldShowEducationDataRows,
   shouldShowQualificationColumn,
+  isReassignFieldMode,
 } from "@/lib/reassignFieldVisibility";
+import { QUALIFICATION_COLUMN_KEYS } from "@/lib/profileReassignFields";
 
 export default function EducationSection({
   education,
@@ -15,7 +17,28 @@ export default function EducationSection({
   const ro = reviewMode;
   const rf = reassignFieldKeys;
   const showRows = shouldShowEducationDataRows(rf);
-  const col = (k) => shouldShowQualificationColumn(rf, k);
+
+  // If ANY qualification column is reassigned, show ALL columns (all editable for better UX)
+  const anyQualColReassigned =
+    isReassignFieldMode(rf) &&
+    Array.from(QUALIFICATION_COLUMN_KEYS).some((k) => rf.includes(k));
+
+  const col = (k) => {
+    if (!isReassignFieldMode(rf)) return true;
+    if (rf.includes("section_education")) return true;
+    if (anyQualColReassigned) return true;
+    return shouldShowQualificationColumn(rf, k);
+  };
+
+  // A column is editable when: not in reassign mode, full section reassigned, OR any education column reassigned (full row editing)
+  const colEditable = (k) => {
+    if (!isReassignFieldMode(rf)) return !ro;
+    if (ro) return false;
+    if (rf.includes("section_education")) return true;
+    // If any education column is reassigned, make ALL columns editable for better UX
+    if (anyQualColReassigned) return true;
+    return rf.includes(k);
+  };
   const addEducation = () => {
     if (ro) return;
     setEducation([...education, { exam_name: "", board_university: "", year_of_passing: "", grade_percentage: "" }]);
@@ -68,10 +91,10 @@ export default function EducationSection({
                 <input
                   type="text"
                   value={edu.exam_name}
-                  onChange={(e) => updateEducation(index, "exam_name", e.target.value)}
+                  onChange={(e) => colEditable("qualification_exam_name") && updateEducation(index, "exam_name", e.target.value)}
                   placeholder="e.g., B.Com"
-                  readOnly={ro}
-                  className={inactive(inputClass)}
+                  readOnly={!colEditable("qualification_exam_name")}
+                  className={!colEditable("qualification_exam_name") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
                 />
               </div>
             )}
@@ -81,9 +104,9 @@ export default function EducationSection({
                 <input
                   type="text"
                   value={edu.board_university}
-                  onChange={(e) => updateEducation(index, "board_university", e.target.value)}
-                  readOnly={ro}
-                  className={inactive(inputClass)}
+                  onChange={(e) => colEditable("qualification_board_university") && updateEducation(index, "board_university", e.target.value)}
+                  readOnly={!colEditable("qualification_board_university")}
+                  className={!colEditable("qualification_board_university") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
                 />
               </div>
             )}
@@ -93,10 +116,10 @@ export default function EducationSection({
                 <input
                   type="text"
                   value={edu.year_of_passing}
-                  onChange={(e) => updateEducation(index, "year_of_passing", e.target.value)}
+                  onChange={(e) => colEditable("qualification_year_of_passing") && updateEducation(index, "year_of_passing", e.target.value)}
                   placeholder="2020"
-                  readOnly={ro}
-                  className={inactive(inputClass)}
+                  readOnly={!colEditable("qualification_year_of_passing")}
+                  className={!colEditable("qualification_year_of_passing") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
                 />
               </div>
             )}
@@ -106,10 +129,10 @@ export default function EducationSection({
                 <input
                   type="text"
                   value={edu.grade_percentage}
-                  onChange={(e) => updateEducation(index, "grade_percentage", e.target.value)}
+                  onChange={(e) => colEditable("qualification_grade_percentage") && updateEducation(index, "grade_percentage", e.target.value)}
                   placeholder="75%"
-                  readOnly={ro}
-                  className={inactive(inputClass)}
+                  readOnly={!colEditable("qualification_grade_percentage")}
+                  className={!colEditable("qualification_grade_percentage") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
                 />
               </div>
             )}

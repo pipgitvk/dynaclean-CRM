@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
-import { shouldShowExperienceColumn } from "@/lib/reassignFieldVisibility";
+import { shouldShowExperienceColumn, isReassignFieldMode } from "@/lib/reassignFieldVisibility";
+import { EXPERIENCE_COLUMN_KEYS } from "@/lib/profileReassignFields";
 
 export default function ExperienceSection({
   experience,
@@ -11,7 +12,29 @@ export default function ExperienceSection({
 }) {
   const ro = reviewMode;
   const rf = reassignFieldKeys;
-  const col = (k) => shouldShowExperienceColumn(rf, k);
+
+  // If ANY experience column is reassigned, show ALL columns (reassigned ones editable, others read-only for context)
+  const anyExpColReassigned =
+    isReassignFieldMode(rf) &&
+    Array.from(EXPERIENCE_COLUMN_KEYS).some((k) => rf.includes(k));
+
+  const col = (k) => {
+    if (!isReassignFieldMode(rf)) return true;
+    if (rf.includes("section_experience")) return true;
+    // If any experience column is reassigned, show all columns for full row context
+    if (anyExpColReassigned) return true;
+    return shouldShowExperienceColumn(rf, k);
+  };
+
+  // A column is editable when: not in reassign mode, full section reassigned, OR any experience column reassigned (full row editing)
+  const colEditable = (k) => {
+    if (!isReassignFieldMode(rf)) return !ro;
+    if (ro) return false;
+    if (rf.includes("section_experience")) return true;
+    // If any experience column is reassigned, make ALL columns editable for better UX
+    if (anyExpColReassigned) return true;
+    return rf.includes(k);
+  };
   const addExperience = () => {
     if (ro) return;
     setExperience([...experience, { company_name: "", designation: "", gross_salary_ctc: "", period_from: "", period_to: "", reason_for_leaving: "" }]);
@@ -81,9 +104,9 @@ export default function ExperienceSection({
               <input
                 type="text"
                 value={exp.company_name}
-                onChange={(e) => updateExperience(index, "company_name", e.target.value)}
-                readOnly={ro}
-                className={inactive(inputClass)}
+                onChange={(e) => colEditable("experience_company_name") && updateExperience(index, "company_name", e.target.value)}
+                readOnly={!colEditable("experience_company_name")}
+                className={!colEditable("experience_company_name") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
               />
             </div>
           )}
@@ -93,9 +116,9 @@ export default function ExperienceSection({
               <input
                 type="text"
                 value={exp.designation}
-                onChange={(e) => updateExperience(index, "designation", e.target.value)}
-                readOnly={ro}
-                className={inactive(inputClass)}
+                onChange={(e) => colEditable("experience_designation") && updateExperience(index, "designation", e.target.value)}
+                readOnly={!colEditable("experience_designation")}
+                className={!colEditable("experience_designation") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
               />
             </div>
           )}
@@ -105,9 +128,9 @@ export default function ExperienceSection({
               <input
                 type="number"
                 value={exp.gross_salary_ctc}
-                onChange={(e) => updateExperience(index, "gross_salary_ctc", e.target.value)}
-                readOnly={ro}
-                className={inactive(inputClass)}
+                onChange={(e) => colEditable("experience_gross_salary_ctc") && updateExperience(index, "gross_salary_ctc", e.target.value)}
+                readOnly={!colEditable("experience_gross_salary_ctc")}
+                className={!colEditable("experience_gross_salary_ctc") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
               />
             </div>
           )}
@@ -117,9 +140,9 @@ export default function ExperienceSection({
               <input
                 type="date"
                 value={exp.period_from}
-                onChange={(e) => updateExperience(index, "period_from", e.target.value)}
-                disabled={ro}
-                className={inactive(inputClass)}
+                onChange={(e) => colEditable("experience_period_from") && updateExperience(index, "period_from", e.target.value)}
+                disabled={!colEditable("experience_period_from")}
+                className={!colEditable("experience_period_from") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
               />
             </div>
           )}
@@ -129,9 +152,9 @@ export default function ExperienceSection({
               <input
                 type="date"
                 value={exp.period_to}
-                onChange={(e) => updateExperience(index, "period_to", e.target.value)}
-                disabled={ro}
-                className={inactive(inputClass)}
+                onChange={(e) => colEditable("experience_period_to") && updateExperience(index, "period_to", e.target.value)}
+                disabled={!colEditable("experience_period_to")}
+                className={!colEditable("experience_period_to") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
               />
             </div>
           )}
@@ -140,11 +163,11 @@ export default function ExperienceSection({
               <label className={labelClass}>Reason for Leaving *</label>
               <textarea
                 value={exp.reason_for_leaving}
-                onChange={(e) => updateExperience(index, "reason_for_leaving", e.target.value)}
+                onChange={(e) => colEditable("experience_reason_for_leaving") && updateExperience(index, "reason_for_leaving", e.target.value)}
                 rows="2"
-                readOnly={ro}
-                required={!ro}
-                className={inactive(inputClass)}
+                readOnly={!colEditable("experience_reason_for_leaving")}
+                required={colEditable("experience_reason_for_leaving")}
+                className={!colEditable("experience_reason_for_leaving") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
               />
             </div>
           )}

@@ -72,6 +72,9 @@ export default function UserProfileView() {
   // Check if user is privileged (Admin/HR)
   const isPrivilegedEditor = ["SUPERADMIN", "ADMIN", "HR HEAD", "HR", "HR Executive", "JUNIOR HR EXECUTIVE", "HR RECRUITER"].includes(userRole);
 
+  // Check if there are reassigned fields from HR
+  const hasReassignedFields = latestSubmission?.status === "reassign" || latestSubmission?.status === "revision_requested";
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
@@ -89,16 +92,28 @@ export default function UserProfileView() {
               <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
               <p className="text-gray-600 mt-1">View and manage your profile information</p>
             </div>
-            {/* Show Edit only if user has no submission in employee_profile_submissions table */}
-            {(latestSubmission === null || isPrivilegedEditor) && (
-              <button
-                onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
-                className="inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-md hover:shadow-lg"
-              >
-                <Edit className="w-4 h-4" />
-                Edit Profile
-              </button>
-            )}
+            <div className="flex gap-3">
+              {/* Show "Edit Reassigned Fields" button when HR has requested corrections */}
+              {hasReassignedFields && (
+                <button
+                  onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
+                  className="inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium transition-colors shadow-md hover:shadow-lg"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit Requested Fields
+                </button>
+              )}
+              {/* Show regular Edit button only if no pending submission or privileged editor */}
+              {(latestSubmission === null || isPrivilegedEditor) && !hasReassignedFields && (
+                <button
+                  onClick={() => router.push("/empcrm/user-dashboard/profile/edit")}
+                  className="inline-flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-md hover:shadow-lg"
+                >
+                  <Edit className="w-4 h-4" />
+                  Edit Profile
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

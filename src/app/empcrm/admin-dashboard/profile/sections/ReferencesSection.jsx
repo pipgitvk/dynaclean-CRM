@@ -1,9 +1,31 @@
-import { shouldShowReferenceColumn } from "@/lib/reassignFieldVisibility";
+import { shouldShowReferenceColumn, isReassignFieldMode } from "@/lib/reassignFieldVisibility";
+import { REFERENCE_COLUMN_KEYS } from "@/lib/profileReassignFields";
 
 export default function ReferencesSection({ references, setReferences, reviewMode = false, reassignFieldKeys = null }) {
     const ro = reviewMode;
     const rf = reassignFieldKeys;
-    const col = (k) => shouldShowReferenceColumn(rf, k);
+
+    // If ANY reference column is reassigned, show ALL columns (reassigned ones editable, others read-only for context)
+    const anyRefColReassigned =
+      isReassignFieldMode(rf) &&
+      Array.from(REFERENCE_COLUMN_KEYS).some((k) => rf.includes(k));
+
+    const col = (k) => {
+      if (!isReassignFieldMode(rf)) return true;
+      if (rf.includes("section_references")) return true;
+      if (anyRefColReassigned) return true;
+      return shouldShowReferenceColumn(rf, k);
+    };
+
+    // A column is editable when: not in reassign mode, full section reassigned, OR any reference column reassigned (full row editing)
+    const colEditable = (k) => {
+      if (!isReassignFieldMode(rf)) return !ro;
+      if (ro) return false;
+      if (rf.includes("section_references")) return true;
+      // If any reference column is reassigned, make ALL columns editable for better UX
+      if (anyRefColReassigned) return true;
+      return rf.includes(k);
+    };
     const addReference = () => {
         if (ro) return;
         setReferences([...references, { name: "", contact: "", address: "", relationship: "" }]);
@@ -50,10 +72,10 @@ export default function ReferencesSection({ references, setReferences, reviewMod
                         <input
                             type="text"
                             value={ref.name}
-                            onChange={(e) => handleChange(index, "name", e.target.value)}
-                            required
-                            readOnly={ro}
-                            className={inactive(inputClass)}
+                            onChange={(e) => colEditable("reference_name") && handleChange(index, "name", e.target.value)}
+                            required={colEditable("reference_name")}
+                            readOnly={!colEditable("reference_name")}
+                            className={!colEditable("reference_name") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
                         />
                     </div>
                     )}
@@ -63,10 +85,10 @@ export default function ReferencesSection({ references, setReferences, reviewMod
                         <input
                             type="tel"
                             value={ref.contact}
-                            onChange={(e) => handleChange(index, "contact", e.target.value)}
-                            required
-                            readOnly={ro}
-                            className={inactive(inputClass)}
+                            onChange={(e) => colEditable("reference_contact") && handleChange(index, "contact", e.target.value)}
+                            required={colEditable("reference_contact")}
+                            readOnly={!colEditable("reference_contact")}
+                            className={!colEditable("reference_contact") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
                         />
                     </div>
                     )}
@@ -76,10 +98,10 @@ export default function ReferencesSection({ references, setReferences, reviewMod
                         <input
                             type="text"
                             value={ref.address}
-                            onChange={(e) => handleChange(index, "address", e.target.value)}
-                            required
-                            readOnly={ro}
-                            className={inactive(inputClass)}
+                            onChange={(e) => colEditable("reference_address") && handleChange(index, "address", e.target.value)}
+                            required={colEditable("reference_address")}
+                            readOnly={!colEditable("reference_address")}
+                            className={!colEditable("reference_address") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
                         />
                     </div>
                     )}
@@ -88,10 +110,10 @@ export default function ReferencesSection({ references, setReferences, reviewMod
                         <label className={labelClass}>Relationship w/ Applicant *</label>
                         <select
                             value={ref.relationship || ""}
-                            onChange={(e) => handleChange(index, "relationship", e.target.value)}
-                            required={!ro}
-                            disabled={ro}
-                            className={inactive(inputClass)}
+                            onChange={(e) => colEditable("reference_relationship") && handleChange(index, "relationship", e.target.value)}
+                            required={colEditable("reference_relationship")}
+                            disabled={!colEditable("reference_relationship")}
+                            className={!colEditable("reference_relationship") ? `${inputClass} bg-gray-50 cursor-not-allowed` : inactive(inputClass)}
                         >
                             <option value="">Select Neighbours or Relation</option>
                             <option value="neighbours">Neighbours</option>

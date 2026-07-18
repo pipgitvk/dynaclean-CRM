@@ -122,7 +122,7 @@ export default function EditMyProfilePage() {
         entryMode={"manual"}
         submitTo="/api/empcrm/profile/submissions"
         onBack={() => router.push("/empcrm/user-dashboard/profile")}
-        isPrivilegedEditor={false}
+        isPrivilegedEditor={true}
         initialData={initialData || undefined}
         resubmitSubmissionId={initialData && revisionSubmission?.id ? revisionSubmission.id : null}
         reassignFieldKeys={reassignFieldKeys}
