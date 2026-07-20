@@ -299,15 +299,13 @@ export default async function CustomerPage({ params }) {
               Special Price
             </Link>
 
-            {/* View Ledger - hide from SERVICE SUPPORT and GEM */}
-            {userRole !== "SERVICE SUPPORT" && userRole !== "GEM" && (
-              <Link
-                href={`/admin-dashboard/accounting/ledger?customerId=${customerId}`}
-                className="btn text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
-              >
-                View Ledger
-              </Link>
-            )}
+            {/* View Ledger - visible to all */}
+            <Link
+              href={`/admin-dashboard/accounting/ledger?customerId=${customerId}`}
+              className="btn text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+            >
+              View Ledger
+            </Link>
           </div>
 
           <section>
