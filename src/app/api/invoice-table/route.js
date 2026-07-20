@@ -402,6 +402,9 @@ export async function POST(req) {
       delivery_challan_no = null,
       linked_trans_ids = null,
       customer_id: bodyCustomerId,
+      cgst_rate: bodyCgstRate = 0,
+      sgst_rate: bodySgstRate = 0,
+      igst_rate: bodyIgstRate = 0,
     } = body;
 
     const customerIdSql =
@@ -522,6 +525,17 @@ export async function POST(req) {
           } catch (__) {}
         }
 
+        // Ensure cgst_rate, sgst_rate, igst_rate columns exist
+        try {
+          await conn.execute("SELECT cgst_rate FROM invoices LIMIT 1");
+        } catch (_) {
+          try {
+            await conn.execute("ALTER TABLE invoices ADD COLUMN cgst_rate DECIMAL(5,2) NULL DEFAULT 0");
+            await conn.execute("ALTER TABLE invoices ADD COLUMN sgst_rate DECIMAL(5,2) NULL DEFAULT 0");
+            await conn.execute("ALTER TABLE invoices ADD COLUMN igst_rate DECIMAL(5,2) NULL DEFAULT 0");
+          } catch (__) {}
+        }
+
         // Check if employee_name column exists
         let employeeNameColumnExists = false;
         try {
@@ -546,8 +560,8 @@ export async function POST(req) {
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, employee_name, state, state_code, 
             subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
             payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
-            customer_id, linked_trans_ids, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
           insertValues = [
             quotation_id,
             finalInvoiceNumber,
@@ -582,6 +596,9 @@ export async function POST(req) {
             delivery_challan_no,
             customerIdSql,
             linkedTransIdsJson,
+            bodyCgstRate,
+            bodySgstRate,
+            bodyIgstRate,
           ];
         } else {
           insertQuery = `INSERT INTO invoices 
@@ -589,8 +606,8 @@ export async function POST(req) {
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
             subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
             payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
-            customer_id, linked_trans_ids, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
           insertValues = [
             quotation_id,
             finalInvoiceNumber,
@@ -624,6 +641,9 @@ export async function POST(req) {
             delivery_challan_no,
             customerIdSql,
             linkedTransIdsJson,
+            bodyCgstRate,
+            bodySgstRate,
+            bodyIgstRate,
           ];
         }
 

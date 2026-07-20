@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toWords } from "number-to-words";
 
 export default function TaxAndSummary({
@@ -21,15 +21,49 @@ export default function TaxAndSummary({
 }) {
   const [amountInWords, setAmountInWords] = useState("Zero");
 
+  // Recalculate tax amounts using cgstRate/sgstRate/igstRate (from quotation DB)
+  const computedTax = useMemo(() => {
+    let computedCgst = 0;
+    let computedSgst = 0;
+    let computedIgst = 0;
+
+    items.forEach((item) => {
+      const qty = item.quantity || 0;
+      const rate = item.rate || 0;
+      const discountAmount = item.discount_amount || 0;
+      const itemSubtotal = qty * rate - discountAmount;
+
+      computedCgst += (itemSubtotal * cgstRate) / 100;
+      computedSgst += (itemSubtotal * sgstRate) / 100;
+      computedIgst += (itemSubtotal * igstRate) / 100;
+    });
+
+    const totalTax = computedCgst + computedSgst + computedIgst;
+    const totalBeforeRound = subtotal + totalTax;
+    const finalRoundOff = isAutoRoundOff
+      ? Math.round(totalBeforeRound) - totalBeforeRound
+      : parseFloat(roundOff) || 0;
+    const computedGrandTotal = totalBeforeRound + finalRoundOff;
+
+    return { computedCgst, computedSgst, computedIgst, totalTax, computedGrandTotal, finalRoundOff };
+  }, [items, cgstRate, sgstRate, igstRate, subtotal, roundOff, isAutoRoundOff]);
+
+  // Sync roundOff when auto
+  useEffect(() => {
+    if (isAutoRoundOff) {
+      setRoundOff(parseFloat(computedTax.finalRoundOff.toFixed(2)));
+    }
+  }, [computedTax.finalRoundOff, isAutoRoundOff, setRoundOff]);
+
   useEffect(() => {
     setAmountInWords(
-      grandTotal === 0
+      computedTax.computedGrandTotal === 0
         ? "Zero"
-        : toWords(Math.round(grandTotal)).replace(/\b\w/g, (l) =>
+        : toWords(Math.round(computedTax.computedGrandTotal)).replace(/\b\w/g, (l) =>
             l.toUpperCase(),
           ) + " Only",
     );
-  }, [grandTotal]);
+  }, [computedTax.computedGrandTotal]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 border rounded p-4">
@@ -45,70 +79,70 @@ export default function TaxAndSummary({
             </tr>
           </thead>
           <tbody>
-  {/* IGST – Interstate */}
-  {igstRate > 0 && (
-    <tr className="border">
-      <td className="px-3 py-2 border">IGST</td>
-      <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-      <td className="px-3 py-2 border text-center">
-        {igstRate}%
-      </td>
-      <td className="px-3 py-2 border">₹ {igst.toFixed(2)}</td>
-    </tr>
-  )}
-
-  {/* CGST + SGST – Intrastate */}
-  {igstRate === 0 && (
-    <>
-      <tr className="border">
-        <td className="px-3 py-2 border">CGST</td>
-        <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-        <td className="px-3 py-2 border text-center">
-          {cgstRate}%
-        </td>
-        <td className="px-3 py-2 border">₹ {cgst.toFixed(2)}</td>
-      </tr>
-
-      <tr className="border">
-        <td className="px-3 py-2 border">SGST</td>
-        <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
-        <td className="px-3 py-2 border text-center">
-          {sgstRate}%
-        </td>
-        <td className="px-3 py-2 border">₹ {sgst.toFixed(2)}</td>
-      </tr>
-    </>
-  )}
-</tbody>
-
+            {igstRate > 0 && (
+              <tr className="border">
+                <td className="px-3 py-2 border">IGST</td>
+                <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                <td className="px-3 py-2 border text-center">{igstRate}%</td>
+                <td className="px-3 py-2 border">₹ {computedTax.computedIgst.toFixed(2)}</td>
+              </tr>
+            )}
+            {igstRate === 0 && (
+              <>
+                {cgstRate > 0 && (
+                  <tr className="border">
+                    <td className="px-3 py-2 border">CGST</td>
+                    <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                    <td className="px-3 py-2 border text-center">{cgstRate}%</td>
+                    <td className="px-3 py-2 border">₹ {computedTax.computedCgst.toFixed(2)}</td>
+                  </tr>
+                )}
+                {sgstRate > 0 && (
+                  <tr className="border">
+                    <td className="px-3 py-2 border">SGST</td>
+                    <td className="px-3 py-2 border">₹ {subtotal.toFixed(2)}</td>
+                    <td className="px-3 py-2 border text-center">{sgstRate}%</td>
+                    <td className="px-3 py-2 border">₹ {computedTax.computedSgst.toFixed(2)}</td>
+                  </tr>
+                )}
+              </>
+            )}
+          </tbody>
         </table>
       </div>
 
       {/* Summary */}
       <div className="bg-gray-50 p-4 rounded shadow-sm text-sm border flex flex-col justify-between">
         <div>
-          <h3 className="text-lg font-semibold mb-4 text-center">
-            Invoice Summary
-          </h3>
+          <h3 className="text-lg font-semibold mb-4 text-center">Invoice Summary</h3>
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Subtotal:</span>
             <span>₹ {subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">CGST ({cgstRate}%):</span>
-            <span>₹ {cgst.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">SGST ({sgstRate}%):</span>
-            <span>₹ {sgst.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b">
-            <span className="font-medium">IGST ({igstRate}%):</span>
-            <span>₹ {igst.toFixed(2)}</span>
-          </div>
+          {igstRate > 0 ? (
+            <div className="flex justify-between py-1 border-b">
+              <span className="font-medium">IGST ({igstRate}%):</span>
+              <span>₹ {computedTax.computedIgst.toFixed(2)}</span>
+            </div>
+          ) : (
+            <>
+              {cgstRate > 0 && (
+                <div className="flex justify-between py-1 border-b">
+                  <span className="font-medium">CGST ({cgstRate}%):</span>
+                  <span>₹ {computedTax.computedCgst.toFixed(2)}</span>
+                </div>
+              )}
+              {sgstRate > 0 && (
+                <div className="flex justify-between py-1 border-b">
+                  <span className="font-medium">SGST ({sgstRate}%):</span>
+                  <span>₹ {computedTax.computedSgst.toFixed(2)}</span>
+                </div>
+              )}
+            </>
+          )}
           <div className="flex justify-between py-1 border-b">
             <span className="font-medium">Total Tax:</span>
-            <span>₹ {(cgst + sgst + igst).toFixed(2)}</span>
+            <span>₹ {computedTax.totalTax.toFixed(2)}</span>
           </div>
           <div className="flex justify-between py-1 border-b items-center">
             <span className="font-medium flex items-center gap-2">
@@ -127,22 +161,20 @@ export default function TaxAndSummary({
               type="number"
               value={roundOff}
               onChange={(e) => setRoundOff(parseFloat(e.target.value) || 0)}
-              className={`w-24 p-1 border rounded text-right ${isAutoRoundOff ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              className={`w-24 p-1 border rounded text-right ${isAutoRoundOff ? "bg-gray-100 cursor-not-allowed" : ""}`}
               step="0.01"
               disabled={isAutoRoundOff}
             />
           </div>
           <div className="flex justify-between py-2 mt-2 text-lg font-bold text-red-600">
             <span>Amount Due:</span>
-            <span>₹ {grandTotal.toFixed(2)}</span>
+            <span>₹ {computedTax.computedGrandTotal.toFixed(2)}</span>
           </div>
         </div>
         <div className="mt-3 text-xs text-center text-gray-700 border-t pt-2 italic">
           Total Amount in Words:
           <br />
-          <span className="text-sm font-medium text-black">
-            {amountInWords}
-          </span>
+          <span className="text-sm font-medium text-black">{amountInWords}</span>
         </div>
       </div>
     </div>

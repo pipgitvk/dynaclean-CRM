@@ -224,6 +224,9 @@ Thanks for doing business with us!`,
         payment_status: finalPaymentStatus,
         notes,
         terms_conditions: editableTerms,
+        cgst_rate: cgstRate,
+        sgst_rate: sgstRate,
+        igst_rate: igstRate,
       };
 
       const res = await fetch("/api/invoice-table", {

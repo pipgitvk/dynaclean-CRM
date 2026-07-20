@@ -192,6 +192,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
 
 
   useEffect(() => {
+    if (isFromQuotation) return;
     const code = form.state_code || parseCodeFromDisplay(form.state);
 
     if (!code) return;
@@ -267,20 +268,32 @@ Thanks for doing business with us!`,
     setIsSubmitting(true);
 
     try {
-      // Calculate item-level totals
+      // Use cgstRate/sgstRate/igstRate (from quotation DB) for all calculations
+      let finalSubtotal = 0;
+      let finalCgst = 0;
+      let finalSgst = 0;
+      let finalIgst = 0;
+
       const itemsWithTotals = items.map((item) => {
         const qty = item.quantity || 0;
         const rate = item.rate || 0;
         const discountAmount = item.discount_amount || 0;
         const taxableValue = qty * rate - discountAmount;
-
-        const cgstAmount = (taxableValue * (item.cgst_percent || 0)) / 100;
-        const sgstAmount = (taxableValue * (item.sgst_percent || 0)) / 100;
-        const igstAmount = (taxableValue * (item.igst_percent || 0)) / 100;
+        const cgstAmount = (taxableValue * cgstRate) / 100;
+        const sgstAmount = (taxableValue * sgstRate) / 100;
+        const igstAmount = (taxableValue * igstRate) / 100;
         const totalAmount = taxableValue + cgstAmount + sgstAmount + igstAmount;
+
+        finalSubtotal += taxableValue;
+        finalCgst += cgstAmount;
+        finalSgst += sgstAmount;
+        finalIgst += igstAmount;
 
         return {
           ...item,
+          cgst_percent: cgstRate,
+          sgst_percent: sgstRate,
+          igst_percent: igstRate,
           taxable_value: taxableValue,
           cgst_amount: cgstAmount,
           sgst_amount: sgstAmount,
@@ -288,16 +301,24 @@ Thanks for doing business with us!`,
           total_amount: totalAmount,
         };
       });
+
+      const finalTotalTax = finalCgst + finalSgst + finalIgst;
+      const totalBeforeRound = finalSubtotal + finalTotalTax;
+      const finalRoundOff = isAutoRoundOff
+        ? Math.round(totalBeforeRound) - totalBeforeRound
+        : parseFloat(roundOff) || 0;
+      const finalGrandTotal = totalBeforeRound + finalRoundOff;
+
       const amountPaid = Number(form.amount_paid || 0);
-      const balanceAmount = taxSummary.grandTotal - amountPaid;
+      const balanceAmount = finalGrandTotal - amountPaid;
 
       // Auto-set payment status based on balance amount
       let finalPaymentStatus = form.payment_status;
-      if (balanceAmount === 0 && taxSummary.grandTotal > 0) {
+      if (balanceAmount === 0 && finalGrandTotal > 0) {
         finalPaymentStatus = "PAID";
-      } else if (balanceAmount > 0 && balanceAmount < taxSummary.grandTotal) {
+      } else if (balanceAmount > 0 && balanceAmount < finalGrandTotal) {
         finalPaymentStatus = "PARTIAL";
-      } else if (balanceAmount === taxSummary.grandTotal || balanceAmount > taxSummary.grandTotal) {
+      } else if (balanceAmount === finalGrandTotal || balanceAmount > finalGrandTotal) {
         finalPaymentStatus = "UNPAID";
       }
 
@@ -306,18 +327,21 @@ Thanks for doing business with us!`,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
         items: itemsWithTotals,
-        subtotal: taxSummary.subtotal,
-        cgst: taxSummary.cgst,
-        sgst: taxSummary.sgst,
-        igst: taxSummary.igst,
-        total_tax: taxSummary.totalTax,
-        round_off: parseFloat(roundOff) || 0,
-        grand_total: taxSummary.grandTotal,
+        subtotal: finalSubtotal,
+        cgst: finalCgst,
+        sgst: finalSgst,
+        igst: finalIgst,
+        total_tax: finalTotalTax,
+        round_off: parseFloat(finalRoundOff.toFixed(2)),
+        grand_total: finalGrandTotal,
         amount_paid: amountPaid,
         balance_amount: balanceAmount < 0 ? 0 : balanceAmount,
         payment_status: finalPaymentStatus,
         notes: notes,
         terms_conditions: editableTerms,
+        cgst_rate: cgstRate,
+        sgst_rate: sgstRate,
+        igst_rate: igstRate,
         linked_trans_ids: linkedTransIds.length > 0 ? linkedTransIds : null,
       };
 
@@ -388,6 +412,11 @@ const fetchQuotationAndFill = async () => {
     }
 
     const quotation = data.quotation;
+
+    // Set GST rates from quotation DB
+    if (quotation.cgstRate !== undefined && quotation.cgstRate !== null) setCgstRate(Number(quotation.cgstRate));
+    if (quotation.sgstRate !== undefined && quotation.sgstRate !== null) setSgstRate(Number(quotation.sgstRate));
+    if (quotation.igstRate !== undefined && quotation.igstRate !== null) setIgstRate(Number(quotation.igstRate));
 
     // Fill only available quotation fields
     setForm((prev) => ({

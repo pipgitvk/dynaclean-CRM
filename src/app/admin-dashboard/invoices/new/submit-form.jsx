@@ -329,6 +329,9 @@ Thanks for doing business with us!`,
         payment_status: finalPaymentStatus,
         notes: notes,
         terms_conditions: editableTerms,
+        cgst_rate: cgstRate,
+        sgst_rate: sgstRate,
+        igst_rate: igstRate,
       };
 
       console.log("Data being sent to API:", dataToSend);

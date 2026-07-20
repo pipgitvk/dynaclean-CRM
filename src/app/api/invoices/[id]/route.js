@@ -149,6 +149,9 @@ export async function PATCH(req, context) {
       customer_id: bodyCustomerId,
       linked_trans_ids: bodyLinkedTransIds,
       send_customer_payment_notice = false,
+      cgst_rate: bodyCgstRate = null,
+      sgst_rate: bodySgstRate = null,
+      igst_rate: bodyIgstRate = null,
     } = body;
 
     if (!invoice_number || !customer_name || !billing_address) {
@@ -204,6 +207,15 @@ export async function PATCH(req, context) {
     } catch (_) {
       try {
         await conn.execute("ALTER TABLE invoices ADD COLUMN linked_trans_ids TEXT NULL");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT cgst_rate FROM invoices LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoices ADD COLUMN cgst_rate DECIMAL(5,2) NULL DEFAULT 0");
+        await conn.execute("ALTER TABLE invoices ADD COLUMN sgst_rate DECIMAL(5,2) NULL DEFAULT 0");
+        await conn.execute("ALTER TABLE invoices ADD COLUMN igst_rate DECIMAL(5,2) NULL DEFAULT 0");
       } catch (__) {}
     }
     try {
@@ -277,6 +289,7 @@ export async function PATCH(req, context) {
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
           customer_id = ?, linked_trans_ids = ?,
+          cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate),
           created_at = ?
         WHERE id = ?`,
         [
@@ -310,8 +323,11 @@ export async function PATCH(req, context) {
           buyers_order_no,
           eway_bill_no,
           delivery_challan_no,
-        customerIdVal ?? null,
-        linkedTransIdsSql,
+          customerIdVal ?? null,
+          linkedTransIdsSql,
+          bodyCgstRate,
+          bodySgstRate,
+          bodyIgstRate,
           createdAtSql,
           invoiceId,
         ],
@@ -326,7 +342,8 @@ export async function PATCH(req, context) {
           subtotal = ?, cgst = ?, sgst = ?, igst = ?, total_tax = ?, round_off = ?, grand_total = ?,
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
-          customer_id = ?, linked_trans_ids = ?
+          customer_id = ?, linked_trans_ids = ?,
+          cgst_rate = COALESCE(?, cgst_rate), sgst_rate = COALESCE(?, sgst_rate), igst_rate = COALESCE(?, igst_rate)
         WHERE id = ?`,
         [
           quotation_id,
@@ -359,8 +376,11 @@ export async function PATCH(req, context) {
           buyers_order_no,
           eway_bill_no,
           delivery_challan_no,
-        customerIdVal ?? null,
-        linkedTransIdsSql,
+          customerIdVal ?? null,
+          linkedTransIdsSql,
+          bodyCgstRate,
+          bodySgstRate,
+          bodyIgstRate,
           invoiceId,
         ],
       );

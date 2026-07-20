@@ -211,17 +211,22 @@ export default function InvoiceEditModal({
             : [emptyItem()];
         setItems(loadedItems);
 
+        // Use stored cgst_rate/sgst_rate/igst_rate columns directly
+        // Fall back to back-calculation only if columns not yet populated (old invoices)
+        const storedCgstRate = Number(inv.cgst_rate);
+        const storedSgstRate = Number(inv.sgst_rate);
+        const storedIgstRate = Number(inv.igst_rate);
         const st = Number(inv.subtotal) || 0;
-        if (st > 0) {
-          setCgstRate(
-            Math.round(((Number(inv.cgst) || 0) / st) * 10000) / 100,
-          );
-          setSgstRate(
-            Math.round(((Number(inv.sgst) || 0) / st) * 10000) / 100,
-          );
-          setIgstRate(
-            Math.round(((Number(inv.igst) || 0) / st) * 10000) / 100,
-          );
+
+        if (storedCgstRate > 0 || storedSgstRate > 0 || storedIgstRate > 0) {
+          setCgstRate(storedCgstRate);
+          setSgstRate(storedSgstRate);
+          setIgstRate(storedIgstRate);
+        } else if (st > 0) {
+          // Legacy fallback for invoices created before this fix
+          setCgstRate(Math.round(((Number(inv.cgst) || 0) / st) * 10000) / 100);
+          setSgstRate(Math.round(((Number(inv.sgst) || 0) / st) * 10000) / 100);
+          setIgstRate(Math.round(((Number(inv.igst) || 0) / st) * 10000) / 100);
         } else {
           setCgstRate(9);
           setSgstRate(9);
@@ -326,6 +331,9 @@ export default function InvoiceEditModal({
         created_at: createdAtLocal || null,
         customer_id: String(form.customer_id || "").trim() || null,
         linked_trans_ids: linkedTransIds,
+        cgst_rate: cgstRate,
+        sgst_rate: sgstRate,
+        igst_rate: igstRate,
         send_customer_payment_notice: Boolean(
           String(form.customer_email || "").trim(),
         ),
