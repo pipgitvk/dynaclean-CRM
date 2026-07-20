@@ -351,6 +351,15 @@ function ReturnProductsPage() {
     // Check total quantity from quotation_items
     const totalQty = installation.total_qty || 0;
 
+    // Check if a partial return already exists for this installation
+    const quoteNo = installation.quote_number || `QT-${installation.order_id}`;
+    const invoiceNo = installation.invoice_number || `INV-${installation.order_id}`;
+    const hasPartialReturn = existingReturns.some(
+      (r) =>
+        (r.quotation_no === quoteNo || r.invoice_no === invoiceNo) &&
+        r.return_type === 'partial'
+    );
+
     // If qty is 1, show only Full Return
     if (totalQty === 1) {
       return (
@@ -367,8 +376,14 @@ function ReturnProductsPage() {
     return (
       <div className="flex gap-2">
         <button
-          onClick={() => handlePartialReturnClick(installation)}
-          className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-medium transition flex-1"
+          onClick={() => !hasPartialReturn && handlePartialReturnClick(installation)}
+          disabled={hasPartialReturn}
+          title={hasPartialReturn ? 'Partial return already initiated' : ''}
+          className={`px-3 py-1 rounded text-xs font-medium transition flex-1 ${
+            hasPartialReturn
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-orange-500 hover:bg-orange-600 text-white cursor-pointer'
+          }`}
         >
           Partial Return
         </button>

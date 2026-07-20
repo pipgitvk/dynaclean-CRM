@@ -3,7 +3,7 @@ import { verify } from 'jsonwebtoken';
 
 const SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// GET -  return products fetch करें
+// GET -  return products fetch 
 export async function GET(request) {
   try {
     const pool = await getDbConnection();

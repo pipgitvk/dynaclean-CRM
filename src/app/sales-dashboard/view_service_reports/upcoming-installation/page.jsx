@@ -253,7 +253,7 @@ export default function UpcomingInstallationsPage() {
               >
                 Installed
               </button>
-              <button
+              {/* <button
                 onClick={() => openReturnModal(r.order_id)}
                 className="w-full px-3 py-2 bg-orange-600 text-white text-xs rounded hover:bg-orange-700"
               >
@@ -264,7 +264,7 @@ export default function UpcomingInstallationsPage() {
                 className="w-full px-3 py-2 bg-red-600 text-white text-xs rounded hover:bg-red-700"
               >
                 Full Return
-              </button>
+              </button> */}
             </div>
           </div>
         ))}
@@ -318,7 +318,7 @@ export default function UpcomingInstallationsPage() {
                     >
                       Installed
                     </button>
-                    <button
+                    {/* <button
                       onClick={() => openReturnModal(r.order_id)}
                       className="px-3 py-1.5 bg-orange-600 text-white rounded text-xs hover:bg-orange-700"
                     >
@@ -329,7 +329,7 @@ export default function UpcomingInstallationsPage() {
                       className="px-3 py-1.5 bg-red-600 text-white rounded text-xs hover:bg-red-700"
                     >
                       Full Return
-                    </button>
+                    </button> */}
                   </div>
                 </td>
               </tr>
