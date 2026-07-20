@@ -428,49 +428,7 @@ export default function SubmissionDetailsPage() {
                 </div>
             )}
 
-            {/* Display Field Changes */}
-            {submission.payload && (() => {
-                try {
-                    const payload = typeof submission.payload === 'string' ? JSON.parse(submission.payload) : submission.payload;
-                    const fieldChanges = payload.field_changes || [];
-                    if (fieldChanges.length === 0) return null;
-                    return (
-                        <div className="mb-4 rounded-xl border border-indigo-200 bg-white shadow-sm overflow-hidden">
-                            <div className="flex items-center gap-2 bg-indigo-600 px-5 py-3">
-                                <svg className="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                                <span className="font-bold text-white text-sm tracking-wide">
-                                    Employee changed {fieldChanges.length} field{fieldChanges.length > 1 ? "s" : ""}
-                                </span>
-                            </div>
-                            <div className="divide-y divide-gray-100">
-                                {fieldChanges.map((change, idx) => (
-                                    <div key={idx} className="px-5 py-3 flex flex-col sm:flex-row sm:items-start gap-2">
-                                        <div className="w-48 shrink-0">
-                                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{change.label}</span>
-                                        </div>
-                                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                                            <div className="flex-1 min-w-0 bg-red-50 border border-red-200 rounded px-3 py-2">
-                                                <p className="text-xs text-red-500 font-semibold uppercase mb-1">Before</p>
-                                                <p className="text-sm text-red-800 break-words">{change.oldValue || <span className="italic text-red-400">empty</span>}</p>
-                                            </div>
-                                            <div className="shrink-0 mt-3 text-gray-400 font-bold text-lg">→</div>
-                                            <div className="flex-1 min-w-0 bg-green-50 border border-green-200 rounded px-3 py-2">
-                                                <p className="text-xs text-green-600 font-semibold uppercase mb-1">After</p>
-                                                <p className="text-sm text-green-800 font-medium break-words">{change.newValue || <span className="italic text-green-400">empty</span>}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                } catch (e) {
-                    console.error("Error parsing field changes:", e);
-                }
-                return null;
-            })()}
+
 
             <div
                 className={`border-l-4 p-4 mb-6 rounded-r ${

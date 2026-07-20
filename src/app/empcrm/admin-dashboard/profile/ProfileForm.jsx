@@ -624,12 +624,14 @@ export default function ProfileForm({
     Object.keys(fieldLabels).forEach(key => {
       const oldVal = originalFormData[key];
       const newVal = formData[key];
-      if (String(oldVal || "") !== String(newVal || "")) {
+      const strOldVal = String(oldVal || "");
+      const strNewVal = String(newVal || "");
+      if (strOldVal !== strNewVal && strNewVal.trim() !== "") {
         changes.push({
           fieldName: key,
           label: fieldLabels[key],
-          oldValue: String(oldVal || ""),
-          newValue: String(newVal || ""),
+          oldValue: strOldVal,
+          newValue: strNewVal,
         });
       }
     });
