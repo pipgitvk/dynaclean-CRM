@@ -184,7 +184,7 @@ export default function AddProductPage() {
       label: "Item Code",
       name: "item_code",
       required: true,
-      placeholder: "e.g., IPH15-PRO-256GB",
+      placeholder: "Example: DYNA-40, DRO-100T",
     },
     {
       label: "Category",
@@ -292,7 +292,7 @@ export default function AddProductPage() {
       {showCodeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Enter Product Code</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Enter Product Model</h2>
             <p className="text-sm text-gray-600 mb-4">We will check availability and show similar products.</p>
 
             {/* One-time load of index */}
@@ -306,7 +306,7 @@ export default function AddProductPage() {
                   type="text"
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value)}
-                  placeholder="e.g., IPH15-PRO-256GB"
+                  placeholder="Example: DYNA-40, DRO-100T"
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-2"
                   autoFocus
                 />
