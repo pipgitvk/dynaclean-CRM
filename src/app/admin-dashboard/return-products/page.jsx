@@ -349,7 +349,7 @@ function ReturnProductsPage() {
 
   const renderActionButtons = (installation) => {
     // Check total quantity from quotation_items
-    const totalQty = installation.total_qty || 0;
+    const totalQty = Number(installation.total_qty) || 0;
 
     // Check if a partial return already exists for this installation
     const quoteNo = installation.quote_number || `QT-${installation.order_id}`;
