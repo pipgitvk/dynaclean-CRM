@@ -163,16 +163,46 @@ export function buildProfileSubmissionInitialData(submission) {
     }
   }
 
+  console.log('[DEBUG][buildProfileSubmissionInitialData] submission:', {
+    id: submission.id,
+    updated_profile_photo: submission.updated_profile_photo,
+    updated_signature: submission.updated_signature,
+    payload: !!submission.payload
+  });
+  
   const fileUrls = mergeFileUrlMaps(
     fileUrlsFromUploadedFilesArray(uploadedFiles),
     fileUrlsFromDocumentsSubmittedObject(documents_submitted),
     fileUrlsFromJoiningFormDocuments(payload.data?.joining_form_documents)
   );
+  
+  console.log('[DEBUG][buildProfileSubmissionInitialData] fileUrls before update:', fileUrls);
+  
+  // Use the new updated_profile_photo and updated_signature columns first, then fall back to payload
+  if (submission.updated_profile_photo && typeof submission.updated_profile_photo === 'string') {
+    fileUrls.profile_photo = submission.updated_profile_photo;
+    console.log('[DEBUG][buildProfileSubmissionInitialData] set fileUrls.profile_photo from column:', submission.updated_profile_photo);
+  } else if (payload.data?.profile_photo && typeof payload.data.profile_photo === 'string') {
+    fileUrls.profile_photo = payload.data.profile_photo;
+    console.log('[DEBUG][buildProfileSubmissionInitialData] set fileUrls.profile_photo from payload:', payload.data.profile_photo);
+  }
+  if (submission.updated_signature && typeof submission.updated_signature === 'string') {
+    fileUrls.signature = submission.updated_signature;
+    console.log('[DEBUG][buildProfileSubmissionInitialData] set fileUrls.signature from column:', submission.updated_signature);
+  } else if (payload.data?.signature && typeof payload.data.signature === 'string') {
+    fileUrls.signature = payload.data.signature;
+    console.log('[DEBUG][buildProfileSubmissionInitialData] set fileUrls.signature from payload:', payload.data.signature);
+  }
+  
+  console.log('[DEBUG][buildProfileSubmissionInitialData] fileUrls after update:', fileUrls);
 
   documents_submitted = normalizeDocumentsSubmittedForForm(documents_submitted);
 
   const initialData = {
     ...payload.data,
+    // Also set profile_photo and signature directly on initialData for the form
+    profile_photo: fileUrls.profile_photo,
+    signature: fileUrls.signature,
     references: payload.references,
     education: payload.education,
     experience: payload.experience,

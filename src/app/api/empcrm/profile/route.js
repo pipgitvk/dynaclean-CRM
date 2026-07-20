@@ -146,6 +146,9 @@ export async function GET(request) {
         references,
         education,
         experience,
+        // Ensure updated_ columns are included
+        updated_profile_photo: profile.updated_profile_photo || null,
+        updated_signature: profile.updated_signature || null
       },
     });
   } catch (error) {

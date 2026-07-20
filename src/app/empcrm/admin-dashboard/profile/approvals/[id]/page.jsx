@@ -1,7 +1,7 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
 import ProfileForm from "@/app/empcrm/admin-dashboard/profile/ProfileForm";
 import ReassignFieldsModal from "@/app/empcrm/admin-dashboard/profile/approvals/ReassignFieldsModal";
 import { Check, X, ListChecks } from "lucide-react";
@@ -10,8 +10,8 @@ import { buildProfileSubmissionInitialData, mergeSubmissionInitialWithLiveProfil
 import { labelForReassignKey } from "@/lib/profileReassignFields";
 import { parseReassignKeys } from "@/lib/reassignFieldVisibility";
 
-export default function SubmissionDetailsPage({ params }) {
-    const { id } = use(params);
+export default function SubmissionDetailsPage() {
+    const { id } = useParams();
     const searchParams = useSearchParams();
     const fromAdminQueue = searchParams.get("from") === "admin";
 

@@ -406,24 +406,65 @@ export async function POST(request) {
     const uploadedFiles = [];
     const fileExt = (name) => { try { return path.extname(name || '').slice(0, 16); } catch { return ''; } };
 
-    const profilePhoto = formData.get('profile_photo');
-    if (profilePhoto && profilePhoto.size > 0) {
-      const name = `profile_photo_${Date.now()}${fileExt(profilePhoto.name)}`;
+    console.log('[DEBUG][POST] formData keys:', Array.from(formData.keys()));
+    
+    // Log all formData entries to see exactly what we're getting
+    console.log('[DEBUG][POST] --- FormData Entries ---');
+    for (const [k, v] of formData.entries()) {
+      console.log(`[DEBUG][POST] ${k}:`, typeof v, v instanceof File ? `File(${v.name}, ${v.size} bytes)` : v);
+    }
+    console.log('[DEBUG][POST] -----------------------');
+
+    // Helper to get the last File object from formData for a key
+    const getFileFromFormData = (key) => {
+      const all = formData.getAll(key);
+      console.log(`[DEBUG][POST] getAll(${key}):`, all.map(v => ({ 
+        type: typeof v, 
+        isFile: v instanceof File,
+        value: v instanceof File ? `${v.name} (${v.size} bytes)` : v
+      })));
+      // Find the last entry that is a File with size > 0
+      for (let i = all.length - 1; i >= 0; i--) {
+        const val = all[i];
+        if (val && val instanceof File && val.size > 0) {
+          return val;
+        }
+      }
+      return null;
+    };
+
+    let updatedProfilePhoto = null;
+    const profilePhoto = getFileFromFormData('profile_photo');
+    console.log('[DEBUG][POST] profilePhoto (from getAll):', profilePhoto ? `${profilePhoto.name} (${profilePhoto.size} bytes)` : null);
+    
+    if (profilePhoto) {
+      const name = `updated_profile_photo_${Date.now()}${fileExt(profilePhoto.name)}`;
       const p = path.join(uploadDir, name);
+      console.log('[DEBUG][POST] Saving profilePhoto to:', p);
       const buffer = Buffer.from(await profilePhoto.arrayBuffer());
       await writeFile(p, buffer);
-      data.profile_photo = `/employee_profiles/${encodeURIComponent(username)}/${encodeURIComponent(name)}`;
-      uploadedFiles.push(data.profile_photo);
+      updatedProfilePhoto = `/employee_profiles/${encodeURIComponent(username)}/${encodeURIComponent(name)}`;
+      uploadedFiles.push(updatedProfilePhoto);
+      console.log('[DEBUG][POST] updatedProfilePhoto set to:', updatedProfilePhoto);
+    } else {
+      console.log('[DEBUG][POST] No valid profilePhoto File found');
     }
 
-    const signature = formData.get('signature');
-    if (signature && signature.size > 0) {
-      const name = `signature_${Date.now()}${fileExt(signature.name)}`;
+    let updatedSignature = null;
+    const signature = getFileFromFormData('signature');
+    console.log('[DEBUG][POST] signature (from getAll):', signature ? `${signature.name} (${signature.size} bytes)` : null);
+    
+    if (signature) {
+      const name = `updated_signature_${Date.now()}${fileExt(signature.name)}`;
       const p = path.join(uploadDir, name);
+      console.log('[DEBUG][POST] Saving signature to:', p);
       const buffer = Buffer.from(await signature.arrayBuffer());
       await writeFile(p, buffer);
-      data.signature = `/employee_profiles/${encodeURIComponent(username)}/${encodeURIComponent(name)}`;
-      uploadedFiles.push(data.signature);
+      updatedSignature = `/employee_profiles/${encodeURIComponent(username)}/${encodeURIComponent(name)}`;
+      uploadedFiles.push(updatedSignature);
+      console.log('[DEBUG][POST] updatedSignature set to:', updatedSignature);
+    } else {
+      console.log('[DEBUG][POST] No valid signature File found');
     }
 
     // Strategy A: joining_form_documents[]
@@ -544,16 +585,32 @@ export async function POST(request) {
       // Keep reassigned_fields / reassignment_note so HR can see what was sent back until approve/reject.
       await conn.execute(
         `UPDATE employee_profile_submissions SET status = 'pending', payload = ?, uploaded_files = ?, submitted_by = ?, submitted_at = NOW(),
-         reviewed_by = NULL, reviewed_at = NULL, rejection_reason = NULL, pending_assignee_username = NULL
+         reviewed_by = NULL, reviewed_at = NULL, rejection_reason = NULL, pending_assignee_username = NULL,
+         updated_profile_photo = ?, updated_signature = ?
          WHERE id = ?`,
-        [JSON.stringify({ data: mergedData, references: mergedReferences, education: mergedEducation, experience: mergedExperience, field_changes: fieldChanges }), JSON.stringify(mergedUploadedFiles), session.username, resubmitId]
+        [
+          JSON.stringify({ data: mergedData, references: mergedReferences, education: mergedEducation, experience: mergedExperience, field_changes: fieldChanges }),
+          JSON.stringify(mergedUploadedFiles),
+          session.username,
+          updatedProfilePhoto,
+          updatedSignature,
+          resubmitId
+        ]
       );
       return NextResponse.json({ success: true, message: "Profile resubmitted for HR approval", submissionId: resubmitId });
     }
 
     const [result] = await conn.execute(
-      `INSERT INTO employee_profile_submissions (username, empId, status, payload, uploaded_files, submitted_by) VALUES (?, ?, 'pending', ?, ?, ?)`,
-      [username, empId, JSON.stringify({ data, references, education, experience, field_changes: fieldChanges }), JSON.stringify(uploadedFiles), session.username]
+      `INSERT INTO employee_profile_submissions (username, empId, status, payload, uploaded_files, submitted_by, updated_profile_photo, updated_signature) VALUES (?, ?, 'pending', ?, ?, ?, ?, ?)`,
+      [
+        username,
+        empId,
+        JSON.stringify({ data, references, education, experience, field_changes: fieldChanges }),
+        JSON.stringify(uploadedFiles),
+        session.username,
+        updatedProfilePhoto,
+        updatedSignature
+      ]
     );
 
     return NextResponse.json({ success: true, message: 'Profile submitted for HR approval', submissionId: result.insertId });
@@ -843,7 +900,16 @@ export async function PATCH(request) {
     const mergedFlat = mergePayloadDataPreferNonEmpty(existingRow, data);
     // Remove field_changes — it should only be stored in submission payload, not in employee_profiles table
     const { field_changes, ...upsertWithoutChanges } = mergedFlat;
-    const upsertData = { ...upsertWithoutChanges, joining_form_documents: JSON.stringify(uniqueDocs) };
+    const upsertData = { 
+      ...upsertWithoutChanges, 
+      joining_form_documents: JSON.stringify(uniqueDocs),
+      // Save the updated photos/signatures from submission to employee_profiles
+      updated_profile_photo: submission.updated_profile_photo || existingRow.updated_profile_photo || null,
+      updated_signature: submission.updated_signature || existingRow.updated_signature || null,
+      // Also update the main profile_photo and signature if we have updated ones
+      profile_photo: submission.updated_profile_photo || upsertWithoutChanges.profile_photo || existingRow.profile_photo || null,
+      signature: submission.updated_signature || upsertWithoutChanges.signature || existingRow.signature || null
+    };
 
     if (existing.length > 0) {
       // Update

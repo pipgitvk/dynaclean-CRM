@@ -690,7 +690,11 @@ export default function ProfileForm({
           key === "documents_submitted" ||
           key === "joining_form_documents" ||
           key === "fileUrls" ||
-          key === "is_experienced"
+          key === "is_experienced" ||
+          key === "profile_photo" ||
+          key === "signature" ||
+          key === "updated_profile_photo" ||
+          key === "updated_signature"
         ) {
           // Skip these as they are handled explicitly below
           return;
