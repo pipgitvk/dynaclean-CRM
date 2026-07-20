@@ -719,6 +719,7 @@ const EmpTable = ({ employees }) => {
       "product-stock",
       "spare-parts",
       "installation-videos",
+      "return-products",
     ],
     "SERVICE SUPPORT": [
       "dashboard-home",
@@ -739,6 +740,7 @@ const EmpTable = ({ employees }) => {
       "product-stock",
       "spare-parts",
       "installation-videos",
+      "return-products",
     ],
   };
 

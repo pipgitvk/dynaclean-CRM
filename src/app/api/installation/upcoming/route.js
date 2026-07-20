@@ -47,6 +47,8 @@ export async function GET(req) {
         no.contact,
         no.created_by AS emp_name,
         DATE_FORMAT(no.delivery_date, '%Y-%m-%d') AS delivery_date,
+        COALESCE(SUM(qi.total_price), 0) AS pricing_total,
+        COALESCE(SUM(qi.quantity), 0) AS total_qty,
         CASE 
           WHEN no.delivery_date < CURDATE() THEN 'overdue'
           WHEN no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY) THEN 'upcoming'
@@ -55,6 +57,7 @@ export async function GET(req) {
         DATEDIFF(no.delivery_date, CURDATE()) AS days_until_installation
       FROM neworder no
        JOIN dispatch d ON d.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
+       LEFT JOIN quotation_items qi ON qi.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
        WHERE d.serial_no IS NOT NULL AND d.serial_no <> ''
        AND no.installation_status = 0
        AND (no.is_returned = 0 OR no.is_returned = 2 OR no.is_returned IS NULL)

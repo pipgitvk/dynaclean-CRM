@@ -443,6 +443,13 @@ const allMenuItems = [
         icon: "MapPin",
       },
       {
+        path: "/user-dashboard/return-products",
+        name: "Return Products",
+        moduleKey: "return-products",
+        roles: ["ALL"],
+        icon: "RotateCcw",
+      },
+      {
         path: "/user-dashboard/amc-cmc",
         name: "AMC/CMC Management",
         moduleKey: "amc-cmc",
