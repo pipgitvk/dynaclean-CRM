@@ -1798,43 +1798,25 @@ const NewInvoice = ({ invoice }) => {
 
   // Calculate item-level totals for display
   const calculateItemTotals = () => {
-    if (!invoice.items || !Array.isArray(invoice.items)) {
-      return {
-        subtotal: invoice.subtotal || 0,
-        totalTax: invoice.total_tax || 0,
-        grandTotal: invoice.grand_total || 0,
-        totalCGST: invoice.cgst || 0,
-        totalSGST: invoice.sgst || 0,
-        totalIGST: invoice.igst || 0,
-        totalQuantity: 1,
-      };
-    }
-
+    // Use stored invoice totals to prevent discrepancies
     const totals = {
-      subtotal: 0,
-      totalTax: 0,
-      grandTotal: 0,
-      totalCGST: 0,
-      totalSGST: 0,
-      totalIGST: 0,
+      subtotal: invoice.subtotal || 0,
+      totalTax: invoice.total_tax || 0,
+      grandTotal: invoice.grand_total || 0,
+      totalCGST: invoice.cgst || 0,
+      totalSGST: invoice.sgst || 0,
+      totalIGST: invoice.igst || 0,
       totalQuantity: 0,
     };
 
-    invoice.items.forEach((item) => {
-      totals.subtotal += parseFloat(item.taxable_value) || 0;
-      totals.totalCGST += parseFloat(item.cgst_amount) || 0;
-      totals.totalSGST += parseFloat(item.sgst_amount) || 0;
-      totals.totalIGST += parseFloat(item.igst_amount) || 0;
-      totals.totalTax +=
-        (parseFloat(item.cgst_amount) || 0) +
-        (parseFloat(item.sgst_amount) || 0) +
-        (parseFloat(item.igst_amount) || 0);
-      totals.grandTotal += parseFloat(item.total_amount) || 0;
-      totals.totalQuantity += parseFloat(item.quantity) || 0;
-    });
-
-    const roundOff = parseFloat(invoice.round_off) || 0;
-    totals.grandTotal += roundOff;
+    // Only calculate total quantity from items
+    if (invoice.items && Array.isArray(invoice.items)) {
+      invoice.items.forEach((item) => {
+        totals.totalQuantity += parseFloat(item.quantity) || 0;
+      });
+    } else {
+      totals.totalQuantity = 1;
+    }
 
     return totals;
   };
