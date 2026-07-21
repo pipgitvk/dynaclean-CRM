@@ -69,52 +69,58 @@ function createMysqlPool() {
   return pool;
 }
 
+let lastHealthCheckTime = 0;
+const HEALTH_CHECK_INTERVAL = 60000; // 1 minute in ms
+
 export async function getDbConnection() {
   if (!g.__mysqlPool) {
     g.__mysqlPool = createMysqlPool();
   }
 
-  try {
-    /**
-     * Quick health check
-     * Agar pool closed/broken hai to recreate ho jayega.
-     */
-    const connection = await g.__mysqlPool.getConnection();
-    connection.release();
+  const now = Date.now();
+  if (now - lastHealthCheckTime > HEALTH_CHECK_INTERVAL) {
+    try {
+      /**
+       * Quick health check (only every minute)
+       * Agar pool closed/broken hai to recreate ho jayega.
+       */
+      const connection = await g.__mysqlPool.getConnection();
+      connection.release();
+      lastHealthCheckTime = now;
+    } catch (error) {
+      const message = error?.message || "";
+      const code = error?.code || "";
 
-    return g.__mysqlPool;
-  } catch (error) {
-    const message = error?.message || "";
-    const code = error?.code || "";
+      console.error("❌ [DB] Pool health check failed:", {
+        code,
+        message,
+      });
 
-    console.error("❌ [DB] Pool health check failed:", {
-      code,
-      message,
-    });
+      if (
+        message.includes("Pool is closed") ||
+        code === "POOL_CLOSED" ||
+        code === "PROTOCOL_CONNECTION_LOST" ||
+        code === "ECONNRESET" ||
+        code === "ETIMEDOUT"
+      ) {
+        console.log("⚠️ [DB] Recreating MySQL pool...");
 
-    if (
-      message.includes("Pool is closed") ||
-      code === "POOL_CLOSED" ||
-      code === "PROTOCOL_CONNECTION_LOST" ||
-      code === "ECONNRESET" ||
-      code === "ETIMEDOUT"
-    ) {
-      console.log("⚠️ [DB] Recreating MySQL pool...");
+        try {
+          await g.__mysqlPool.end();
+        } catch (_) {
+          // ignore end error
+        }
 
-      try {
-        await g.__mysqlPool.end();
-      } catch (_) {
-        // ignore end error
+        delete g.__mysqlPool;
+        g.__mysqlPool = createMysqlPool();
+        lastHealthCheckTime = now;
+      } else {
+        throw error;
       }
-
-      delete g.__mysqlPool;
-      g.__mysqlPool = createMysqlPool();
-
-      return g.__mysqlPool;
     }
-
-    throw error;
   }
+
+  return g.__mysqlPool;
 }
 
 export async function dbQuery(sql, params = []) {
