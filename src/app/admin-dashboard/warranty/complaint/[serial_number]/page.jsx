@@ -33,6 +33,7 @@ export default function AddComplaintPage({ params }) {
 
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // Removed productDetails state as it's no longer fetched on the frontend for this page
   // const [productDetails, setProductDetails] = useState(null);
   // const [loadingProductDetails, setLoadingProductDetails] = useState(true); // No longer needed
@@ -65,6 +66,12 @@ export default function AddComplaintPage({ params }) {
   }, [serialNumberFromParams, setValue]); // Re-run if serialNumberFromParams changes
 
   const onSubmit = async (data) => {
+    // Prevent double submission
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
     const formData = new FormData();
     for (const key in data) {
       if (key === "attachments" && data[key] && data[key].length > 0) {
@@ -93,10 +100,12 @@ export default function AddComplaintPage({ params }) {
         const errorData = await response.json();
         toast.error(`Error: ${errorData.error || "Failed to add complaint."}`);
         console.error("API Error:", errorData);
+        setIsSubmitting(false); // Re-enable button on error
       }
     } catch (error) {
       console.error("Submission error:", error);
       toast.error("An unexpected error occurred. Please try again.");
+      setIsSubmitting(false); // Re-enable button on error
     }
   };
 
@@ -234,9 +243,10 @@ export default function AddComplaintPage({ params }) {
 
             <button
               type="submit"
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isSubmitting}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Submit Complaint
+              {isSubmitting ? "Submitting..." : "Submit Complaint"}
             </button>
           </form>
         </div>
