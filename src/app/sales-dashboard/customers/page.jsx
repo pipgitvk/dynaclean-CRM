@@ -36,6 +36,7 @@ export default async function CustomersPage({ searchParams }) {
     next_follow_date,
     employee,
     tags,
+    filter,
     page = '1'
   } = searchParamsResolved;
 
@@ -77,6 +78,21 @@ export default async function CustomersPage({ searchParams }) {
   let joinClause = "";
   const followupConditions = [];
   const followupParams = [];
+
+  // Handle today_reporting filter - show customers with today's TL followup
+  if (filter === "today_reporting") {
+    const today = new Date().toISOString().split("T")[0];
+    joinClause = `
+      INNER JOIN (
+        SELECT customer_id, MAX(id) as latest_id
+        FROM TL_followups
+        GROUP BY customer_id
+      ) tlf_latest ON c.customer_id = tlf_latest.customer_id
+      INNER JOIN TL_followups tlf ON tlf.id = tlf_latest.latest_id
+    `;
+    followupConditions.push("DATE(tlf.next_followup_date) = ?");
+    followupParams.push(today);
+  }
 
   // Build INNER JOIN for filtering by next_follow_date or tags
   if (next_follow_date || tags) {
@@ -172,10 +188,11 @@ export default async function CustomersPage({ searchParams }) {
       c.date_created,
       c.lead_campaign,
       c.products_interest,
-      COALESCE(cf.multi_tag, '') AS multi_tag,
-      cf.next_followup_date AS next_follow_date,
-      cf.notes AS latest_followup_notes
+      COALESCE(${filter === "today_reporting" ? "tlf.multi_tag" : "cf.multi_tag"}, '') AS multi_tag,
+      ${filter === "today_reporting" ? "tlf.next_followup_date" : "cf.next_followup_date"} AS next_follow_date,
+      ${filter === "today_reporting" ? "tlf.notes" : "cf.notes"} AS latest_followup_notes
     FROM customers c
+    ${filter === "today_reporting" ? "" : `
     LEFT JOIN (
       SELECT 
         customer_id,
@@ -185,6 +202,7 @@ export default async function CustomersPage({ searchParams }) {
         ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY time_stamp DESC) AS rn
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
+    `}
     ${joinClause}
     WHERE ${whereClauseString}
   `;

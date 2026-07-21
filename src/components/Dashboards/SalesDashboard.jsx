@@ -7,6 +7,7 @@ import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import HotLeadsCards from "@/components/Leads/HotLeadsCards";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
+import TodaysReportingButton from "@/components/TodaysReportingButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 
 export default function SalesDashboard({ user }) {
@@ -30,6 +31,7 @@ export default function SalesDashboard({ user }) {
 
             {/* Buttons row - separate on mobile */}
             <div className="flex flex-row gap-2 justify-start sm:justify-end">
+              <TodaysReportingButton />
               <TodayReportButton />
               <LeaveApprovalButton />
             </div>
