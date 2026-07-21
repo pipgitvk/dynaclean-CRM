@@ -24,6 +24,8 @@ import {
   formatCrmDayjsForISTDisplay,
 } from "@/lib/timezone";
 import TLCustomerFollowUpCards from "@/components/TL/TLCustomerFollowUpCards";
+import PreBookingModal from "@/components/PreBookingModal";
+import PreBookingColumn from "@/components/PreBookingColumn";
 
 export default function TLCustomersTable({
   customers,
@@ -59,6 +61,11 @@ export default function TLCustomersTable({
   const [activeFilter, setActiveFilter] = useState("all");
   const [showQuotePopup, setShowQuotePopup] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [preBookingModal, setPreBookingModal] = useState({
+    isOpen: false,
+    customerId: null,
+    customerName: null,
+  });
 
   const filterTagOptions = useMemo(() => getTlCustomersTableTagOptions(), []);
 
@@ -864,13 +871,22 @@ export default function TLCustomersTable({
         </div>
 
         {/* Filter Description */}
-        <div className="text-center mt-3">
+        <div className="text-center mt-3 flex items-center justify-between">
           <p className="text-xs text-gray-500">
             {activeFilter === "all" && "Showing all customers"}
             {activeFilter === "upcoming" && "Follow-up within 3 hours"}
             {activeFilter === "due" && "Overdue follow-ups"}
             {activeFilter === "prime" && "Prime customers"}
           </p>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setPreBookingModal({ isOpen: true, customerId: null, customerName: null })}
+              className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-md hover:shadow-lg"
+            >
+              <UserPlus size={18} />
+              Pre-Booking
+            </button>
+          )}
         </div>
       </div>
 
@@ -924,6 +940,9 @@ export default function TLCustomersTable({
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Multi Tag
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                PB
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Next Followup
@@ -1025,6 +1044,13 @@ export default function TLCustomersTable({
                       )}
                     </div>
                   </td>
+
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center">
+                    <div className="flex justify-center">
+                      <PreBookingColumn customerId={customer.customer_id} />
+                    </div>
+                  </td>
+
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
                     {tlOnly
                       ? formatCrmDatetimeForISTDisplay(
@@ -1326,6 +1352,15 @@ export default function TLCustomersTable({
           </div>
         </div>
       </div>
+
+      {/* Pre-Booking Modal */}
+      <PreBookingModal
+        isOpen={preBookingModal.isOpen}
+        onClose={() => setPreBookingModal({ isOpen: false, customerId: null, customerName: null })}
+        customerId={preBookingModal.customerId}
+        customerName={preBookingModal.customerName}
+        onSuccess={() => {}}
+      />
     </div>
   );
 }

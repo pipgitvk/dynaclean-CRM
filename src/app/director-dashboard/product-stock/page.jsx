@@ -32,6 +32,7 @@ function ProductStockList() {
   const [zeroStockProducts, setZeroStockProducts] = useState([]);
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [showZeroStockCard, setShowZeroStockCard] = useState(true);
+  const [preBookingData, setPreBookingData] = useState([]);
 
   const handleViewSpares = (product) => {
     // Filter spares based on product/machine compatibility
@@ -97,6 +98,7 @@ function ProductStockList() {
     fetchPurchasePrices();
     fetchAllSpares();
     fetchStockAlerts();
+    fetchPreBookingData();
   }, []);
 
   const fetchAllSpares = async () => {
@@ -173,6 +175,25 @@ function ProductStockList() {
       console.error("Error fetching purchase prices:", err);
       setPurchasePriceData([]);
     }
+  };
+
+  const fetchPreBookingData = async () => {
+    try {
+      const res = await fetch("/api/pre-booking-summary");
+      const data = await res.json();
+      setPreBookingData(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching pre-booking data:", err);
+      setPreBookingData([]);
+    }
+  };
+
+  const getPreBookedQuantity = (itemName) => {
+    if (!itemName) return 0;
+    const preBooking = preBookingData.find(
+      (pb) => pb.product_name && String(pb.product_name).toLowerCase() === String(itemName).toLowerCase()
+    );
+    return preBooking ? preBooking.pre_booked_quantity : 0;
   };
 
   const openTransferModal = (product) => {
@@ -451,6 +472,8 @@ function ProductStockList() {
                   <th className="px-5 py-2 text-left font-semibold">Delhi</th>
                   <th className="px-5 py-2 text-left font-semibold">South</th>
                   <th className="px-5 py-2 text-left font-semibold">Total Qty</th>
+                  <th className="px-5 py-2 text-left font-semibold">Pre-booked</th>
+                  <th className="px-5 py-2 text-left font-semibold">Net Qty</th>
                 </tr>
               </thead>
               <tbody>
@@ -471,6 +494,8 @@ function ProductStockList() {
                         {p.total_quantity ?? 0}
                       </span>
                     </td>
+                    <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
+                    <td className="px-5 py-3 font-semibold text-green-600">{(p.total_quantity ?? 0) - getPreBookedQuantity(p.item_name)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -509,6 +534,8 @@ function ProductStockList() {
                   <th className="px-5 py-2 text-left font-semibold">Min Qty</th>
                   <th className="px-5 py-2 text-left font-semibold">Delhi</th>
                   <th className="px-5 py-2 text-left font-semibold">South</th>
+                  <th className="px-5 py-2 text-left font-semibold">Pre-booked</th>
+                  <th className="px-5 py-2 text-left font-semibold">Net Qty</th>
                 </tr>
               </thead>
               <tbody>
@@ -531,6 +558,8 @@ function ProductStockList() {
                       <td className="px-5 py-3 text-gray-600">{p.min_qty ?? "—"}</td>
                       <td className="px-5 py-3 text-gray-700">{p.delhi ?? 0}</td>
                       <td className="px-5 py-3 text-gray-700">{p.south ?? 0}</td>
+                      <td className="px-5 py-3 font-semibold text-orange-600">{getPreBookedQuantity(p.item_name)}</td>
+                      <td className="px-5 py-3 font-semibold text-green-600">{(p.total_quantity ?? 0) - getPreBookedQuantity(p.item_name)}</td>
                     </tr>
                   ))}
               </tbody>

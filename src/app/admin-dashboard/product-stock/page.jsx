@@ -1403,6 +1403,7 @@ export default function ProductStockForm() {
   const [availableStockData, setAvailableStockData] = useState([]);
   const [stockTransactionsData, setStockTransactionsData] = useState([]);
   const [stockSummaryData, setStockSummaryData] = useState([]);
+  const [preBookingData, setPreBookingData] = useState([]);
 
   // Search and filter states
   const [availableSearch, setAvailableSearch] = useState("");
@@ -1449,6 +1450,12 @@ export default function ProductStockForm() {
       .then((res) => res.json())
       .then(setStockSummaryData)
       .catch(() => setStockSummaryData([]));
+
+    // Fetch pre-booking summary
+    fetch("/api/pre-booking-summary")
+      .then((res) => res.json())
+      .then(setPreBookingData)
+      .catch(() => setPreBookingData([]));
   }, []);
 
   const handleSaveLocation = async (row) => {
@@ -1589,7 +1596,21 @@ export default function ProductStockForm() {
 
   // Filtered data for each section
   const filteredAvailableStock = useMemo(() => {
-    const rows = Array.isArray(availableStockData) ? [...availableStockData] : [];
+    let rows = Array.isArray(availableStockData) ? [...availableStockData] : [];
+    
+    // Merge pre-booking data
+    rows = rows.map((item) => {
+      const itemName = item.item_name ? String(item.item_name).toLowerCase() : "";
+      const preBooking = preBookingData.find(
+        (pb) => pb.product_name && String(pb.product_name).toLowerCase() === itemName
+      );
+      return {
+        ...item,
+        pre_booked: preBooking ? preBooking.pre_booked_quantity : 0,
+        net_qty: (item.total || 0) - (preBooking ? preBooking.pre_booked_quantity : 0)
+      };
+    });
+
     return availableSearch
       ? rows.filter((item) =>
         Object.values(item).some((val) =>
@@ -1597,7 +1618,7 @@ export default function ProductStockForm() {
         )
       )
       : rows;
-  }, [availableStockData, availableSearch]);
+  }, [availableStockData, availableSearch, preBookingData]);
 
   const filteredTransactions = useMemo(() => {
     let filtered = stockTransactionsData;
@@ -1778,6 +1799,14 @@ export default function ProductStockForm() {
                         <p className="text-gray-500">South</p>
                         <p className="font-medium">{row.south}</p>
                       </div>
+                      <div>
+                        <p className="text-gray-500">Pre-booked</p>
+                        <p className="font-semibold text-orange-600">{row.pre_booked || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Net Qty</p>
+                        <p className="font-semibold text-green-600">{row.net_qty || 0}</p>
+                      </div>
                     </div>
 
                     {/* Storage Location Editor */}
@@ -1866,6 +1895,8 @@ export default function ProductStockForm() {
                     <th className="p-3 border-b font-semibold">Product Image</th>
                     <th className="p-3 border-b font-semibold">Item Name</th>
                     <th className="p-3 border-b font-semibold">Total Qty</th>
+                    <th className="p-3 border-b font-semibold">Pre-booked</th>
+                    <th className="p-3 border-b font-semibold">Net Qty</th>
                     <th className="p-3 border-b font-semibold">Delhi Godown</th>
                     <th className="p-3 border-b font-semibold">South Godown</th>
                     <th className="p-3 border-b font-semibold">Storage Location</th>
@@ -1876,7 +1907,7 @@ export default function ProductStockForm() {
                 <tbody>
                   {filteredAvailableStock.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="p-4 text-center text-gray-500">
+                      <td colSpan="11" className="p-4 text-center text-gray-500">
                         No stock data available
                       </td>
                     </tr>
@@ -1901,6 +1932,8 @@ export default function ProductStockForm() {
                         </td>
                         <td className="p-2 sm:p-3">{row.item_name}</td>
                         <td className="p-2 sm:p-3 font-semibold">{row.total}</td>
+                        <td className="p-2 sm:p-3 font-semibold text-orange-600">{row.pre_booked || 0}</td>
+                        <td className="p-2 sm:p-3 font-semibold text-green-600">{row.net_qty || 0}</td>
                         <td className="p-2 sm:p-3">{row.delhi}</td>
                         <td className="p-2 sm:p-3">{row.south}</td>
                         <td className="p-2 sm:p-3">
