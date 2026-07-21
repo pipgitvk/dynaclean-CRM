@@ -237,7 +237,7 @@ export default function EditBidPage({ params }) {
     'technical_preparation',
     'submitted',
     'technical_qualified',
-    'ra_participated',
+    'opened',
     'won',
     'lost',
     'cancelled'
@@ -249,7 +249,7 @@ export default function EditBidPage({ params }) {
     technical_preparation: 'Technical Preparation',
     submitted: 'Submitted',
     technical_qualified: 'Technical Qualified',
-    ra_participated: 'RA Participated',
+    opened: 'Opened',
     won: 'Won',
     lost: 'Lost',
     cancelled: 'Cancelled'
@@ -586,7 +586,7 @@ export default function EditBidPage({ params }) {
                   <p className="text-sm font-medium text-gray-700 mb-3">RA Participation Details</p>
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      RA Participated
+                      RA
                     </label>
                     <select
                       name="ra_participated"
