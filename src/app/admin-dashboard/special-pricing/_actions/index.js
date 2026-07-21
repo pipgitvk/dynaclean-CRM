@@ -120,30 +120,9 @@ export async function decideSpecialPrice(prevState, formData) {
       );
     }
 
-    try {
-      const [rows] = await conn.execute(
-        `SELECT product_id, special_price FROM special_price WHERE id = ? LIMIT 1`,
-        [numericId],
-      );
-
-      if (rows.length > 0) {
-        const { product_id, special_price } = rows[0];
-
-        await conn.execute(
-          `
-          UPDATE products_list
-          SET last_negotiation_price = ?
-          WHERE id = ?
-        `,
-          [Number(special_price), Number(product_id)],
-        );
-      }
-    } catch (e) {
-      console.error(
-        "⚠️ Failed to update products_list.last_negotiation_price on approval:",
-        e,
-      );
-    }
+    // Note: Removed automatic price update to products_list
+    // Special pricing should only apply to specific customers,
+    // not update the general product prices in the product stock
   } else {
     try {
       await conn.execute(

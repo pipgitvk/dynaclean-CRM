@@ -1131,6 +1131,101 @@ export default function EditBidPage({ params }) {
           />
         </div>
 
+        {/* Bid Opened Details Section */}
+        {["opened", "won", "lost", "cancelled"].includes(formData.bid_status) && (
+          <div className="bg-purple-50 rounded-lg shadow-sm border border-purple-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Bid Opened Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+              {/* L1 Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L1 Level
+                </label>
+                <input
+                  type="text"
+                  name="l1_level"
+                  value={formData.l1_level}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L1 Price (₹)
+                </label>
+                <input
+                  type="number"
+                  name="l1_price"
+                  value={formData.l1_price}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Price"
+                />
+              </div>
+
+              {/* L2 Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L2 Level
+                </label>
+                <input
+                  type="text"
+                  name="l2_level"
+                  value={formData.l2_level}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L2 Price (₹)
+                </label>
+                <input
+                  type="number"
+                  name="l2_price"
+                  value={formData.l2_price}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Price"
+                />
+              </div>
+
+              {/* L3 Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L3 Level
+                </label>
+                <input
+                  type="text"
+                  name="l3_level"
+                  value={formData.l3_level}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L3 Price (₹)
+                </label>
+                <input
+                  type="number"
+                  name="l3_price"
+                  value={formData.l3_price}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Price"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Submit Button */}
         <div className="flex justify-end gap-3 pt-6">
           <button
