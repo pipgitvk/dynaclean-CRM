@@ -86,6 +86,7 @@ export async function GET(req) {
     const organisationId = searchParams.get("organisationId") || "";
     const dateFrom = searchParams.get("dateFrom") || "";
     const dateTo = searchParams.get("dateTo") || "";
+    const raParticipated = searchParams.get("raParticipated") || "";
     const endingSoon = searchParams.get("endingSoon") === "true";
     const activeRA = searchParams.get("activeRA") === "true";
 
@@ -188,6 +189,11 @@ export async function GET(req) {
       if (dateTo) {
         conditions.push("bid_end_date <= ?");
         params.push(dateTo);
+      }
+
+      if (raParticipated) {
+        conditions.push("ra_participated = ?");
+        params.push(raParticipated);
       }
 
       // Filter for bids ending within 1 week
@@ -335,6 +341,13 @@ export async function POST(req) {
       tds_under_ita,
       tds_under_gst,
       other_deduction,
+      selected_level,
+      l1_level,
+      l1_price,
+      l2_level,
+      l2_price,
+      l3_level,
+      l3_price,
     } = fields;
 
     console.log("DEBUG: Received fields:", {
@@ -410,7 +423,14 @@ export async function POST(req) {
         { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
         { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
         { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
-        { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' }
+        { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'selected_level', type: 'VARCHAR(10) NULL' },
+        { name: 'l1_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l1_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'l2_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l2_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'l3_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l3_price', type: 'DECIMAL(10,2) NULL' }
       ];
 
       for (const { name, type } of columnsToCheck) {
@@ -476,6 +496,13 @@ export async function POST(req) {
         tds_under_ita || null,
         tds_under_gst || null,
         other_deduction || null,
+        selected_level || null,
+        l1_level || null,
+        l1_price || null,
+        l2_level || null,
+        l2_price || null,
+        l3_level || null,
+        l3_price || null,
       ];
 
       console.log("INSERT columns:", insertColumns);

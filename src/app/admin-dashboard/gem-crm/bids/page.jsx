@@ -13,6 +13,8 @@ import {
   X,
   AlertTriangle,
   Timer,
+  Edit3,
+  Info,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -53,16 +55,29 @@ export default function GemCrmBidsPage() {
   const [platformFilter, setPlatformFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [raFilter, setRaFilter] = useState("");
   const [endingSoonFilter, setEndingSoonFilter] = useState(searchParams.get('endingSoon') === 'true');
   const [activeRAFilter, setActiveRAFilter] = useState(searchParams.get('activeRA') === 'true');
   const [showFilters, setShowFilters] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [stats, setStats] = useState({ total: 0, won: 0, lost: 0 });
+  const [showModal, setShowModal] = useState(false);
+  const [selectedBid, setSelectedBid] = useState(null);
+  const [bidForm, setBidForm] = useState({
+    selected_level: "",
+    l1_level: "",
+    l1_price: "",
+    l2_level: "",
+    l2_price: "",
+    l3_level: "",
+    l3_price: "",
+  });
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchBids();
     fetchStats();
-  }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter, dateFrom, dateTo, endingSoonFilter, activeRAFilter]);
+  }, [pagination.page, statusFilter, technicalStatusFilter, financialStatusFilter, platformFilter, dateFrom, dateTo, endingSoonFilter, activeRAFilter, raFilter]);
 
   const fetchBids = async () => {
     try {
@@ -77,6 +92,7 @@ export default function GemCrmBidsPage() {
         ...(platformFilter && { platform: platformFilter }),
         ...(dateFrom && { dateFrom }),
         ...(dateTo && { dateTo }),
+        ...(raFilter && { raParticipated: raFilter }),
         ...(endingSoonFilter && { endingSoon: 'true' }),
         ...(activeRAFilter && { activeRA: 'true' }),
       });
@@ -126,6 +142,45 @@ export default function GemCrmBidsPage() {
   const clearActiveRAFilter = () => {
     setActiveRAFilter(false);
     router.push('/admin-dashboard/gem-crm/bids');
+  };
+
+  const openBidOpenedModal = (bid) => {
+    setSelectedBid(bid);
+    setBidForm({
+      selected_level: bid.selected_level || "",
+      l1_level: bid.l1_level || "",
+      l1_price: bid.l1_price || "",
+      l2_level: bid.l2_level || "",
+      l2_price: bid.l2_price || "",
+      l3_level: bid.l3_level || "",
+      l3_price: bid.l3_price || "",
+    });
+    setShowModal(true);
+  };
+
+  const handleSaveBidOpened = async () => {
+    if (!selectedBid) return;
+    try {
+      setIsSaving(true);
+      const res = await fetch(`/api/gem-crm/bids/${selectedBid.bid_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bidForm),
+      });
+      const result = await res.json();
+      if (result.success) {
+        toast.success("Bid opened details updated successfully");
+        setShowModal(false);
+        fetchBids(); // Refresh bids list
+      } else {
+        toast.error(result.message || "Failed to update bid");
+      }
+    } catch (error) {
+      console.error("Error updating bid:", error);
+      toast.error("Error updating bid");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -323,6 +378,19 @@ export default function GemCrmBidsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Reverse Auction</label>
+                <select
+                  value={raFilter}
+                  onChange={(e) => setRaFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All RA Status</option>
+                  <option value="yes">Yes (RA Participated)</option>
+                  <option value="no">No (RA Not Participated)</option>
+                </select>
+              </div>
             </div>
           </div>
         )}
@@ -365,6 +433,9 @@ export default function GemCrmBidsPage() {
                   Opening Date
                 </th>
                 <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
+                  RA
+                </th>
+                <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Status
                 </th>
                 <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
@@ -375,7 +446,7 @@ export default function GemCrmBidsPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan="12" className="py-8 text-center text-gray-500">
+                  <td colSpan="13" className="py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
@@ -383,7 +454,7 @@ export default function GemCrmBidsPage() {
                 </tr>
               ) : bids.length === 0 ? (
                 <tr>
-                  <td colSpan="12" className="py-8 text-center text-gray-500">
+                  <td colSpan="13" className="py-8 text-center text-gray-500">
                     No bids found
                   </td>
                 </tr>
@@ -425,6 +496,11 @@ export default function GemCrmBidsPage() {
                       {bid.bid_open_date ? new Date(bid.bid_open_date).toLocaleDateString('en-IN') : "-"}
                     </td>
                     <td className="py-3 px-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${bid.ra_participated === 'yes' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {bid.ra_participated === 'yes' ? 'YES' : 'NO'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
                       <StatusBadge status={bid.bid_status} />
                     </td>
                     <td className="py-3 px-4">
@@ -443,6 +519,27 @@ export default function GemCrmBidsPage() {
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
+                        {["opened", "won", "lost", "cancelled"].includes(bid.bid_status) && (
+                          <div className="relative group">
+                            <button
+                              onClick={() => openBidOpenedModal(bid)}
+                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                              title="Edit Bid Opened Details"
+                            >
+                              <Info className="w-4 h-4" />
+                            </button>
+                            {/* Tooltip */}
+                            {(bid.selected_level || bid.l1_level || bid.l2_level || bid.l3_level) && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-72 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-normal break-words pointer-events-none">
+                                {bid.selected_level && <p className="mb-1"><strong>Selected Level:</strong> {bid.selected_level}</p>}
+                                {bid.l1_level && <p className="mb-1"><strong>L1:</strong> {bid.l1_level} {bid.l1_price ? `(₹${Number(bid.l1_price).toLocaleString()})` : ""}</p>}
+                                {bid.l2_level && <p className="mb-1"><strong>L2:</strong> {bid.l2_level} {bid.l2_price ? `(₹${Number(bid.l2_price).toLocaleString()})` : ""}</p>}
+                                {bid.l3_level && <p><strong>L3:</strong> {bid.l3_level} {bid.l3_price ? `(₹${Number(bid.l3_price).toLocaleString()})` : ""}</p>}
+                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -481,6 +578,121 @@ export default function GemCrmBidsPage() {
           </div>
         )}
       </div>
+
+      {/* Modal for Bid Opened Details */}
+      {showModal && selectedBid && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Edit Bid Opened Details</h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* L1 Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">L1 Level (Company Name)</label>
+                  <input
+                    type="text"
+                    value={bidForm.l1_level}
+                    onChange={(e) => setBidForm({ ...bidForm, l1_level: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter company name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">L1 Price (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={bidForm.l1_price}
+                    onChange={(e) => setBidForm({ ...bidForm, l1_price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter price"
+                  />
+                </div>
+              </div>
+
+              {/* L2 Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">L2 Level (Company Name)</label>
+                  <input
+                    type="text"
+                    value={bidForm.l2_level}
+                    onChange={(e) => setBidForm({ ...bidForm, l2_level: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter company name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">L2 Price (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={bidForm.l2_price}
+                    onChange={(e) => setBidForm({ ...bidForm, l2_price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter price"
+                  />
+                </div>
+              </div>
+
+              {/* L3 Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">L3 Level (Company Name)</label>
+                  <input
+                    type="text"
+                    value={bidForm.l3_level}
+                    onChange={(e) => setBidForm({ ...bidForm, l3_level: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter company name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">L3 Price (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={bidForm.l3_price}
+                    onChange={(e) => setBidForm({ ...bidForm, l3_price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter price"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveBidOpened}
+                disabled={isSaving}
+                className="px-4 py-2 text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

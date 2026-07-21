@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDbConnection } from "@/lib/db";
+import { withPool } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseFormData } from "@/lib/parseForm";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
@@ -83,178 +83,177 @@ export async function GET(req, { params }) {
       return NextResponse.json({ error: "Bid ID is required" }, { status: 400 });
     }
 
-    const conn = await getDbConnection();
-    const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
+    const result = await withPool(async (conn) => {
+      const currentEmpId = await resolveGemCrmEmployeeId(payload);
 
-    // Build WHERE clause for filtering
-    let whereClause = "WHERE b.bid_id = ?";
-    let queryParams = [bid_id];
+      // Build WHERE clause for filtering
+      let whereClause = "WHERE b.bid_id = ?";
+      let queryParams = [bid_id];
 
-    // Only SUPERADMIN can see all bids, others can only see their own assigned bids
-    if (payload.role !== "SUPERADMIN") {
-      if (currentEmpId) {
-        whereClause += " AND b.assigned_employee_id = ?";
-        queryParams.push(currentEmpId);
-      } else {
-        // Fallback: try to get employee ID from username
-        const username = payload?.username;
-        if (username) {
-          const [empRows] = await conn.execute(
-            "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
-            [username]
-          );
-          if (empRows?.[0]?.empId) {
-            whereClause += " AND b.assigned_employee_id = ?";
-            queryParams.push(empRows[0].empId);
-          } else {
-            const [repRows] = await conn.execute(
-              "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
-              [username]
-            );
-            if (repRows?.[0]?.empId) {
+      // Only SUPERADMIN can see all bids, others can only see their own assigned bids
+      if (payload.role !== "SUPERADMIN") {
+        if (currentEmpId) {
+          whereClause += " AND b.assigned_employee_id = ?";
+          queryParams.push(currentEmpId);
+        } else {
+          // Fallback: try to get employee ID from username
+          const username = payload?.username;
+          if (username) {
+            const empRows = await resolveGemCrmEmployeeId({ username });
+            if (empRows) {
               whereClause += " AND b.assigned_employee_id = ?";
-              queryParams.push(repRows[0].empId);
+              queryParams.push(empRows);
             }
           }
         }
       }
-    }
 
-    // Ensure RA columns exist in database
-    const columnsToCheck = [
-      { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
-      { name: 'ra_start_date', type: 'DATE NULL' },
-      { name: 'ra_end_date', type: 'DATE NULL' },
-      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
-      { name: 'customer_id', type: 'VARCHAR(255) NULL' },
-      { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
-      { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
-      { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' }
-    ];
+      // Ensure RA columns exist in database
+      const columnsToCheck = [
+        { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
+        { name: 'ra_start_date', type: 'DATE NULL' },
+        { name: 'ra_end_date', type: 'DATE NULL' },
+        { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'customer_id', type: 'VARCHAR(255) NULL' },
+        { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
+        { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
+        { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'l1_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l1_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'l2_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l2_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'l3_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l3_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'selected_level', type: 'VARCHAR(10) NULL' }
+      ];
 
-    const [tableInfo] = await conn.execute("DESCRIBE bids");
-    const existingColumns = tableInfo.map(row => row.Field);
+      const [tableInfo] = await conn.execute("DESCRIBE bids");
+      const existingColumns = tableInfo.map(row => row.Field);
 
-    for (const { name, type } of columnsToCheck) {
-      if (!existingColumns.includes(name)) {
-        try {
-          await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
-          console.log(`✅ Added column ${name} to bids table`);
-        } catch (alterError) {
-          console.error(`❌ Failed to add column ${name}:`, alterError.message);
+      for (const { name, type } of columnsToCheck) {
+        if (!existingColumns.includes(name)) {
+          try {
+            await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
+            console.log(`✅ Added column ${name} to bids table`);
+          } catch (alterError) {
+            console.error(`❌ Failed to add column ${name}:`, alterError.message);
+          }
         }
       }
-    }
 
-    // Get bid details with safe joins
-    let bids = [];
-    try {
-      const [bidsResult] = await conn.execute(
-        `SELECT b.*, 
-          e.username as assigned_employee_name,
-          e.empId as assigned_employee_empid,
-          e.email as assigned_employee_email,
-          dd.party_name as dd_party_name,
-          dd.amount as dd_amount,
-          dd.status as dd_status,
-          dd.dd_number as dd_number,
-          dd.bg_number as dd_bg_number
-        FROM bids b
-        LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
-        LEFT JOIN dd_management dd ON b.dd_id = dd.id
-        ${whereClause}`,
-        queryParams
-      );
-      bids = bidsResult;
-    } catch (e) {
-      console.log("Bid details query with joins failed, trying with only emplist:", e.message);
+      // Get bid details with safe joins
+      let bids = [];
       try {
         const [bidsResult] = await conn.execute(
           `SELECT b.*, 
             e.username as assigned_employee_name,
             e.empId as assigned_employee_empid,
-            e.email as assigned_employee_email
+            e.email as assigned_employee_email,
+            dd.party_name as dd_party_name,
+            dd.amount as dd_amount,
+            dd.status as dd_status,
+            dd.dd_number as dd_number,
+            dd.bg_number as dd_bg_number
           FROM bids b
           LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+          LEFT JOIN dd_management dd ON b.dd_id = dd.id
           ${whereClause}`,
           queryParams
         );
         bids = bidsResult;
-      } catch (e2) {
-        console.log("Bid details query with emplist also failed, trying without joins:", e2.message);
-        const [bidsResult] = await conn.execute(
-          `SELECT b.*
-          FROM bids b
-          ${whereClause}`,
-          queryParams
-        );
-        bids = bidsResult;
+      } catch (e) {
+        console.log("Bid details query with joins failed, trying with only emplist:", e.message);
+        try {
+          const [bidsResult] = await conn.execute(
+            `SELECT b.*, 
+              e.username as assigned_employee_name,
+              e.empId as assigned_employee_empid,
+              e.email as assigned_employee_email
+            FROM bids b
+            LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+            ${whereClause}`,
+            queryParams
+          );
+          bids = bidsResult;
+        } catch (e2) {
+          console.log("Bid details query with emplist also failed, trying without joins:", e2.message);
+          const [bidsResult] = await conn.execute(
+            `SELECT b.*
+            FROM bids b
+            ${whereClause}`,
+            queryParams
+          );
+          bids = bidsResult;
+        }
       }
-    }
 
-    if (bids.length === 0) {
-      await conn.end();
+      if (bids.length === 0) {
+        return { notFound: true };
+      }
+
+      // Get bid documents (safe query)
+      let documents = [];
+      try {
+        const [docsResult] = await conn.execute(
+          `SELECT bd.*, e.username as uploaded_by_name
+           FROM bid_documents bd
+           LEFT JOIN emplist e ON bd.uploaded_by = e.empId
+           WHERE bd.bid_id = ?
+           ORDER BY bd.created_at DESC`,
+          [bid_id]
+        );
+        documents = docsResult;
+      } catch (e) {
+        console.log("Bid documents query failed, trying without emplist:", e.message);
+        const [docsResult] = await conn.execute(
+          `SELECT bd.*
+           FROM bid_documents bd
+           WHERE bd.bid_id = ?
+           ORDER BY bd.created_at DESC`,
+          [bid_id]
+        );
+        documents = docsResult;
+      }
+
+      // Get bid logs (safe query)
+      let logs = [];
+      try {
+        const [logsResult] = await conn.execute(
+          `SELECT bl.*, e.username as updated_by_name
+           FROM bid_logs bl
+           LEFT JOIN emplist e ON bl.updated_by = e.empId
+           WHERE bl.bid_id = ?
+           ORDER BY bl.created_at DESC`,
+          [bid_id]
+        );
+        logs = logsResult;
+      } catch (e) {
+        console.log("Bid logs query failed, trying without emplist:", e.message);
+        const [logsResult] = await conn.execute(
+          `SELECT bl.*
+           FROM bid_logs bl
+           WHERE bl.bid_id = ?
+           ORDER BY bl.created_at DESC`,
+          [bid_id]
+        );
+        logs = logsResult;
+      }
+
+      return { bids, documents, logs };
+    });
+
+    if (result.notFound) {
       return NextResponse.json({ error: "Bid not found" }, { status: 404 });
     }
 
-    // Get bid documents (safe query)
-    let documents = [];
-    try {
-      const [docsResult] = await conn.execute(
-        `SELECT bd.*, e.username as uploaded_by_name
-         FROM bid_documents bd
-         LEFT JOIN emplist e ON bd.uploaded_by = e.empId
-         WHERE bd.bid_id = ?
-         ORDER BY bd.created_at DESC`,
-        [bid_id]
-      );
-      documents = docsResult;
-    } catch (e) {
-      console.log("Bid documents query failed, trying without emplist:", e.message);
-      const [docsResult] = await conn.execute(
-        `SELECT bd.*
-         FROM bid_documents bd
-         WHERE bd.bid_id = ?
-         ORDER BY bd.created_at DESC`,
-        [bid_id]
-      );
-      documents = docsResult;
-    }
-
-    // Get bid logs (safe query)
-    let logs = [];
-    try {
-      const [logsResult] = await conn.execute(
-        `SELECT bl.*, e.username as updated_by_name
-         FROM bid_logs bl
-         LEFT JOIN emplist e ON bl.updated_by = e.empId
-         WHERE bl.bid_id = ?
-         ORDER BY bl.created_at DESC`,
-        [bid_id]
-      );
-      logs = logsResult;
-    } catch (e) {
-      console.log("Bid logs query failed, trying without emplist:", e.message);
-      const [logsResult] = await conn.execute(
-        `SELECT bl.*
-         FROM bid_logs bl
-         WHERE bl.bid_id = ?
-         ORDER BY bl.created_at DESC`,
-        [bid_id]
-      );
-      logs = logsResult;
-    }
-
-    await conn.end();
-
     return NextResponse.json({
       success: true,
-      data: bids[0],
-      documents,
-      logs,
+      data: result.bids[0],
+      documents: result.documents,
+      logs: result.logs,
     });
   } catch (error) {
     console.error("Error fetching bid:", error);
@@ -287,172 +286,175 @@ export async function PUT(req, { params }) {
       }
     }
 
-    const conn = await getDbConnection();
-    const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
+    const result = await withPool(async (conn) => {
+      const currentEmpId = await resolveGemCrmEmployeeId(payload);
 
-    // Build WHERE clause for filtering
-    let whereClause = "WHERE bid_id = ?";
-    let queryParams = [bid_id];
+      // Build WHERE clause for filtering
+      let whereClause = "WHERE bid_id = ?";
+      let queryParams = [bid_id];
 
-    // Only SUPERADMIN can update all bids, others can only update their own assigned bids
-    if (payload.role !== "SUPERADMIN") {
-      if (currentEmpId) {
-        whereClause += " AND assigned_employee_id = ?";
-        queryParams.push(currentEmpId);
-      } else {
-        // Fallback: try to get employee ID from username
-        const username = payload?.username;
-        if (username) {
-          const [empRows] = await conn.execute(
-            "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
-            [username]
-          );
-          if (empRows?.[0]?.empId) {
-            whereClause += " AND assigned_employee_id = ?";
-            queryParams.push(empRows[0].empId);
-          } else {
-            const [repRows] = await conn.execute(
-              "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
-              [username]
-            );
-            if (repRows?.[0]?.empId) {
+      // Only SUPERADMIN can update all bids, others can only update their own assigned bids
+      if (payload.role !== "SUPERADMIN") {
+        if (currentEmpId) {
+          whereClause += " AND assigned_employee_id = ?";
+          queryParams.push(currentEmpId);
+        } else {
+          // Fallback: try to get employee ID from username
+          const username = payload?.username;
+          if (username) {
+            const empRows = await resolveGemCrmEmployeeId({ username });
+            if (empRows) {
               whereClause += " AND assigned_employee_id = ?";
-              queryParams.push(repRows[0].empId);
+              queryParams.push(empRows);
             }
           }
         }
       }
-    }
 
-    // Get current bid to check for status change
-    const [currentBids] = await conn.execute(
-      `SELECT bid_status, bid_document FROM bids ${whereClause}`,
-      queryParams
-    );
+      // Get current bid to check for status change
+      const [currentBids] = await conn.execute(
+        `SELECT bid_status, bid_document FROM bids ${whereClause}`,
+        queryParams
+      );
 
-    if (currentBids.length === 0) {
-      await conn.end();
+      if (currentBids.length === 0) {
+        return { notFound: true };
+      }
+
+      const currentBid = currentBids[0];
+
+      // Ensure RA columns exist in database
+      const columnsToCheck = [
+        { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
+        { name: 'ra_start_date', type: 'DATE NULL' },
+        { name: 'ra_end_date', type: 'DATE NULL' },
+        { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'customer_id', type: 'VARCHAR(255) NULL' },
+        { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
+        { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
+        { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'l1_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l1_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'l2_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l2_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'l3_level', type: 'VARCHAR(50) NULL' },
+        { name: 'l3_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'selected_level', type: 'VARCHAR(10) NULL' }
+      ];
+
+      const [tableInfo] = await conn.execute("DESCRIBE bids");
+      const existingColumns = tableInfo.map(row => row.Field);
+
+      for (const { name, type } of columnsToCheck) {
+        if (!existingColumns.includes(name)) {
+          try {
+            await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
+            console.log(`✅ Added column ${name} to bids table`);
+          } catch (alterError) {
+            console.error(`❌ Failed to add column ${name}:`, alterError.message);
+          }
+        }
+      }
+
+      // Handle bid document upload if provided
+      let bid_document = fields.bid_document || currentBid.bid_document;
+      if (files.bid_document && files.bid_document[0]) {
+        // Delete old file
+        if (currentBid.bid_document) {
+          if (currentBid.bid_document.includes("cloudinary.com")) {
+            try {
+              const urlObj = new URL(currentBid.bid_document);
+              const pathname = urlObj.pathname;
+              const parts = pathname.split('/');
+              const versionIndex = parts.findIndex(p => p.startsWith('v'));
+              if (versionIndex !== -1 && versionIndex < parts.length - 1) {
+                const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
+                await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
+                console.log("✅ Deleted old bid document from Cloudinary:", publicIdWithFolder);
+              }
+            } catch (err) {
+              console.error("Failed to delete old document from Cloudinary:", err);
+            }
+          } else if (currentBid.bid_document.startsWith('/uploads/')) {
+            const oldPath = path.join(process.cwd(), "public", currentBid.bid_document);
+            await fs.unlink(oldPath).catch(() => {});
+          }
+        }
+        bid_document = await saveBidDocument(files.bid_document[0]);
+      }
+
+      // Build update query dynamically
+      const updateFields = [];
+      const updateValues = [];
+
+      const allowedFields = [
+        'bidding_platform', 'bid_number', 'gem_bid_no', 'bid_title', 'bid_link',
+        'bid_document', 'item_category', 'organisation_id', 'bid_start_date',
+        'bid_end_date', 'bid_open_date', 'bid_validity_days', 'model_id',
+        'specification', 'total_quantity', 'bid_type', 'evaluation_method',
+        'estimated_bid_value', 'bid_value', 'emd_required', 'emd_amount', 'epbg_percentage',
+        'epbg_duration_months', 'reverse_auction', 'turnover_required',
+        'oem_turnover_required', 'experience_required_years', 'delivery_days',
+        'inspection_required', 'technical_status', 'financial_status',
+        'bid_status', 'assigned_employee_id', 'dd_id', 'remarks', 'ra_participated',
+        'ra_start_date', 'ra_end_date', 'ra_last_price', 'order_id', 'customer_id',
+        'sd_deduction', 'ld_deduction', 'epbg_deduction', 'tds_under_ita',
+        'tds_under_gst', 'other_deduction', 'l1_level', 'l1_price', 'l2_level',
+        'l2_price', 'l3_level', 'l3_price', 'selected_level'
+      ];
+
+      for (const field of allowedFields) {
+        if (payload.role !== "SUPERADMIN" && field === "assigned_employee_id") continue;
+        if (fields[field] !== undefined) {
+          updateFields.push(`${field} = ?`);
+          updateValues.push(fields[field]);
+        }
+      }
+
+      if (updateFields.length === 0) {
+        return { noFieldsToUpdate: true };
+      }
+
+      updateValues.push(...queryParams);
+
+      await conn.execute(
+        `UPDATE bids SET ${updateFields.join(', ')} ${whereClause}`,
+        updateValues
+      );
+
+      // Log status change if status changed
+      if (fields.bid_status && fields.bid_status !== currentBid.bid_status) {
+        await conn.execute(
+          `INSERT INTO bid_logs (bid_id, old_status, new_status, remarks, updated_by)
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            bid_id,
+            currentBid.bid_status,
+            fields.bid_status,
+            fields.status_remarks || 'Status updated',
+            payload.empId || payload.id || null,
+          ]
+        );
+
+        // If bid status is "won", create order entry
+        if (fields.bid_status === 'won') {
+          await createOrderFromBid(conn, bid_id, payload);
+        }
+      }
+
+      return { success: true };
+    });
+
+    if (result.notFound) {
       return NextResponse.json({ error: "Bid not found" }, { status: 404 });
     }
 
-    const currentBid = currentBids[0];
-
-    // Ensure RA columns exist in database
-    const columnsToCheck = [
-      { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
-      { name: 'ra_start_date', type: 'DATE NULL' },
-      { name: 'ra_end_date', type: 'DATE NULL' },
-      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
-      { name: 'customer_id', type: 'VARCHAR(255) NULL' },
-      { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
-      { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
-      { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' }
-    ];
-
-    const [tableInfo] = await conn.execute("DESCRIBE bids");
-    const existingColumns = tableInfo.map(row => row.Field);
-
-    for (const { name, type } of columnsToCheck) {
-      if (!existingColumns.includes(name)) {
-        try {
-          await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
-          console.log(`✅ Added column ${name} to bids table`);
-        } catch (alterError) {
-          console.error(`❌ Failed to add column ${name}:`, alterError.message);
-        }
-      }
-    }
-
-    // Handle bid document upload if provided
-    let bid_document = fields.bid_document || currentBid.bid_document;
-    if (files.bid_document && files.bid_document[0]) {
-      // Delete old file
-      if (currentBid.bid_document) {
-        if (currentBid.bid_document.includes("cloudinary.com")) {
-          try {
-            const urlObj = new URL(currentBid.bid_document);
-            const pathname = urlObj.pathname;
-            const parts = pathname.split('/');
-            const versionIndex = parts.findIndex(p => p.startsWith('v'));
-            if (versionIndex !== -1 && versionIndex < parts.length - 1) {
-              const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
-              await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
-              console.log("✅ Deleted old bid document from Cloudinary:", publicIdWithFolder);
-            }
-          } catch (err) {
-            console.error("Failed to delete old document from Cloudinary:", err);
-          }
-        } else if (currentBid.bid_document.startsWith('/uploads/')) {
-          const oldPath = path.join(process.cwd(), "public", currentBid.bid_document);
-          await fs.unlink(oldPath).catch(() => {});
-        }
-      }
-      bid_document = await saveBidDocument(files.bid_document[0]);
-    }
-
-    // Build update query dynamically
-    const updateFields = [];
-    const updateValues = [];
-
-    const allowedFields = [
-      'bidding_platform', 'bid_number', 'gem_bid_no', 'bid_title', 'bid_link',
-      'bid_document', 'item_category', 'organisation_id', 'bid_start_date',
-      'bid_end_date', 'bid_open_date', 'bid_validity_days', 'model_id',
-      'specification', 'total_quantity', 'bid_type', 'evaluation_method',
-      'estimated_bid_value', 'bid_value', 'emd_required', 'emd_amount', 'epbg_percentage',
-      'epbg_duration_months', 'reverse_auction', 'turnover_required',
-      'oem_turnover_required', 'experience_required_years', 'delivery_days',
-      'inspection_required', 'technical_status', 'financial_status',
-      'bid_status', 'assigned_employee_id', 'dd_id', 'remarks', 'ra_participated',
-      'ra_start_date', 'ra_end_date', 'ra_last_price', 'order_id', 'customer_id',
-      'sd_deduction', 'ld_deduction', 'epbg_deduction', 'tds_under_ita',
-      'tds_under_gst', 'other_deduction'
-    ];
-
-    for (const field of allowedFields) {
-      if (payload.role !== "SUPERADMIN" && field === "assigned_employee_id") continue;
-      if (fields[field] !== undefined) {
-        updateFields.push(`${field} = ?`);
-        updateValues.push(fields[field]);
-      }
-    }
-
-    if (updateFields.length === 0) {
-      await conn.end();
+    if (result.noFieldsToUpdate) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
-
-    updateValues.push(...queryParams);
-
-    await conn.execute(
-      `UPDATE bids SET ${updateFields.join(', ')} ${whereClause}`,
-      updateValues
-    );
-
-    // Log status change if status changed
-    if (fields.bid_status && fields.bid_status !== currentBid.bid_status) {
-      await conn.execute(
-        `INSERT INTO bid_logs (bid_id, old_status, new_status, remarks, updated_by)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          bid_id,
-          currentBid.bid_status,
-          fields.bid_status,
-          fields.status_remarks || 'Status updated',
-          payload.empId || payload.id || null,
-        ]
-      );
-
-      // If bid status is "won", create order entry
-      if (fields.bid_status === 'won') {
-        await createOrderFromBid(conn, bid_id, payload);
-      }
-    }
-
-    await conn.end();
 
     return NextResponse.json({
       success: true,
@@ -480,86 +482,50 @@ export async function DELETE(req, { params }) {
     if (!bid_id) {
       return NextResponse.json({ error: "Bid ID is required" }, { status: 400 });
     }
-    const conn = await getDbConnection();
-    const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
 
-    // Build WHERE clause for filtering
-    let whereClause = "WHERE bid_id = ?";
-    let queryParams = [bid_id];
+    const result = await withPool(async (conn) => {
+      const currentEmpId = await resolveGemCrmEmployeeId(payload);
 
-    // Only SUPERADMIN can delete all bids, others can only delete their own assigned bids
-    if (payload.role !== "SUPERADMIN") {
-      if (currentEmpId) {
-        whereClause += " AND assigned_employee_id = ?";
-        queryParams.push(currentEmpId);
-      } else {
-        // Fallback: try to get employee ID from username
-        const username = payload?.username;
-        if (username) {
-          const [empRows] = await conn.execute(
-            "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
-            [username]
-          );
-          if (empRows?.[0]?.empId) {
-            whereClause += " AND assigned_employee_id = ?";
-            queryParams.push(empRows[0].empId);
-          } else {
-            const [repRows] = await conn.execute(
-              "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
-              [username]
-            );
-            if (repRows?.[0]?.empId) {
+      // Build WHERE clause for filtering
+      let whereClause = "WHERE bid_id = ?";
+      let queryParams = [bid_id];
+
+      // Only SUPERADMIN can delete all bids, others can only delete their own assigned bids
+      if (payload.role !== "SUPERADMIN") {
+        if (currentEmpId) {
+          whereClause += " AND assigned_employee_id = ?";
+          queryParams.push(currentEmpId);
+        } else {
+          // Fallback: try to get employee ID from username
+          const username = payload?.username;
+          if (username) {
+            const empRows = await resolveGemCrmEmployeeId({ username });
+            if (empRows) {
               whereClause += " AND assigned_employee_id = ?";
-              queryParams.push(repRows[0].empId);
+              queryParams.push(empRows);
             }
           }
         }
       }
-    }
 
-    // Get bid to delete document
-    const [bids] = await conn.execute(
-      `SELECT bid_document FROM bids ${whereClause}`,
-      queryParams
-    );
-    if (bids.length === 0) {
-      await conn.end();
-      return NextResponse.json({ error: "Bid not found" }, { status: 404 });
-    }
-
-    // Get all bid documents to delete their files
-    const [documents] = await conn.execute(
-      "SELECT document_file FROM bid_documents WHERE bid_id = ?",
-      [bid_id]
-    );
-
-    // Delete main bid document
-    if (bids.length > 0 && bids[0].bid_document) {
-      const documentFile = bids[0].bid_document;
-      if (documentFile.includes("cloudinary.com")) {
-        try {
-          const urlObj = new URL(documentFile);
-          const pathname = urlObj.pathname;
-          const parts = pathname.split('/');
-          const versionIndex = parts.findIndex(p => p.startsWith('v'));
-          if (versionIndex !== -1 && versionIndex < parts.length - 1) {
-            const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
-            await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
-            console.log("✅ Deleted bid document from Cloudinary:", publicIdWithFolder);
-          }
-        } catch (err) {
-          console.error("Failed to delete bid document from Cloudinary:", err);
-        }
-      } else if (documentFile.startsWith('/uploads/')) {
-        const docPath = path.join(process.cwd(), "public", documentFile);
-        await fs.unlink(docPath).catch(() => {});
+      // Get bid to delete document
+      const [bids] = await conn.execute(
+        `SELECT bid_document FROM bids ${whereClause}`,
+        queryParams
+      );
+      if (bids.length === 0) {
+        return { notFound: true };
       }
-    }
 
-    // Delete all additional bid documents' files
-    for (const doc of documents) {
-      const documentFile = doc.document_file;
-      if (documentFile) {
+      // Get all bid documents to delete their files
+      const [documents] = await conn.execute(
+        "SELECT document_file FROM bid_documents WHERE bid_id = ?",
+        [bid_id]
+      );
+
+      // Delete main bid document
+      if (bids.length > 0 && bids[0].bid_document) {
+        const documentFile = bids[0].bid_document;
         if (documentFile.includes("cloudinary.com")) {
           try {
             const urlObj = new URL(documentFile);
@@ -569,25 +535,54 @@ export async function DELETE(req, { params }) {
             if (versionIndex !== -1 && versionIndex < parts.length - 1) {
               const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
               await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
-              console.log("✅ Deleted additional bid document from Cloudinary:", publicIdWithFolder);
+              console.log("✅ Deleted bid document from Cloudinary:", publicIdWithFolder);
             }
           } catch (err) {
-            console.error("Failed to delete additional bid document from Cloudinary:", err);
+            console.error("Failed to delete bid document from Cloudinary:", err);
           }
         } else if (documentFile.startsWith('/uploads/')) {
           const docPath = path.join(process.cwd(), "public", documentFile);
           await fs.unlink(docPath).catch(() => {});
         }
       }
+
+      // Delete all additional bid documents' files
+      for (const doc of documents) {
+        const documentFile = doc.document_file;
+        if (documentFile) {
+          if (documentFile.includes("cloudinary.com")) {
+            try {
+              const urlObj = new URL(documentFile);
+              const pathname = urlObj.pathname;
+              const parts = pathname.split('/');
+              const versionIndex = parts.findIndex(p => p.startsWith('v'));
+              if (versionIndex !== -1 && versionIndex < parts.length - 1) {
+                const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
+                await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
+                console.log("✅ Deleted additional bid document from Cloudinary:", publicIdWithFolder);
+              }
+            } catch (err) {
+              console.error("Failed to delete additional bid document from Cloudinary:", err);
+            }
+          } else if (documentFile.startsWith('/uploads/')) {
+            const docPath = path.join(process.cwd(), "public", documentFile);
+            await fs.unlink(docPath).catch(() => {});
+          }
+        }
+      }
+
+      // Delete bid (cascade will delete documents and logs)
+      await conn.execute(
+        `DELETE FROM bids ${whereClause}`,
+        queryParams
+      );
+
+      return { success: true };
+    });
+
+    if (result.notFound) {
+      return NextResponse.json({ error: "Bid not found" }, { status: 404 });
     }
-
-    // Delete bid (cascade will delete documents and logs)
-    await conn.execute(
-      `DELETE FROM bids ${whereClause}`,
-      queryParams
-    );
-
-    await conn.end();
 
     return NextResponse.json({
       success: true,

@@ -62,6 +62,13 @@ export default function EditBidPage({ params }) {
     ra_last_price: "",
     order_id: "",
     customer_id: "",
+    selected_level: "",
+    l1_level: "",
+    l1_price: "",
+    l2_level: "",
+    l2_price: "",
+    l3_level: "",
+    l3_price: "",
   });
 
   const handleViewFile = (filePath) => {
@@ -156,48 +163,55 @@ export default function EditBidPage({ params }) {
         setBid(bid);
         
         setFormData({
-          bidding_platform: bid.bidding_platform || "",
-          bid_number: bid.bid_number || "",
-          gem_bid_no: bid.gem_bid_no || "",
-          bid_title: bid.bid_title || "",
-          bid_link: bid.bid_link || "",
-          item_category: bid.item_category || "",
-          organisation_id: bid.organisation_id || "",
-          bid_start_date: formattedStartDate,
-          bid_end_date: formattedEndDate,
-          bid_open_date: formattedOpenDate,
-          bid_validity_days: bid.bid_validity_days || "",
-          model_id: bid.model_id || "",
-          specification: bid.specification || "",
-          total_quantity: bid.total_quantity || "",
-          bid_type: bid.bid_type || "",
-          evaluation_method: bid.evaluation_method || "",
-          estimated_bid_value: bid.estimated_bid_value || "",
-          bid_value: bid.bid_value || "",
-          emd_required: bid.emd_required || "no",
-          emd_amount: bid.emd_amount || "",
-          epbg_percentage: bid.epbg_percentage || "",
-          epbg_duration_months: bid.epbg_duration_months || "",
-          reverse_auction: bid.reverse_auction || "no",
-          turnover_required: bid.turnover_required || "",
-          oem_turnover_required: bid.oem_turnover_required || "",
-          experience_required_years: bid.experience_required_years || "",
-          delivery_days: bid.delivery_days || "",
-          inspection_required: bid.inspection_required || "no",
-          technical_status: bid.technical_status || "pending",
-          financial_status: bid.financial_status || "pending",
-          bid_status: bid.bid_status || "new",
-          assigned_employee_id: bid.assigned_employee_id || "",
-          dd_id: bid.dd_id || "",
-          remarks: bid.remarks || "",
-          bid_document: null,
-          ra_participated: bid.ra_participated || "no",
-          ra_start_date: formatDateForInput(bid.ra_start_date) || "",
-          ra_end_date: formatDateForInput(bid.ra_end_date) || "",
-          ra_last_price: bid.ra_last_price || "",
-          customer_id: bid.customer_id || "",
-          order_id: bid.order_id || "",
-        });
+        bidding_platform: bid.bidding_platform || "",
+        bid_number: bid.bid_number || "",
+        gem_bid_no: bid.gem_bid_no || "",
+        bid_title: bid.bid_title || "",
+        bid_link: bid.bid_link || "",
+        item_category: bid.item_category || "",
+        organisation_id: bid.organisation_id || "",
+        bid_start_date: formattedStartDate,
+        bid_end_date: formattedEndDate,
+        bid_open_date: formattedOpenDate,
+        bid_validity_days: bid.bid_validity_days || "",
+        model_id: bid.model_id || "",
+        specification: bid.specification || "",
+        total_quantity: bid.total_quantity || "",
+        bid_type: bid.bid_type || "",
+        evaluation_method: bid.evaluation_method || "",
+        estimated_bid_value: bid.estimated_bid_value || "",
+        bid_value: bid.bid_value || "",
+        emd_required: bid.emd_required || "no",
+        emd_amount: bid.emd_amount || "",
+        epbg_percentage: bid.epbg_percentage || "",
+        epbg_duration_months: bid.epbg_duration_months || "",
+        reverse_auction: bid.reverse_auction || "no",
+        turnover_required: bid.turnover_required || "",
+        oem_turnover_required: bid.oem_turnover_required || "",
+        experience_required_years: bid.experience_required_years || "",
+        delivery_days: bid.delivery_days || "",
+        inspection_required: bid.inspection_required || "no",
+        technical_status: bid.technical_status || "pending",
+        financial_status: bid.financial_status || "pending",
+        bid_status: bid.bid_status || "new",
+        assigned_employee_id: bid.assigned_employee_id || "",
+        dd_id: bid.dd_id || "",
+        remarks: bid.remarks || "",
+        bid_document: null,
+        ra_participated: bid.ra_participated || "no",
+        ra_start_date: formatDateForInput(bid.ra_start_date) || "",
+        ra_end_date: formatDateForInput(bid.ra_end_date) || "",
+        ra_last_price: bid.ra_last_price || "",
+        customer_id: bid.customer_id || "",
+        order_id: bid.order_id || "",
+        selected_level: bid.selected_level || "",
+        l1_level: bid.l1_level || "",
+        l1_price: bid.l1_price || "",
+        l2_level: bid.l2_level || "",
+        l2_price: bid.l2_price || "",
+        l3_level: bid.l3_level || "",
+        l3_price: bid.l3_price || "",
+      });
       } else {
         toast.error("Failed to fetch bid details");
       }
@@ -357,14 +371,13 @@ export default function EditBidPage({ params }) {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Basic Information */}
-          <div className="lg:col-span-2">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              Basic Information
-            </h3>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic Information */}
+        <div className="bg-blue-50 rounded-lg shadow-sm border border-blue-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Basic Information
+          </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -507,10 +520,10 @@ export default function EditBidPage({ params }) {
             </div>
           </div>
 
-          {/* Status */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Status</h3>
-            <div className="space-y-4">
+        {/* Status Section */}
+        <div className="bg-green-50 rounded-lg shadow-sm border border-green-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Status</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bid Status
@@ -666,12 +679,109 @@ export default function EditBidPage({ params }) {
             </div>
           </div>
 
-          {/* Dates */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Important Dates
-            </h3>
+        {/* Bid Opened Details Section */}
+        {["opened", "won", "lost", "cancelled"].includes(formData.bid_status) && (
+          <div className="bg-purple-50 rounded-lg shadow-sm border border-purple-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Bid Opened Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* L1 Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L1 Level (Company Name)
+                </label>
+                <input
+                  type="text"
+                  name="l1_level"
+                  value={formData.l1_level}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L1 Price (₹)
+                </label>
+                <input
+                  type="number"
+                  name="l1_price"
+                  value={formData.l1_price}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter L1 price"
+                />
+              </div>
+
+              {/* L2 Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L2 Level (Company Name)
+                </label>
+                <input
+                  type="text"
+                  name="l2_level"
+                  value={formData.l2_level}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L2 Price (₹)
+                </label>
+                <input
+                  type="number"
+                  name="l2_price"
+                  value={formData.l2_price}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter L2 price"
+                />
+              </div>
+
+              {/* L3 Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L3 Level (Company Name)
+                </label>
+                <input
+                  type="text"
+                  name="l3_level"
+                  value={formData.l3_level}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter company name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  L3 Price (₹)
+                </label>
+                <input
+                  type="number"
+                  name="l3_price"
+                  value={formData.l3_price}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter L3 price"
+                />
+              </div>
+
+
+            </div>
+          </div>
+        )}
+
+        {/* Important Dates Section */}
+        <div className="bg-yellow-50 rounded-lg shadow-sm border border-yellow-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Important Dates
+          </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -727,8 +837,8 @@ export default function EditBidPage({ params }) {
             </div>
           </div>
 
-          {/* Financial Details */}
-          <div>
+        {/* Financial Details */}
+        <div className="bg-orange-50 rounded-lg shadow-sm border border-orange-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <DollarSign className="w-5 h-5" />
               Financial Details
@@ -822,8 +932,8 @@ export default function EditBidPage({ params }) {
             </div>
           </div>
 
-          {/* Assignment */}
-          <div>
+        {/* Assignment */}
+        <div className="bg-teal-50 rounded-lg shadow-sm border border-teal-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <User className="w-5 h-5" />
               Assignment
@@ -933,8 +1043,8 @@ export default function EditBidPage({ params }) {
             </div>
           </div>
 
-          {/* Remarks */}
-          <div className="lg:col-span-2">
+        {/* Remarks */}
+        <div className="bg-gray-50 rounded-lg shadow-sm border border-gray-200 p-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Remarks
             </label>
@@ -946,7 +1056,6 @@ export default function EditBidPage({ params }) {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
-        </div>
 
         {/* Submit Button */}
         <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">

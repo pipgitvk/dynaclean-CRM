@@ -383,6 +383,33 @@ export default function BidDetailsPage({ params }) {
         </div>
       )}
 
+      {/* Bid Opened Details */}
+      {["opened", "won", "lost", "cancelled"].includes(bid.bid_status) && (
+        <div className="bg-purple-50 rounded-xl shadow-md p-6 border border-purple-100">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Bid Opened Details</h3>
+          <div className="space-y-3">
+            {bid.l1_level && (
+              <>
+                <DetailRow label="L1 Company Name" value={bid.l1_level} />
+                <DetailRow label="L1 Price" value={bid.l1_price ? `₹${Number(bid.l1_price).toLocaleString()}` : "-"} />
+              </>
+            )}
+            {bid.l2_level && (
+              <>
+                <DetailRow label="L2 Company Name" value={bid.l2_level} />
+                <DetailRow label="L2 Price" value={bid.l2_price ? `₹${Number(bid.l2_price).toLocaleString()}` : "-"} />
+              </>
+            )}
+            {bid.l3_level && (
+              <>
+                <DetailRow label="L3 Company Name" value={bid.l3_level} />
+                <DetailRow label="L3 Price" value={bid.l3_price ? `₹${Number(bid.l3_price).toLocaleString()}` : "-"} />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Remarks */}
       {bid.remarks && (
         <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
