@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDbConnection } from "@/lib/db";
+import { getDbConnection, withPool, dbExecute } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseFormData } from "@/lib/parseForm";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
@@ -90,8 +90,7 @@ export async function GET(req) {
     const activeRA = searchParams.get("activeRA") === "true";
 
     const offset = (page - 1) * limit;
-    const conn = await getDbConnection();
-    const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
+    const currentEmpId = await resolveGemCrmEmployeeId(payload);
 
     console.log("DEBUG: User Info", {
       username: payload?.username,
@@ -101,169 +100,171 @@ export async function GET(req) {
       resolvedEmpId: currentEmpId
     });
 
-    // Build WHERE clause
-    const conditions = [];
-    const params = [];
+    const result = await withPool(async (conn) => {
+      // Build WHERE clause
+      const conditions = [];
+      const params = [];
 
-    // Only SUPERADMIN can see all bids, others can only see their own assigned bids
-    if (payload.role !== "SUPERADMIN") {
-      // Try to filter by employee ID first
-      if (currentEmpId) {
-        console.log("DEBUG: Using resolved employee ID:", currentEmpId);
-        conditions.push("assigned_employee_id = ?");
-        params.push(currentEmpId);
-      } else {
-        // Fallback: try to get employee ID from username
-        const username = payload?.username;
-        console.log("DEBUG: Trying to resolve employee ID from username:", username);
-        if (username) {
-          const [empRows] = await conn.execute(
-            "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
-            [username]
-          );
-          if (empRows?.[0]?.empId) {
-            console.log("DEBUG: Found employee ID in emplist:", empRows[0].empId);
-            conditions.push("assigned_employee_id = ?");
-            params.push(empRows[0].empId);
-          } else {
-            const [repRows] = await conn.execute(
-              "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
+      // Only SUPERADMIN can see all bids, others can only see their own assigned bids
+      if (payload.role !== "SUPERADMIN") {
+        // Try to filter by employee ID first
+        if (currentEmpId) {
+          console.log("DEBUG: Using resolved employee ID:", currentEmpId);
+          conditions.push("assigned_employee_id = ?");
+          params.push(currentEmpId);
+        } else {
+          // Fallback: try to get employee ID from username
+          const username = payload?.username;
+          console.log("DEBUG: Trying to resolve employee ID from username:", username);
+          if (username) {
+            const empRows = await dbExecute(
+              "SELECT empId FROM emplist WHERE LOWER(username) = LOWER(?) LIMIT 1",
               [username]
             );
-            if (repRows?.[0]?.empId) {
-              console.log("DEBUG: Found employee ID in rep_list:", repRows[0].empId);
+            if (empRows?.[0]?.empId) {
+              console.log("DEBUG: Found employee ID in emplist:", empRows[0].empId);
               conditions.push("assigned_employee_id = ?");
-              params.push(repRows[0].empId);
+              params.push(empRows[0].empId);
             } else {
-              console.log("DEBUG: Employee ID not found for username:", username);
+              const repRows = await dbExecute(
+                "SELECT empId FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
+                [username]
+              );
+              if (repRows?.[0]?.empId) {
+                console.log("DEBUG: Found employee ID in rep_list:", repRows[0].empId);
+                conditions.push("assigned_employee_id = ?");
+                params.push(repRows[0].empId);
+              } else {
+                console.log("DEBUG: Employee ID not found for username:", username);
+              }
             }
           }
         }
       }
-    }
 
-    if (search) {
-      conditions.push(
-        "(bid_number LIKE ? OR gem_bid_no LIKE ? OR bid_title LIKE ?)"
+      if (search) {
+        conditions.push(
+          "(bid_number LIKE ? OR gem_bid_no LIKE ? OR bid_title LIKE ?)"
+        );
+        const searchPattern = `%${search}%`;
+        params.push(searchPattern, searchPattern, searchPattern);
+      }
+
+      if (status) {
+        conditions.push("bid_status = ?");
+        params.push(status);
+      }
+
+      if (technicalStatus) {
+        conditions.push("technical_status = ?");
+        params.push(technicalStatus);
+      }
+
+      if (financialStatus) {
+        conditions.push("financial_status = ?");
+        params.push(financialStatus);
+      }
+
+      if (platform) {
+        conditions.push("bidding_platform = ?");
+        params.push(platform);
+      }
+
+      if (employeeId && payload.role === "SUPERADMIN") {
+        conditions.push("assigned_employee_id = ?");
+        params.push(employeeId);
+      }
+
+      if (organisationId) {
+        conditions.push("organisation_id = ?");
+        params.push(organisationId);
+      }
+
+      if (dateFrom) {
+        conditions.push("bid_start_date >= ?");
+        params.push(dateFrom);
+      }
+
+      if (dateTo) {
+        conditions.push("bid_end_date <= ?");
+        params.push(dateTo);
+      }
+
+      // Filter for bids ending within 1 week
+      if (endingSoon) {
+        conditions.push("bid_end_date >= CURDATE()");
+        conditions.push("bid_end_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
+      }
+
+      // Filter for bids with active RA period (today between RA start and end date)
+      if (activeRA) {
+        conditions.push("bid_status = 'ra_participated'");
+        conditions.push("ra_start_date IS NOT NULL");
+        conditions.push("ra_end_date IS NOT NULL");
+        conditions.push("CURDATE() >= ra_start_date");
+        conditions.push("CURDATE() <= ra_end_date");
+      }
+
+      const whereClause = conditions.length > 0
+        ? "WHERE " + conditions.join(" AND ")
+        : "";
+
+      // Get total count
+      const countRows = await dbExecute(
+        `SELECT COUNT(*) as total FROM bids ${whereClause}`,
+        params
       );
-      const searchPattern = `%${search}%`;
-      params.push(searchPattern, searchPattern, searchPattern);
-    }
+      const total = countRows[0].total;
 
-    if (status) {
-      conditions.push("bid_status = ?");
-      params.push(status);
-    }
+      // Get bids with employee name (safe query - try without dd_management first)
+      let bids = [];
+      try {
+        const [bidsResult] = await conn.execute(
+          `SELECT b.*, 
+            COALESCE(r.username, e.username, CONCAT('Employee #', b.assigned_employee_id)) as assigned_employee_name,
+            b.assigned_employee_id as assigned_employee_empid,
+            dd.party_name as dd_party_name,
+            dd.amount as dd_amount,
+            dd.status as dd_status
+          FROM bids b
+          LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+          LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
+          LEFT JOIN dd_management dd ON b.dd_id = dd.id
+          ${whereClause}
+          ORDER BY b.created_at DESC
+          LIMIT ? OFFSET ?`,
+          [...params, limit, offset]
+        );
+        bids = bidsResult;
+      } catch (e) {
+        console.log("Bids query with dd_management failed, trying without:", e.message);
+        // Fallback query without dd_management
+        const [bidsResult] = await conn.execute(
+          `SELECT b.*, 
+            COALESCE(r.username, e.username, CONCAT('Employee #', b.assigned_employee_id)) as assigned_employee_name,
+            b.assigned_employee_id as assigned_employee_empid
+          FROM bids b
+          LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
+          LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
+          ${whereClause}
+          ORDER BY b.created_at DESC
+          LIMIT ? OFFSET ?`,
+          [...params, limit, offset]
+        );
+        bids = bidsResult;
+      }
 
-    if (technicalStatus) {
-      conditions.push("technical_status = ?");
-      params.push(technicalStatus);
-    }
-
-    if (financialStatus) {
-      conditions.push("financial_status = ?");
-      params.push(financialStatus);
-    }
-
-    if (platform) {
-      conditions.push("bidding_platform = ?");
-      params.push(platform);
-    }
-
-    if (employeeId && payload.role === "SUPERADMIN") {
-      conditions.push("assigned_employee_id = ?");
-      params.push(employeeId);
-    }
-
-    if (organisationId) {
-      conditions.push("organisation_id = ?");
-      params.push(organisationId);
-    }
-
-    if (dateFrom) {
-      conditions.push("bid_start_date >= ?");
-      params.push(dateFrom);
-    }
-
-    if (dateTo) {
-      conditions.push("bid_end_date <= ?");
-      params.push(dateTo);
-    }
-
-    // Filter for bids ending within 1 week
-    if (endingSoon) {
-      conditions.push("bid_end_date >= CURDATE()");
-      conditions.push("bid_end_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
-    }
-
-    // Filter for bids with active RA period (today between RA start and end date)
-    if (activeRA) {
-      conditions.push("bid_status = 'ra_participated'");
-      conditions.push("ra_start_date IS NOT NULL");
-      conditions.push("ra_end_date IS NOT NULL");
-      conditions.push("CURDATE() >= ra_start_date");
-      conditions.push("CURDATE() <= ra_end_date");
-    }
-
-    const whereClause = conditions.length > 0
-      ? "WHERE " + conditions.join(" AND ")
-      : "";
-
-    // Get total count
-    const [countRows] = await conn.execute(
-      `SELECT COUNT(*) as total FROM bids ${whereClause}`,
-      params
-    );
-    const total = countRows[0].total;
-
-    // Get bids with employee name (safe query - try without dd_management first)
-    let bids = [];
-    try {
-      const [bidsResult] = await conn.execute(
-        `SELECT b.*, 
-          COALESCE(r.username, e.username, CONCAT('Employee #', b.assigned_employee_id)) as assigned_employee_name,
-          b.assigned_employee_id as assigned_employee_empid,
-          dd.party_name as dd_party_name,
-          dd.amount as dd_amount,
-          dd.status as dd_status
-        FROM bids b
-        LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
-        LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
-        LEFT JOIN dd_management dd ON b.dd_id = dd.id
-        ${whereClause}
-        ORDER BY b.created_at DESC
-        LIMIT ? OFFSET ?`,
-        [...params, limit, offset]
-      );
-      bids = bidsResult;
-    } catch (e) {
-      console.log("Bids query with dd_management failed, trying without:", e.message);
-      // Fallback query without dd_management
-      const [bidsResult] = await conn.execute(
-        `SELECT b.*, 
-          COALESCE(r.username, e.username, CONCAT('Employee #', b.assigned_employee_id)) as assigned_employee_name,
-          b.assigned_employee_id as assigned_employee_empid
-        FROM bids b
-        LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
-        LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
-        ${whereClause}
-        ORDER BY b.created_at DESC
-        LIMIT ? OFFSET ?`,
-        [...params, limit, offset]
-      );
-      bids = bidsResult;
-    }
-
-    await conn.end();
+      return { total, bids };
+    });
 
     return NextResponse.json({
       success: true,
-      data: bids,
+      data: result.bids,
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: result.total,
+        totalPages: Math.ceil(result.total / limit),
       },
     });
   } catch (error) {
@@ -349,179 +350,179 @@ export async function POST(req) {
       bid_document = await saveBidDocument(files.bid_document[0]);
     }
 
-    const conn = await getDbConnection();
-    const currentEmpId = await resolveGemCrmEmployeeId(conn, payload);
+    const currentEmpId = await resolveGemCrmEmployeeId(payload);
     if (payload.role === "GEM" && !currentEmpId) {
-      await conn.end();
       return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
     }
 
-    // Get actual table structure
-    const [tableInfo] = await conn.execute("DESCRIBE bids");
-    const existingColumns = tableInfo.map(row => row.Field);
-    console.log("Existing columns in bids table:", existingColumns);
+    const result = await withPool(async (conn) => {
+      // Get actual table structure
+      const [tableInfo] = await conn.execute("DESCRIBE bids");
+      const existingColumns = tableInfo.map(row => row.Field);
+      console.log("Existing columns in bids table:", existingColumns);
 
-    // Ensure all required columns exist
-    const columnsToCheck = [
-      { name: 'bidding_platform', type: 'VARCHAR(255) NULL' },
-      { name: 'bid_number', type: 'VARCHAR(255) NULL' },
-      { name: 'gem_bid_no', type: 'VARCHAR(255) NULL' },
-      { name: 'bid_title', type: 'VARCHAR(500) NULL' },
-      { name: 'bid_link', type: 'TEXT NULL' },
-      { name: 'bid_document', type: 'TEXT NULL' },
-      { name: 'item_category', type: 'VARCHAR(255) NULL' },
-      { name: 'organisation_id', type: 'INT NULL' },
-      { name: 'bid_start_date', type: 'DATE NULL' },
-      { name: 'bid_end_date', type: 'DATE NULL' },
-      { name: 'bid_open_date', type: 'DATE NULL' },
-      { name: 'bid_validity_days', type: 'INT NULL' },
-      { name: 'model_id', type: 'VARCHAR(255) NULL' },
-      { name: 'specification', type: 'TEXT NULL' },
-      { name: 'total_quantity', type: 'DECIMAL(10,2) NULL' },
-      { name: 'bid_type', type: 'VARCHAR(50) NULL' },
-      { name: 'evaluation_method', type: 'VARCHAR(50) NULL' },
-      { name: 'estimated_bid_value', type: 'DECIMAL(10,2) NULL' },
-      { name: 'bid_value', type: 'DECIMAL(10,2) NULL' },
-      { name: 'emd_required', type: 'ENUM("yes", "no") DEFAULT "no"' },
-      { name: 'emd_amount', type: 'DECIMAL(10,2) NULL' },
-      { name: 'epbg_percentage', type: 'DECIMAL(5,2) NULL' },
-      { name: 'epbg_duration_months', type: 'INT NULL' },
-      { name: 'reverse_auction', type: 'ENUM("yes", "no") DEFAULT "no"' },
-      { name: 'turnover_required', type: 'DECIMAL(10,2) NULL' },
-      { name: 'oem_turnover_required', type: 'DECIMAL(10,2) NULL' },
-      { name: 'experience_required_years', type: 'INT NULL' },
-      { name: 'delivery_days', type: 'INT NULL' },
-      { name: 'inspection_required', type: 'ENUM("yes", "no") DEFAULT "no"' },
-      { name: 'technical_status', type: 'VARCHAR(50) NULL' },
-      { name: 'financial_status', type: 'VARCHAR(50) NULL' },
-      { name: 'bid_status', type: 'VARCHAR(50) NULL' },
-      { name: 'assigned_employee_id', type: 'INT NULL' },
-      { name: 'dd_id', type: 'INT NULL' },
-      { name: 'remarks', type: 'TEXT NULL' },
-      { name: 'ra_start_date', type: 'DATE NULL' },
-      { name: 'ra_end_date', type: 'DATE NULL' },
-      { name: 'order_id', type: 'VARCHAR(255) NULL' },
-      { name: 'created_by', type: 'INT NULL' },
-      { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
-      { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
-      { name: 'customer_id', type: 'VARCHAR(255) NULL' },
-      { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
-      { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
-      { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
-      { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' }
-    ];
+      // Ensure all required columns exist
+      const columnsToCheck = [
+        { name: 'bidding_platform', type: 'VARCHAR(255) NULL' },
+        { name: 'bid_number', type: 'VARCHAR(255) NULL' },
+        { name: 'gem_bid_no', type: 'VARCHAR(255) NULL' },
+        { name: 'bid_title', type: 'VARCHAR(500) NULL' },
+        { name: 'bid_link', type: 'TEXT NULL' },
+        { name: 'bid_document', type: 'TEXT NULL' },
+        { name: 'item_category', type: 'VARCHAR(255) NULL' },
+        { name: 'organisation_id', type: 'INT NULL' },
+        { name: 'bid_start_date', type: 'DATE NULL' },
+        { name: 'bid_end_date', type: 'DATE NULL' },
+        { name: 'bid_open_date', type: 'DATE NULL' },
+        { name: 'bid_validity_days', type: 'INT NULL' },
+        { name: 'model_id', type: 'VARCHAR(255) NULL' },
+        { name: 'specification', type: 'TEXT NULL' },
+        { name: 'total_quantity', type: 'DECIMAL(10,2) NULL' },
+        { name: 'bid_type', type: 'VARCHAR(50) NULL' },
+        { name: 'evaluation_method', type: 'VARCHAR(50) NULL' },
+        { name: 'estimated_bid_value', type: 'DECIMAL(10,2) NULL' },
+        { name: 'bid_value', type: 'DECIMAL(10,2) NULL' },
+        { name: 'emd_required', type: 'ENUM("yes", "no") DEFAULT "no"' },
+        { name: 'emd_amount', type: 'DECIMAL(10,2) NULL' },
+        { name: 'epbg_percentage', type: 'DECIMAL(5,2) NULL' },
+        { name: 'epbg_duration_months', type: 'INT NULL' },
+        { name: 'reverse_auction', type: 'ENUM("yes", "no") DEFAULT "no"' },
+        { name: 'turnover_required', type: 'DECIMAL(10,2) NULL' },
+        { name: 'oem_turnover_required', type: 'DECIMAL(10,2) NULL' },
+        { name: 'experience_required_years', type: 'INT NULL' },
+        { name: 'delivery_days', type: 'INT NULL' },
+        { name: 'inspection_required', type: 'ENUM("yes", "no") DEFAULT "no"' },
+        { name: 'technical_status', type: 'VARCHAR(50) NULL' },
+        { name: 'financial_status', type: 'VARCHAR(50) NULL' },
+        { name: 'bid_status', type: 'VARCHAR(50) NULL' },
+        { name: 'assigned_employee_id', type: 'INT NULL' },
+        { name: 'dd_id', type: 'INT NULL' },
+        { name: 'remarks', type: 'TEXT NULL' },
+        { name: 'ra_start_date', type: 'DATE NULL' },
+        { name: 'ra_end_date', type: 'DATE NULL' },
+        { name: 'order_id', type: 'VARCHAR(255) NULL' },
+        { name: 'created_by', type: 'INT NULL' },
+        { name: 'ra_participated', type: 'ENUM("yes", "no") DEFAULT "no"' },
+        { name: 'ra_last_price', type: 'DECIMAL(10,2) NULL' },
+        { name: 'customer_id', type: 'VARCHAR(255) NULL' },
+        { name: 'sd_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'ld_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'epbg_deduction', type: 'DECIMAL(10,2) NULL' },
+        { name: 'tds_under_ita', type: 'DECIMAL(10,2) NULL' },
+        { name: 'tds_under_gst', type: 'DECIMAL(10,2) NULL' },
+        { name: 'other_deduction', type: 'DECIMAL(10,2) NULL' }
+      ];
 
-    for (const { name, type } of columnsToCheck) {
-      if (!existingColumns.includes(name)) {
-        try {
-          await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
-          console.log(`✅ Added column ${name} to bids table`);
-        } catch (alterError) {
-          console.error(`❌ Failed to add column ${name}:`, alterError.message);
+      for (const { name, type } of columnsToCheck) {
+        if (!existingColumns.includes(name)) {
+          try {
+            await conn.execute(`ALTER TABLE bids ADD COLUMN ${name} ${type}`);
+            console.log(`✅ Added column ${name} to bids table`);
+          } catch (alterError) {
+            console.error(`❌ Failed to add column ${name}:`, alterError.message);
+          }
         }
       }
-    }
 
-    // Build INSERT statement dynamically based on actual columns
-    const insertColumns = columnsToCheck.map(c => c.name).join(', ');
-    const placeholders = columnsToCheck.map(() => '?').join(', ');
-    const values = [
-      bidding_platform || null,
-      bid_number || null,
-      gem_bid_no || null,
-      bid_title || null,
-      bid_link || null,
-      bid_document,
-      item_category || null,
-      organisation_id || null,
-      bid_start_date || null,
-      bid_end_date || null,
-      bid_open_date || null,
-      bid_validity_days || null,
-      model_id || null,
-      specification || null,
-      total_quantity || null,
-      bid_type || null,
-      evaluation_method || null,
-      estimated_bid_value || null,
-      bid_value || null,
-      emd_required || 'no',
-      emd_amount || null,
-      epbg_percentage || null,
-      epbg_duration_months || null,
-      reverse_auction || 'no',
-      turnover_required || null,
-      oem_turnover_required || null,
-      experience_required_years || null,
-      delivery_days || null,
-      inspection_required || 'no',
-      'pending',
-      'pending',
-      'new',
-      payload.role === "GEM" ? currentEmpId : assigned_employee_id || null,
-      dd_id || null,
-      remarks || null,
-      ra_start_date || null,
-      ra_end_date || null,
-      null,
-      payload.empId || payload.id || null,
-      ra_participated || 'no',
-      ra_last_price || null,
-      customer_id || null,
-      sd_deduction || null,
-      ld_deduction || null,
-      epbg_deduction || null,
-      tds_under_ita || null,
-      tds_under_gst || null,
-      other_deduction || null,
-    ];
+      // Build INSERT statement dynamically based on actual columns
+      const insertColumns = columnsToCheck.map(c => c.name).join(', ');
+      const placeholders = columnsToCheck.map(() => '?').join(', ');
+      const values = [
+        bidding_platform || null,
+        bid_number || null,
+        gem_bid_no || null,
+        bid_title || null,
+        bid_link || null,
+        bid_document,
+        item_category || null,
+        organisation_id || null,
+        bid_start_date || null,
+        bid_end_date || null,
+        bid_open_date || null,
+        bid_validity_days || null,
+        model_id || null,
+        specification || null,
+        total_quantity || null,
+        bid_type || null,
+        evaluation_method || null,
+        estimated_bid_value || null,
+        bid_value || null,
+        emd_required || 'no',
+        emd_amount || null,
+        epbg_percentage || null,
+        epbg_duration_months || null,
+        reverse_auction || 'no',
+        turnover_required || null,
+        oem_turnover_required || null,
+        experience_required_years || null,
+        delivery_days || null,
+        inspection_required || 'no',
+        'pending',
+        'pending',
+        'new',
+        payload.role === "GEM" ? currentEmpId : assigned_employee_id || null,
+        dd_id || null,
+        remarks || null,
+        ra_start_date || null,
+        ra_end_date || null,
+        null,
+        payload.empId || payload.id || null,
+        ra_participated || 'no',
+        ra_last_price || null,
+        customer_id || null,
+        sd_deduction || null,
+        ld_deduction || null,
+        epbg_deduction || null,
+        tds_under_ita || null,
+        tds_under_gst || null,
+        other_deduction || null,
+      ];
 
-    console.log("INSERT columns:", insertColumns);
-    console.log("VALUES count:", values.length);
-    console.log("VALUES for INSERT:", values.slice(-10)); // Last 10 values including RA fields
-    console.log("Full VALUES array:", values);
+      console.log("INSERT columns:", insertColumns);
+      console.log("VALUES count:", values.length);
+      console.log("VALUES for INSERT:", values.slice(-10)); // Last 10 values including RA fields
+      console.log("Full VALUES array:", values);
 
-    const [result] = await conn.execute(
-      `INSERT INTO bids (${insertColumns}) VALUES (${placeholders})`,
-      values
-    );
+      const [result] = await conn.execute(
+        `INSERT INTO bids (${insertColumns}) VALUES (${placeholders})`,
+        values
+      );
 
-    // Log initial status
-    await conn.execute(
-      `INSERT INTO bid_logs (bid_id, old_status, new_status, remarks, updated_by)
-       VALUES (?, NULL, 'new', 'Bid created', ?)`,
-      [result.insertId, payload.empId || payload.id || null]
-    );
+      // Log initial status
+      await conn.execute(
+        `INSERT INTO bid_logs (bid_id, old_status, new_status, remarks, updated_by)
+         VALUES (?, NULL, 'new', 'Bid created', ?)`,
+        [result.insertId, payload.empId || payload.id || null]
+      );
 
-    // Create/update customer in customers table if customer_id is provided
-    if (customer_id && customer_id.trim() !== "") {
-      try {
-        // Check if customer already exists
-        const [existingCustomer] = await conn.execute(
-          `SELECT customer_id FROM customers WHERE customer_id = ?`,
-          [customer_id]
-        );
-
-        if (existingCustomer.length === 0) {
-          // Create new customer entry
-          await conn.execute(
-            `INSERT INTO customers (customer_id, first_name, last_name, email, phone, company)
-             VALUES (?, '', '', '', '', '')`,
+      // Create/update customer in customers table if customer_id is provided
+      if (customer_id && customer_id.trim() !== "") {
+        try {
+          // Check if customer already exists
+          const [existingCustomer] = await conn.execute(
+            `SELECT customer_id FROM customers WHERE customer_id = ?`,
             [customer_id]
           );
-          console.log(`✅ Created customer entry with ID: ${customer_id}`);
-        } else {
-          console.log(`ℹ️ Customer with ID ${customer_id} already exists`);
-        }
-      } catch (customerError) {
-        console.error("❌ Failed to create/update customer:", customerError.message);
-        // Don't fail the bid creation if customer creation fails
-      }
-    }
 
-    await conn.end();
+          if (existingCustomer.length === 0) {
+            // Create new customer entry
+            await conn.execute(
+              `INSERT INTO customers (customer_id, first_name, last_name, email, phone, company)
+               VALUES (?, '', '', '', '', '')`,
+              [customer_id]
+            );
+            console.log(`✅ Created customer entry with ID: ${customer_id}`);
+          } else {
+            console.log(`ℹ️ Customer with ID ${customer_id} already exists`);
+          }
+        } catch (customerError) {
+          console.error("❌ Failed to create/update customer:", customerError.message);
+          // Don't fail the bid creation if customer creation fails
+        }
+      }
+
+      return result;
+    });
 
     return NextResponse.json({
       success: true,

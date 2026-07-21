@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
-import { getDbConnection } from "@/lib/db";
 import NotificationService from "@/lib/services/NotificationService";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
 
@@ -20,8 +19,7 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const conn = await getDbConnection();
-    const empId = await resolveGemCrmEmployeeId(conn, {
+    const empId = await resolveGemCrmEmployeeId({
       username: payload.username,
       empId: payload.empId,
     });

@@ -2,17 +2,14 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
-import { getDbConnection } from "@/lib/db";
+import { dbExecute } from "@/lib/db";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 
 export async function GET() {
   // ✅ Await cookies() (important in App Router)
-  // const cookieStore = await cookies();
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
-  console.log("User Token".token);
-  
 
   if (!token) {
     return NextResponse.json({ error: "No token" }, { status: 401 });
@@ -26,11 +23,8 @@ export async function GET() {
 
     const username = payload.username;
 
-    // ✅ Create MySQL connection
-    const conn = await getDbConnection();
-
-    // ✅ Query user from both tables
-    const [rows] = await conn.execute(
+    // ✅ Query user from both tables using dbExecute (which handles retries)
+    const rows = await dbExecute(
       `
       SELECT username, email, empId, userRole FROM emplist WHERE username = ?
       UNION
@@ -38,8 +32,6 @@ export async function GET() {
       `,
       [username, username]
     );
-
-        // await conn.end();
 
     if (rows.length === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });

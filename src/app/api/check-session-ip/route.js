@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMainSessionPayload } from "@/lib/auth";
-import { getDbConnection } from "@/lib/db";
+import { dbExecute } from "@/lib/db";
 
 export async function GET(request) {
   try {
@@ -20,16 +20,14 @@ export async function GET(request) {
       "unknown";
     if (ip.includes(",")) ip = ip.split(",")[0].trim();
 
-    const conn = await getDbConnection();
-
-    // Check emplist first, then rep_list
-    let [rows] = await conn.execute(
+    // Check emplist first, then rep_list using dbExecute (which handles retries)
+    let rows = await dbExecute(
       "SELECT allowed_ips, ip_restriction_enabled FROM emplist WHERE LOWER(username) = LOWER(?)",
       [username]
     );
 
     if (rows.length === 0) {
-      [rows] = await conn.execute(
+      rows = await dbExecute(
         "SELECT allowed_ips, ip_restriction_enabled FROM rep_list WHERE LOWER(username) = LOWER(?)",
         [username]
       );

@@ -20,6 +20,10 @@ function requiredEnv(name) {
   return value;
 }
 
+// Mutex for pool creation to prevent race conditions
+let poolCreationLock = null;
+let isCreatingPool = false;
+
 function createMysqlPool() {
   const DB_HOST = requiredEnv("DB_HOST");
   const DB_USER = requiredEnv("DB_USER");
@@ -72,9 +76,63 @@ function createMysqlPool() {
 let lastHealthCheckTime = 0;
 const HEALTH_CHECK_INTERVAL = 60000; // 1 minute in ms
 
-export async function getDbConnection() {
-  if (!g.__mysqlPool) {
+async function recreatePool() {
+  // If we're already creating a pool, wait for the existing one to finish
+  if (isCreatingPool && poolCreationLock) {
+    console.log("⚠️ [DB] Waiting for existing pool creation to complete...");
+    await poolCreationLock;
+    return;
+  }
+
+  // Acquire the lock by setting our own promise
+  let resolveLock;
+  poolCreationLock = new Promise((resolve) => {
+    resolveLock = resolve;
+  });
+  isCreatingPool = true;
+
+  try {
+    console.log("⚠️ [DB] Recreating MySQL pool...");
+
+    // Remove old pool reference immediately so new requests wait for the new one
+    delete g.__mysqlPool;
+
+    // Create new pool
     g.__mysqlPool = createMysqlPool();
+    lastHealthCheckTime = Date.now();
+  } finally {
+    isCreatingPool = false;
+    resolveLock();
+  }
+}
+
+async function recreatePoolIfNeeded(error) {
+  const message = error?.message || "";
+  const code = error?.code || "";
+
+  if (
+    message.includes("Pool is closed") ||
+    code === "POOL_CLOSED" ||
+    code === "PROTOCOL_CONNECTION_LOST" ||
+    code === "ECONNRESET" ||
+    code === "ETIMEDOUT"
+  ) {
+    console.log("⚠️ [DB] Recreating MySQL pool due to error:", { code, message });
+    await recreatePool();
+    return true;
+  }
+  return false;
+}
+
+export async function getDbConnection() {
+  // If we're in the middle of creating a pool, wait for it
+  if (isCreatingPool && poolCreationLock) {
+    console.log("⚠️ [DB] Waiting for pool to be created...");
+    await poolCreationLock;
+  }
+
+  if (!g.__mysqlPool) {
+    await recreatePool();
   }
 
   const now = Date.now();
@@ -88,51 +146,52 @@ export async function getDbConnection() {
       connection.release();
       lastHealthCheckTime = now;
     } catch (error) {
-      const message = error?.message || "";
-      const code = error?.code || "";
-
-      console.error("❌ [DB] Pool health check failed:", {
-        code,
-        message,
-      });
-
-      if (
-        message.includes("Pool is closed") ||
-        code === "POOL_CLOSED" ||
-        code === "PROTOCOL_CONNECTION_LOST" ||
-        code === "ECONNRESET" ||
-        code === "ETIMEDOUT"
-      ) {
-        console.log("⚠️ [DB] Recreating MySQL pool...");
-
-        try {
-          await g.__mysqlPool.end();
-        } catch (_) {
-          // ignore end error
-        }
-
-        delete g.__mysqlPool;
-        g.__mysqlPool = createMysqlPool();
-        lastHealthCheckTime = now;
-      } else {
-        throw error;
-      }
+      await recreatePoolIfNeeded(error);
     }
   }
 
   return g.__mysqlPool;
 }
 
-export async function dbQuery(sql, params = []) {
-  const db = await getDbConnection();
-  const [rows] = await db.query(sql, params);
-  return rows;
+export async function dbQuery(sql, params = [], retry = true) {
+  try {
+    const db = await getDbConnection();
+    const [rows] = await db.query(sql, params);
+    return rows;
+  } catch (error) {
+    if (retry && await recreatePoolIfNeeded(error)) {
+      // Retry once with new pool
+      return dbQuery(sql, params, false);
+    }
+    throw error;
+  }
 }
 
-export async function dbExecute(sql, params = []) {
-  const db = await getDbConnection();
-  const [result] = await db.execute(sql, params);
-  return result;
+export async function dbExecute(sql, params = [], retry = true) {
+  try {
+    const db = await getDbConnection();
+    const [result] = await db.execute(sql, params);
+    return result;
+  } catch (error) {
+    if (retry && await recreatePoolIfNeeded(error)) {
+      // Retry once with new pool
+      return dbExecute(sql, params, false);
+    }
+    throw error;
+  }
+}
+
+export async function withPool(callback, retry = true) {
+  try {
+    const db = await getDbConnection();
+    return await callback(db);
+  } catch (error) {
+    if (retry && await recreatePoolIfNeeded(error)) {
+      // Retry once with new pool
+      return withPool(callback, false);
+    }
+    throw error;
+  }
 }
 
 export async function getDbDebugInfo() {
