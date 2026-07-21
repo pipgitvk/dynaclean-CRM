@@ -73,9 +73,6 @@ function createMysqlPool() {
   return pool;
 }
 
-let lastHealthCheckTime = 0;
-const HEALTH_CHECK_INTERVAL = 60000; // 1 minute in ms
-
 async function recreatePool() {
   // If we're already creating a pool, wait for the existing one to finish
   if (isCreatingPool && poolCreationLock) {
@@ -99,29 +96,22 @@ async function recreatePool() {
 
     // Create new pool
     g.__mysqlPool = createMysqlPool();
-    lastHealthCheckTime = Date.now();
   } finally {
     isCreatingPool = false;
     resolveLock();
   }
 }
 
-async function recreatePoolIfNeeded(error) {
+function shouldRecreatePool(error) {
   const message = error?.message || "";
   const code = error?.code || "";
-
-  if (
+  return (
     message.includes("Pool is closed") ||
     code === "POOL_CLOSED" ||
     code === "PROTOCOL_CONNECTION_LOST" ||
     code === "ECONNRESET" ||
     code === "ETIMEDOUT"
-  ) {
-    console.log("⚠️ [DB] Recreating MySQL pool due to error:", { code, message });
-    await recreatePool();
-    return true;
-  }
-  return false;
+  );
 }
 
 export async function getDbConnection() {
@@ -135,21 +125,6 @@ export async function getDbConnection() {
     await recreatePool();
   }
 
-  const now = Date.now();
-  if (now - lastHealthCheckTime > HEALTH_CHECK_INTERVAL) {
-    try {
-      /**
-       * Quick health check (only every minute)
-       * Agar pool closed/broken hai to recreate ho jayega.
-       */
-      const connection = await g.__mysqlPool.getConnection();
-      connection.release();
-      lastHealthCheckTime = now;
-    } catch (error) {
-      await recreatePoolIfNeeded(error);
-    }
-  }
-
   return g.__mysqlPool;
 }
 
@@ -159,7 +134,9 @@ export async function dbQuery(sql, params = [], retry = true) {
     const [rows] = await db.query(sql, params);
     return rows;
   } catch (error) {
-    if (retry && await recreatePoolIfNeeded(error)) {
+    if (retry && shouldRecreatePool(error)) {
+      console.log("⚠️ [DB] Recreating pool and retrying query...");
+      await recreatePool();
       // Retry once with new pool
       return dbQuery(sql, params, false);
     }
@@ -173,7 +150,9 @@ export async function dbExecute(sql, params = [], retry = true) {
     const [result] = await db.execute(sql, params);
     return result;
   } catch (error) {
-    if (retry && await recreatePoolIfNeeded(error)) {
+    if (retry && shouldRecreatePool(error)) {
+      console.log("⚠️ [DB] Recreating pool and retrying execute...");
+      await recreatePool();
       // Retry once with new pool
       return dbExecute(sql, params, false);
     }
@@ -186,7 +165,9 @@ export async function withPool(callback, retry = true) {
     const db = await getDbConnection();
     return await callback(db);
   } catch (error) {
-    if (retry && await recreatePoolIfNeeded(error)) {
+    if (retry && shouldRecreatePool(error)) {
+      console.log("⚠️ [DB] Recreating pool and retrying withPool...");
+      await recreatePool();
       // Retry once with new pool
       return withPool(callback, false);
     }
