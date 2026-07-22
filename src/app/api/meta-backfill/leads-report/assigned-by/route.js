@@ -81,25 +81,27 @@ export async function GET(request) {
     // Original behavior: return leads where assigned_to = assigner
     const [rows] = await conn.execute(
       `SELECT 
-        customer_id,
-        first_name,
-        last_name,
-        phone,
-        email,
-        status,
-        stage,
-        lead_campaign,
-        date_created,
-        assigned_to,
-        lead_source,
-        sales_representative
-       FROM customers
-       WHERE DATE(date_created) BETWEEN ? AND ?
-       AND assigned_to = ?
-       AND assigned_to IS NOT NULL
-       AND assigned_to != ''
-       AND assigned_to != 'Automatic'
-       ORDER BY date_created DESC`,
+        c.customer_id,
+        c.first_name,
+        c.last_name,
+        c.phone,
+        c.email,
+        c.status,
+        c.stage,
+        c.lead_campaign,
+        c.date_created,
+        c.assigned_to,
+        c.lead_source,
+        c.sales_representative,
+        ml.products_interest
+       FROM customers c
+       LEFT JOIN meta_leads ml ON c.customer_id = ml.crm_customer_id
+       WHERE DATE(c.date_created) BETWEEN ? AND ?
+       AND c.assigned_to = ?
+       AND c.assigned_to IS NOT NULL
+       AND c.assigned_to != ''
+       AND c.assigned_to != 'Automatic'
+       ORDER BY c.date_created DESC`,
       [from, to, assigner]
     );
 

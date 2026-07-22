@@ -1562,6 +1562,7 @@ export default function MetaBackfillPage() {
                         <th className="px-2 py-2 text-left border-b">Status</th>
                         <th className="px-2 py-2 text-left border-b">Stage</th>
                         <th className="px-2 py-2 text-left border-b">Campaign</th>
+                        <th className="px-2 py-2 text-left border-b">Product Interest</th>
                         <th className="px-2 py-2 text-left border-b">Created_by</th>
                         <th className="px-2 py-2 text-left border-b">sales_representative</th>
                         <th className="px-2 py-2 text-left border-b">Created</th>
@@ -1586,6 +1587,7 @@ export default function MetaBackfillPage() {
                             <td className="px-2 py-2">{lead.status || "—"}</td>
                             <td className="px-2 py-2">{lead.stage || "—"}</td>
                             <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
+                            <td className="px-2 py-2">{lead.products_interest || "—"}</td>
                             <td className="px-2 py-2 whitespace-nowrap">{lead.assigned_to || "—"}</td>
                             <td className="px-2 py-2 whitespace-nowrap">{lead.sales_representative || "—"}</td>
                             <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
@@ -1766,6 +1768,7 @@ export default function MetaBackfillPage() {
                         <th className="px-2 py-2 text-left border-b">Status</th>
                         <th className="px-2 py-2 text-left border-b">Stage</th>
                         <th className="px-2 py-2 text-left border-b">Campaign</th>
+                        <th className="px-2 py-2 text-left border-b">Product Interest</th>
                         <th className="px-2 py-2 text-left border-b">Created</th>
                       </tr>
                     </thead>
@@ -1788,6 +1791,7 @@ export default function MetaBackfillPage() {
                             <td className="px-2 py-2">{lead.status || "—"}</td>
                             <td className="px-2 py-2">{lead.stage || "—"}</td>
                             <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
+                            <td className="px-2 py-2">{lead.products_interest || "—"}</td>
                             <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
                           </tr>
                         );
@@ -1893,6 +1897,7 @@ export default function MetaBackfillPage() {
                             <th className="px-2 py-2 text-left border-b">Status</th>
                             <th className="px-2 py-2 text-left border-b">Stage</th>
                             <th className="px-2 py-2 text-left border-b">Campaign</th>
+                            <th className="px-2 py-2 text-left border-b">Product Interest</th>
                             <th className="px-2 py-2 text-left border-b">Created</th>
                           </tr>
                         </thead>
@@ -1914,10 +1919,10 @@ export default function MetaBackfillPage() {
                                 <td className="px-2 py-2 break-all max-w-[160px]">{lead.email || "—"}</td>
                                 <td className="px-2 py-2 whitespace-nowrap">{lead.lead_source || "—"}</td>
                                 <td className="px-2 py-2 whitespace-nowrap">{lead.sales_representative || "—"}</td>
-                                <td className="px-2 py-2 whitespace-nowrap">{lead.assigned_to || "—"}</td>
                                 <td className="px-2 py-2">{lead.status || "—"}</td>
                                 <td className="px-2 py-2">{lead.stage || "—"}</td>
                                 <td className="px-2 py-2">{lead.lead_campaign || "—"}</td>
+                                <td className="px-2 py-2">{lead.products_interest || "—"}</td>
                                 <td className="px-2 py-2 whitespace-nowrap text-gray-700">{created}</td>
                               </tr>
                             );

@@ -57,14 +57,16 @@ export async function GET(request) {
         c.date_created,
         c.assigned_to,
         c.lead_source,
-        c.sales_representative
-       FROM customers c`;
+        c.sales_representative,
+        ml.products_interest
+       FROM customers c
+       LEFT JOIN meta_leads ml ON c.customer_id = ml.crm_customer_id`;
     
     let params = [from, to, assigner];
 
     // Join with meta_leads if formIds filter is present
     if (formIds && formIds.length > 0) {
-      query += ` INNER JOIN meta_leads ml ON c.customer_id = ml.crm_customer_id`;
+      query += ` INNER JOIN meta_leads ml2 ON c.customer_id = ml2.crm_customer_id`;
     }
 
     query += ` WHERE DATE(c.date_created) BETWEEN ? AND ?
@@ -72,7 +74,7 @@ export async function GET(request) {
 
     // Add formIds filter if present
     if (formIds && formIds.length > 0) {
-      query += ` AND ml.form_id IN (${formIds.map(() => '?').join(',')})`;
+      query += ` AND ml2.form_id IN (${formIds.map(() => '?').join(',')})`;
       params.push(...formIds);
     }
 
