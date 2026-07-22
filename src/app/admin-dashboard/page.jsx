@@ -194,6 +194,8 @@ import { jwtVerify } from "jose";
 import { TextEncoder as NodeTextEncoder } from "util";
 import { getDbConnection } from "@/lib/db";
 import UpcomingTasks from "@/components/task/UpcomingTasksAdmin";
+import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
+
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
@@ -495,6 +497,9 @@ export default async function UserDashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Profile Approvals - Dynamic Card Component */}
+          <ProfileApprovalsCard />
 
         </div>
 
