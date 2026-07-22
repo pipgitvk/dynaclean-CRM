@@ -311,6 +311,7 @@ export default function CustomerTable({
                   "Notes",
                   "Created",
                   "Products Interest",
+                  "Reporting Date",
                 ].map((h) => (
                   <th key={h} className="px-4 py-2 text-left whitespace-nowrap">
                     {h}
@@ -337,6 +338,9 @@ export default function CustomerTable({
                     {dayjs(r.date_created).format("DD MMM YYYY HH:mm")}
                   </td>
                   <td className="px-4 py-2">{r.products_interest}</td>
+                  <td className="px-4 py-2">
+                    {r.reporting_date ? dayjs(r.reporting_date).format("DD MMM YYYY HH:mm") : "—"}
+                  </td>
                   <td className="px-4 py-2 flex items-center gap-2 justify-center text-gray-600">
                     <button
                       title="View"
@@ -373,7 +377,7 @@ export default function CustomerTable({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center p-4">
+                  <td colSpan={10} className="text-center p-4">
                     No customers found.
                   </td>
                 </tr>
@@ -418,6 +422,10 @@ export default function CustomerTable({
               </div>
               <div>
                 <span className="font-semibold">Products Interest:</span> {r.products_interest}
+              </div>
+              <div>
+                <span className="font-semibold">Reporting Date:</span>{" "}
+                {r.reporting_date ? dayjs(r.reporting_date).format("DD MMM YYYY HH:mm") : "—"}
               </div>
               <div className="flex items-center gap-4 pt-2 cursor-pointer">
                 <button

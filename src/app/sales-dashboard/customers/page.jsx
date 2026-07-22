@@ -190,7 +190,8 @@ export default async function CustomersPage({ searchParams }) {
       c.products_interest,
       COALESCE(${filter === "today_reporting" ? "tlf.multi_tag" : "cf.multi_tag"}, '') AS multi_tag,
       ${filter === "today_reporting" ? "tlf.next_followup_date" : "cf.next_followup_date"} AS next_follow_date,
-      ${filter === "today_reporting" ? "tlf.notes" : "cf.notes"} AS latest_followup_notes
+      ${filter === "today_reporting" ? "tlf.notes" : "cf.notes"} AS latest_followup_notes,
+      COALESCE(${filter === "today_reporting" ? "tlf" : "tl_report"}.next_followup_date, '') AS reporting_date
     FROM customers c
     ${filter === "today_reporting" ? "" : `
     LEFT JOIN (
@@ -203,6 +204,13 @@ export default async function CustomersPage({ searchParams }) {
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     `}
+    LEFT JOIN (
+      SELECT 
+        customer_id,
+        next_followup_date,
+        ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY id DESC) AS rn
+      FROM TL_followups
+    ) tl_report ON c.customer_id = tl_report.customer_id AND tl_report.rn = 1
     ${joinClause}
     WHERE ${whereClauseString}
   `;
