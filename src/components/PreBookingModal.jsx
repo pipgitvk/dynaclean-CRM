@@ -25,6 +25,12 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
     item_code: false,
   });
   
+  const [selectedSuggestions, setSelectedSuggestions] = useState({
+    customer_id: false,
+    product_name: false,
+    item_code: false,
+  });
+  
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -44,6 +50,11 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
       }));
       setErrors({});
       setTouched({});
+      setSelectedSuggestions({
+        customer_id: !!customerId,
+        product_name: false,
+        item_code: false,
+      });
     }
   }, [isOpen, customerId]);
 
@@ -83,6 +94,11 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
     }));
     setTouched((prev) => ({ ...prev, [name]: true }));
     
+    // Reset selection flag if field is cleared
+    if (!stringValue.trim()) {
+      setSelectedSuggestions((prev) => ({ ...prev, [name]: false }));
+    }
+    
     // Fetch suggestions on change
     if (stringValue.trim()) {
       fetchSuggestions(name, stringValue);
@@ -99,6 +115,7 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
     }));
     setShowSuggestions((prev) => ({ ...prev, [field]: false }));
     setSuggestions((prev) => ({ ...prev, [field]: [] }));
+    setSelectedSuggestions((prev) => ({ ...prev, [field]: true }));
   };
 
   const validateForm = () => {
@@ -108,14 +125,43 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
     if (!customerId) {
       newErrors.customer_id = "Customer ID is required";
     }
+    if (!selectedSuggestions.customer_id && customerId) {
+      newErrors.customer_id = "Please select a customer from suggestions";
+    }
 
     const productName = String(formData.product_name || "").trim();
     if (!productName) {
       newErrors.product_name = "Product name is required";
     }
+    if (!selectedSuggestions.product_name && productName) {
+      newErrors.product_name = "Please select a product from suggestions";
+    }
+
+    const itemCode = String(formData.item_code || "").trim();
+    if (!itemCode) {
+      newErrors.item_code = "Item code is required";
+    }
+    if (!selectedSuggestions.item_code && itemCode) {
+      newErrors.item_code = "Please select an item code from suggestions";
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const isFormValid = () => {
+    const customerId = String(formData.customer_id || "").trim();
+    const productName = String(formData.product_name || "").trim();
+    const itemCode = String(formData.item_code || "").trim();
+
+    return (
+      selectedSuggestions.customer_id &&
+      customerId &&
+      selectedSuggestions.product_name &&
+      productName &&
+      selectedSuggestions.item_code &&
+      itemCode
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -154,6 +200,11 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
         });
         setErrors({});
         setTouched({});
+        setSelectedSuggestions({
+          customer_id: false,
+          product_name: false,
+          item_code: false,
+        });
         onClose();
         if (onSuccess) onSuccess();
       } else {
@@ -303,14 +354,14 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
           {/* Item Code with Autocomplete */}
           <div ref={(el) => (suggestionsRef.current.item_code = el)} className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Item Code
+              Item Code <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               name="item_code"
               value={formData.item_code}
               onChange={handleChange}
-              placeholder="Enter item code (optional)"
+              placeholder="Enter item code (required)"
               className={`w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 transition-all ${
                 errors.item_code && touched.item_code
                   ? "border-red-500 focus:ring-red-500"
@@ -391,7 +442,7 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isFormValid()}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
