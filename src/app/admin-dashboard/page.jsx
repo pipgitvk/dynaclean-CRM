@@ -195,6 +195,7 @@ import { TextEncoder as NodeTextEncoder } from "util";
 import { getDbConnection } from "@/lib/db";
 import UpcomingTasks from "@/components/task/UpcomingTasksAdmin";
 import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
+import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText } from "lucide-react";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -300,9 +301,7 @@ export default async function UserDashboardPage() {
             <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div>
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
-                    📋
-                  </span>
+                  <Package className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
                     <span className="block">Pending Orders</span>
                     <span className="block"></span>
@@ -327,9 +326,7 @@ export default async function UserDashboardPage() {
           <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
             <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div className="flex items-center gap-2 sm:gap-3">
-                <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
-                  📊
-                </span>
+                <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
                 <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
                   <span className="block">System Performance</span>
                   <span className="block">Dashboard</span>
@@ -351,9 +348,7 @@ export default async function UserDashboardPage() {
             <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div>
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
-                    📤
-                  </span>
+                  <Upload className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
                     <span className="block">Bulk Upload</span>
                     <span className="block">Customers</span>
@@ -379,9 +374,7 @@ export default async function UserDashboardPage() {
             <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div>
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
-                    💰
-                  </span>
+                  <DollarSign className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
                     <span className="block">Special Price</span>
                     <span className="block">Approvals</span>
@@ -410,9 +403,7 @@ export default async function UserDashboardPage() {
             <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div>
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
-                    📅
-                  </span>
+                  <Calendar className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
                     <span className="block">Attendance</span>
                     <span className="block">Regularization Requests</span>
@@ -441,9 +432,7 @@ export default async function UserDashboardPage() {
             <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div>
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
-                    🏖️
-                  </span>
+                  <Plane className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
                     <span className="block">Leave</span>
                     <span className="block">Approvals</span>
@@ -472,9 +461,7 @@ export default async function UserDashboardPage() {
             <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div>
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="text-2xl sm:text-3xl shrink-0" aria-hidden>
-                    📝
-                  </span>
+                  <FileText className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
                     <span className="block">AMC/CMC</span>
                     <span className="block">Requests</span>
