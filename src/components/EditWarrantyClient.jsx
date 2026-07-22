@@ -519,9 +519,16 @@ export default function EditWarrantyPage({ serial_number }) {
                 <textarea
                   id="customer_address"
                   rows="3"
-                  {...register("customer_address")}
+                  {...register("customer_address", {
+                    required: "Customer Address is required",
+                  })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-gray-900 resize-y"
                 ></textarea>
+                {errors.customer_address && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.customer_address.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label
@@ -532,7 +539,9 @@ export default function EditWarrantyPage({ serial_number }) {
                 </label>
                 <select
                   id="state"
-                  {...register("state")}
+                  {...register("state", {
+                    required: "State is required",
+                  })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-gray-900"
                 >
                   <option value="">Select State</option>
@@ -542,6 +551,11 @@ export default function EditWarrantyPage({ serial_number }) {
                     </option>
                   ))}
                 </select>
+                {errors.state && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.state.message}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -560,9 +574,16 @@ export default function EditWarrantyPage({ serial_number }) {
                 <input
                   type="text"
                   id="site_person"
-                  {...register("site_person")}
+                  {...register("site_person", {
+                    required: "Site Person is required",
+                  })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-gray-900"
                 />
+                {errors.site_person && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.site_person.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label
@@ -574,9 +595,16 @@ export default function EditWarrantyPage({ serial_number }) {
                 <input
                   type="text"
                   id="site_contact"
-                  {...register("site_contact")}
+                  {...register("site_contact", {
+                    required: "Site Person Contact is required",
+                  })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-gray-900"
                 />
+                {errors.site_contact && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.site_contact.message}
+                  </p>
+                )}
               </div>
               <div>
                 <label
@@ -654,9 +682,16 @@ export default function EditWarrantyPage({ serial_number }) {
                 <textarea
                   id="installed_address"
                   rows="3"
-                  {...register("installed_address")}
+                  {...register("installed_address", {
+                    required: "Installed Address is required",
+                  })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-gray-900 resize-y"
                 ></textarea>
+                {errors.installed_address && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.installed_address.message}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -717,7 +752,9 @@ export default function EditWarrantyPage({ serial_number }) {
                 <input
                   type="date"
                   id="installation_date"
-                  {...register("installation_date")}
+                  {...register("installation_date", {
+                    required: "Installation Date is required",
+                  })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 text-gray-900"
                 />
                 {errors.installation_date && (

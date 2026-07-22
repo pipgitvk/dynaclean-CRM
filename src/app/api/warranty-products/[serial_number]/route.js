@@ -93,26 +93,52 @@ export async function PUT(req, { params }) {
     const site_contact = formData.get("site_contact");
     const gstin = formData.get("gstin"); // Added from PHP form
 
-    // Debug: Log all received fields
-    console.log("Received fields:", {
-      product_name, warranty_period, customer_name, 
-      invoice_number, invoice_date, email, contact, quantity
-    });
-
-    // Validation: Check only the most critical fields
-    const criticalFields = {
+    // Validation: Check all required fields for updates too
+    const requiredFields = {
       product_name: product_name?.trim(),
-      customer_name: customer_name?.trim(),
+      serial_number: new_serial_number?.trim(),
       warranty_period: warranty_period?.toString().trim(),
+      customer_name: customer_name?.trim(),
+      email: email?.trim(),
+      contact_person: contact_person?.trim(),
+      contact: contact?.toString().trim(),
+      customer_address: customer_address?.trim(),
+      state: state?.trim(),
+      invoice_number: invoice_number?.trim(),
+      invoice_date: invoice_date?.trim(),
+      installation_date: installation_date?.trim(),
+      installed_address: installed_address?.trim(),
+      site_person: site_person?.trim(),
+      site_contact: site_contact?.toString().trim(),
     };
 
-    // Check if critical fields are empty
-    const missingFields = Object.keys(criticalFields).filter(key => !criticalFields[key]);
-    
+    // Check if any required fields are empty
+    const missingFields = Object.keys(requiredFields).filter(
+      (key) => !requiredFields[key]
+    );
+
     if (missingFields.length > 0) {
       console.error("Missing required fields:", missingFields);
       return NextResponse.json(
         { error: `Missing required fields: ${missingFields.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // Email validation
+    const emailRegex = /^\S+@\S+$/i;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: "Invalid email address" },
+        { status: 400 }
+      );
+    }
+
+    // Warranty period validation
+    const warrantyPeriod = parseInt(warranty_period);
+    if (isNaN(warrantyPeriod) || warrantyPeriod < 0) {
+      return NextResponse.json(
+        { error: "Warranty period must be a positive number" },
         { status: 400 }
       );
     }

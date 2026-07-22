@@ -51,6 +51,56 @@ export async function POST(req) {
 
     // Insert form data to DB
     const f = Object.fromEntries(formData.entries());
+    
+    // Validation: Check for all required fields
+    const requiredFields = {
+      product_name: f.product_name?.trim(),
+      serial_number: f.serial_number?.trim(),
+      warranty_period: f.warranty_period?.toString().trim(),
+      customer_name: f.customer_name?.trim(),
+      email: f.email?.trim(),
+      contact_person: f.contact_person?.trim(),
+      contact: f.contact?.toString().trim(),
+      customer_address: f.customer_address?.trim(),
+      state: f.state?.trim(),
+      invoice_number: f.invoice_number?.trim(),
+      invoice_date: f.invoice_date?.trim(),
+    };
+
+    // Check if any required fields are empty
+    const missingFields = Object.keys(requiredFields).filter(
+      (key) => !requiredFields[key]
+    );
+
+    if (missingFields.length > 0) {
+      console.error("Missing required fields:", missingFields);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Missing required fields: ${missingFields.join(", ")}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // Email validation
+    const emailRegex = /^\S+@\S+$/i;
+    if (!emailRegex.test(f.email)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid email address" },
+        { status: 400 }
+      );
+    }
+
+    // Warranty period validation
+    const warrantyPeriod = parseInt(f.warranty_period);
+    if (isNaN(warrantyPeriod) || warrantyPeriod < 0) {
+      return NextResponse.json(
+        { success: false, error: "Warranty period must be a positive number" },
+        { status: 400 }
+      );
+    }
+
     const conn = await getDbConnection();
     const sql = `INSERT INTO warranty_products
       (product_name, specification, model, serial_number, gstin, warranty_period,
@@ -58,13 +108,6 @@ export async function POST(req) {
        invoice_date, invoice_file, report_file, quantity, contact_person,
        created_by, created_at, updated_by, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-    // await conn.execute(sql, [
-    //   f.product_name, f.specification, f.model, f.serial_number, f.gstin,
-    //   f.warranty_period, f.customer_name, f.email, f.contact, f.customer_address,
-    //   f.invoice_number, f.invoice_date, invoiceFilename,
-    //   reportNames.join(","), f.quantity, f.contact_person
-    // ]);
 
     const now = new Date();
     const values = [
