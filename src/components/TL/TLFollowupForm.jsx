@@ -23,6 +23,7 @@ export default function TLFollowupForm({
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [showProductSuggestions, setShowProductSuggestions] = useState(false);
   const [modelSearchInput, setModelSearchInput] = useState("");
+  const [selectedModels, setSelectedModels] = useState([]); // Array for multiple products
   console.log("customer Data in Tl follow", customerData);
 
   // ✅ Format datetime for <input type="datetime-local"> in IST (Asia/Kolkata)
@@ -47,7 +48,7 @@ export default function TLFollowupForm({
   const [formData, setFormData] = useState({
     estimated_order_date: "",
     lead_quality_score: "",
-    model: "",
+    model: [], // Changed to array for multiple products
     multi_tag: [],
     status: "",
     notes: "",
@@ -115,11 +116,24 @@ export default function TLFollowupForm({
       .map(normalizeLegacyPostponingTagLabel)
       .filter((t) => allowed.has(t));
 
+    // Parse model field - if it's a comma-separated string, convert to array
+    let modelArray = [];
+    if (latestfollowup.model) {
+      if (typeof latestfollowup.model === 'string') {
+        modelArray = latestfollowup.model
+          .split(",")
+          .map((m) => m.trim())
+          .filter(Boolean);
+      } else if (Array.isArray(latestfollowup.model)) {
+        modelArray = latestfollowup.model;
+      }
+    }
+
     setFormData((prev) => ({
       ...prev,
       // estimated_order_date: latestfollowup.estimated_order_date || "",
       lead_quality_score: latestfollowup.lead_quality_score || "",
-      model: latestfollowup.model || "",
+      model: modelArray,
       status: latestfollowup.status || "",
       notes: latestfollowup.notes || "",
       // Always set next_followup_date to today (current month/year with today's date)
@@ -129,7 +143,8 @@ export default function TLFollowupForm({
       assigned_employee:
         latestfollowup.assigned_employee || prev.assigned_employee,
     }));
-    setModelSearchInput(latestfollowup.model || "");
+    setSelectedModels(modelArray);
+    setModelSearchInput("");
   }, [latestfollowup]);
 
   // Filter stages based on customer's current stage from database
@@ -187,13 +202,30 @@ export default function TLFollowupForm({
   // Handle product selection from suggestions
   const handleSelectProduct = (product) => {
     const productLabel = `${product.item_code} - ${product.item_name}`;
-    setFormData((prev) => ({
-      ...prev,
-      model: productLabel,
-    }));
-    setModelSearchInput(productLabel);
+    
+    // Add to selectedModels array if not already there
+    if (!selectedModels.some(m => m === productLabel)) {
+      const newModels = [...selectedModels, productLabel];
+      setSelectedModels(newModels);
+      setFormData((prev) => ({
+        ...prev,
+        model: newModels,
+      }));
+    }
+    
+    setModelSearchInput("");
     setShowProductSuggestions(false);
     setProductSuggestions([]);
+  };
+
+  // Remove a product from the selected list
+  const handleRemoveModel = (productLabel) => {
+    const newModels = selectedModels.filter((m) => m !== productLabel);
+    setSelectedModels(newModels);
+    setFormData((prev) => ({
+      ...prev,
+      model: newModels,
+    }));
   };
 
   const handleTagChange = (tag) => {
@@ -233,6 +265,7 @@ export default function TLFollowupForm({
         body: JSON.stringify({
           customer_id: customerId,
           ...formData,
+          model: formData.model.join(", "), // Convert model array to comma-separated string
           multi_tag: formData.multi_tag.join(", "), // Convert array to comma-separated string
         }),
       });
@@ -340,11 +373,34 @@ export default function TLFollowupForm({
             />
           </div>
 
-          {/* Model */}
+          {/* Model - Multiple Selection */}
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Model
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Products / Models (Multiple Selection)
             </label>
+            
+            {/* Selected Products Chips */}
+            {selectedModels.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3 p-3 bg-blue-50 rounded-md border border-blue-200">
+                {selectedModels.map((productLabel, index) => (
+                  <div
+                    key={index}
+                    className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500 text-white rounded-full text-sm"
+                  >
+                    <span>{productLabel}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveModel(productLabel)}
+                      className="ml-1 hover:bg-blue-600 rounded-full p-0.5 transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Search Input */}
             <div className="relative">
               <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500">
                 <Search size={16} className="ml-3 text-gray-400" />
@@ -353,7 +409,7 @@ export default function TLFollowupForm({
                   value={modelSearchInput}
                   onChange={(e) => handleModelSearch(e.target.value)}
                   onFocus={() => modelSearchInput.length >= 2 && setShowProductSuggestions(true)}
-                  placeholder="Search product code or name..."
+                  placeholder="Search & add product code or name..."
                   className="flex-1 px-3 py-2 border-0 outline-none focus:ring-0"
                 />
               </div>
@@ -361,20 +417,32 @@ export default function TLFollowupForm({
               {/* Product Suggestions Dropdown */}
               {showProductSuggestions && productSuggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
-                  {productSuggestions.map((product) => (
-                    <button
-                      key={product.item_code}
-                      type="button"
-                      onClick={() => handleSelectProduct(product)}
-                      className="w-full text-left px-4 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 transition-colors"
-                    >
-                      <div className="font-semibold text-gray-800">{product.item_code}</div>
-                      <div className="text-sm text-gray-600">{product.item_name}</div>
-                      {product.product_number && (
-                        <div className="text-xs text-gray-500">Product #: {product.product_number}</div>
-                      )}
-                    </button>
-                  ))}
+                  {productSuggestions.map((product) => {
+                    const productLabel = `${product.item_code} - ${product.item_name}`;
+                    const isSelected = selectedModels.includes(productLabel);
+                    return (
+                      <button
+                        key={product.item_code}
+                        type="button"
+                        onClick={() => handleSelectProduct(product)}
+                        className={`w-full text-left px-4 py-2 border-b border-gray-200 last:border-b-0 transition-colors ${
+                          isSelected
+                            ? "bg-blue-100 hover:bg-blue-200"
+                            : "hover:bg-blue-50"
+                        }`}
+                        disabled={isSelected}
+                      >
+                        <div className="font-semibold text-gray-800">{product.item_code}</div>
+                        <div className="text-sm text-gray-600">{product.item_name}</div>
+                        {product.product_number && (
+                          <div className="text-xs text-gray-500">Product #: {product.product_number}</div>
+                        )}
+                        {isSelected && (
+                          <div className="text-xs text-blue-600 font-semibold">✓ Added</div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -390,8 +458,15 @@ export default function TLFollowupForm({
             <input
               type="hidden"
               name="model"
-              value={formData.model}
+              value={formData.model.join(", ")}
             />
+
+            {/* Helper text */}
+            <p className="mt-1 text-xs text-gray-500">
+              {selectedModels.length > 0
+                ? `${selectedModels.length} product(s) selected`
+                : "Search and select multiple products"}
+            </p>
           </div>
 
           {/* Status */}
