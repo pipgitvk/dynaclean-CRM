@@ -11,7 +11,6 @@ import {
   Calendar,
   User,
   Eye,
-  Calculator,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -20,7 +19,6 @@ export default function EditBidPage({ params }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [employees, setEmployees] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
   const [bidId, setBidId] = useState(null);
   const [bid, setBid] = useState(null);
   const [formData, setFormData] = useState({
@@ -59,18 +57,11 @@ export default function EditBidPage({ params }) {
     dd_id: "",
     remarks: "",
     bid_document: null,
-    ra_participated: "no",
     ra_start_date: "",
     ra_end_date: "",
     ra_last_price: "",
     order_id: "",
     customer_id: "",
-    sd_deduction: "",
-    ld_deduction: "",
-    epbg_deduction: "",
-    tds_under_ita: "",
-    tds_under_gst: "",
-    other_deduction: "",
     selected_level: "",
     l1_level: "",
     l1_price: "",
@@ -102,7 +93,7 @@ export default function EditBidPage({ params }) {
   useEffect(() => {
     if (bidId) {
       fetchBidDetails();
-      fetchCurrentUser();
+      fetchEmployees();
     }
   }, [bidId]);
 
@@ -172,61 +163,55 @@ export default function EditBidPage({ params }) {
         setBid(bid);
         
         setFormData({
-          bidding_platform: bid.bidding_platform || "",
-          bid_number: bid.bid_number || "",
-          gem_bid_no: bid.gem_bid_no || "",
-          bid_title: bid.bid_title || "",
-          bid_link: bid.bid_link || "",
-          item_category: bid.item_category || "",
-          organisation_id: bid.organisation_id || "",
-          bid_start_date: formattedStartDate,
-          bid_end_date: formattedEndDate,
-          bid_open_date: formattedOpenDate,
-          bid_validity_days: bid.bid_validity_days || "",
-          model_id: bid.model_id || "",
-          specification: bid.specification || "",
-          total_quantity: bid.total_quantity || "",
-          bid_type: bid.bid_type || "",
-          evaluation_method: bid.evaluation_method || "",
-          estimated_bid_value: bid.estimated_bid_value || "",
-          bid_value: bid.bid_value || "",
-          emd_required: bid.emd_required || "no",
-          emd_amount: bid.emd_amount || "",
-          epbg_percentage: bid.epbg_percentage || "",
-          epbg_duration_months: bid.epbg_duration_months || "",
-          reverse_auction: bid.reverse_auction || "no",
-          turnover_required: bid.turnover_required || "",
-          oem_turnover_required: bid.oem_turnover_required || "",
-          experience_required_years: bid.experience_required_years || "",
-          delivery_days: bid.delivery_days || "",
-          inspection_required: bid.inspection_required || "no",
-          technical_status: bid.technical_status || "pending",
-          financial_status: bid.financial_status || "pending",
-          bid_status: bid.bid_status || "new",
-          assigned_employee_id: bid.assigned_employee_id || "",
-          dd_id: bid.dd_id || "",
-          remarks: bid.remarks || "",
-          bid_document: null,
-          ra_participated: bid.ra_participated || "no",
-          ra_start_date: formatDateForInput(bid.ra_start_date) || "",
-          ra_end_date: formatDateForInput(bid.ra_end_date) || "",
-          ra_last_price: bid.ra_last_price || "",
-          order_id: bid.order_id || "",
-          customer_id: bid.customer_id || "",
-          sd_deduction: bid.sd_deduction || "",
-          ld_deduction: bid.ld_deduction || "",
-          epbg_deduction: bid.epbg_deduction || "",
-          tds_under_ita: bid.tds_under_ita || "",
-          tds_under_gst: bid.tds_under_gst || "",
-          other_deduction: bid.other_deduction || "",
-          selected_level: bid.selected_level || "",
-          l1_level: bid.l1_level || "",
-          l1_price: bid.l1_price || "",
-          l2_level: bid.l2_level || "",
-          l2_price: bid.l2_price || "",
-          l3_level: bid.l3_level || "",
-          l3_price: bid.l3_price || "",
-        });
+        bidding_platform: bid.bidding_platform || "",
+        bid_number: bid.bid_number || "",
+        gem_bid_no: bid.gem_bid_no || "",
+        bid_title: bid.bid_title || "",
+        bid_link: bid.bid_link || "",
+        item_category: bid.item_category || "",
+        organisation_id: bid.organisation_id || "",
+        bid_start_date: formattedStartDate,
+        bid_end_date: formattedEndDate,
+        bid_open_date: formattedOpenDate,
+        bid_validity_days: bid.bid_validity_days || "",
+        model_id: bid.model_id || "",
+        specification: bid.specification || "",
+        total_quantity: bid.total_quantity || "",
+        bid_type: bid.bid_type || "",
+        evaluation_method: bid.evaluation_method || "",
+        estimated_bid_value: bid.estimated_bid_value || "",
+        bid_value: bid.bid_value || "",
+        emd_required: bid.emd_required || "no",
+        emd_amount: bid.emd_amount || "",
+        epbg_percentage: bid.epbg_percentage || "",
+        epbg_duration_months: bid.epbg_duration_months || "",
+        reverse_auction: bid.reverse_auction || "no",
+        turnover_required: bid.turnover_required || "",
+        oem_turnover_required: bid.oem_turnover_required || "",
+        experience_required_years: bid.experience_required_years || "",
+        delivery_days: bid.delivery_days || "",
+        inspection_required: bid.inspection_required || "no",
+        technical_status: bid.technical_status || "pending",
+        financial_status: bid.financial_status || "pending",
+        bid_status: bid.bid_status || "new",
+        assigned_employee_id: bid.assigned_employee_id || "",
+        dd_id: bid.dd_id || "",
+        remarks: bid.remarks || "",
+        bid_document: null,
+        ra_participated: bid.ra_participated || "no",
+        ra_start_date: formatDateForInput(bid.ra_start_date) || "",
+        ra_end_date: formatDateForInput(bid.ra_end_date) || "",
+        ra_last_price: bid.ra_last_price || "",
+        customer_id: bid.customer_id || "",
+        order_id: bid.order_id || "",
+        selected_level: bid.selected_level || "",
+        l1_level: bid.l1_level || "",
+        l1_price: bid.l1_price || "",
+        l2_level: bid.l2_level || "",
+        l2_price: bid.l2_price || "",
+        l3_level: bid.l3_level || "",
+        l3_price: bid.l3_price || "",
+      });
       } else {
         toast.error("Failed to fetch bid details");
       }
@@ -238,21 +223,15 @@ export default function EditBidPage({ params }) {
     }
   };
 
-  const fetchCurrentUser = async () => {
+  const fetchEmployees = async () => {
     try {
-      const res = await fetch("/api/me");
-      if (!res.ok) return;
-      const user = await res.json();
-      setCurrentUser(user);
-      if (user?.empId) {
-        setEmployees([user]);
-        setFormData((prev) => ({
-          ...prev,
-          assigned_employee_id: String(user.empId),
-        }));
+      const res = await fetch("/api/gem-crm/employees");
+      const result = await res.json();
+      if (result.success) {
+        setEmployees(result.data || []);
       }
     } catch (error) {
-      console.error("Error fetching current user:", error);
+      console.error("Error fetching employees:", error);
     }
   };
 
@@ -263,26 +242,6 @@ export default function EditBidPage({ params }) {
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
-  };
-
-  // Helper function to check if a field should be editable
-  const isFieldEditable = (fieldName) => {
-    // Status fields are always editable
-    const statusFields = ['bid_status', 'technical_status', 'financial_status', 'status_remarks'];
-    // Financial value fields are always editable
-    const financialValueFields = ['estimated_bid_value', 'bid_value'];
-    // Remarks field is always editable
-    const remarksFields = ['remarks'];
-    // Inspection and Reverse Auction fields are always editable, 'ra_participated', 'ra_last_price'
-    const inspectionFields = ['inspection_required', 'reverse_auction', 'ra_participated', 'ra_last_price'];
-    // Document upload is always allowed (for replacement)
-    const alwaysEditableFields = ['bid_document', 'bid_end_date', 'bid_open_date'];
-    if (statusFields.includes(fieldName) || financialValueFields.includes(fieldName) || remarksFields.includes(fieldName) || inspectionFields.includes(fieldName) || alwaysEditableFields.includes(fieldName)) {
-      return true;
-    }
-    // Use original server data (not live form state) so fields don't lock while typing
-    const value = bid ? bid[fieldName] : formData[fieldName];
-    return value === null || value === '' || value === undefined;
   };
 
   // Status timeline order
@@ -419,14 +378,14 @@ export default function EditBidPage({ params }) {
             {/* L1 Fields */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                L1 Company
+                L1 Level (Company Name)
               </label>
               <input
                 type="text"
                 name="l1_level"
                 value={formData.l1_level}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Company name"
               />
             </div>
@@ -440,7 +399,7 @@ export default function EditBidPage({ params }) {
                 value={formData.l1_price}
                 onChange={handleChange}
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Price"
               />
             </div>
@@ -448,14 +407,14 @@ export default function EditBidPage({ params }) {
             {/* L2 Fields */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                L2 Company
+                L2 Level (Company Name)
               </label>
               <input
                 type="text"
                 name="l2_level"
                 value={formData.l2_level}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Company name"
               />
             </div>
@@ -469,7 +428,7 @@ export default function EditBidPage({ params }) {
                 value={formData.l2_price}
                 onChange={handleChange}
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Price"
               />
             </div>
@@ -477,14 +436,14 @@ export default function EditBidPage({ params }) {
             {/* L3 Fields */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                L3 Company
+                L3 Level (Company Name)
               </label>
               <input
                 type="text"
                 name="l3_level"
                 value={formData.l3_level}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Company name"
               />
             </div>
@@ -498,7 +457,7 @@ export default function EditBidPage({ params }) {
                 value={formData.l3_price}
                 onChange={handleChange}
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Price"
               />
             </div>
@@ -508,15 +467,13 @@ export default function EditBidPage({ params }) {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information Section */}
+        {/* Basic Information */}
         <div className="bg-blue-50 rounded-lg shadow-sm border border-blue-100 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5" />
             Basic Information
           </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="lg:col-span-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Bidding Platform *
@@ -525,8 +482,7 @@ export default function EditBidPage({ params }) {
                   name="bidding_platform"
                   value={formData.bidding_platform}
                   onChange={handleChange}
-                  disabled={!isFieldEditable('bidding_platform')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bidding_platform') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   required
                 >
                   <option value="">Select Platform</option>
@@ -545,8 +501,7 @@ export default function EditBidPage({ params }) {
                   name="bid_number"
                   value={formData.bid_number}
                   onChange={handleChange}
-                  disabled={!isFieldEditable('bid_number')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_number') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -560,8 +515,7 @@ export default function EditBidPage({ params }) {
                   name="gem_bid_no"
                   value={formData.gem_bid_no}
                   onChange={handleChange}
-                  disabled={!isFieldEditable('gem_bid_no')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('gem_bid_no') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -574,8 +528,7 @@ export default function EditBidPage({ params }) {
                   name="customer_id"
                   value={formData.customer_id}
                   onChange={handleChange}
-                  disabled={!isFieldEditable('customer_id')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('customer_id') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter customer GEM ID"
                 />
               </div>
@@ -589,8 +542,7 @@ export default function EditBidPage({ params }) {
                   name="bid_title"
                   value={formData.bid_title}
                   onChange={handleChange}
-                  disabled={!isFieldEditable('bid_title')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_title') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -604,8 +556,7 @@ export default function EditBidPage({ params }) {
                   name="bid_link"
                   value={formData.bid_link}
                   onChange={handleChange}
-                  disabled={!isFieldEditable('bid_link')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_link') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="https://"
                 />
               </div>
@@ -619,8 +570,7 @@ export default function EditBidPage({ params }) {
                   name="item_category"
                   value={formData.item_category}
                   onChange={handleChange}
-                  disabled={!isFieldEditable('item_category')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('item_category') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -633,8 +583,7 @@ export default function EditBidPage({ params }) {
                   name="organisation_id"
                   value={formData.organisation_id}
                   onChange={handleChange}
-                  disabled={!isFieldEditable('organisation_id')}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('organisation_id') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -648,8 +597,7 @@ export default function EditBidPage({ params }) {
                     name="bid_document"
                     onChange={handleChange}
                     accept=".pdf,.doc,.docx"
-                    disabled={!isFieldEditable('bid_document')}
-                    className={`flex-1 px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_document') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                   <Upload className="w-5 h-5 text-gray-400" />
                   {bid && bid.bid_document && (
@@ -664,10 +612,8 @@ export default function EditBidPage({ params }) {
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Leave empty to keep existing document</p>
               </div>
-              </div>
             </div>
           </div>
-        </div>
 
         {/* Status Section */}
         <div className="bg-green-50 rounded-lg shadow-sm border border-green-100 p-6">
@@ -744,7 +690,7 @@ export default function EditBidPage({ params }) {
                 />
               </div>
 
-              <div className="border-t border-gray-200 pt-4 mt-4">
+              <div className="border-t border-gray-200 pt-4 mt-4 md:col-span-2">
                   <p className="text-sm font-medium text-gray-700 mb-3">RA Participation Details</p>
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -754,15 +700,14 @@ export default function EditBidPage({ params }) {
                       name="ra_participated"
                       value={formData.ra_participated}
                       onChange={handleChange}
-                      disabled={!isFieldEditable('ra_participated')}
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ra_participated') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="no">No</option>
                       <option value="yes">Yes</option>
                     </select>
                   </div>
                   {formData.ra_participated === "yes" && (
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         RA Start Date *
@@ -772,9 +717,8 @@ export default function EditBidPage({ params }) {
                         name="ra_start_date"
                         value={formData.ra_start_date}
                         onChange={handleChange}
-                        disabled={!isFieldEditable('ra_start_date')}
                         required
-                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ra_start_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
@@ -786,9 +730,8 @@ export default function EditBidPage({ params }) {
                         name="ra_end_date"
                         value={formData.ra_end_date}
                         onChange={handleChange}
-                        disabled={!isFieldEditable('ra_end_date')}
                         required
-                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ra_end_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
                     <div>
@@ -800,9 +743,8 @@ export default function EditBidPage({ params }) {
                         name="ra_last_price"
                         value={formData.ra_last_price}
                         onChange={handleChange}
-                        disabled={!isFieldEditable('ra_last_price')}
                         step="0.01"
-                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ra_last_price') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         placeholder="Enter RA last price"
                       />
                     </div>
@@ -811,7 +753,7 @@ export default function EditBidPage({ params }) {
                 </div>
 
               {formData.bid_status === "won" && (
-                <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="border-t border-gray-200 pt-4 mt-4 md:col-span-2">
                   <p className="text-sm font-medium text-gray-700 mb-3">Won Bid Details</p>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -822,9 +764,8 @@ export default function EditBidPage({ params }) {
                       name="order_id"
                       value={formData.order_id}
                       onChange={handleChange}
-                      disabled={!isFieldEditable('order_id')}
                       required
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('order_id') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter Order ID"
                     />
                   </div>
@@ -833,320 +774,22 @@ export default function EditBidPage({ params }) {
             </div>
           </div>
 
-
-
-        {/* Important Dates Section */}
-        <div className="bg-yellow-50 rounded-lg shadow-sm border border-yellow-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Important Dates
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bid Start Date
-              </label>
-              <input
-                type="date"
-                name="bid_start_date"
-                value={formData.bid_start_date}
-                onChange={handleChange}
-                disabled={!isFieldEditable('bid_start_date')}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_start_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bid End Date
-              </label>
-              <input
-                type="date"
-                name="bid_end_date"
-                value={formData.bid_end_date}
-                onChange={handleChange}
-                disabled={!isFieldEditable('bid_end_date')}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_end_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bid Open Date
-              </label>
-              <input
-                type="date"
-                name="bid_open_date"
-                value={formData.bid_open_date}
-                onChange={handleChange}
-                disabled={!isFieldEditable('bid_open_date')}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_open_date') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bid Validity Days
-              </label>
-              <input
-                type="number"
-                name="bid_validity_days"
-                value={formData.bid_validity_days}
-                onChange={handleChange}
-                disabled={!isFieldEditable('bid_validity_days')}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_validity_days') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Financial Details Section */}
-        <div className="bg-orange-50 rounded-lg shadow-sm border border-orange-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
-            Financial Details
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estimated Bid Value (₹)
-              </label>
-              <input
-                type="number"
-                name="estimated_bid_value"
-                value={formData.estimated_bid_value}
-                onChange={handleChange}
-                disabled={!isFieldEditable('estimated_bid_value')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('estimated_bid_value') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bid Value (₹)
-              </label>
-              <input
-                type="number"
-                name="bid_value"
-                value={formData.bid_value}
-                onChange={handleChange}
-                disabled={!isFieldEditable('bid_value')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('bid_value') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                EMD Required
-              </label>
-              <select
-                name="emd_required"
-                value={formData.emd_required}
-                onChange={handleChange}
-                disabled={!isFieldEditable('emd_required')}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('emd_required') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              >
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
-            </div>
-
-            {formData.emd_required === "yes" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  EMD Amount (₹)
-                </label>
-                <input
-                  type="number"
-                  name="emd_amount"
-                  value={formData.emd_amount}
-                  onChange={handleChange}
-                  disabled={!isFieldEditable('emd_amount')}
-                  step="0.01"
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('emd_amount') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                EPBG Percentage
-              </label>
-              <input
-                type="number"
-                name="epbg_percentage"
-                value={formData.epbg_percentage}
-                onChange={handleChange}
-                disabled={!isFieldEditable('epbg_percentage')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('epbg_percentage') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                EPBG Duration (Months)
-              </label>
-              <input
-                type="number"
-                name="epbg_duration_months"
-                value={formData.epbg_duration_months}
-                onChange={handleChange}
-                disabled={!isFieldEditable('epbg_duration_months')}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('epbg_duration_months') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* GEM Payment Deductions Section */}
-        <div className="bg-pink-50 rounded-lg shadow-sm border border-pink-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Calculator className="w-5 h-5" />
-            GEM Payment Deductions
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                SD (₹)
-              </label>
-              <input
-                type="number"
-                name="sd_deduction"
-                value={formData.sd_deduction}
-                onChange={handleChange}
-                disabled={!isFieldEditable('sd_deduction')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('sd_deduction') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-              </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                LD (₹)
-              </label>
-              <input
-                type="number"
-                name="ld_deduction"
-                value={formData.ld_deduction}
-                onChange={handleChange}
-                disabled={!isFieldEditable('ld_deduction')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('ld_deduction') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                EPBG (₹)
-              </label>
-              <input
-                type="number"
-                name="epbg_deduction"
-                value={formData.epbg_deduction}
-                onChange={handleChange}
-                disabled={!isFieldEditable('epbg_deduction')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('epbg_deduction') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                TDS under ITA (₹)
-              </label>
-              <input
-                type="number"
-                name="tds_under_ita"
-                value={formData.tds_under_ita}
-                onChange={handleChange}
-                disabled={!isFieldEditable('tds_under_ita')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('tds_under_ita') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                TDS under GST (₹)
-              </label>
-              <input
-                type="number"
-                name="tds_under_gst"
-                value={formData.tds_under_gst}
-                onChange={handleChange}
-                disabled={!isFieldEditable('tds_under_gst')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('tds_under_gst') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Other (₹)
-              </label>
-              <input
-                type="number"
-                name="other_deduction"
-                value={formData.other_deduction}
-                onChange={handleChange}
-                disabled={!isFieldEditable('other_deduction')}
-                step="0.01"
-                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('other_deduction') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Assignment Section */}
-        <div className="bg-indigo-50 rounded-lg shadow-sm border border-indigo-100 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Assignment
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Assigned Employee
-              </label>
-              <input
-                type="text"
-                value={currentUser?.username || employees[0]?.username || ""}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
-                disabled
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Remarks Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Remarks
-          </label>
-          <textarea
-            name="remarks"
-            value={formData.remarks}
-            onChange={handleChange}
-            disabled={!isFieldEditable('remarks')}
-            rows={3}
-            className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${!isFieldEditable('remarks') ? 'bg-gray-100 cursor-not-allowed' : 'focus:ring-2 focus:ring-blue-500'}`}
-          />
-        </div>
-
         {/* Bid Opened Details Section */}
         {["opened", "won", "lost", "cancelled"].includes(formData.bid_status) && (
           <div className="bg-purple-50 rounded-lg shadow-sm border border-purple-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Bid Opened Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* L1 Fields */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  L1 Level
+                  L1 Level (Company Name)
                 </label>
                 <input
                   type="text"
                   name="l1_level"
                   value={formData.l1_level}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Company name"
                 />
               </div>
@@ -1160,7 +803,7 @@ export default function EditBidPage({ params }) {
                   value={formData.l1_price}
                   onChange={handleChange}
                   step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Price"
                 />
               </div>
@@ -1168,14 +811,14 @@ export default function EditBidPage({ params }) {
               {/* L2 Fields */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  L2 Level
+                  L2 Level (Company Name)
                 </label>
                 <input
                   type="text"
                   name="l2_level"
                   value={formData.l2_level}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Company name"
                 />
               </div>
@@ -1189,7 +832,7 @@ export default function EditBidPage({ params }) {
                   value={formData.l2_price}
                   onChange={handleChange}
                   step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Price"
                 />
               </div>
@@ -1197,14 +840,14 @@ export default function EditBidPage({ params }) {
               {/* L3 Fields */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  L3 Level
+                  L3 Level (Company Name)
                 </label>
                 <input
                   type="text"
                   name="l3_level"
                   value={formData.l3_level}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Company name"
                 />
               </div>
@@ -1218,7 +861,7 @@ export default function EditBidPage({ params }) {
                   value={formData.l3_price}
                   onChange={handleChange}
                   step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Price"
                 />
               </div>
@@ -1226,8 +869,289 @@ export default function EditBidPage({ params }) {
           </div>
         )}
 
+        {/* Important Dates Section */}
+        <div className="bg-yellow-50 rounded-lg shadow-sm border border-yellow-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Important Dates
+          </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bid Start Date
+                </label>
+                <input
+                  type="date"
+                  name="bid_start_date"
+                  value={formData.bid_start_date}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bid End Date
+                </label>
+                <input
+                  type="date"
+                  name="bid_end_date"
+                  value={formData.bid_end_date}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bid Open Date
+                </label>
+                <input
+                  type="date"
+                  name="bid_open_date"
+                  value={formData.bid_open_date}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bid Validity Days
+                </label>
+                <input
+                  type="number"
+                  name="bid_validity_days"
+                  value={formData.bid_validity_days}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+        {/* Financial Details */}
+        <div className="bg-orange-50 rounded-lg shadow-sm border border-orange-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Financial Details
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estimated Bid Value (₹)
+                </label>
+                <input
+                  type="number"
+                  name="estimated_bid_value"
+                  value={formData.estimated_bid_value}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Bid Value (₹)
+                </label>
+                <input
+                  type="number"
+                  name="bid_value"
+                  value={formData.bid_value}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  EMD Required
+                </label>
+                <select
+                  name="emd_required"
+                  value={formData.emd_required}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+
+              {formData.emd_required === "yes" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    EMD Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    name="emd_amount"
+                    value={formData.emd_amount}
+                    onChange={handleChange}
+                    step="0.01"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  EPBG Percentage
+                </label>
+                <input
+                  type="number"
+                  name="epbg_percentage"
+                  value={formData.epbg_percentage}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  EPBG Duration (Months)
+                </label>
+                <input
+                  type="number"
+                  name="epbg_duration_months"
+                  value={formData.epbg_duration_months}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+        {/* Assignment */}
+        <div className="bg-teal-50 rounded-lg shadow-sm border border-teal-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Assignment
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Assigned Employee
+                </label>
+                <select
+                  name="assigned_employee_id"
+                  value={formData.assigned_employee_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Employee</option>
+                  {employees.map((emp) => (
+                    <option key={emp.empId} value={emp.empId}>
+                      {emp.username}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Link DD/BG
+                </label>
+                <input
+                  type="number"
+                  name="dd_id"
+                  value={formData.dd_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter DD/BG ID"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Total Quantity
+                </label>
+                <input
+                  type="number"
+                  name="total_quantity"
+                  value={formData.total_quantity}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Delivery Days
+                </label>
+                <input
+                  type="number"
+                  name="delivery_days"
+                  value={formData.delivery_days}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Experience Required (Years)
+                </label>
+                <input
+                  type="number"
+                  name="experience_required_years"
+                  value={formData.experience_required_years}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reverse Auction
+                </label>
+                <select
+                  name="reverse_auction"
+                  value={formData.reverse_auction}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Inspection Required
+                </label>
+                <select
+                  name="inspection_required"
+                  value={formData.inspection_required}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+        {/* Remarks */}
+        <div className="bg-gray-50 rounded-lg shadow-sm border border-gray-200 p-6">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Remarks
+            </label>
+            <textarea
+              name="remarks"
+              value={formData.remarks}
+              onChange={handleChange}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
         {/* Submit Button */}
-        <div className="flex justify-end gap-3 pt-6">
+        <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
           <button
             type="button"
             onClick={() => router.push(`/gem-dashboard/gem-crm/bids/${params.bid_id}`)}
