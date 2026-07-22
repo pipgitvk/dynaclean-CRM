@@ -164,7 +164,8 @@ export default async function TLFollowupPage({ params }) {
         customerId={customerId} 
         customerData={customer}
         isAdmin={false}
-        currentStage={latestTLFollowup?.stage || "New"}
+        latestfollowup={latestTLFollowup ? { ...latestTLFollowup, status: customer.status, stage: customer.stage } : { status: customer.status, stage: customer.stage }}
+        currentStage={customer.stage || "New"}
       />
     </div>
   );

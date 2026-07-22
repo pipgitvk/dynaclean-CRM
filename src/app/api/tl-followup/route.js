@@ -115,12 +115,11 @@ export async function POST(request) {
       );
     }
 
-    // Fetch last follow-up: use its estimated_order_date, lead_quality_score, model for new record
+    // Fetch last follow-up: use its estimated_order_date, model for new record (but NOT lead_quality_score)
     let lastEstimatedOrderDate = null;
-    let lastLeadQualityScore = null;
     let lastModel = null;
     const [lastRows] = await connection.execute(
-      `SELECT estimated_order_date, lead_quality_score, model
+      `SELECT estimated_order_date, model
        FROM TL_followups
        WHERE customer_id = ?
        ORDER BY created_at DESC
@@ -129,12 +128,11 @@ export async function POST(request) {
     );
     if (lastRows && lastRows.length > 0) {
       lastEstimatedOrderDate = lastRows[0].estimated_order_date;
-      lastLeadQualityScore = lastRows[0].lead_quality_score;
       lastModel = lastRows[0].model;
     }
 
     const finalEstimatedOrderDate = lastEstimatedOrderDate != null ? lastEstimatedOrderDate : (estimatedOrderDateUTC || null);
-    const finalLeadQualityScore = lastLeadQualityScore ?? lead_quality_score ?? null;
+    const finalLeadQualityScore = lead_quality_score ?? null;  // Always use the current input
     const finalModel = (model && String(model).trim()) ? model : (lastModel || null);
 
     // Start transaction to update both tables

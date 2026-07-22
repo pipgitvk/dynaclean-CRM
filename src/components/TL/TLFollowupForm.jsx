@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Save, X } from "lucide-react";
+import { Calendar, Save, X, Search } from "lucide-react";
 import {
   getTlTagOptions,
   getTlMultiTagChipClass,
@@ -20,6 +20,9 @@ export default function TLFollowupForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [customerCurrentStage, setCustomerCurrentStage] = useState("New");
+  const [productSuggestions, setProductSuggestions] = useState([]);
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const [modelSearchInput, setModelSearchInput] = useState("");
   console.log("customer Data in Tl follow", customerData);
 
   // ✅ Format datetime for <input type="datetime-local"> in IST (Asia/Kolkata)
@@ -126,6 +129,7 @@ export default function TLFollowupForm({
       assigned_employee:
         latestfollowup.assigned_employee || prev.assigned_employee,
     }));
+    setModelSearchInput(latestfollowup.model || "");
   }, [latestfollowup]);
 
   // Filter stages based on customer's current stage from database
@@ -156,6 +160,40 @@ export default function TLFollowupForm({
       ...prev,
       [name]: value,
     }));
+  };
+
+  // Search for product suggestions
+  const handleModelSearch = async (searchTerm) => {
+    setModelSearchInput(searchTerm);
+    
+    if (searchTerm.length < 2) {
+      setProductSuggestions([]);
+      setShowProductSuggestions(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/products/search?q=${encodeURIComponent(searchTerm)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProductSuggestions(data);
+        setShowProductSuggestions(true);
+      }
+    } catch (err) {
+      console.error("Error searching products:", err);
+    }
+  };
+
+  // Handle product selection from suggestions
+  const handleSelectProduct = (product) => {
+    const productLabel = `${product.item_code} - ${product.item_name}`;
+    setFormData((prev) => ({
+      ...prev,
+      model: productLabel,
+    }));
+    setModelSearchInput(productLabel);
+    setShowProductSuggestions(false);
+    setProductSuggestions([]);
   };
 
   const handleTagChange = (tag) => {
@@ -303,17 +341,56 @@ export default function TLFollowupForm({
           </div>
 
           {/* Model */}
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Model
             </label>
+            <div className="relative">
+              <div className="flex items-center border border-gray-300 rounded-md focus-within:ring-2 focus-within:ring-blue-500">
+                <Search size={16} className="ml-3 text-gray-400" />
+                <input
+                  type="text"
+                  value={modelSearchInput}
+                  onChange={(e) => handleModelSearch(e.target.value)}
+                  onFocus={() => modelSearchInput.length >= 2 && setShowProductSuggestions(true)}
+                  placeholder="Search product code or name..."
+                  className="flex-1 px-3 py-2 border-0 outline-none focus:ring-0"
+                />
+              </div>
+              
+              {/* Product Suggestions Dropdown */}
+              {showProductSuggestions && productSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+                  {productSuggestions.map((product) => (
+                    <button
+                      key={product.item_code}
+                      type="button"
+                      onClick={() => handleSelectProduct(product)}
+                      className="w-full text-left px-4 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 transition-colors"
+                    >
+                      <div className="font-semibold text-gray-800">{product.item_code}</div>
+                      <div className="text-sm text-gray-600">{product.item_name}</div>
+                      {product.product_number && (
+                        <div className="text-xs text-gray-500">Product #: {product.product_number}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* No Results Message */}
+              {showProductSuggestions && modelSearchInput.length >= 2 && productSuggestions.length === 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-10 p-3 text-center text-gray-600">
+                  No products found
+                </div>
+              )}
+            </div>
+
+            {/* Hidden input to store model value for form submission */}
             <input
-              type="text"
+              type="hidden"
               name="model"
               value={formData.model}
-              onChange={handleChange}
-              placeholder="Product / Model name"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
