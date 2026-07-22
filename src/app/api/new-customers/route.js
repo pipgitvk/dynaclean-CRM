@@ -22,7 +22,7 @@ export async function POST(req) {
     const createdby = payload.username;
 
     const data = await req.formData();
-    const fields = Object.fromEntries(data.entries());
+    const fields = Object.fromEntries(data.entries());  
 
     // ✅ Handle visiting card uploads
     const cards = [];

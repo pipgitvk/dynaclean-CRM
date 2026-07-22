@@ -161,11 +161,15 @@ async function importLeadToCRM(lead, assignedTo) {
   const normalizedPhone = normalizePhone(lead.phone);
   const phoneToStore = (normalizedPhone && normalizedPhone.length === 10) ? normalizedPhone : lead.phone;
   
+  // ✅ Calculate next_followup_date: now + 2 hours
+  const nextFollowupDate = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  
   const [customerResult] = await conn.execute(
     `INSERT INTO customers (
         first_name, email, phone, address, lead_campaign,
-        lead_source, sales_representative, assigned_to, status, date_created, products_interest
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        lead_source, sales_representative, assigned_to, status, date_created, products_interest,
+        next_follow_date
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       lead.first_name,
       lead.email,
@@ -177,7 +181,8 @@ async function importLeadToCRM(lead, assignedTo) {
       'Automatic',
       'New',
       now,
-      lead.products_interest || ''
+      lead.products_interest || '',
+      nextFollowupDate
     ]
   );
   
@@ -192,12 +197,26 @@ async function importLeadToCRM(lead, assignedTo) {
       customerId,
       lead.first_name,
       phoneToStore,
-      null,
+      nextFollowupDate,
       assignedTo,
       now,
       'Facebook',
       'Lead from Facebook ad (multi-credential)',
       lead.email || ''
+    ]
+  );
+
+  // ✅ Insert into TL_followups table with next_followup_date = followed_date + 2 hours
+  await conn.execute(
+    `INSERT INTO TL_followups (
+        customer_id, followed_date, next_followup_date, followed_by, notes
+      ) VALUES (?, ?, ?, ?, ?)`,
+    [
+      customerId,
+      now,
+      nextFollowupDate,
+      assignedTo,
+      'Lead from Facebook ad (multi-credential)'
     ]
   );
   
