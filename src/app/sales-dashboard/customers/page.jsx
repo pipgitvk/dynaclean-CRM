@@ -37,6 +37,8 @@ export default async function CustomersPage({ searchParams }) {
     employee,
     tags,
     filter,
+    reporting_date_from,
+    reporting_date_to,
     page = '1'
   } = searchParamsResolved;
 
@@ -166,6 +168,12 @@ export default async function CustomersPage({ searchParams }) {
     customerParams.push(date_from, date_to);
   }
 
+  if (reporting_date_from && reporting_date_to) {
+    const reportingTable = filter === "today_reporting" ? "tlf" : "tl_report";
+    customerConditions.push(`DATE(${reportingTable}.next_followup_date) BETWEEN ? AND ?`);
+    customerParams.push(reporting_date_from, reporting_date_to);
+  }
+
   // Combine all WHERE clauses
   let allWhereConditions = [...customerConditions];
   if (followupConditions.length > 0) {
@@ -233,6 +241,24 @@ export default async function CustomersPage({ searchParams }) {
     let countSql = `
       SELECT COUNT(*) as total
       FROM customers c
+      ${filter === "today_reporting" ? "" : `
+      LEFT JOIN (
+        SELECT 
+          customer_id,
+          multi_tag,
+          next_followup_date,
+          notes,
+          ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY time_stamp DESC) AS rn
+        FROM customers_followup
+      ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
+      `}
+      LEFT JOIN (
+        SELECT 
+          customer_id,
+          next_followup_date,
+          ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY id DESC) AS rn
+        FROM TL_followups
+      ) tl_report ON c.customer_id = tl_report.customer_id AND tl_report.rn = 1
       ${joinClause}
       WHERE ${whereClauseString}
     `;

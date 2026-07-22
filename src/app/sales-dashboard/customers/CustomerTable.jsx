@@ -36,6 +36,8 @@ export default function CustomerTable({
     search: searchParams.search ?? "",
     date_from: searchParams.date_from ?? "",
     date_to: searchParams.date_to ?? "",
+    reporting_date_from: searchParams.reporting_date_from ?? "",
+    reporting_date_to: searchParams.reporting_date_to ?? "",
     sort: searchParams.sort ?? "", // ✅ empty unless explicitly set
     status: normalizeStatusFromParams(searchParams.status ?? ""),
     stage: searchParams.stage ?? "",
@@ -58,6 +60,8 @@ export default function CustomerTable({
       search: searchParams.search ?? "",
       date_from: searchParams.date_from ?? "",
       date_to: searchParams.date_to ?? "",
+      reporting_date_from: searchParams.reporting_date_from ?? "",
+      reporting_date_to: searchParams.reporting_date_to ?? "",
       sort: searchParams.sort ?? "",
       status: normalizeStatusFromParams(searchParams.status ?? ""),
       stage: searchParams.stage ?? "",
@@ -74,6 +78,8 @@ export default function CustomerTable({
       search: "",
       date_from: "",
       date_to: "",
+      reporting_date_from: "",
+      reporting_date_to: "",
       sort: "date_created", // ✅ fallback sort on reset
       status: "",
       stage: "",
@@ -283,13 +289,37 @@ export default function CustomerTable({
             ))}
           </select>
         )}
-
+      </div>
+      
+      {/* Second row for Reset and Reporting Date Filters */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-2">
         <button
           onClick={resetFilters}
-          className="p-2 border rounded bg-red-100 hover:bg-red-200 w-full"
+          className="p-2 px-8 border rounded bg-red-100 hover:bg-red-200 w-full sm:w-auto"
         >
           Reset
         </button>
+        
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-col gap-1 w-full sm:w-auto">
+            <label className="text-xs text-gray-700 font-medium">Reporting From</label>
+            <input
+              type="date"
+              value={filters.reporting_date_from}
+              onChange={(e) => update("reporting_date_from", e.target.value)}
+              className="p-2 border rounded w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1 w-full sm:w-auto">
+            <label className="text-xs text-gray-700 font-medium">Reporting To</label>
+            <input
+              type="date"
+              value={filters.reporting_date_to}
+              onChange={(e) => update("reporting_date_to", e.target.value)}
+              className="p-2 border rounded w-full"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Row count */}
