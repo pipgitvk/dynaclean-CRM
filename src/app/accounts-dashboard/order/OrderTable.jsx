@@ -59,11 +59,39 @@ export default function OrderTable({ orders, userRole }) {
   const [dateTo, setDateTo] = useState("");
   const [createdByFilter, setCreatedByFilter] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
+  const [paymentPendingData, setPaymentPendingData] = useState({}); // Maps order_id to remaining amount
+  const [loadingPendingData, setLoadingPendingData] = useState(true);
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
   };
+
+  // Fetch payment pending data on component mount
+  useEffect(() => {
+    const fetchPaymentPendingData = async () => {
+      try {
+        setLoadingPendingData(true);
+        const res = await fetch("/api/reports/payment-pending");
+        const data = await res.json();
+        
+        if (data.success && data.orders) {
+          // Create a map of order_id to remaining amount
+          const pendingMap = {};
+          data.orders.forEach(order => {
+            pendingMap[order.order_id] = order.remaining_amount;
+          });
+          setPaymentPendingData(pendingMap);
+        }
+      } catch (error) {
+        console.error("Error fetching payment pending data:", error);
+      } finally {
+        setLoadingPendingData(false);
+      }
+    };
+
+    fetchPaymentPendingData();
+  }, []);
 
   // Filter orders based on search query, status filter, and date range
   useEffect(() => {
@@ -413,6 +441,7 @@ export default function OrderTable({ orders, userRole }) {
               <th className="px-3 py-3 font-semibold text-left">Payment Terms</th>
               <th className="px-3 py-3 font-semibold text-center">Status</th>
               <th className="px-3 py-3 font-semibold text-center">Payment</th>
+              <th className="px-3 py-3 font-semibold text-center">Payment Pending</th>
               <th className="px-3 py-3 font-semibold text-center">Due Date</th>
               {/* {canShowInstall && (
                 <th className="px-3 py-3 font-semibold text-center">Install</th>
@@ -506,6 +535,17 @@ export default function OrderTable({ orders, userRole }) {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-center">
+                      {loadingPendingData ? (
+                        <span className="text-gray-400 text-xs">Loading...</span>
+                      ) : paymentPendingData[r.order_id] ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          ₹{paymentPendingData[r.order_id].toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-center">
                       {dayjs(r.duedate).format("DD/MM/YYYY")}
                     </td>
                     {/* {canShowInstall && (
@@ -528,7 +568,7 @@ export default function OrderTable({ orders, userRole }) {
               })
             ) : (
               <tr>
-                <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
                   No orders found.
                 </td>
               </tr>
@@ -592,6 +632,18 @@ export default function OrderTable({ orders, userRole }) {
                 </div>
                 <div>
                   <strong>Location:</strong> {r.state}
+                </div>
+                <div>
+                  <strong>Payment Pending:</strong>{" "}
+                  {loadingPendingData ? (
+                    <span className="text-gray-400 text-xs">Loading...</span>
+                  ) : paymentPendingData[r.order_id] ? (
+                    <span className="font-semibold text-red-600">
+                      ₹{paymentPendingData[r.order_id].toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
                 </div>
               </div>
             );
