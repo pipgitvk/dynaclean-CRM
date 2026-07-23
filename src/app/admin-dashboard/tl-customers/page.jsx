@@ -29,12 +29,14 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     lead_campaign,
     page = "1",
     tlOnly = "true",
+    preBookingOnly = "false",
   } = searchParamsResolved;
 
   const currentPage = parseInt(page);
   const pageSize = 50; // Number of records per page
   const offset = (currentPage - 1) * pageSize;
   const showTLOnly = tlOnly === "true";
+  const showPreBookingOnly = preBookingOnly === "true";
   const sqlNextForDateFilter = SQL_EFFECTIVE_NEXT_FOLLOWUP;
 
   const conn = await getDbConnection();
@@ -56,7 +58,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
       tlf.followed_by as tl_followed_by,
-      ${showTLOnly ? "fu.followup_start_at" : "NULL AS followup_start_at"}
+      ${showTLOnly ? "fu.followup_start_at" : "NULL AS followup_start_at"},
+      pb.customer_id as has_pre_booking
     FROM customers c
     LEFT JOIN (
       SELECT customer_id, next_followup_date, followed_date, notes, followed_by, multi_tag,
@@ -68,6 +71,9 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
+    LEFT JOIN (
+      SELECT DISTINCT customer_id FROM pre_booking
+    ) pb ON c.customer_id = pb.customer_id
     ${showTLOnly ? `LEFT JOIN (
       SELECT customer_id, MIN(dt) AS followup_start_at
       FROM (
@@ -127,6 +133,11 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   // When ON: show only customers that have TL_followups rows
   if (showTLOnly) {
     query += ` AND tlf.customer_id IS NOT NULL`;
+  }
+
+  // When ON: show only customers that have pre_booking rows
+  if (showPreBookingOnly) {
+    query += ` AND pb.customer_id IS NOT NULL`;
   }
 
   // TL mode: TL next stored as UTC in prod — bounds must be IST calendar day → UTC.
@@ -195,7 +206,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       tlf.followed_date as tl_followed_date,
       tlf.customer_id as tl_customer_id,
       cf.next_followup_date as latest_next_followup,
-      cf.followed_date as latest_followed_date
+      cf.followed_date as latest_followed_date,
+      pb.customer_id as has_pre_booking
     FROM customers c
     LEFT JOIN (
       SELECT customer_id, next_followup_date, followed_date, multi_tag,
@@ -207,6 +219,9 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
+    LEFT JOIN (
+      SELECT DISTINCT customer_id FROM pre_booking
+    ) pb ON c.customer_id = pb.customer_id
     WHERE 1=1
   `;
 
@@ -250,6 +265,10 @@ export default async function AdminTLCustomersPage({ searchParams }) {
 
   if (showTLOnly) {
     kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
+  }
+
+  if (showPreBookingOnly) {
+    kpiQuery += ` AND pb.customer_id IS NOT NULL`;
   }
 
   if (nextFromDate && nextToDate) {
@@ -326,6 +345,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
         pageSize={pageSize}
         isAdmin={true}
         tlOnly={showTLOnly}
+        preBookingOnly={showPreBookingOnly}
         isSuperAdmin={isSuperAdmin}
       />
     </div>

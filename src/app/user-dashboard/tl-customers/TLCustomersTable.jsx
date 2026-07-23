@@ -38,6 +38,7 @@ export default function TLCustomersTable({
   pageSize = 50,
   isAdmin = false,
   tlOnly = true,
+  preBookingOnly = false,
   isSuperAdmin = false,
 }) {
   const router = useRouter();
@@ -758,6 +759,51 @@ export default function TLCustomersTable({
                     }`}
                   >
                     {tlOnly ? "ON" : "OFF"}
+                  </span>
+                </div>
+
+                {/* Pre-Booking Toggle */}
+                <div className="ml-4 flex items-center gap-2 border-l pl-4">
+                  <label className="text-sm font-medium text-gray-700">
+                    Pre-Booking Only:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      startTransition(() => {
+                        const params = new URLSearchParams();
+                        if (searchTerm) params.set("search", searchTerm);
+                        if (selectedEmployee)
+                          params.set("employee", selectedEmployee);
+                        if (selectedStatus)
+                          params.set("status", selectedStatus);
+                        if (selectedStage) params.set("stage", selectedStage);
+                        if (selectedTag) params.set("tag", selectedTag);
+                        if (nextFromDate)
+                          params.set("nextFromDate", nextFromDate);
+                        if (nextToDate) params.set("nextToDate", nextToDate);
+                        if (tlOnly) params.set("tlOnly", "true");
+                        params.set("preBookingOnly", preBookingOnly ? "false" : "true");
+                        router.push(`${basePath}?${params.toString()}`);
+                      });
+                    }}
+                    disabled={isPending}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      preBookingOnly ? "bg-green-600" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        preBookingOnly ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                  <span
+                    className={`text-xs font-semibold ${
+                      preBookingOnly ? "text-green-600" : "text-gray-500"
+                    }`}
+                  >
+                    {preBookingOnly ? "ON" : "OFF"}
                   </span>
                 </div>
               </div>
