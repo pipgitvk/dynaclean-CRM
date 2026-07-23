@@ -8,7 +8,8 @@ import UpdateReportButton from "@/components/UpdateReportButton";
 export const dynamic = "force-dynamic";
 
 export default async function CompleteServicePage({ params }) {
-  const serviceId = params.service_id;
+  const { service_id } = await params;
+  const serviceId = service_id;
   const conn = await getDbConnection();
 
   const [[service]] = await conn.execute(

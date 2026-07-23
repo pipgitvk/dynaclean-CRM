@@ -19,7 +19,7 @@ async function getServiceReportData(serviceId) {
 }
 
 export default async function ServiceReportPage({ params }) {
-  const { service_id } = params;
+  const { service_id } = await params;
 
   let reportData = null;
   let error = null;

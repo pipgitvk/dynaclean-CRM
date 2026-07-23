@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 
-export default function UpdateServicePage({ params }) {
+export default function UpdateServicePage() {
   const router = useRouter();
-  const serviceId = params.service_id;
+  const { service_id } = useParams();
+  const serviceId = service_id;
 
   const [companyCost, setCompanyCost] = useState("");
 

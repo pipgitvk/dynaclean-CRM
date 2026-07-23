@@ -38,7 +38,7 @@ export async function updateServiceAssignment(formData) {
 
 // Page Component
 export default async function AssignServicePage({ params, searchParams }) {
-  const service_id = params.service_id;
+  const { service_id } = await params;
   const message = searchParams?.message || "";
 
   let engineers = [];

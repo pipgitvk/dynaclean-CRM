@@ -2,12 +2,12 @@
 "use client"; // This makes it a Client Component
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast"; // For notifications
 
-export default function ServiceReportPage({ params }) {
-  const { service_id } = params;
+export default function ServiceReportPage() {
+  const { service_id } = useParams();
   const router = useRouter();
   const [serviceData, setServiceData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);

@@ -2,13 +2,13 @@
 "use client"; // This makes it a Client Component
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form"; // For easier form handling and validation
 import toast from "react-hot-toast"; // For better success/error messages
 
-export default function UpdateServiceRecordPage({ params }) {
-  const { service_id } = params;
+export default function UpdateServiceRecordPage() {
+  const { service_id } = useParams();
   const router = useRouter();
   const [serviceData, setServiceData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
