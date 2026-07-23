@@ -795,7 +795,8 @@ export default function TLCustomersTable({
                           if (nextFromDate)
                             params.set("nextFromDate", nextFromDate);
                           if (nextToDate) params.set("nextToDate", nextToDate);
-                          if (tlOnly) params.set("tlOnly", "true");
+                          // Keep tlOnly state unchanged - only toggle preBookingOnly
+                          params.set("tlOnly", tlOnly ? "true" : "false");
                           params.set("preBookingOnly", preBookingOnly ? "false" : "true");
                           router.push(`${basePath}?${params.toString()}`);
                         });
