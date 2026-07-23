@@ -210,12 +210,19 @@ export default function TLCustomersTable({
 
   // denied customer not show
   const allowCustomerByStatus = (customer) => {
-    // Show Denied or Invalid ONLY when explicitly selected
-    if (selectedStatus === "Denied") {
-      return customer.status === "Denied";
-    }
-    if (selectedStatus === "Invalid") {
-      return customer.status === "Invalid";
+    // When tlOnly is OFF, superadmin can see Denied/Invalid leads
+    if (!tlOnly && isSuperAdmin) {
+      // If no status filter selected (All Statuses), show everything
+      if (!selectedStatus) {
+        return true;
+      }
+      // Show Denied or Invalid ONLY when explicitly selected
+      if (selectedStatus === "Denied") {
+        return customer.status === "Denied";
+      }
+      if (selectedStatus === "Invalid") {
+        return customer.status === "Invalid";
+      }
     }
 
     // Otherwise hide Denied and Invalid
@@ -556,8 +563,7 @@ export default function TLCustomersTable({
                       "Very Good",
                       "Average",
                       "Poor",
-                      "Denied",
-                      "Invalid",
+                      ...(!tlOnly && isSuperAdmin ? ["Denied", "Invalid"] : []),
                       "old_reassign",
                     ].map((s) => {
                       const statusCounts = getStatusCounts();
