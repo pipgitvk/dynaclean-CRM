@@ -939,8 +939,7 @@ export default function TLCustomersTable({
             {activeFilter === "due" && "Overdue follow-ups"}
             {activeFilter === "prime" && "Prime customers"}
           </p>
-          {/* Pre-Booking button commented out - moved to individual customer page */}
-          {/* {isSuperAdmin && (
+          {isSuperAdmin && (
             <button
               onClick={() => setPreBookingModal({ isOpen: true, customerId: null, customerName: null })}
               className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-md hover:shadow-lg"
@@ -948,7 +947,7 @@ export default function TLCustomersTable({
               <UserPlus size={18} />
               Pre-Booking
             </button>
-          )} */}
+          )}
         </div>
       </div>
 
