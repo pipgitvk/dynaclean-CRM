@@ -189,9 +189,13 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   const totalRecords = countResult[0].total;
   const totalPages = Math.ceil(totalRecords / pageSize);
 
-  // Add pagination to main query
-  query += ` ORDER BY c.date_created DESC LIMIT ? OFFSET ?`;
-  params.push(pageSize, offset);
+  // Add pagination to main query - but if preBookingOnly, fetch all records
+  if (showPreBookingOnly) {
+    query += ` ORDER BY c.date_created DESC`;
+  } else {
+    query += ` ORDER BY c.date_created DESC LIMIT ? OFFSET ?`;
+    params.push(pageSize, offset);
+  }
 
   const [customers] = await conn.execute(query, params);
 

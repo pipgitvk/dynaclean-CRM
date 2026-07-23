@@ -26,7 +26,6 @@ import {
 import TLCustomerFollowUpCards from "@/components/TL/TLCustomerFollowUpCards";
 import PreBookingModal from "@/components/PreBookingModal";
 import PreBookingColumn from "@/components/PreBookingColumn";
-import PreBookingTableView from "@/components/PreBookingTableView";
 
 export default function TLCustomersTable({
   customers,
@@ -83,10 +82,16 @@ export default function TLCustomersTable({
 
   const getFilteredCustomers = () => {
     const now = dayjs();
+    
+    // If pre-booking toggle is ON, show only customers with pre-booking data
+    let baseCustomers = customers;
+    if (preBookingOnly) {
+      baseCustomers = customers.filter((customer) => customer.has_pre_booking);
+    }
 
     switch (activeFilter) {
       case "upcoming":
-        return customers.filter(
+        return baseCustomers.filter(
           (customer) =>
             allowCustomerByStatus(customer) &&
             customer.multi_tag &&
@@ -94,7 +99,7 @@ export default function TLCustomersTable({
         );
 
       case "due":
-        return customers.filter((customer) => {
+        return baseCustomers.filter((customer) => {
           if (!allowCustomerByStatus(customer)) return false;
 
           // Exclude closed stages
@@ -112,7 +117,7 @@ export default function TLCustomersTable({
         });
 
       case "prime":
-        return customers.filter(
+        return baseCustomers.filter(
           (customer) =>
             allowCustomerByStatus(customer) &&
             customer.multi_tag &&
@@ -120,7 +125,7 @@ export default function TLCustomersTable({
         );
 
       default:
-        return customers.filter((customer) => allowCustomerByStatus(customer));
+        return baseCustomers.filter((customer) => allowCustomerByStatus(customer));
     }
   };
 
@@ -946,22 +951,19 @@ export default function TLCustomersTable({
         </div>
       </div>
 
-      {/* Show Pre-Booking Table when toggle is ON */}
-      {preBookingOnly ? (
-        <PreBookingTableView basePath={basePath} />
-      ) : (
-        <>
-          {isAdmin && tlOnly && isSuperAdmin ? (
-            <TLCustomerFollowUpCards
-              customers={getFilteredCustomers()}
-              basePath={basePath}
-              queryString={queryString}
-              useLatestNextFollowup
-            />
-          ) : null}
+      {/* Table - shows all customers, or only pre-booking customers when toggle is ON */}
+      <>
+        {isAdmin && tlOnly && isSuperAdmin ? (
+          <TLCustomerFollowUpCards
+            customers={getFilteredCustomers()}
+            basePath={basePath}
+            queryString={queryString}
+            useLatestNextFollowup
+          />
+        ) : null}
 
-          {/* Table */}
-          <div className="overflow-x-auto relative">
+        {/* Table */}
+        <div className="overflow-x-auto relative">
         {isPending && (
           <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
             <div className="flex flex-col items-center gap-2">
@@ -1413,8 +1415,7 @@ export default function TLCustomersTable({
           </div>
         </div>
       </div>
-        </>
-      )}
+      </>
 
       {/* Pre-Booking Modal */}
       <PreBookingModal
