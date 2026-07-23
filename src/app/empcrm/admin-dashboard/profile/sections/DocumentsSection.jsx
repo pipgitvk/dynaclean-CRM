@@ -339,25 +339,16 @@ export default function DocumentsSection({
                   <div key={doc.key} className="p-3 bg-white border rounded-md hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <label className={`flex items-start gap-2 ${ro ? "cursor-default" : "cursor-pointer"}`}>
-                          <input
-                            type="checkbox"
-                            checked={documents[doc.key] || false}
-                            onChange={() => handleDocumentCheckbox(doc.key)}
-                            disabled={ro}
-                            className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 disabled:opacity-60"
-                          />
-                          <div>
-                            <span className="text-sm font-medium text-gray-700 block truncate" title={doc.label}>
-                              {doc.label} {doc.required && <span className="text-red-500">*</span>}
+                        <div>
+                          <span className="text-sm font-medium text-gray-700 block truncate" title={doc.label}>
+                            {doc.label} {doc.required && <span className="text-red-500">*</span>}
+                          </span>
+                          {(documents[doc.key] || files[doc.key]) && (
+                            <span className="text-xs text-green-600 flex items-center gap-1 mt-0.5">
+                              <CheckCircle className="w-3 h-3" /> Selected
                             </span>
-                            {(documents[doc.key] || files[doc.key]) && (
-                              <span className="text-xs text-green-600 flex items-center gap-1 mt-0.5">
-                                <CheckCircle className="w-3 h-3" /> Selected
-                              </span>
-                            )}
-                          </div>
-                        </label>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
