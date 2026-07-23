@@ -30,6 +30,15 @@ function createMysqlPool() {
   const DB_PASSWORD = process.env.DB_PASSWORD || "";
   const DB_NAME = requiredEnv("DB_NAME");
 
+
+
+  console.log({
+    host: DB_HOST,
+    user: DB_USER,
+    database: DB_NAME,
+    passwordLength: DB_PASSWORD.length,
+  });
+
   const pool = mysql.createPool({
     host: DB_HOST,
     user: DB_USER,

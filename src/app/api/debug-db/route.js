@@ -2,29 +2,55 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    const conn = await getDbConnection();
-    const [dbNameResult] = await conn.query("SELECT DATABASE() AS current_db");
-    const currentDb = dbNameResult[0].current_db;
+    const db = await getDbConnection();
 
-    const [testRecords] = await conn.query(
-      "SELECT * FROM service_records WHERE service_id IN (235178, 235175)"
-    );
+    const [dbInfo] = await db.query(`
+      SELECT 
+        DATABASE() AS db,
+        @@hostname AS mysqlHost,
+        @@server_id AS serverId,
+        @@port AS mysqlPort,
+        NOW() AS nowTime,
+        CURDATE() AS today
+    `);
+
+    const [latest] = await db.query(`
+      SELECT id, username, date, checkin_time, created_at
+      FROM attendance_logs
+      ORDER BY id DESC
+      LIMIT 10
+    `);
+
+    const [sakshi] = await db.query(`
+      SELECT id, username, date, checkin_time, created_at
+      FROM attendance_logs
+      WHERE username = 'sakshi'
+      ORDER BY id DESC
+      LIMIT 10
+    `);
 
     return NextResponse.json({
       success: true,
-      current_database: currentDb,
-      test_records_found: testRecords.length,
-      test_records: testRecords
+      dbInfo: dbInfo[0],
+      latest,
+      sakshi,
+      envHost: process.env.DB_HOST,
+      envDb: process.env.DB_NAME,
+      envUser: process.env.DB_USER,
     });
   } catch (error) {
-    console.error("❌ Debug API Error:", error);
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: error.message,
+        code: error.code || null,
+        sqlMessage: error.sqlMessage || null,
+      },
+      { status: 500 }
+    );
   }
 }
-
