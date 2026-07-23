@@ -109,10 +109,20 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
   };
 
   const handleSelectSuggestion = (field, suggestion) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: suggestion.id,
-    }));
+    setFormData((prev) => {
+      const newData = {
+        ...prev,
+        [field]: suggestion.id,
+      };
+
+      // Auto-populate item_code when product_name is selected
+      if (field === "product_name" && suggestion.item_code) {
+        newData.item_code = suggestion.item_code;
+        setSelectedSuggestions((prev) => ({ ...prev, item_code: true }));
+      }
+
+      return newData;
+    });
     setShowSuggestions((prev) => ({ ...prev, [field]: false }));
     setSuggestions((prev) => ({ ...prev, [field]: [] }));
     setSelectedSuggestions((prev) => ({ ...prev, [field]: true }));
@@ -267,8 +277,8 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
                 errors.customer_id && touched.customer_id
                   ? "border-red-500 focus:ring-red-500"
                   : "border-gray-300 focus:ring-blue-500"
-              }`}
-              disabled={loading}
+              } ${customerId ? "bg-gray-100 cursor-not-allowed" : ""}`}
+              disabled={loading || !!customerId}
               autoComplete="off"
             />
             
@@ -366,8 +376,8 @@ export default function PreBookingModal({ isOpen, onClose, customerId, customerN
                 errors.item_code && touched.item_code
                   ? "border-red-500 focus:ring-red-500"
                   : "border-gray-300 focus:ring-blue-500"
-              }`}
-              disabled={loading}
+              } ${selectedSuggestions.item_code ? "bg-gray-100 cursor-not-allowed" : ""}`}
+              disabled={loading || selectedSuggestions.item_code}
               autoComplete="off"
             />
             

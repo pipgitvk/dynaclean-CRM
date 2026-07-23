@@ -26,6 +26,7 @@ import {
 import TLCustomerFollowUpCards from "@/components/TL/TLCustomerFollowUpCards";
 import PreBookingModal from "@/components/PreBookingModal";
 import PreBookingColumn from "@/components/PreBookingColumn";
+import PreBookingTableView from "@/components/PreBookingTableView";
 
 export default function TLCustomersTable({
   customers,
@@ -932,7 +933,8 @@ export default function TLCustomersTable({
             {activeFilter === "due" && "Overdue follow-ups"}
             {activeFilter === "prime" && "Prime customers"}
           </p>
-          {isSuperAdmin && (
+          {/* Pre-Booking button commented out - moved to individual customer page */}
+          {/* {isSuperAdmin && (
             <button
               onClick={() => setPreBookingModal({ isOpen: true, customerId: null, customerName: null })}
               className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-md hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-md hover:shadow-lg"
@@ -940,21 +942,26 @@ export default function TLCustomersTable({
               <UserPlus size={18} />
               Pre-Booking
             </button>
-          )}
+          )} */}
         </div>
       </div>
 
-      {isAdmin && tlOnly && isSuperAdmin ? (
-        <TLCustomerFollowUpCards
-          customers={getFilteredCustomers()}
-          basePath={basePath}
-          queryString={queryString}
-          useLatestNextFollowup
-        />
-      ) : null}
+      {/* Show Pre-Booking Table when toggle is ON */}
+      {preBookingOnly ? (
+        <PreBookingTableView basePath={basePath} />
+      ) : (
+        <>
+          {isAdmin && tlOnly && isSuperAdmin ? (
+            <TLCustomerFollowUpCards
+              customers={getFilteredCustomers()}
+              basePath={basePath}
+              queryString={queryString}
+              useLatestNextFollowup
+            />
+          ) : null}
 
-      {/* Table */}
-      <div className="overflow-x-auto relative">
+          {/* Table */}
+          <div className="overflow-x-auto relative">
         {isPending && (
           <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
             <div className="flex flex-col items-center gap-2">
@@ -1406,6 +1413,8 @@ export default function TLCustomersTable({
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* Pre-Booking Modal */}
       <PreBookingModal

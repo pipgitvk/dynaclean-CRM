@@ -326,12 +326,20 @@ export default async function AdminTLCustomersPage({ searchParams }) {
         <h1 className="text-3xl font-bold text-gray-800">
           TL Customer Management (Admin)
         </h1>
-        <Link
-          href="/admin-dashboard/tl-customers/bulk-follow-uploads"
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
-        >
-          Bulk Follow Uploads
-        </Link>
+        <div className="flex gap-4">
+          <Link
+            href="/admin-dashboard/tl-customers/pre-booking"
+            className="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition font-medium"
+          >
+            📋 View Pre-Bookings
+          </Link>
+          <Link
+            href="/admin-dashboard/tl-customers/bulk-follow-uploads"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
+          >
+            Bulk Follow Uploads
+          </Link>
+        </div>
       </div>
 
       <TLCustomersTable
