@@ -36,10 +36,15 @@ export function reassignKeysImplyExperience(keys) {
 /**
  * Employee re-submit screen: show work experience UI if the profile is experienced OR HR asked for
  * experience corrections (even when is_experienced was wrongly stored as false).
+ * 
+ * HOWEVER: If employee explicitly selects "Fresher", don't show experience section even if HR marked fields.
+ * The employee's current choice takes precedence during re-submission.
  */
 export function effectiveExperiencedForEmployeeReassignUi(isExperienced, keys) {
   if (!isReassignFieldMode(keys)) return isExperienced;
-  return isExperienced || reassignKeysImplyExperience(keys);
+  // Employee's current selection takes precedence: if they selected Fresher (isExperienced=false), 
+  // don't show experience section even if HR asked for it
+  return isExperienced;
 }
 
 export function parseReassignKeys(raw) {
