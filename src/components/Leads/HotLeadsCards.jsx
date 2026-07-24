@@ -164,6 +164,13 @@ export default function HotLeadsCards({ leadSource }) {
   const processedLeads = (() => {
     let filtered = [...leads];
 
+    // Exclude invalid statuses
+    const invalidStatuses = ["invalid", "disqualified", "denied"];
+    filtered = filtered.filter((c) => {
+      const statusLower = (c.status || "").trim().toLowerCase();
+      return !invalidStatuses.includes(statusLower);
+    });
+
     // Exclude Disqualified / Invalid Lead stage
     filtered = filtered.filter(
       (c) => (c.stage || "").trim().toLowerCase() !== "disqualified / invalid lead"

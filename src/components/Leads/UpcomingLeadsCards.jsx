@@ -46,6 +46,13 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
   const processedLeads = (() => {
     let filtered = [...leads];
 
+    // Exclude invalid statuses (like 'Invalid', 'Disqualified', 'Denied')
+    const invalidStatuses = ["invalid", "disqualified", "denied"];
+    filtered = filtered.filter((c) => {
+      const statusLower = (c.status || "").trim().toLowerCase();
+      return !invalidStatuses.includes(statusLower);
+    });
+
     // For SERVICE SUPPORT, only show leads with service_next_followup set
     if (isServiceSupport) {
       filtered = filtered.filter((cust) => cust.service_next_followup);

@@ -44,7 +44,9 @@ FROM (
     ROW_NUMBER() OVER(PARTITION BY cf.customer_id ORDER BY cf.time_stamp DESC) AS rn
   FROM customers_followup cf
   INNER JOIN customers c ON cf.customer_id = c.customer_id
-  WHERE c.lead_source = ? AND c.status != 'DENIED'
+  WHERE c.lead_source = ? 
+    AND c.status NOT IN ('DENIED', 'Invalid', 'Disqualified')
+    AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
 ) AS T
 WHERE T.rn = 1
   AND (T.next_followup_date <= ? OR T.next_followup_date IS NULL);
