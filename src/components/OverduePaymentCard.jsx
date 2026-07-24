@@ -56,7 +56,7 @@ export default function OverduePaymentCard() {
   return (
     <Link
       href="/admin-dashboard/reports/payment-pendingiss"
-      className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white block"
+      className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white block hover:shadow-xl hover:scale-105 transform duration-200 transition-all"
     >
       <div className="flex flex-col h-full justify-between min-h-[160px]">
         <div>
@@ -75,12 +75,9 @@ export default function OverduePaymentCard() {
           </p>
         </div>
         <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-          <a
-            href="/admin-dashboard/reports/payment-pendingiss"
-            className="px-4 py-2 bg-white text-red-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
-          >
+          <span className="inline-block px-4 py-2 bg-white text-red-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg">
             View Details →
-          </a>
+          </span>
         </div>
       </div>
     </Link>
