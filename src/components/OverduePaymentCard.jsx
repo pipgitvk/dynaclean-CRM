@@ -47,18 +47,18 @@ export default function OverduePaymentCard() {
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white animate-pulse">
-        <div className="h-32 bg-white/10 rounded"></div>
+      <div className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white animate-pulse min-h-[160px]">
+        <div className="h-full bg-white/10 rounded"></div>
       </div>
     );
   }
 
   return (
     <Link
-      href="/admin-dashboard/reports/payment-pending"
-      className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white hover:shadow-xl transition-all duration-300 transform hover:scale-105 block min-h-[160px]"
+      href="/admin-dashboard/reports/payment-pendingiss"
+      className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white block"
     >
-      <div className="flex flex-col h-full justify-between">
+      <div className="flex flex-col h-full justify-between min-h-[160px]">
         <div>
           <div className="flex items-center gap-2 sm:gap-3">
             <AlertTriangle className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
@@ -75,9 +75,12 @@ export default function OverduePaymentCard() {
           </p>
         </div>
         <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-          <span className="px-4 py-2 bg-white text-red-600 rounded-lg font-bold text-lg inline-block hover:bg-gray-100 transition-colors shadow-lg">
+          <a
+            href="/admin-dashboard/reports/payment-pendingiss"
+            className="px-4 py-2 bg-white text-red-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
+          >
             View Details →
-          </span>
+          </a>
         </div>
       </div>
     </Link>
