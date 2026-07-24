@@ -298,7 +298,7 @@ export default function DeliveryChallanViewPage() {
             <h3 className="font-bold mb-1 underline text-[#000000]">Terms and Conditions</h3>
             <div className="space-y-1 mt-2 min-h-[60px] text-[#000000]">
               <p>Thanks for doing business with us!</p>
-              <p>{challan.remarks || "This is not for sale only use for Demo"}</p>
+              {/* <p>{challan.remarks || "This is not for sale only use for Demo"}</p> */}
             </div>
           </div>
 
