@@ -195,6 +195,7 @@ import { TextEncoder as NodeTextEncoder } from "util";
 import { getDbConnection } from "@/lib/db";
 import UpcomingTasks from "@/components/task/UpcomingTasksAdmin";
 import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
+import OverduePaymentCard from "@/components/OverduePaymentCard";
 import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText } from "lucide-react";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
@@ -321,6 +322,9 @@ export default async function UserDashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Overdue Payments Card */}
+          <OverduePaymentCard />
 
           {/* System Performance Dashboard */}
           <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
