@@ -916,6 +916,7 @@ export default function ProfileForm({
     setDocuments,
     files,
     setFiles,
+    setFormData,
     existingDocs: Array.isArray(formData.joining_form_documents) ? formData.joining_form_documents : [],
     existingPhotoUrl: formData.profile_photo || "",
     existingSignatureUrl: formData.signature || "",

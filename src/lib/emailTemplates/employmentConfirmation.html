@@ -1,147 +1,149 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employment Confirmation</title>
-</head>
- <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
-     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding: 30px 15px;">
-         <tr>
-             <td align="center">
-                  <table width="600" cellpadding="0" cellspacing="0" border="0"
-                        style="width: 100%; max-width: 600px; background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                      <!-- Header -->
-                     <tr>
-                         <td style="padding: 40px 40px 30px 40px; text-align: center; background-color: #FAFBFC; border-bottom: 1px solid #E8EAED;">
-                              <img src="https://app.dynacleanindustries.com/dynaclean_logo.png"
-                                  alt="DynaClean Industries"
-                                  width="160"
-                                  style="display: inline-block; margin-bottom: 15px;">
-                              <div style="width: 50px; height: 3px; background: linear-gradient(90deg, #FF8C42 0%, #FFB366 100%); margin: 15px auto 0 auto;"></div>
-                          </td>
-                     </tr>
-                      <!-- Main Content -->
-                     <tr>
-                         <td style="padding: 0 40px 40px 40px;">
-                              <!-- Heading Box -->
-                             <div style="background: linear-gradient(135deg, #FFF8F3 0%, #FFFBF7 100%); border-left: 5px solid #FF8C42; padding: 24px; margin: 30px 0 35px 0; border-radius: 6px;">
-                                  <h2 style="margin: 0; color: #1A202C; font-size: 24px; font-weight: 600; letter-spacing: -0.5px;">
-                                     Congratulations on Your Permanent Position!
-                                 </h2>
-                              </div>
-                              <p style="margin: 0 0 15px 0; color: #2C3E50; font-size: 16px; font-weight: 500;">
-                                 Dear {{employee_name}},
-                             </p>
-                              <p style="margin: 0 0 20px 0; color: #555555; font-size: 15px; line-height: 1.8;">
-                                 We are delighted to inform you that you have successfully completed your probation period. Based on your exceptional performance, dedication, and professionalism, your employment has been confirmed as a <strong>permanent member</strong> of DynaClean Industries.
-                             </p>
-                              <p style="margin: 0 0 30px 0; color: #555555; font-size: 15px; line-height: 1.8;">
-                                 Your confirmation is effective from <strong style="color: #27AE60;">{{confirmation_date}}</strong>. We are confident that you will continue to make valuable contributions to our organization.
-                             </p>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Employment Confirmation</title>
+    </head>
+    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F5F7FA;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="padding: 30px 15px;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" border="0"
+                            style="width: 100%; max-width: 600px; background-color: #FFFFFF; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                        <!-- Header -->
+                        <tr>
+                            <td style="padding: 40px 40px 30px 40px; text-align: center; background-color: #FAFBFC; border-bottom: 1px solid #E8EAED;">
+                                <img src="https://app.dynacleanindustries.com/dynaclean_logo.png"
+                                    alt="DynaClean Industries"
+                                    width="160"
+                                    style="display: inline-block; margin-bottom: 15px;">
+                                <div style="width: 50px; height: 3px; background: linear-gradient(90deg, #FF8C42 0%, #FFB366 100%); margin: 15px auto 0 auto;"></div>
+                            </td>
+                        </tr>
+                        <!-- Main Content -->
+                        <tr>
+                            <td style="padding: 0 40px 40px 40px;">
+                                <!-- Heading Box -->
+                                <div style="background: linear-gradient(135deg, #FFF8F3 0%, #FFFBF7 100%); border-left: 5px solid #FF8C42; padding: 24px; margin: 30px 0 35px 0; border-radius: 6px;">
+                                    <h2 style="margin: 0; color: #1A202C; font-size: 24px; font-weight: 600; letter-spacing: -0.5px;">
+                                        Congratulations on Your Permanent Position!
+                                    </h2>
+                                </div>
+                                <p style="margin: 0 0 15px 0; color: #2C3E50; font-size: 16px; font-weight: 500;">
+                                    Dear {{employee_name}},
+                                </p>
+                                <p style="margin: 0 0 20px 0; color: #555555; font-size: 15px; line-height: 1.8;">
+                                    We are delighted to inform you that you have successfully completed your probation period. Based on your exceptional performance, dedication, and professionalism, your employment has been confirmed as a <strong>permanent member</strong> of DynaClean Industries.
+                                </p>
+                                <p style="margin: 0 0 30px 0; color: #555555; font-size: 15px; line-height: 1.8;">
+                                    Your confirmation is effective from <strong style="color: #27AE60;">{{confirmation_date}}</strong>. We are confident that you will continue to make valuable contributions to our organization.
+                                </p>
 
-                              <!-- Employee Details - Professional Grid -->
-                             <div style="background-color: #F9FAFB; border: 1px solid #E8EAED; border-radius: 8px; overflow: hidden; margin: 30px 0;">
-                                  <!-- Row 1: Employee ID & Name -->
-                                 <div style="display: flex; border-bottom: 1px solid #E8EAED;">
-                                     <div style="flex: 1; padding: 16px 20px; border-right: 1px solid #E8EAED;">
-                                         <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Employee ID</div>
-                                         <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{employee_id}}</div>
-                                     </div>
-                                     <div style="flex: 1; padding: 16px 20px;">
-                                         <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Full Name</div>
-                                         <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{employee_name}}</div>
-                                     </div>
-                                 </div>
+                                <!-- Employee Details - Professional Grid -->
+                                <div style="background-color: #F9FAFB; border: 1px solid #E8EAED; border-radius: 8px; overflow: hidden; margin: 30px 0;">
+                                    <!-- Row 1: Employee ID & Name -->
+                                    <div style="display: flex; border-bottom: 1px solid #E8EAED;">
+                                        <div style="flex: 1; padding: 16px 20px; border-right: 1px solid #E8EAED;">
+                                            <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Employee ID</div>
+                                            <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{employee_id}}</div>
+                                        </div>
+                                        <div style="flex: 1; padding: 16px 20px;">
+                                            <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Full Name</div>
+                                            <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{employee_name}}</div>
+                                        </div>
+                                    </div>
 
-                                  <!-- Row 2: Designation & Department -->
-                                 <div style="display: flex; border-bottom: 1px solid #E8EAED;">
-                                     <div style="flex: 1; padding: 16px 20px; border-right: 1px solid #E8EAED;">
-                                         <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Designation</div>
-                                         <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{designation}}</div>
-                                     </div>
-                                     <div style="flex: 1; padding: 16px 20px;">
-                                         <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Department</div>
-                                         <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{department}}</div>
-                                     </div>
-                                 </div>
+                                    <!-- Row 2: Designation & Department -->
+                                    <div style="display: flex; border-bottom: 1px solid #E8EAED;">
+                                        <div style="flex: 1; padding: 16px 20px; border-right: 1px solid #E8EAED;">
+                                            <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Designation</div>
+                                            <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{designation}}</div>
+                                        </div>
+                                        <div style="flex: 1; padding: 16px 20px;">
+                                            <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Department</div>
+                                            <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{department}}</div>
+                                        </div>
+                                    </div>
 
-                                  <!-- Row 3: Joining & Confirmation Dates -->
-                                 <div style="display: flex;">
-                                     <div style="flex: 1; padding: 16px 20px; border-right: 1px solid #E8EAED;">
-                                         <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Joining Date</div>
-                                         <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{joining_date}}</div>
-                                     </div>
-                                     <div style="flex: 1; padding: 16px 20px;">
-                                         <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Confirmation Date</div>
-                                         <div style="font-size: 16px; color: #27AE60; font-weight: 700;">{{confirmation_date}}</div>
-                                     </div>
-                                 </div>
+                                    <!-- Row 3: Joining & Confirmation Dates -->
+                                    <div style="display: flex;">
+                                        <div style="flex: 1; padding: 16px 20px; border-right: 1px solid #E8EAED;">
+                                            <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Joining Date</div>
+                                            <div style="font-size: 16px; color: #2C3E50; font-weight: 600;">{{joining_date}}</div>
+                                        </div>
+                                        <div style="flex: 1; padding: 16px 20px;">
+                                            <div style="font-size: 12px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Confirmation Date</div>
+                                            <div style="font-size: 16px; color: #27AE60; font-weight: 700;">{{confirmation_date}}</div>
+                                        </div>
+                                    </div>
 
-                                  <!-- Employment Status -->
-                                 <div style="padding: 16px 20px; background-color: #E8F8F0;">
-                                     <div style="font-size: 12px; color: #27AE60; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">✓ Employment Status</div>
-                                     <div style="display: inline-block; padding: 10px 18px; background-color: #D4EDDA; color: #1B5E20; font-size: 14px; font-weight: 700; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
-                                         Permanent
-                                     </div>
-                                 </div>
-                              </div>
+                                    <!-- Employment Status -->
+                                    <div style="padding: 16px 20px; background-color: #E8F8F0;">
+                                        <div style="font-size: 12px; color: #27AE60; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">✓ Employment Status</div>
+                                        <div style="display: inline-block; padding: 10px 18px; background-color: #D4EDDA; color: #1B5E20; font-size: 14px; font-weight: 700; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            Permanent
+                                        </div>
+                                    </div>
+                                </div>
 
-                              <!-- Congratulations Box -->
-                             <div style="margin: 35px 0; padding: 28px 24px; background: linear-gradient(135deg, #F0FFF4 0%, #E8F8F0 100%); border: 1px solid #C8E6C9; border-radius: 8px; text-align: center;">
-                                  <p style="margin: 0 0 10px 0; color: #1B5E20; font-size: 18px; font-weight: 700;">
-                                     🎉 Welcome to the Permanent Team!
-                                 </p>
-                                  <p style="margin: 0; color: #2E7D32; font-size: 14px; line-height: 1.7;">
-                                     We are excited to have you as a permanent member of DynaClean Industries. Your commitment and excellence have not gone unnoticed. We look forward to your continued success and contributions to our organization.
-                                 </p>
-                              </div>
+                                <!-- Congratulations Box -->
+                                <div style="margin: 35px 0; padding: 28px 24px; background: linear-gradient(135deg, #F0FFF4 0%, #E8F8F0 100%); border: 1px solid #C8E6C9; border-radius: 8px; text-align: center;">
+                                    <p style="margin: 0 0 10px 0; color: #1B5E20; font-size: 18px; font-weight: 700;">
+                                        🎉 Welcome to the Permanent Team!
+                                    </p>
+                                    <p style="margin: 0; color: #2E7D32; font-size: 14px; line-height: 1.7;">
+                                        We are excited to have you as a permanent member of DynaClean Industries. Your commitment and excellence have not gone unnoticed. We look forward to your continued success and contributions to our organization.
+                                    </p>
+                                </div>
 
-                              <!-- Confirmation Letter Section -->
-                             <div style="margin: 35px 0 0 0; padding: 28px 24px; background-color: #FFF8F3; border: 2px solid #FF8C42; border-radius: 8px;">
-                                  <h3 style="margin: 0 0 12px 0; color: #2C3E50; text-align: center; font-size: 18px; font-weight: 700;">
-                                     📄 Your Confirmation Letter
-                                 </h3>
-                                  <p style="margin: 0 0 18px 0; color: #555555; font-size: 14px; text-align: center; line-height: 1.7;">
-                                     Your official employment confirmation letter is attached to this email and is available for download.
-                                 </p>
-                                  <div style="text-align: center; background-color: #FFF5E6; padding: 16px; border-radius: 6px; border-left: 4px solid #FF8C42;">
-                                     <p style="margin: 0; color: #D84315; font-size: 13px; font-weight: 600;">
-                                         ✓ Attachment: <strong>Employment_Confirmation_Letter.pdf</strong>
-                                     </p>
-                                     <p style="margin: 8px 0 0 0; color: #555555; font-size: 13px;">
-                                         Please download and save this letter for your records.
-                                     </p>
-                                  </div>
-                              </div>
+                                <!-- Confirmation Letter Section -->
+                                <div style="margin: 35px 0 0 0; padding: 28px 24px; background-color: #FFF8F3; border: 2px solid #FF8C42; border-radius: 8px;">
+                                    <h3 style="margin: 0 0 12px 0; color: #2C3E50; text-align: center; font-size: 18px; font-weight: 700;">
+                                        📄 Your Confirmation Letter
+                                    </h3>
+                                    <p style="margin: 0 0 18px 0; color: #555555; font-size: 14px; text-align: center; line-height: 1.7;">
+                                        Your official employment confirmation letter is attached to this email and is available for download.
+                                    </p>
+                                    <div style="text-align: center;">
+                                        <a href="{{confirmation_letter_link}}"
+                                          style="display: inline-block; background-color: #FF8C42; color: #FFFFFF; padding: 13px 32px; text-decoration: none; font-size: 14px; font-weight: 600; border-radius: 6px; margin-right: 12px; transition: background-color 0.3s; mso-padding-alt: 13px 32px;">
+                                            📄 View Letter
+                                        </a>
+                                        <a href="{{confirmation_letter_link}}"
+                                          style="display: inline-block; background-color: #4CAF50; color: #FFFFFF; padding: 13px 32px; text-decoration: none; font-size: 14px; font-weight: 600; border-radius: 6px; transition: background-color 0.3s; mso-padding-alt: 13px 32px;">
+                                            ⬇️ Download
+                                        </a>
+                                    </div>
+                                </div>
 
-                              <p style="margin: 35px 0 0 0; color: #555555; font-size: 14px; line-height: 1.8;">
-                                 If you have any questions regarding your employment confirmation, compensation, benefits, or company policies, please feel free to contact our HR department. We are always here to support you.
-                             </p>
-                              <p style="margin: 25px 0 0 0; color: #2C3E50; font-size: 14px; line-height: 1.8;">
-                                 Best Regards,<br>
-                                 <strong>Human Resources Department</strong><br>
-                                 <span style="color: #FF8C42; font-weight: 600;">DynaClean Industries</span>
-                             </p>
-                              <p style="margin: 30px 0 0 0; color: #888888; font-size: 13px; line-height: 1.8;">
-                                 For any inquiries, contact us at <strong style="color: #FF8C42;">hr@dynacleanindustries.com</strong>
-                             </p>
-                          </td>
-                     </tr>
-                      <!-- Footer -->
-                     <tr>
-                         <td style="padding: 25px 40px; background-color: #F9FAFB; text-align: center; border-top: 1px solid #E8EAED;">
-                              <p style="margin: 0 0 8px 0; color: #666666; font-size: 12px; font-weight: 500;">
-                                 © {{current_year}} DynaClean Industries. All Rights Reserved.
-                             </p>
-                              <p style="margin: 0; color: #999999; font-size: 11px;">
-                                 This is an automatically generated employment confirmation email.
-                             </p>
-                          </td>
-                     </tr>
-                  </table>
-              </td>
-         </tr>
-     </table>
- </body>
-</html>
+                                <p style="margin: 35px 0 0 0; color: #555555; font-size: 14px; line-height: 1.8;">
+                                    If you have any questions regarding your employment confirmation, compensation, benefits, or company policies, please feel free to contact our HR department. We are always here to support you.
+                                </p>
+                                <p style="margin: 25px 0 0 0; color: #2C3E50; font-size: 14px; line-height: 1.8;">
+                                    Best Regards,<br>
+                                    <strong>Human Resources Department</strong><br>
+                                    <span style="color: #FF8C42; font-weight: 600;">DynaClean Industries</span>
+                                </p>
+                                <p style="margin: 30px 0 0 0; color: #888888; font-size: 13px; line-height: 1.8;">
+                                    For any inquiries, contact us at <strong style="color: #FF8C42;">hr@dynacleanindustries.com</strong>
+                                </p>
+                            </td>
+                        </tr>
+                        <!-- Footer -->
+                        <tr>
+                            <td style="padding: 25px 40px; background-color: #F9FAFB; text-align: center; border-top: 1px solid #E8EAED;">
+                                <p style="margin: 0 0 8px 0; color: #666666; font-size: 12px; font-weight: 500;">
+                                    © {{current_year}} DynaClean Industries. All Rights Reserved.
+                                </p>
+                                <p style="margin: 0; color: #999999; font-size: 11px;">
+                                    This is an automatically generated employment confirmation email.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>

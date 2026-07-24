@@ -60,6 +60,7 @@ export default function DocumentsSection({
   setDocuments,
   files,
   setFiles,
+  setFormData = () => {},
   existingDocs = [],
   existingPhotoUrl = "",
   existingSignatureUrl = "",
@@ -122,8 +123,16 @@ export default function DocumentsSection({
       setFiles(prev => ({ ...prev, [fieldName]: file }));
       setDocuments(prev => ({ ...prev, [fieldName]: true }));
       
-      // Clear old fileUrl so new file is displayed
-      // This is done by not using fileUrls[fieldName] anymore when files[fieldName] exists
+      // Store Cloudinary URL so it can be used for email links
+      if (fieldName === 'doc_employment_confirmation_letter') {
+        setFormData(prev => ({
+          ...prev,
+          fileUrls: {
+            ...prev.fileUrls,
+            [fieldName]: result.url,
+          }
+        }));
+      }
       
       toast.success(`${fieldName.replace('_', ' ')} uploaded to Cloudinary`);
     } catch (error) {
