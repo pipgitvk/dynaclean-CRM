@@ -348,7 +348,7 @@ export default async function UserDashboardPage() {
           </div>
 
           {/* Bulk Upload Customers */}
-          <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
+          {/* <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
             <div className="flex flex-col h-full justify-between min-h-[160px]">
               <div>
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -372,6 +372,7 @@ export default async function UserDashboardPage() {
               </div>
             </div>
           </div>
+          */}
 
           {/* Special Price Approvals */}
           <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">

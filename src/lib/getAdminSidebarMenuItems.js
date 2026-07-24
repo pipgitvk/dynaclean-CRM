@@ -295,6 +295,12 @@ const allMenuItems = [
         icon: "Upload",
       },
       {
+        path: "/admin-dashboard/bulk-upload",
+        name: "Bulk Upload Customers",
+        roles: ["SUPERADMIN"],
+        icon: "Upload",
+      },
+      {
         path: "/admin-dashboard/ads-management",
         name: "Meta backfill",
         accessKey: "ads-management",

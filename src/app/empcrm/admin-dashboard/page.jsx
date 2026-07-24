@@ -98,7 +98,7 @@ export default function EmpCrmDashboard() {
         <p className="text-gray-600 mt-2">Manage employee information, leave, attendance, and more</p>
       </div>
 
-      {loading ? (
+      {/* {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="bg-white rounded-lg shadow-md p-6 animate-pulse">
@@ -126,7 +126,7 @@ export default function EmpCrmDashboard() {
           ))}
         </div>
         </div>
-      )}
+      )} */
 
       {/* Admin Access Button for HR and HR Head */}
       {hasAdminAccess && (
