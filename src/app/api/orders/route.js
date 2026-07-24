@@ -379,30 +379,30 @@ export async function POST(req) {
 
         console.log(`🔍 Order ${orderId}: Found ${preBookings.length} matching pre-bookings`);
 
-        // Update each matching pre-booking if delivery date is on or before expected date
+        // Update each matching pre-booking regardless of delivery date
+        // (even if order is processed after expected date, it will still get 'received' status)
         for (const preBooking of preBookings) {
           const expectedDate = new Date(preBooking.expected_date);
           const deliveryDateTime = new Date(deliveryDate);
           const preBookingQty = Number(preBooking.quantity) || 0;
+          const isLateDelivery = deliveryDateTime > expectedDate;
 
-          console.log(`📅 Pre-booking ${preBooking.id}: Expected=${preBooking.expected_date}, Delivery=${deliveryDate}, Match=${deliveryDateTime <= expectedDate}`);
+          console.log(`📅 Pre-booking ${preBooking.id}: Expected=${preBooking.expected_date}, Delivery=${deliveryDate}, IsLate=${isLateDelivery}`);
 
-          if (deliveryDateTime <= expectedDate) {
-            // Determine status based on quantity
-            let newStatus = 'received';
-            if (orderQuantity < preBookingQty) {
-              newStatus = 'partial';
-              console.log(`⚠️ Pre-booking ${preBooking.id}: Partial fulfillment (order qty: ${orderQuantity} < pre-booking qty: ${preBookingQty})`);
-            } else {
-              console.log(`✅ Pre-booking ${preBooking.id}: Full fulfillment (order qty: ${orderQuantity} >= pre-booking qty: ${preBookingQty})`);
-            }
-
-            await conn.execute(
-              `UPDATE pre_booking SET status = ?, order_id = ?, received_date = ? WHERE id = ?`,
-              [newStatus, orderId, deliveryDate, preBooking.id]
-            );
-            console.log(`✅ Pre-booking ${preBooking.id} updated to ${newStatus} for order ${orderId}`);
+          // Determine status based on quantity
+          let newStatus = 'received';
+          if (orderQuantity < preBookingQty) {
+            newStatus = 'partial';
+            console.log(`⚠️ Pre-booking ${preBooking.id}: Partial fulfillment (order qty: ${orderQuantity} < pre-booking qty: ${preBookingQty})`);
+          } else {
+            console.log(`✅ Pre-booking ${preBooking.id}: Full fulfillment (order qty: ${orderQuantity} >= pre-booking qty: ${preBookingQty})`);
           }
+
+          await conn.execute(
+            `UPDATE pre_booking SET status = ?, order_id = ?, received_date = ? WHERE id = ?`,
+            [newStatus, orderId, deliveryDate, preBooking.id]
+          );
+          console.log(`✅ Pre-booking ${preBooking.id} updated to ${newStatus} for order ${orderId}${isLateDelivery ? ' (Late delivery)' : ''}`);
         }
       } else {
         console.log(`⚠️ Order ${orderId}: No quotation items found for quote ${quote_number}`);
