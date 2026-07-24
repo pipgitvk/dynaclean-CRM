@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { Menu, LogOut, User, Plus, UserPlus, Search, Bell, X } from "lucide-react";
+import { Menu, LogOut, User, Plus, UserPlus, Search, Bell, X, DollarSign } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -387,65 +387,107 @@ export default function Navbar({ onToggleSidebar }) {
             {showNotificationDropdown && (
               <div 
                 data-notification-dropdown
-                className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-xl z-[9999] max-h-[400px] overflow-y-auto"
+                className="absolute right-0 top-full mt-2 w-96 bg-white border border-gray-200 rounded-xl shadow-2xl z-[9999] max-h-[500px] overflow-y-auto"
               >
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                  <h3 className="font-semibold text-gray-800">Notifications</h3>
+                <div className="sticky top-0 p-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <div className="flex items-center gap-2">
+                    <Bell size={20} className="text-blue-600" />
+                    <h3 className="font-bold text-gray-800 text-lg">Notifications</h3>
+                    {notifications.filter(n => !n.is_read).length > 0 && (
+                      <span className="ml-2 px-2.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                        {notifications.filter(n => !n.is_read).length}
+                      </span>
+                    )}
+                  </div>
                   <button 
                     type="button"
                     onClick={() => setShowNotificationDropdown(false)}
-                    className="text-gray-500 hover:text-gray-700"
+                    className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 p-1 rounded-lg transition"
                   >
-                    <X size={16} />
+                    <X size={18} />
                   </button>
                 </div>
                 
                 <div className="p-2">
                   {notifications.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">
-                      No new notifications
+                    <div className="p-8 text-center">
+                      <div className="text-gray-300 mb-2">
+                        <Bell size={32} className="mx-auto" />
+                      </div>
+                      <p className="text-gray-500 font-medium">No new notifications</p>
+                      <p className="text-xs text-gray-400 mt-1">You're all caught up!</p>
                     </div>
                   ) : (
-                    notifications.map((notification) => (
-                      <div 
-                        key={notification.id} 
-                        className={`p-3 border-b border-gray-100 ${!notification.is_read ? 'hover:bg-gray-50 cursor-pointer' : 'bg-gray-50 opacity-75'}`}
-                        onClick={() => {
-                          if (notification.related_id && notification.type === 'recurring_task' || notification.type === 'task_reassign') {
-                            const isAdminDashboard = pathname?.startsWith("/admin-dashboard");
-                            const viewTaskRoute = isAdminDashboard
-                              ? `/admin-dashboard/view-task/${notification.related_id}`
-                              : `/user-dashboard/view-task/${notification.related_id}`;
-                            router.push(viewTaskRoute);
-                            setShowNotificationDropdown(false);
-                          }
-                        }}
-                      >
-                        <p className="text-sm text-gray-800">{notification.message}</p>
-                        <div className="flex justify-between items-center mt-2">
-                          <p className="text-xs text-gray-500">
-                            {new Date(notification.created_at).toLocaleString()}
-                          </p>
-                          <div className="flex gap-2">
-                            {!notification.is_read && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  markNotificationAsRead(notification.id);
-                                }}
-                                className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                              >
-                                Mark as Read
-                              </button>
-                            )}
-                            {notification.is_read && (
-                              <span className="text-xs text-green-600 font-medium">Read</span>
-                            )}
+                    notifications.map((notification) => {
+                      const isPaymentDue = notification.type === 'payment_due' || notification.type === 'payment_due_admin';
+                      const isRecurringTask = notification.type === 'recurring_task' || notification.type === 'task_reassign';
+                      
+                      return (
+                        <div 
+                          key={notification.id} 
+                          className={`p-4 border-b border-gray-100 transition-all duration-200 hover:bg-blue-50 ${!notification.is_read ? 'bg-blue-50 border-l-4 border-l-blue-500' : 'bg-white'}`}
+                          onClick={() => {
+                            if (notification.related_id && isRecurringTask) {
+                              const isAdminDashboard = pathname?.startsWith("/admin-dashboard");
+                              const viewTaskRoute = isAdminDashboard
+                                ? `/admin-dashboard/view-task/${notification.related_id}`
+                                : `/user-dashboard/view-task/${notification.related_id}`;
+                              router.push(viewTaskRoute);
+                              setShowNotificationDropdown(false);
+                            }
+                          }}
+                        >
+                          <div className="flex items-start gap-3">
+                            {/* Icon */}
+                            <div className={`mt-1 p-2 rounded-lg ${isPaymentDue ? 'bg-amber-100' : 'bg-blue-100'}`}>
+                              {isPaymentDue ? (
+                                <DollarSign size={18} className="text-amber-600" />
+                              ) : (
+                                <Bell size={18} className="text-blue-600" />
+                              )}
+                            </div>
+                            
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              {/* Message */}
+                              <p className="text-sm text-gray-800 font-medium leading-snug">
+                                {notification.message}
+                              </p>
+                              
+                              {/* Footer */}
+                              <div className="flex justify-between items-center mt-3 gap-2">
+                                <p className="text-xs text-gray-500">
+                                  {new Date(notification.created_at).toLocaleString('en-IN', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </p>
+                                <div className="flex gap-2">
+                                  {!notification.is_read && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        markNotificationAsRead(notification.id);
+                                      }}
+                                      className="text-xs px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors font-medium"
+                                    >
+                                      Mark as Read
+                                    </button>
+                                  )}
+                                  {notification.is_read && (
+                                    <span className="text-xs text-green-600 font-semibold bg-green-50 px-2.5 py-1 rounded-md">✓ Read</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>

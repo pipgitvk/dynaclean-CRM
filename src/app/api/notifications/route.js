@@ -10,6 +10,9 @@ if (!cronStarted) {
   import("@/lib/cron/recurringTaskCron").then((mod) => {
     mod.startRecurringTaskCron();
   });
+  import("@/lib/cron/paymentDueNotificationCron").then((mod) => {
+    mod.startPaymentDueNotificationCron();
+  });
 }
 
 export async function GET(req) {
@@ -29,6 +32,7 @@ export async function GET(req) {
     }
 
     const notifications = await NotificationService.getUnreadNotifications(empId);
+    console.log(`📬 Fetched ${notifications.length} unread notifications for user ${empId}`);
     return NextResponse.json({ success: true, notifications });
   } catch (error) {
     console.error("Error fetching notifications:", error);

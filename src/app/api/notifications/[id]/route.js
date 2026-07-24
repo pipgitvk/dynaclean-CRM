@@ -16,8 +16,7 @@ export async function PATCH(req, { params }) {
     const { id } = await params;
     console.log("Notification ID:", id);
 
-    const conn = await getDbConnection();
-    const empId = await resolveGemCrmEmployeeId(conn, {
+    const empId = await resolveGemCrmEmployeeId({
       username: payload.username,
       empId: payload.empId,
     });
