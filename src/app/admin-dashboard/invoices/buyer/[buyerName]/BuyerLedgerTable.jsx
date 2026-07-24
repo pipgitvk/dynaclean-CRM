@@ -687,7 +687,7 @@ left("Closing Balance", col.particulars, y, 9, true);
                     {Number(row.credit) > 0 ? `₹${fmt(row.credit)}` : "—"}
                   </td>
 
-                  <td className="px-4 py-3">
+                  {/* <td className="px-4 py-3">
                     <button
                       onClick={() => handleDelete(row.id)}
                       disabled={deletingId === row.id}
@@ -696,7 +696,7 @@ left("Closing Balance", col.particulars, y, 9, true);
                     >
                       <Trash2 size={15} />
                     </button>
-                  </td>
+                  </td> */}
                 </tr>
               ))
             )}
@@ -775,13 +775,13 @@ left("Closing Balance", col.particulars, y, 9, true);
                   </p>
                 </div>
 
-                <button
+                {/* <button
                   onClick={() => handleDelete(row.id)}
                   disabled={deletingId === row.id}
                   className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 disabled:opacity-50 transition shrink-0"
                 >
                   <Trash2 size={15} />
-                </button>
+                </button> */}
               </div>
 
               <div className="flex flex-wrap gap-2 text-xs">
