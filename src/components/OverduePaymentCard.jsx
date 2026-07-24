@@ -55,7 +55,7 @@ export default function OverduePaymentCard() {
 
   return (
     <Link
-      href="/admin-dashboard/reports/payment-pendingiss"
+      href="/admin-dashboard/reports/payment-pending"
       className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white block hover:shadow-xl hover:scale-105 transform duration-200 transition-all"
     >
       <div className="flex flex-col h-full justify-between min-h-[160px]">
