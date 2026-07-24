@@ -140,6 +140,16 @@ export async function POST(req) {
       paymentDate,
       transactionId,
       paymentAmount,
+      item_name,
+      item_code,
+      specification,
+      quantity,
+      unit,
+      price_per_unit,
+      taxable_price,
+      gst,
+      total_price,
+      img_url,
     } = fields;
 
     // Validate mandatory fields
@@ -257,8 +267,9 @@ export async function POST(req) {
          (order_id, quote_number, po_file, payment_proof, client_name,
           contact, email, delivery_location, company_name, company_address,
           state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status,
-          po_number, payment_date, transaction_id, payment_amount)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          po_number, payment_date, transaction_id, payment_amount, item_name, item_code, specification,
+          quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         quote_number,
@@ -282,6 +293,16 @@ export async function POST(req) {
         paymentDate || null,
         transactionId || null,
         paymentAmount || null,
+        item_name || null,
+        item_code || null,
+        specification || null,
+        quantity || null,
+        unit || null,
+        price_per_unit || null,
+        taxable_price || null,
+        gst || null,
+        total_price || null,
+        img_url || null,
       ],
     );
 

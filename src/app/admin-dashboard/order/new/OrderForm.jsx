@@ -56,6 +56,21 @@ export default function OrderForm({ quotation, reset }) {
     // Include computed duedate
     if (computedDueDateISO) fd.append("duedate", computedDueDateISO);
 
+    // Add first product's data from quotation items
+    if (quotation.items && quotation.items.length > 0) {
+      const firstItem = quotation.items[0];
+      fd.append("item_name", firstItem.item_name || "");
+      fd.append("item_code", firstItem.item_code || "");
+      fd.append("specification", firstItem.specification || "");
+      fd.append("quantity", firstItem.quantity || "");
+      fd.append("unit", firstItem.unit || "");
+      fd.append("price_per_unit", firstItem.price_per_unit || "");
+      fd.append("taxable_price", firstItem.taxable_price || "");
+      fd.append("gst", firstItem.gst || "");
+      fd.append("total_price", firstItem.total_price || "");
+      fd.append("img_url", firstItem.img_url || "");
+    }
+
     setSubmitting(true);
     const res = await fetch("/api/orders", { method: "POST", body: fd });
     const json = await res.json();
