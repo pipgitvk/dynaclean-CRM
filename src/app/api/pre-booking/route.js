@@ -136,3 +136,48 @@ export async function DELETE(request) {
     );
   }
 }
+
+// PUT - Update pre-booking status
+export async function PUT(request) {
+  try {
+    const payload = await getSessionPayload();
+    if (!payload) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { id, status } = body;
+
+    if (!id || !status) {
+      return NextResponse.json(
+        { error: "id and status are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!['pending', 'received'].includes(status)) {
+      return NextResponse.json(
+        { error: "Invalid status. Must be 'pending' or 'received'" },
+        { status: 400 }
+      );
+    }
+
+    const connection = await getDbConnection();
+
+    await connection.execute(
+      `UPDATE pre_booking SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [status, id]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "Pre-booking status updated successfully"
+    });
+  } catch (error) {
+    console.error("Error updating pre-booking status:", error);
+    return NextResponse.json(
+      { error: "Failed to update pre-booking status" },
+      { status: 500 }
+    );
+  }
+}

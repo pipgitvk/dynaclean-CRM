@@ -249,6 +249,15 @@ export async function POST(req) {
       duedateISO = due.toISOString().slice(0, 10);
     }
 
+    // Get customer_id from quotation
+    const [quotationRecordForCustomer] = await conn.execute(
+      `SELECT customer_id FROM quotations_records WHERE quote_number = ? LIMIT 1`,
+      [quote_number]
+    );
+    const customerIdFromQuotation = quotationRecordForCustomer.length > 0 
+      ? quotationRecordForCustomer[0].customer_id 
+      : null;
+
     // console here
     console.log("INSERT PARAMS", {
       quote_number,
@@ -268,8 +277,8 @@ export async function POST(req) {
           contact, email, delivery_location, company_name, company_address,
           state, sales_status, sales_remark, ship_to, created_by, duedate, client_delivery_date, approval_status,
           po_number, payment_date, transaction_id, payment_amount, item_name, item_code, specification,
-          quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          quantity, unit, price_per_unit, taxable_price, gst, total_price, img_url, customer_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         quote_number,
@@ -303,6 +312,7 @@ export async function POST(req) {
         gst || null,
         total_price || null,
         img_url || null,
+        customerIdFromQuotation,
       ],
     );
 
@@ -335,6 +345,59 @@ export async function POST(req) {
       } catch (emailErr) {
         console.error("⚠️ Failed to send approval email:", emailErr);
       }
+    }
+
+    // 7. Auto-update pre-bookings for this customer & product
+    // Match pre-bookings where:
+    // - customer_id matches (from quotation, now saved in neworder)
+    // - product_name matches (from quotation items)
+    // - status is still 'pending'
+    // - delivery date is on or before expected_date
+    try {
+      const deliveryDate = clientDeliveryDate || duedateISO;
+      const customerIdStr = String(customerIdFromQuotation); // Convert to string for matching
+      console.log(`📋 Order ${orderId}: Looking for pre-bookings with customer_id=${customerIdStr}, deliveryDate=${deliveryDate}`);
+
+      // Get first product from quotation to match
+      const [quotationItems] = await conn.execute(
+        `SELECT item_name FROM quotation_items WHERE quote_number = ? LIMIT 1`,
+        [quote_number]
+      );
+
+      if (quotationItems.length > 0) {
+        const productName = quotationItems[0].item_name;
+        console.log(`📦 Order ${orderId}: Looking for product="${productName}"`);
+
+        // Find matching pre-bookings using customer_id from quotation (convert to string)
+        const [preBookings] = await conn.execute(
+          `SELECT id, expected_date FROM pre_booking 
+           WHERE customer_id = ? AND product_name = ? AND status = 'pending' AND expected_date IS NOT NULL`,
+          [customerIdStr, productName]
+        );
+
+        console.log(`🔍 Order ${orderId}: Found ${preBookings.length} matching pre-bookings`);
+
+        // Update each matching pre-booking if delivery date is on or before expected date
+        for (const preBooking of preBookings) {
+          const expectedDate = new Date(preBooking.expected_date);
+          const deliveryDateTime = new Date(deliveryDate);
+
+          console.log(`📅 Pre-booking ${preBooking.id}: Expected=${preBooking.expected_date}, Delivery=${deliveryDate}, Match=${deliveryDateTime <= expectedDate}`);
+
+          if (deliveryDateTime <= expectedDate) {
+            await conn.execute(
+              `UPDATE pre_booking SET status = 'received', order_id = ?, received_date = ? WHERE id = ?`,
+              [orderId, deliveryDate, preBooking.id]
+            );
+            console.log(`✅ Pre-booking ${preBooking.id} updated to received for order ${orderId}`);
+          }
+        }
+      } else {
+        console.log(`⚠️ Order ${orderId}: No quotation items found for quote ${quote_number}`);
+      }
+    } catch (preBookingErr) {
+      console.error("⚠️ Error updating pre-bookings:", preBookingErr);
+      // Don't fail the order creation if pre-booking update fails
     }
 
     // Seed dispatch rows per quantity from quotation items

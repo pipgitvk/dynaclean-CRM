@@ -27,6 +27,7 @@ export default function PreBookingListClient({
   const [expectedDateFrom, setExpectedDateFrom] = useState(initialExpectedDateFrom);
   const [expectedDateTo, setExpectedDateTo] = useState(initialExpectedDateTo);
   const [showFilters, setShowFilters] = useState(false);
+  const [updatingId, setUpdatingId] = useState(null);
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -59,6 +60,32 @@ export default function PreBookingListClient({
     const params = new URLSearchParams(searchParams);
     params.set("page", newPage.toString());
     router.push(`/admin-dashboard/tl-customers/pre-booking?${params.toString()}`);
+  };
+
+  const handleStatusChange = async (bookingId, newStatus) => {
+    try {
+      setUpdatingId(bookingId);
+      const response = await fetch("/api/pre-booking", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: bookingId, status: newStatus }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Status updated to ${newStatus}`);
+        // Refresh the page to show updated status
+        router.refresh();
+      } else {
+        toast.error(data.error || "Failed to update status");
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update status");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const hasActiveFilters = search || modelFilter || leadSourceFilter || expectedDateFrom || expectedDateTo;
@@ -207,6 +234,15 @@ export default function PreBookingListClient({
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
                       Expected Date
                     </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                      Order ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                      Received Date
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -244,6 +280,29 @@ export default function PreBookingListClient({
                         {booking.expected_date
                           ? dayjs(booking.expected_date).format("DD MMM YYYY")
                           : "N/A"}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`inline-block px-3 py-1 rounded text-sm font-medium border-2 ${
+                          (booking.status || 'pending') === 'pending'
+                            ? 'bg-yellow-100 border-yellow-400 text-yellow-800'
+                            : 'bg-green-100 border-green-400 text-green-800'
+                        }`}>
+                          {(booking.status || 'pending').charAt(0).toUpperCase() + (booking.status || 'pending').slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {booking.order_id ? (
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                            {booking.order_id}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {booking.received_date
+                          ? dayjs(booking.received_date).format("DD MMM YYYY")
+                          : "-"}
                       </td>
                     </tr>
                   ))}
