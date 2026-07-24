@@ -12,6 +12,11 @@ export default function PaymentPendingReport() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userRole, setUserRole] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  
+  // New filter states
+  const [dueDateFrom, setDueDateFrom] = useState("");
+  const [dueDateTo, setDueDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
 
   // History modal state
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -68,6 +73,35 @@ export default function PaymentPendingReport() {
       );
     }
 
+    // Apply due date range filter
+    if (dueDateFrom) {
+      filtered = filtered.filter(order =>
+        dayjs(order.due_date).isAfter(dayjs(dueDateFrom).subtract(1, 'day'), 'day')
+      );
+    }
+    if (dueDateTo) {
+      filtered = filtered.filter(order =>
+        dayjs(order.due_date).isBefore(dayjs(dueDateTo).add(1, 'day'), 'day')
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      const today = dayjs().startOf('day');
+      if (statusFilter === "due") {
+        // Due: due_date has passed (is before today)
+        filtered = filtered.filter(order =>
+          dayjs(order.due_date).isBefore(today, 'day')
+        );
+      } else if (statusFilter === "no-due") {
+        // No Due: due_date is in future (is same or after today)
+        filtered = filtered.filter(order => {
+          const orderDate = dayjs(order.due_date).startOf('day');
+          return !orderDate.isBefore(today, 'day');
+        });
+      }
+    }
+
     // Apply sorting
     if (sortConfig.key) {
       filtered = [...filtered].sort((a, b) => {
@@ -97,7 +131,7 @@ export default function PaymentPendingReport() {
     }
 
     setFilteredOrders(filtered);
-  }, [searchQuery, orders, sortConfig]);
+  }, [searchQuery, orders, sortConfig, dueDateFrom, dueDateTo, statusFilter]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -292,24 +326,82 @@ export default function PaymentPendingReport() {
 
       {/* Filters and Actions */}
       <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative flex-1 w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search by order ID, customer, company, contact, or employee..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+        <div className="space-y-4">
+          {/* Search and Export Row */}
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="relative flex-1 w-full md:w-auto">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search by order ID, customer, company, contact, or employee..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={exportToCSV}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap"
+            >
+              <Download size={18} />
+              Export CSV
+            </button>
           </div>
-          <button
-            onClick={exportToCSV}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
-          >
-            <Download size={18} />
-            Export CSV
-          </button>
+
+          {/* Date Range and Status Filters Row */}
+          <div className="flex flex-col md:flex-row gap-4 items-center">
+            {/* Due Date From */}
+            <div className="flex flex-col w-full md:w-auto">
+              <label className="text-xs font-semibold text-gray-700 mb-1">Due Date From</label>
+              <input
+                type="date"
+                value={dueDateFrom}
+                onChange={(e) => setDueDateFrom(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Due Date To */}
+            <div className="flex flex-col w-full md:w-auto">
+              <label className="text-xs font-semibold text-gray-700 mb-1">Due Date To</label>
+              <input
+                type="date"
+                value={dueDateTo}
+                onChange={(e) => setDueDateTo(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Status Filter */}
+            <div className="flex flex-col w-full md:w-auto">
+              <label className="text-xs font-semibold text-gray-700 mb-1">Payment Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Orders</option>
+                <option value="due">Due (Overdue)</option>
+                <option value="no-due">Not Due</option>
+              </select>
+            </div>
+
+            {/* Clear Filters Button */}
+            {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+              <button
+                onClick={() => {
+                  setDueDateFrom("");
+                  setDueDateTo("");
+                  setStatusFilter("all");
+                  setSearchQuery("");
+                }}
+                className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap mt-5 md:mt-0"
+              >
+                <X size={16} />
+                Clear Filters
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
