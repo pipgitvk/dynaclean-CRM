@@ -285,6 +285,8 @@ export default function PreBookingListClient({
                         <span className={`inline-block px-3 py-1 rounded text-sm font-medium border-2 ${
                           (booking.status || 'pending') === 'pending'
                             ? 'bg-yellow-100 border-yellow-400 text-yellow-800'
+                            : (booking.status || 'pending') === 'partial'
+                            ? 'bg-orange-100 border-orange-400 text-orange-800'
                             : 'bg-green-100 border-green-400 text-green-800'
                         }`}>
                           {(booking.status || 'pending').charAt(0).toUpperCase() + (booking.status || 'pending').slice(1)}
