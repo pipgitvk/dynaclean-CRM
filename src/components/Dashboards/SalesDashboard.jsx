@@ -9,6 +9,7 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import TodaysReportingButton from "@/components/TodaysReportingButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
+import PaymentPendingButton from "@/components/PaymentPendingCircle";
 
 export default function SalesDashboard({ user }) {
   return (
@@ -32,6 +33,7 @@ export default function SalesDashboard({ user }) {
             {/* Buttons row - separate on mobile */}
             <div className="flex flex-row gap-2 justify-start sm:justify-end">
               <TodaysReportingButton />
+              <PaymentPendingButton />
               <TodayReportButton />
               <LeaveApprovalButton />
             </div>
