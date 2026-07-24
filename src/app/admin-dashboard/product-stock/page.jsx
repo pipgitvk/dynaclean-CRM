@@ -1803,7 +1803,7 @@ export default function ProductStockForm() {
                         <p className="text-gray-500">Pre-booked</p>
                         <p className="font-semibold text-orange-600">{row.pre_booked || 0}</p>
                       </div>
-                      <div>
+                      <div className="bg-yellow-200 rounded p-2">
                         <p className="text-gray-500">Net Qty</p>
                         <p className="font-semibold text-green-600">{row.net_qty || 0}</p>
                       </div>
@@ -1933,7 +1933,7 @@ export default function ProductStockForm() {
                         <td className="p-2 sm:p-3">{row.item_name}</td>
                         <td className="p-2 sm:p-3 font-semibold">{row.total}</td>
                         <td className="p-2 sm:p-3 font-semibold text-orange-600">{row.pre_booked || 0}</td>
-                        <td className="p-2 sm:p-3 font-semibold text-green-600">{row.net_qty || 0}</td>
+                        <td className="p-2 sm:p-3 font-semibold text-green-600 bg-yellow-200 rounded">{row.net_qty || 0}</td>
                         <td className="p-2 sm:p-3">{row.delhi}</td>
                         <td className="p-2 sm:p-3">{row.south}</td>
                         <td className="p-2 sm:p-3">
