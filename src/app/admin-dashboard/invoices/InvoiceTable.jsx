@@ -7,7 +7,7 @@ import MultiInvoiceLinkModal from "@/app/user-dashboard/invoices/MultiInvoiceLin
 
 const InvoiceEditModal = dynamic(() => import("./InvoiceEditModal"), { ssr: false });
 
-export default function InvoiceTable() {
+export default function InvoiceTable({ onSummaryUpdate }) {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -111,14 +111,32 @@ export default function InvoiceTable() {
 
         setInvoices(sortedData);
         setMeta(response.meta);
+
+        // Calculate and update summary data
+        const summaryData = {
+          grandTotal: sortedData.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
+          balanceAmount: sortedData.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
+          taxAmount: sortedData.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
+          totalInvoices: sortedData.length,
+        };
+        
+        if (onSummaryUpdate) {
+          onSummaryUpdate(summaryData);
+        }
       } else {
         setInvoices([]);
         setFetchError(response.detail || response.error || "Failed to load invoices");
+        if (onSummaryUpdate) {
+          onSummaryUpdate({ grandTotal: 0, balanceAmount: 0, taxAmount: 0, totalInvoices: 0 });
+        }
       }
     } catch (err) {
       console.error("Fetch invoices failed:", err);
       setInvoices([]);
       setFetchError(err?.message || "Failed to load invoices");
+      if (onSummaryUpdate) {
+        onSummaryUpdate({ grandTotal: 0, balanceAmount: 0, taxAmount: 0, totalInvoices: 0 });
+      }
     } finally {
       setLoading(false);
     }
