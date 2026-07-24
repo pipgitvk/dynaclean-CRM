@@ -98,35 +98,8 @@ export default function EmpCrmDashboard() {
         <p className="text-gray-600 mt-2">Manage employee information, leave, attendance, and more</p>
       </div>
 
-      {/* {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-lg shadow-md p-6 animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-              <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statCards.map((card, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-gray-600 text-sm font-medium">{card.title}</h3>
-                <div className={`${card.color} p-3 rounded-lg`}>
-                  <card.icon className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <p className="text-3xl font-bold text-gray-800">{card.value}</p>
-            </div>
-          ))}
-        </div>
-        </div>
-      )} */
+      {/* Stats Cards - Commented Out */}
+      {/* Loading and Stats Section would go here */}
 
       {/* Admin Access Button for HR and HR Head */}
       {hasAdminAccess && (
