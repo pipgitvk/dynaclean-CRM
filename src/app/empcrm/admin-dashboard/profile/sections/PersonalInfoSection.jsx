@@ -1,5 +1,8 @@
 import { shouldShowField, isReassignFieldMode } from "@/lib/reassignFieldVisibility";
-import { Eye, Upload } from "lucide-react";
+import { Eye, Upload, Loader } from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { uploadToCloudinary } from "@/utils/cloudinaryUpload";
 
 export default function PersonalInfoSection({
   formData,
@@ -17,6 +20,7 @@ export default function PersonalInfoSection({
   const rf = reassignFieldKeys;
   const show = (k) => shouldShowField(rf, k);
   const hideIdRow = isReassignFieldMode(rf);
+  const [uploadingFiles, setUploadingFiles] = useState({});
 
   const handleChange = (e) => {
     if (ro) return;
@@ -38,6 +42,50 @@ export default function PersonalInfoSection({
       }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleConfirmationLetterUpload = async (e) => {
+    if (ro) return;
+    const file = e.target.files?.[0];
+    if (!file) {
+      setFiles(prev => {
+        const next = { ...prev };
+        delete next.doc_employment_confirmation_letter;
+        return next;
+      });
+      return;
+    }
+
+    setUploadingFiles(prev => ({ ...prev, doc_employment_confirmation_letter: true }));
+    try {
+      const result = await uploadToCloudinary(file, "emp_profiles/documents", {
+        public_id: `doc_employment_confirmation_letter_${Date.now()}`,
+        tags: "emp_profile,confirmation_letter",
+      });
+
+      setFiles(prev => ({ ...prev, doc_employment_confirmation_letter: file }));
+      
+      // Clear the old file URL so new one is used
+      setFormData(prev => ({
+        ...prev,
+        fileUrls: {
+          ...prev.fileUrls,
+          doc_employment_confirmation_letter: null,
+        }
+      }));
+      
+      toast.success("Employment Confirmation Letter uploaded to Cloudinary");
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error("Failed to upload Employment Confirmation Letter");
+      setFiles(prev => {
+        const next = { ...prev };
+        delete next.doc_employment_confirmation_letter;
+        return next;
+      });
+    } finally {
+      setUploadingFiles(prev => ({ ...prev, doc_employment_confirmation_letter: false }));
     }
   };
 
@@ -276,26 +324,24 @@ export default function PersonalInfoSection({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <label className={`cursor-pointer ${ro ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <label className={`cursor-pointer ${ro || uploadingFiles.doc_employment_confirmation_letter ? 'opacity-50 cursor-not-allowed' : ''}`}>
               <input
                 type="file"
                 name="doc_employment_confirmation_letter"
                 accept="image/*"
-                onChange={(e) => {
-                  if (ro) return;
-                  const file = e.target.files[0];
-                  if (file) {
-                    setFiles((prev) => ({ ...prev, doc_employment_confirmation_letter: file }));
-                  }
-                }}
-                disabled={ro}
+                onChange={handleConfirmationLetterUpload}
+                disabled={ro || uploadingFiles.doc_employment_confirmation_letter}
                 className="hidden"
               />
-              <Upload className="w-5 h-5 text-blue-600 hover:text-blue-800" />
+              {uploadingFiles.doc_employment_confirmation_letter ? (
+                <Loader className="w-5 h-5 text-blue-600 animate-spin" />
+              ) : (
+                <Upload className="w-5 h-5 text-blue-600 hover:text-blue-800" />
+              )}
             </label>
-            {(formData.fileUrls?.doc_employment_confirmation_letter || files.doc_employment_confirmation_letter) && (
+            {(files.doc_employment_confirmation_letter ? URL.createObjectURL(files.doc_employment_confirmation_letter) : formData.fileUrls?.doc_employment_confirmation_letter) && (
               <a
-                href={formData.fileUrls?.doc_employment_confirmation_letter || URL.createObjectURL(files.doc_employment_confirmation_letter)}
+                href={files.doc_employment_confirmation_letter ? URL.createObjectURL(files.doc_employment_confirmation_letter) : formData.fileUrls?.doc_employment_confirmation_letter}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="cursor-pointer"

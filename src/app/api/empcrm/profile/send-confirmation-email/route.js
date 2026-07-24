@@ -154,6 +154,8 @@ export async function POST(request) {
 
     // Send email to all recipients
     const emailResults = [];
+    const hrEmail = "hr@dynacleanindustries.com";
+    
     for (const recipientEmail of recipientEmails) {
       try {
         const mailOptions = {
@@ -164,9 +166,17 @@ export async function POST(request) {
           attachments: attachments,
         };
         
-        // Add reporting manager to CC if available
+        // Build CC list with reporting manager and HR email
+        const ccEmails = [];
         if (reportingManagerEmail && reportingManagerEmail !== recipientEmail) {
-          mailOptions.cc = reportingManagerEmail;
+          ccEmails.push(reportingManagerEmail);
+        }
+        if (hrEmail && hrEmail !== recipientEmail && !ccEmails.includes(hrEmail)) {
+          ccEmails.push(hrEmail);
+        }
+        
+        if (ccEmails.length > 0) {
+          mailOptions.cc = ccEmails.join(',');
         }
         
         const result = await transporter.sendMail(mailOptions);
@@ -175,10 +185,10 @@ export async function POST(request) {
           email: recipientEmail,
           success: true,
           messageId: result.messageId,
-          cc: reportingManagerEmail || null,
+          cc: ccEmails.join(', ') || null,
         });
 
-        console.log(`✅ Confirmation email sent to ${recipientEmail}${reportingManagerEmail ? ` (CC: ${reportingManagerEmail})` : ''}`);
+        console.log(`✅ Confirmation email sent to ${recipientEmail}${ccEmails.length > 0 ? ` (CC: ${ccEmails.join(', ')})` : ''}`);
       } catch (err) {
         console.error(`❌ Failed to send email to ${recipientEmail}:`, err);
         emailResults.push({

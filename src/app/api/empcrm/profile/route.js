@@ -3,6 +3,35 @@ import { getDbConnection } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { getSessionPayload } from "@/lib/auth";
+import { v2 as cloudinary } from "cloudinary";
+
+// Initialize Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Helper function to upload file to Cloudinary
+async function uploadFileToCloudinary(buffer, filename, folder) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        public_id: path.parse(filename).name,
+        resource_type: "auto",
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(result.secure_url || result.url);
+        }
+      }
+    );
+    stream.end(buffer);
+  });
+}
 
 // GET: Fetch profile by username (query param)
 export async function GET(request) {
@@ -248,10 +277,19 @@ async function saveProfile(request, methodType) {
 
     const processFile = async (file, prefix) => {
       const name = `${prefix}_${Date.now()}${fileExt(file.name)}`;
-      const p = path.join(uploadDir, name);
       const buffer = Buffer.from(await file.arrayBuffer());
-      await writeFile(p, buffer);
-      return `/employee_profiles/${encodeURIComponent(username)}/${encodeURIComponent(name)}`;
+      
+      try {
+        // Upload to Cloudinary
+        const cloudinaryUrl = await uploadFileToCloudinary(buffer, name, "emp_profiles/documents");
+        return cloudinaryUrl;
+      } catch (error) {
+        console.warn(`Failed to upload to Cloudinary, falling back to local storage:`, error);
+        // Fallback to local storage if Cloudinary fails
+        const p = path.join(uploadDir, name);
+        await writeFile(p, buffer);
+        return `/employee_profiles/${encodeURIComponent(username)}/${encodeURIComponent(name)}`;
+      }
     };
 
     const profilePhoto = formData.get("profile_photo");

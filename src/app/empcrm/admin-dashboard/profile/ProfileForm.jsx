@@ -1216,15 +1216,20 @@ export default function ProfileForm({
                   <>• {formData.professional_email}<br /></>
                 )}
               </p>
-              {formData.reporting_manager && (
-                <p className="text-sm text-blue-900 border-t border-blue-200 pt-2">
-                  <strong>📋 CC:</strong> {reportingManagerName || formData.reporting_manager} (Reporting Manager)
+              <p className="text-sm text-blue-900 border-t border-blue-200 pt-2">
+                <strong>📋 CC:</strong>
+                <br />
+                {formData.reporting_manager && (
+                  <>{reportingManagerName || formData.reporting_manager} (Reporting Manager)<br />
                   {reportingManagerEmail && (
-                    <> — <span className="text-blue-700">{reportingManagerEmail}</span></>
-                  )}<br />
-                  <span className="text-xs text-blue-800">Will receive a copy for notification</span>
-                </p>
-              )}
+                    <span className="text-blue-700">{reportingManagerEmail}</span>
+                  )}<br /></>
+                )}
+                HR Department<br />
+                <span className="text-blue-700">hr@dynacleanindustries.com</span>
+                <br />
+                <span className="text-xs text-blue-800">Will receive a copy for notification</span>
+              </p>
               <p className="text-sm text-blue-900 border-t border-blue-200 pt-2">
                 <strong>📎 Attachment:</strong> Employment Confirmation Letter
               </p>

@@ -1,5 +1,8 @@
-import { Upload, Eye, CheckCircle } from "lucide-react";
+import { Upload, Eye, CheckCircle, Loader } from "lucide-react";
+import { useState } from "react";
+import toast from "react-hot-toast";
 import { profileAssetViewUrl } from "@/lib/profileMediaUrl";
+import { uploadToCloudinary } from "@/utils/cloudinaryUpload";
 import {
   shouldShowDocumentReassignItem,
   shouldShowProfilePhotoReassign,
@@ -84,6 +87,7 @@ export default function DocumentsSection({
 }) {
   const ro = reviewMode;
   const rf = reassignFieldKeys;
+  const [uploadingFiles, setUploadingFiles] = useState({});
 
   const itemVisible = (docKey) => shouldShowDocumentReassignItem(rf, docKey);
 
@@ -92,19 +96,47 @@ export default function DocumentsSection({
     setDocuments(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleFileChange = (e, fieldName) => {
+  const handleFileChange = async (e, fieldName) => {
     if (ro) return;
     const file = e.target.files?.[0];
-    if (file) {
-      setFiles(prev => ({ ...prev, [fieldName]: file }));
-      setDocuments(prev => ({ ...prev, [fieldName]: true }));
-    } else {
+    if (!file) {
       setFiles(prev => {
         const next = { ...prev };
         delete next[fieldName];
         return next;
       });
       setDocuments(prev => ({ ...prev, [fieldName]: false }));
+      return;
+    }
+
+    // Start upload to Cloudinary
+    setUploadingFiles(prev => ({ ...prev, [fieldName]: true }));
+    try {
+      const cloudinaryFolder = "emp_profiles/documents";
+      const result = await uploadToCloudinary(file, cloudinaryFolder, {
+        public_id: `${fieldName}_${Date.now()}`,
+        tags: `emp_profile,${fieldName}`,
+      });
+
+      // Store the new file
+      setFiles(prev => ({ ...prev, [fieldName]: file }));
+      setDocuments(prev => ({ ...prev, [fieldName]: true }));
+      
+      // Clear old fileUrl so new file is displayed
+      // This is done by not using fileUrls[fieldName] anymore when files[fieldName] exists
+      
+      toast.success(`${fieldName.replace('_', ' ')} uploaded to Cloudinary`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error(`Failed to upload ${fieldName.replace('_', ' ')}`);
+      setFiles(prev => {
+        const next = { ...prev };
+        delete next[fieldName];
+        return next;
+      });
+      setDocuments(prev => ({ ...prev, [fieldName]: false }));
+    } finally {
+      setUploadingFiles(prev => ({ ...prev, [fieldName]: false }));
     }
   };
 
@@ -237,13 +269,13 @@ export default function DocumentsSection({
       >
         {showPhotoSlot && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Passport Size Photograph *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Passport Size Photograph * {uploadingFiles.profile_photo && <span className="text-xs text-blue-600">(Uploading...)</span>}</label>
           <div className="flex items-center gap-4">
             <input
               type="file"
               accept="image/*"
               onChange={(e) => handleFileChange(e, "profile_photo")}
-              disabled={ro}
+              disabled={ro || uploadingFiles.profile_photo}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {existingPhotoUrl && !files.profile_photo && (
@@ -271,13 +303,13 @@ export default function DocumentsSection({
         )}
         {showSignatureSlot && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Signature *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Signature * {uploadingFiles.signature && <span className="text-xs text-blue-600">(Uploading...)</span>}</label>
           <div className="flex items-center gap-4">
             <input
               type="file"
               accept="image/*"
               onChange={(e) => handleFileChange(e, "signature")}
-              disabled={ro}
+              disabled={ro || uploadingFiles.signature}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {existingSignatureUrl && !files.signature && (
@@ -362,13 +394,17 @@ export default function DocumentsSection({
                         <button
                           type="button"
                           onClick={() =>
-                            !ro && document.getElementById(`${htmlIdPrefix}file_${doc.key}`)?.click()
+                            !ro && !uploadingFiles[doc.key] && document.getElementById(`${htmlIdPrefix}file_${doc.key}`)?.click()
                           }
-                          disabled={ro}
+                          disabled={ro || uploadingFiles[doc.key]}
                           className="p-2 rounded-full hover:bg-gray-100 text-gray-600 disabled:opacity-40 disabled:pointer-events-none"
-                          title="Upload File"
+                          title={uploadingFiles[doc.key] ? "Uploading..." : "Upload File"}
                         >
-                          <Upload className="w-4 h-4" />
+                          {uploadingFiles[doc.key] ? (
+                            <Loader className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Upload className="w-4 h-4" />
+                          )}
                         </button>
 
                         {files[doc.key] && (
