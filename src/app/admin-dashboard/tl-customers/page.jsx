@@ -135,9 +135,9 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     }
   }
 
-  // When ON: show only customers that have TL_followups rows OR have an automatic next_followup_date
+  // When ON: show only customers that have TL_followups rows (TL ne follow-up dala ho)
   if (showTLOnly) {
-    query += ` AND (tlf.customer_id IS NOT NULL OR tlf.next_followup_date IS NOT NULL)`;
+    query += ` AND tlf.customer_id IS NOT NULL`;
   }
 
   // When ON: show only customers that have pre_booking rows
@@ -273,7 +273,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   if (showTLOnly) {
-    kpiQuery += ` AND (tlf.customer_id IS NOT NULL OR tlf.next_followup_date IS NOT NULL)`;
+    kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
   }
 
   if (showPreBookingOnly) {
