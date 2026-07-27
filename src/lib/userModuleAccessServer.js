@@ -31,8 +31,10 @@ export async function getEffectiveAllowedModuleKeys(username, role) {
   if (!u) return [];
 
   let allowedRaw = null;
+  let conn;
   try {
-    const conn = await getDbConnection();
+    const pool = await getDbConnection();
+    conn = await pool.getConnection();
     const [rows] = await conn.execute(
       "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
       [u],
@@ -45,6 +47,14 @@ export async function getEffectiveAllowedModuleKeys(username, role) {
       return null; // legacy: column missing → full access behavior handled by callers
     }
     return [];
+  } finally {
+    if (conn) {
+      try {
+        await conn.release();
+      } catch (releaseError) {
+        console.error("❌ Error releasing connection in getEffectiveAllowedModuleKeys:", releaseError);
+      }
+    }
   }
 
   let next = applySuperadminOnlyModuleRestrictions(allowedRaw, roleKey) ?? [];

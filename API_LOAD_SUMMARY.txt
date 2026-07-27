@@ -1,0 +1,85 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║         🔥 HIGH-LOAD APIs - DynaClean CRM - Quick Reference                   ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌─ TOP 5 HEAVIEST APIs ────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  #1 🔴 /api/validate-ip          [GET]                                        │
+│     └─ Location: EVERY REQUEST (in middleware)                                 │
+│     └─ Frequency: 1000s of times per minute                                    │
+│     └─ Load: ⭐⭐⭐⭐⭐ CRITICAL                                                  │
+│     └─ Connections/hour: 500+ (BIGGEST CULPRIT!)                              │
+│     └─ Why: IP check requires 2 table queries (emplist + rep_list)             │
+│     └─ Fix: Cache for 5 minutes                                                │
+│                                                                                 │
+│  #2 🔴 /api/me                   [GET]                                        │
+│     └─ Location: EVERY PAGE LOAD (on dashboard open)                           │
+│     └─ Frequency: 100-200 times per minute                                     │
+│     └─ Load: ⭐⭐⭐⭐ VERY HIGH                                                  │
+│     └─ Connections/hour: 400+                                                 │
+│     └─ Why: User profile fetching                                              │
+│     └─ Fix: Cache for 10 minutes                                               │
+│                                                                                 │
+│  #3 🟠 /api/login                [POST]                                       │
+│     └─ Location: Every login attempt                                           │
+│     └─ Frequency: 50-100 times per hour                                        │
+│     └─ Load: ⭐⭐⭐⭐⭐ CRITICAL                                                  │
+│     └─ Connections/hour: 50-100 (per login attempt)                           │
+│     └─ Why: 2 table search + login_activity log + JWT generation              │
+│     └─ Fix: Connection release ✅ (already fixed)                              │
+│                                                                                 │
+│  #4 🟠 /api/table-data           [GET]                                        │
+│     └─ Location: Dashboard table/grid opens + when searching                   │
+│     └─ Frequency: 200-300 times per hour                                       │
+│     └─ Load: ⭐⭐⭐⭐⭐ CRITICAL                                                  │
+│     └─ Connections/hour: 200+ + repeated search queries                       │
+│     └─ Why: Complex JOINs (10+ tables), pagination, large data                 │
+│     └─ Fix: Add database indexes + pagination caching                         │
+│                                                                                 │
+│  #5 🟠 /api/notifications        [GET]                                        │
+│     └─ Location: Continuous polling (every 3-5 seconds)                        │
+│     └─ Frequency: 1000+ per minute (non-stop polling)                          │
+│     └─ Load: ⭐⭐⭐⭐ VERY HIGH                                                  │
+│     └─ Connections/hour: 300+                                                 │
+│     └─ Why: Real-time notification check (polling overhead)                   │
+│     └─ Fix: Switch to WebSocket (stop polling!)                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+┌─ NEXT 5 Heavy APIs ──────────────────────────────────────────────────────────┐
+│                                                                                 │
+│  #6 🟠 /api/dashboard-data       [GET]  → 100-150 conn/hr                     │
+│     └─ Dashboard stats aggregation (complex calculations)                      │
+│                                                                                 │
+│  #7 🟠 /api/daily-followups      [GET]  → 100-150 conn/hr                     │
+│     └─ Employee dashboard - task list (called on every employee login)         │
+│                                                                                 │
+│  #8 🟠 /api/followups            [GET]  → 150-200 conn/hr                     │
+│     └─ Followup page load + search                                             │
+│                                                                                 │
+│  #9 🟠 /api/card-data            [GET]  → 80-120 conn/hr                      │
+│     └─ Dashboard summary cards                                                 │
+│                                                                                 │
+│  #10 🟡 /api/admin-dashboard-stats [GET]  → 80-100 conn/hr                    │
+│      └─ Admin dashboard statistics                                             │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                        CONNECTION USAGE BREAKDOWN                              ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+Peak Hour Connection Usage (9 AM - 5 PM):
+
+  /api/validate-ip         ██████████████████████████████████░░░ 500 conn/hr
+  /api/me                  ████████████████████░░░░░░░░░░░░░░░░ 400 conn/hr
+  /api/table-data          ████████████░░░░░░░░░░░░░░░░░░░░░░░░ 200 conn/hr
+  /api/notifications       ████████████░░░░░░░░░░░░░░░░░░░░░░░░ 300 conn/hr
+  /api/daily-followups     ████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 150 conn/hr
+  /api/dashboard-data      ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 100 conn/hr
+  /api/followups           ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 200 conn/hr
+  /api/login & others      ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  50 conn/hr
+  ─────────────────────────────────────────────────────────────────────────
+  TOTAL NEED:              2000+ connections/hour ❌
+  YOUR LIMIT:              500 connections/hour  ❌
+  SHORTAGE:                1500+ connections/hour 💥
