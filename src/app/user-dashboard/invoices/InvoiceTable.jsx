@@ -1,4 +1,4 @@
-"use client";
+  "use client";
 
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
@@ -8,11 +8,20 @@ import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 const InvoiceEditModal = dynamic(() => import("@/app/admin-dashboard/invoices/InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable({ onSummaryUpdate }) {
+  // Get current month's start and end dates
+  const now = new Date();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  const formatDateForInput = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
+  const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
 
   // Single page — fetch all records
   const [currentPage] = useState(1);
