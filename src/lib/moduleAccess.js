@@ -121,6 +121,7 @@ export const MODULE_TREE = [
       { key: "dd-management", label: "DD Management" },
       { key: "other-income", label: "Other Income", icon: "📈" },
       { key: "import-billing", label: "Billing" },
+      { key: "ledger", label: "Ledger" },
     ],
   },
   {
@@ -352,6 +353,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "dd-management", label: "DD Management" },
       { kind: "leaf", key: "other-income", label: "📈 Other Income" },
       { kind: "leaf", key: "import-billing", label: "Billing" },
+      { kind: "leaf", key: "ledger", label: "Ledger" },
     ],
   },
   {

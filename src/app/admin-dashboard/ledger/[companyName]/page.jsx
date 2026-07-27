@@ -1,8 +1,6 @@
-  import { getDbConnection } from "@/lib/db";
+import { getDbConnection } from "@/lib/db";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
-import BuyerInvoiceTable from "./BuyerInvoiceTable";
-import BuyerLedgerTable from "./BuyerLedgerTable";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -11,11 +9,10 @@ const JWT_SECRET = process.env.JWT_SECRET;
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
-  const { buyerName } = await params;
-  return { title: `Invoices – ${decodeURIComponent(buyerName)} | DynaClean CRM` };
+  const { companyName } = await params;
+  return { title: `Ledger – ${decodeURIComponent(companyName)} | DynaClean CRM` };
 }
 
-/** Parse linked_trans_ids JSON or plain string → array of strings */
 function parseTransIds(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
@@ -30,7 +27,6 @@ function parseTransIds(raw) {
   return [];
 }
 
-/** Parse linked_purchase_ids (JSON, comma-separated, or single token) → array of strings */
 function parseLinkedPurchaseIds(raw) {
   if (!raw) return [];
   let arr = null;
@@ -59,9 +55,14 @@ function parseLinkedPurchaseIds(raw) {
   return keys;
 }
 
-export default async function BuyerInvoicesPage({ params }) {
-  const { buyerName } = await params;
-  const decodedBuyer = decodeURIComponent(buyerName).trim();
+const fmt = (n) => {
+  const num = Number(n) || 0;
+  return num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+export default async function LedgerPage({ params }) {
+  const { companyName } = await params;
+  const decodedCompany = decodeURIComponent(companyName).trim();
 
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
@@ -75,12 +76,12 @@ export default async function BuyerInvoicesPage({ params }) {
 
   let invoices = [];
   let ledgerEntries = [];
-  let customerIdForBuyer = null;
+  let customerIdForCompany = null;
 
   try {
     const conn = await getDbConnection();
 
-    // ── 1. Invoices for this buyer ──────────────────────────────
+    // ── 1. Invoices for this company ──────────────────────────────
     const [invRows] = await conn.execute(
       `SELECT
          id,
@@ -95,93 +96,52 @@ export default async function BuyerInvoicesPage({ params }) {
          DATE(created_at) AS created_date,
          created_at
        FROM invoices
-       WHERE TRIM(customer_name) = ? OR customer_name = ?
+       WHERE TRIM(customer_name) = ?
        ORDER BY COALESCE(order_date, invoice_date) DESC, id DESC`,
-      [decodedBuyer, decodedBuyer]
+      [decodedCompany]
     );
     invoices = invRows;
 
-    // Capture customer_id from first invoice (if available)
     if (invoices.length > 0 && invoices[0].customer_id) {
-      customerIdForBuyer = invoices[0].customer_id;
+      customerIdForCompany = invoices[0].customer_id;
     }
 
-    // Fallback: if invoice has no customer_id, look it up from product_stock_request by client_name
-    if (!customerIdForBuyer) {
-      const [cRows] = await conn.execute(
-        `SELECT customer_id FROM product_stock_request 
-         WHERE TRIM(client_name) = ? AND customer_id IS NOT NULL AND customer_id != 0
-         LIMIT 1`,
-        [decodedBuyer]
-      );
-      if (cRows.length > 0) {
-        customerIdForBuyer = cRows[0].customer_id;
-      }
-    }
-
-    // ── 2. Collect all relevant statements for this buyer ──────
+    // ── 2. Collect all relevant statements for this company ──────
     const buyerInvoiceIds = new Set(invoices.map(i => i.id));
     const buyerInvoiceNumbers = new Set(invoices.map(i => i.invoice_number).filter(Boolean));
 
-    // Fetch all statements first
+    // Fetch all statements
     const [allStatements] = await conn.execute(
       `SELECT id, trans_id, date, amount, description, type, linked_purchase_ids, invoice_number, invoice_status
        FROM statements
        ORDER BY date ASC, id ASC`
     );
-    
-    console.log("[Buyer Page] All statements count:", allStatements.length);
-    console.log("[Buyer Page] Buyer invoice IDs:", [...buyerInvoiceIds]);
-    console.log("[Buyer Page] Buyer invoice numbers:", [...buyerInvoiceNumbers]);
-    console.log("[Buyer Page] First invoice details:", invoices[0]);
 
-    // Filter to get only statements relevant to this buyer
+    // Filter statements relevant to this company
     let statementRows = allStatements.filter(stmt => {
       const inLinkedTransIds = invoices.some(inv => {
         const invLinkedTransIds = parseTransIds(inv.linked_trans_ids);
-        const includes = invLinkedTransIds.includes(stmt.trans_id);
-        if (includes) {
-          console.log(`[Buyer Page] Statement ${stmt.id} (${stmt.trans_id}) in invoice ${inv.id}'s linked_trans_ids:`, invLinkedTransIds);
-        }
-        return includes;
+        return invLinkedTransIds.includes(stmt.trans_id);
       });
       const matchesInvoiceNumber = stmt.invoice_number && buyerInvoiceNumbers.has(stmt.invoice_number);
       const linkedPurchaseTokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
       const hasLinkedInvoiceId = linkedPurchaseTokens.some(token => {
         if (token.startsWith("IP")) {
           const invId = parseInt(token.replace("IP", ""));
-          const has = buyerInvoiceIds.has(invId);
-          if (has) {
-            console.log(`[Buyer Page] Statement ${stmt.id} (${stmt.trans_id}) has linked_purchase_ids token ${token} matching invoice ${invId}`);
-          }
-          return has;
+          return buyerInvoiceIds.has(invId);
         }
         return false;
       });
-      const isRelevant = inLinkedTransIds || matchesInvoiceNumber || hasLinkedInvoiceId;
-      if (isRelevant) {
-        console.log("[Buyer Page] Found relevant statement:", { id: stmt.id, trans_id: stmt.trans_id, amount: stmt.amount, linked_purchase_ids: stmt.linked_purchase_ids, invoice_number: stmt.invoice_number, linkedPurchaseTokens, inLinkedTransIds, matchesInvoiceNumber, hasLinkedInvoiceId });
-      } else {
-        // Log statements with trans_id S2671864 specifically (the settled one)
-        if (stmt.trans_id === "S2671864" || stmt.id === 6993) {
-          console.log("[Buyer Page] EXCLUDING statement 6993/S2671864:", {
-            id: stmt.id, trans_id: stmt.trans_id, amount: stmt.amount,
-            linked_purchase_ids: stmt.linked_purchase_ids, invoice_number: stmt.invoice_number,
-            linkedPurchaseTokens, inLinkedTransIds, matchesInvoiceNumber, hasLinkedInvoiceId
-          });
-        }
-      }
-      return isRelevant;
+      return inLinkedTransIds || matchesInvoiceNumber || hasLinkedInvoiceId;
     });
-    console.log("[Buyer Page] Filtered statement rows count:", statementRows.length);
 
-    // ── 3. Fetch ALL invoices linked to these statements (for amount allocation)
+    // ── 3. Fetch ALL invoices linked to these statements
     let allLinkedInvoices = [];
     if (statementRows.length > 0) {
       const allLinkedInvoiceIds = new Set();
       const allLinkedInvoiceNumbers = new Set();
       for (const stmt of statementRows) {
-        const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
+        const tokens = parseTransIds(stmt.linked_purchase_ids);
         for (const token of tokens) {
           if (token.startsWith("IP")) {
             allLinkedInvoiceIds.add(parseInt(token.replace("IP", "")));
@@ -191,13 +151,11 @@ export default async function BuyerInvoicesPage({ params }) {
           allLinkedInvoiceNumbers.add(stmt.invoice_number);
         }
       }
-      // Include all buyer's invoices too
       invoices.forEach(inv => {
         allLinkedInvoiceIds.add(inv.id);
         if (inv.invoice_number) allLinkedInvoiceNumbers.add(inv.invoice_number);
       });
 
-      // Build query to get all linked invoices
       let queryParts = [];
       let queryParams = [];
       if (allLinkedInvoiceIds.size > 0) {
@@ -230,12 +188,10 @@ export default async function BuyerInvoicesPage({ params }) {
       if (inv.invoice_number) invoiceNumberToIdMap[inv.invoice_number] = inv.id;
     }
 
-    // Create a map of trans_id -> linked invoice ids (PRIORITIZE current buyer's invoices)
     const transToInvoiceIdsMap = {};
     for (const stmt of statementRows) {
       const allIdsInOrder = [];
       const seenIds = new Set();
-      // Add from linked_purchase_ids (IN ORDER)
       const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
       for (const token of tokens) {
         if (token.startsWith("IP")) {
@@ -246,7 +202,6 @@ export default async function BuyerInvoicesPage({ params }) {
           }
         }
       }
-      // Add from invoice_number (if not already added)
       if (stmt.invoice_number && invoiceNumberToIdMap[stmt.invoice_number]) {
         const invId = invoiceNumberToIdMap[stmt.invoice_number];
         if (!seenIds.has(invId)) {
@@ -254,7 +209,6 @@ export default async function BuyerInvoicesPage({ params }) {
           seenIds.add(invId);
         }
       }
-      // Split into buyer's invoices and others, preserving order
       const buyerIds = [];
       const otherIds = [];
       for (const invId of allIdsInOrder) {
@@ -264,32 +218,18 @@ export default async function BuyerInvoicesPage({ params }) {
           otherIds.push(invId);
         }
       }
-      // Combine: buyer's invoices first, then others
       transToInvoiceIdsMap[stmt.trans_id] = [...buyerIds, ...otherIds];
     }
 
-    // Calculate allocation map: key `${invId}-${transId}` -> allocated amount
     const allocationMap = {};
-    // Track remaining balance for each invoice across all statements
     const invoiceRemainingMap = {};
-    // Initialize remaining balance for each invoice to grand total
     for (const invId in invoiceMap) {
       invoiceRemainingMap[invId] = Number(invoiceMap[invId].grand_total) || 0;
-      console.log(`[Buyer Page] Invoice ${invId} (${invoiceMap[invId].invoice_number}) initialized with grand total ${invoiceMap[invId].grand_total}`);
     }
-    console.log("[Buyer Page] Initial invoiceRemainingMap:", invoiceRemainingMap);
 
-    // Process statements in order (ascending by id/date)
     for (const stmt of statementRows) {
-      console.log(`[Buyer Page] Processing statement ${stmt.id} (${stmt.trans_id}) with amount ${stmt.amount}`);
-      
       const linkedInvIds = transToInvoiceIdsMap[stmt.trans_id] || [];
-      console.log(`[Buyer Page] Statement ${stmt.id} linked to invoices:`, linkedInvIds);
-      
-      if (linkedInvIds.length === 0) {
-        console.log(`[Buyer Page] No linked invoices for statement ${stmt.id}`);
-        continue;
-      }
+      if (linkedInvIds.length === 0) continue;
 
       let remainingToAllocate = Math.abs(Number(stmt.amount) || 0);
       const invoicePaidForStmt = {};
@@ -302,65 +242,15 @@ export default async function BuyerInvoicesPage({ params }) {
           invoicePaidForStmt[invId] = toAllocate;
           invoiceRemainingMap[invId] -= toAllocate;
           remainingToAllocate -= toAllocate;
-          console.log(`[Buyer Page] Allocated ${toAllocate} to invoice ${invId} from statement ${stmt.id}`);
         }
       }
-      // Save to allocation map
       for (const invId of linkedInvIds) {
         const key = `${invId}-${stmt.trans_id}`;
         allocationMap[key] = invoicePaidForStmt[invId] || 0;
-        console.log(`[Buyer Page] allocationMap[${key}] = ${allocationMap[key]}`);
       }
     }
-    console.log("[Buyer Page] Final allocationMap:", allocationMap);
 
-    // ── 5. Attach linkedStatements and balance_amount to each invoice
-    invoices = invoices.map(inv => {
-      // Find statements relevant to this invoice
-      const linkedStatements = statementRows.filter(stmt => {
-        const inLinkedTransIds = parseTransIds(inv.linked_trans_ids).includes(stmt.trans_id);
-        const matchesInvoiceNumber = stmt.invoice_number === inv.invoice_number;
-        const hasLinkedInvoiceId = parseLinkedPurchaseIds(stmt.linked_purchase_ids).some(token => 
-          token.startsWith("IP") && parseInt(token.replace("IP", "")) === inv.id
-        );
-        return inLinkedTransIds || matchesInvoiceNumber || hasLinkedInvoiceId;
-      });
-
-      // Calculate total allocated amount for this invoice
-      const totalLinkedAmount = linkedStatements.reduce((sum, stmt) => {
-        const key = `${inv.id}-${stmt.trans_id}`;
-        return sum + (allocationMap[key] || 0);
-      }, 0);
-
-      const balance_amount = Math.max(0, Number(inv.grand_total) - totalLinkedAmount);
-
-      return {
-        ...inv,
-        linkedStatements,
-        balance_amount,
-        totalLinkedAmount
-      };
-    });
-
-    // ── 6. Fetch purchases for this buyer (by customer_id) ──────
-    let purchaseRows = [];
-    if (customerIdForBuyer) {
-      const [pRows] = await conn.execute(
-        `SELECT 
-           id,
-           COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
-           invoice_number,
-           net_amount,
-           client_name
-         FROM product_stock_request
-         WHERE customer_id = ?
-         ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
-        [customerIdForBuyer]
-      );
-      purchaseRows = pRows;
-    }
-
-    // ── 7. Build derived ledger rows ────────────────────────────
+    // ── 5. Build ledger entries ────────────────────────────
     const derivedLedger = [];
 
     // Add sales entries
@@ -378,27 +268,8 @@ export default async function BuyerInvoicesPage({ params }) {
       });
     }
 
-    // Add purchase entries
-    for (const purch of purchaseRows) {
-      const purchDate = purch.invoice_date ? String(purch.invoice_date).slice(0, 10) : null;
-      if (!purchDate) continue;
-
-      derivedLedger.push({
-        id: `purch-${purch.id}`,
-        entry_date: purchDate,
-        particulars: `Purchase – ${purch.invoice_number}`,
-        vch_type: "Purchase",
-        vch_no: purch.invoice_number,
-        debit: 0,
-        credit: Number(purch.net_amount) || 0,
-        source: "purchase",
-      });
-    }
-
-    // Now add receipt entries for the buyer's invoices
+    // Add receipt entries
     for (const inv of invoices) {
-      console.log(`[Buyer Page] Processing invoice ${inv.id} (${inv.invoice_number}) for receipt entries`);
-      
       const relevantTransIds = new Set([
         ...parseTransIds(inv.linked_trans_ids),
         ...statementRows.filter(s => s.invoice_number === inv.invoice_number).map(s => s.trans_id),
@@ -407,29 +278,17 @@ export default async function BuyerInvoicesPage({ params }) {
           return tokens.includes(`IP${inv.id}`);
         }).map(s => s.trans_id)
       ]);
-      
-      console.log(`[Buyer Page] Invoice ${inv.id} relevantTransIds:`, [...relevantTransIds]);
 
       for (const transId of relevantTransIds) {
         const stmt = statementRows.find(s => s.trans_id === transId);
-        if (!stmt) {
-          console.log(`[Buyer Page] No statement found for transId ${transId}`);
-          continue;
-        }
+        if (!stmt) continue;
         const stmtDate = stmt.date ? String(stmt.date).slice(0, 10) : null;
-        if (!stmtDate) {
-          console.log(`[Buyer Page] Statement ${stmt.id} has no date`);
-          continue;
-        }
+        if (!stmtDate) continue;
 
         const key = `${inv.id}-${transId}`;
         const allocatedAmount = allocationMap[key] || 0;
-        console.log(`[Buyer Page] Statement ${stmt.id} (${transId}): allocationMap[${key}] = ${allocatedAmount}`);
         
-        if (allocatedAmount <= 0) {
-          console.log(`[Buyer Page] Skipping statement ${stmt.id} because allocatedAmount <= 0`);
-          continue;
-        }
+        if (allocatedAmount <= 0) continue;
 
         derivedLedger.push({
           id: `stmt-${transId}-inv-${inv.id}`,
@@ -443,11 +302,10 @@ export default async function BuyerInvoicesPage({ params }) {
           credit: allocatedAmount,
           source: "statement",
         });
-        console.log(`[Buyer Page] Added receipt entry:`, derivedLedger[derivedLedger.length - 1]);
       }
     }
 
-    // ── 8. Manual ledger entries for this buyer ─────────────────
+    // ── 6. Manual ledger entries
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS ledger_entries (
         id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -462,21 +320,15 @@ export default async function BuyerInvoicesPage({ params }) {
         updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
-    try {
-      await conn.execute("SELECT buyer_name FROM ledger_entries LIMIT 1");
-    } catch (_) {
-      try { await conn.execute("ALTER TABLE ledger_entries ADD COLUMN buyer_name VARCHAR(255) NULL"); } catch (__) {}
-    }
 
     const [manualRows] = await conn.execute(
       `SELECT id, entry_date, particulars, vch_type, vch_no, debit, credit, created_at
        FROM ledger_entries
        WHERE buyer_name = ?
        ORDER BY entry_date ASC, id ASC`,
-      [decodedBuyer]
+      [decodedCompany]
     );
 
-    // Get only the latest return entry for each invoice (to avoid duplicates)
     const returnEntriesMap = {};
     for (const row of manualRows) {
       if (row.vch_type === 'Return') {
@@ -494,7 +346,7 @@ export default async function BuyerInvoicesPage({ params }) {
       return true;
     });
 
-    // ── 9. Merge + sort by date asc ─────────────────────────────
+    // ── 7. Merge + sort by date
     const combined = [
       ...derivedLedger,
       ...filteredManualRows.map((r) => ({ ...r, source: "manual" })),
@@ -512,37 +364,104 @@ export default async function BuyerInvoicesPage({ params }) {
 
     ledgerEntries = combined;
   } catch (err) {
-    console.error("[buyer invoices page] DB error:", err?.message);
+    console.error("[ledger page] DB error:", err?.message);
   }
 
-  // Get buyer billing address from first invoice (if available)
-  const buyerBillingAddress = invoices.length > 0 ? invoices[0].billing_address : "";
+  // Calculate totals
+  let totalDebit = 0;
+  let totalCredit = 0;
+  for (const entry of ledgerEntries) {
+    totalDebit += Number(entry.debit) || 0;
+    totalCredit += Number(entry.credit) || 0;
+  }
+  const netBalance = totalDebit - totalCredit;
 
   return (
-    <div className="max-w-[1600px] mx-auto p-4 md:p-6 w-full space-y-6">
+    <div className="max-w-7xl mx-auto p-6 w-full space-y-6">
       {/* Back button */}
       <Link
-        href="/accounts-dashboard/invoices"
+        href="/admin-dashboard/ledger"
         className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
       >
         <ArrowLeft size={15} />
-        Back to Buyers
+        Back to Ledger Search
       </Link>
 
-      {/* Buyer heading */}
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">{decodedBuyer}</h1>
+        <h1 className="text-2xl font-bold text-gray-800">{decodedCompany}</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          {customerIdForBuyer && <span className="font-medium">ID: {customerIdForBuyer}</span>} {customerIdForBuyer ? '• ' : ''}
-          {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} on record
+          {customerIdForCompany && <span className="font-medium">ID: {customerIdForCompany}</span>} • {ledgerEntries.length} ledger entries on record
         </p>
       </div>
 
-      {/* Invoice Table */}
-      <BuyerInvoiceTable invoices={invoices} buyerName={decodedBuyer} />
+      {/* Summary Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <p className="text-sm text-gray-600 mb-2">TOTAL DEBIT</p>
+          <p className="text-2xl font-bold text-red-600">₹{fmt(totalDebit)}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <p className="text-sm text-gray-600 mb-2">TOTAL CREDIT</p>
+          <p className="text-2xl font-bold text-green-600">₹{fmt(totalCredit)}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <p className="text-sm text-gray-600 mb-2">NET BALANCE</p>
+          <p className={`text-2xl font-bold ${netBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+            ₹{fmt(Math.abs(netBalance))} {netBalance > 0 ? '(Dr)' : '(Cr)'}
+          </p>
+        </div>
+      </div>
 
       {/* Ledger Table */}
-      <BuyerLedgerTable rows={ledgerEntries} buyerName={decodedBuyer} billingAddress={buyerBillingAddress} />
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Particulars</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Vch Type</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Vch No</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-700">Debit (₹)</th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-700">Credit (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledgerEntries.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                    No ledger entries found
+                  </td>
+                </tr>
+              ) : (
+                ledgerEntries.map((entry, idx) => (
+                  <tr key={entry.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-4 py-3 text-gray-800">{String(entry.entry_date).slice(0, 10)}</td>
+                    <td className="px-4 py-3 text-gray-800">{entry.particulars}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        entry.vch_type === 'Sales' ? 'bg-purple-100 text-purple-800' :
+                        entry.vch_type === 'Receipt' ? 'bg-green-100 text-green-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {entry.vch_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-800">{entry.vch_no}</td>
+                    <td className="px-4 py-3 text-right font-medium text-red-600">
+                      {Number(entry.debit) > 0 ? `₹${fmt(entry.debit)}` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-green-600">
+                      {Number(entry.credit) > 0 ? `₹${fmt(entry.credit)}` : '-'}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

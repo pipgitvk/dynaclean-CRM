@@ -533,6 +533,9 @@ export default async function BuyerInvoicesPage({ params }) {
       <div>
         <h1 className="text-2xl font-bold text-gray-800">{decodedBuyer}</h1>
         <p className="text-sm text-gray-500 mt-0.5">
+          {invoices.length > 0 && invoices[0].customer_id && (
+            <span className="font-medium">ID: {invoices[0].customer_id}</span>
+          )} {invoices.length > 0 && invoices[0].customer_id ? '• ' : ''}
           {invoices.length} invoice{invoices.length !== 1 ? "s" : ""} on record
         </p>
       </div>

@@ -651,6 +651,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "Receipt",
       },
+      {
+        path: "/admin-dashboard/ledger",
+        name: "Ledger",
+        accessKey: "ledger",
+        roles: ["SUPERADMIN", "ADMIN", "ACCOUNTANT"],
+        icon: "BookOpen",
+      },
     ],
   },
   {

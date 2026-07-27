@@ -682,6 +682,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Receipt",
       },
+      {
+        path: "/admin-dashboard/ledger",
+        name: "Ledger",
+        moduleKey: "ledger",
+        roles: ["ALL"],
+        icon: "BookOpen",
+      },
     ],
   },
   {
