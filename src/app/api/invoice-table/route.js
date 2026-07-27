@@ -317,6 +317,20 @@ export async function GET(req) {
         0
       );
       const newBalanceAmount = Math.max(0, Number(invoice.grand_total) - totalLinkedAmount);
+
+      // Derive payment_status dynamically from the runtime-calculated balance
+      // (DB payment_status may be stale if balance was recalculated via linked statements)
+      const grandTotal = Number(invoice.grand_total) || 0;
+      let derivedPaymentStatus = invoice.payment_status || "UNPAID";
+      if (grandTotal > 0) {
+        if (newBalanceAmount === 0) {
+          derivedPaymentStatus = "PAID";
+        } else if (newBalanceAmount < grandTotal) {
+          derivedPaymentStatus = "PARTIAL";
+        } else {
+          derivedPaymentStatus = "UNPAID";
+        }
+      }
       
       // Log for debugging
       console.log(`Invoice ${invoice.id} (${invoice.invoice_number}) related invoices:`, uniqueRelatedInvoices);
@@ -326,7 +340,8 @@ export async function GET(req) {
         ...invoice,
         items: items || [],
         linkedStatements: linkedStatements || [],
-        balance_amount: newBalanceAmount
+        balance_amount: newBalanceAmount,
+        payment_status: derivedPaymentStatus
       };
     })
   );

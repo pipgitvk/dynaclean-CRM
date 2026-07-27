@@ -128,7 +128,7 @@ async function getInvoiceWithItems(invoiceNumber) {
   let linkedStatements = [];
   for (const inv of uniqueRelatedInvoices) {
     const [stmts] = await conn.execute(
-      "SELECT id, trans_id, date, description, amount, invoice_status FROM statements WHERE linked_purchase_ids LIKE ? OR invoice_number = ?",
+      "SELECT id, trans_id, date, description, amount, invoice_status, linked_purchase_ids FROM statements WHERE linked_purchase_ids LIKE ? OR invoice_number = ?",
       [`%IP${inv.id}%`, inv.number]
     );
     linkedStatements.push(...stmts);
@@ -145,8 +145,81 @@ async function getInvoiceWithItems(invoiceNumber) {
   }
   linkedStatements = uniqueLinkedStatements;
 
+  // --- Runtime recalculation of balance_amount and payment_status ---
+  // Build a map of grand_total for all related invoices (for waterfall allocation)
+  const relatedInvoiceGrandTotals = {};
+  for (const inv of uniqueRelatedInvoices) {
+    if (inv.id === invoice.id) {
+      relatedInvoiceGrandTotals[inv.id] = Number(invoice.grand_total) || 0;
+    } else {
+      const [[relInv]] = await conn.execute(
+        "SELECT grand_total FROM invoices WHERE id = ? LIMIT 1",
+        [inv.id]
+      );
+      relatedInvoiceGrandTotals[inv.id] = Number(relInv?.grand_total) || 0;
+    }
+  }
+
+  // Waterfall allocation: distribute each statement's amount across related invoices in id order
+  const invoiceRemainingMap = { ...relatedInvoiceGrandTotals };
+  const allocationMap = {}; // key: `${invoiceId}-${trans_id}` → allocated amount
+
+  for (const stmt of linkedStatements) {
+    // Parse linked_purchase_ids to get ordered invoice ids
+    let tokens = [];
+    try {
+      const raw = stmt.linked_purchase_ids;
+      if (raw) {
+        const parsed = Array.isArray(raw) ? raw : JSON.parse(raw);
+        tokens = Array.isArray(parsed) ? parsed : [parsed];
+      }
+    } catch {
+      tokens = String(stmt.linked_purchase_ids || "").split(",").map(s => s.trim());
+    }
+    const orderedIds = tokens
+      .map(t => {
+        const m = String(t).toUpperCase().match(/^IP(\d+)$/);
+        return m ? parseInt(m[1]) : null;
+      })
+      .filter(id => id !== null && relatedInvoiceGrandTotals[id] !== undefined);
+
+    // Also include this invoice if matched by invoice_number but not token
+    if (orderedIds.length === 0) orderedIds.push(invoice.id);
+
+    let remaining = Math.abs(Number(stmt.amount) || 0);
+    for (const invId of orderedIds) {
+      if (remaining <= 0) break;
+      const avail = invoiceRemainingMap[invId] || 0;
+      if (avail <= 0) continue;
+      const toAllocate = Math.min(avail, remaining);
+      allocationMap[`${invId}-${stmt.trans_id}`] = (allocationMap[`${invId}-${stmt.trans_id}`] || 0) + toAllocate;
+      invoiceRemainingMap[invId] -= toAllocate;
+      remaining -= toAllocate;
+    }
+  }
+
+  // Calculate this invoice's allocated total
+  const totalAllocated = linkedStatements.reduce((sum, stmt) => {
+    return sum + (allocationMap[`${invoice.id}-${stmt.trans_id}`] || 0);
+  }, 0);
+
+  const grandTotal = Number(invoice.grand_total) || 0;
+  const computedBalance = Math.max(0, grandTotal - totalAllocated);
+
+  let computedPaymentStatus = "UNPAID";
+  if (grandTotal > 0) {
+    if (computedBalance === 0) {
+      computedPaymentStatus = "PAID";
+    } else if (computedBalance < grandTotal) {
+      computedPaymentStatus = "PARTIAL";
+    }
+  }
+  // --- End recalculation ---
+
   return {
     ...invoice,
+    balance_amount: computedBalance,
+    payment_status: computedPaymentStatus,
     reference_quote_number: resolvedQuoteNumber,
     reference_quote_created_at: resolvedQuoteCreatedAt,
     items,

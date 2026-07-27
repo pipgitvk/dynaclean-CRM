@@ -92,8 +92,68 @@ async function getInvoiceWithItems(invoiceNumber) {
     [invoice.id],
   );
 
+  // --- Runtime recalculation of balance_amount and payment_status via linked statements ---
+  let relatedInvoices = [{ id: invoice.id, number: invoice.invoice_number }];
+  if (invoice.parent_id) {
+    const [parent] = await conn.execute("SELECT id, invoice_number FROM invoices WHERE id = ? LIMIT 1", [invoice.parent_id]);
+    if (parent.length > 0) relatedInvoices.push({ id: parent[0].id, number: parent[0].invoice_number });
+    const [siblings] = await conn.execute("SELECT id, invoice_number FROM invoices WHERE parent_id = ?", [invoice.parent_id]);
+    siblings.forEach(s => relatedInvoices.push({ id: s.id, number: s.invoice_number }));
+  } else {
+    const [children] = await conn.execute("SELECT id, invoice_number FROM invoices WHERE parent_id = ?", [invoice.id]);
+    children.forEach(c => relatedInvoices.push({ id: c.id, number: c.invoice_number }));
+  }
+  const seenRelated = new Set();
+  relatedInvoices = relatedInvoices.filter(inv => { if (seenRelated.has(inv.id)) return false; seenRelated.add(inv.id); return true; });
+
+  const relatedGrandTotals = {};
+  for (const inv of relatedInvoices) {
+    if (inv.id === invoice.id) { relatedGrandTotals[inv.id] = Number(invoice.grand_total) || 0; }
+    else { const [[rel]] = await conn.execute("SELECT grand_total FROM invoices WHERE id = ? LIMIT 1", [inv.id]); relatedGrandTotals[inv.id] = Number(rel?.grand_total) || 0; }
+  }
+
+  let linkedStatements = [];
+  for (const inv of relatedInvoices) {
+    const [stmts] = await conn.execute(
+      "SELECT id, trans_id, amount, invoice_status, linked_purchase_ids FROM statements WHERE linked_purchase_ids LIKE ? OR invoice_number = ?",
+      [`%IP${inv.id}%`, inv.number]
+    );
+    linkedStatements.push(...stmts);
+  }
+  const seenStmts = new Set();
+  linkedStatements = linkedStatements.filter(s => { if (seenStmts.has(s.id)) return false; seenStmts.add(s.id); return true; });
+
+  const invoiceRemainingMap = { ...relatedGrandTotals };
+  const allocationMap = {};
+  for (const stmt of linkedStatements) {
+    let tokens = [];
+    try { const raw = stmt.linked_purchase_ids; if (raw) { const p = Array.isArray(raw) ? raw : JSON.parse(raw); tokens = Array.isArray(p) ? p : [p]; } } catch { tokens = String(stmt.linked_purchase_ids || "").split(",").map(s => s.trim()); }
+    const orderedIds = tokens.map(t => { const m = String(t).toUpperCase().match(/^IP(\d+)$/); return m ? parseInt(m[1]) : null; }).filter(id => id !== null && relatedGrandTotals[id] !== undefined);
+    if (orderedIds.length === 0) orderedIds.push(invoice.id);
+    let remaining = Math.abs(Number(stmt.amount) || 0);
+    for (const invId of orderedIds) {
+      if (remaining <= 0) break;
+      const avail = invoiceRemainingMap[invId] || 0; if (avail <= 0) continue;
+      const toAllocate = Math.min(avail, remaining);
+      allocationMap[`${invId}-${stmt.trans_id}`] = (allocationMap[`${invId}-${stmt.trans_id}`] || 0) + toAllocate;
+      invoiceRemainingMap[invId] -= toAllocate; remaining -= toAllocate;
+    }
+  }
+
+  const totalAllocated = linkedStatements.reduce((sum, stmt) => sum + (allocationMap[`${invoice.id}-${stmt.trans_id}`] || 0), 0);
+  const grandTotal = Number(invoice.grand_total) || 0;
+  const computedBalance = Math.max(0, grandTotal - totalAllocated);
+  let computedPaymentStatus = "UNPAID";
+  if (grandTotal > 0) {
+    if (computedBalance === 0) computedPaymentStatus = "PAID";
+    else if (computedBalance < grandTotal) computedPaymentStatus = "PARTIAL";
+  }
+  // --- End recalculation ---
+
   return {
     ...invoice,
+    balance_amount: computedBalance,
+    payment_status: computedPaymentStatus,
     reference_quote_number: resolvedQuoteNumber,
     reference_quote_created_at: resolvedQuoteCreatedAt,
     reference_quote_sno: resolvedQuoteSno,
