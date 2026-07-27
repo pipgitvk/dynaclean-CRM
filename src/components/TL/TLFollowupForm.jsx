@@ -136,8 +136,9 @@ export default function TLFollowupForm({
       model: modelArray,
       status: latestfollowup.status || "",
       notes: latestfollowup.notes || "",
-      // Allow user to set next_followup_date; defaults to empty (user must specify)
-      next_followup_date: latestfollowup.next_followup_date ? latestfollowup.next_followup_date : "",
+      // next_followup_date is intentionally NOT carried over from previous followup.
+      // It must be explicitly set by the user in each new followup entry.
+      next_followup_date: "",
       stage: latestfollowup.stage || prev.stage,
       multi_tag,
       assigned_employee:

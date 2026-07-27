@@ -206,7 +206,8 @@ async function importLeadToCRM(lead, assignedTo) {
     ]
   );
 
-  // ✅ Insert into TL_followups table with next_followup_date = followed_date + 2 hours
+  // ✅ Insert into TL_followups table — next_followup_date is NULL on auto-import;
+  //    TL must manually set it when they follow up.
   await conn.execute(
     `INSERT INTO TL_followups (
         customer_id, followed_date, next_followup_date, followed_by, notes
@@ -214,7 +215,7 @@ async function importLeadToCRM(lead, assignedTo) {
     [
       customerId,
       now,
-      nextFollowupDate,
+      null,
       assignedTo,
       'Lead from Facebook ad (multi-credential)'
     ]
