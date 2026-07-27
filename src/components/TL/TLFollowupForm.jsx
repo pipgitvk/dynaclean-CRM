@@ -53,7 +53,7 @@ export default function TLFollowupForm({
     status: "",
     notes: "",
     followed_date: formatISTDateTime(new Date()),
-    next_followup_date: formatISTDateTime(new Date()),
+    next_followup_date: "", // Empty - user must specify when creating new followup
     assigned_employee: customerData?.lead_source || "",
     stage: "New",
   });
@@ -136,8 +136,8 @@ export default function TLFollowupForm({
       model: modelArray,
       status: latestfollowup.status || "",
       notes: latestfollowup.notes || "",
-      // Always set next_followup_date to today (current month/year with today's date)
-      next_followup_date: formatISTDateTime(new Date()),
+      // Allow user to set next_followup_date; defaults to empty (user must specify)
+      next_followup_date: latestfollowup.next_followup_date ? latestfollowup.next_followup_date : "",
       stage: latestfollowup.stage || prev.stage,
       multi_tag,
       assigned_employee:

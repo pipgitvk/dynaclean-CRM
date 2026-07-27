@@ -126,9 +126,9 @@ export default async function TLCustomersPage({ searchParams }) {
     }
   }
 
-  // TL toggle on: only customers who have at least one TL_followups row (TL ne follow-up dala ho)
+  // TL toggle on: only customers who have at least one TL_followups row OR have an automatic next_followup_date
   if (showTLOnly) {
-    query += ` AND tlf.customer_id IS NOT NULL`;
+    query += ` AND (tlf.customer_id IS NOT NULL OR tlf.next_followup_date IS NOT NULL)`;
   }
 
   if (nextFromDate && nextToDate) {
@@ -250,7 +250,7 @@ export default async function TLCustomersPage({ searchParams }) {
   }
 
   if (showTLOnly) {
-    kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
+    kpiQuery += ` AND (tlf.customer_id IS NOT NULL OR tlf.next_followup_date IS NOT NULL)`;
   }
 
   if (nextFromDate && nextToDate) {

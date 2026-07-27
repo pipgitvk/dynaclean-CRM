@@ -18,7 +18,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   const searchParamsResolved = await searchParams;
-  const {
+  let {
     search,
     employee,
     status,
@@ -28,9 +28,14 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     nextToDate,
     lead_campaign,
     page = "1",
-    tlOnly = "true",
+    tlOnly,
     preBookingOnly = "false",
   } = searchParamsResolved;
+
+  // Default to showing TL-only customers if parameter not specified
+  if (tlOnly === undefined || tlOnly === null) {
+    tlOnly = "true";
+  }
 
   const currentPage = parseInt(page);
   const pageSize = 50; // Number of records per page
@@ -130,9 +135,9 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     }
   }
 
-  // When ON: show only customers that have TL_followups rows
+  // When ON: show only customers that have TL_followups rows OR have an automatic next_followup_date
   if (showTLOnly) {
-    query += ` AND tlf.customer_id IS NOT NULL`;
+    query += ` AND (tlf.customer_id IS NOT NULL OR tlf.next_followup_date IS NOT NULL)`;
   }
 
   // When ON: show only customers that have pre_booking rows
@@ -268,7 +273,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   if (showTLOnly) {
-    kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
+    kpiQuery += ` AND (tlf.customer_id IS NOT NULL OR tlf.next_followup_date IS NOT NULL)`;
   }
 
   if (showPreBookingOnly) {
