@@ -43,6 +43,7 @@ async function saveFile(file) {
 export async function GET(req) {
   console.log("GET /warehouse-request started");
 
+  let conn;
   try {
     const payload = await getSessionPayload();
     console.log("Session payload:", payload);
@@ -52,7 +53,8 @@ export async function GET(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = await getDbConnection();
+    const pool = await getDbConnection();
+    conn = await pool.getConnection();
     console.log("DB connection established");
 
     const query = `
@@ -75,7 +77,7 @@ export async function GET(req) {
     `;
 
     console.log("Executing GET query...");
-    const [requests] = await db.execute(query);
+    const [requests] = await conn.execute(query);
 
     console.log("Fetched requests:", requests.length);
 
@@ -86,6 +88,14 @@ export async function GET(req) {
       { error: "Failed to fetch pending requests" },
       { status: 500 }
     );
+  } finally {
+    if (conn) {
+      try {
+        await conn.release();
+      } catch (releaseError) {
+        console.error("Error releasing connection:", releaseError);
+      }
+    }
   }
 }
 

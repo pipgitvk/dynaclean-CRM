@@ -51,9 +51,11 @@ export function canProxyAttendanceRegularization(role) {
 export async function resolveRoleForAttendanceAdmin(payload) {
   if (!payload?.username) return null;
   if (canManageAttendanceRules(payload.role)) return payload.role;
+  let conn;
   try {
     const { getDbConnection } = await import("@/lib/db");
-    const conn = await getDbConnection();
+    const pool = await getDbConnection();
+    conn = await pool.getConnection();
     const [repRows] = await conn.query(
       "SELECT userRole FROM rep_list WHERE LOWER(username) = LOWER(?) LIMIT 1",
       [payload.username]
@@ -68,6 +70,14 @@ export async function resolveRoleForAttendanceAdmin(payload) {
     if (ur2 != null && String(ur2).trim() !== "") return String(ur2).trim();
   } catch (e) {
     console.error("resolveRoleForAttendanceAdmin:", e);
+  } finally {
+    if (conn) {
+      try {
+        await conn.release();
+      } catch (releaseError) {
+        console.error("Error releasing connection:", releaseError);
+      }
+    }
   }
   return payload.role;
 }

@@ -9,7 +9,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
 export async function POST(request) {
   console.log("--- API Route Execution Start ---");
 
-  const conn = await getDbConnection();
   const userAgent = request.headers.get("user-agent") || "unknown";
 
   // Get client IP address
@@ -23,8 +22,11 @@ export async function POST(request) {
     ip = ip.split(",")[0].trim();
   }
 
+  let pool, conn;
+
   // Helper to record activity
   const recordActivity = async (username, role, status, message) => {
+    if (!conn) return; // Safety check
     try {
       await conn.execute(
         "INSERT INTO login_activity (username, ip_address, user_agent, status, role, message) VALUES (?, ?, ?, ?, ?, ?)",
@@ -36,6 +38,10 @@ export async function POST(request) {
   };
 
   try {
+    // Get pool and a connection from it
+    pool = await getDbConnection();
+    conn = await pool.getConnection();
+
     const { username, password } = await request.json();
     console.log("🟡 Login request received:", username);
 
@@ -113,7 +119,7 @@ export async function POST(request) {
       );
       
       if (repRows.length > 0) {
-        user = [repRows][0][0];
+        user = repRows[0];
         sourceTable = "rep_list";
       }
     
@@ -205,6 +211,16 @@ console.log('✅ User ',user);
       { error: "Internal Server Error" },
       { status: 500 },
     );
+  } finally {
+    // CRITICAL: Always release connection back to pool
+    if (conn) {
+      try {
+        await conn.release();
+        console.log("✅ Login connection released back to pool");
+      } catch (releaseError) {
+        console.error("❌ Error releasing login connection:", releaseError);
+      }
+    }
   }
 }
 

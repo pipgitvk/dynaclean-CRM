@@ -10,6 +10,7 @@ export async function GET(request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  let conn;
   try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username")?.trim();
@@ -19,7 +20,8 @@ export async function GET(request) {
       return NextResponse.json({ allowed: true });
     }
 
-    const conn = await getDbConnection();
+    const pool = await getDbConnection();
+    conn = await pool.getConnection();
 
     // Check emplist first, then rep_list
     let [rows] = await conn.execute(
@@ -54,5 +56,13 @@ export async function GET(request) {
     console.error("Error in validate-ip:", error);
     // Fail open to avoid lockouts on DB error
     return NextResponse.json({ allowed: true });
+  } finally {
+    if (conn) {
+      try {
+        await conn.release();
+      } catch (releaseError) {
+        console.error("Error releasing connection:", releaseError);
+      }
+    }
   }
 }

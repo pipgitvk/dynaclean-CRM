@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 
 export async function GET(req) {
+  let conn;
   try {
     const { searchParams } = new URL(req.url);
     const orderId = searchParams.get("order_id");
@@ -13,7 +14,8 @@ export async function GET(req) {
       );
     }
 
-    const conn = await getDbConnection();
+    const pool = await getDbConnection();
+    conn = await pool.getConnection();
 
     // STEP 1: Check if Order exists
     const [orderCheck] = await conn.execute(
@@ -131,5 +133,13 @@ export async function GET(req) {
       { success: false, error: "Internal server error", message: error.message },
       { status: 500 }
     );
+  } finally {
+    if (conn) {
+      try {
+        await conn.release();
+      } catch (releaseError) {
+        console.error("Error releasing connection:", releaseError);
+      }
+    }
   }
 }

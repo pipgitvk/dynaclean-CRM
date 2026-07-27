@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import path from "path";
 
 export async function POST(request) {
+  let conn;
   try {
     const data = await request.formData();
     const file = data.get("profileImage");
@@ -29,10 +30,10 @@ export async function POST(request) {
     await fs.writeFile(filePath, buffer);
 
     // Update database
-    const db = await getDbConnection();
+    const pool = await getDbConnection();
+    conn = await pool.getConnection();
     const query = `UPDATE rep_list SET profile_pic = ? WHERE username = ?`;
-    await db.query(query, [`/employees/${username}/${filename}`, username]);
-    // db.end();
+    await conn.execute(query, [`/employees/${username}/${filename}`, username]);
 
     return NextResponse.json({
       message: "File uploaded successfully",
@@ -40,5 +41,13 @@ export async function POST(request) {
   } catch (error) {
     console.error("API error:", error);
     return NextResponse.json({ error: "Failed to upload file." }, { status: 500 });
+  } finally {
+    if (conn) {
+      try {
+        await conn.release();
+      } catch (releaseError) {
+        console.error("Error releasing connection:", releaseError);
+      }
+    }
   }
 }

@@ -50,6 +50,13 @@ function createMysqlPool() {
     queueLimit: 0,
 
     connectTimeout: 10000,
+    
+    /**
+     * CRITICAL: Idle timeout prevents connection leaks
+     * Closes idle connections after 30 seconds to free up resources
+     * This prevents ER_USER_LIMIT_REACHED errors
+     */
+    idleTimeout: 30000,
 
     /**
      * Important:
