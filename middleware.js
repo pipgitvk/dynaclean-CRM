@@ -141,7 +141,7 @@ export async function middleware(request) {
         // Allow everyone to access accounting/ledger and invoices/buyer routes
         const isEveryoneAllowedRoute = isAccountingLedgerRoute || isInvoicesBuyerRoute;
         
-        if (!(roleNorm === "EA" && isEaAllowed) && !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) && !(isSales && isDeniedLeadsRoute) && !isEveryoneAllowedRoute) {
+        if (!(roleNorm === "EA" && isEaAllowed) && !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) && !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute)) && !isEveryoneAllowedRoute) {
           const dest = new URL("/user-dashboard", request.url);
           dest.search = request.nextUrl.search;
           return NextResponse.redirect(dest);
