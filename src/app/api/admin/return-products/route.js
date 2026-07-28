@@ -124,6 +124,7 @@ export async function POST(request) {
       return_type,
       reason,
       customer_id,
+      company_name,
       items,
     } = body;
 
@@ -250,6 +251,203 @@ export async function POST(request) {
 
           await connection.query(itemInsertQuery, itemValues);
         }
+      }
+
+      // ── 1. Ledger entry create (company_name 1st priority) ──
+      try {
+        // Ensure ledger_entries table exists
+        try {
+          await connection.query(`
+            CREATE TABLE IF NOT EXISTS ledger_entries (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              entry_date DATE NOT NULL,
+              particulars VARCHAR(255) NOT NULL,
+              vch_type VARCHAR(50) DEFAULT NULL,
+              vch_no VARCHAR(100) DEFAULT NULL,
+              debit DECIMAL(15,2) DEFAULT 0.00,
+              credit DECIMAL(15,2) DEFAULT 0.00,
+              buyer_name VARCHAR(255) DEFAULT NULL,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              INDEX idx_ledger_buyer (buyer_name),
+              INDEX idx_ledger_entry_date (entry_date),
+              INDEX idx_ledger_vch (vch_type, vch_no)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+          `);
+        } catch (ce) { /* ignore already exists */ }
+
+        try {
+          await connection.query(`
+            ALTER TABLE ledger_entries
+            ADD COLUMN IF NOT EXISTS buyer_name VARCHAR(255) DEFAULT NULL
+          `);
+        } catch (ae) { /* ignore already exists */ }
+
+        // Resolve buyer_name — company_name 1st priority
+        let buyerName = null;
+        if (company_name && String(company_name).trim()) {
+          buyerName = String(company_name).trim();
+        }
+        if (!buyerName && invoice_no) {
+          try {
+            const trimmedInv = String(invoice_no).trim();
+            const [invRows] = await connection.query(
+              `SELECT customer_name, grand_total FROM invoices WHERE TRIM(invoice_number) = ? LIMIT 1`,
+              [trimmedInv]
+            );
+            if (invRows.length > 0 && invRows[0].customer_name) {
+              buyerName = invRows[0].customer_name;
+            }
+          } catch (errInv) { console.warn('invoice lookup:', errInv.message); }
+        }
+        if (!buyerName && quotation_no) {
+          try {
+            const trimmedQ = String(quotation_no).trim();
+            const [qRows] = await connection.query(
+              `SELECT qr.buyer_name
+               FROM quotations_records qr
+               WHERE TRIM(qr.quote_number) = ? LIMIT 1`,
+              [trimmedQ]
+            );
+            if (qRows.length > 0 && qRows[0].buyer_name) {
+              buyerName = qRows[0].buyer_name;
+            }
+          } catch (errQ) { console.warn('quotation lookup:', errQ.message); }
+        }
+        if (!buyerName && customer_id) {
+          try {
+            const [custRows] = await connection.query(
+              `SELECT company FROM customers WHERE id = ? LIMIT 1`,
+              [customer_id]
+            );
+            if (custRows.length > 0 && custRows[0].company) {
+              buyerName = custRows[0].company;
+            }
+          } catch (errCust) { console.warn('customer lookup:', errCust.message); }
+        }
+
+        if (buyerName) {
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const isFull = return_type === 'full';
+          const invNoTrim = String(invoice_no || quotation_no || '').trim();
+          const particulars = `Return (${isFull ? 'Full' : 'Partial'})` + (invNoTrim ? ` – ${invNoTrim}` : '');
+          const creditAmt = Number(pricing_total || 0);
+
+          await connection.query(
+            `INSERT INTO ledger_entries (entry_date, particulars, vch_type, vch_no, debit, credit, buyer_name, created_at, updated_at)
+             VALUES (?, ?, 'Return', ?, 0, ?, ?, NOW(), NOW())`,
+            [todayStr, particulars, invNoTrim || null, creditAmt, buyerName]
+          );
+        }
+      } catch (ledgerErr) {
+        console.warn('[return-products] ledger entry skipped:', ledgerErr.message);
+      }
+
+      // ── 2. Same sync as installation/action: neworder, dispatch, invoices, order_return_items ──
+      try {
+        const trimmedQ = String(quotation_no || '').trim();
+        const trimmedInv = String(invoice_no || '').trim();
+        const isFull = return_type === 'full';
+
+        // Resolve order_id from neworder
+        let orderIdForReturn = null;
+        if (trimmedQ) {
+          try {
+            const [ord] = await connection.query(
+              `SELECT order_id FROM neworder WHERE TRIM(quote_number) = ? LIMIT 1`,
+              [trimmedQ]
+            );
+            if (ord.length > 0) orderIdForReturn = ord[0].order_id;
+          } catch (e) { /* ignore */ }
+        }
+        if (!orderIdForReturn && trimmedInv) {
+          try {
+            const [ord2] = await connection.query(
+              `SELECT order_id FROM neworder WHERE TRIM(invoice_number) = ? LIMIT 1`,
+              [trimmedInv]
+            );
+            if (ord2.length > 0) orderIdForReturn = ord2[0].order_id;
+          } catch (e) { /* ignore */ }
+        }
+
+        if (orderIdForReturn) {
+          // ── 2a. UPDATE neworder ──
+          try {
+            await connection.query(
+              `UPDATE neworder SET installation_status = 0, is_returned = ? WHERE order_id = ?`,
+              [isFull ? 1 : 2, orderIdForReturn]
+            );
+          } catch (e) { console.warn('neworder update:', e.message); }
+
+          // ── 2b. UPDATE invoices returned_date + returned_status ──
+          if (trimmedQ) {
+            try {
+              const [qDt] = await connection.query(
+                `SELECT \`S.No.\` as quotation_id FROM quotations_records WHERE TRIM(quote_number) = ? LIMIT 1`,
+                [trimmedQ]
+              );
+              if (qDt.length > 0) {
+                const qid = qDt[0].quotation_id;
+                await connection.query(
+                  `UPDATE invoices SET returned_date = NOW(), returned_status = ? WHERE quotation_id = ?`,
+                  [isFull ? 'full' : 'partial', qid]
+                );
+              }
+            } catch (e) { console.warn('invoices update:', e.message); }
+          }
+
+          // ── 2c. UPDATE dispatch rows (stock_deducted=0 + returned_date) + order_return_items ──
+          if (trimmedQ) {
+            if (isFull) {
+              try {
+                await connection.query(
+                  `UPDATE dispatch SET stock_deducted = 0, returned_date = NOW(), updated_at = NOW()
+                   WHERE TRIM(quote_number) = ? AND stock_deducted = 1`,
+                  [trimmedQ]
+                );
+              } catch (e) { console.warn('dispatch full update:', e.message); }
+            } else if (items && items.length > 0) {
+              for (const itm of items) {
+                try {
+                  const ic = String(itm.item_code || '').trim();
+                  if (!ic) continue;
+                  const [match] = await connection.query(
+                    `SELECT id, godown FROM dispatch WHERE TRIM(quote_number) = ? AND TRIM(item_code) = ? AND stock_deducted = 1 LIMIT 1`,
+                    [trimmedQ, ic]
+                  );
+                  if (match.length > 0) {
+                    const did = match[0].id;
+                    const gd = match[0].godown || '';
+                    await connection.query(
+                      `UPDATE dispatch SET stock_deducted = 0, returned_date = NOW(), updated_at = NOW() WHERE id = ?`,
+                      [did]
+                    );
+                    // order_return_items insert (stock_reversed=0 since actual reversal happens later at warehouse-in PUT step)
+                    try {
+                      await connection.query(
+                        `INSERT INTO order_return_items
+                         (order_id, dispatch_id, item_code, item_name, quantity_returned, return_reason, returned_by, godown, stock_reversed, created_at, updated_at)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())`,
+                        [
+                          orderIdForReturn,
+                          did,
+                          ic,
+                          itm.item_name || null,
+                          Number(itm.quantity || 1),
+                          reason || null,
+                          userId,
+                          gd
+                        ]
+                      );
+                    } catch (ori) { console.warn('order_return_items insert:', ori.message); }
+                  }
+                } catch (e) { console.warn('dispatch partial item skip:', e.message); }
+              }
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn('[return-products] installation-style sync skipped:', syncErr.message);
       }
 
       await connection.commit();
