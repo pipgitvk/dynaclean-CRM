@@ -71,26 +71,26 @@ Font.register({
 // Create styles
 const styles = StyleSheet.create({
   page: {
-    padding: 10,
-    paddingTop: 20,
-    paddingBottom: 20,
-    fontSize: 9,
+    padding: 6,
+    paddingTop: 8,
+    paddingBottom: 8,
+    fontSize: 8.5,
     fontFamily: "Roboto",
     backgroundColor: "#fff",
     width: "100%",
   },
   container: {
     border: "1px solid #000",
-    padding: 10,
+    padding: 6,
     width: "100%",
   },
   invoiceTitleOutside: {
     width: "100%",
     textAlign: "center",
-    marginBottom: 6,
+    marginBottom: 3,
   },
   headerTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 400,
     margin: 0,
   },
@@ -100,58 +100,58 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 6,
   },
   logoContainer: {
     width: "30%",
   },
   logo: {
-    width: 120,
-    height: 110,
+    width: 100,
+    height: 56,
   },
   companyDetails: {
     width: "70%",
     textAlign: "center",
   },
   companyName: {
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: 700,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   companyText: {
-    fontSize: 10,
+    fontSize: 9,
     marginBottom: 1,
-    lineHeight: 1.2,
+    lineHeight: 1.15,
   },
   companyDetailText: {
-    fontSize: 10,
-    marginBottom: 2,
-    lineHeight: 1.45,
+    fontSize: 9,
+    marginBottom: 1,
+    lineHeight: 1.25,
     fontWeight: 400,
   },
   // Tables
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    marginBottom: 10,
+    marginBottom: 5,
     flexDirection: "column",
     flexShrink: 0,
   },
   tableRow: {
     flexDirection: "row",
     borderBottom: "1px solid #000",
-    minHeight: 24,
+    minHeight: 18,
   },
   tableCell: {
-    padding: "4px",
+    padding: "3px",
     border: "1px solid #000",
-    fontSize: 9,
+    fontSize: 8.5,
   },
   invoiceMetaCell: {
-    paddingTop: 5,
-    paddingBottom: 8,
-    paddingLeft: 8,
-    paddingRight: 8,
+    paddingTop: 3,
+    paddingBottom: 4,
+    paddingLeft: 4,
+    paddingRight: 4,
     alignItems: "flex-start",
   },
   tableHeader: {
@@ -160,12 +160,12 @@ const styles = StyleSheet.create({
   },
   // Sections
   section: {
-    marginBottom: 10,
+    marginBottom: 5,
   },
   sectionTitle: {
     fontWeight: 700,
-    marginBottom: 4,
-    fontSize: 9,
+    marginBottom: 2,
+    fontSize: 8.5,
   },
   // Text styles
   bold: {
@@ -182,45 +182,45 @@ const styles = StyleSheet.create({
   },
   // Items table
   descriptionCell: {
-    padding: "4px",
+    padding: "3px",
     border: "1px solid #000",
   },
   descriptionText: {
     fontWeight: 700,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   descriptionSubtext: {
-    fontSize: 8,
-    marginTop: 2,
-    lineHeight: 1.2,
+    fontSize: 7.5,
+    marginTop: 1,
+    lineHeight: 1.15,
   },
   // Tax summary
   taxSummaryRow: {
     flexDirection: "row",
     borderBottom: "1px solid #000",
-    minHeight: 20,
+    minHeight: 16,
   },
   // Footer
   termsBankContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 15,
+    marginBottom: 8,
   },
   termsContainer: {
     flex: 1,
-    marginRight: 10,
+    marginRight: 6,
   },
   bankContainer: {
-    width: 250,
+    width: 240,
   },
   signature: {
-    marginTop: 40,
+    marginTop: 12,
     textAlign: "right",
   },
   footer: {
     textAlign: "center",
-    marginTop: 20,
-    fontSize: 8,
+    marginTop: 8,
+    fontSize: 7.5,
   },
 });
 
@@ -385,26 +385,26 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                 flexDirection: "row",
                 alignItems: "flex-start",
                 borderBottom: "1px solid #000",
-                minHeight: 100,
-                paddingTop: 14,
-                paddingBottom: 12,
+                minHeight: 70,
+                paddingTop: 6,
+                paddingBottom: 6,
                 paddingLeft: 4,
-                paddingRight: 24,
+                paddingRight: 8,
                 flexShrink: 0,
               }}
             >
-              <View style={{ width: 110, marginRight: 44, marginTop: 14, flexShrink: 0 }}>
+              <View style={{ width: 90, marginRight: 15, marginTop: 4, flexShrink: 0 }}>
                 {logoPdfSrc ? (
                   <Image
                     src={logoPdfSrc}
                     style={{
-                      width: 110,
-                      height: 62,
+                      width: 90,
+                      height: 50,
                       objectFit: "contain",
                     }}
                   />
                 ) : (
-                  <View style={{ width: 110, height: 62 }} />
+                  <View style={{ width: 90, height: 50 }} />
                 )}
               </View>
               <View
@@ -448,19 +448,19 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
             {/* Invoice metadata — inline labels like print view */}
             <View style={styles.tableRow}>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>Invoice No. : </Text>
                   <Text>{data.invoice.number || "-"}</Text>
                 </Text>
               </View>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>Invoice Date : </Text>
                   <Text>{data.invoice.invoiceDate || "-"}</Text>
                 </Text>
               </View>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.34%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>Due Date : </Text>
                   <Text>{data.invoice.dueDate || "-"}</Text>
                 </Text>
@@ -469,7 +469,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
 
             <View style={styles.tableRow}>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
-                <Text style={{ fontSize: 9, lineHeight: 1.35 }}>
+                <Text style={{ fontSize: 8.5, lineHeight: 1.25 }}>
                   <Text style={styles.bold}>Reference No. : </Text>
                   <Text>{data.invoice.referenceNo || "-"}</Text>
                   {"\n"}
@@ -478,13 +478,13 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                 </Text>
               </View>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>Buyer&apos;s Order No. : </Text>
                   <Text>{data.invoice.buyersOrderNo || "-"}</Text>
                 </Text>
               </View>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.34%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>Order Date : </Text>
                   <Text>{data.invoice.orderDate || "-"}</Text>
                 </Text>
@@ -493,19 +493,19 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
 
             <View style={styles.tableRow}>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>e-Way Bill No. : </Text>
                   <Text>{data.invoice.eWayBill || "-"}</Text>
                 </Text>
               </View>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.33%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>Payment Status : </Text>
                   <Text>{data.paymentInfo.status || "-"}</Text>
                 </Text>
               </View>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "33.34%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>Balance Amount : </Text>
                   <Text>{data.paymentInfo.balanceAmount || "0.00"}</Text>
                 </Text>
@@ -514,7 +514,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
 
             <View style={styles.tableRow}>
               <View style={[styles.tableCell, styles.invoiceMetaCell, { width: "100%" }]}>
-                <Text style={{ fontSize: 9 }}>
+                <Text style={{ fontSize: 8.5 }}>
                   <Text style={styles.bold}>Delivery Challan No. : </Text>
                   <Text>{data.invoice.deliveryChallanNo || "-"}</Text>
                 </Text>
@@ -526,53 +526,53 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
           <View style={styles.section}>
             <View style={styles.table}>
               <View style={styles.tableRow}>
-                <View style={[styles.tableCell, { width: "50%", padding: 8 }]}>
-                  <Text style={[styles.bold, { fontSize: 9, marginBottom: 4 }]}>
+                <View style={[styles.tableCell, { width: "50%", padding: 4 }]}>
+                  <Text style={[styles.bold, { fontSize: 8.5, marginBottom: 2 }]}>
                     Buyer (Bill To) : {data.buyer.name || "-"}
                   </Text>
-                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, marginBottom: 2, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>Address: </Text>
                     <Text>{data.buyer.address || "-"}</Text>
                   </Text>
-                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, marginBottom: 2, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>GSTIN: </Text>
                     <Text>{data.buyer.gstin || "N/A"}</Text>
                     <Text>   </Text>
                     <Text style={styles.bold}>State: </Text>
                     <Text>{data.buyer.state || "-"}</Text>
                   </Text>
-                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, marginBottom: 2, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>Place of Supply: </Text>
                     <Text>{data.buyer.placeOfSupply || "-"}</Text>
                   </Text>
-                  <Text style={{ fontSize: 9, marginBottom: 2, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, marginBottom: 1, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>Contact: </Text>
                     <Text>{data.buyer.contactPerson || "-"}</Text>
                     <Text> ({data.buyer.phone || "-"})</Text>
                   </Text>
-                  <Text style={{ fontSize: 9, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>Email: </Text>
                     <Text>{data.buyer.email || "-"}</Text>
                   </Text>
                 </View>
 
-                <View style={[styles.tableCell, { width: "50%", padding: 8 }]}>
-                  <Text style={[styles.bold, { fontSize: 9, marginBottom: 4 }]}>
+                <View style={[styles.tableCell, { width: "50%", padding: 4 }]}>
+                  <Text style={[styles.bold, { fontSize: 8.5, marginBottom: 2 }]}>
                     Consignee (Ship To) : {data.consignee.name || "-"}
                   </Text>
-                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, marginBottom: 2, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>Address: </Text>
                     <Text>{data.consignee.address || "-"}</Text>
                   </Text>
-                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, marginBottom: 2, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>GSTIN: </Text>
                     <Text>{data.consignee.gstin || "N/A"}</Text>
                   </Text>
-                  <Text style={{ fontSize: 9, marginBottom: 3, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, marginBottom: 2, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>State: </Text>
                     <Text>{data.consignee.state || "-"}</Text>
                   </Text>
-                  <Text style={{ fontSize: 9, lineHeight: 1.4 }}>
+                  <Text style={{ fontSize: 8.5, lineHeight: 1.25 }}>
                     <Text style={styles.bold}>Contact: </Text>
                     <Text>{data.consignee.contactPerson || "-"}</Text>
                     <Text> ({data.consignee.phone || "-"})</Text>
@@ -586,22 +586,22 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
           <View style={styles.section}>
             <View style={styles.table}>
               <View style={styles.tableRow}>
-                <View style={[styles.tableCell, { width: "50%", paddingVertical: 6 }]}>
-                  <Text style={{ fontSize: 9 }}>
+                <View style={[styles.tableCell, { width: "50%", paddingVertical: 3 }]}>
+                  <Text style={{ fontSize: 8.5 }}>
                     <Text style={styles.bold}>State Code : </Text>
                     <Text>{data.invoice.stateCode || ""}</Text>
                   </Text>
                 </View>
-                <View style={[styles.tableCell, { width: "50%", paddingVertical: 6 }]}>
-                  <Text style={{ fontSize: 9 }}>
+                <View style={[styles.tableCell, { width: "50%", paddingVertical: 3 }]}>
+                  <Text style={{ fontSize: 8.5 }}>
                     <Text style={styles.bold}>Amount Paid : </Text>
                     <Text>₹{data.paymentInfo.amountPaid || "0.00"}</Text>
                   </Text>
                 </View>
               </View>
               <View style={styles.tableRow}>
-                <View style={[styles.tableCell, { width: "100%", paddingVertical: 6 }]}>
-                  <Text style={{ fontSize: 9 }}>
+                <View style={[styles.tableCell, { width: "100%", paddingVertical: 3 }]}>
+                  <Text style={{ fontSize: 8.5 }}>
                     <Text style={styles.bold}>Notes : </Text>
                     <Text>{data.notes || ""}</Text>
                   </Text>
@@ -729,13 +729,13 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
           </View>
 
           {/* Amount in Words */}
-          <View style={[styles.section, { marginBottom: 10 }]}>
-            <Text style={{ fontSize: 9, marginBottom: 4 }}>
+          <View style={[styles.section, { marginBottom: 5 }]}>
+            <Text style={{ fontSize: 8.5, marginBottom: 2 }}>
               <Text style={styles.bold}>
                 Amount Chargeable (in words) E. &amp; O.E
               </Text>
             </Text>
-            <Text style={[styles.bold, { fontSize: 9 }]}>
+            <Text style={[styles.bold, { fontSize: 8.5 }]}>
               INR- {numberToWords(data.total)}
             </Text>
           </View>
@@ -1052,15 +1052,15 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "flex-start",
-              marginBottom: 15,
+              marginBottom: 8,
               width: "100%",
             }}
           >
-            <Text style={[styles.bold, { fontSize: 9, flex: 1, paddingRight: 8 }]}>
+            <Text style={[styles.bold, { fontSize: 8.5, flex: 1, paddingRight: 4 }]}>
               Tax Amount (in words) : INR- {numberToWords(data.taxAmount)}
             </Text>
             {data.roundOff !== 0 && data.roundOff != null ? (
-              <Text style={[styles.bold, { fontSize: 9 }]}>
+              <Text style={[styles.bold, { fontSize: 8.5 }]}>
                 Round Off:{" "}
                 {data.roundOff > 0
                   ? `+₹${Math.abs(Number(data.roundOff)).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
@@ -1075,41 +1075,41 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
               <Text style={styles.sectionTitle}>Terms & Condition</Text>
               {data.terms.length > 0 ? (
                 data.terms.map((term, index) => (
-                  <Text key={index} style={{ marginBottom: 3 }}>
+                  <Text key={index} style={{ marginBottom: 1, fontSize: 8, lineHeight: 1.2 }}>
                     {term}
                   </Text>
                 ))
               ) : (
-                <Text>No terms and conditions specified.</Text>
+                <Text style={{ fontSize: 8 }}>No terms and conditions specified.</Text>
               )}
             </View>
             <View style={styles.bankContainer}>
               <Text style={styles.sectionTitle}>Company's Bank Details</Text>
-              <Text>A/C Holder Name : {data.bank.accountHolderName}</Text>
-              <Text>Bank Name : {data.bank.name}</Text>
-              <Text>A/c No. : {data.bank.accountNo}</Text>
-              <Text>Branch & IFS Code: {data.bank.IFSC}</Text>
+              <Text style={{ fontSize: 8, lineHeight: 1.25 }}>A/C Holder Name : {data.bank.accountHolderName}</Text>
+              <Text style={{ fontSize: 8, lineHeight: 1.25 }}>Bank Name : {data.bank.name}</Text>
+              <Text style={{ fontSize: 8, lineHeight: 1.25 }}>A/c No. : {data.bank.accountNo}</Text>
+              <Text style={{ fontSize: 8, lineHeight: 1.25 }}>Branch & IFS Code: {data.bank.IFSC}</Text>
             </View>
           </View>
 
           {/* Signature */}
           <View style={styles.signature}>
-            <Text style={{ fontSize: 9 }}>for {data.company.name}</Text>
-            <View style={{ alignItems: "flex-end", marginTop: 10 }}>
+            <Text style={{ fontSize: 8.5 }}>for {data.company.name}</Text>
+            <View style={{ alignItems: "flex-end", marginTop: 4 }}>
               {signaturePdfSrc ? (
                 <Image
                   src={signaturePdfSrc}
                   style={{
-                    width: 120,
-                    height: 60,
+                    width: 100,
+                    height: 48,
                     objectFit: "contain",
                   }}
                 />
               ) : (
-                <View style={{ width: 120, height: 60 }} />
+                <View style={{ width: 100, height: 48 }} />
               )}
             </View>
-            <Text style={[styles.bold, { marginTop: 8, fontSize: 9 }]}>
+            <Text style={[styles.bold, { marginTop: 4, fontSize: 8.5 }]}>
               Authorised Signatory
             </Text>
           </View>
