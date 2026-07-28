@@ -782,24 +782,43 @@ export default function MetaBackfillPage() {
               Filtered by Form IDs: {filteredFormIds.join(', ')}
             </p>
           )}
+          <div className="flex flex-wrap gap-2 mt-2 text-xs">
+            <Link
+              href="/admin-dashboard/lead-distribution"
+              className="px-3 py-1 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 font-medium"
+              target="_blank"
+            >
+              🔧 Lead Distribution (Add Reps)
+            </Link>
+            <Link
+              href="/admin-dashboard/meta-credentials"
+              className="px-3 py-1 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 font-medium"
+              target="_blank"
+            >
+              🔑 Meta Credentials (Full Setup)
+            </Link>
+          </div>
         </div>
-        {filteredFormIds && (
-          <Link
-            href="/admin-dashboard/ads-management"
-            className="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-700"
+        <div className="flex flex-wrap gap-2 items-center">
+          {filteredFormIds && (
+            <Link
+              href="/admin-dashboard/ads-management"
+              className="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-700"
+            >
+              Clear Filter
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              loadCredentials();
+              setCredentialModalOpen(true);
+            }}
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
           >
-            Clear Filter
-          </Link>
-        )}
-        {/*
-        <button
-          type="button"
-          onClick={() => setCredentialModalOpen(true)}
-          className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
-        >
-          Add Credential
-        </button>
-        */}
+            🔑 Update FB Credentials
+          </button>
+        </div>
       </div>
 
       {credentialModalOpen && (
