@@ -106,10 +106,17 @@ export default async function DeniedLeadsPage({ searchParams }) {
     const [rows] = await connection.execute(query, params);
     deniedLeads = rows;
 
-    // Collect distinct employees from current denied leads data
-    const uniqueEmployees = [...new Set(deniedLeads.map(row => row.followed_by).filter(Boolean))];
-    uniqueEmployees.sort();
-    employees = uniqueEmployees;
+    // Fetch distinct employees from ALL denied leads in the database (not just current page)
+    // All users with module access see ALL denied leads - no automatic followed_by filtering
+    const [empRows] = await connection.execute(
+      `SELECT DISTINCT cf.followed_by
+       FROM customers_followup cf
+       WHERE cf.notes LIKE '%marked%Denied%'
+         AND cf.followed_by IS NOT NULL
+         AND cf.followed_by != ''
+       ORDER BY cf.followed_by`
+    );
+    employees = empRows.map(row => row.followed_by).filter(Boolean);
   } catch (err) {
     console.error("Database query error:", err);
     error = "Failed to fetch data from the database.";
