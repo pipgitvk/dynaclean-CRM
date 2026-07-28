@@ -20,6 +20,8 @@ export default function DeniedLeadsTable({
   const [filters, setFilters] = useState({
     from: searchParams?.from || "",
     to: searchParams?.to || "",
+    denied_from: searchParams?.denied_from || "",
+    denied_to: searchParams?.denied_to || "",
     followed_by: searchParams?.followed_by || "",
   });
 
@@ -30,6 +32,8 @@ export default function DeniedLeadsTable({
       if (search) params.set("search", search);
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
+      if (filters.denied_from) params.set("denied_from", filters.denied_from);
+      if (filters.denied_to) params.set("denied_to", filters.denied_to);
       if (filters.followed_by) params.set("followed_by", filters.followed_by);
       router.push(`/admin-dashboard/denied-leads?${params.toString()}`);
     });
@@ -41,6 +45,8 @@ export default function DeniedLeadsTable({
       setFilters({
         from: "",
         to: "",
+        denied_from: "",
+        denied_to: "",
         followed_by: "",
       });
       router.push("/admin-dashboard/denied-leads");
@@ -53,6 +59,8 @@ export default function DeniedLeadsTable({
       if (search) params.set("search", search);
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
+      if (filters.denied_from) params.set("denied_from", filters.denied_from);
+      if (filters.denied_to) params.set("denied_to", filters.denied_to);
       if (filters.followed_by) params.set("followed_by", filters.followed_by);
       params.set("page", newPage.toString());
       router.push(`/admin-dashboard/denied-leads?${params.toString()}`);
@@ -83,6 +91,25 @@ export default function DeniedLeadsTable({
               <option key={emp} value={emp}>{emp}</option>
             ))}
           </select>
+          <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
+            <span className="text-xs font-semibold text-red-700 whitespace-nowrap">Denied From</span>
+            <input
+              type="date"
+              value={filters.denied_from}
+              onChange={(e) => setFilters({ ...filters, denied_from: e.target.value })}
+              className="border-0 bg-transparent text-sm min-w-[120px] sm:min-w-0 focus:outline-none focus:ring-0"
+            />
+          </div>
+          <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1">
+            <span className="text-xs font-semibold text-red-700 whitespace-nowrap">Denied To</span>
+            <input
+              type="date"
+              value={filters.denied_to}
+              onChange={(e) => setFilters({ ...filters, denied_to: e.target.value })}
+              className="border-0 bg-transparent text-sm min-w-[120px] sm:min-w-0 focus:outline-none focus:ring-0"
+            />
+          </div>
+          <span className="text-xs text-gray-400 font-medium hidden sm:inline">│</span>
           <input
             type="date"
             value={filters.from}
@@ -132,7 +159,10 @@ export default function DeniedLeadsTable({
                 <div className="font-medium text-gray-900 truncate">{row.name}</div>
                 <div className="text-xs text-gray-500">Contact: {row.contact}</div>
                 <div className="text-xs text-gray-500">Followed by: {row.followed_by}</div>
-                <div className="text-xs text-gray-600 mt-1">
+                <div className="text-xs font-medium text-red-700 mt-1">
+                  Denied on: {row.denied_date ? format(new Date(row.denied_date), "dd MMM yyyy HH:mm") : "—"}
+                </div>
+                <div className="text-xs text-gray-600">
                   Followed on: {row.followed_date ? format(new Date(row.followed_date), "dd MMM yyyy HH:mm") : "—"}
                 </div>
                 <div className="text-xs text-gray-600">
@@ -167,6 +197,7 @@ export default function DeniedLeadsTable({
                   <th className="px-4 py-2 text-left">Customer</th>
                   <th className="px-4 py-2 text-left">Contact</th>
                   <th className="px-4 py-2 text-left">Followed By</th>
+                  <th className="px-4 py-2 text-left">Denied Date</th>
                   <th className="px-4 py-2 text-left">Followed Date</th>
                   <th className="px-4 py-2 text-left">Next Follow-up</th>
                   <th className="px-4 py-2 text-left">Customer Status</th>
@@ -184,6 +215,9 @@ export default function DeniedLeadsTable({
                     </td>
                     <td className="px-4 py-2">{row.contact}</td>
                     <td className="px-4 py-2">{row.followed_by}</td>
+                    <td className="px-4 py-2 font-medium text-red-700">
+                      {row.denied_date ? format(new Date(row.denied_date), "dd MMM yyyy HH:mm") : "—"}
+                    </td>
                     <td className="px-4 py-2">
                       {row.followed_date ? format(new Date(row.followed_date), "dd MMM yyyy HH:mm") : "—"}
                     </td>
@@ -209,7 +243,7 @@ export default function DeniedLeadsTable({
                 {data.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-4 py-4 text-center text-gray-400"
                     >
                       No results found.

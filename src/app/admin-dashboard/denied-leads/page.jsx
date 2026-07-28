@@ -26,6 +26,8 @@ export default async function DeniedLeadsPage({ searchParams }) {
     search,
     from,
     to,
+    denied_from,
+    denied_to,
     followed_by,
     page = "1",
   } = searchParamsResolved;
@@ -44,6 +46,7 @@ export default async function DeniedLeadsPage({ searchParams }) {
         cf.contact,
         cf.notes,
         cf.followed_date,
+        cf.followed_date AS denied_date,
         cf.next_followup_date,
         cf.followed_by,
         c.status as customer_status,
@@ -77,6 +80,16 @@ export default async function DeniedLeadsPage({ searchParams }) {
     if (to) {
       query += ` AND DATE(cf.followed_date) <= ?`;
       params.push(to);
+    }
+
+    if (denied_from) {
+      query += ` AND DATE(cf.followed_date) >= ?`;
+      params.push(denied_from);
+    }
+
+    if (denied_to) {
+      query += ` AND DATE(cf.followed_date) <= ?`;
+      params.push(denied_to);
     }
 
     let countQuery = query.replace(
