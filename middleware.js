@@ -135,13 +135,14 @@ export async function middleware(request) {
         const isSales = roleNorm.includes("SALES");
         const isDeniedLeadsRoute = pathname.startsWith("/admin-dashboard/denied-leads");
         const isViewCustomerRoute = pathname.startsWith("/admin-dashboard/view-customer");
+        const isBulkReassignRoute = pathname.startsWith("/admin-dashboard/bulk-reassign");
         const isAccountingLedgerRoute = pathname.startsWith("/admin-dashboard/accounting/ledger");
         const isInvoicesBuyerRoute = pathname.startsWith("/admin-dashboard/invoices/buyer");
         
         // Allow everyone to access accounting/ledger and invoices/buyer routes
         const isEveryoneAllowedRoute = isAccountingLedgerRoute || isInvoicesBuyerRoute;
         
-        if (!(roleNorm === "EA" && isEaAllowed) && !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) && !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute)) && !isEveryoneAllowedRoute) {
+        if (!(roleNorm === "EA" && isEaAllowed) && !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) && !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute || isBulkReassignRoute)) && !isEveryoneAllowedRoute) {
           const dest = new URL("/user-dashboard", request.url);
           dest.search = request.nextUrl.search;
           return NextResponse.redirect(dest);
