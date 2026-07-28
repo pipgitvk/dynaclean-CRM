@@ -68,6 +68,7 @@ export async function GET(request) {
       SELECT 
         el.id,
         el.username,
+        el.leave_type,
         el.from_date,
         el.to_date,
         el.total_days,
@@ -81,6 +82,26 @@ export async function GET(request) {
     `;
 
     const [leavesUsed] = await conn.execute(leavesQuery, [username, accrualStartDate]);
+
+    // Fetch all unpaid leaves - approved, pending, and rejected (for ledger display)
+    const unpaidLeavesQuery = `
+      SELECT 
+        el.id,
+        el.username,
+        el.leave_type,
+        el.from_date,
+        el.to_date,
+        el.total_days,
+        el.status,
+        el.reason,
+        el.created_at,
+        el.rejection_reason
+      FROM employee_leaves el
+      WHERE el.username = ? AND el.leave_type = 'unpaid'
+      ORDER BY el.from_date ASC
+    `;
+
+    const [unpaidLeaves] = await conn.execute(unpaidLeavesQuery, [username]);
 
     // Build ledger with monthly accruals
     const ledgerEntries = [];
@@ -114,18 +135,49 @@ export async function GET(request) {
       });
     });
 
-    // Add debit (used) entries
+    // Add debit (used) entries for paid leaves
     leavesUsed.forEach(leave => {
       ledgerEntries.push({
         type: "debit",
         date: leave.from_date,
         days: leave.total_days,
-        description: `Leave taken`,
+        description: `Paid Leave taken`,
         leaveId: leave.id,
         entryType: "usage",
-        reason: leave.reason
+        reason: leave.reason,
+        leave_type: "paid",
+        status: leave.status
       });
     });
+
+    // Build unpaid leave ledger entries (debit only - no accrual)
+    const unpaidLedgerEntries = unpaidLeaves.map(leave => ({
+      type: "debit",
+      date: leave.from_date,
+      to_date: leave.to_date,
+      days: leave.total_days,
+      description: `Unpaid Leave (${leave.status})`,
+      leaveId: leave.id,
+      entryType: "usage",
+      reason: leave.reason,
+      leave_type: "unpaid",
+      status: leave.status,
+      rejection_reason: leave.rejection_reason
+    }));
+
+    // Calculate unpaid leave summary
+    const unpaidSummary = {
+      totalApproved: unpaidLeaves
+        .filter(l => l.status === 'approved')
+        .reduce((sum, l) => sum + l.total_days, 0),
+      totalPending: unpaidLeaves
+        .filter(l => l.status === 'pending')
+        .reduce((sum, l) => sum + l.total_days, 0),
+      totalRejected: unpaidLeaves
+        .filter(l => l.status === 'rejected')
+        .reduce((sum, l) => sum + l.total_days, 0),
+      totalDays: unpaidLeaves.reduce((sum, l) => sum + l.total_days, 0)
+    };
 
     // Sort by date
     const sortedLedger = ledgerEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -153,6 +205,9 @@ export async function GET(request) {
       .reduce((sum, e) => sum + e.days, 0);
     const balance = totalCredit - totalDebit;
 
+    // Sort unpaid entries by date
+    const sortedUnpaidLedger = unpaidLedgerEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
+
     return NextResponse.json({
       success: true,
       ledger: processedLedger,
@@ -161,6 +216,8 @@ export async function GET(request) {
         totalDebit: Math.round(totalDebit * 100) / 100,
         balance: Math.round(balance * 100) / 100
       },
+      unpaidLedger: sortedUnpaidLedger,
+      unpaidSummary,
       accrualStartDate
     });
   } catch (error) {
