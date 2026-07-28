@@ -10,8 +10,8 @@ export default async function BulkReassignPage() {
         return null;
     }
 
-    // Only allow admin roles to access this page
-    if (!["ADMIN", "SUPERADMIN", "DIRECTOR"].includes(String(payload.role).toUpperCase())) {
+    // Only allow admin and sales roles to access this page
+    if (!["ADMIN", "SUPERADMIN", "DIRECTOR", "SALES"].includes(String(payload.role).toUpperCase())) {
         return (
             <div className="min-h-screen bg-gray-100 p-8">
                 <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-8">
