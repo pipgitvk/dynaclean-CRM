@@ -1,6 +1,9 @@
 import { getDbConnection } from "@/lib/db";
 import DeniedLeadsTable from "./DeniedLeadsTable";
 import { getSessionPayload } from "@/lib/auth";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
+import { parseModuleAccess, applySuperadminOnlyModuleRestrictions, applyRoleDenyModuleRestrictions } from "@/lib/moduleAccess";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +23,33 @@ export default async function DeniedLeadsPage({ searchParams }) {
   }
   username = payload.username;
   userRole = payload.role;
+
+  // Check module access for denied-leads
+  const roleKey = normalizeRoleKey(userRole) || "GUEST";
+  if (roleKey !== "SUPERADMIN") {
+    try {
+      connection = await getDbConnection();
+      const [rows] = await connection.execute(
+        "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+        [username]
+      );
+
+      let allowedModules = null;
+      if (rows.length > 0) {
+        allowedModules = parseModuleAccess(rows[0].module_access ?? null);
+        allowedModules = applySuperadminOnlyModuleRestrictions(allowedModules, roleKey);
+        allowedModules = applyRoleDenyModuleRestrictions(allowedModules, roleKey);
+      }
+
+      // Check if denied-leads is in allowed modules
+      if (!allowedModules || !allowedModules.includes("denied-leads")) {
+        redirect("/admin-dashboard");
+      }
+    } catch (err) {
+      console.error("Error checking module access:", err);
+      redirect("/admin-dashboard");
+    }
+  }
 
   const searchParamsResolved = await searchParams;
   const {
