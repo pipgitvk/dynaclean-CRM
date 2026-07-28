@@ -26,8 +26,8 @@ export async function GET(request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Only allow admin roles
-        if (!["ADMIN", "SUPERADMIN"].includes(payload.role)) {
+        // Only allow admin and sales roles
+        if (!["ADMIN", "SUPERADMIN", "SALES"].includes(payload.role)) {
             return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 });
         }
 
