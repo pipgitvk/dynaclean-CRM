@@ -390,7 +390,7 @@ const allMenuItems = [
         icon: "FileSignature",
       },
       {
-        path: "/admin-dashboard/invoices",
+        path: "/admin-dashboard/invoices/list",
         name: "Invoices",
         roles: ["SUPERADMIN"],
         icon: "FileText",
