@@ -301,8 +301,8 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         <table className="min-w-full text-sm">
           <thead className="bg-gray-100">
             <tr>
-              <th className="px-4 py-2 w-12"></th>
-              <th className="px-4 py-2 w-12">
+              <th className="px-4 py-2 w-12 bg-gray-100 sticky left-0 z-20"></th>
+              <th className="px-4 py-2 w-12 bg-gray-100 sticky left-12 z-20">
                 <input
                   type="checkbox"
                   checked={selectedInvoiceIds.size > 0 && selectedInvoiceIds.size === invoices.length && invoices.length > 0}
@@ -318,6 +318,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                   }}
                   className="w-4 h-4 cursor-pointer"
                 />
+              </th>
+              <th className="px-4 py-2 bg-amber-50 text-amber-800 sticky left-24 z-10">
+                Customer ID
               </th>
               <th
                 onClick={() => handleSort("invoice_number")}
@@ -348,13 +351,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="11" className="text-center py-4">
+                <td colSpan="12" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="11" className="text-center py-6 text-red-600">
+                <td colSpan="12" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -362,7 +365,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               invoices.map((i) => (
                 <React.Fragment key={i.id}>
                   <tr className={`border-t hover:bg-gray-50 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : ''}`}>
-                    <td className="px-4 py-2 w-12">
+                    <td className={`px-4 py-2 w-12 sticky left-0 z-20 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : 'bg-white'}`}>
                       {i.linkedStatements && i.linkedStatements.length > 0 && (
                         <button
                           onClick={() => setExpandedInvoiceId(expandedInvoiceId === i.id ? null : i.id)}
@@ -372,13 +375,18 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                         </button>
                       )}
                     </td>
-                    <td className="px-4 py-2 w-12">
+                    <td className={`px-4 py-2 w-12 sticky left-12 z-20 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50' : 'bg-white'}`}>
                       <input
                         type="checkbox"
                         checked={selectedInvoiceIds.has(i.id)}
                         onChange={() => handleSelectInvoice(i.id)}
                         className="w-4 h-4 cursor-pointer"
                       />
+                    </td>
+                    <td className={`px-4 py-2 bg-amber-50 sticky left-24 z-10 ${selectedInvoiceIds.has(i.id) ? 'bg-blue-50/60' : ''}`}>
+                      <span className="font-mono text-sm font-semibold text-amber-900 bg-amber-100 px-2 py-0.5 rounded">
+                        {i.customer_id || i.customer_id === 0 ? i.customer_id : "-"}
+                      </span>
                     </td>
                     <td className="px-4 py-2 font-medium">
                       {i.parent_id && (
@@ -463,7 +471,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                   </tr>
                   {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
                     <tr>
-                      <td colSpan="11" className="px-8 py-4 bg-gray-50">
+                      <td colSpan="12" className="px-8 py-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
@@ -522,7 +530,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               ))
             ) : (
               <tr>
-                <td colSpan="11" className="text-center py-6 text-gray-500">
+                <td colSpan="12" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>

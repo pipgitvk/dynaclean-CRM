@@ -123,6 +123,7 @@ export async function GET(req) {
         id,
         invoice_number,
         customer_name AS buyer_name,
+        customer_id,
         gst_number,
         employee_name,
         parent_id,
