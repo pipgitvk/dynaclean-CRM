@@ -30,24 +30,22 @@ export async function GET(request) {
 
     if (!query || query.length < 1) {
       console.log("[ledger API] Query too short");
-      return Response.json({ customers: [] });
+      return Response.json({ companies: [] });
     }
 
     const conn = await getDbConnection();
 
-    // Build search query - search in company, phone, customer_id, and gstin
     const searchPattern = `%${query}%`;
     const startPattern = `${query}%`;
 
     console.log("[ledger API] Executing search with pattern:", searchPattern);
 
-    // Search from customers table - group by company
-    const [results] = await conn.execute(
+    const [customerResults] = await conn.execute(
       `SELECT DISTINCT
          customer_id,
-         company,
-         phone,
-         gstin
+         company AS company_name,
+         phone AS mobile,
+         gstin AS gst_in
        FROM customers
        WHERE 
          (company LIKE ? 
@@ -66,20 +64,66 @@ export async function GET(request) {
       [searchPattern, searchPattern, searchPattern, searchPattern, startPattern]
     );
 
-    console.log(`[ledger API] Query: "${query}", Results: ${results.length}`);
-    if (results.length > 0) {
-      console.log("[ledger API] First result:", results[0]);
+    const [invoiceResults] = await conn.execute(
+      `SELECT DISTINCT
+         COALESCE(i.customer_id, c.customer_id) AS customer_id,
+         TRIM(i.customer_name) AS company_name,
+         c.phone AS mobile,
+         c.gstin AS gst_in
+       FROM invoices i
+       LEFT JOIN customers c ON 
+         LOWER(TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, '')))) = LOWER(TRIM(i.customer_name))
+         OR LOWER(TRIM(c.company)) = LOWER(TRIM(i.customer_name))
+         OR LOWER(TRIM(c.first_name)) = LOWER(TRIM(i.customer_name))
+       WHERE i.customer_name IS NOT NULL
+         AND TRIM(i.customer_name) != ''
+         AND TRIM(i.customer_name) LIKE ?
+       GROUP BY TRIM(i.customer_name), COALESCE(i.customer_id, c.customer_id), c.phone, c.gstin
+       ORDER BY 
+         CASE 
+           WHEN TRIM(i.customer_name) LIKE ? THEN 0
+           ELSE 1
+         END,
+         TRIM(i.customer_name) ASC
+       LIMIT 20`,
+      [searchPattern, startPattern]
+    );
+
+    const seen = new Map();
+    for (const row of customerResults) {
+      if (row.company_name) {
+        seen.set(row.company_name.trim().toLowerCase(), {
+          customer_id: row.customer_id,
+          company_name: row.company_name || "",
+          mobile: row.mobile || null,
+          gst_in: row.gst_in || null,
+        });
+      }
+    }
+    for (const row of invoiceResults) {
+      if (row.company_name) {
+        const key = row.company_name.trim().toLowerCase();
+        if (!seen.has(key)) {
+          seen.set(key, {
+            customer_id: row.customer_id,
+            company_name: row.company_name || "",
+            mobile: row.mobile || null,
+            gst_in: row.gst_in || null,
+          });
+        } else if (!seen.get(key).customer_id && row.customer_id) {
+          seen.get(key).customer_id = row.customer_id;
+        }
+      }
     }
 
-    // Format results
-    const companies = results.map((row) => ({
-      customer_id: row.customer_id,
-      company_name: row.company || "",
-      mobile: row.phone || null,
-      gst_in: row.gstin || null,
-    }));
+    const companies = Array.from(seen.values()).slice(0, 20);
 
-    return Response.json({ companies, count: results.length });
+    console.log(`[ledger API] Query: "${query}", customers: ${customerResults.length}, invoices: ${invoiceResults.length}, combined: ${companies.length}`);
+    if (companies.length > 0) {
+      console.log("[ledger API] First result:", companies[0]);
+    }
+
+    return Response.json({ companies, count: companies.length });
   } catch (error) {
     console.error("[ledger search] Error:", error);
     return Response.json(

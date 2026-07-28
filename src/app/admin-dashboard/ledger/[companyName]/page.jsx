@@ -96,14 +96,26 @@ export default async function LedgerPage({ params }) {
          DATE(created_at) AS created_date,
          created_at
        FROM invoices
-       WHERE TRIM(customer_name) = ?
+       WHERE TRIM(customer_name) = ? OR customer_name = ?
        ORDER BY COALESCE(order_date, invoice_date) DESC, id DESC`,
-      [decodedCompany]
+      [decodedCompany, decodedCompany]
     );
     invoices = invRows;
 
     if (invoices.length > 0 && invoices[0].customer_id) {
       customerIdForCompany = invoices[0].customer_id;
+    }
+
+    if (!customerIdForCompany) {
+      const [cRows] = await conn.execute(
+        `SELECT customer_id FROM product_stock_request 
+         WHERE TRIM(client_name) = ? AND customer_id IS NOT NULL AND customer_id != 0
+         LIMIT 1`,
+        [decodedCompany]
+      );
+      if (cRows.length > 0) {
+        customerIdForCompany = cRows[0].customer_id;
+      }
     }
 
     // ── 2. Collect all relevant statements for this company ──────
@@ -250,7 +262,25 @@ export default async function LedgerPage({ params }) {
       }
     }
 
-    // ── 5. Build ledger entries ────────────────────────────
+    // ── 5. Fetch purchases for this company (by customer_id) ──────
+    let purchaseRows = [];
+    if (customerIdForCompany) {
+      const [pRows] = await conn.execute(
+        `SELECT 
+           id,
+           COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
+           invoice_number,
+           net_amount,
+           client_name
+         FROM product_stock_request
+         WHERE customer_id = ?
+         ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
+        [customerIdForCompany]
+      );
+      purchaseRows = pRows;
+    }
+
+    // ── 6. Build ledger entries ────────────────────────────
     const derivedLedger = [];
 
     // Add sales entries
@@ -265,6 +295,23 @@ export default async function LedgerPage({ params }) {
         debit: Number(inv.grand_total) || 0,
         credit: 0,
         source: "invoice",
+      });
+    }
+
+    // Add purchase entries
+    for (const purch of purchaseRows) {
+      const purchDate = purch.invoice_date ? String(purch.invoice_date).slice(0, 10) : null;
+      if (!purchDate) continue;
+
+      derivedLedger.push({
+        id: `purch-${purch.id}`,
+        entry_date: purchDate,
+        particulars: `Purchase – ${purch.invoice_number}`,
+        vch_type: "Purchase",
+        vch_no: purch.invoice_number,
+        debit: 0,
+        credit: Number(purch.net_amount) || 0,
+        source: "purchase",
       });
     }
 
@@ -305,7 +352,7 @@ export default async function LedgerPage({ params }) {
       }
     }
 
-    // ── 6. Manual ledger entries
+    // ── 7. Manual ledger entries
     await conn.execute(`
       CREATE TABLE IF NOT EXISTS ledger_entries (
         id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -320,6 +367,11 @@ export default async function LedgerPage({ params }) {
         updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
+    try {
+      await conn.execute("SELECT buyer_name FROM ledger_entries LIMIT 1");
+    } catch (_) {
+      try { await conn.execute("ALTER TABLE ledger_entries ADD COLUMN buyer_name VARCHAR(255) NULL"); } catch (__) {}
+    }
 
     const [manualRows] = await conn.execute(
       `SELECT id, entry_date, particulars, vch_type, vch_no, debit, credit, created_at
@@ -346,7 +398,7 @@ export default async function LedgerPage({ params }) {
       return true;
     });
 
-    // ── 7. Merge + sort by date
+    // ── 8. Merge + sort by date
     const combined = [
       ...derivedLedger,
       ...filteredManualRows.map((r) => ({ ...r, source: "manual" })),
