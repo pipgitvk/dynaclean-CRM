@@ -52,7 +52,7 @@ function createImportCrmTransporter() {
   });
 }
 
-export async function sendImportCrmSmtpEmail({ to, subject, html, text, attachments }) {
+export async function sendImportCrmSmtpEmail({ to, cc, bcc, subject, html, text, attachments }) {
   const user = (process.env.IMPORT_CRM_SMTP_USER || process.env.SMTP_USER)?.trim();
   const fromOverride = (process.env.IMPORT_CRM_SMTP_FROM || process.env.SMTP_FROM)?.trim();
   const from = fromOverride
@@ -63,6 +63,8 @@ export async function sendImportCrmSmtpEmail({ to, subject, html, text, attachme
   await transporter.sendMail({
     from,
     to,
+    cc: cc || undefined,
+    bcc: bcc || undefined,
     subject,
     html,
     text: text || undefined,

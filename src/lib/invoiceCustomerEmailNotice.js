@@ -435,6 +435,7 @@ export async function sendInvoicePaymentNoticeEmail(invWithItems) {
 
     await sendImportCrmSmtpEmail({
       to,
+      cc: "accounts@dynacleanindustries.com",
       subject: subj.trim(),
       html,
       attachments: [
