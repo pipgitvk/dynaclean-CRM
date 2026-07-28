@@ -71,23 +71,23 @@ Font.register({
 // Create styles
 const styles = StyleSheet.create({
   page: {
-    padding: 6,
-    paddingTop: 8,
-    paddingBottom: 8,
-    fontSize: 8.5,
+    padding: 4,
+    paddingTop: 5,
+    paddingBottom: 4,
+    fontSize: 8,
     fontFamily: "Roboto",
     backgroundColor: "#fff",
     width: "100%",
   },
   container: {
     border: "1px solid #000",
-    padding: 6,
+    padding: 4,
     width: "100%",
   },
   invoiceTitleOutside: {
     width: "100%",
     textAlign: "center",
-    marginBottom: 3,
+    marginBottom: 2,
   },
   headerTitle: {
     fontSize: 13,
@@ -133,25 +133,25 @@ const styles = StyleSheet.create({
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    marginBottom: 5,
+    marginBottom: 3,
     flexDirection: "column",
     flexShrink: 0,
   },
   tableRow: {
     flexDirection: "row",
     borderBottom: "1px solid #000",
-    minHeight: 18,
+    minHeight: 16,
   },
   tableCell: {
-    padding: "3px",
+    padding: "2px",
     border: "1px solid #000",
-    fontSize: 8.5,
+    fontSize: 8,
   },
   invoiceMetaCell: {
-    paddingTop: 3,
-    paddingBottom: 4,
-    paddingLeft: 4,
-    paddingRight: 4,
+    paddingTop: 2,
+    paddingBottom: 2,
+    paddingLeft: 3,
+    paddingRight: 3,
     alignItems: "flex-start",
   },
   tableHeader: {
@@ -160,12 +160,12 @@ const styles = StyleSheet.create({
   },
   // Sections
   section: {
-    marginBottom: 5,
+    marginBottom: 3,
   },
   sectionTitle: {
     fontWeight: 700,
-    marginBottom: 2,
-    fontSize: 8.5,
+    marginBottom: 1,
+    fontSize: 8,
   },
   // Text styles
   bold: {
@@ -182,45 +182,45 @@ const styles = StyleSheet.create({
   },
   // Items table
   descriptionCell: {
-    padding: "3px",
+    padding: "2px",
     border: "1px solid #000",
   },
   descriptionText: {
     fontWeight: 700,
-    marginBottom: 1,
+    marginBottom: 0,
   },
   descriptionSubtext: {
-    fontSize: 7.5,
-    marginTop: 1,
-    lineHeight: 1.15,
+    fontSize: 7,
+    marginTop: 0,
+    lineHeight: 1.1,
   },
   // Tax summary
   taxSummaryRow: {
     flexDirection: "row",
     borderBottom: "1px solid #000",
-    minHeight: 16,
+    minHeight: 14,
   },
   // Footer
   termsBankContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
+    marginBottom: 4,
   },
   termsContainer: {
     flex: 1,
-    marginRight: 6,
+    marginRight: 4,
   },
   bankContainer: {
     width: 240,
   },
   signature: {
-    marginTop: 12,
+    marginTop: 4,
     textAlign: "right",
   },
   footer: {
     textAlign: "center",
-    marginTop: 8,
-    fontSize: 7.5,
+    marginTop: 3,
+    fontSize: 7,
   },
 });
 
@@ -385,26 +385,26 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
                 flexDirection: "row",
                 alignItems: "flex-start",
                 borderBottom: "1px solid #000",
-                minHeight: 70,
-                paddingTop: 6,
-                paddingBottom: 6,
-                paddingLeft: 4,
-                paddingRight: 8,
+                minHeight: 58,
+                paddingTop: 3,
+                paddingBottom: 3,
+                paddingLeft: 3,
+                paddingRight: 5,
                 flexShrink: 0,
               }}
             >
-              <View style={{ width: 90, marginRight: 15, marginTop: 4, flexShrink: 0 }}>
+              <View style={{ width: 80, marginRight: 10, marginTop: 2, flexShrink: 0 }}>
                 {logoPdfSrc ? (
                   <Image
                     src={logoPdfSrc}
                     style={{
-                      width: 90,
-                      height: 50,
+                      width: 80,
+                      height: 44,
                       objectFit: "contain",
                     }}
                   />
                 ) : (
-                  <View style={{ width: 90, height: 50 }} />
+                  <View style={{ width: 80, height: 44 }} />
                 )}
               </View>
               <View
@@ -1094,22 +1094,22 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
 
           {/* Signature */}
           <View style={styles.signature}>
-            <Text style={{ fontSize: 8.5 }}>for {data.company.name}</Text>
-            <View style={{ alignItems: "flex-end", marginTop: 4 }}>
+            <Text style={{ fontSize: 8 }}>for {data.company.name}</Text>
+            <View style={{ alignItems: "flex-end", marginTop: 1 }}>
               {signaturePdfSrc ? (
                 <Image
                   src={signaturePdfSrc}
                   style={{
-                    width: 100,
-                    height: 48,
+                    width: 85,
+                    height: 40,
                     objectFit: "contain",
                   }}
                 />
               ) : (
-                <View style={{ width: 100, height: 48 }} />
+                <View style={{ width: 85, height: 40 }} />
               )}
             </View>
-            <Text style={[styles.bold, { marginTop: 4, fontSize: 8.5 }]}>
+            <Text style={[styles.bold, { marginTop: 2, fontSize: 8 }]}>
               Authorised Signatory
             </Text>
           </View>
