@@ -27,7 +27,7 @@ export async function GET(request) {
         }
 
         // Only allow admin and sales roles
-        if (!["ADMIN", "SUPERADMIN", "SALES"].includes(payload.role)) {
+        if (!["ADMIN", "SUPERADMIN", "SALES", "SALES CUM BACKOFFICE"].includes(payload.role)) {
             return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 });
         }
 

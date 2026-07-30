@@ -133,6 +133,7 @@ export async function middleware(request) {
         // Allow Team Leader for denied-leads, view-customer, accounting/ledger, and invoices/buyer pages
         const isTeamLeader = roleNorm.includes("TEAM LEADER");
         const isSales = roleNorm.includes("SALES");
+        const isSalesCumBackoffice = roleNorm === "SALES CUM BACKOFFICE";
         const isDeniedLeadsRoute = pathname.startsWith("/admin-dashboard/denied-leads");
         const isViewCustomerRoute = pathname.startsWith("/admin-dashboard/view-customer");
         const isBulkReassignRoute = pathname.startsWith("/admin-dashboard/bulk-reassign");
@@ -142,7 +143,13 @@ export async function middleware(request) {
         // Allow everyone to access accounting/ledger and invoices/buyer routes
         const isEveryoneAllowedRoute = isAccountingLedgerRoute || isInvoicesBuyerRoute;
         
-        if (!(roleNorm === "EA" && isEaAllowed) && !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) && !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute || isBulkReassignRoute)) && !isEveryoneAllowedRoute) {
+        if (
+          !(roleNorm === "EA" && isEaAllowed) &&
+          !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) &&
+          !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute || isBulkReassignRoute)) &&
+          !(isSalesCumBackoffice && isBulkReassignRoute) &&
+          !isEveryoneAllowedRoute
+        ) {
           const dest = new URL("/user-dashboard", request.url);
           dest.search = request.nextUrl.search;
           return NextResponse.redirect(dest);

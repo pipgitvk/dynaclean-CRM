@@ -13,7 +13,7 @@ export async function POST(request) {
         }
 
         // Only allow admin and sales roles to perform bulk operations
-        if (!["ADMIN", "SUPERADMIN", "SALES"].includes(payload.role)) {
+        if (!["ADMIN", "SUPERADMIN", "SALES", "SALES CUM BACKOFFICE"].includes(payload.role)) {
             return NextResponse.json({ error: "Forbidden - Admin access required" }, { status: 403 });
         }
 
