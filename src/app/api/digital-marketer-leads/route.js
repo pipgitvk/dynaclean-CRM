@@ -48,7 +48,7 @@ export async function GET() {
       `SELECT username
        FROM rep_list
        WHERE status = 1
-         AND userRole IN ('SALES', 'ADMIN', 'BACK OFFICE', 'SALES HEAD', 'GEM PORTAL')
+         AND userRole IN ('SALES', 'ADMIN', 'BACK OFFICE', 'SALES CUM BACKOFFICE', 'SALES HEAD', 'GEM PORTAL')
        ORDER BY username`,
     );
 

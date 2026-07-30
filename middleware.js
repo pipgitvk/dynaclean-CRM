@@ -98,7 +98,7 @@ export async function middleware(request) {
 
       // Prospects module is used by SALES roles too.
       if (pathname.startsWith("/admin-dashboard/prospects")) {
-        if (["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD"].includes(role) || roleNorm === "DIRECTOR") {
+        if (["SUPERADMIN", "ADMIN", "SALES", "SALES CUM BACKOFFICE", "SALES HEAD"].includes(role) || roleNorm === "DIRECTOR") {
           return NextResponse.next();
         }
       }

@@ -24,7 +24,7 @@ export async function GET(request) {
             OR (t.target_start_date <= ? AND t.target_end_date >= ?)
             OR (t.target_start_date >= ? AND t.target_end_date <= ?)
           )
-        WHERE rl.userRole IN ('BACK OFFICE', 'SALES', 'SALES HEAD', 'TEAM LEADER', 'GEM PORTAL') 
+        WHERE rl.userRole IN ('BACK OFFICE', 'SALES', 'SALES CUM BACKOFFICE', 'SALES HEAD', 'TEAM LEADER', 'GEM PORTAL') 
           AND rl.userRole NOT IN ('ADMIN')
           AND (rl.status = 1)
           AND t.username IS NULL
@@ -36,7 +36,7 @@ export async function GET(request) {
       sql = `
         SELECT username 
         FROM rep_list 
-        WHERE userRole IN ('BACK OFFICE', 'SALES', 'SALES HEAD', 'TEAM LEADER', 'GEM PORTAL') 
+        WHERE userRole IN ('BACK OFFICE', 'SALES', 'SALES CUM BACKOFFICE', 'SALES HEAD', 'TEAM LEADER', 'GEM PORTAL') 
           AND userRole NOT IN ('ADMIN')
           AND (status = 1)
         ORDER BY username;

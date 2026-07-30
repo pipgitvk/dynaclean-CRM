@@ -59,7 +59,7 @@ export async function GET(request) {
 
     // Fetch employees with SALES role or related roles
     const [employees] = await connection.execute(
-      `SELECT username, username as name FROM rep_list WHERE status = 1 and userRole IN ('SALES', 'ADMIN', 'BACK OFFICE', 'SALES HEAD', 'GEM PORTAL') ORDER BY username`
+      `SELECT username, username as name FROM rep_list WHERE status = 1 and userRole IN ('SALES', 'ADMIN', 'BACK OFFICE', 'SALES CUM BACKOFFICE', 'SALES HEAD', 'GEM PORTAL') ORDER BY username`
     );
 
     return NextResponse.json({ success: true, employees });

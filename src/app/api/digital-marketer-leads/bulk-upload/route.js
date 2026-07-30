@@ -9,7 +9,7 @@ import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
 
 const MAX_ROWS = 500;
 
-const ASSIGNABLE_ROLE_SQL = `userRole IN ('SALES', 'ADMIN', 'BACK OFFICE', 'SALES HEAD', 'GEM PORTAL')`;
+const ASSIGNABLE_ROLE_SQL = `userRole IN ('SALES', 'ADMIN', 'BACK OFFICE', 'SALES CUM BACKOFFICE', 'SALES HEAD', 'GEM PORTAL')`;
 
 async function isValidAssignee(connection, username) {
   if (!username || !String(username).trim()) return false;

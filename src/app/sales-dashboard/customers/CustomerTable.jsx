@@ -28,6 +28,7 @@ export default function CustomerTable({
   pageSize = 50,
   userRole,
   employees = [],
+  isSalesCumBackoffice = false,
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -38,14 +39,14 @@ export default function CustomerTable({
     date_to: searchParams.date_to ?? "",
     reporting_date_from: searchParams.reporting_date_from ?? "",
     reporting_date_to: searchParams.reporting_date_to ?? "",
-    sort: searchParams.sort ?? "", // ✅ empty unless explicitly set
+    sort: searchParams.sort ?? "",
     status: normalizeStatusFromParams(searchParams.status ?? ""),
     stage: searchParams.stage ?? "",
     lead_campaign: searchParams.lead_campaign ?? "",
     next_follow_date: searchParams.next_follow_date ?? "",
     employee: searchParams.employee ?? "",
     tags: searchParams.tags ?? "",
-    tag_filter: searchParams.tag_filter ?? "", // New separate tag filter
+    tag_filter: searchParams.tag_filter ?? "",
   });
   const [isInputVisible, setIsInputVisible] = useState(false);
 
@@ -80,7 +81,7 @@ export default function CustomerTable({
       date_to: "",
       reporting_date_from: "",
       reporting_date_to: "",
-      sort: "date_created", // ✅ fallback sort on reset
+      sort: "date_created",
       status: "",
       stage: "",
       lead_campaign: "",

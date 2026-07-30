@@ -65,11 +65,22 @@ export default async function CustomersPage({ searchParams }) {
   const customerConditions = [];
   const customerParams = [];
 
-  // Only filter by assigned fields if user is not ADMIN, SUPERADMIN, or SERVICE HEAD or TEAM LEADER or EA
-  if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
+  // SALES CUM BACKOFFICE: show all Denied customers OR customers they created
+  const isSalesCumBackoffice = userRole === "SALES CUM BACKOFFICE";
+
+  if (isSalesCumBackoffice) {
+    customerConditions.push(
+      "(c.status = 'Denied' OR c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)"
+    );
+    customerParams.push(username, username, username);
+  } else if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
+    // Only filter by assigned fields for non-admin roles
     customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
     customerParams.push(username, username, username);
   }
+
+  // effectiveStatus: for SALES CUM BACKOFFICE no extra status filter (handled above)
+  const effectiveStatus = isSalesCumBackoffice ? "" : status;
 
   // Employee filter (only for ADMIN, SUPERADMIN, TEAM LEADER, EA)
   if (employee && (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA")) {
@@ -120,9 +131,9 @@ export default async function CustomersPage({ searchParams }) {
     }
   }
 
-  if (status) {
+  if (effectiveStatus) {
     customerConditions.push("c.status = ?");
-    customerParams.push(status);
+    customerParams.push(effectiveStatus);
   }
   if (stage) {
     customerConditions.push("c.stage = ?");
@@ -293,6 +304,7 @@ export default async function CustomersPage({ searchParams }) {
           pageSize={pageSize}
           userRole={userRole}
           employees={employees}
+          isSalesCumBackoffice={isSalesCumBackoffice}
         />
       </div>
     );

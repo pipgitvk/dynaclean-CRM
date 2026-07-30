@@ -1,7 +1,7 @@
 /** Roles allowed to use admin Prospects module (pages + APIs). */
 export function canAccessProspectsRole(role) {
   const r = String(role ?? "").toUpperCase().trim();
-  return ["SUPERADMIN", "ADMIN", "SALES", "SALES HEAD", "DIRECTOR"].includes(r);
+  return ["SUPERADMIN", "ADMIN", "SALES", "SALES CUM BACKOFFICE", "SALES HEAD", "DIRECTOR"].includes(r);
 }
 
 export function isProspectsAdminRole(role) {
@@ -12,5 +12,5 @@ export function isProspectsAdminRole(role) {
 /** Sales / sales head — amount on add forms is driven by quotation × qty only (not manually edited). */
 export function isProspectsSalesOnlyRole(role) {
   const r = String(role ?? "").toUpperCase().trim();
-  return r === "SALES" || r === "SALES HEAD";
+  return r === "SALES" || r === "SALES CUM BACKOFFICE" || r === "SALES HEAD";
 }

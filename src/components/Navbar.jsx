@@ -219,7 +219,8 @@ export default function Navbar({ onToggleSidebar }) {
       r === "SALES REPRESENTATIVE" ||
       r === "DIRECTOR" ||
       r === "EA" ||
-      r === "SERVICE SUPPORT"
+      r === "SERVICE SUPPORT" ||
+      r === "SALES CUM BACKOFFICE"
     );
   };
 
