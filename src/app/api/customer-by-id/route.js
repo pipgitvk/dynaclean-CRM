@@ -38,8 +38,8 @@ export async function POST(req) {
 
     let query, params;
 
-    // If SUPERADMIN, ADMIN, SERVICE HEAD, or SERVICE SUPPORT can access all customers
-    if (role === "SUPERADMIN" || role === "ADMIN" || role === "SERVICE HEAD" || role === "SERVICE SUPPORT") {
+    // If SUPERADMIN, ADMIN, SERVICE HEAD, SERVICE SUPPORT, or SALES CUM BACKOFFICE can access all customers
+    if (role === "SUPERADMIN" || role === "ADMIN" || role === "SERVICE HEAD" || role === "SERVICE SUPPORT" || role === "SALES CUM BACKOFFICE") {
       query = `
         SELECT customer_id, company, first_name, last_name, address, gstin, state, lead_source
         FROM customers

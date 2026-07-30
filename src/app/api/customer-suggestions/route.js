@@ -34,7 +34,7 @@ export async function POST(req) {
     let rows;
 
     // Check if user can access all customers
-    const canAccessAll = role === "SUPERADMIN" || role === "ADMIN" || role === "SERVICE HEAD";
+    const canAccessAll = role === "SUPERADMIN" || role === "ADMIN" || role === "SERVICE HEAD" || role === "SALES CUM BACKOFFICE";
 
     if (/^\d+$/.test(query.trim())) {
       // Pure numeric input → likely customer ID
