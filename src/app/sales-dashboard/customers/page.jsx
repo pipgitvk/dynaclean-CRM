@@ -65,22 +65,19 @@ export default async function CustomersPage({ searchParams }) {
   const customerConditions = [];
   const customerParams = [];
 
-  // SALES CUM BACKOFFICE: show all Denied customers OR customers they created
+  // SALES CUM BACKOFFICE: show ALL customers (no ownership restriction)
   const isSalesCumBackoffice = userRole === "SALES CUM BACKOFFICE";
 
   if (isSalesCumBackoffice) {
-    customerConditions.push(
-      "(c.status = 'Denied' OR c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)"
-    );
-    customerParams.push(username, username, username);
+    // No condition added — all customers visible, same as SUPERADMIN
   } else if (userRole !== "ADMIN" && userRole !== "SUPERADMIN" && userRole !== "SERVICE HEAD" && userRole !== "TEAM LEADER" && userRole !== "EA") {
     // Only filter by assigned fields for non-admin roles
     customerConditions.push("(c.lead_source = ? OR c.sales_representative = ? OR c.assigned_to = ?)");
     customerParams.push(username, username, username);
   }
 
-  // effectiveStatus: for SALES CUM BACKOFFICE no extra status filter (handled above)
-  const effectiveStatus = isSalesCumBackoffice ? "" : status;
+  // effectiveStatus: SALES CUM BACKOFFICE can also filter by status from UI
+  const effectiveStatus = status;
 
   // Employee filter (only for ADMIN, SUPERADMIN, TEAM LEADER, EA)
   if (employee && (userRole === "ADMIN" || userRole === "SUPERADMIN" || userRole === "TEAM LEADER" || userRole === "EA")) {
