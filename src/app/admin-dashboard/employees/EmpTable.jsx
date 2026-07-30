@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Link from "next/link";
-import { LogIn, Key, Edit, Shield, UserPlus, X } from "lucide-react";
+import { LogIn, Key, Edit, Shield, UserPlus, X, ExternalLink } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import toast from "react-hot-toast";
 import {
@@ -14,6 +14,7 @@ import {
   collectModuleKeysFromUiNode,
   buildModuleUiSearchIndex,
 } from "@/lib/moduleAccess";
+import { getModuleUrl } from "@/lib/moduleUrlMapping";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -46,6 +47,7 @@ function ModuleUiBlock({
 
   if (node.kind === "single") {
     const isChecked = selected.includes(node.key);
+    const url = getModuleUrl(node.key);
     return (
       <div
         id={`bulk-section-${node.id}`}
@@ -55,16 +57,28 @@ function ModuleUiBlock({
             : "border-gray-200 bg-white"
         }`}
       >
-        <label className="flex items-center gap-2 px-3 py-2.5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isChecked}
-            onChange={() => !disabled && onToggleChild(node.key)}
-            disabled={disabled}
-            className="w-4 h-4 accent-blue-600 flex-shrink-0"
-          />
-          <span className="text-sm font-semibold text-gray-800">{node.label}</span>
-        </label>
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <label className="flex items-center gap-2 cursor-pointer flex-1">
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={() => !disabled && onToggleChild(node.key)}
+              disabled={disabled}
+              className="w-4 h-4 accent-blue-600 flex-shrink-0"
+            />
+            <span className="text-sm font-semibold text-gray-800">{node.label}</span>
+          </label>
+          {url && (
+            <button
+              onClick={() => window.open(url, "_blank")}
+              className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors p-1"
+              title="Open module in new tab"
+              type="button"
+            >
+              <ExternalLink size={16} />
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -134,24 +148,36 @@ function ModuleUiBlock({
                   />
                 </div>
               ) : (
-                <label
+                <div
                   key={ch.key}
                   id={`bulk-module-${ch.key}`}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border cursor-pointer transition-colors text-xs ${
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border transition-colors text-xs ${
                     selected.includes(ch.key)
                       ? "bg-blue-50 border-blue-200 text-blue-800"
                       : "bg-white border-gray-100 text-gray-500 hover:border-blue-200"
                   } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
                 >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(ch.key)}
-                    onChange={() => !disabled && onToggleChild(ch.key)}
-                    disabled={disabled}
-                    className="w-3.5 h-3.5 accent-blue-600 flex-shrink-0"
-                  />
-                  <span className="leading-tight">{ch.label}</span>
-                </label>
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(ch.key)}
+                      onChange={() => !disabled && onToggleChild(ch.key)}
+                      disabled={disabled}
+                      className="w-3.5 h-3.5 accent-blue-600 flex-shrink-0"
+                    />
+                    <span className="leading-tight">{ch.label}</span>
+                  </label>
+                  {getModuleUrl(ch.key) && (
+                    <button
+                      onClick={() => window.open(getModuleUrl(ch.key), "_blank")}
+                      className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors p-0.5"
+                      title="Open module in new tab"
+                      type="button"
+                    >
+                      <ExternalLink size={14} />
+                    </button>
+                  )}
+                </div>
               ),
             )}
           </div>
