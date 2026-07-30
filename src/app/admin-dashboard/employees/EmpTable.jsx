@@ -760,9 +760,8 @@ const EmpTable = ({ employees }) => {
       "payment-pending",
       "manual-payments",
       "employee-crm",
-      "salary-slips",
       "prospects-add",
-      "prospects-new",
+      "prospects-ne",
       "installation-videos",
     ],
   };

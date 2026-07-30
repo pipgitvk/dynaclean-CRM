@@ -12,7 +12,7 @@ export async function GET() {
         const { role, username } = payload;
 
         // Check if user has access to this report
-        const allowedRoles = ["SUPERADMIN", "ADMIN", "ACCOUNTANT", "HR HEAD", "SALES", "TEAM LEADER", "DIRECTOR", "GEM PORTAL", "GEM"];
+        const allowedRoles = ["SUPERADMIN", "ADMIN", "ACCOUNTANT", "HR HEAD", "SALES", "SALES CUM BACKOFFICE", "TEAM LEADER", "DIRECTOR", "GEM PORTAL", "GEM"];
         if (!allowedRoles.includes(role)) {
             return NextResponse.json({ error: "Access denied" }, { status: 403 });
         }
@@ -44,6 +44,7 @@ export async function GET() {
     `;
 
         // Filter for SALES and GEM roles - only their own orders
+        // SALES CUM BACKOFFICE sees ALL orders (no filter)
         if (role === "SALES" || role === "GEM PORTAL" || role === "GEM") {
             sql += ` AND created_by = ?`;
         }
