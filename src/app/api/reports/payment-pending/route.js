@@ -40,7 +40,7 @@ export async function GET() {
         ppf_latest.next_followup_date AS next_followup_date
       FROM neworder AS o
       LEFT JOIN customers AS c 
-        ON o.contact = c.phone COLLATE utf8mb4_unicode_ci
+        ON o.contact COLLATE utf8mb4_unicode_ci = c.phone COLLATE utf8mb4_unicode_ci
       LEFT JOIN (
         SELECT ppf.order_id, ppf.next_followup_date
         FROM payment_pending_followups ppf
@@ -49,8 +49,8 @@ export async function GET() {
           FROM payment_pending_followups
           GROUP BY order_id
         ) t ON t.order_id = ppf.order_id AND t.max_id = ppf.id
-      ) ppf_latest ON ppf_latest.order_id = o.order_id
-      WHERE (o.payment_status IS NULL OR o.payment_status != 'paid')
+      ) ppf_latest ON ppf_latest.order_id COLLATE utf8mb4_unicode_ci = o.order_id COLLATE utf8mb4_unicode_ci
+      WHERE (o.payment_status IS NULL OR o.payment_status COLLATE utf8mb4_unicode_ci != 'paid')
         AND (o.is_returned = 0 OR o.is_returned = 2 OR o.is_returned IS NULL)
         AND (o.is_cancelled = 0 or o.is_cancelled IS NULL)
     `;
@@ -58,7 +58,7 @@ export async function GET() {
         // Filter for SALES and GEM roles - only their own orders
         // SALES CUM BACKOFFICE sees ALL orders (no filter)
         if (role === "SALES" || role === "GEM PORTAL" || role === "GEM") {
-            sql += ` AND created_by = ?`;
+            sql += ` AND o.created_by COLLATE utf8mb4_unicode_ci = ?`;
         }
 
         sql += ` ORDER BY duedate ASC`;
