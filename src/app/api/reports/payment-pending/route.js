@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensurePaymentPendingFollowupsTable } from "@/lib/ensurePaymentPendingFollowupsTable";
 
 export async function GET() {
     try {
@@ -18,6 +19,7 @@ export async function GET() {
         }
 
         const pool = await getDbConnection();
+        await ensurePaymentPendingFollowupsTable();
 
         // Build SQL query based on role
         let sql = `
@@ -34,10 +36,20 @@ export async function GET() {
         o.created_at,
         o.company_name,
         o.is_returned,
-        c.customer_id
+        c.customer_id,
+        ppf_latest.next_followup_date AS next_followup_date
       FROM neworder AS o
       LEFT JOIN customers AS c 
         ON o.contact = c.phone COLLATE utf8mb4_unicode_ci
+      LEFT JOIN (
+        SELECT ppf.order_id, ppf.next_followup_date
+        FROM payment_pending_followups ppf
+        INNER JOIN (
+          SELECT order_id, MAX(id) AS max_id
+          FROM payment_pending_followups
+          GROUP BY order_id
+        ) t ON t.order_id = ppf.order_id AND t.max_id = ppf.id
+      ) ppf_latest ON ppf_latest.order_id = o.order_id
       WHERE (o.payment_status IS NULL OR o.payment_status != 'paid')
         AND (o.is_returned = 0 OR o.is_returned = 2 OR o.is_returned IS NULL)
         AND (o.is_cancelled = 0 or o.is_cancelled IS NULL)
@@ -135,6 +147,7 @@ export async function GET() {
                 paid_amount: paidAmount,
                 remaining_amount: remaining,
                 due_date: order.duedate,
+                next_followup_date: order.next_followup_date || null,
                 payment_status: order.payment_status || 'pending',
                 created_at: order.created_at,
                 is_partially_returned: order.is_returned === 2,

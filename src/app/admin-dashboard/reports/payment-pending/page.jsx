@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
@@ -18,6 +18,9 @@ export default function PaymentPendingReport() {
   const [dueDateFrom, setDueDateFrom] = useState("");
   const [dueDateTo, setDueDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
+  const [followupModalOpen, setFollowupModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     fetchReport();
@@ -95,7 +98,7 @@ export default function PaymentPendingReport() {
         let bVal = b[sortConfig.key];
 
         // Handle date sorting
-        if (sortConfig.key === 'due_date') {
+        if (sortConfig.key === 'due_date' || sortConfig.key === 'next_followup_date') {
           aVal = dayjs(aVal).unix();
           bVal = dayjs(bVal).unix();
         }
@@ -134,7 +137,7 @@ export default function PaymentPendingReport() {
   };
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date"];
+    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
     const csvData = filteredOrders.map(order => [
       order.order_id,
       order.client_name,
@@ -144,7 +147,9 @@ export default function PaymentPendingReport() {
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
       order.remaining_amount.toFixed(2),
-      dayjs(order.due_date).format("DD/MM/YYYY")
+      dayjs(order.due_date).format("DD/MM/YYYY"),
+      order.latest_deduction || "",
+      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : ""
     ]);
 
     const csvContent = [
@@ -214,6 +219,9 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-8 bg-gray-300 rounded w-28"></div></td>
     </tr>
   );
 
@@ -418,6 +426,19 @@ export default function PaymentPendingReport() {
                 >
                   Due Date <SortIcon columnKey="due_date" />
                 </th>
+                <th
+                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => handleSort('latest_deduction')}
+                >
+                  Tag <SortIcon columnKey="latest_deduction" />
+                </th>
+                <th
+                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => handleSort('next_followup_date')}
+                >
+                  Next Followup <SortIcon columnKey="next_followup_date" />
+                </th>
+                <th className="px-4 py-3 text-center font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -456,18 +477,369 @@ export default function PaymentPendingReport() {
                           {isOverdue && " ⚠️"}
                         </span>
                       </td>
+                      <td className="px-4 py-3 border-b text-center">
+                        {order.latest_deduction ? (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            order.latest_deduction === "LD" ? "bg-blue-100 text-blue-700" :
+                            order.latest_deduction === "SD" ? "bg-green-100 text-green-700" :
+                            order.latest_deduction === "TDS" ? "bg-purple-100 text-purple-700" :
+                            "bg-gray-100 text-gray-700"
+                          }`}>
+                            {order.latest_deduction}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 border-b text-center text-gray-700">
+                        {order.next_followup_date
+                          ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A")
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-3 border-b">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setFollowupModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                          >
+                            <PhoneCall size={14} />
+                            Followup
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setHistoryModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-md bg-gray-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
+                          >
+                            <History size={14} />
+                            History
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
                     No pending payments found
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <FollowupModal
+        open={followupModalOpen}
+        onClose={() => {
+          setFollowupModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        order={selectedOrder}
+        onSaved={() => {
+          setFollowupModalOpen(false);
+          setSelectedOrder(null);
+        }}
+      />
+
+      <HistoryModal
+        open={historyModalOpen}
+        onClose={() => {
+          setHistoryModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        order={selectedOrder}
+      />
+    </div>
+  );
+}
+
+function FollowupModal({ open, onClose, order, onSaved }) {
+  const [followedDate, setFollowedDate] = useState("");
+  const [communicationMode, setCommunicationMode] = useState("Call");
+  const [nextFollowupDate, setNextFollowupDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setFollowedDate(dayjs().format("YYYY-MM-DDTHH:mm"));
+    setCommunicationMode("Call");
+    setNextFollowupDate("");
+    setNotes("");
+  }, [open, order?.order_id]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <div className="text-lg font-bold text-gray-900">Add Followup</div>
+            <div className="text-xs text-gray-600">
+              {order?.order_id ? `Order: ${order.order_id}` : ""}
+              {order?.client_name ? ` | ${order.client_name}` : ""}
+              {order?.company_name ? ` | ${order.company_name}` : ""}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">
+                Followed Date
+              </label>
+              <input
+                type="datetime-local"
+                value={followedDate}
+                readOnly
+                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">
+                Communication Mode
+              </label>
+              <select
+                value={communicationMode}
+                onChange={(e) => setCommunicationMode(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Call">Call</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Email">Email</option>
+                <option value="Visit">Visit</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">
+                Next Followup Date
+              </label>
+              <input
+                type="datetime-local"
+                value={nextFollowupDate}
+                onChange={(e) => setNextFollowupDate(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">
+                Pending Amount
+              </label>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-red-600">
+                ₹{Number(order?.remaining_amount || 0).toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col">
+            <label className="mb-1 text-xs font-semibold text-gray-700">Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              className="resize-none rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Call details / customer response / payment plan..."
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={async () => {
+              if (!order?.order_id) return;
+              if (!notes.trim()) {
+                alert("Notes required");
+                return;
+              }
+              try {
+                setSubmitting(true);
+                const res = await fetch("/api/reports/payment-pending/followups", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    order_id: order.order_id,
+                    customer_id: order.customer_id || null,
+                    client_name: order.client_name || null,
+                    company_name: order.company_name || null,
+                    contact: order.contact || null,
+                    followed_date: followedDate || null,
+                    communication_mode: communicationMode || null,
+                    next_followup_date: nextFollowupDate || null,
+                    notes: notes.trim(),
+                  }),
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data?.success) {
+                  throw new Error(data?.error || "Failed to save followup");
+                }
+
+                alert("Followup saved");
+                onSaved?.();
+              } catch (e) {
+                alert(e?.message || "Failed to save followup");
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {submitting ? <Loader2 size={16} className="animate-spin" /> : <PhoneCall size={16} />}
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryModal({ open, onClose, order }) {
+  const [loading, setLoading] = useState(false);
+  const [followups, setFollowups] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open || !order?.order_id) return;
+    let cancelled = false;
+
+    async function run() {
+      try {
+        setError("");
+        setLoading(true);
+        const res = await fetch(
+          `/api/reports/payment-pending/followups?order_id=${encodeURIComponent(order.order_id)}`,
+        );
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.error || "Failed to fetch history");
+        }
+        if (cancelled) return;
+        setFollowups(data.followups || []);
+      } catch (e) {
+        if (cancelled) return;
+        setError(e?.message || "Failed to fetch history");
+        setFollowups([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, order?.order_id]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <div className="text-lg font-bold text-gray-900">Followup History</div>
+            <div className="text-xs text-gray-600">
+              {order?.order_id ? `Order: ${order.order_id}` : ""}
+              {order?.client_name ? ` | ${order.client_name}` : ""}
+              {order?.company_name ? ` | ${order.company_name}` : ""}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-700">
+              <Loader2 size={18} className="animate-spin" />
+              Loading...
+            </div>
+          ) : error ? (
+            <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          ) : followups.length === 0 ? (
+            <div className="rounded-md bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+              No followups yet
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {followups.map((f) => (
+                <div key={f.id} className="rounded-md border border-gray-200 p-4">
+                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <div className="text-sm font-semibold text-gray-900">
+                      {f.created_by || "Unknown"}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {f.created_at ? dayjs(f.created_at).format("DD/MM/YYYY hh:mm A") : ""}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{f.notes}</div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {f.followed_date && (
+                      <div className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">
+                        Followed: {dayjs(f.followed_date).format("DD/MM/YYYY hh:mm A")}
+                      </div>
+                    )}
+                    {f.communication_mode && (
+                      <div className="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-800">
+                        Mode: {String(f.communication_mode)}
+                      </div>
+                    )}
+                    {f.next_followup_date && (
+                      <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
+                        Next: {dayjs(f.next_followup_date).format("DD/MM/YYYY hh:mm A")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end border-t px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-300"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>
