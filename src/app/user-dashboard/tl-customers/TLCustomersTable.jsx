@@ -68,6 +68,7 @@ export default function TLCustomersTable({
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState(productsList);
   const [showProductsDropdown, setShowProductsDropdown] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
   const [preBookingModal, setPreBookingModal] = useState({
     isOpen: false,
     customerId: null,
@@ -89,6 +90,16 @@ export default function TLCustomersTable({
   }, [productsList, isAdmin]);
 
   const filterTagOptions = useMemo(() => getTlCustomersTableTagOptions(), []);
+  const filteredProducts = useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((product) => {
+      const searchable = `${product.item_code || ""} ${product.item_name || ""}`
+        .trim()
+        .toLowerCase();
+      return searchable.includes(q);
+    });
+  }, [products, productSearch]);
 
   console.log("customer data ", customers);
 
@@ -578,6 +589,7 @@ export default function TLCustomersTable({
                         if (status) params.set("status", status);
                         if (selectedStage) params.set("stage", selectedStage);
                         if (selectedTag) params.set("tag", selectedTag);
+                        if (selectedModel) params.set("model", selectedModel);
                         if (nextFromDate)
                           params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
@@ -625,6 +637,7 @@ export default function TLCustomersTable({
                           params.set("status", selectedStatus);
                         if (stage) params.set("stage", stage);
                         if (selectedTag) params.set("tag", selectedTag);
+                        if (selectedModel) params.set("model", selectedModel);
                         if (nextFromDate)
                           params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
@@ -679,6 +692,7 @@ export default function TLCustomersTable({
                           params.set("status", selectedStatus);
                         if (selectedStage) params.set("stage", selectedStage);
                         if (tag) params.set("tag", tag);
+                        if (selectedModel) params.set("model", selectedModel);
                         if (nextFromDate)
                           params.set("nextFromDate", nextFromDate);
                         if (nextToDate) params.set("nextToDate", nextToDate);
@@ -699,6 +713,33 @@ export default function TLCustomersTable({
                   </select>
                 </div>
 
+                {/* Next Followup (same value as table column "Next Followup") */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Next Followup from
+                  </label>
+                  <input
+                    type="date"
+                    placeholder="dd/mm/yyyy"
+                    value={nextFromDate}
+                    onChange={(e) => setNextFromDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Next Followup to
+                  </label>
+                  <input
+                    type="date"
+                    placeholder="dd/mm/yyyy"
+                    value={nextToDate}
+                    onChange={(e) => setNextToDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
                 {/* Products / Models filter - Dropdown */}
                 <div className="relative">
                   <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">
@@ -706,7 +747,10 @@ export default function TLCustomersTable({
                   </label>
                   <button
                     type="button"
-                    onClick={() => setShowProductsDropdown(!showProductsDropdown)}
+                    onClick={() => {
+                      setShowProductsDropdown(!showProductsDropdown);
+                      if (!showProductsDropdown) setProductSearch("");
+                    }}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between hover:bg-gray-50"
                   >
                     <span>
@@ -735,11 +779,21 @@ export default function TLCustomersTable({
                   {/* Dropdown Menu */}
                   {showProductsDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-20 max-h-64 overflow-y-auto">
+                      <div className="p-2 border-b border-gray-200 bg-white sticky top-0 z-10">
+                        <input
+                          type="text"
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                          placeholder="Search products..."
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedModel("");
                           setShowProductsDropdown(false);
+                          setProductSearch("");
                           startTransition(() => {
                             const params = new URLSearchParams();
                             if (searchTerm) params.set("search", searchTerm);
@@ -760,7 +814,12 @@ export default function TLCustomersTable({
                       >
                         All Products
                       </button>
-                      {products.slice(0, 10).map((product) => {
+                      {filteredProducts.length === 0 && (
+                        <div className="px-4 py-3 text-sm text-gray-500">
+                          No products found
+                        </div>
+                      )}
+                      {filteredProducts.map((product) => {
                         const displayLabel = `${product.item_code} - ${product.item_name}`;
                         return (
                           <button
@@ -770,6 +829,7 @@ export default function TLCustomersTable({
                               const model = displayLabel;
                               setSelectedModel(model);
                               setShowProductsDropdown(false);
+                              setProductSearch("");
                               startTransition(() => {
                                 const params = new URLSearchParams();
                                 if (searchTerm)
@@ -795,45 +855,16 @@ export default function TLCustomersTable({
                                 : "text-gray-700"
                             }`}
                           >
-                            {product.item_code}
+                            {displayLabel}
                           </button>
                         );
                       })}
-                      {products.length > 10 && (
-                        <div className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-t border-gray-200">
-                          Showing {products.slice(0, 10).length} of{" "}
-                          {products.length} products
-                        </div>
-                      )}
+                      <div className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-t border-gray-200">
+                        Showing {filteredProducts.length} of {products.length}{" "}
+                        products
+                      </div>
                     </div>
                   )}
-                </div>
-
-                {/* Next Followup (same value as table column "Next Followup") */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Next Followup from
-                  </label>
-                  <input
-                    type="date"
-                    placeholder="dd/mm/yyyy"
-                    value={nextFromDate}
-                    onChange={(e) => setNextFromDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Next Followup to
-                  </label>
-                  <input
-                    type="date"
-                    placeholder="dd/mm/yyyy"
-                    value={nextToDate}
-                    onChange={(e) => setNextToDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
                 </div>
               </div>
 
