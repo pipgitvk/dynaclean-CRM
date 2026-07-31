@@ -5,6 +5,22 @@ export function isSuperAdminRole(role) {
   return k === "SUPERADMIN" || k === "DIRECTOR";
 }
 
+/** Roles that may search/view all customers (header search, reports, etc.) */
+export function canViewAllCustomers(role) {
+  const k = normalizeRoleKey(role || "");
+  return (
+    isSuperAdminRole(role) ||
+    k === "ADMIN" ||
+    k === "SERVICE HEAD" ||
+    k === "SALES CUM BACKOFFICE" ||
+    k === "HR" ||
+    k === "HR HEAD" ||
+    k === "HR EXECUTIVE" ||
+    k === "TEAM LEADER" ||
+    k === "EA"
+  );
+}
+
 /** SUPERADMIN, ADMIN, and DIRECTOR may view any employee on the daily dashboard; all other roles are self-only. */
 export function canViewAllEmployeeDailyReports(role) {
   const k = normalizeRoleKey(role);

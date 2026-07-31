@@ -4,15 +4,10 @@ import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
 import {
   buildOwnershipWhere,
+  canViewAllCustomers,
   getScopedUsername,
-  isSuperAdminRole,
 } from "@/lib/dataScope";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
-
-function isHrPrivilegedCustomersRole(role) {
-  const r = normalizeRoleKey(role || "");
-  return r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE" || r === "TEAM LEADER" || r === "EA";
-}
 
 export async function GET(req) {
   const conn = await getDbConnection();
@@ -46,8 +41,8 @@ export async function GET(req) {
     let employees = employeeRows.map((row) => row.username);
 
     // Employee filter dropdown:
-    // SUPERADMIN + HR roles can filter by any rep; everyone else should only see themselves.
-    if (!isSuperAdminRole(role) && !isHrPrivilegedCustomersRole(role)) {
+    // Privileged roles can filter by any rep; everyone else should only see themselves.
+    if (!canViewAllCustomers(role)) {
       employees = username ? [username] : [];
     }
 
@@ -76,11 +71,11 @@ export async function GET(req) {
     }
 
     // Data visibility:
-    // SUPERADMIN + HR roles → all rows
+    // Privileged roles (incl. SALES CUM BACKOFFICE) → all rows incl. Denied
     // SERVICE SUPPORT → rows where service_lead_source = their username
     // GEM → rows where gem_lead_source = their username
     // everyone else → only rows assigned/owned by them (or deny if username missing)
-    if (!isSuperAdminRole(role) && !isHrPrivilegedCustomersRole(role)) {
+    if (!canViewAllCustomers(role)) {
       const normalizedRole = normalizeRoleKey(role);
 
       if (normalizedRole === "SERVICE SUPPORT") {
