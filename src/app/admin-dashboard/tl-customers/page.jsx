@@ -219,6 +219,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       c.status,
       c.stage,
       COALESCE(tlf.multi_tag, cf.multi_tag) as multi_tag,
+      tlf.model as tl_model,
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
       tlf.customer_id as tl_customer_id,
@@ -232,7 +233,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     LEFT JOIN (
-      SELECT customer_id, multi_tag, next_followup_date, followed_date,
+      SELECT customer_id, multi_tag, model, next_followup_date, followed_date,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
