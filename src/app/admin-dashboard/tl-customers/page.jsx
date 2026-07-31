@@ -24,6 +24,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     status,
     stage,
     tag,
+    model,
     nextFromDate,
     nextToDate,
     lead_campaign,
@@ -58,6 +59,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       tlf.id as tl_followup_id,
       tlf.estimated_order_date,
       tlf.lead_quality_score,
+      tlf.model as tl_model,
       COALESCE(tlf.multi_tag, cf.multi_tag) as multi_tag,
       tlf.notes as tl_notes,
       tlf.next_followup_date as tl_next_followup,
@@ -72,7 +74,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     LEFT JOIN (
-      SELECT customer_id, id, estimated_order_date, lead_quality_score, multi_tag, notes, next_followup_date, followed_date, followed_by,
+      SELECT customer_id, id, estimated_order_date, lead_quality_score, multi_tag, model, notes, next_followup_date, followed_date, followed_by,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
@@ -183,6 +185,12 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   if (lead_campaign) {
     query += ` AND c.lead_campaign = ?`;
     params.push(lead_campaign);
+  }
+
+  // Filter by model (product)
+  if (model) {
+    query += ` AND tlf.model LIKE ?`;
+    params.push(`%${model}%`);
   }
 
   // Get total count for pagination (without LIMIT)
@@ -318,6 +326,12 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     kpiParams.push(lead_campaign);
   }
 
+  // Filter by model (product) for KPI
+  if (model) {
+    kpiQuery += ` AND tlf.model LIKE ?`;
+    kpiParams.push(`%${model}%`);
+  }
+
   const [allCustomersForKPI] = await conn.execute(kpiQuery, kpiParams);
 
   const isSuperAdmin = String(payload.role ?? payload.userRole ?? "")
@@ -327,6 +341,11 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   // Fetch employees for only sales role
   const [employees] = await conn.execute(
     `SELECT DISTINCT username, username as name FROM rep_list WHERE userRole IN ('SALES') AND status = 1 ORDER BY username`,
+  );
+
+  // Fetch all products for the model filter dropdown
+  const [productsList] = await conn.execute(
+    `SELECT item_code, item_name FROM products_list ORDER BY item_name ASC`,
   );
 
   return (
@@ -355,6 +374,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
         customers={customers}
         allCustomersForKPI={allCustomersForKPI}
         employees={employees}
+        productsList={productsList}
         searchParams={searchParamsResolved}
         currentPage={currentPage}
         totalPages={totalPages}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -31,6 +31,7 @@ export default function TLCustomersTable({
   customers,
   allCustomersForKPI = [],
   employees,
+  productsList = [],
   searchParams,
   currentPage = 1,
   totalPages = 1,
@@ -52,6 +53,9 @@ export default function TLCustomersTable({
   );
   const [selectedStage, setSelectedStage] = useState(searchParams?.stage || "");
   const [selectedTag, setSelectedTag] = useState(searchParams?.tag || "");
+  const [selectedModel, setSelectedModel] = useState(
+    searchParams?.model || "",
+  );
   const [nextFromDate, setNextFromDate] = useState(
     searchParams?.nextFromDate || "",
   );
@@ -62,11 +66,27 @@ export default function TLCustomersTable({
   const [activeFilter, setActiveFilter] = useState("all");
   const [showQuotePopup, setShowQuotePopup] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState(productsList);
+  const [showProductsDropdown, setShowProductsDropdown] = useState(false);
   const [preBookingModal, setPreBookingModal] = useState({
     isOpen: false,
     customerId: null,
     customerName: null,
   });
+
+  // Fetch products if not provided via props
+  useEffect(() => {
+    if (productsList.length === 0 && isAdmin) {
+      fetch("/api/products/list")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setProducts(data);
+          }
+        })
+        .catch((err) => console.error("Failed to fetch products:", err));
+    }
+  }, [productsList, isAdmin]);
 
   const filterTagOptions = useMemo(() => getTlCustomersTableTagOptions(), []);
 
@@ -323,6 +343,7 @@ export default function TLCustomersTable({
       if (selectedStatus) params.set("status", selectedStatus);
       if (selectedStage) params.set("stage", selectedStage);
       if (selectedTag) params.set("tag", selectedTag);
+      if (selectedModel) params.set("model", selectedModel);
       if (nextFromDate) params.set("nextFromDate", nextFromDate);
       if (nextToDate) params.set("nextToDate", nextToDate);
       params.set("tlOnly", tlOnly ? "true" : "false");
@@ -337,6 +358,7 @@ export default function TLCustomersTable({
       setSelectedStatus("");
       setSelectedStage("");
       setSelectedTag("");
+      setSelectedModel("");
       setNextFromDate("");
       setNextToDate("");
       router.push(basePath);
@@ -351,6 +373,7 @@ export default function TLCustomersTable({
       if (selectedStatus) params.set("status", selectedStatus);
       if (selectedStage) params.set("stage", selectedStage);
       if (selectedTag) params.set("tag", selectedTag);
+      if (selectedModel) params.set("model", selectedModel);
       if (nextFromDate) params.set("nextFromDate", nextFromDate);
       if (nextToDate) params.set("nextToDate", nextToDate);
 
@@ -367,6 +390,7 @@ export default function TLCustomersTable({
   if (selectedStatus) currentQuery.set("status", selectedStatus);
   if (selectedStage) currentQuery.set("stage", selectedStage);
   if (selectedTag) currentQuery.set("tag", selectedTag);
+  if (selectedModel) currentQuery.set("model", selectedModel);
   if (nextFromDate) currentQuery.set("nextFromDate", nextFromDate);
   if (nextToDate) currentQuery.set("nextToDate", nextToDate);
   if (tlOnly !== undefined)
@@ -492,11 +516,11 @@ export default function TLCustomersTable({
     <div className="bg-white rounded-lg shadow-md">
       {/* Search and Filters */}
       <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center justify-between gap-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           {/* Left side - Search filters */}
-          <div className="flex-1">
+          <div className="w-full flex-1">
             <form onSubmit={handleSearch} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {/* Search */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -675,6 +699,116 @@ export default function TLCustomersTable({
                   </select>
                 </div>
 
+                {/* Products / Models filter - Dropdown */}
+                <div className="relative">
+                  <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1">
+                    Products / Models
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowProductsDropdown(!showProductsDropdown)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between hover:bg-gray-50"
+                  >
+                    <span>
+                      {selectedModel
+                        ? selectedModel.substring(0, 20) +
+                          (selectedModel.length > 20 ? "..." : "")
+                        : "All Products"}
+                    </span>
+                    <svg
+                      className={`w-4 h-4 transition-transform ${
+                        showProductsDropdown ? "transform rotate-180" : ""
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showProductsDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg z-20 max-h-64 overflow-y-auto">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedModel("");
+                          setShowProductsDropdown(false);
+                          startTransition(() => {
+                            const params = new URLSearchParams();
+                            if (searchTerm) params.set("search", searchTerm);
+                            if (selectedEmployee)
+                              params.set("employee", selectedEmployee);
+                            if (selectedStatus)
+                              params.set("status", selectedStatus);
+                            if (selectedStage) params.set("stage", selectedStage);
+                            if (selectedTag) params.set("tag", selectedTag);
+                            if (nextFromDate)
+                              params.set("nextFromDate", nextFromDate);
+                            if (nextToDate)
+                              params.set("nextToDate", nextToDate);
+                            router.push(`${basePath}?${params.toString()}`);
+                          });
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 border-b border-gray-200"
+                      >
+                        All Products
+                      </button>
+                      {products.slice(0, 10).map((product) => {
+                        const displayLabel = `${product.item_code} - ${product.item_name}`;
+                        return (
+                          <button
+                            key={product.item_code}
+                            type="button"
+                            onClick={() => {
+                              const model = displayLabel;
+                              setSelectedModel(model);
+                              setShowProductsDropdown(false);
+                              startTransition(() => {
+                                const params = new URLSearchParams();
+                                if (searchTerm)
+                                  params.set("search", searchTerm);
+                                if (selectedEmployee)
+                                  params.set("employee", selectedEmployee);
+                                if (selectedStatus)
+                                  params.set("status", selectedStatus);
+                                if (selectedStage)
+                                  params.set("stage", selectedStage);
+                                if (selectedTag) params.set("tag", selectedTag);
+                                if (model) params.set("model", model);
+                                if (nextFromDate)
+                                  params.set("nextFromDate", nextFromDate);
+                                if (nextToDate)
+                                  params.set("nextToDate", nextToDate);
+                                router.push(`${basePath}?${params.toString()}`);
+                              });
+                            }}
+                            className={`w-full text-left px-4 py-2 text-sm border-b border-gray-100 hover:bg-blue-50 transition-colors ${
+                              selectedModel === displayLabel
+                                ? "bg-blue-100 text-blue-900 font-medium"
+                                : "text-gray-700"
+                            }`}
+                          >
+                            {product.item_code}
+                          </button>
+                        );
+                      })}
+                      {products.length > 10 && (
+                        <div className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-t border-gray-200">
+                          Showing {products.slice(0, 10).length} of{" "}
+                          {products.length} products
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Next Followup (same value as table column "Next Followup") */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -703,82 +837,39 @@ export default function TLCustomersTable({
                 </div>
               </div>
 
-              <div className="flex gap-2 items-center">
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isPending ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <Search size={18} />
-                  )}
-                  {isPending ? "Searching..." : "Search"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  disabled={isPending}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isPending ? (
-                    <Loader2 size={18} className="animate-spin" />
-                  ) : (
-                    <RefreshCw size={18} />
-                  )}
-                  Reset
-                </button>
-
-                {/* TL Only Toggle */}
-                <div className="ml-4 flex items-center gap-2 border-l pl-4">
-                  <label className="text-sm font-medium text-gray-700">
-                    Show TL Entries Only:
-                  </label>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="submit"
+                    disabled={isPending}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isPending ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Search size={18} />
+                    )}
+                    {isPending ? "Searching..." : "Search"}
+                  </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      startTransition(() => {
-                        const params = new URLSearchParams();
-                        if (searchTerm) params.set("search", searchTerm);
-                        if (selectedEmployee)
-                          params.set("employee", selectedEmployee);
-                        if (selectedStatus)
-                          params.set("status", selectedStatus);
-                        if (selectedStage) params.set("stage", selectedStage);
-                        if (selectedTag) params.set("tag", selectedTag);
-                        if (nextFromDate)
-                          params.set("nextFromDate", nextFromDate);
-                        if (nextToDate) params.set("nextToDate", nextToDate);
-                        params.set("tlOnly", tlOnly ? "false" : "true");
-                        router.push(`${basePath}?${params.toString()}`);
-                      });
-                    }}
+                    onClick={handleReset}
                     disabled={isPending}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      tlOnly ? "bg-blue-600" : "bg-gray-300"
-                    }`}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        tlOnly ? "translate-x-6" : "translate-x-1"
-                      }`}
-                    />
+                    {isPending ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={18} />
+                    )}
+                    Reset
                   </button>
-                  <span
-                    className={`text-xs font-semibold ${
-                      tlOnly ? "text-blue-600" : "text-gray-500"
-                    }`}
-                  >
-                    {tlOnly ? "ON" : "OFF"}
-                  </span>
                 </div>
 
-                {/* Pre-Booking Toggle - Only for Superadmin */}
-                {isSuperAdmin && (
-                  <div className="ml-4 flex items-center gap-2 border-l pl-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 sm:ml-4 sm:pl-4 sm:border-l border-gray-200 border-t sm:border-t-0 pt-3 sm:pt-0">
+                  <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-gray-700">
-                      Pre-Booking Only:
+                      Show TL Entries Only:
                     </label>
                     <button
                       type="button"
@@ -792,41 +883,90 @@ export default function TLCustomersTable({
                             params.set("status", selectedStatus);
                           if (selectedStage) params.set("stage", selectedStage);
                           if (selectedTag) params.set("tag", selectedTag);
+                          if (selectedModel) params.set("model", selectedModel);
                           if (nextFromDate)
                             params.set("nextFromDate", nextFromDate);
                           if (nextToDate) params.set("nextToDate", nextToDate);
-                          // Keep tlOnly state unchanged - only toggle preBookingOnly
-                          params.set("tlOnly", tlOnly ? "true" : "false");
-                          params.set("preBookingOnly", preBookingOnly ? "false" : "true");
+                          params.set("tlOnly", tlOnly ? "false" : "true");
                           router.push(`${basePath}?${params.toString()}`);
                         });
                       }}
                       disabled={isPending}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                        preBookingOnly ? "bg-green-600" : "bg-gray-300"
+                        tlOnly ? "bg-blue-600" : "bg-gray-300"
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          preBookingOnly ? "translate-x-6" : "translate-x-1"
+                          tlOnly ? "translate-x-6" : "translate-x-1"
                         }`}
                       />
                     </button>
                     <span
                       className={`text-xs font-semibold ${
-                        preBookingOnly ? "text-green-600" : "text-gray-500"
+                        tlOnly ? "text-blue-600" : "text-gray-500"
                       }`}
                     >
-                      {preBookingOnly ? "ON" : "OFF"}
+                      {tlOnly ? "ON" : "OFF"}
                     </span>
                   </div>
-                )}
+
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Pre-Booking Only:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          startTransition(() => {
+                            const params = new URLSearchParams();
+                            if (searchTerm) params.set("search", searchTerm);
+                            if (selectedEmployee)
+                              params.set("employee", selectedEmployee);
+                            if (selectedStatus)
+                              params.set("status", selectedStatus);
+                            if (selectedStage) params.set("stage", selectedStage);
+                            if (selectedTag) params.set("tag", selectedTag);
+                            if (selectedModel) params.set("model", selectedModel);
+                            if (nextFromDate)
+                              params.set("nextFromDate", nextFromDate);
+                            if (nextToDate) params.set("nextToDate", nextToDate);
+                            params.set("tlOnly", tlOnly ? "true" : "false");
+                            params.set(
+                              "preBookingOnly",
+                              preBookingOnly ? "false" : "true"
+                            );
+                            router.push(`${basePath}?${params.toString()}`);
+                          });
+                        }}
+                        disabled={isPending}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                          preBookingOnly ? "bg-green-600" : "bg-gray-300"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            preBookingOnly ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                      <span
+                        className={`text-xs font-semibold ${
+                          preBookingOnly ? "text-green-600" : "text-gray-500"
+                        }`}
+                      >
+                        {preBookingOnly ? "ON" : "OFF"}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </form>
           </div>
 
           {/* Right side - Filter indicators */}
-          <div className="flex items-center gap-4">
+          <div className="w-full lg:w-auto flex flex-wrap justify-center lg:justify-end items-center gap-4">
             {/* Total/All Filter */}
             <div
               onClick={() => handleFilterClick("all")}
@@ -932,8 +1072,8 @@ export default function TLCustomersTable({
         </div>
 
         {/* Filter Description */}
-        <div className="text-center mt-3 flex items-center justify-between">
-          <p className="text-xs text-gray-500">
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p className="text-xs text-gray-500 text-center sm:text-left">
             {activeFilter === "all" && "Showing all customers"}
             {activeFilter === "upcoming" && "Follow-up within 3 hours"}
             {activeFilter === "due" && "Overdue follow-ups"}
@@ -1013,7 +1153,9 @@ export default function TLCustomersTable({
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Estimated Date
               </th>
-
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                Products/Models
+              </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                 Actions
               </th>
@@ -1026,7 +1168,7 @@ export default function TLCustomersTable({
             {getFilteredCustomers().length === 0 ? (
               <tr>
                 <td
-                  colSpan={tlOnly ? 10 : 11}
+                  colSpan={tlOnly ? 11 : 12}
                   className="px-4 py-4 text-center text-gray-500"
                 >
                   {activeFilter === "all"
@@ -1132,6 +1274,22 @@ export default function TLCustomersTable({
                           "DD MMM, YYYY HH:mm",
                         ) || "N/A"
                       : "N/A"}
+                  </td>
+                  <td className="px-4 py-4 text-sm text-gray-700 max-w-[160px]">
+                    {customer.tl_model ? (
+                      <div className="flex flex-wrap gap-1">
+                        {customer.tl_model.split(",").map((m, i) => (
+                          <span
+                            key={i}
+                            className="inline-block px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded text-xs font-medium"
+                          >
+                            {m.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex gap-3">
