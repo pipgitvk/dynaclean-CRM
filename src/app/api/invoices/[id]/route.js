@@ -127,6 +127,7 @@ export async function PATCH(req, context) {
       Consignee = null,
       Consignee_Contact = null,
       gst_number = null,
+      gst_consignee = null,
       state = null,
       state_code = null,
       items,
@@ -153,6 +154,8 @@ export async function PATCH(req, context) {
       sgst_rate: bodySgstRate = null,
       igst_rate: bodyIgstRate = null,
     } = body;
+
+    console.log("Invoice PATCH - Received gst_consignee:", gst_consignee);
 
     if (!invoice_number || !customer_name || !billing_address) {
       return NextResponse.json(
@@ -216,6 +219,13 @@ export async function PATCH(req, context) {
         await conn.execute("ALTER TABLE invoices ADD COLUMN cgst_rate DECIMAL(5,2) NULL DEFAULT 0");
         await conn.execute("ALTER TABLE invoices ADD COLUMN sgst_rate DECIMAL(5,2) NULL DEFAULT 0");
         await conn.execute("ALTER TABLE invoices ADD COLUMN igst_rate DECIMAL(5,2) NULL DEFAULT 0");
+      } catch (__) {}
+    }
+    try {
+      await conn.execute("SELECT gst_consignee FROM invoices LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoices ADD COLUMN gst_consignee VARCHAR(50) NULL");
       } catch (__) {}
     }
     try {
@@ -284,7 +294,7 @@ export async function PATCH(req, context) {
           quotation_id = ?, invoice_number = ?, invoice_date = ?, order_date = ?, due_date = ?,
           customer_name = ?, customer_email = ?, customer_phone = ?,
           billing_address = ?, shipping_address = ?, Consignee = ?, Consignee_Contact = ?,
-          gst_number = ?, state = ?, state_code = ?,
+          gst_number = ?, gst_consignee = ?, state = ?, state_code = ?,
           subtotal = ?, cgst = ?, sgst = ?, igst = ?, total_tax = ?, round_off = ?, grand_total = ?,
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
@@ -306,6 +316,7 @@ export async function PATCH(req, context) {
           Consignee,
           Consignee_Contact,
           gst_number,
+          gst_consignee,
           state,
           state_code,
           subtotal,
@@ -338,7 +349,7 @@ export async function PATCH(req, context) {
           quotation_id = ?, invoice_number = ?, invoice_date = ?, order_date = ?, due_date = ?,
           customer_name = ?, customer_email = ?, customer_phone = ?,
           billing_address = ?, shipping_address = ?, Consignee = ?, Consignee_Contact = ?,
-          gst_number = ?, state = ?, state_code = ?,
+          gst_number = ?, gst_consignee = ?, state = ?, state_code = ?,
           subtotal = ?, cgst = ?, sgst = ?, igst = ?, total_tax = ?, round_off = ?, grand_total = ?,
           amount_paid = ?, balance_amount = ?, payment_status = ?, notes = ?, terms_conditions = ?,
           buyers_order_no = ?, eway_bill_no = ?, delivery_challan_no = ?,
@@ -359,6 +370,7 @@ export async function PATCH(req, context) {
           Consignee,
           Consignee_Contact,
           gst_number,
+          gst_consignee,
           state,
           state_code,
           subtotal,

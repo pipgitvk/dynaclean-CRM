@@ -1839,7 +1839,7 @@ const NewInvoice = ({ invoice }) => {
     consignee: {
       name: invoice.Consignee || invoice.customer_name || "",
       address: invoice.shipping_address || invoice.billing_address || "",
-      gstin: invoice.gst_number || "",
+      gstin: invoice.gst_consignee || invoice.gst_number || "",
       state: invoice.state || "",
       contactPerson: invoice.customer_name || "",
       phone: invoice.Consignee_Contact || "",

@@ -97,6 +97,7 @@ export default function InvoiceEditModal({
     Consignee: "",
     Consignee_Contact: "",
     gst_number: "",
+    gst_consignee: "",
     state: "",
     state_code: "",
     due_date: "",
@@ -185,6 +186,7 @@ export default function InvoiceEditModal({
           Consignee: inv.Consignee || "",
           Consignee_Contact: inv.Consignee_Contact || "",
           gst_number: inv.gst_number || "",
+          gst_consignee: inv.gst_consignee || "",
           state: inv.state || "",
           state_code: normalizeStateCode(inv.state_code, inv.gst_number),
           due_date: dateInputValue(inv.due_date) || "",
@@ -310,6 +312,7 @@ export default function InvoiceEditModal({
         Consignee: form.Consignee || null,
         Consignee_Contact: form.Consignee_Contact || null,
         gst_number: form.gst_number || null,
+        gst_consignee: form.gst_consignee || null,
         state: form.state || null,
         state_code: form.state_code || null,
         items: itemsWithTotals,
@@ -655,12 +658,23 @@ export default function InvoiceEditModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1">GSTIN</label>
+                  <label className="block text-gray-600 mb-1">GSTIN (Buyer)</label>
                   <input
                     className="w-full border rounded px-2 py-1.5"
                     value={form.gst_number}
                     onChange={(e) =>
                       setForm({ ...form, gst_number: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-600 mb-1">GSTIN (Consignee)</label>
+                  <input
+                    className="w-full border rounded px-2 py-1.5"
+                    placeholder="Auto fill From buyer "
+                    value={form.gst_consignee}
+                    onChange={(e) =>
+                      setForm({ ...form, gst_consignee: e.target.value })
                     }
                   />
                 </div>

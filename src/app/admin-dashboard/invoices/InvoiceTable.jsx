@@ -329,6 +329,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 Invoice No <SortIcon column="invoice_number" />
               </th>
               <th className="px-4 py-2">Buyer</th>
+              <th className="px-4 py-2">Consignee GSTIN</th>
               <th className="px-4 py-2">Employee</th>
               <th
                 onClick={() => handleSort("order_date")}
@@ -351,13 +352,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="12" className="text-center py-4">
+                <td colSpan="13" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="12" className="text-center py-6 text-red-600">
+                <td colSpan="13" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -403,6 +404,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       )}
                     </td>
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.buyer_name}</td>
+                    <td className={`px-4 py-2 text-sm font-mono ${i.parent_id ? 'pl-8' : ''}`}>{i.gst_consignee || "-"}</td>
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.employee_name || "-"}</td>
                     <td className="px-4 py-2">
                       {new Date(i.order_date).toLocaleDateString("en-IN")}
@@ -530,7 +532,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               ))
             ) : (
               <tr>
-                <td colSpan="12" className="text-center py-6 text-gray-500">
+                <td colSpan="13" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>
