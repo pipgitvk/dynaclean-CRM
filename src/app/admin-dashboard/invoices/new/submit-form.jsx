@@ -9,10 +9,13 @@ import toast from "react-hot-toast";
 import AddSpecialPriceModal from "@/components/specialPrice/AddSpecialPriceModal";
 import dynacleanLogo from "@/components/logo1.jpg";
 
-export default function InvoiceForm({ invoiceNumber, invoiceDate }) {
+export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = "tax", onBack }) {
   const router = useRouter();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Determine the display label based on invoice type
+  const invoiceTypeLabel = invoiceType === "performa" ? "Performa Invoice" : "Invoice";
   const [ showQuotationModal, setShowQuotationModal]= useState(false)
   const [quotationNumber, setQuotationNumber] = useState("")
   const [isFromQuotation, setIsFromQuotation] = useState(false);
@@ -316,6 +319,7 @@ Thanks for doing business with us!`,
         ...form,
         invoice_number: invoiceNumber,
         invoice_date: invoiceDate,
+        invoice_type: invoiceType,
         items: itemsWithTotals,
         subtotal: taxSummary.subtotal,
         cgst: taxSummary.cgst,
@@ -474,7 +478,19 @@ const fetchQuotationAndFill = async () => {
 
   return (
     <>
-    <div className="p-5 w-full flex justify-end">
+    <div className="p-5 w-full flex justify-between items-center">
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="bg-gray-500 px-4 py-2 rounded text-white cursor-pointer hover:bg-gray-600"
+        >
+          ← Back
+        </button>
+      )}
+      <h1 className="text-2xl font-bold text-gray-800 flex-1 text-center">
+        Create {invoiceTypeLabel}
+      </h1>
       <button  className="bg-green-500 px-4 py-2 rounded text-white cursor-pointer"  onClick={() => setShowQuotationModal(true)}>Add with quotation number</button>
     </div>
     <form
@@ -526,7 +542,7 @@ const fetchQuotationAndFill = async () => {
       {/* Invoice Info */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-gray-50 p-4 rounded">
         <div>
-          <label className="text-sm text-gray-600">Invoice No.</label>
+          <label className="text-sm text-gray-600">{invoiceTypeLabel} No.</label>
           <input
             type="text"
             value={invoiceNumber}
@@ -535,7 +551,7 @@ const fetchQuotationAndFill = async () => {
           />
         </div>
         <div>
-          <label className="text-sm text-gray-600">Invoice Date</label>
+          <label className="text-sm text-gray-600">{invoiceTypeLabel} Date</label>
           <input
             type="date"
             value={invoiceDate}
@@ -906,7 +922,7 @@ const fetchQuotationAndFill = async () => {
               : "bg-emerald-600 hover:bg-emerald-700 text-white"
           }`}
         >
-          {isSubmitting ? "Submitting..." : "Create Invoice"}
+          {isSubmitting ? "Submitting..." : `Create ${invoiceTypeLabel}`}
         </button>
       </div>
     </form>

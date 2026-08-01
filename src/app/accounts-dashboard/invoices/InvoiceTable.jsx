@@ -14,6 +14,7 @@ export default function InvoiceTable() {
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
 
   // Single page — fetch all records
   const [currentPage] = useState(1);
@@ -48,6 +49,7 @@ export default function InvoiceTable() {
     if (fromDate) params.append("fromDate", fromDate);
     if (toDate) params.append("toDate", toDate);
     if (search) params.append("search", search);
+    if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
 
     try {
       const res = await fetch(`/api/invoice-table?${params.toString()}`);
@@ -194,6 +196,7 @@ export default function InvoiceTable() {
     if (fromDate) params.append("fromDate", fromDate);
     if (toDate) params.append("toDate", toDate);
     if (search) params.append("search", search);
+    if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
 
     try {
       setFetchError(null);
@@ -273,7 +276,7 @@ export default function InvoiceTable() {
 
   useEffect(() => {
     fetchData();
-  }, [fromDate, toDate, sortBy, sortOrder]);
+  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -286,6 +289,7 @@ export default function InvoiceTable() {
     setSearch("");
     setFromDate("");
     setToDate("");
+    setInvoiceTypeFilter("");
     setSortBy("created_at");
     setSortOrder("desc");
     setFetchError(null);
@@ -396,6 +400,15 @@ export default function InvoiceTable() {
             onChange={(e) => setToDate(e.target.value)}
             className="border px-3 py-1 rounded"
           />
+          <select
+            value={invoiceTypeFilter}
+            onChange={(e) => setInvoiceTypeFilter(e.target.value)}
+            className="border px-3 py-1 rounded"
+          >
+            <option value="">All Types</option>
+            <option value="tax">Tax Invoice</option>
+            <option value="performa">Performa Invoice</option>
+          </select>
           <button
             onClick={handleExportToExcel}
             disabled={isExporting}
@@ -460,6 +473,7 @@ export default function InvoiceTable() {
               >
                 Order Date <SortIcon column="order_date" />
               </th>
+              <th className="px-4 py-2">Type</th>
               <th className="px-4 py-2">Tax</th>
               <th className="px-4 py-2">Grand Total</th>
               <th className="px-4 py-2">Balance Amount</th>
@@ -475,13 +489,13 @@ export default function InvoiceTable() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="11" className="text-center py-4">
+                <td colSpan="12" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="11" className="text-center py-6 text-red-600">
+                <td colSpan="12" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -525,6 +539,15 @@ export default function InvoiceTable() {
                     <td className={`px-4 py-2 ${i.parent_id ? 'pl-8' : ''}`}>{i.employee_name || "-"}</td>
                     <td className="px-4 py-2">
                       {new Date(i.order_date).toLocaleDateString("en-IN")}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className={`px-3 py-1 rounded text-sm font-semibold ${
+                        i.type === 'performa' 
+                          ? 'bg-purple-100 text-purple-800' 
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {i.type === 'performa' ? 'Performa Invoice' : 'Tax Invoice'}
+                      </span>
                     </td>
                     <td className="px-4 py-2">
                       ₹{Number(i.tax_amount).toLocaleString("en-IN")}
@@ -590,7 +613,7 @@ export default function InvoiceTable() {
                   </tr>
                   {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
                     <tr>
-                      <td colSpan="11" className="px-8 py-4 bg-gray-50">
+                      <td colSpan="12" className="px-8 py-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
@@ -649,7 +672,7 @@ export default function InvoiceTable() {
               ))
             ) : (
               <tr>
-                <td colSpan="11" className="text-center py-6 text-gray-500">
+                <td colSpan="12" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>

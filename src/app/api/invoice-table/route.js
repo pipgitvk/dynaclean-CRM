@@ -72,6 +72,7 @@ export async function GET(req) {
     const search = searchParams.get("search");
     const fromDate = searchParams.get("fromDate");
     const toDate = searchParams.get("toDate");
+    const invoiceType = searchParams.get("invoiceType");
 
     const conn = await getDbConnection();
 
@@ -92,6 +93,11 @@ export async function GET(req) {
     if (toDate) {
       where += " AND DATE(created_at) <= ?";
       values.push(toDate);
+    }
+
+    if (invoiceType) {
+      where += " AND type = ?";
+      values.push(invoiceType);
     }
 
     // 📊 Count
@@ -132,7 +138,8 @@ export async function GET(req) {
         grand_total,
         amount_paid,
         COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) AS balance_amount,
-        created_at
+        created_at,
+        type
       FROM invoices
       ${where}
       ORDER BY ${sortBy} ${sortOrder}
@@ -421,6 +428,7 @@ export async function POST(req) {
       cgst_rate: bodyCgstRate = 0,
       sgst_rate: bodySgstRate = 0,
       igst_rate: bodyIgstRate = 0,
+      invoice_type = "tax",
     } = body;
 
     const customerIdSql =
@@ -484,6 +492,12 @@ export async function POST(req) {
       const endYear2Digits = String((startYear + 1) % 100).padStart(2, "0");
       return `DYN/${startYear}-${endYear2Digits}/`;
     };
+
+    // For performa invoices, use DYN/PI- prefix
+    const getPerformaPrefix = () => {
+      return `DYN/PI-`;
+    };
+
     const serverInvoiceDate = invoice_date || now.toISOString().split("T")[0];
     const serverOrderDate =
       order_date != null && String(order_date).trim() !== ""
@@ -492,7 +506,9 @@ export async function POST(req) {
     const dateForPrefix = invoice_date
       ? new Date(`${String(invoice_date).slice(0, 10)}T12:00:00`)
       : now;
-    const invoicePrefix = getDefaultPrefix(dateForPrefix);
+    
+    // Choose prefix based on invoice type
+    const invoicePrefix = invoice_type === "performa" ? getPerformaPrefix() : getDefaultPrefix(dateForPrefix);
 
     let attempt = 0;
     let finalInvoiceNumber = "";
@@ -517,7 +533,9 @@ export async function POST(req) {
         if (!Number.isNaN(lastIncrement)) increment = lastIncrement + 1;
       }
 
-      finalInvoiceNumber = `${invoicePrefix}${increment.toString().padStart(3, "0")}`;
+      // Format the number with padding (3 digits for tax invoices, 3 digits for performa)
+      const paddingLength = 3;
+      finalInvoiceNumber = `${invoicePrefix}${increment.toString().padStart(paddingLength, "0")}`;
 
       try {
         // Insert the invoice header
@@ -576,8 +594,8 @@ export async function POST(req) {
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, employee_name, state, state_code, 
             subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
             payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
-            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, type, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
           insertValues = [
             quotation_id,
             finalInvoiceNumber,
@@ -615,6 +633,7 @@ export async function POST(req) {
             bodyCgstRate,
             bodySgstRate,
             bodyIgstRate,
+            invoice_type,
           ];
         } else {
           insertQuery = `INSERT INTO invoices 
@@ -622,8 +641,8 @@ export async function POST(req) {
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, state, state_code, 
             subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
             payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
-            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, type, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
           insertValues = [
             quotation_id,
             finalInvoiceNumber,
@@ -660,6 +679,7 @@ export async function POST(req) {
             bodyCgstRate,
             bodySgstRate,
             bodyIgstRate,
+            invoice_type,
           ];
         }
 

@@ -1735,6 +1735,9 @@ import { INVOICE_LETTERHEAD } from "@/lib/invoiceLetterhead";
 console.log(signImg);
 
 const NewInvoice = ({ invoice }) => {
+  // Determine invoice type label
+  const invoiceTypeLabel = invoice.type === "performa" ? "Performa Invoice" : "Invoice";
+  
   // Calculate tax rate from the invoice data
   const calculateTaxRate = () => {
     if (invoice.subtotal && invoice.subtotal > 0) {
@@ -2146,7 +2149,10 @@ const NewInvoice = ({ invoice }) => {
 
       pdf.addImage(imgData, "PNG", x, y, drawW, drawH, undefined, "FAST");
 
-      pdf.save(`Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`);
+      const pdfFileName = invoice.type === "performa" 
+        ? `Performa-Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`
+        : `Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`;
+      pdf.save(pdfFileName);
 
       el.style.width = originalWidth;
       el.style.maxWidth = originalMaxWidth;
@@ -2364,7 +2370,7 @@ const NewInvoice = ({ invoice }) => {
               color: "#000",
             }}
           >
-            Tax Invoice
+            {invoiceTypeLabel}
           </h1>
         </div>
         <div
@@ -2538,7 +2544,7 @@ const NewInvoice = ({ invoice }) => {
                   verticalAlign: "top",
                 }}
               >
-                Invoice No. : <span style={{
+                {invoiceTypeLabel} No. : <span style={{
                   fontWeight: "normal",
                 }}>{data.invoice.number}</span>
               </td>
@@ -2554,7 +2560,7 @@ const NewInvoice = ({ invoice }) => {
                   verticalAlign: "top",
                 }}
               >
-                Invoice Date : <span style={{
+                {invoiceTypeLabel} Date : <span style={{
                   fontWeight: "normal",
                 }}>{data.invoice.invoiceDate}</span>
               </td>

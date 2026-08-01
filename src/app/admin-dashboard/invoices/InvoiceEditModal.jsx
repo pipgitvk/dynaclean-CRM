@@ -86,6 +86,7 @@ export default function InvoiceEditModal({
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [createdAtLocal, setCreatedAtLocal] = useState("");
+  const [invoiceType, setInvoiceType] = useState("tax");
   const [items, setItems] = useState([emptyItem()]);
   const [form, setForm] = useState({
     customer_id: "",
@@ -169,6 +170,7 @@ export default function InvoiceEditModal({
 
         const inv = data.invoice;
         setInvoiceNumber(inv.invoice_number || "");
+        setInvoiceType(inv.type || "tax");
         // Invoice date should reflect when the invoice record was created.
         // Order date is the editable business date.
         setInvoiceDate(dateInputValue(inv.created_at || inv.invoice_date) || "");
@@ -429,7 +431,7 @@ export default function InvoiceEditModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[92vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-gray-50 shrink-0">
-          <h2 className="text-lg font-semibold text-gray-800">Edit invoice</h2>
+          <h2 className="text-lg font-semibold text-gray-800">Edit {invoiceType === "performa" ? "Performa Invoice" : "Invoice"}</h2>
           <div className="flex items-center gap-2">
             {invoiceNumber ? (
               <Link
@@ -474,7 +476,7 @@ export default function InvoiceEditModal({
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
-                  <label className="block text-gray-600 mb-1">Invoice no.</label>
+                  <label className="block text-gray-600 mb-1">{invoiceType === "performa" ? "Performa Invoice" : "Invoice"} no.</label>
                   <input
                     readOnly
                     tabIndex={-1}
@@ -484,7 +486,7 @@ export default function InvoiceEditModal({
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-600 mb-1">Invoice date</label>
+                  <label className="block text-gray-600 mb-1">{invoiceType === "performa" ? "Performa Invoice" : "Invoice"} date</label>
                   <input
                     type="date"
                     className="w-full border rounded px-2 py-1.5 bg-gray-100 cursor-not-allowed"
