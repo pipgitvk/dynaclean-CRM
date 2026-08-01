@@ -22,6 +22,7 @@ export default function ProductAccessoriesPage() {
         accessory_name: "",
         description: "",
         is_mandatory: false,
+        qty: 1,
     });
 
     // Edit state
@@ -30,6 +31,7 @@ export default function ProductAccessoriesPage() {
         accessory_name: "",
         description: "",
         is_mandatory: false,
+        qty: 1,
     });
 
     useEffect(() => {
@@ -98,7 +100,7 @@ export default function ProductAccessoriesPage() {
             const json = await res.json();
             if (json.success) {
                 alert("Accessory added successfully");
-                setNewAccessory({ accessory_name: "", description: "", is_mandatory: false });
+                setNewAccessory({ accessory_name: "", description: "", is_mandatory: false, qty: 1 });
                 loadAccessories(selectedProduct.item_code);
             } else {
                 alert(json.error || "Failed to add accessory");
@@ -165,12 +167,13 @@ export default function ProductAccessoriesPage() {
             accessory_name: accessory.accessory_name,
             description: accessory.description || "",
             is_mandatory: accessory.is_mandatory === 1,
+            qty: accessory.qty || 1,
         });
     };
 
     const cancelEdit = () => {
         setEditingId(null);
-        setEditForm({ accessory_name: "", description: "", is_mandatory: false });
+        setEditForm({ accessory_name: "", description: "", is_mandatory: false, qty: 1 });
     };
 
     const filteredProducts = products.filter((p) =>
@@ -278,6 +281,18 @@ export default function ProductAccessoriesPage() {
                                         />
                                         <span className="text-sm">Mark as mandatory</span>
                                     </label>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">Quantity</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            className="w-full px-3 py-2 text-sm border rounded"
+                                            value={newAccessory.qty}
+                                            onChange={(e) =>
+                                                setNewAccessory({ ...newAccessory, qty: parseInt(e.target.value) || 1 })
+                                            }
+                                        />
+                                    </div>
                                     <button
                                         type="submit"
                                         disabled={saving}
@@ -343,6 +358,7 @@ export default function ProductAccessoriesPage() {
                                                     <tr className="bg-gray-100">
                                                         <th className="p-2 border text-left">Name</th>
                                                         <th className="p-2 border text-left">Description</th>
+                                                        <th className="p-2 border text-center">Qty</th>
                                                         <th className="p-2 border text-left">Type</th>
                                                         <th className="p-2 border text-center">Actions</th>
                                                     </tr>
@@ -369,6 +385,17 @@ export default function ProductAccessoriesPage() {
                                                                             value={editForm.description}
                                                                             onChange={(e) =>
                                                                                 setEditForm({ ...editForm, description: e.target.value })
+                                                                            }
+                                                                        />
+                                                                    </td>
+                                                                    <td className="p-2 border">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            className="w-full px-2 py-1 text-sm border rounded"
+                                                                            value={editForm.qty}
+                                                                            onChange={(e) =>
+                                                                                setEditForm({ ...editForm, qty: parseInt(e.target.value) || 1 })
                                                                             }
                                                                         />
                                                                     </td>
@@ -408,6 +435,7 @@ export default function ProductAccessoriesPage() {
                                                                     <td className="p-2 border text-gray-600 max-w-xs truncate">
                                                                         {acc.description || "-"}
                                                                     </td>
+                                                                    <td className="p-2 border text-center font-medium">{acc.qty || 1}</td>
                                                                     <td className="p-2 border">
                                                                         {acc.is_mandatory === 1 ? (
                                                                             <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded">
@@ -467,6 +495,16 @@ export default function ProductAccessoriesPage() {
                                                                 }
                                                                 placeholder="Description"
                                                             />
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                className="w-full px-2 py-1 text-sm border rounded"
+                                                                value={editForm.qty}
+                                                                onChange={(e) =>
+                                                                    setEditForm({ ...editForm, qty: parseInt(e.target.value) || 1 })
+                                                                }
+                                                                placeholder="Quantity"
+                                                            />
                                                             <label className="flex items-center gap-2 text-sm">
                                                                 <input
                                                                     type="checkbox"
@@ -510,6 +548,9 @@ export default function ProductAccessoriesPage() {
                                                             {acc.description && (
                                                                 <p className="text-xs text-gray-600 mb-2">{acc.description}</p>
                                                             )}
+                                                            <div className="text-xs text-gray-600 mb-2">
+                                                                <span className="font-medium">Qty:</span> {acc.qty || 1}
+                                                            </div>
                                                             <div className="flex gap-2 pt-2 border-t">
                                                                 <button
                                                                     onClick={() => startEdit(acc)}

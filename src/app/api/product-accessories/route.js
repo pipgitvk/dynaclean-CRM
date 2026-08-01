@@ -21,6 +21,7 @@ export async function GET(req) {
         pa.accessory_name,
         pa.description,
         pa.is_mandatory,
+        pa.qty,
         pa.created_by,
         pa.created_at,
         pa.updated_at,
@@ -65,7 +66,7 @@ export async function POST(req) {
         }
 
         const body = await req.json();
-        const { product_code, accessory_name, description, is_mandatory } = body;
+        const { product_code, accessory_name, description, is_mandatory, qty } = body;
 
         if (!product_code || !accessory_name) {
             return NextResponse.json(
@@ -78,13 +79,14 @@ export async function POST(req) {
 
         const [result] = await conn.execute(
             `INSERT INTO product_accessories 
-        (product_code, accessory_name, description, is_mandatory, created_by) 
-       VALUES (?, ?, ?, ?, ?)`,
+        (product_code, accessory_name, description, is_mandatory, qty, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
             [
                 product_code,
                 accessory_name,
                 description || null,
                 is_mandatory ? 1 : 0,
+                qty || 1,
                 tokenPayload.username || null,
             ]
         );
