@@ -31,12 +31,12 @@ export default function InvoicePage() {
           >
             Cards
           </a>
-          {/* <a
+          <a
             href="/admin-dashboard/invoices/new"
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
           >
             Add Invoice
-          </a> */}
+          </a>
         </div>
       </div>
 
