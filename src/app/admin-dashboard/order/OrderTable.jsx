@@ -1412,20 +1412,20 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <span>View Report</span>
                 </Link>
               ) : (
-                <div className="flex items-center">
+                <>
                   <Link
                     href={`/admin-dashboard/order/upload/${r.order_id}`}
-                    className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-yellow-700"
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-yellow-700"
                     title="Upload Report"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <UploadCloud size={16} />
                     <span>Upload Report</span>
                   </Link>
-                  <div className="px-2">
+                  <div onClick={(e) => e.stopPropagation()}>
                     <DeleteButton orderId={r.order_id} />
                   </div>
-                </div>
+                </>
               ))}
             {isSuperAdmin &&
               (hasBooking ? (

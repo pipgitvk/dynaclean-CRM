@@ -33,9 +33,11 @@ export default function DeleteButton({ orderId }) {
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="text-red-500 hover:text-red-700 p-1"
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-red-600"
+        title="Order Cancel"
       >
-        <X className="w-5 h-5 cursor-pointer" />
+        <X size={16} />
+        <span>Order Cancel</span>
       </button>
 
       {isModalOpen && (
