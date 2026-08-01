@@ -51,20 +51,107 @@ const SkeletonLoader = () => (
 );
 
 export default function OrderTable({ orders, userRole }) {
-  const [searchQuery, setSearchQuery] = useState("");
+  // Initialize from localStorage with defaults
+  const [searchQuery, setSearchQuery] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("accountsOrderTable_searchQuery") || "";
+    }
+    return "";
+  });
   const [filteredOrders, setFilteredOrders] = useState([]);
-  const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
-  const [paymentTermsFilter, setPaymentTermsFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [createdByFilter, setCreatedByFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("accountsOrderTable_statusFilter") || "";
+    }
+    return "";
+  });
+  const [paymentTermsFilter, setPaymentTermsFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("accountsOrderTable_paymentTermsFilter") || "";
+    }
+    return "";
+  });
+  const [dateFrom, setDateFrom] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("accountsOrderTable_dateFrom") || "";
+    }
+    return "";
+  });
+  const [dateTo, setDateTo] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("accountsOrderTable_dateTo") || "";
+    }
+    return "";
+  });
+  const [createdByFilter, setCreatedByFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("accountsOrderTable_createdByFilter") || "";
+    }
+    return "";
+  });
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   const [paymentPendingData, setPaymentPendingData] = useState({}); // Maps order_id to remaining amount
   const [loadingPendingData, setLoadingPendingData] = useState(true);
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
+  // Save filter states to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_searchQuery", searchQuery);
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_statusFilter", statusFilter);
+    }
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_paymentTermsFilter", paymentTermsFilter);
+    }
+  }, [paymentTermsFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_dateFrom", dateFrom);
+    }
+  }, [dateFrom]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_dateTo", dateTo);
+    }
+  }, [dateTo]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("accountsOrderTable_createdByFilter", createdByFilter);
+    }
+  }, [createdByFilter]);
+
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setPaymentTermsFilter("");
+    setDateFrom("");
+    setDateTo("");
+    setCreatedByFilter("");
+    
+    // Clear localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accountsOrderTable_searchQuery");
+      localStorage.removeItem("accountsOrderTable_statusFilter");
+      localStorage.removeItem("accountsOrderTable_paymentTermsFilter");
+      localStorage.removeItem("accountsOrderTable_dateFrom");
+      localStorage.removeItem("accountsOrderTable_dateTo");
+      localStorage.removeItem("accountsOrderTable_createdByFilter");
+    }
   };
 
   // Fetch payment pending data on component mount
@@ -343,13 +430,21 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
           />
         </div>
-        <button
-          onClick={exportToCSV}
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
-        >
-          <Download size={18} />
-          Export CSV
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleResetFilters}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+          >
+            Reset Filters
+          </button>
+          <button
+            onClick={exportToCSV}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+          >
+            <Download size={18} />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {/* 🧰 Filters */}

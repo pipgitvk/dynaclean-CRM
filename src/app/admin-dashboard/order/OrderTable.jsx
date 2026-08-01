@@ -149,16 +149,55 @@ function orderCreatedInDateRange(order, dateFrom, dateTo) {
 }
 
 export default function OrderTable({ orders, userRole }) {
-  const [searchQuery, setSearchQuery] = useState("");
+  // Initialize from localStorage with defaults
+  const [searchQuery, setSearchQuery] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_searchQuery") || "";
+    }
+    return "";
+  });
   const [filteredOrders, setFilteredOrders] = useState([]);
-  const [statusFilter, setStatusFilter] = useState(""); // '', pendinginvoice, invoiceuploaded, bookingdone, dispatchdone, canceled
-  const [dateFrom, setDateFrom] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
-  const [dateTo, setDateTo] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));
-  const [createdByFilter, setCreatedByFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_statusFilter") || "";
+    }
+    return "";
+  });
+  const [dateFrom, setDateFrom] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("orderTable_dateFrom");
+      return saved || dayjs().startOf('month').format('YYYY-MM-DD');
+    }
+    return dayjs().startOf('month').format('YYYY-MM-DD');
+  });
+  const [dateTo, setDateTo] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("orderTable_dateTo");
+      return saved || dayjs().endOf('month').format('YYYY-MM-DD');
+    }
+    return dayjs().endOf('month').format('YYYY-MM-DD');
+  });
+  const [createdByFilter, setCreatedByFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_createdByFilter") || "";
+    }
+    return "";
+  });
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   // const canShowInstall = ["SUPERADMIN"].includes(userRole);
-  const [approvalStatusFilter, setApprovalStatusFilter] = useState("");
-  const [showRejected, setShowRejected] = useState(false); // Toggle for showing rejected orders
+  const [approvalStatusFilter, setApprovalStatusFilter] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("orderTable_approvalStatusFilter") || "";
+    }
+    return "";
+  });
+  const [showRejected, setShowRejected] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("orderTable_showRejected");
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
   const [showNukePanel, setShowNukePanel] = useState(false);
   const [nukeConfirmText, setNukeConfirmText] = useState("");
   const [nukeLoading, setNukeLoading] = useState(false);
@@ -168,6 +207,49 @@ export default function OrderTable({ orders, userRole }) {
   // Sorting state
   const [sortColumn, setSortColumn] = useState("created_at");
   const [sortDirection, setSortDirection] = useState("desc");
+
+  // Save filter states to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_searchQuery", searchQuery);
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_statusFilter", statusFilter);
+    }
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_dateFrom", dateFrom);
+    }
+  }, [dateFrom]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_dateTo", dateTo);
+    }
+  }, [dateTo]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_createdByFilter", createdByFilter);
+    }
+  }, [createdByFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_approvalStatusFilter", approvalStatusFilter);
+    }
+  }, [approvalStatusFilter]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orderTable_showRejected", JSON.stringify(showRejected));
+    }
+  }, [showRejected]);
 
   const toggleMenu = (id) => {
     setOpenMenuId(openMenuId === id ? null : id);
@@ -224,10 +306,22 @@ export default function OrderTable({ orders, userRole }) {
   const handleResetFilters = () => {
     setSearchQuery("");
     setStatusFilter("");
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(dayjs().startOf('month').format('YYYY-MM-DD'));
+    setDateTo(dayjs().endOf('month').format('YYYY-MM-DD'));
     setCreatedByFilter("");
     setApprovalStatusFilter("");
+    setShowRejected(false);
+    
+    // Clear localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("orderTable_searchQuery");
+      localStorage.removeItem("orderTable_statusFilter");
+      localStorage.removeItem("orderTable_dateFrom");
+      localStorage.removeItem("orderTable_dateTo");
+      localStorage.removeItem("orderTable_createdByFilter");
+      localStorage.removeItem("orderTable_approvalStatusFilter");
+      localStorage.removeItem("orderTable_showRejected");
+    }
   };
 
   const handleExportToExcel = async () => {
