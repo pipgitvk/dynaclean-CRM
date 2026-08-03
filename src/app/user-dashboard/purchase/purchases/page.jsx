@@ -8,6 +8,7 @@ import { toast } from "react-hot-toast";
 import ExcelJS from "exceljs";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { useUser } from "@/context/UserContext";
 
 const formatDisplayDate = (value) => {
   if (!value) return "—";
@@ -467,11 +468,12 @@ function EditCustomerModal({ open, onClose, record, onSaved }) {
   );
 }
 
-function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementIds }) {
+function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementIds, userRole }) {
   const [loading, setLoading] = useState(false);
   const [statements, setStatements] = useState([]);
   const [search, setSearch] = useState("");
   const [linkingId, setLinkingId] = useState(null);
+  const [showOnlySelected, setShowOnlySelected] = useState(userRole === "SUPERADMIN");
 
   useEffect(() => {
     if (!open) return;
@@ -533,6 +535,12 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
     return { currentTotal: total, myKey: key };
   }, [statements, purchase?.id]);
 
+  const hasPurchaseId = (stmt) => {
+    const pid = Number(purchase?.id);
+    if (!Number.isFinite(pid) || pid <= 0) return false;
+    return getLinkedKeys(stmt).includes(`PP${pid}`);
+  };
+
   const eligibleStatements = useMemo(() => {
     const q = search.trim().toLowerCase();
     const isUnsettled = (s) =>
@@ -553,6 +561,11 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
       return false;
     });
 
+    // Filter to show only selected (linked to current purchase) if checkbox is checked
+    if (showOnlySelected) {
+      rows = rows.filter((s) => hasPurchaseId(s));
+    }
+
     if (q) {
       rows = rows.filter((s) => {
         const id = String(s.id ?? "").toLowerCase();
@@ -566,13 +579,7 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
     }
 
     return rows;
-  }, [statements, search, myKey, currentStatementIds]);
-
-  const hasPurchaseId = (stmt) => {
-    const pid = Number(purchase?.id);
-    if (!Number.isFinite(pid) || pid <= 0) return false;
-    return getLinkedKeys(stmt).includes(`PP${pid}`);
-  };
+  }, [statements, search, myKey, currentStatementIds, showOnlySelected]);
 
   async function toggleLink(statementId, transId, currentlyLinked) {
     try {
@@ -668,8 +675,21 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
               className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-72 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
-          <div className="text-xs text-gray-600 font-medium">
-            {loading ? "Loading..." : `Showing ${eligibleStatements.length} statement(s)`}
+          <div className="flex items-center gap-4">
+            {userRole === "SUPERADMIN" && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showOnlySelected}
+                  onChange={(e) => setShowOnlySelected(e.target.checked)}
+                  className="w-4 h-4 accent-blue-600"
+                />
+                <span className="text-sm font-medium text-gray-700">Show Selected Only</span>
+              </label>
+            )}
+            <div className="text-xs text-gray-600 font-medium">
+              {loading ? "Loading..." : `Showing ${eligibleStatements.length} statement(s)`}
+            </div>
           </div>
         </div>
 
@@ -750,6 +770,9 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
 }
 
 export default function PurchasesPage() {
+  const { user } = useUser();
+  const userRole = user?.userRole;
+  
   const [purchases, setPurchases] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1626,6 +1649,7 @@ export default function PurchasesPage() {
         purchase={linkPurchase}
         onLinked={markPurchaseLinked}
         currentStatementIds={paymentStatementByPurchaseId?.[Number(linkPurchase?.id)]}
+        userRole={userRole}
       />
 
       {/* Multi Purchase Link Modal */}
