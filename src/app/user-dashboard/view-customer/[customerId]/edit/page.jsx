@@ -25,7 +25,9 @@ export default async function EditCustomerPage({ params }) {
      LEFT JOIN rep_list r ON c.lead_source = r.username 
      WHERE c.lead_source IS NOT NULL 
      AND r.status = 1
-     ORDER BY c.lead_source ASC`
+     UNION
+     SELECT username as lead_source FROM rep_list WHERE userRole = 'SALES CUM BACKOFFICE' AND status = 1
+     ORDER BY lead_source ASC`
   );
   // Fetch employees with SERVICE HEAD or SERVICE SUPPORT roles
   let serviceEmployees = [];
