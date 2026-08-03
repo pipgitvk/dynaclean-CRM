@@ -9,6 +9,7 @@ export default async function QuotationPage({ searchParams }) {
   const cookieStore = await cookies();
   const token = cookieStore.get("token")?.value;
   let username = "";
+  let role = "";
 
   if (token) {
     const { payload } = await jwtVerify(
@@ -16,6 +17,7 @@ export default async function QuotationPage({ searchParams }) {
       new TextEncoder().encode(process.env.JWT_SECRET),
     );
     username = payload.username;
+    role = payload.role || "";
   }
 
   const sp = await searchParams;
@@ -40,7 +42,7 @@ export default async function QuotationPage({ searchParams }) {
       </div>
 
       {/* Send username to client component */}
-      <QuotationTableClient username={username} customerId={customerId} />
+      <QuotationTableClient username={username} customerId={customerId} role={role} />
     </div>
   );
 }

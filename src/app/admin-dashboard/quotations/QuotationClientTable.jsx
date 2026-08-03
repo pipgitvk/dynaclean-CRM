@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
-export default function QuotationTableClient({ username, customerId }) {
+export default function QuotationTableClient({ username, customerId, role }) {
+  const isSuperAdmin = role === "SUPERADMIN";
   const [quotations, setQuotations] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [modalQuote, setModalQuote] = useState(null);
@@ -217,6 +218,14 @@ export default function QuotationTableClient({ username, customerId }) {
                     >
                       View
                     </button>
+                    {isSuperAdmin && (
+                      <a
+                        href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
+                        className="ml-2 bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 inline-block"
+                      >
+                        Edit
+                      </a>
+                    )}
                   </td>
                 </tr>
               ))
@@ -281,13 +290,23 @@ export default function QuotationTableClient({ username, customerId }) {
                     Pending
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setModalQuote(q.quote_number)}
-                  className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm"
-                >
-                  View
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setModalQuote(q.quote_number)}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm"
+                  >
+                    View
+                  </button>
+                  {isSuperAdmin && (
+                    <a
+                      href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
+                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+                    >
+                      Edit
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           ))
