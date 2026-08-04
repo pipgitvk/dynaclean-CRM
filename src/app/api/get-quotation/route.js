@@ -139,21 +139,46 @@ export async function GET(req) {
 
         terms_conditions: quotation.term_con || "",
 
-        items: itemRows.map((item) => ({
-          item_name: item.item_name,
-          item_code: item.item_code,
-          description: item.specification,
-          hsn_code: item.hsn_sac,
-          quantity: item.quantity,
-          unit: item.unit,
-          rate: item.price_per_unit,
-          discount_percent: 0,
-          discount_amount: 0,
-          cgst_percent: item.cgsttax,
-          sgst_percent: item.sgsttax,
-          igst_percent: item.igsttax,
-          img_url: item.img_url,
-        })),
+        items: itemRows.map((item) => {
+          // Header-level rates are the source of truth for tax TYPE.
+          // If header says IGST but item has cgst/sgst (old data mismatch), correct it.
+          const headerIgstRate = Number(quotation.igst_rate) || 0;
+          const headerCgstRate = Number(quotation.cgst_rate) || 0;
+
+          let cgst_percent = Number(item.cgsttax) || 0;
+          let sgst_percent = Number(item.sgsttax) || 0;
+          let igst_percent = Number(item.igsttax) || 0;
+
+          if (headerIgstRate > 0 && headerCgstRate === 0) {
+            // Interstate invoice — force IGST on items
+            const totalGst = cgst_percent + sgst_percent || igst_percent || headerIgstRate;
+            igst_percent = totalGst;
+            cgst_percent = 0;
+            sgst_percent = 0;
+          } else if (headerCgstRate > 0 && headerIgstRate === 0) {
+            // Intrastate invoice — force CGST+SGST on items
+            const totalGst = igst_percent || cgst_percent + sgst_percent || headerCgstRate * 2;
+            cgst_percent = totalGst / 2;
+            sgst_percent = totalGst / 2;
+            igst_percent = 0;
+          }
+
+          return {
+            item_name: item.item_name,
+            item_code: item.item_code,
+            description: item.specification,
+            hsn_code: item.hsn_sac,
+            quantity: item.quantity,
+            unit: item.unit,
+            rate: item.price_per_unit,
+            discount_percent: 0,
+            discount_amount: 0,
+            cgst_percent,
+            sgst_percent,
+            igst_percent,
+            img_url: item.img_url,
+          };
+        }),
       },
     });
   } catch (err) {
