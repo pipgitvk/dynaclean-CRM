@@ -1740,19 +1740,25 @@ const NewInvoice = ({ invoice }) => {
   
   // Calculate tax rate from the invoice data
   const calculateTaxRate = () => {
-    // Prefer stored igst_rate / cgst_rate columns (set at invoice creation time)
     const storedIgstRate = parseFloat(invoice.igst_rate) || 0;
     const storedCgstRate = parseFloat(invoice.cgst_rate) || 0;
-    if (storedIgstRate > 0) return storedIgstRate.toFixed(2);
-    if (storedCgstRate > 0) return storedCgstRate.toFixed(2);
+    const totalCGST = parseFloat(invoice.cgst) || 0;
+    const totalSGST = parseFloat(invoice.sgst) || 0;
+    const totalIGST = parseFloat(invoice.igst) || 0;
 
-    // Fallback: derive from stored amounts
-    if (invoice.subtotal && invoice.subtotal > 0) {
-      if (invoice.igst && invoice.igst > 0) {
-        return ((invoice.igst / invoice.subtotal) * 100).toFixed(2);
-      } else if (invoice.cgst && invoice.cgst > 0) {
-        return ((invoice.cgst / invoice.subtotal) * 100).toFixed(2);
-      }
+    // Stored amounts decide the tax type — same logic as calculateItemTotals
+    if (totalCGST > 0 || totalSGST > 0) {
+      // CGST+SGST invoice — show CGST rate
+      if (storedCgstRate > 0) return storedCgstRate.toFixed(2);
+      if (invoice.subtotal > 0) return ((totalCGST / invoice.subtotal) * 100).toFixed(2);
+    } else if (totalIGST > 0) {
+      // IGST invoice — show IGST rate
+      if (storedIgstRate > 0) return storedIgstRate.toFixed(2);
+      if (invoice.subtotal > 0) return ((totalIGST / invoice.subtotal) * 100).toFixed(2);
+    } else {
+      // All amounts 0 — fall back to rate columns
+      if (storedIgstRate > 0 && storedCgstRate === 0) return storedIgstRate.toFixed(2);
+      if (storedCgstRate > 0) return storedCgstRate.toFixed(2);
     }
     return "0.00";
   };
@@ -1813,24 +1819,31 @@ const NewInvoice = ({ invoice }) => {
     const storedSgstRate = parseFloat(invoice.sgst_rate) || 0;
     const subtotal = parseFloat(invoice.subtotal) || 0;
 
-    // If invoice was saved with wrong GST type (e.g. igst_rate set but igst amount = 0),
-    // recalculate from igst_rate so the view shows the correct tax type.
     let totalCGST = parseFloat(invoice.cgst) || 0;
     let totalSGST = parseFloat(invoice.sgst) || 0;
     let totalIGST = parseFloat(invoice.igst) || 0;
 
-    if (storedIgstRate > 0 && totalIGST === 0 && subtotal > 0) {
-      // Invoice should have been IGST — recalculate from rate
-      totalIGST = (subtotal * storedIgstRate) / 100;
+    // Stored amounts are the primary source of truth.
+    // Rate columns are only used to FILL IN missing amounts (when amount = 0).
+    // Never override a non-zero amount using rate columns.
+
+    if (totalCGST > 0 || totalSGST > 0) {
+      // This is clearly a CGST+SGST invoice — force IGST to 0
+      totalIGST = 0;
+    } else if (totalIGST > 0) {
+      // This is clearly an IGST invoice — force CGST/SGST to 0
       totalCGST = 0;
       totalSGST = 0;
-    } else if (storedCgstRate > 0 && totalCGST === 0 && subtotal > 0 && totalIGST === 0) {
-      // Invoice should have been CGST+SGST — recalculate from rates
-      totalCGST = (subtotal * storedCgstRate) / 100;
-      totalSGST = (subtotal * storedSgstRate) / 100;
+    } else if (subtotal > 0) {
+      // All amounts are 0 — use rate columns to determine tax type
+      if (storedIgstRate > 0 && storedCgstRate === 0) {
+        totalIGST = (subtotal * storedIgstRate) / 100;
+      } else if (storedCgstRate > 0) {
+        totalCGST = (subtotal * storedCgstRate) / 100;
+        totalSGST = (subtotal * storedSgstRate) / 100;
+      }
     }
 
-    // Use stored invoice totals to prevent discrepancies
     const totals = {
       subtotal,
       totalTax: parseFloat(invoice.total_tax) || totalCGST + totalSGST + totalIGST,
@@ -1841,7 +1854,6 @@ const NewInvoice = ({ invoice }) => {
       totalQuantity: 0,
     };
 
-    // Only calculate total quantity from items
     if (invoice.items && Array.isArray(invoice.items)) {
       invoice.items.forEach((item) => {
         totals.totalQuantity += parseFloat(item.quantity) || 0;
