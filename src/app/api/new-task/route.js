@@ -141,12 +141,26 @@ export async function POST(req) {
     // ✅ Insert guard: prevent duplicate (same user, same task name + description)
     const conn = await getDbConnection();
 
-    const creatorEmpId = await resolveGemCrmEmployeeId(conn, {
+    const creatorEmpId = await resolveGemCrmEmployeeId({
       username: createdby,
       empId: payload.empId,
+      id: payload.id,
     });
-    const assignedEmpId =
-      (await resolveGemCrmEmployeeId(conn, { username: taskassignto })) ?? 0;
+    const assignedEmpId = await resolveGemCrmEmployeeId({
+      username: taskassignto,
+    });
+    if (is_recurring && !creatorEmpId) {
+      return NextResponse.json(
+        { error: "Could not resolve creator employee ID for recurring task." },
+        { status: 400 }
+      );
+    }
+    if (is_recurring && !assignedEmpId) {
+      return NextResponse.json(
+        { error: "Could not resolve assignee employee ID for recurring task." },
+        { status: 400 }
+      );
+    }
 
     // Normalize params to avoid collation issues (compare pre-normalized params to normalized columns)
     const norm = (s) => (s ?? "").toString().trim().toLowerCase();
