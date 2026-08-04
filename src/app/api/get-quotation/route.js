@@ -126,6 +126,7 @@ export async function GET(req) {
 
         gst_number: quotation.gstin || "",
         state: quotation.state || "",
+        state_code: quotation.gstin ? quotation.gstin.substring(0, 2) : "",
 
         amount_paid: Number(amountPaid),
         due_date: dueDate,

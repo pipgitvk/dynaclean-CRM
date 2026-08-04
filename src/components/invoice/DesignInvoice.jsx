@@ -1740,6 +1740,13 @@ const NewInvoice = ({ invoice }) => {
   
   // Calculate tax rate from the invoice data
   const calculateTaxRate = () => {
+    // Prefer stored igst_rate / cgst_rate columns (set at invoice creation time)
+    const storedIgstRate = parseFloat(invoice.igst_rate) || 0;
+    const storedCgstRate = parseFloat(invoice.cgst_rate) || 0;
+    if (storedIgstRate > 0) return storedIgstRate.toFixed(2);
+    if (storedCgstRate > 0) return storedCgstRate.toFixed(2);
+
+    // Fallback: derive from stored amounts
     if (invoice.subtotal && invoice.subtotal > 0) {
       if (invoice.igst && invoice.igst > 0) {
         return ((invoice.igst / invoice.subtotal) * 100).toFixed(2);
@@ -1801,14 +1808,36 @@ const NewInvoice = ({ invoice }) => {
 
   // Calculate item-level totals for display
   const calculateItemTotals = () => {
+    const storedIgstRate = parseFloat(invoice.igst_rate) || 0;
+    const storedCgstRate = parseFloat(invoice.cgst_rate) || 0;
+    const storedSgstRate = parseFloat(invoice.sgst_rate) || 0;
+    const subtotal = parseFloat(invoice.subtotal) || 0;
+
+    // If invoice was saved with wrong GST type (e.g. igst_rate set but igst amount = 0),
+    // recalculate from igst_rate so the view shows the correct tax type.
+    let totalCGST = parseFloat(invoice.cgst) || 0;
+    let totalSGST = parseFloat(invoice.sgst) || 0;
+    let totalIGST = parseFloat(invoice.igst) || 0;
+
+    if (storedIgstRate > 0 && totalIGST === 0 && subtotal > 0) {
+      // Invoice should have been IGST — recalculate from rate
+      totalIGST = (subtotal * storedIgstRate) / 100;
+      totalCGST = 0;
+      totalSGST = 0;
+    } else if (storedCgstRate > 0 && totalCGST === 0 && subtotal > 0 && totalIGST === 0) {
+      // Invoice should have been CGST+SGST — recalculate from rates
+      totalCGST = (subtotal * storedCgstRate) / 100;
+      totalSGST = (subtotal * storedSgstRate) / 100;
+    }
+
     // Use stored invoice totals to prevent discrepancies
     const totals = {
-      subtotal: invoice.subtotal || 0,
-      totalTax: invoice.total_tax || 0,
-      grandTotal: invoice.grand_total || 0,
-      totalCGST: invoice.cgst || 0,
-      totalSGST: invoice.sgst || 0,
-      totalIGST: invoice.igst || 0,
+      subtotal,
+      totalTax: parseFloat(invoice.total_tax) || totalCGST + totalSGST + totalIGST,
+      grandTotal: parseFloat(invoice.grand_total) || 0,
+      totalCGST,
+      totalSGST,
+      totalIGST,
       totalQuantity: 0,
     };
 

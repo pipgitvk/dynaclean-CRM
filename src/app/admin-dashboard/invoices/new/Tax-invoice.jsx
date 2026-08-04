@@ -119,10 +119,6 @@ export default function TaxAndSummary({
           {igstRate > 0 ? (
             <>
               <div className="flex justify-between py-1 border-b">
-                <span className="font-medium">CGST ({cgstRate}%):</span>
-                <span>₹ {computedTax.computedCgst.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b">
                 <span className="font-medium">IGST ({igstRate}%):</span>
                 <span>₹ {computedTax.computedIgst.toFixed(2)}</span>
               </div>

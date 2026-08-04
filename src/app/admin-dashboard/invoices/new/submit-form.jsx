@@ -183,7 +183,9 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
 
   // Auto-set state + state_code from GSTIN when valid.
+  // Skip when form is pre-filled from a quotation (quotation already has correct state + GST rates).
   useEffect(() => {
+    if (isFromQuotation) return;
     const st = getStateFromGSTIN(form.gst_number?.trim());
     if (!st) return;
     setForm((prev) => ({
@@ -193,7 +195,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
     }));
     setStateSearch(st.display);
     setShowStateSuggestions(false);
-  }, [form.gst_number]);
+  }, [form.gst_number, isFromQuotation]);
 
   // State-based rate setting - only when NOT from quotation
   useEffect(() => {
