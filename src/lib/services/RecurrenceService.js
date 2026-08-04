@@ -392,12 +392,21 @@ class RecurrenceService {
       return null;
     }
 
-    // Get username from emplist using created_by empId
+    // Get username from emplist using created_by empId (fallback to rep_list)
+    let creatorUsername = 'system';
     const [[emp]] = await conn.execute(
       `SELECT username FROM emplist WHERE empId = ? LIMIT 1`,
       [recurringTask.created_by]
     );
-    const creatorUsername = emp?.username || 'system';
+    if (emp?.username) {
+      creatorUsername = emp.username;
+    } else {
+      const [[empRep]] = await conn.execute(
+        `SELECT username FROM rep_list WHERE empId = ? LIMIT 1`,
+        [recurringTask.created_by]
+      );
+      if (empRep?.username) creatorUsername = empRep.username;
+    }
     
     // Get assigned username from emplist or rep_list using assigned_user_id (empId)
     let assignedUsername = String(recurringTask.assigned_user_id);
