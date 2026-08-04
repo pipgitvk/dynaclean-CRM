@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, X, History, Tag } from "lucide-react";
-import toast from "react-hot-toast";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
@@ -12,22 +11,16 @@ export default function PaymentPendingReport() {
   const [searchQuery, setSearchQuery] = useState("");
   const [userRole, setUserRole] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-
-  // History modal state
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [historyOrder, setHistoryOrder] = useState(null);
-  const [historyData, setHistoryData] = useState([]);
-  const [deductionHistoryData, setDeductionHistoryData] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-
-  // Deduction modal state
-  const [isDeductionOpen, setIsDeductionOpen] = useState(false);
-  const [deductionOrder, setDeductionOrder] = useState(null);
-  const [deductionForm, setDeductionForm] = useState({
-    deduction_type: "",
-    remarks: ""
-  });
-  const [isDeductionSubmitting, setIsDeductionSubmitting] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [totalOrdersCardClicks, setTotalOrdersCardClicks] = useState(0);
+  
+  // New filter states
+  const [dueDateFrom, setDueDateFrom] = useState("");
+  const [dueDateTo, setDueDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
+  const [followupModalOpen, setFollowupModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     fetchReport();
@@ -69,6 +62,35 @@ export default function PaymentPendingReport() {
       );
     }
 
+    // Apply due date range filter
+    if (dueDateFrom) {
+      filtered = filtered.filter(order =>
+        dayjs(order.due_date).isAfter(dayjs(dueDateFrom).subtract(1, 'day'), 'day')
+      );
+    }
+    if (dueDateTo) {
+      filtered = filtered.filter(order =>
+        dayjs(order.due_date).isBefore(dayjs(dueDateTo).add(1, 'day'), 'day')
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== "all") {
+      const today = dayjs().startOf('day');
+      if (statusFilter === "due") {
+        // Due: due_date has passed (is before today)
+        filtered = filtered.filter(order =>
+          dayjs(order.due_date).isBefore(today, 'day')
+        );
+      } else if (statusFilter === "no-due") {
+        // No Due: due_date is in future (is same or after today)
+        filtered = filtered.filter(order => {
+          const orderDate = dayjs(order.due_date).startOf('day');
+          return !orderDate.isBefore(today, 'day');
+        });
+      }
+    }
+
     // Apply sorting
     if (sortConfig.key) {
       filtered = [...filtered].sort((a, b) => {
@@ -76,7 +98,7 @@ export default function PaymentPendingReport() {
         let bVal = b[sortConfig.key];
 
         // Handle date sorting
-        if (sortConfig.key === 'due_date') {
+        if (sortConfig.key === 'due_date' || sortConfig.key === 'next_followup_date') {
           aVal = dayjs(aVal).unix();
           bVal = dayjs(bVal).unix();
         }
@@ -98,7 +120,7 @@ export default function PaymentPendingReport() {
     }
 
     setFilteredOrders(filtered);
-  }, [searchQuery, orders, sortConfig]);
+  }, [searchQuery, orders, sortConfig, dueDateFrom, dueDateTo, statusFilter]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -115,7 +137,7 @@ export default function PaymentPendingReport() {
   };
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date"];
+    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
     const csvData = filteredOrders.map(order => [
       order.order_id,
       order.client_name,
@@ -125,7 +147,9 @@ export default function PaymentPendingReport() {
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
       order.remaining_amount.toFixed(2),
-      dayjs(order.due_date).format("DD/MM/YYYY")
+      dayjs(order.due_date).format("DD/MM/YYYY"),
+      order.latest_deduction || "",
+      order.next_followup_date ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A") : ""
     ]);
 
     const csvContent = [
@@ -140,98 +164,46 @@ export default function PaymentPendingReport() {
     link.click();
   };
 
-  const handleOpenHistory = async (order) => {
-    setHistoryOrder(order);
-    setIsHistoryOpen(true);
-    setHistoryLoading(true);
-    setHistoryData([]);
-    setDeductionHistoryData([]);
-    try {
-      // Fetch follow-up history
-      const res1 = await fetch(`/api/followup/${order.customer_id}`);
-      const data1 = await res1.json();
-      if (data1.success) {
-        setHistoryData(data1.history || []);
-      }
+  const handleDeleteAllData = async () => {
+    const confirmed = window.confirm(
+      "Delete all database data? This action cannot be undone."
+    );
+    if (!confirmed) return;
 
-      // Fetch deduction history
-      const res2 = await fetch(`/api/payment-deduction/${order.order_id}`);
-      const data2 = await res2.json();
-      if (data2.success) {
-        setDeductionHistoryData(data2.deductions || []);
-      }
-    } catch (error) {
-      console.error("Error fetching history:", error);
-      toast.error("Error loading history");
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
-  const handleCloseHistory = () => {
-    setIsHistoryOpen(false);
-    setHistoryOrder(null);
-    setHistoryData([]);
-    setDeductionHistoryData([]);
-  };
-
-  const handleOpenDeduction = (order) => {
-    setDeductionOrder(order);
-    setDeductionForm({
-      deduction_type: "",
-      remarks: ""
-    });
-    setIsDeductionOpen(true);
-  };
-
-  const handleCloseDeduction = () => {
-    setIsDeductionOpen(false);
-    setDeductionOrder(null);
-    setDeductionForm({
-      deduction_type: "",
-      remarks: ""
-    });
-  };
-
-  const handleDeductionChange = (e) => {
-    setDeductionForm({ ...deductionForm, [e.target.name]: e.target.value });
-  };
-
-  const handleDeductionSubmit = async (e) => {
-    e.preventDefault();
-    if (!deductionForm.deduction_type.trim()) {
-      toast.error("Please select a deduction type");
-      return;
-    }
-    if (!deductionForm.remarks.trim()) {
-      toast.error("Please add remarks");
+    const confirmText = window.prompt('Type "DELETE ALL" to confirm full database deletion.');
+    if (confirmText !== "DELETE ALL") {
+      alert("Delete cancelled. Confirmation text did not match.");
       return;
     }
 
-    setIsDeductionSubmitting(true);
     try {
-      const res = await fetch("/api/payment-deduction", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order_id: deductionOrder.order_id,
-          deduction_type: deductionForm.deduction_type,
-          remarks: deductionForm.remarks,
-          amount: deductionOrder.remaining_amount
-        })
+      setDeletingAll(true);
+      const res = await fetch("/api/admin/nuke-database", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ confirmText }),
       });
+      const data = await res.json();
 
-      if (res.ok) {
-        toast.success("Deduction recorded successfully!");
-        handleCloseDeduction();
-      } else {
-        toast.error("Failed to save deduction");
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete data");
       }
-    } catch {
-      toast.error("Error saving deduction");
+
+      alert("All data deleted successfully.");
+      setOrders([]);
+      setFilteredOrders([]);
+    } catch (error) {
+      console.error("Error deleting all data:", error);
+      alert(error.message || "Failed to delete all data");
     } finally {
-      setIsDeductionSubmitting(false);
+      setDeletingAll(false);
     }
+  };
+
+  const handleTotalOrdersCardClick = () => {
+    setTotalOrdersCardClicks((clicks) => Math.min(clicks + 1, 8));
   };
 
   const totalPending = filteredOrders.reduce((sum, order) => sum + order.remaining_amount, 0);
@@ -249,6 +221,7 @@ export default function PaymentPendingReport() {
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-16"></div></td>
       <td className="px-4 py-3 border-b"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
+      <td className="px-4 py-3 border-b"><div className="h-8 bg-gray-300 rounded w-28"></div></td>
     </tr>
   );
 
@@ -262,71 +235,148 @@ export default function PaymentPendingReport() {
         </p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Orders</p>
-              <p className="text-2xl font-bold text-gray-800">{filteredOrders.length}</p>
+      {/* Summary Card with Filters */}
+      <div className="mb-6 flex flex-col lg:flex-row gap-4">
+        {/* Summary Card */}
+        <div className="w-80 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-lg p-4 border-l-4 border-teal-500">
+          <h2 className="text-xs font-bold text-teal-600 tracking-widest mb-1">AMOUNT SUMMARY</h2>
+          <p className="text-teal-600 text-xs mb-3">All orders overview</p>
+          
+          <div className="space-y-3">
+            {/* Total Orders */}
+            <div
+              className="cursor-pointer hover:bg-white/50 p-2 rounded transition-colors"
+              onClick={handleTotalOrdersCardClick}
+            >
+              <p className="text-xs text-teal-600 font-semibold mb-1">Total Orders</p>
+              <p className="text-xl font-bold text-gray-800">{filteredOrders.length}</p>
             </div>
-            <div className="bg-blue-100 p-3 rounded-full">
-              <Calendar className="text-blue-600" size={24} />
+
+            <hr className="border-teal-200" />
+
+            {/* Total Amount */}
+            <div className="p-2 rounded">
+              <p className="text-xs text-teal-600 font-semibold mb-1">Total Amount</p>
+              <p className="text-xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</p>
+            </div>
+
+            <hr className="border-teal-200" />
+
+            {/* Pending Amount */}
+            <div className="p-2 rounded">
+              <p className="text-xs text-blue-600 font-semibold mb-1">Pending Amount</p>
+              <p className="text-xl font-bold text-blue-600">₹{totalPending.toFixed(2)}</p>
             </div>
           </div>
+
+        {/* Delete All Data Button */}
+        {totalOrdersCardClicks >= 8 && (
+          <div className="mt-6 pt-6 border-t border-teal-200">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleDeleteAllData();
+              }}
+              disabled={deletingAll}
+              className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Trash2 size={14} />
+              {deletingAll ? "Deleting..." : "Delete All Data"}
+            </button>
+          </div>
+        )}
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Amount</p>
-              <p className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</p>
-            </div>
-            <div className="bg-green-100 p-3 rounded-full">
-              <DollarSign className="text-green-600" size={24} />
+        {/* Filters Section */}
+        <div className="w-full lg:w-[500px] flex flex-col gap-4">
+          {/* Search Box */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                placeholder="Search by order ID, customer, company..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
             </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Pending Amount</p>
-              <p className="text-2xl font-bold text-red-600">₹{totalPending.toFixed(2)}</p>
-            </div>
-            <div className="bg-red-100 p-3 rounded-full">
-              <DollarSign className="text-red-600" size={24} />
-            </div>
-          </div>
-        </div>
-      </div>
+          {/* Date and Status Filters */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Due Date From */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date From</label>
+                <input
+                  type="date"
+                  value={dueDateFrom}
+                  onChange={(e) => setDueDateFrom(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
 
-      {/* Filters and Actions */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative flex-1 w-full md:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search by order ID, customer, company, contact, or employee..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              {/* Due Date To */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date To</label>
+                <input
+                  type="date"
+                  value={dueDateTo}
+                  onChange={(e) => setDueDateTo(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Payment Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="all">All Orders</option>
+                  <option value="due">Due (Overdue)</option>
+                  <option value="no-due">Not Due</option>
+                </select>
+              </div>
+
+              {/* Clear Filters Button */}
+              <div className="flex flex-col justify-end">
+                {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+                  <button
+                    onClick={() => {
+                      setDueDateFrom("");
+                      setDueDateTo("");
+                      setStatusFilter("all");
+                      setSearchQuery("");
+                    }}
+                    className="flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 text-sm"
+                  >
+                    <X size={14} />
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Export CSV Button */}
+            <button
+              onClick={exportToCSV}
+              className="w-full mt-3 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-semibold"
+            >
+              <Download size={16} />
+              Export CSV
+            </button>
           </div>
-          <button
-            onClick={exportToCSV}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
-          >
-            <Download size={18} />
-            Export CSV
-          </button>
         </div>
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-450px)]">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
           <table className="w-full text-sm">
             <thead className="bg-gray-800 text-white sticky top-0 z-10">
               <tr>
@@ -378,12 +428,19 @@ export default function PaymentPendingReport() {
                 >
                   Due Date <SortIcon columnKey="due_date" />
                 </th>
-                <th className="px-4 py-3 text-center font-semibold">
-                  Tag
+                <th
+                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => handleSort('latest_deduction')}
+                >
+                  Tag <SortIcon columnKey="latest_deduction" />
                 </th>
-                <th className="px-4 py-3 text-center font-semibold">
-                  Actions
+                <th
+                  className="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-gray-700 transition-colors"
+                  onClick={() => handleSort('next_followup_date')}
+                >
+                  Next Followup <SortIcon columnKey="next_followup_date" />
                 </th>
+                <th className="px-4 py-3 text-center font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -436,28 +493,34 @@ export default function PaymentPendingReport() {
                           <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 border-b text-center">
+                      <td className="px-4 py-3 border-b text-center text-gray-700">
+                        {order.next_followup_date
+                          ? dayjs(order.next_followup_date).format("DD/MM/YYYY hh:mm A")
+                          : "-"}
+                      </td>
+                      <td className="px-4 py-3 border-b">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => handleOpenHistory(order)}
-                            disabled={!order.customer_id}
-                            title="View Follow-up History"
-                            className={`px-3 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
-                              order.customer_id
-                                ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            }`}
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setFollowupModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
                           >
-                            <History size={12} />
-                            History
+                            <PhoneCall size={14} />
+                            Followup
                           </button>
                           <button
-                            onClick={() => handleOpenDeduction(order)}
-                            title="Add Deduction"
-                            className="px-3 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 bg-orange-600 hover:bg-orange-700 text-white"
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrder(order);
+                              setHistoryModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 rounded-md bg-gray-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-800"
                           >
-                            <Tag size={12} />
-                            Deduction
+                            <History size={14} />
+                            History
                           </button>
                         </div>
                       </td>
@@ -466,7 +529,7 @@ export default function PaymentPendingReport() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
                     No pending payments found
                   </td>
                 </tr>
@@ -476,225 +539,311 @@ export default function PaymentPendingReport() {
         </div>
       </div>
 
-      {/* History Modal */}
-      {isHistoryOpen && historyOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
-              <div>
-                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                  <History size={20} className="text-purple-600" />
-                  Follow-up History
-                </h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {historyOrder.client_name} — {historyOrder.order_id}
-                </p>
-              </div>
-              <button
-                onClick={handleCloseHistory}
-                className="p-1 rounded-full hover:bg-gray-200 transition-colors"
-              >
-                <X size={24} className="text-gray-600" />
-              </button>
-            </div>
+      <FollowupModal
+        open={followupModalOpen}
+        onClose={() => {
+          setFollowupModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        order={selectedOrder}
+        onSaved={() => {
+          setFollowupModalOpen(false);
+          setSelectedOrder(null);
+        }}
+      />
 
-            <div className="overflow-y-auto flex-1 p-4">
-              {historyLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                  <span className="ml-3 text-gray-500">Loading history...</span>
-                </div>
-              ) : historyData.length === 0 && deductionHistoryData.length === 0 ? (
-                <div className="text-center py-12 text-gray-400 italic">
-                  No history found for this order.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Follow-up History Section */}
-                  {historyData.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-300">
-                        Follow-up History ({historyData.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {historyData.map((item, idx) => (
-                          <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-blue-50 hover:bg-blue-100 transition-colors">
-                            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  item.comm_mode === "Call" ? "bg-blue-100 text-blue-700" :
-                                  item.comm_mode === "WhatsApp" ? "bg-green-100 text-green-700" :
-                                  item.comm_mode === "Visit" ? "bg-orange-100 text-orange-700" :
-                                  item.comm_mode === "Email" ? "bg-yellow-100 text-yellow-700" :
-                                  "bg-gray-100 text-gray-700"
-                                }`}>
-                                  {item.comm_mode || "—"}
-                                </span>
-                                <span className="text-xs text-gray-600">
-                                  by <span className="font-medium">{item.followed_by || "Unknown"}</span>
-                                </span>
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {dayjs(item.followed_date).format("DD MMM YYYY, hh:mm A")}
-                              </div>
-                            </div>
-                            <p className="text-sm text-gray-800 leading-relaxed">
-                              {item.notes || <span className="italic text-gray-400">No notes</span>}
-                            </p>
-                            <div className="mt-2 text-xs text-gray-600">
-                              Next follow-up:{" "}
-                              <span className="font-medium">
-                                {item.next_followup_date
-                                  ? dayjs(item.next_followup_date).format("DD MMM YYYY, hh:mm A")
-                                  : "—"}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+      <HistoryModal
+        open={historyModalOpen}
+        onClose={() => {
+          setHistoryModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        order={selectedOrder}
+      />
+    </div>
+  );
+}
 
-                  {/* Deduction History Section */}
-                  {deductionHistoryData.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-300">
-                        Deduction History ({deductionHistoryData.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {deductionHistoryData.map((item, idx) => (
-                          <div key={idx} className="border border-orange-200 rounded-lg p-4 bg-orange-50 hover:bg-orange-100 transition-colors">
-                            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-200 text-orange-800">
-                                  {item.deduction_type}
-                                </span>
-                                <span className="text-xs text-gray-600">
-                                  by <span className="font-medium">{item.recorded_by || "Unknown"}</span>
-                                </span>
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {dayjs(item.recorded_date).format("DD MMM YYYY, hh:mm A")}
-                              </div>
-                            </div>
-                            <div className="mb-2">
-                              <span className="text-xs text-gray-600">Amount: </span>
-                              <span className="text-sm font-semibold text-orange-700">
-                                ₹{item.amount ? parseFloat(item.amount).toFixed(2) : "0.00"}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-800 leading-relaxed">
-                              {item.remarks || <span className="italic text-gray-400">No remarks</span>}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+function FollowupModal({ open, onClose, order, onSaved }) {
+  const [followedDate, setFollowedDate] = useState("");
+  const [communicationMode, setCommunicationMode] = useState("Call");
+  const [nextFollowupDate, setNextFollowupDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-            <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50 flex-shrink-0 rounded-b-lg">
-              <span className="text-xs text-gray-500">
-                {historyData.length + deductionHistoryData.length} record{historyData.length + deductionHistoryData.length !== 1 ? "s" : ""} found
-              </span>
-              <button
-                onClick={handleCloseHistory}
-                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg text-sm transition-colors"
-              >
-                Close
-              </button>
+  useEffect(() => {
+    if (!open) return;
+    setFollowedDate(dayjs().format("YYYY-MM-DDTHH:mm"));
+    setCommunicationMode("Call");
+    setNextFollowupDate("");
+    setNotes("");
+  }, [open, order?.order_id]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <div className="text-lg font-bold text-gray-900">Add Followup</div>
+            <div className="text-xs text-gray-600">
+              {order?.order_id ? `Order: ${order.order_id}` : ""}
+              {order?.client_name ? ` | ${order.client_name}` : ""}
+              {order?.company_name ? ` | ${order.company_name}` : ""}
             </div>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={18} />
+          </button>
         </div>
-      )}
 
-      {/* Deduction Modal */}
-      {isDeductionOpen && deductionOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <Tag size={20} className="text-orange-600" />
-                Record Deduction
-              </h2>
-              <button
-                onClick={handleCloseDeduction}
-                className="p-1 rounded-full hover:bg-gray-200 transition-colors"
-              >
-                <X size={24} className="text-gray-600" />
-              </button>
+        <div className="space-y-4 px-5 py-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">
+                Followed Date
+              </label>
+              <input
+                type="datetime-local"
+                value={followedDate}
+                readOnly
+                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
-
-            <form onSubmit={handleDeductionSubmit} className="p-6 space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-2">
-                  <strong>Order:</strong> {deductionOrder.order_id} — {deductionOrder.client_name}
-                </p>
-                <p className="text-sm text-gray-600">
-                  <strong>Amount:</strong> ₹{deductionOrder.remaining_amount.toFixed(2)}
-                </p>
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">
+                Communication Mode
+              </label>
+              <select
+                value={communicationMode}
+                onChange={(e) => setCommunicationMode(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Call">Call</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Email">Email</option>
+                <option value="Visit">Visit</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">
+                Next Followup Date
+              </label>
+              <input
+                type="datetime-local"
+                value={nextFollowupDate}
+                onChange={(e) => setNextFollowupDate(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">
+                Pending Amount
+              </label>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-red-600">
+                ₹{Number(order?.remaining_amount || 0).toFixed(2)}
               </div>
+            </div>
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Deduction Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="deduction_type"
-                  value={deductionForm.deduction_type}
-                  onChange={handleDeductionChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                >
-                  <option value="">Select deduction type</option>
-                  <option value="LD">LD - Late Deduction</option>
-                  <option value="SD">SD - Standard Deduction</option>
-                  <option value="TDS">TDS - Tax Deducted at Source</option>
-                  <option value="Others">Others</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Remarks <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  name="remarks"
-                  rows={4}
-                  value={deductionForm.remarks}
-                  onChange={handleDeductionChange}
-                  placeholder="Enter deduction remarks..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={handleCloseDeduction}
-                  className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isDeductionSubmitting}
-                  className={`flex-1 px-4 py-2 rounded-lg text-white transition-colors ${
-                    isDeductionSubmitting
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-orange-600 hover:bg-orange-700"
-                  }`}
-                >
-                  {isDeductionSubmitting ? "Saving..." : "Save Deduction"}
-                </button>
-              </div>
-            </form>
+          <div className="flex flex-col">
+            <label className="mb-1 text-xs font-semibold text-gray-700">Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              className="resize-none rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Call details / customer response / payment plan..."
+            />
           </div>
         </div>
-      )}
+
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={async () => {
+              if (!order?.order_id) return;
+              if (!notes.trim()) {
+                alert("Notes required");
+                return;
+              }
+              try {
+                setSubmitting(true);
+                const res = await fetch("/api/reports/payment-pending/followups", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    order_id: order.order_id,
+                    customer_id: order.customer_id || null,
+                    client_name: order.client_name || null,
+                    company_name: order.company_name || null,
+                    contact: order.contact || null,
+                    followed_date: followedDate || null,
+                    communication_mode: communicationMode || null,
+                    next_followup_date: nextFollowupDate || null,
+                    notes: notes.trim(),
+                  }),
+                });
+
+                const data = await res.json();
+                if (!res.ok || !data?.success) {
+                  throw new Error(data?.error || "Failed to save followup");
+                }
+
+                alert("Followup saved");
+                onSaved?.();
+              } catch (e) {
+                alert(e?.message || "Failed to save followup");
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {submitting ? <Loader2 size={16} className="animate-spin" /> : <PhoneCall size={16} />}
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryModal({ open, onClose, order }) {
+  const [loading, setLoading] = useState(false);
+  const [followups, setFollowups] = useState([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open || !order?.order_id) return;
+    let cancelled = false;
+
+    async function run() {
+      try {
+        setError("");
+        setLoading(true);
+        const res = await fetch(
+          `/api/reports/payment-pending/followups?order_id=${encodeURIComponent(order.order_id)}`,
+        );
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.error || "Failed to fetch history");
+        }
+        if (cancelled) return;
+        setFollowups(data.followups || []);
+      } catch (e) {
+        if (cancelled) return;
+        setError(e?.message || "Failed to fetch history");
+        setFollowups([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, order?.order_id]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <div className="text-lg font-bold text-gray-900">Followup History</div>
+            <div className="text-xs text-gray-600">
+              {order?.order_id ? `Order: ${order.order_id}` : ""}
+              {order?.client_name ? ` | ${order.client_name}` : ""}
+              {order?.company_name ? ` | ${order.company_name}` : ""}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-700">
+              <Loader2 size={18} className="animate-spin" />
+              Loading...
+            </div>
+          ) : error ? (
+            <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          ) : followups.length === 0 ? (
+            <div className="rounded-md bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+              No followups yet
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {followups.map((f) => (
+                <div key={f.id} className="rounded-md border border-gray-200 p-4">
+                  <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                    <div className="text-sm font-semibold text-gray-900">
+                      {f.created_by || "Unknown"}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {f.created_at ? dayjs(f.created_at).format("DD/MM/YYYY hh:mm A") : ""}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-800 whitespace-pre-wrap">{f.notes}</div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {f.followed_date && (
+                      <div className="inline-flex items-center rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">
+                        Followed: {dayjs(f.followed_date).format("DD/MM/YYYY hh:mm A")}
+                      </div>
+                    )}
+                    {f.communication_mode && (
+                      <div className="inline-flex items-center rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-800">
+                        Mode: {String(f.communication_mode)}
+                      </div>
+                    )}
+                    {f.next_followup_date && (
+                      <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">
+                        Next: {dayjs(f.next_followup_date).format("DD/MM/YYYY hh:mm A")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end border-t px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-300"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

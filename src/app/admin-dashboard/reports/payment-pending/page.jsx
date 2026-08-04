@@ -235,146 +235,148 @@ export default function PaymentPendingReport() {
         </p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div
-          className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500"
-          onClick={handleTotalOrdersCardClick}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Orders</p>
-              <p className="text-2xl font-bold text-gray-800">{filteredOrders.length}</p>
-              {totalOrdersCardClicks >= 8 && (
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleDeleteAllData();
-                  }}
-                  disabled={deletingAll}
-                  className="mt-3 inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Trash2 size={14} />
-                  {deletingAll ? "Deleting..." : "Delete All Data"}
-                </button>
-              )}
-            </div>
-            <div className="bg-blue-100 p-3 rounded-full">
-              <Calendar className="text-blue-600" size={24} />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Amount</p>
-              <p className="text-2xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</p>
-            </div>
-            <div className="bg-green-100 p-3 rounded-full">
-              <DollarSign className="text-green-600" size={24} />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Pending Amount</p>
-              <p className="text-2xl font-bold text-red-600">₹{totalPending.toFixed(2)}</p>
-            </div>
-            <div className="bg-red-100 p-3 rounded-full">
-              <DollarSign className="text-red-600" size={24} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters and Actions */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <div className="space-y-4">
-          {/* Search and Export Row */}
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="relative flex-1 w-full md:w-auto">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Search by order ID, customer, company, contact, or employee..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <button
-              onClick={exportToCSV}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap"
+      {/* Summary Card with Filters */}
+      <div className="mb-6 flex flex-col lg:flex-row gap-4">
+        {/* Summary Card */}
+        <div className="w-80 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-lg p-4 border-l-4 border-teal-500">
+          <h2 className="text-xs font-bold text-teal-600 tracking-widest mb-1">AMOUNT SUMMARY</h2>
+          <p className="text-teal-600 text-xs mb-3">All orders overview</p>
+          
+          <div className="space-y-3">
+            {/* Total Orders */}
+            <div
+              className="cursor-pointer hover:bg-white/50 p-2 rounded transition-colors"
+              onClick={handleTotalOrdersCardClick}
             >
-              <Download size={18} />
-              Export CSV
+              <p className="text-xs text-teal-600 font-semibold mb-1">Total Orders</p>
+              <p className="text-xl font-bold text-gray-800">{filteredOrders.length}</p>
+            </div>
+
+            <hr className="border-teal-200" />
+
+            {/* Total Amount */}
+            <div className="p-2 rounded">
+              <p className="text-xs text-teal-600 font-semibold mb-1">Total Amount</p>
+              <p className="text-xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</p>
+            </div>
+
+            <hr className="border-teal-200" />
+
+            {/* Pending Amount */}
+            <div className="p-2 rounded">
+              <p className="text-xs text-blue-600 font-semibold mb-1">Pending Amount</p>
+              <p className="text-xl font-bold text-blue-600">₹{totalPending.toFixed(2)}</p>
+            </div>
+          </div>
+
+        {/* Delete All Data Button */}
+        {totalOrdersCardClicks >= 8 && (
+          <div className="mt-6 pt-6 border-t border-teal-200">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleDeleteAllData();
+              }}
+              disabled={deletingAll}
+              className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Trash2 size={14} />
+              {deletingAll ? "Deleting..." : "Delete All Data"}
             </button>
           </div>
+        )}
+        </div>
 
-          {/* Date Range and Status Filters Row */}
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            {/* Due Date From */}
-            <div className="flex flex-col w-full md:w-auto">
-              <label className="text-xs font-semibold text-gray-700 mb-1">Due Date From</label>
+        {/* Filters Section */}
+        <div className="w-full lg:w-[500px] flex flex-col gap-4">
+          {/* Search Box */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <input
-                type="date"
-                value={dueDateFrom}
-                onChange={(e) => setDueDateFrom(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                type="text"
+                placeholder="Search by order ID, customer, company..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
+          </div>
 
-            {/* Due Date To */}
-            <div className="flex flex-col w-full md:w-auto">
-              <label className="text-xs font-semibold text-gray-700 mb-1">Due Date To</label>
-              <input
-                type="date"
-                value={dueDateTo}
-                onChange={(e) => setDueDateTo(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          {/* Date and Status Filters */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Due Date From */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date From</label>
+                <input
+                  type="date"
+                  value={dueDateFrom}
+                  onChange={(e) => setDueDateFrom(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              {/* Due Date To */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date To</label>
+                <input
+                  type="date"
+                  value={dueDateTo}
+                  onChange={(e) => setDueDateTo(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex flex-col">
+                <label className="text-xs font-semibold text-gray-700 mb-1">Payment Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                >
+                  <option value="all">All Orders</option>
+                  <option value="due">Due (Overdue)</option>
+                  <option value="no-due">Not Due</option>
+                </select>
+              </div>
+
+              {/* Clear Filters Button */}
+              <div className="flex flex-col justify-end">
+                {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+                  <button
+                    onClick={() => {
+                      setDueDateFrom("");
+                      setDueDateTo("");
+                      setStatusFilter("all");
+                      setSearchQuery("");
+                    }}
+                    className="flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 text-sm"
+                  >
+                    <X size={14} />
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Status Filter */}
-            <div className="flex flex-col w-full md:w-auto">
-              <label className="text-xs font-semibold text-gray-700 mb-1">Payment Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Orders</option>
-                <option value="due">Due (Overdue)</option>
-                <option value="no-due">Not Due</option>
-              </select>
-            </div>
-
-            {/* Clear Filters Button */}
-            {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
-              <button
-                onClick={() => {
-                  setDueDateFrom("");
-                  setDueDateTo("");
-                  setStatusFilter("all");
-                  setSearchQuery("");
-                }}
-                className="flex items-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 whitespace-nowrap mt-5 md:mt-0"
-              >
-                <X size={16} />
-                Clear Filters
-              </button>
-            )}
+            {/* Export CSV Button */}
+            <button
+              onClick={exportToCSV}
+              className="w-full mt-3 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-semibold"
+            >
+              <Download size={16} />
+              Export CSV
+            </button>
           </div>
         </div>
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-450px)]">
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
           <table className="w-full text-sm">
             <thead className="bg-gray-800 text-white sticky top-0 z-10">
               <tr>

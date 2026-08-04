@@ -23,48 +23,44 @@ CREATE TABLE IF NOT EXISTS payment_pending_followups (
 )`;
 
 export async function ensurePaymentPendingFollowupsTable() {
-  const conn = await getDbConnection();
-  await conn.execute(CREATE_PAYMENT_PENDING_FOLLOWUPS_TABLE);
+  const pool = await getDbConnection();
+  
   try {
-    await conn.execute(
-      `ALTER TABLE payment_pending_followups ADD COLUMN followed_date DATETIME NULL`,
-    );
+    await pool.execute(CREATE_PAYMENT_PENDING_FOLLOWUPS_TABLE);
   } catch (e) {
-    if (e?.errno !== 1060) throw e;
+    console.error("Error creating table:", e?.message);
   }
+
+  // Run all ALTER operations in parallel where possible to reduce connection hold time
+  const alterOperations = [
+    pool.execute(
+      `ALTER TABLE payment_pending_followups ADD COLUMN followed_date DATETIME NULL`
+    ).catch(e => e?.errno === 1060 ? null : Promise.reject(e)),
+    
+    pool.execute(
+      `ALTER TABLE payment_pending_followups ADD COLUMN communication_mode VARCHAR(32) NULL`
+    ).catch(e => e?.errno === 1060 ? null : Promise.reject(e)),
+    
+    pool.execute(
+      `ALTER TABLE payment_pending_followups MODIFY COLUMN followed_date DATETIME NULL`
+    ).catch(() => null),
+    
+    pool.execute(
+      `ALTER TABLE payment_pending_followups ADD INDEX idx_ppf_followed_date (followed_date)`
+    ).catch(e => e?.errno === 1061 ? null : Promise.reject(e)),
+    
+    pool.execute(
+      `ALTER TABLE payment_pending_followups ADD INDEX idx_ppf_comm_mode (communication_mode)`
+    ).catch(e => e?.errno === 1061 ? null : Promise.reject(e)),
+    
+    pool.execute(
+      `ALTER TABLE payment_pending_followups MODIFY COLUMN next_followup_date DATETIME NULL`
+    ).catch(() => null),
+  ];
+
   try {
-    await conn.execute(
-      `ALTER TABLE payment_pending_followups ADD COLUMN communication_mode VARCHAR(32) NULL`,
-    );
-  } catch (e) {
-    if (e?.errno !== 1060) throw e;
-  }
-  try {
-    await conn.execute(
-      `ALTER TABLE payment_pending_followups MODIFY COLUMN followed_date DATETIME NULL`,
-    );
-  } catch {
-    /* ignore */
-  }
-  try {
-    await conn.execute(
-      `ALTER TABLE payment_pending_followups ADD INDEX idx_ppf_followed_date (followed_date)`,
-    );
-  } catch (e) {
-    if (e?.errno !== 1061) throw e;
-  }
-  try {
-    await conn.execute(
-      `ALTER TABLE payment_pending_followups ADD INDEX idx_ppf_comm_mode (communication_mode)`,
-    );
-  } catch (e) {
-    if (e?.errno !== 1061) throw e;
-  }
-  try {
-    await conn.execute(
-      `ALTER TABLE payment_pending_followups MODIFY COLUMN next_followup_date DATETIME NULL`,
-    );
-  } catch {
-    /* ignore */
+    await Promise.all(alterOperations);
+  } catch (error) {
+    console.error("Error in ALTER operations:", error?.message);
   }
 }
