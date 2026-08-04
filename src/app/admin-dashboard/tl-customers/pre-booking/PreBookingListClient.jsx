@@ -14,6 +14,7 @@ export default function PreBookingListClient({
   search: initialSearch,
   modelFilter: initialModelFilter,
   leadSourceFilter: initialLeadSourceFilter,
+  statusFilter: initialStatusFilter,
   expectedDateFrom: initialExpectedDateFrom,
   expectedDateTo: initialExpectedDateTo,
   leadSources,
@@ -24,6 +25,7 @@ export default function PreBookingListClient({
   const [search, setSearch] = useState(initialSearch);
   const [modelFilter, setModelFilter] = useState(initialModelFilter);
   const [leadSourceFilter, setLeadSourceFilter] = useState(initialLeadSourceFilter);
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [expectedDateFrom, setExpectedDateFrom] = useState(initialExpectedDateFrom);
   const [expectedDateTo, setExpectedDateTo] = useState(initialExpectedDateTo);
   const [showFilters, setShowFilters] = useState(false);
@@ -40,6 +42,7 @@ export default function PreBookingListClient({
     if (search) params.set("search", search);
     if (modelFilter) params.set("modelFilter", modelFilter);
     if (leadSourceFilter) params.set("leadSourceFilter", leadSourceFilter);
+    if (statusFilter) params.set("statusFilter", statusFilter);
     if (expectedDateFrom) params.set("expectedDateFrom", expectedDateFrom);
     if (expectedDateTo) params.set("expectedDateTo", expectedDateTo);
     params.set("page", "1");
@@ -51,6 +54,7 @@ export default function PreBookingListClient({
     setSearch("");
     setModelFilter("");
     setLeadSourceFilter("");
+    setStatusFilter("");
     setExpectedDateFrom("");
     setExpectedDateTo("");
     router.push("/admin-dashboard/tl-customers/pre-booking");
@@ -88,7 +92,7 @@ export default function PreBookingListClient({
     }
   };
 
-  const hasActiveFilters = search || modelFilter || leadSourceFilter || expectedDateFrom || expectedDateTo;
+  const hasActiveFilters = search || modelFilter || leadSourceFilter || statusFilter || expectedDateFrom || expectedDateTo;
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -142,7 +146,7 @@ export default function PreBookingListClient({
 
         {/* Filter Panel */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
             {/* Lead Source Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -159,6 +163,23 @@ export default function PreBookingListClient({
                     {source}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="partial">Partial</option>
+                <option value="received">Received</option>
               </select>
             </div>
 

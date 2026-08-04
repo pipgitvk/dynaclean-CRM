@@ -16,6 +16,7 @@ export default async function PreBookingPage({ searchParams }) {
     search = "",
     modelFilter = "",
     leadSourceFilter = "",
+    statusFilter = "",
     expectedDateFrom = "",
     expectedDateTo = "",
     page = "1",
@@ -66,6 +67,12 @@ export default async function PreBookingPage({ searchParams }) {
     params.push(leadSourceFilter);
   }
 
+  // Status filter
+  if (statusFilter && statusFilter.trim()) {
+    query += ` AND pb.status = ?`;
+    params.push(statusFilter);
+  }
+
   // Expected Date From filter
   if (expectedDateFrom && expectedDateFrom.trim()) {
     query += ` AND DATE(pb.expected_date) >= ?`;
@@ -108,6 +115,7 @@ export default async function PreBookingPage({ searchParams }) {
       search={search}
       modelFilter={modelFilter}
       leadSourceFilter={leadSourceFilter}
+      statusFilter={statusFilter}
       expectedDateFrom={expectedDateFrom}
       expectedDateTo={expectedDateTo}
       leadSources={leadSources.map((ls) => ls.lead_source)}
