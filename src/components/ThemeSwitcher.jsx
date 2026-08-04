@@ -9,7 +9,8 @@ import { useUser } from "@/context/UserContext";
 export default function ThemeSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
   const { currentTheme, changeTheme } = useTheme();
-  const { user } = useUser();
+  const userContext = useUser();
+  const user = userContext?.user;
 
   const themeKeys = getThemeKeys();
 

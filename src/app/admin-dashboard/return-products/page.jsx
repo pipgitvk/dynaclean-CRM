@@ -1,9 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 
 function ReturnProductsPage() {
+  const searchParams = useSearchParams();
   const [installations, setInstallations] = useState([]);
   const [filteredInstallations, setFilteredInstallations] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -31,6 +33,11 @@ function ReturnProductsPage() {
     fetchUpcomingInstallations();
     fetchExistingReturns();
   }, []);
+
+  useEffect(() => {
+    const orderId = searchParams?.get('order_id');
+    if (orderId) setSearchTerm(String(orderId));
+  }, [searchParams]);
 
   const fetchExistingReturns = async () => {
     try {

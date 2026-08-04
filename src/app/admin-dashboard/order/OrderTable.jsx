@@ -14,6 +14,7 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
+  PackageCheck,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import dayjs from "dayjs";
@@ -60,6 +61,7 @@ function isDisplayedDispatchDone(order) {
   if (order.approval_status === "rejected") return false;
   if (order.is_returned === 1) return false;
   if (order.is_returned === 2) return false;
+  if (order.is_returned === 3) return false;
   if (order.is_cancelled || order.approval_status === "rejected") return false;
   if (order.installation_status) return false;
   if (order.delivery_status) return false;
@@ -543,7 +545,32 @@ export default function OrderTable({ orders, userRole }) {
       };
     }
     // Check for return status first (highest priority)
-    if (order.is_returned === 1) {
+    if (Number(order.is_returned) === 3) {
+      if (Number(order.return_booking_done) === 1) {
+        return {
+          text: "Return Booking Done",
+          bg: "bg-indigo-100",
+          textCol: "text-indigo-800",
+          icon: <ArrowUp size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Return Initiated",
+        bg: "bg-purple-100",
+        textCol: "text-purple-800",
+        icon: <ArrowUp size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.is_returned) === 1) {
+      // Check if warehouse-in is also done for "Return Completed" status
+      if (Number(order.warehouse_in_done) === 1) {
+        return {
+          text: "Return Completed",
+          bg: "bg-green-100",
+          textCol: "text-green-800",
+          icon: <CheckCircle size={14} className="mr-1" />,
+        };
+      }
       return {
         text: "Fully Returned",
         bg: "bg-red-100",
@@ -551,7 +578,7 @@ export default function OrderTable({ orders, userRole }) {
         icon: <XCircle size={14} className="mr-1" />,
       };
     }
-    if (order.is_returned === 2) {
+    if (Number(order.is_returned) === 2) {
       return {
         text: "Partially Returned",
         bg: "bg-orange-100",
@@ -844,8 +871,11 @@ export default function OrderTable({ orders, userRole }) {
             <option value="delivered">Delivered</option>
             <option value="installed">Installed</option>
             <option value="canceled">Canceled</option>
+            <option value="returninitiated">Return Initiated</option>
+            <option value="returnbookingdone">Return Booking Done</option>
             <option value="partiallyreturned">Partially Returned</option>
             <option value="fullyreturned">Fully Returned</option>
+            <option value="returncompleted">Return Completed</option>
           </select>
         </div>
 
@@ -1323,7 +1353,241 @@ export default function OrderTable({ orders, userRole }) {
   );
 }
 
-// 🔘 Modular Action Buttons (used in both views)
+// ── Return Initiate ──────────────────────────────────────────────────────────
+function ReturnInitiateMenuItem({ order }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+  const [selectedItems, setSelectedItems] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const dispatchDone = Number(order.dispatch_status) === 1;
+  if (!dispatchDone) return null;
+
+  const fetchItems = async () => {
+    setLoadingItems(true);
+    try {
+      const res = await fetch(
+        `/api/orders/items?quote_number=${encodeURIComponent(order.quote_number)}`
+      );
+      const json = await res.json();
+      if (json.success) {
+        setItems(json.items || []);
+      } else {
+        toast.error(json.error || "Failed to load items");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load order items");
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+
+  const handleOpen = (e) => {
+    e.stopPropagation();
+    setOpen(true);
+    setSelectedItems({});
+    fetchItems();
+  };
+
+  const toggleItem = (itemId) => {
+    setSelectedItems((prev) => {
+      const next = { ...prev };
+      if (next[itemId]) {
+        delete next[itemId];
+      } else {
+        next[itemId] = true;
+      }
+      return next;
+    });
+  };
+
+  const selectedCount = Object.keys(selectedItems).length;
+
+  const handleCreateCreditNote = async () => {
+    if (selectedCount === 0) {
+      toast.error("Please select at least one product to return");
+      return;
+    }
+    const returnItems = items.filter((it) => selectedItems[it.id]);
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/orders/return-initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: order.order_id,
+          quote_number: order.quote_number,
+          items: returnItems.map((it) => ({
+            id: it.id,
+            item_name: it.item_name,
+            item_code: it.item_code,
+            qty: it.quantity || 1,
+            price: it.total_taxable_amt || it.taxable_price || it.total_price || 0,
+          })),
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success("Credit note created! Opening…");
+        setOpen(false);
+        // Store draft data in sessionStorage — will only be saved to DB on "Download & Save"
+        sessionStorage.setItem("creditNoteDraft", JSON.stringify(json.draft));
+        sessionStorage.setItem("creditNoteReturnPath", "/admin-dashboard/order");
+        // Navigate to the credit note preview page
+        router.push(`/admin-dashboard/credit-notes/new`);
+      } else {
+        toast.error(json.error || "Failed to create credit note");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to initiate return");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleOpen}
+        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-orange-50 text-orange-700 text-left"
+        title="Initiate Return"
+      >
+        <ArrowUp size={16} />
+        <span>Return Initiate</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={(e) => e.target === e.currentTarget && setOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Return Initiate
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Order: <span className="font-medium text-gray-700">{order.order_id}</span>
+                  {order.client_name && (
+                    <> &nbsp;·&nbsp; {order.client_name}</>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Instructions */}
+            <p className="text-sm text-gray-600 mb-4">
+              Select the products to include in the return. A credit note will be created for the selected items.
+            </p>
+
+            {/* Product List */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden mb-5">
+              {loadingItems ? (
+                <div className="py-8 text-center text-gray-500 text-sm">
+                  Loading products…
+                </div>
+              ) : items.length === 0 ? (
+                <div className="py-8 text-center text-gray-500 text-sm">
+                  No products found for this order.
+                </div>
+              ) : (
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="w-10 px-3 py-2"></th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Product</th>
+                      <th className="px-3 py-2 text-left font-medium text-gray-600">Code</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">Qty</th>
+                      <th className="px-3 py-2 text-right font-medium text-gray-600">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr
+                        key={item.id}
+                        onClick={() => toggleItem(item.id)}
+                        className={`border-t border-gray-100 cursor-pointer transition-colors ${
+                          selectedItems[item.id]
+                            ? "bg-orange-50"
+                            : "hover:bg-gray-50"
+                        }`}
+                      >
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={!!selectedItems[item.id]}
+                            onChange={() => toggleItem(item.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 accent-orange-500 cursor-pointer"
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-medium text-gray-800">
+                          {item.item_name || "-"}
+                        </td>
+                        <td className="px-3 py-2 text-gray-500 font-mono text-xs">
+                          {item.item_code || "-"}
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-700">
+                          {item.quantity || 1}
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-700">
+                          ₹{Number(
+                            item.total_taxable_amt || item.taxable_price || item.total_price || 0
+                          ).toLocaleString("en-IN")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Selection summary */}
+            {selectedCount > 0 && (
+              <p className="text-sm text-orange-700 font-medium mb-4">
+                {selectedCount} product{selectedCount > 1 ? "s" : ""} selected for return
+              </p>
+            )}
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setOpen(false)}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateCreditNote}
+                disabled={submitting || selectedCount === 0 || loadingItems}
+                className="px-5 py-2 rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+              >
+                {submitting ? "Creating…" : "Create Credit Note"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   if (r.is_cancelled) {
     return null;
@@ -1342,6 +1606,8 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "warehouse incharge",
   ].includes(role);
   const isSuperAdmin = role === "superadmin";
+  const isAccountant = role.includes("accountant");
+  const canManageReturns = isSuperAdmin || isAccountant;
   const isWarehouse = role === "warehouse incharge";
   const hasBooking =
     r.booking_id !== undefined &&
@@ -1427,7 +1693,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </>
               ))}
-            {isSuperAdmin &&
+            {canManageReturns &&
               (hasBooking ? (
                 <Link
                   href={`/admin-dashboard/order/view-booking/${r.order_id}`}
@@ -1449,7 +1715,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   <span>Create Booking</span>
                 </Link>
               ))}
-            {(isWarehouse || isSuperAdmin) &&
+            {(isWarehouse || canManageReturns) &&
               hasBooking &&
               dispatchStatus === 0 && (
                 <>
@@ -1464,7 +1730,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </Link>
                 </>
               )}
-            {(isWarehouse || isSuperAdmin) &&
+            {(isWarehouse || canManageReturns) &&
               hasBooking &&
               dispatchStatus === 1 && (
                 <>
@@ -1485,6 +1751,45 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               </div>
             )}
             <UpdateDeliveryMenuItem order={r} />
+            {canManageReturns &&
+              dispatchStatus === 1 &&
+              ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <ReturnInitiateMenuItem order={r} />
+              </div>
+            )}
+            {[3, 1, 2].includes(Number(r.is_returned)) && r.credit_note_id && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <Link
+                  href={`/admin-dashboard/credit-notes/${r.credit_note_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700"
+                  title="View Credit Note"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} />
+                  <span>View Credit Note</span>
+                </Link>
+              </div>
+            )}
+            {canManageReturns &&
+              (Number(r.is_returned) === 3 || Number(r.return_booking_done) === 1) && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <ReturnBookingMenuItem order={r} />
+              </div>
+            )}
+            {canManageReturns &&
+              Number(r.is_returned) === 3 &&
+              Number(r.return_booking_done) === 1 &&
+              Number(r.warehouse_in_done) !== 1 && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <WarehouseInMenuItem order={r} />
+              </div>
+            )}
+            {canManageReturns && Number(r.warehouse_in_done) === 1 && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <WarehouseInMenuItem order={r} />
+              </div>
+            )}
             {isSuperAdmin && (
               <div className="border-t border-gray-100 mt-1 pt-1">
                 <DeletePermanentlyButton orderId={r.order_id} onDeleted={toggleMenu} />
@@ -2106,6 +2411,406 @@ function UpdateDeliveryMenuItem({ order }) {
 function canRevertOrder(dispatchStatus) {
   // Cannot revert if order is dispatched
   return !dispatchStatus;
+}
+
+function WarehouseInMenuItem({ order }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [image, setImage] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const isDone = Number(order.warehouse_in_done) === 1;
+
+  const fmtDate = (d) => {
+    if (!d) return "-";
+    return new Date(d).toLocaleDateString("en-IN");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!image) { setError("Please upload warehouse-in image."); return; }
+    setError(""); setSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("order_id", order.order_id);
+      fd.append("warehouse_in_date", date);
+      fd.append("image", image);
+      const res = await fetch("/api/orders/warehouse-in", { method: "POST", body: fd });
+      const json = await res.json();
+      if (json.success) {
+        setSuccess("✅ Warehouse-In done! Stock updated.");
+        setTimeout(() => { setOpen(false); setSuccess(""); router.refresh(); }, 1500);
+      } else {
+        setError(json.error || "Failed to process warehouse-in.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className={`flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-sm ${isDone ? "text-blue-700" : "text-green-700"}`}
+      >
+        {isDone ? <FileCheck size={16} /> : <PackageCheck size={16} />}
+        <span>{isDone ? "View Warehouse-In" : "Warehouse In"}</span>
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h2 className="text-xl font-bold mb-4 text-center">
+                {isDone ? "View Warehouse-In" : "Warehouse In"}
+              </h2>
+              <table className="w-full mb-4 text-sm border">
+                <tbody>
+                  {[
+                    ["Order ID", order.order_id],
+                    ["Client", order.client_name],
+                    ["Booking Ref", order.return_booking_ref || "-"],
+                  ].map(([label, value]) => (
+                    <tr key={label} className="border">
+                      <td className="p-2 font-medium bg-gray-50 w-2/5">{label}</td>
+                      <td className="p-2">{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {isDone ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Date</p>
+                      <p className="font-medium text-gray-800">{fmtDate(order.warehouse_in_date)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Done By</p>
+                      <p className="font-medium text-gray-800">{order.warehouse_in_by || "-"}</p>
+                    </div>
+                  </div>
+                  {order.warehouse_in_image ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-700">Proof Image</p>
+                      <a
+                        href={order.warehouse_in_image}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="block rounded-lg overflow-hidden border border-gray-200"
+                      >
+                        <img
+                          src={order.warehouse_in_image}
+                          alt="Warehouse-In proof"
+                          className="w-full h-52 object-cover"
+                        />
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No image uploaded</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="w-full border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Warehouse In Date</label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      required
+                      className="w-full border px-3 py-2 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Upload Image <span className="text-red-500">*</span></label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setImage(e.target.files[0] || null)}
+                      required
+                      className="w-full border px-3 py-2 rounded-md text-sm"
+                    />
+                  </div>
+                  {error && <p className="text-red-600 font-medium">{error}</p>}
+                  {success && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md font-bold">{success}</div>}
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => setOpen(false)} className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50">Cancel</button>
+                    <button type="submit" disabled={submitting} className={`flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md ${submitting ? "opacity-50 cursor-not-allowed" : ""}`}>
+                      {submitting ? "Processing..." : "Confirm Warehouse In"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReturnBookingMenuItem({ order }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    return_booking_id: "",
+    return_booking_date: "",
+    expected_pickup_date: "",
+    return_booking_url: "",
+    return_booking_remarks: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const hasReturnBooking = Number(order.return_booking_done) === 1;
+
+  // If booking already done → show "View Return Booking" details instead
+  if (hasReturnBooking) {
+    return (
+      <>
+        <button
+          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+          className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-indigo-700 text-sm"
+        >
+          <FileText size={16} />
+          <span>View Return Booking</span>
+        </button>
+        {open && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={() => setOpen(false)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl w-full max-w-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6">
+                <h2 className="text-xl font-bold mb-4 text-center">Return Booking Details</h2>
+                <table className="w-full text-sm border">
+                  <tbody>
+                    {[
+                      ["Order ID", order.order_id],
+                      ["Booking Ref ID", order.return_booking_ref || "-"],
+                      ["Booking Date", order.return_booking_date ? new Date(order.return_booking_date).toLocaleDateString("en-IN") : "-"],
+                      ["Expected Pickup Date", order.expected_pickup_date ? new Date(order.expected_pickup_date).toLocaleDateString("en-IN") : "-"],
+                      ["Booking URL", order.return_booking_url || "-"],
+                      ["Remarks", order.return_booking_remarks || "-"],
+                      ["Booked By", order.return_booking_by || "-"],
+                    ].map(([label, value]) => (
+                      <tr key={label} className="border">
+                        <td className="p-2 font-medium w-2/5 bg-gray-50">{label}</td>
+                        <td className="p-2 break-all">{value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="mt-4 w-full border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/orders/return-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: order.order_id,
+          return_booking_id: formData.return_booking_id,
+          return_booking_date: formData.return_booking_date,
+          expected_pickup_date: formData.expected_pickup_date,
+          return_booking_url: formData.return_booking_url,
+          return_booking_remarks: formData.return_booking_remarks,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSuccess("✅ Return booking created successfully!");
+        setTimeout(() => {
+          setOpen(false);
+          setSuccess("");
+          setFormData({ return_booking_id: "", return_booking_date: "", expected_pickup_date: "", return_booking_url: "", return_booking_remarks: "" });
+          router.refresh();
+        }, 1500);
+      } else {
+        setError(json.error || "Failed to create return booking.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-blue-700 text-sm"
+      >
+        <UploadCloud size={16} />
+        <span>Return Booking</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h1 className="text-2xl font-bold mb-6 text-center">Return Booking</h1>
+
+              {/* Order info table */}
+              <table className="w-full mb-6 text-sm border">
+                <tbody>
+                  {[
+                    ["Order ID", order.order_id],
+                    ["Client Name", order.client_name],
+                    ["Contact", order.contact],
+                    ["Email", order.email],
+                    ["Delivery Location", order.delivery_location],
+                    ["Client Delivery Date", order.client_delivery_date
+                      ? new Date(order.client_delivery_date).toLocaleDateString("en-IN")
+                      : "-"],
+                  ].map(([label, value]) => (
+                    <tr key={label} className="border">
+                      <td className="p-2 font-medium w-1/3 bg-gray-50">{label}</td>
+                      <td className="p-2">{value || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <input
+                  type="text"
+                  name="return_booking_id"
+                  value={formData.return_booking_id}
+                  onChange={handleChange}
+                  required
+                  placeholder="Return Booking ID"
+                  className="w-full border px-3 py-2 rounded-md"
+                />
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Return Booking Date</label>
+                  <input
+                    type="date"
+                    name="return_booking_date"
+                    value={formData.return_booking_date}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Expected Pickup Date</label>
+                  <input
+                    type="date"
+                    name="expected_pickup_date"
+                    value={formData.expected_pickup_date}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  name="return_booking_url"
+                  value={formData.return_booking_url}
+                  onChange={handleChange}
+                  placeholder="Booking URL (optional)"
+                  className="w-full border px-3 py-2 rounded-md"
+                />
+
+                <textarea
+                  name="return_booking_remarks"
+                  value={formData.return_booking_remarks}
+                  onChange={handleChange}
+                  placeholder="Remark *"
+                  required
+                  className="w-full border px-3 py-2 rounded-md"
+                  rows={3}
+                />
+
+                {error && <p className="text-red-600 font-bold">{error}</p>}
+                {success && (
+                  <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md font-bold">
+                    {success}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className={`flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md ${submitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {submitting ? "Uploading..." : "Upload Booking"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function ApprovalActions({ r, userRole }) {

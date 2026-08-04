@@ -11,11 +11,14 @@ import {
   XCircle,
   MoreVertical,
   Truck,
+  ArrowUp,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
+import toast from "react-hot-toast";
+import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -97,11 +100,6 @@ export default function OrderTable({ orders, userRole }) {
         return false;
       }
 
-      // Step 2.6: Filter by approval_status (User Dashboard specific)
-      if (order.approval_status === 'pending') {
-        return false;
-      }
-
       // Step 2.7: Filter by payment_terms
       if (paymentTermsFilter && order.payment_terms !== paymentTermsFilter) {
         return false;
@@ -120,8 +118,35 @@ export default function OrderTable({ orders, userRole }) {
   }, [searchQuery, orders, statusFilter, paymentTermsFilter, dateFrom, dateTo, createdByFilter]);
 
   const getStatusText = (order) => {
-    // Check for return status first (highest priority)
-    if (order.is_returned === 1) {
+    // Check for pending approval first
+    if (order.approval_status === 'pending') {
+      return {
+        text: "Order Initiated",
+        bg: "bg-yellow-100",
+        textCol: "text-yellow-800",
+        icon: <FileText size={14} className="mr-1" />,
+      };
+    }
+    if (order.approval_status === 'rejected') {
+      return {
+        text: "Rejected",
+        bg: "bg-red-100",
+        textCol: "text-red-800",
+        icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    // Check for return status (highest priority after pending)
+    // Note: is_returned === 3 (Return Initiated) is admin-only and hidden from users
+    if (Number(order.is_returned) === 1) {
+      // If warehouse_in_done = 1, show "Return Completed"
+      if (Number(order.warehouse_in_done) === 1) {
+        return {
+          text: "Return Completed",
+          bg: "bg-teal-100",
+          textCol: "text-teal-800",
+          icon: <CheckCircle size={14} className="mr-1" />,
+        };
+      }
       return {
         text: "Fully Returned",
         bg: "bg-red-100",
@@ -129,12 +154,28 @@ export default function OrderTable({ orders, userRole }) {
         icon: <XCircle size={14} className="mr-1" />,
       };
     }
-    if (order.is_returned === 2) {
+    if (Number(order.is_returned) === 2) {
       return {
         text: "Partially Returned",
         bg: "bg-orange-100",
         textCol: "text-orange-800",
         icon: <XCircle size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.is_returned) === 3) {
+      if (Number(order.return_booking_done) === 1) {
+        return {
+          text: "Return Booking Done",
+          bg: "bg-indigo-100",
+          textCol: "text-indigo-800",
+          icon: <ArrowUp size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Return Initiated",
+        bg: "bg-purple-100",
+        textCol: "text-purple-800",
+        icon: <ArrowUp size={14} className="mr-1" />,
       };
     }
     if (order.is_cancelled || order.approval_status === 'rejected') {
@@ -279,6 +320,7 @@ export default function OrderTable({ orders, userRole }) {
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
             <option value="">All Status</option>
+            <option value="orderinitialized">Order Initiated</option>
             <option value="pendinginvoice">Pending Invoice</option>
             <option value="invoiceuploaded">Invoice Uploaded</option>
             <option value="bookingdone">Booking Done</option>
@@ -286,8 +328,11 @@ export default function OrderTable({ orders, userRole }) {
             <option value="delivered">Delivered</option>
             <option value="installed">Installed</option>
             <option value="canceled">Canceled</option>
+            <option value="returninitiated">Return Initiated</option>
+            <option value="returnbookingdone">Return Booking Done</option>
             <option value="partiallyreturned">Partially Returned</option>
             <option value="fullyreturned">Fully Returned</option>
+            <option value="returncompleted">Return Completed</option>
           </select>
         </div>
         <div>
@@ -544,6 +589,103 @@ export default function OrderTable({ orders, userRole }) {
   );
 }
 
+function ViewReturnBookingMenuItem({ order }) {
+  const [open, setOpen] = useState(false);
+  const hasReturnBooking = Number(order.return_booking_done) === 1;
+  if (!hasReturnBooking) return null;
+
+  const fmtDate = (d) => {
+    if (!d) return "-";
+    const date = new Date(d);
+    return isNaN(date.getTime()) ? String(d) : date.toLocaleDateString("en-IN");
+  };
+
+  const url = (order.return_booking_url || "").toString().trim();
+
+  return (
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-gray-700 text-sm"
+      >
+        <FileCheck size={16} />
+        <span>View Return Booking</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h1 className="text-2xl font-bold mb-6 text-center">Return Booking</h1>
+
+              <table className="w-full text-sm border">
+                <tbody>
+                  {[
+                    ["Order ID", order.order_id],
+                    ["Return Booking ID", order.return_booking_ref],
+                    ["Return Booking Date", fmtDate(order.return_booking_date)],
+                    ["Expected Pickup Date", fmtDate(order.expected_pickup_date)],
+                    ["Booked By", order.return_booking_by],
+                    ["Remarks", order.return_booking_remarks],
+                  ].map(([label, value]) => (
+                    <tr key={label} className="border">
+                      <td className="p-2 font-medium w-1/3 bg-gray-50">{label}</td>
+                      <td className="p-2 whitespace-pre-wrap">{value || "-"}</td>
+                    </tr>
+                  ))}
+                  <tr className="border">
+                    <td className="p-2 font-medium w-1/3 bg-gray-50">Booking URL</td>
+                    <td className="p-2">
+                      {url ? (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-700 hover:underline break-all"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {url}
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // 🔘 Modular Action Buttons (used in both views)
 function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
   if (r.is_cancelled) {
@@ -564,8 +706,10 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "service head",
   ].includes(role) || isGem;
   const isAdmin = role === "admin";
+  const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
+  const canManageReturns = isAdmin || isAccountant || isTeamLeader;
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -651,7 +795,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                       </div>
                     </div>
                   ))}
-                {(isAdmin || isTeamLeader) &&
+                {(canManageReturns) &&
                   (hasBooking ? (
                     <Link
                       href={`/user-dashboard/order/view-booking/${r.order_id}`}
@@ -684,7 +828,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                     <span>Dispatch</span>
                   </Link>
                 )}
-                {(isWarehouse || isAdmin || isTeamLeader) &&
+                {(isWarehouse || canManageReturns) &&
                   hasBooking &&
                   dispatchStatus === 1 && (
                     <Link
@@ -703,6 +847,58 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 )}
                 <UpdateDeliveryMenuItem order={r} />
+                {canManageReturns &&
+                  dispatchStatus === 1 &&
+                  ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <ReturnInitiateMenuItem
+                      order={r}
+                      orderListPath="/user-dashboard/order"
+                    />
+                  </div>
+                )}
+                {canManageReturns && Number(r.is_returned) === 3 && (
+                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <ReturnBookingMenuItem order={r} />
+                  </div>
+                )}
+                {isWarehouse && Number(r.is_returned) === 3 && Number(r.return_booking_done) !== 1 && (
+                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <MarkReturnBookingDoneMenuItem order={r} />
+                  </div>
+                )}
+                {(canManageReturns || isWarehouse) && Number(r.return_booking_done) === 1 && (
+                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <ViewReturnBookingMenuItem order={r} />
+                  </div>
+                )}
+                {(isAdmin || isAccountant) && [3, 1, 2].includes(Number(r.is_returned)) && r.credit_note_id && (
+                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <Link
+                      href={`/user-dashboard/credit-notes/${r.credit_note_id}`}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700 w-full"
+                      title="View Credit Note"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <FileText size={16} />
+                      <span>View Credit Note</span>
+                    </Link>
+                  </div>
+                )}
+                {isWarehouse &&
+                  Number(r.is_returned) === 3 &&
+                  Number(r.return_booking_done) === 1 &&
+                  Number(r.warehouse_in_done) !== 1 && (
+                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <WarehouseInMenuItem order={r} />
+                  </div>
+                )}
+                {/* After warehouse-in done, show view for admin + accountant + warehouse */}
+                {(isAdmin || isAccountant || isWarehouse) && Number(r.warehouse_in_done) === 1 && (
+                  <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <WarehouseInMenuItem order={r} />
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1237,6 +1433,648 @@ function UpdateDeliveryMenuItem({ order }) {
                       ? "Saving..."
                       : "Mark as Delivered"}
                 </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function MarkReturnBookingDoneMenuItem({ order }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [currentDate, setCurrentDate] = useState("");
+
+  useEffect(() => {
+    // Fetch current user
+    const fetchUser = async () => {
+      try {
+        const res = await fetch("/api/me");
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUser(data.username);
+        }
+      } catch (error) {
+        console.error("Error fetching user:", error);
+      }
+    };
+    fetchUser();
+
+    // Set current date
+    const today = new Date().toISOString().split("T")[0];
+    setCurrentDate(today);
+  }, []);
+
+  // Show only if status is "Return Initiated" and not already marked as done
+  const shouldShow = () => {
+    if (Number(order.is_returned) !== 3) return false;
+    if (Number(order.return_booking_done) === 1) return false;
+    return true;
+  };
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImage(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImagePreview(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!image) {
+      setError("Please upload an image (mandatory)");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // Upload image
+      const formData = new FormData();
+      formData.append("file", image);
+
+      const uploadRes = await fetch("/api/upload-return-booking-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Failed to upload image");
+      }
+
+      const uploadJson = await uploadRes.json();
+      const imageUrl = uploadJson.url;
+
+      // Mark as return booking done
+      const res = await fetch("/api/orders/mark-return-booking-done", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: order.order_id,
+          return_booking_date: currentDate,
+          return_booking_image: imageUrl,
+          return_booking_by: currentUser,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setSuccess("✅ Return booking marked as done!");
+        setTimeout(() => {
+          setOpen(false);
+          setSuccess("");
+          setImage(null);
+          setImagePreview(null);
+          router.refresh(); // Refresh page data in background
+        }, 1500);
+      } else {
+        setError(json.error || "Failed to mark return booking as done.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!shouldShow()) return null;
+
+  return (
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-green-700 text-sm"
+      >
+        <CheckCircle size={16} />
+        <span>Mark Return Booking Done</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-4 text-center">Mark Return Booking Done</h2>
+
+              {/* Order info */}
+              <div className="space-y-3 mb-6 p-3 bg-gray-50 rounded-lg">
+                <div className="text-sm">
+                  <span className="font-medium text-gray-700">Order ID:</span>
+                  <span className="text-gray-800 ml-2">{order.order_id}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="font-medium text-gray-700">Client Name:</span>
+                  <span className="text-gray-800 ml-2">{order.client_name}</span>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Current Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={currentDate}
+                    readOnly
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Today's date</p>
+                </div>
+
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Upload Image *
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    required
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  />
+                  {image && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      ✓ Selected: {image.name}
+                    </p>
+                  )}
+                </div>
+
+                {/* Image Preview */}
+                {imagePreview && (
+                  <div className="border border-gray-300 rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs text-gray-600 mb-2">Preview:</p>
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-40 object-cover rounded"
+                    />
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {error && (
+                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
+
+                {/* Success Message */}
+                {success && (
+                  <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg text-sm font-medium">
+                    {success}
+                  </div>
+                )}
+
+                {/* Buttons */}
+                <div className="flex gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      setImage(null);
+                      setImagePreview(null);
+                      setError("");
+                    }}
+                    className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || !image}
+                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  >
+                    {submitting ? "Submitting..." : "Mark as Done"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReturnBookingMenuItem({ order }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    return_booking_id: "",
+    return_booking_date: "",
+    expected_pickup_date: "",
+    return_booking_url: "",
+    return_booking_remarks: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const hasReturnBooking = Number(order.return_booking_done) === 1;
+  if (hasReturnBooking) return null;
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/orders/return-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: order.order_id,
+          return_booking_id: formData.return_booking_id,
+          return_booking_date: formData.return_booking_date,
+          expected_pickup_date: formData.expected_pickup_date,
+          return_booking_url: formData.return_booking_url,
+          return_booking_remarks: formData.return_booking_remarks,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setSuccess("✅ Return booking created successfully!");
+        setTimeout(() => {
+          setOpen(false);
+          setSuccess("");
+          setFormData({ return_booking_id: "", return_booking_date: "", expected_pickup_date: "", return_booking_url: "", return_booking_remarks: "" });
+          router.refresh();
+        }, 1500);
+      } else {
+        setError(json.error || "Failed to create return booking.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className="flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-blue-700 text-sm"
+      >
+        <UploadCloud size={16} />
+        <span>Return Booking</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <h1 className="text-2xl font-bold mb-6 text-center">Return Booking</h1>
+
+              {/* Order info table */}
+              <table className="w-full mb-6 text-sm border">
+                <tbody>
+                  {[
+                    ["Order ID", order.order_id],
+                    ["Client Name", order.client_name],
+                    ["Contact", order.contact],
+                    ["Email", order.email],
+                    ["Delivery Location", order.delivery_location],
+                    ["Client Delivery Date", order.client_delivery_date
+                      ? new Date(order.client_delivery_date).toLocaleDateString("en-IN")
+                      : "-"],
+                  ].map(([label, value]) => (
+                    <tr key={label} className="border">
+                      <td className="p-2 font-medium w-1/3 bg-gray-50">{label}</td>
+                      <td className="p-2">{value || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <input
+                  type="text"
+                  name="return_booking_id"
+                  value={formData.return_booking_id}
+                  onChange={handleChange}
+                  required
+                  placeholder="Return Booking ID"
+                  className="w-full border px-3 py-2 rounded-md"
+                />
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Return Booking Date
+                  </label>
+                  <input
+                    type="date"
+                    name="return_booking_date"
+                    value={formData.return_booking_date}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Expected Pickup Date
+                  </label>
+                  <input
+                    type="date"
+                    name="expected_pickup_date"
+                    value={formData.expected_pickup_date}
+                    onChange={handleChange}
+                    required
+                    className="mt-1 w-full border px-3 py-2 rounded-md"
+                  />
+                </div>
+
+                <input
+                  type="text"
+                  name="return_booking_url"
+                  value={formData.return_booking_url}
+                  onChange={handleChange}
+                  placeholder="Booking URL (optional)"
+                  className="w-full border px-3 py-2 rounded-md"
+                />
+
+                <textarea
+                  name="return_booking_remarks"
+                  value={formData.return_booking_remarks}
+                  onChange={handleChange}
+                  placeholder="Remark *"
+                  required
+                  className="w-full border px-3 py-2 rounded-md"
+                  rows={3}
+                />
+
+                {error && <p className="text-red-600 font-bold">{error}</p>}
+                {success && (
+                  <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md font-bold">
+                    {success}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className={`flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md ${submitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {submitting ? "Uploading..." : "Upload Booking"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function WarehouseInMenuItem({ order }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const today = new Date().toLocaleDateString("en-CA");
+
+  const isDone = Number(order.warehouse_in_done) === 1;
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImage(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setImagePreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!image) {
+      setError("Image upload karna mandatory hai.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("order_id", order.order_id);
+      fd.append("warehouse_in_date", today);
+      fd.append("image", image);
+
+      const res = await fetch("/api/orders/warehouse-in", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "Failed to save");
+
+      setSuccess("✅ Warehouse-In done! Stock updated.");
+      setTimeout(() => {
+        setOpen(false);
+        setSuccess("");
+        setImage(null);
+        setImagePreview(null);
+        router.refresh();
+      }, 1500);
+    } catch (err) {
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const fmtDate = (d) => {
+    if (!d) return "-";
+    return new Date(d).toLocaleDateString("en-IN");
+  };
+
+  return (
+    <>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className={`flex items-center gap-2 w-full px-3 py-2 hover:bg-gray-50 text-sm ${isDone ? "text-blue-700" : "text-green-700"}`}
+      >
+        {isDone ? <FileCheck size={16} /> : <CheckCircle size={16} />}
+        <span>{isDone ? "View Warehouse-In" : "Warehouse-In"}</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 space-y-5">
+              <h2 className="text-xl font-bold text-center text-gray-800">
+                {isDone ? "View Warehouse-In" : "Warehouse-In"}
+              </h2>
+
+              {/* Order Info */}
+              <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                <div><span className="font-medium text-gray-600">Order ID:</span> <span className="text-gray-800 ml-1">{order.order_id}</span></div>
+                <div><span className="font-medium text-gray-600">Client:</span> <span className="text-gray-800 ml-1">{order.client_name}</span></div>
+              </div>
+
+              {isDone ? (
+                /* ── VIEW MODE ── */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Date</p>
+                      <p className="font-medium text-gray-800">{fmtDate(order.warehouse_in_date)}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Done By</p>
+                      <p className="font-medium text-gray-800">{order.warehouse_in_by || "-"}</p>
+                    </div>
+                  </div>
+
+                  {/* Image */}
+                  {order.warehouse_in_image ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-gray-700">Proof Image</p>
+                      <div className="relative rounded-lg overflow-hidden border border-gray-200 group">
+                        <img
+                          src={order.warehouse_in_image}
+                          alt="Warehouse-In proof"
+                          className="w-full h-52 object-cover"
+                        />
+                        <a
+                          href={order.warehouse_in_image}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-all"
+                        >
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white text-gray-800 px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 shadow">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            View Full Image
+                          </span>
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No image uploaded</p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="w-full border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : (
+                /* ── SUBMIT MODE ── */
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={today}
+                      readOnly
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-100 cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Image Upload <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+                    />
+                    {image && <p className="text-xs text-green-700 mt-1">✓ {image.name}</p>}
+                  </div>
+
+                  {imagePreview && (
+                    <div className="rounded-lg overflow-hidden border border-gray-200">
+                      <img src={imagePreview} alt="Preview" className="w-full h-44 object-cover" />
+                    </div>
+                  )}
+
+                  {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+                  {success && <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 font-medium">{success}</p>}
+
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => { setOpen(false); setImage(null); setImagePreview(null); setError(""); }}
+                      className="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting || !image}
+                      className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+                    >
+                      {submitting ? "Saving..." : "Submit"}
+                    </button>
+                  </div>
+                </form>
               )}
             </div>
           </div>

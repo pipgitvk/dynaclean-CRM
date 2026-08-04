@@ -23,6 +23,19 @@ export default async function OrdersPage() {
 
   const conn = await getDbConnection();
 
+  // Ensure new columns exist safely
+  const safeAlters = [
+    "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_done TINYINT(1) DEFAULT 0",
+    "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_date DATE NULL",
+    "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_image VARCHAR(500) NULL",
+    "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_by VARCHAR(100) NULL",
+    "ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS is_saved TINYINT(1) NOT NULL DEFAULT 0",
+    "ALTER TABLE credit_notes ADD COLUMN IF NOT EXISTS saved_at DATETIME NULL DEFAULT NULL",
+  ];
+  for (const alter of safeAlters) {
+    await conn.execute(alter).catch(() => {});
+  }
+
   // 1. Fetch the user role
   const [roleRows] = await conn.execute(
     "SELECT userRole FROM rep_list WHERE username = ?",
@@ -40,6 +53,17 @@ export default async function OrdersPage() {
                 no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                 COALESCE(no.delivery_remark, '') as delivery_remark,
                 no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
+                COALESCE(no.return_booking_done, 0) as return_booking_done,
+                no.return_booking_ref,
+                no.return_booking_date,
+                no.expected_pickup_date,
+                no.return_booking_url,
+                no.return_booking_remarks,
+                no.return_booking_by,
+                COALESCE(no.warehouse_in_done, 0) as warehouse_in_done,
+                no.warehouse_in_date,
+                no.warehouse_in_image,
+                no.warehouse_in_by,
                 CASE 
                   WHEN qr.payment_term_days = 0 THEN 'Advance'
                   WHEN qr.payment_term_days = 9 THEN 'COD'
@@ -50,6 +74,8 @@ export default async function OrdersPage() {
                   ELSE CONCAT(qr.payment_term_days, ' Days')
                 END as payment_terms,
                 qr.company_name, qr.emp_name, qr.state,
+                MAX(cn.id) as credit_note_id,
+                MAX(cn.credit_note_number) as credit_note_number,
                 GROUP_CONCAT(DISTINCT qi.item_name SEPARATOR ', ') as item_name,
                 GROUP_CONCAT(DISTINCT qi.item_code SEPARATOR ', ') as item_code
             FROM
@@ -57,7 +83,9 @@ export default async function OrdersPage() {
             LEFT JOIN
                 quotations_records qr ON no.quote_number = qr.quote_number
             LEFT JOIN
-                quotation_items qi ON no.quote_number = qi.quote_number`;
+                quotation_items qi ON no.quote_number = qi.quote_number
+            LEFT JOIN
+                credit_notes cn ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci AND cn.is_saved = 1`;
 
   const params = [];
 

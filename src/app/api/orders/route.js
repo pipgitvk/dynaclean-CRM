@@ -59,6 +59,20 @@ export async function GET(req) {
 
     const conn = await getDbConnection();
 
+    // Ensure new columns exist (safe, runs only if missing)
+    const safeAlters = [
+      "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS return_booking_done TINYINT(1) DEFAULT 0",
+      "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS return_booking_date DATE NULL",
+      "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS return_booking_by VARCHAR(100) NULL",
+      "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_done TINYINT(1) DEFAULT 0",
+      "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_date DATE NULL",
+      "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_image VARCHAR(500) NULL",
+      "ALTER TABLE neworder ADD COLUMN IF NOT EXISTS warehouse_in_by VARCHAR(100) NULL",
+    ];
+    for (const alter of safeAlters) {
+      await conn.execute(alter).catch(() => {});
+    }
+
     // Fetch orders based on role with individual items (not grouped)
     let sql = `SELECT 
                   no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
@@ -69,6 +83,8 @@ export async function GET(req) {
                   no.baseAmount, no.taxamt,
                   no.delivery_date, no.delivered_on, no.delivery_status,no.delivery_proof,
                   no.installation_status, no.is_returned, no.approval_status, no.approval_remark, no.approval_date,
+                  no.return_booking_done, no.return_booking_date, no.return_booking_by,
+                  no.warehouse_in_done, no.warehouse_in_date, no.warehouse_in_image, no.warehouse_in_by,
                   qr.company_name, qr.emp_name, qr.state,
                   qi.item_name,
                   qi.item_code,

@@ -12,11 +12,18 @@ import {
   MoreVertical,
   Truck,
   Download,
+  ArrowUp,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
+import ReturnInitiateMenuItem from "@/components/orders/ReturnInitiateMenuItem";
+import {
+  ViewReturnBookingMenuItem,
+  ReturnBookingMenuItem,
+  WarehouseInMenuItem,
+} from "@/components/orders/ReturnBookingWarehouseMenuItems";
 
 // 👻 A sleek skeleton loader for a modern feel
 const SkeletonLoader = () => (
@@ -284,7 +291,31 @@ export default function OrderTable({ orders, userRole }) {
 
   const getStatusText = (order) => {
     // Check for return status first (highest priority)
-    if (order.is_returned === 1) {
+    if (Number(order.is_returned) === 3) {
+      if (Number(order.return_booking_done) === 1) {
+        return {
+          text: "Return Booking Done",
+          bg: "bg-indigo-100",
+          textCol: "text-indigo-800",
+          icon: <ArrowUp size={14} className="mr-1" />,
+        };
+      }
+      return {
+        text: "Return Initiated",
+        bg: "bg-purple-100",
+        textCol: "text-purple-800",
+        icon: <ArrowUp size={14} className="mr-1" />,
+      };
+    }
+    if (Number(order.is_returned) === 1) {
+      if (Number(order.warehouse_in_done) === 1) {
+        return {
+          text: "Return Completed",
+          bg: "bg-teal-100",
+          textCol: "text-teal-800",
+          icon: <CheckCircle size={14} className="mr-1" />,
+        };
+      }
       return {
         text: "Fully Returned",
         bg: "bg-red-100",
@@ -292,7 +323,7 @@ export default function OrderTable({ orders, userRole }) {
         icon: <XCircle size={14} className="mr-1" />,
       };
     }
-    if (order.is_returned === 2) {
+    if (Number(order.is_returned) === 2) {
       return {
         text: "Partially Returned",
         bg: "bg-orange-100",
@@ -464,8 +495,11 @@ export default function OrderTable({ orders, userRole }) {
             <option value="delivered">Delivered</option>
             <option value="installed">Installed</option>
             <option value="canceled">Canceled</option>
+            <option value="returninitiated">Return Initiated</option>
+            <option value="returnbookingdone">Return Booking Done</option>
             <option value="partiallyreturned">Partially Returned</option>
             <option value="fullyreturned">Fully Returned</option>
+            <option value="returncompleted">Return Completed</option>
           </select>
         </div>
         <div>
@@ -770,8 +804,10 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
     "service head",
   ].includes(role);
   const isAdmin = role === "admin";
+  const isAccountant = role.includes("accountant");
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
+  const canManageReturns = isAdmin || isAccountant || isTeamLeader;
   const hasBooking =
     r.booking_id !== undefined &&
     r.booking_id !== null &&
@@ -857,10 +893,10 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                   </div>
                 </div>
               ))}
-            {(isAdmin || isTeamLeader) &&
+            {canManageReturns &&
               (hasBooking ? (
                 <Link
-                  href={`/user-dashboard/order/view-booking/${r.order_id}`}
+                  href={`/accounts-dashboard/order/view-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                   title="View Booking"
                   onClick={(e) => e.stopPropagation()}
@@ -870,7 +906,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 </Link>
               ) : (
                 <Link
-                  href={`/user-dashboard/order/upload-booking/${r.order_id}`}
+                  href={`/accounts-dashboard/order/upload-booking/${r.order_id}`}
                   className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-green-700"
                   title="Create Booking"
                   onClick={(e) => e.stopPropagation()}
@@ -892,12 +928,12 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
                 </Link>
               </>
             )}
-            {(isWarehouse || isAdmin || isTeamLeader) &&
+            {(isWarehouse || canManageReturns) &&
               hasBooking &&
               dispatchStatus === 1 && (
                 <>
                   <Link
-                    href={`/user-dashboard/order/dispatch/view/${r.order_id}`}
+                    href={`/accounts-dashboard/order/dispatch/view/${r.order_id}`}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                     title="View Dispatch"
                     onClick={(e) => e.stopPropagation()}
@@ -913,6 +949,54 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
               </div>
             )}
             <UpdateDeliveryMenuItem order={r} />
+            {canManageReturns &&
+              dispatchStatus === 1 &&
+              ![1, 2, 3].includes(Number(r.is_returned || 0)) && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <ReturnInitiateMenuItem
+                  order={r}
+                  orderListPath="/accounts-dashboard/order"
+                />
+              </div>
+            )}
+            {canManageReturns && Number(r.is_returned) === 3 && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <ReturnBookingMenuItem order={r} />
+              </div>
+            )}
+            {(canManageReturns || isWarehouse) && Number(r.return_booking_done) === 1 && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <ViewReturnBookingMenuItem order={r} />
+              </div>
+            )}
+            {(isAdmin || isAccountant) &&
+              [3, 1, 2].includes(Number(r.is_returned)) &&
+              r.credit_note_id && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <Link
+                  href={`/admin-dashboard/credit-notes/${r.credit_note_id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-teal-700"
+                  title="View Credit Note"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FileText size={16} />
+                  <span>View Credit Note</span>
+                </Link>
+              </div>
+            )}
+            {(isAdmin || isAccountant || isWarehouse) && Number(r.warehouse_in_done) === 1 && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <WarehouseInMenuItem order={r} />
+              </div>
+            )}
+            {isWarehouse &&
+              Number(r.is_returned) === 3 &&
+              Number(r.return_booking_done) === 1 &&
+              Number(r.warehouse_in_done) !== 1 && (
+              <div className="border-t border-gray-100 mt-1 pt-1" onClick={(e) => e.stopPropagation()}>
+                <WarehouseInMenuItem order={r} />
+              </div>
+            )}
           </div>
         </div>
       )}
