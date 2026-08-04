@@ -1736,7 +1736,7 @@ console.log(signImg);
 
 const NewInvoice = ({ invoice }) => {
   // Determine invoice type label
-  const invoiceTypeLabel = invoice.type === "performa" ? "Performa Invoice" : "Invoice";
+  const invoiceTypeLabel = invoice.type === "performa" ? "Performa Invoice" : "Tax Invoice";
   
   // Calculate tax rate from the invoice data
   const calculateTaxRate = () => {
