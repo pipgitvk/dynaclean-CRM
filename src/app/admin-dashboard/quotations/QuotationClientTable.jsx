@@ -211,21 +211,23 @@ export default function QuotationTableClient({ username, customerId, role }) {
                     )}
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setModalQuote(q.quote_number)}
-                      className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 inline-block"
-                    >
-                      View
-                    </button>
-                    {isSuperAdmin && (
-                      <a
-                        href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
-                        className="ml-2 bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 inline-block"
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setModalQuote(q.quote_number)}
+                        className="bg-green-600 text-white px-4 py-2 rounded font-medium text-sm hover:bg-green-700 transition-colors duration-200"
                       >
-                        Edit
-                      </a>
-                    )}
+                        View
+                      </button>
+                      {isSuperAdmin && (
+                        <a
+                          href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
+                          className="bg-blue-600 text-white px-4 py-2 rounded font-medium text-sm hover:bg-blue-700 transition-colors duration-200 inline-block"
+                        >
+                          Edit
+                        </a>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -290,18 +292,18 @@ export default function QuotationTableClient({ username, customerId, role }) {
                     Pending
                   </span>
                 )}
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setModalQuote(q.quote_number)}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm"
+                    className="bg-green-600 text-white px-4 py-2 rounded font-medium text-sm hover:bg-green-700 transition-colors duration-200 flex-1 sm:flex-none"
                   >
                     View
                   </button>
                   {isSuperAdmin && (
                     <a
                       href={`/admin-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
-                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
+                      className="bg-blue-600 text-white px-4 py-2 rounded font-medium text-sm hover:bg-blue-700 transition-colors duration-200 flex-1 sm:flex-none text-center inline-block"
                     >
                       Edit
                     </a>
