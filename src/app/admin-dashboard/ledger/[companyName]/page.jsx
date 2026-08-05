@@ -267,13 +267,31 @@ export default async function LedgerPage({ params }) {
            COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
            invoice_number,
            net_amount,
-           client_name
+           client_name,
+           'product' AS purchase_source
          FROM product_stock_request
          WHERE customer_id = ?
          ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
         [customerIdForCompany]
       );
       purchaseRows = pRows;
+
+      // Also fetch spare purchases for this customer
+      // spare_stock_request has no invoice_date column — use created_at only
+      const [spareRows] = await conn.execute(
+        `SELECT 
+           id,
+           DATE(created_at) AS invoice_date,
+           NULL AS invoice_number,
+           net_amount,
+           client_name,
+           'spare' AS purchase_source
+         FROM spare_stock_request
+         WHERE customer_id = ?
+         ORDER BY created_at DESC, id DESC`,
+        [customerIdForCompany]
+      );
+      purchaseRows = [...purchaseRows, ...spareRows];
     }
 
     // ── 6. Build ledger entries ────────────────────────────
@@ -299,11 +317,14 @@ export default async function LedgerPage({ params }) {
       const purchDate = purch.invoice_date ? String(purch.invoice_date).slice(0, 10) : null;
       if (!purchDate) continue;
 
+      const purchLabel = purch.purchase_source === 'spare' ? 'Spare Purchase' : 'Purchase';
+      const purchIdPrefix = purch.purchase_source === 'spare' ? 'spare-purch' : 'purch';
+
       derivedLedger.push({
-        id: `purch-${purch.id}`,
+        id: `${purchIdPrefix}-${purch.id}`,
         entry_date: purchDate,
-        particulars: `Purchase – ${purch.invoice_number}`,
-        vch_type: "Purchase",
+        particulars: `${purchLabel} – ${purch.invoice_number || `#${purch.id}`}`,
+        vch_type: purchLabel,
         vch_no: purch.invoice_number,
         debit: 0,
         credit: Number(purch.net_amount) || 0,
