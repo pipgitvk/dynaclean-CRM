@@ -295,204 +295,115 @@ export default async function UserDashboardPage() {
     return (
       <div className="space-y-3 sm:space-y-4 md:space-y-6 max-w-full">
         {/* Dashboard Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-7">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 md:gap-3">
 
           {/* Pending Orders */}
-          <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[160px]">
+          <a href="/admin-dashboard/order" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-blue-500 min-h-[140px]">
+            <div className="flex flex-col h-full justify-between">
               <div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Package className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-                    <span className="block">Pending Orders</span>
-                    <span className="block"></span>
+                <div className="flex items-center gap-2 mb-2">
+                  <Package className="w-5 h-5 text-blue-500 shrink-0" />
+                  <h2 className="text-sm font-bold text-black leading-tight">
+                    Pending Orders
                   </h2>
                 </div>
-                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+                <p className={`text-2xl font-bold mt-1 ${pendingOrdersCount === 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {pendingOrdersCount}
                 </p>
               </div>
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-                <a
-                  href="/admin-dashboard/order"
-                  className="px-4 py-2 bg-white text-purple-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
-                >
-                  View Orders →
-                </a>
-              </div>
             </div>
-          </div>
+          </a>
 
           {/* Overdue Payments Card */}
-          <OverduePaymentCard />
+       
 
           {/* System Performance Dashboard */}
-          <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[160px]">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <BarChart3 className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-                  <span className="block">System Performance</span>
-                  <span className="block">Dashboard</span>
-                </h2>
-              </div>
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-                <a
-                  href="/admin-dashboard/stats"
-                  className="px-4 py-2 bg-white text-purple-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
-                >
-                  View Dashboard →
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Bulk Upload Customers */}
-          {/* <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[160px]">
-              <div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Upload className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-                    <span className="block">Bulk Upload</span>
-                    <span className="block">Customers</span>
-                  </h2>
-                </div>
-                <p className="mt-2 text-sm sm:text-base font-semibold text-white/90">
-                  CSV · Auto-distribute to reps
-                </p>
-              </div>
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-                <a
-                  href="/admin-dashboard/bulk-upload"
-                  className="px-4 py-2 bg-white text-teal-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
-                >
-                  Upload CSV →
-                </a>
-              </div>
-            </div>
-          </div>
-          */}
+         
 
           {/* Special Price Approvals */}
-          <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[160px]">
+          <a href="/admin-dashboard/special-pricing" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-indigo-500 min-h-[140px]">
+            <div className="flex flex-col h-full justify-between">
               <div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <DollarSign className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-                    <span className="block">Special Price</span>
-                    <span className="block">Approvals</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="w-5 h-5 text-indigo-500 shrink-0" />
+                  <h2 className="text-sm font-bold text-black leading-tight">
+                    Special Price
                   </h2>
                 </div>
-                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+                <p className={`text-2xl font-bold mt-1 ${pendingSpecialCount === 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {pendingSpecialCount}
                 </p>
-                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
-                  Pending approvals
-                </p>
-              </div>
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-                <a
-                  href="/admin-dashboard/special-pricing"
-                  className="px-4 py-2 bg-white text-purple-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
-                >
-                  Review Special Prices →
-                </a>
               </div>
             </div>
-          </div>
+          </a>
 
           {/* Attendance Regularization */}
-          <div className="bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[160px]">
+          <a href="/admin-dashboard/attendance-regularization" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-orange-500 min-h-[140px]">
+            <div className="flex flex-col h-full justify-between">
               <div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Calendar className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-                    <span className="block">Attendance</span>
-                    <span className="block">Regularization Requests</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-5 h-5 text-orange-500 shrink-0" />
+                  <h2 className="text-sm font-bold text-black leading-tight">
+                    Attendance
                   </h2>
                 </div>
-                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+                <p className={`text-2xl font-bold mt-1 ${regPending === 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {regPending}
                 </p>
-                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
-                  Pending · Total: {regTotal}
+                <p className="text-xs text-gray-600 mt-0.5">
+                  Pending · {regTotal}
                 </p>
               </div>
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-                <a
-                  href="/admin-dashboard/attendance-regularization"
-                  className="px-4 py-2 bg-white text-orange-700 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
-                >
-                  View all requests →
-                </a>
-              </div>
             </div>
-          </div>
+          </a>
 
           {/* Leave Approvals */}
-          <div className="bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[160px]">
+          <a href="/empcrm/admin-dashboard/leave" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-cyan-500 min-h-[140px]">
+            <div className="flex flex-col h-full justify-between">
               <div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <Plane className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-                    <span className="block">Leave</span>
-                    <span className="block">Approvals</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <Plane className="w-5 h-5 text-cyan-500 shrink-0" />
+                  <h2 className="text-sm font-bold text-black leading-tight">
+                    Leave Approvals
                   </h2>
                 </div>
-                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+                <p className={`text-2xl font-bold mt-1 ${pendingLeaveCount === 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {pendingLeaveCount}
                 </p>
-                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
-                  Pending approvals
-                </p>
-              </div>
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-                <a
-                  href="/empcrm/admin-dashboard/leave"
-                  className="px-4 py-2 bg-white text-indigo-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
-                >
-                  Review Leaves →
-                </a>
               </div>
             </div>
-          </div>
+          </a>
 
           {/* AMC/CMC Requests */}
-          <div className="bg-gradient-to-br from-pink-500 via-red-500 to-rose-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white">
-            <div className="flex flex-col h-full justify-between min-h-[160px]">
+          <a href="/admin-dashboard/amc-cmc" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-red-500 min-h-[140px]">
+            <div className="flex flex-col h-full justify-between">
               <div>
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <FileText className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-                    <span className="block">AMC/CMC</span>
-                    <span className="block">Requests</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="w-5 h-5 text-red-500 shrink-0" />
+                  <h2 className="text-sm font-bold text-black leading-tight">
+                    AMC/CMC
                   </h2>
                 </div>
-                <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+                <p className={`text-2xl font-bold mt-1 ${pendingAmcCmcCount === 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {pendingAmcCmcCount}
                 </p>
-                <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
-                  Pending approvals
-                </p>
-              </div>
-              <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-                <a
-                  href="/admin-dashboard/amc-cmc"
-                  className="px-4 py-2 bg-white text-rose-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg hover:scale-105 transform duration-200"
-                >
-                  Review Requests →
-                </a>
               </div>
             </div>
-          </div>
+          </a>
 
           {/* Profile Approvals - Dynamic Card Component */}
           <ProfileApprovalsCard />
-
+             <OverduePaymentCard />
+ <a href="/admin-dashboard/stats" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-purple-500 min-h-[140px]">
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="w-5 h-5 text-purple-500 shrink-0" />
+                <h2 className="text-sm font-bold text-black leading-tight">
+                  System Performance
+                </h2>
+              </div>
+            </div>
+          </a>
         </div>
 
         {/* System Performance Dashboard - Featured Card */}

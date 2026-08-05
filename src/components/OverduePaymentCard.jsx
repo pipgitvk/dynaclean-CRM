@@ -47,8 +47,8 @@ export default function OverduePaymentCard() {
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white animate-pulse min-h-[160px]">
-        <div className="h-full bg-white/10 rounded"></div>
+      <div className="bg-white rounded-lg shadow-md p-4 text-black animate-pulse border-l-4 border-red-500 min-h-[140px]">
+        <div className="h-full bg-gray-200 rounded"></div>
       </div>
     );
   }
@@ -56,28 +56,22 @@ export default function OverduePaymentCard() {
   return (
     <Link
       href="/admin-dashboard/reports/payment-pending"
-      className="bg-gradient-to-br from-red-500 via-pink-500 to-red-600 rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-6 text-white block hover:shadow-xl hover:scale-105 transform duration-200 transition-all"
+      className="bg-white rounded-lg shadow-md p-4 text-black block hover:shadow-lg transition-shadow h-full cursor-pointer border-l-4 border-red-500 min-h-[140px]"
     >
-      <div className="flex flex-col h-full justify-between min-h-[160px]">
+      <div className="flex flex-col h-full justify-between">
         <div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <AlertTriangle className="w-8 h-8 sm:w-10 sm:h-10 text-white shrink-0" />
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight tracking-tight">
-              <span className="block">Overdue</span>
-              <span className="block">Payments</span>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+            <h2 className="text-sm font-bold text-black leading-tight">
+              Overdue Payments
             </h2>
           </div>
-          <p className="mt-2 sm:mt-3 text-2xl sm:text-3xl md:text-4xl font-bold">
+          <p className={`text-2xl font-bold mt-1 ${parseFloat(totalOverdueAmount) === 0 ? 'text-green-600' : 'text-red-600'}`}>
             ₹{parseFloat(totalOverdueAmount).toLocaleString('en-IN')}
           </p>
-          <p className="mt-1 text-sm sm:text-base font-semibold text-white/90">
+          <p className="text-xs text-gray-600 mt-0.5">
             {overdueCount} order{overdueCount !== 1 ? "s" : ""} overdue
           </p>
-        </div>
-        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/20">
-          <span className="inline-block px-4 py-2 bg-white text-red-600 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg">
-            View Details →
-          </span>
         </div>
       </div>
     </Link>
