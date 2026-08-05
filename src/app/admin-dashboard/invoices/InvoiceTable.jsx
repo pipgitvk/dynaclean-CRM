@@ -123,12 +123,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         setInvoices(sortedData);
         setMeta(response.meta);
 
-        // Calculate and update summary data
+        // Calculate and update summary data - exclude proforma invoices
+        const filteredForSummary = sortedData.filter(inv => inv.type !== 'performa');
         const summaryData = {
-          grandTotal: sortedData.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
-          balanceAmount: sortedData.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
-          taxAmount: sortedData.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
-          totalInvoices: sortedData.length,
+          grandTotal: filteredForSummary.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
+          balanceAmount: filteredForSummary.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
+          taxAmount: filteredForSummary.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
+          totalInvoices: filteredForSummary.length,
         };
         
         if (onSummaryUpdate) {
@@ -300,7 +301,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           {selectedInvoiceIds.size > 0 && (
             <button
               onClick={handleLinkPaymentClick}
-              className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-700 whitespace-nowrap font-semibold"
+              disabled={selectedInvoices.some(inv => inv.type === 'performa')}
+              className={`px-4 py-1 rounded whitespace-nowrap font-semibold ${
+                selectedInvoices.some(inv => inv.type === 'performa')
+                  ? 'bg-gray-400 text-white cursor-not-allowed opacity-50'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+              title={selectedInvoices.some(inv => inv.type === 'performa') ? 'Cannot link payments to Performa Invoices' : ''}
             >
               Link Payment ({selectedInvoiceIds.size})
             </button>
@@ -480,13 +487,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                               setShowLinkModal(true);
                             }
                           }}
-                          disabled={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)}
+                          disabled={i.type === 'performa' || (selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id))}
                           className={`text-white px-3 py-1 rounded ${
-                            selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id)
+                            i.type === 'performa' || (selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id))
                               ? 'bg-gray-400 cursor-not-allowed opacity-50'
                               : 'bg-purple-600 hover:bg-purple-700'
                           }`}
-                          title={selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
+                          title={i.type === 'performa' ? 'Link Payment not available for Performa Invoices' : selectedInvoiceIds.size > 0 && !selectedInvoiceIds.has(i.id) ? 'Disabled: These invoices are linked to a payment' : ''}
                         >
                           Link Payment
                         </button>
