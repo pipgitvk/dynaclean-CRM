@@ -68,8 +68,30 @@ const GenerateSalaryPage = () => {
         status: 'draft'
     });
 
-    /** true when the loaded record is approved/paid — all editing locked */
-    const isLocked = ["approved", "paid"].includes((formData.status || "").toLowerCase());
+    /**
+     * Record is locked only when BOTH conditions are true:
+     * - status is approved/paid  AND
+     * - edit deadline has already passed (after 10th of following month)
+     * Within the deadline window, even approved salaries can be updated.
+     */
+    const isApprovedOrPaid = ["approved", "paid"].includes((formData.status || "").toLowerCase());
+
+    /**
+     * Salary updates are only allowed up to the 10th of the month FOLLOWING the salary month.
+     * e.g. July salary → editable until 10th August.
+     * Returns true when today is past that deadline.
+     */
+    const isAfterEditDeadline = useMemo(() => {
+        if (!selectedMonth) return false;
+        const [year, month] = selectedMonth.split("-").map(Number); // month is 1-indexed
+        if (!year || !month) return false;
+        // Deadline: 10th of the next calendar month
+        const deadline = new Date(year, month, 10, 23, 59, 59); // month (0-indexed) = next month
+        return new Date() > deadline;
+    }, [selectedMonth]);
+
+    /** Locked = approved/paid AND deadline has passed. Within deadline, editing is always allowed. */
+    const isLocked = isApprovedOrPaid && isAfterEditDeadline;
 
     // Calculated State
     const [calculation, setCalculation] = useState(null);
@@ -604,6 +626,11 @@ const GenerateSalaryPage = () => {
     const handleSave = async () => {
         if (!selectedEmployee || !selectedMonth) return;
 
+        if (isAfterEditDeadline) {
+            toast.error(`Salary update deadline has passed. ${formatMonthHeading(selectedMonth)} salary can only be updated up to the 10th of the following month.`);
+            return;
+        }
+
         setLoading(true);
         try {
             const payload = {
@@ -732,6 +759,19 @@ const GenerateSalaryPage = () => {
 
                     {salaryStructure ? (
                         <div className="space-y-4 pt-4 border-t border-gray-200">
+
+                            {/* Deadline banner — past 10th of following month */}
+                            {isAfterEditDeadline && (
+                                <div className="flex items-start gap-2 px-3 py-2.5 bg-red-50 border border-red-300 rounded-md text-red-800 text-sm font-medium">
+                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <span>
+                                        Salary update deadline has passed. Records for{" "}
+                                        <span className="font-semibold">{formatMonthHeading(selectedMonth)}</span>{" "}
+                                        can only be updated up to the{" "}
+                                        <span className="font-semibold">10th of the following month</span>.
+                                    </span>
+                                </div>
+                            )}
 
                             {/* Lock banner for approved/paid records */}
                             {isLocked && (
@@ -1266,6 +1306,11 @@ const GenerateSalaryPage = () => {
                                     <div className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-500 rounded-lg border border-gray-300 text-sm font-medium cursor-not-allowed select-none">
                                         <Lock className="w-4 h-4" />
                                         Record Locked
+                                    </div>
+                                ) : isAfterEditDeadline ? (
+                                    <div className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-500 rounded-lg border border-red-300 text-sm font-medium cursor-not-allowed select-none">
+                                        <Lock className="w-4 h-4" />
+                                        Edit Deadline Passed (10th of following month)
                                     </div>
                                 ) : (
                                     <button
