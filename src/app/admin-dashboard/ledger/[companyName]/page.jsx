@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import LedgerTableClient from "./LedgerTableClient";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -54,11 +55,6 @@ function parseLinkedPurchaseIds(raw) {
   }
   return keys;
 }
-
-const fmt = (n) => {
-  const num = Number(n) || 0;
-  return num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
 
 export default async function LedgerPage({ params }) {
   const { companyName } = await params;
@@ -419,14 +415,12 @@ export default async function LedgerPage({ params }) {
     console.error("[ledger page] DB error:", err?.message);
   }
 
-  // Calculate totals
-  let totalDebit = 0;
-  let totalCredit = 0;
-  for (const entry of ledgerEntries) {
-    totalDebit += Number(entry.debit) || 0;
-    totalCredit += Number(entry.credit) || 0;
-  }
-  const netBalance = totalDebit - totalCredit;
+  // Serialize dates to strings for client component
+  const serializedEntries = ledgerEntries.map((e) => ({
+    ...e,
+    entry_date: String(e.entry_date).slice(0, 10),
+    created_at: e.created_at ? String(e.created_at).slice(0, 19) : undefined,
+  }));
 
   return (
     <div className="max-w-7xl mx-auto p-6 w-full space-y-6">
@@ -443,77 +437,19 @@ export default async function LedgerPage({ params }) {
       <div>
         <h1 className="text-2xl font-bold text-gray-800">{decodedCompany}</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          {customerIdForCompany && <span className="font-medium">ID: {customerIdForCompany}</span>} • {ledgerEntries.length} ledger entries on record
+          {customerIdForCompany && (
+            <span className="font-medium">ID: {customerIdForCompany}</span>
+          )}{" "}
+          • {ledgerEntries.length} ledger entries on record
         </p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-gray-600 mb-2">TOTAL DEBIT</p>
-          <p className="text-2xl font-bold text-red-600">₹{fmt(totalDebit)}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-gray-600 mb-2">TOTAL CREDIT</p>
-          <p className="text-2xl font-bold text-green-600">₹{fmt(totalCredit)}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-          <p className="text-sm text-gray-600 mb-2">NET BALANCE</p>
-          <p className={`text-2xl font-bold ${netBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-            ₹{fmt(Math.abs(netBalance))} {netBalance > 0 ? '(Dr)' : '(Cr)'}
-          </p>
-        </div>
-      </div>
-
-      {/* Ledger Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Date</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Particulars</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Vch Type</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Vch No</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-700">Debit (₹)</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-700">Credit (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ledgerEntries.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                    No ledger entries found
-                  </td>
-                </tr>
-              ) : (
-                ledgerEntries.map((entry, idx) => (
-                  <tr key={entry.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-3 text-gray-800">{String(entry.entry_date).slice(0, 10)}</td>
-                    <td className="px-4 py-3 text-gray-800">{entry.particulars}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        entry.vch_type === 'Sales' ? 'bg-purple-100 text-purple-800' :
-                        entry.vch_type === 'Receipt' ? 'bg-green-100 text-green-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {entry.vch_type}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-800">{entry.vch_no}</td>
-                    <td className="px-4 py-3 text-right font-medium text-red-600">
-                      {Number(entry.debit) > 0 ? `₹${fmt(entry.debit)}` : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium text-green-600">
-                      {Number(entry.credit) > 0 ? `₹${fmt(entry.credit)}` : '-'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Client component: date filter + download + table */}
+      <LedgerTableClient
+        rows={serializedEntries}
+        companyName={decodedCompany}
+        customerId={customerIdForCompany}
+      />
     </div>
   );
 }
