@@ -547,13 +547,13 @@ const allMenuItems = [
             roles: ["SUPERADMIN"],
             icon: "ShoppingBag",
           },
-          {
-            path: "/admin-dashboard/purchase/ledger",
-            name: "Purchase Ledger",
-            accessKey: "purchase-ledger",
-            roles: ["SUPERADMIN"],
-            icon: "ScrollText",
-          },
+          // {
+          //   path: "/admin-dashboard/purchase/ledger",
+          //   name: "Purchase Ledger",
+          //   accessKey: "purchase-ledger",
+          //   roles: ["SUPERADMIN"],
+          //   icon: "ScrollText",
+          // },
         ],
       },
       {
