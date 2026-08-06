@@ -48,7 +48,7 @@ function parseLinkedPurchaseIds(raw) {
     const s = String(v).trim().toUpperCase();
     if (!s) continue;
     if (/^(IP|PP|PS|SP)\d+$/.test(s)) {
-      keys.push(s);
+      keys.push(s.startsWith("SP") ? `PS${s.slice(2)}` : s);
     } else if (/^\d+$/.test(s)) {
       keys.push(`IP${s}`);
     }
@@ -105,9 +105,10 @@ export default async function LedgerPage({ params }) {
     if (!customerIdForCompany) {
       const [cRows] = await conn.execute(
         `SELECT customer_id FROM product_stock_request 
-         WHERE TRIM(client_name) = ? AND customer_id IS NOT NULL AND customer_id != 0
+         WHERE (TRIM(client_name) = ? OR TRIM(client_company_name) = ?)
+           AND customer_id IS NOT NULL AND customer_id != 0
          LIMIT 1`,
-        [decodedCompany]
+        [decodedCompany, decodedCompany]
       );
       if (cRows.length > 0) {
         customerIdForCompany = cRows[0].customer_id;
@@ -258,26 +259,45 @@ export default async function LedgerPage({ params }) {
       }
     }
 
-    // ── 5. Fetch purchases for this company (by customer_id) ──────
-    let purchaseRows = [];
+    // ── 5. Fetch purchases for this company (customer_id and/or supplier name) ──────
+    const purchaseSelect = `
+      SELECT 
+        id,
+        COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
+        invoice_number,
+        net_amount,
+        client_name,
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM spare_list sl
+            WHERE CAST(sl.id AS CHAR) = TRIM(CAST(product_code AS CHAR))
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM products_list pl
+            WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(product_code))
+          ) THEN 'spare'
+          ELSE 'product'
+        END AS purchase_source
+    `;
+
+    const purchaseById = new Map();
+    const addPurchases = (rows) => {
+      for (const row of rows) {
+        const key = `${row.purchase_source}-${row.id}`;
+        if (!purchaseById.has(key)) purchaseById.set(key, row);
+      }
+    };
+
     if (customerIdForCompany) {
       const [pRows] = await conn.execute(
-        `SELECT 
-           id,
-           COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
-           invoice_number,
-           net_amount,
-           client_name,
-           'product' AS purchase_source
+        `${purchaseSelect}
          FROM product_stock_request
          WHERE customer_id = ?
          ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
         [customerIdForCompany]
       );
-      purchaseRows = pRows;
+      addPurchases(pRows);
 
-      // Also fetch spare purchases for this customer
-      // spare_stock_request has no invoice_date column — use created_at only
       const [spareRows] = await conn.execute(
         `SELECT 
            id,
@@ -291,8 +311,19 @@ export default async function LedgerPage({ params }) {
          ORDER BY created_at DESC, id DESC`,
         [customerIdForCompany]
       );
-      purchaseRows = [...purchaseRows, ...spareRows];
+      addPurchases(spareRows);
     }
+
+    const [supplierPurchases] = await conn.execute(
+      `${purchaseSelect}
+       FROM product_stock_request
+       WHERE TRIM(client_company_name) = ?
+       ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
+      [decodedCompany]
+    );
+    addPurchases(supplierPurchases);
+
+    const purchaseRows = Array.from(purchaseById.values());
 
     // ── 6. Build ledger entries ────────────────────────────
     const derivedLedger = [];
@@ -329,6 +360,46 @@ export default async function LedgerPage({ params }) {
         debit: 0,
         credit: Number(purch.net_amount) || 0,
         source: "purchase",
+      });
+    }
+
+    // Add purchase payment entries (statements linked via PP/PS tokens)
+    const purchaseTokenSet = new Set();
+    const tokenToSource = {};
+    for (const purch of purchaseRows) {
+      const token =
+        purch.purchase_source === "spare" ? `PS${purch.id}` : `PP${purch.id}`;
+      purchaseTokenSet.add(token);
+      tokenToSource[token] = purch.purchase_source;
+    }
+
+    const seenPaymentStmtIds = new Set();
+    for (const stmt of allStatements) {
+      const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
+      const matchingTokens = tokens.filter(
+        (t) => (t.startsWith("PP") || t.startsWith("PS")) && purchaseTokenSet.has(t)
+      );
+      if (matchingTokens.length === 0 || seenPaymentStmtIds.has(stmt.id)) continue;
+      seenPaymentStmtIds.add(stmt.id);
+
+      const stmtDate = stmt.date ? String(stmt.date).slice(0, 10) : null;
+      if (!stmtDate) continue;
+
+      const isSparePayment = matchingTokens.every(
+        (t) => t.startsWith("PS") || tokenToSource[t] === "spare"
+      );
+
+      derivedLedger.push({
+        id: `pmt-${stmt.id}`,
+        entry_date: stmtDate,
+        particulars: stmt.description
+          ? stmt.description
+          : `${isSparePayment ? "Spare" : "Payment"} – ${stmt.trans_id}`,
+        vch_type: isSparePayment ? "Spare" : "Payment",
+        vch_no: String(stmt.trans_id),
+        debit: Math.abs(Number(stmt.amount) || 0),
+        credit: 0,
+        source: "purchase_payment",
       });
     }
 
@@ -424,7 +495,14 @@ export default async function LedgerPage({ params }) {
       const db = String(b.entry_date).slice(0, 10);
       if (da < db) return -1;
       if (da > db) return 1;
-      const orderMap = { "Sales": 0, "Purchase": 1, "Receipt": 2 };
+      const orderMap = {
+        Sales: 0,
+        Purchase: 1,
+        "Spare Purchase": 1,
+        Spare: 2,
+        Payment: 2,
+        Receipt: 3,
+      };
       const aOrder = orderMap[a.vch_type] !== undefined ? orderMap[a.vch_type] : 99;
       const bOrder = orderMap[b.vch_type] !== undefined ? orderMap[b.vch_type] : 99;
       if (aOrder !== bOrder) return aOrder - bOrder;
