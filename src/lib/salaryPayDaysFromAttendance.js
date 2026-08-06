@@ -10,7 +10,8 @@
  *   Late / grace / classifyAttendanceDayForSalary do **not** reduce pay-days — they only split
  *   present vs late_days for reporting; salary amount can still use finer rules separately.
  *   deductionDays = max(0, requiredWorkingDays − totalAttendance)
- *   pay_days_base = periodDays − deductionDays
+ *   salaryPeriodCap = min(30, periodDays) — payout uses 30-day month even when calendar has 31 days
+ *   pay_days_base = salaryPeriodCap − deductionDays
  *   Weekly-off Sunday unpaid if Mon–Sat of that calendar week had no meaningful punch on any
  *   non‑holiday weekday (whole week absent); if that week had at least one such punch, WO Sunday stays paid.
  *   pay_days = pay_days_base − count(such Sundays).
@@ -62,6 +63,14 @@ function addCalendarDays(date, delta) {
 /** Stable YYYY-MM-DD for a local calendar date (avoids TZ shifts vs ISO date strings). */
 function ymdKey(year, month1to12, day) {
   return `${year}-${String(month1to12).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Monthly salary amount is always pro-rated on this many days (even in 31-day months). */
+export const SALARY_PAY_DAYS_DENOMINATOR = 30;
+
+/** Actual calendar days in month (28–31). Attendance period uses this; salary amount divisor stays 30. */
+export function getCalendarDaysInMonth(year, month1to12) {
+  return new Date(year, month1to12, 0).getDate();
 }
 
 /**
@@ -150,7 +159,7 @@ export function computeSalaryPayDaysForUser(p) {
   const { monthStr, logs, holidaysAll, leavesAll, username, rules, dateOfJoining } = p;
   const [y, m] = monthStr.split("-").map(Number);
   const monthIndex = m - 1;
-  const daysInMonth = 30; // Always use 30 days for salary calculation
+  const daysInMonth = getCalendarDaysInMonth(y, m);
   const today = startOfDay(new Date());
   const payrollMonthElapsed = isSalaryMonthFullyElapsed(monthStr, today);
   let dojValid = false;
@@ -276,7 +285,8 @@ export function computeSalaryPayDaysForUser(p) {
 
   const totalAttendance = weekdayPayCredits;
   const deductionDays = Math.max(0, requiredWorkingDays - totalAttendance);
-  const payDaysBase = periodDays - deductionDays;
+  const salaryPeriodCap = Math.min(SALARY_PAY_DAYS_DENOMINATOR, periodDays);
+  const payDaysBase = salaryPeriodCap - deductionDays;
 
   let sundaysUnpaidNoWeekPresence = 0;
 
@@ -315,6 +325,7 @@ export function computeSalaryPayDaysForUser(p) {
     sunday_worked_dates: sundayWorkedDates,
     sundays_in_period_dates: sundaysInPeriodDates,
     period_days: periodDays,
+    salary_period_cap: salaryPeriodCap,
     sundays_in_period: sundaysInPeriod,
     holiday_weekdays_in_period: holidayWeekdaysInPeriod,
     required_working_days: requiredWorkingDays,

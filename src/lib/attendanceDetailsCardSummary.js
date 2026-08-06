@@ -8,7 +8,12 @@ import {
   isHalfDayByRules,
   isHalfDayWithGrace,
 } from "@/lib/attendanceRulesEngine";
-import { dateToYmdKey, weeklyOffSundayCountsAsPaid, isSalaryMonthFullyElapsed } from "@/lib/salaryPayDaysFromAttendance";
+import {
+  dateToYmdKey,
+  weeklyOffSundayCountsAsPaid,
+  isSalaryMonthFullyElapsed,
+  getCalendarDaysInMonth,
+} from "@/lib/salaryPayDaysFromAttendance";
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 
 function startOfDay(d) {
@@ -46,7 +51,7 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
   const { monthStr, username, logs, holidaysAll, leavesAll, rules, dateOfJoining } = p;
   const [y, m] = monthStr.split("-").map(Number);
   const monthIndex = m - 1;
-  const daysInMonth = 30;
+  const daysInMonth = getCalendarDaysInMonth(y, m);
   const today = startOfDay(new Date());
   const payrollMonthElapsed = isSalaryMonthFullyElapsed(monthStr, today);
 

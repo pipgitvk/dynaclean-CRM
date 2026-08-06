@@ -66,6 +66,8 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     pay_days: Number(stats.pay_days),
     pay_days_raw: stats.pay_days_raw != null ? Number(stats.pay_days_raw) : null,
     pay_period_days: stats.period_days != null ? Number(stats.period_days) : null,
+    pay_salary_period_cap:
+      stats.salary_period_cap != null ? Number(stats.salary_period_cap) : null,
     pay_sundays_in_period: stats.sundays_in_period != null ? Number(stats.sundays_in_period) : null,
     pay_sundays_in_period_dates: stats.sundays_in_period_dates,
     pay_holiday_weekdays_in_period:

@@ -50,6 +50,9 @@ export async function POST(req) {
         const specification = formData.get("specification");
         const hsn = formData.get("hsn");
         const unit = formData.get("unit");
+        const item_type = formData.get("item_type") || "product";
+        const spare_id = formData.get("spare_id");
+        const isSpare = item_type === "spare" && spare_id;
 
         // Pricing & Quantity
         const gst_rate = formData.get("gst_rate");
@@ -145,101 +148,176 @@ export async function POST(req) {
             const [reqResult] = await conn.execute(insertRequestQuery, requestValues);
             const requestId = reqResult.insertId;
 
-            // 2. Fetch last stock totals
-            const [lastRows] = await conn.execute(
-                `SELECT total, delhi, south FROM product_stock 
-         WHERE product_code = ? 
-         ORDER BY created_at DESC 
-         LIMIT 1`,
-                [product_code]
-            );
-
-            let totalDB = 0, delhiDB = 0, southDB = 0;
-            if (lastRows.length > 0) {
-                totalDB = Number(lastRows[0].total) || 0;
-                delhiDB = Number(lastRows[0].delhi) || 0;
-                southDB = Number(lastRows[0].south) || 0;
-            }
-
             const isDelhi = /delhi/i.test(String(warehouse_name || ""));
-            const delhiD = isDelhi ? delhiDB + received_quantity : delhiDB;
-            const southD = isDelhi ? southDB : southDB + received_quantity;
-            const totalD = totalDB + received_quantity;
 
-            // 3. Insert into product_stock
-            const insertStockQuery = `
-        INSERT INTO product_stock (
-          product_code,
-          quantity,
-          amount_per_unit,
-          net_amount,
-          note,
-          location,
-          stock_status,
-          from_company,
-          delivery_address,
-          gst,
-          hs_code,
-          added_by,
-          supporting_file,
-          added_date,
-          godown,
-          total,
-          delhi,
-          south
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+            if (isSpare) {
+                // Spare stock → stock_list & stock_summary
+                const [lastRows] = await conn.execute(
+                    `SELECT total, delhi, south FROM stock_list WHERE spare_id = ? ORDER BY created_at DESC LIMIT 1`,
+                    [spare_id]
+                );
 
-            await conn.execute(insertStockQuery, [
-                product_code,
-                received_quantity,
-                amount_per_unit,
-                net_amount,
-                remarks || `Direct stock entry #${requestId}`,
-                location || delivery_location,
-                'IN',
-                from_company,
-                delivery_location,
-                String(gst_rate ?? ''),
-                hsn,
-                username,
-                received_image,
-                received_date ? new Date(received_date) : new Date(),
-                warehouse_name,
-                totalD,
-                delhiD,
-                southD
-            ]);
+                let totalDB = 0, delhiDB = 0, southDB = 0;
+                if (lastRows.length > 0) {
+                    totalDB = Number(lastRows[0].total) || 0;
+                    delhiDB = Number(lastRows[0].delhi) || 0;
+                    southDB = Number(lastRows[0].south) || 0;
+                }
 
-            // 4. Update product_stock_summary
-            const [summaryRows] = await conn.execute(
-                "SELECT total_quantity, Delhi, South FROM product_stock_summary WHERE product_code = ?",
-                [product_code]
-            );
-
-            if (summaryRows.length > 0) {
-                const existingSummary = summaryRows[0];
-                const newTotal = (Number(existingSummary.total_quantity) || 0) + received_quantity;
-                let newDelhi = Number(existingSummary.Delhi) || 0;
-                let newSouth = Number(existingSummary.South) || 0;
-                if (isDelhi) newDelhi += received_quantity; else newSouth += received_quantity;
+                const delhiD = isDelhi ? delhiDB + received_quantity : delhiDB;
+                const southD = isDelhi ? southDB : southDB + received_quantity;
+                const totalD = totalDB + received_quantity;
 
                 await conn.execute(
-                    `UPDATE product_stock_summary
-             SET last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?, last_status = 'IN', updated_at = NOW()
-             WHERE product_code = ?`,
-                    [received_quantity, newTotal, newDelhi, newSouth, product_code]
+                    `INSERT INTO stock_list (
+                      spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, added_date, from_company, delivery_address,
+                      supporting_file, added_by, godown, total, Delhi, South, godown_location
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'IN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        spare_id,
+                        received_quantity,
+                        amount_per_unit,
+                        net_amount,
+                        remarks || `Direct stock entry #${requestId}`,
+                        location || delivery_location,
+                        received_date ? new Date(received_date) : new Date(),
+                        from_company,
+                        delivery_location,
+                        received_image,
+                        username,
+                        warehouse_name,
+                        totalD,
+                        delhiD,
+                        southD,
+                        null
+                    ]
                 );
+
+                const [summaryRows] = await conn.execute(
+                    "SELECT total_quantity, Delhi, South FROM stock_summary WHERE spare_id = ?",
+                    [spare_id]
+                );
+
+                if (summaryRows.length > 0) {
+                    const existing = summaryRows[0];
+                    const newTotal = (Number(existing.total_quantity) || 0) + received_quantity;
+                    let newDelhi = Number(existing.Delhi) || 0;
+                    let newSouth = Number(existing.South) || 0;
+
+                    if (isDelhi) newDelhi += received_quantity;
+                    else newSouth += received_quantity;
+
+                    await conn.execute(
+                        `UPDATE stock_summary SET 
+                          last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?, 
+                          last_status = 'IN', updated_at = NOW() 
+                         WHERE spare_id = ?`,
+                        [received_quantity, newTotal, newDelhi, newSouth, spare_id]
+                    );
+                } else {
+                    const initialDelhi = isDelhi ? received_quantity : 0;
+                    const initialSouth = isDelhi ? 0 : received_quantity;
+
+                    await conn.execute(
+                        `INSERT INTO stock_summary 
+                          (spare_id, last_updated_quantity, total_quantity, Delhi, South, last_status)
+                         VALUES (?, ?, ?, ?, ?, 'IN')`,
+                        [spare_id, received_quantity, received_quantity, initialDelhi, initialSouth]
+                    );
+                }
             } else {
-                const initialDelhi = isDelhi ? received_quantity : 0;
-                const initialSouth = isDelhi ? 0 : received_quantity;
+                // Product stock → product_stock & product_stock_summary
+                const [lastRows] = await conn.execute(
+                    `SELECT total, delhi, south FROM product_stock 
+             WHERE product_code = ? 
+             ORDER BY created_at DESC 
+             LIMIT 1`,
+                    [product_code]
+                );
+
+                let totalDB = 0, delhiDB = 0, southDB = 0;
+                if (lastRows.length > 0) {
+                    totalDB = Number(lastRows[0].total) || 0;
+                    delhiDB = Number(lastRows[0].delhi) || 0;
+                    southDB = Number(lastRows[0].south) || 0;
+                }
+
+                const delhiD = isDelhi ? delhiDB + received_quantity : delhiDB;
+                const southD = isDelhi ? southDB : southDB + received_quantity;
+                const totalD = totalDB + received_quantity;
 
                 await conn.execute(
-                    `INSERT INTO product_stock_summary
-             (product_code, last_updated_quantity, total_quantity, Delhi, South, last_status)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-                    [product_code, received_quantity, received_quantity, initialDelhi, initialSouth, 'IN']
+                    `INSERT INTO product_stock (
+                      product_code,
+                      quantity,
+                      amount_per_unit,
+                      net_amount,
+                      note,
+                      location,
+                      stock_status,
+                      from_company,
+                      delivery_address,
+                      gst,
+                      hs_code,
+                      added_by,
+                      supporting_file,
+                      added_date,
+                      godown,
+                      total,
+                      delhi,
+                      south
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        product_code,
+                        received_quantity,
+                        amount_per_unit,
+                        net_amount,
+                        remarks || `Direct stock entry #${requestId}`,
+                        location || delivery_location,
+                        'IN',
+                        from_company,
+                        delivery_location,
+                        String(gst_rate ?? ''),
+                        hsn,
+                        username,
+                        received_image,
+                        received_date ? new Date(received_date) : new Date(),
+                        warehouse_name,
+                        totalD,
+                        delhiD,
+                        southD
+                    ]
                 );
+
+                const [summaryRows] = await conn.execute(
+                    "SELECT total_quantity, Delhi, South FROM product_stock_summary WHERE product_code = ?",
+                    [product_code]
+                );
+
+                if (summaryRows.length > 0) {
+                    const existingSummary = summaryRows[0];
+                    const newTotal = (Number(existingSummary.total_quantity) || 0) + received_quantity;
+                    let newDelhi = Number(existingSummary.Delhi) || 0;
+                    let newSouth = Number(existingSummary.South) || 0;
+                    if (isDelhi) newDelhi += received_quantity; else newSouth += received_quantity;
+
+                    await conn.execute(
+                        `UPDATE product_stock_summary
+                 SET last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?, last_status = 'IN', updated_at = NOW()
+                 WHERE product_code = ?`,
+                        [received_quantity, newTotal, newDelhi, newSouth, product_code]
+                    );
+                } else {
+                    const initialDelhi = isDelhi ? received_quantity : 0;
+                    const initialSouth = isDelhi ? 0 : received_quantity;
+
+                    await conn.execute(
+                        `INSERT INTO product_stock_summary
+                 (product_code, last_updated_quantity, total_quantity, Delhi, South, last_status)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                        [product_code, received_quantity, received_quantity, initialDelhi, initialSouth, 'IN']
+                    );
+                }
             }
 
             await conn.commit();

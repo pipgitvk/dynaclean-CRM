@@ -17,6 +17,17 @@ const formatDisplayDate = (value) => {
   return parsed.toLocaleDateString("en-IN");
 };
 
+const resolvePurchaseCategory = (purchase) => {
+  const category =
+    purchase?.category === "Product" || purchase?.category === "Spare"
+      ? purchase.category
+      : null;
+  return {
+    category,
+    sub_category: category === "Spare" ? purchase?.sub_category || null : null,
+  };
+};
+
 const FILE_SERVE_PREFIX = "/api/serve/";
 
 const isExternalUrl = (url) => /^https?:\/\//i.test(url);
@@ -776,6 +787,7 @@ export default function PurchasesPage() {
   const [purchases, setPurchases] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortColumn, setSortColumn] = useState("created_at");
@@ -807,7 +819,12 @@ export default function PurchasesPage() {
       const res = await fetch("/api/stock-request");
       if (res.ok) {
         const data = await res.json();
-        setPurchases(data);
+        setPurchases(
+          (Array.isArray(data) ? data : []).map((row) => {
+            const { category, sub_category } = resolvePurchaseCategory(row);
+            return { ...row, category, sub_category };
+          })
+        );
       }
     } catch (error) {
       console.error("Error loading purchases:", error);
@@ -942,6 +959,15 @@ export default function PurchasesPage() {
       filtered = filtered.filter((p) => p.status === statusFilter);
     }
 
+    // Category filter (Product / Spare / Other)
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((p) => {
+        const { category } = resolvePurchaseCategory(p);
+        if (categoryFilter === "Other") return !category;
+        return category === categoryFilter;
+      });
+    }
+
     // Search filter
     if (search) {
       const q = search.toLowerCase();
@@ -1016,7 +1042,7 @@ export default function PurchasesPage() {
       .sort((a, b) => b.id - a.id)
       .forEach(p => sortedFiltered.push(p));
     return sortedFiltered;
-  }, [purchases, search, statusFilter, paymentTransByPurchaseId, startDate, endDate, sortColumn, sortDirection]);
+  }, [purchases, search, statusFilter, categoryFilter, paymentTransByPurchaseId, startDate, endDate, sortColumn, sortDirection]);
 
   const totals = useMemo(() => {
     return filteredPurchases.reduce((acc, p) => {
@@ -1109,6 +1135,8 @@ export default function PurchasesPage() {
     worksheet.columns = [
       { header: "Request ID", key: "id", width: 12 },
       { header: "Product Code", key: "product_code", width: 15 },
+      { header: "Category", key: "category", width: 12 },
+      { header: "Sub Category", key: "sub_category", width: 18 },
       { header: "Product Name", key: "product_name", width: 25 },
       { header: "Quantity", key: "quantity", width: 10 },
       { header: "Price/Unit", key: "price_per_unit", width: 12 },
@@ -1125,6 +1153,8 @@ export default function PurchasesPage() {
     filteredPurchases.forEach((row) =>
       worksheet.addRow({
         ...row,
+        category: row.category === "Product" || row.category === "Spare" ? row.category : "",
+        sub_category: row.category === "Spare" ? (row.sub_category || "") : "",
         status_label: row.status_label || row.status,
         created_at: new Date(row.created_at).toLocaleString(),
         invoice_date: formatDisplayDate(row.invoice_date),
@@ -1228,6 +1258,16 @@ export default function PurchasesPage() {
                 </button>
               )}
             </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-1.5 border rounded-md text-sm bg-white"
+            >
+              <option value="all">All Categories</option>
+              <option value="Product">Product</option>
+              <option value="Spare">Spare</option>
+              <option value="Other">Other</option>
+            </select>
             <div className="flex gap-2">
               <button
                 onClick={() => setStatusFilter("all")}
@@ -1340,7 +1380,7 @@ export default function PurchasesPage() {
           <div className="p-8 text-center text-gray-500">Loading...</div>
         ) : filteredPurchases.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            {search || statusFilter !== "all" ? "No purchases found matching your filters" : "No purchase requests yet"}
+            {search || statusFilter !== "all" || categoryFilter !== "all" ? "No purchases found matching your filters" : "No purchase requests yet"}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1357,6 +1397,8 @@ export default function PurchasesPage() {
                   </th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('id')}>ID {sortColumn === 'id' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_code')}>Product Code {sortColumn === 'product_code' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('category')}>Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('sub_category')}>Sub Category {sortColumn === 'sub_category' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_name')}>Product Name {sortColumn === 'product_name' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold">Customer Details</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('quantity')}>Qty {sortColumn === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -1380,6 +1422,7 @@ export default function PurchasesPage() {
                 {filteredPurchases.map((purchase) => {
                   const isChild = !!purchase.parent_id;
                   const isParent = purchases.some(p => p.parent_id === purchase.id);
+                  const { category, sub_category } = resolvePurchaseCategory(purchase);
                   return (
                     <tr key={purchase.id} className={`border-t hover:bg-gray-50 ${isChild ? 'bg-gray-50' : ''}`}>
                       <td className="p-3">
@@ -1398,6 +1441,28 @@ export default function PurchasesPage() {
                         </div>
                       </td>
                       <td className="p-3 font-medium">{purchase.product_code}</td>
+                      <td className="p-3">
+                        {category === 'Product' ? (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                            Product
+                          </span>
+                        ) : category === 'Spare' ? (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                            Spare
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {category === 'Spare' && sub_category ? (
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700 border border-violet-200">
+                            {sub_category}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="p-3">{purchase.product_name}</td>
                       <td className="p-3">
                         <div className="flex items-start gap-2">
@@ -1550,6 +1615,14 @@ export default function PurchasesPage() {
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
                 ["Product Code", detailPurchase.product_code],
+                ["Category", (() => {
+                  const { category } = resolvePurchaseCategory(detailPurchase);
+                  return category || "—";
+                })()],
+                ["Sub Category", (() => {
+                  const { category, sub_category } = resolvePurchaseCategory(detailPurchase);
+                  return category === "Spare" && sub_category ? sub_category : "—";
+                })()],
                 ["Product Name", detailPurchase.product_name],
                 ["Customer ID", detailPurchase.customer_id],
                 ["Client Name", detailPurchase.client_name],

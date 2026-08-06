@@ -59,29 +59,50 @@ export async function GET(req) {
 
     const query = `
       SELECT 
-        id,
-        product_code,
-        product_image,
-        product_name,
-        quantity,
-        from_company,
-        contact,
-        mode_of_transport,
-        porter_contact,
-        created_at,
-        created_by,
-        status
-      FROM product_stock_request
-      WHERE status = 'requested'
-      ORDER BY created_at DESC
+        psr.id,
+        psr.product_code,
+        psr.product_image,
+        psr.product_name,
+        psr.quantity,
+        psr.from_company,
+        psr.contact,
+        psr.mode_of_transport,
+        psr.porter_contact,
+        psr.created_at,
+        psr.created_by,
+        psr.status,
+        CASE 
+          WHEN TRIM(COALESCE(psr.product_code, '')) = '' THEN NULL
+          WHEN EXISTS (
+            SELECT 1 FROM products_list pl
+            WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(psr.product_code))
+          ) THEN 'Product'
+          WHEN EXISTS (
+            SELECT 1 FROM spare_list sl
+            WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+          ) THEN 'Spare'
+          ELSE NULL
+        END AS item_category
+      FROM product_stock_request psr
+      WHERE psr.status = 'requested'
+      ORDER BY psr.created_at DESC
     `;
 
     console.log("Executing GET query...");
     const [requests] = await conn.execute(query);
 
-    console.log("Fetched requests:", requests.length);
+    const normalized = requests.map((row) => {
+      const category =
+        row.item_category === "Product" || row.item_category === "Spare"
+          ? row.item_category
+          : null;
+      const { item_category, ...rest } = row;
+      return { ...rest, category };
+    });
 
-    return NextResponse.json(requests);
+    console.log("Fetched requests:", normalized.length);
+
+    return NextResponse.json(normalized);
   } catch (error) {
     console.error("Error fetching pending requests:", error);
     return NextResponse.json(
@@ -205,6 +226,97 @@ export async function POST(req) {
         request_id
       ]);
 
+      const qtyNum = Number(received_quantity) || 0;
+      const isDelhi = /delhi/i.test(String(warehouse_name || ""));
+
+      const [[productMatch]] = await conn.execute(
+        `SELECT 1 AS found FROM products_list
+         WHERE LOWER(TRIM(item_code)) = LOWER(TRIM(?)) LIMIT 1`,
+        [request.product_code]
+      );
+      const [[spareMatch]] = await conn.execute(
+        `SELECT id FROM spare_list
+         WHERE CAST(id AS CHAR) = TRIM(CAST(? AS CHAR)) LIMIT 1`,
+        [request.product_code]
+      );
+      const isSpare = !productMatch?.found && !!spareMatch?.id;
+      const spare_id = isSpare ? spareMatch.id : null;
+
+      if (isSpare) {
+        console.log("Spare warehouse-in → stock_list / stock_summary, spare_id:", spare_id);
+
+        const [lastRows] = await conn.execute(
+          `SELECT total, delhi, south FROM stock_list WHERE spare_id = ? ORDER BY created_at DESC LIMIT 1`,
+          [spare_id]
+        );
+
+        let totalDB = 0, delhiDB = 0, southDB = 0;
+        if (lastRows.length > 0) {
+          totalDB = Number(lastRows[0].total) || 0;
+          delhiDB = Number(lastRows[0].delhi) || 0;
+          southDB = Number(lastRows[0].south) || 0;
+        }
+
+        const delhiD = isDelhi ? delhiDB + qtyNum : delhiDB;
+        const southD = isDelhi ? southDB : southDB + qtyNum;
+        const totalD = totalDB + qtyNum;
+
+        await conn.execute(
+          `INSERT INTO stock_list (
+            spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, added_date, from_company, delivery_address,
+            supporting_file, added_by, godown, total, Delhi, South, godown_location
+          ) VALUES (?, ?, ?, ?, ?, ?, 'IN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            spare_id,
+            qtyNum,
+            request.amount_per_unit,
+            request.net_amount,
+            remarks || `Stock request #${request_id} fulfilled`,
+            location || request.delivery_location,
+            received_date ? new Date(received_date) : new Date(),
+            request.from_company,
+            request.delivery_location,
+            received_image,
+            username,
+            warehouse_name,
+            totalD,
+            delhiD,
+            southD,
+            null
+          ]
+        );
+
+        const [summaryRows] = await conn.execute(
+          "SELECT total_quantity, Delhi, South FROM stock_summary WHERE spare_id = ?",
+          [spare_id]
+        );
+
+        if (summaryRows.length > 0) {
+          const existing = summaryRows[0];
+          const newTotal = (Number(existing.total_quantity) || 0) + qtyNum;
+          let newDelhi = Number(existing.Delhi) || 0;
+          let newSouth = Number(existing.South) || 0;
+          if (isDelhi) newDelhi += qtyNum; else newSouth += qtyNum;
+
+          await conn.execute(
+            `UPDATE stock_summary SET 
+              last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?, 
+              last_status = 'IN', updated_at = NOW() 
+             WHERE spare_id = ?`,
+            [qtyNum, newTotal, newDelhi, newSouth, spare_id]
+          );
+        } else {
+          const initialDelhi = isDelhi ? qtyNum : 0;
+          const initialSouth = isDelhi ? 0 : qtyNum;
+
+          await conn.execute(
+            `INSERT INTO stock_summary 
+              (spare_id, last_updated_quantity, total_quantity, Delhi, South, last_status)
+             VALUES (?, ?, ?, ?, ?, 'IN')`,
+            [spare_id, qtyNum, qtyNum, initialDelhi, initialSouth]
+          );
+        }
+      } else {
       console.log("Fetching last stock totals...");
 
       const [lastRows] = await conn.execute(
@@ -224,9 +336,6 @@ export async function POST(req) {
         southDB = Number(lastRows[0].south) || 0;
       }
 
-      const qtyNum = Number(received_quantity) || 0;
-
-      const isDelhi = /delhi/i.test(String(warehouse_name || ""));
       console.log("Warehouse location check:", { isDelhi });
 
       const delhiD = isDelhi ? delhiDB + qtyNum : delhiDB;
@@ -317,6 +426,7 @@ export async function POST(req) {
              VALUES (?, ?, ?, ?, ?, ?)`,
           [request.product_code, qtyNum, qtyNum, initialDelhi, initialSouth, 'IN']
         );
+      }
       }
 
       console.log("Committing transaction...");

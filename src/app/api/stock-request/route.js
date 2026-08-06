@@ -288,6 +288,34 @@ export async function GET(req) {
       SELECT 
         psr.*,
         CASE 
+          WHEN TRIM(COALESCE(psr.product_code, '')) = '' THEN NULL
+          WHEN EXISTS (
+            SELECT 1 FROM products_list pl
+            WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(psr.product_code))
+          ) THEN 'Product'
+          WHEN EXISTS (
+            SELECT 1 FROM spare_list sl
+            WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+          ) THEN 'Spare'
+          ELSE NULL
+        END AS item_category,
+        CASE
+          WHEN TRIM(COALESCE(psr.product_code, '')) = '' THEN NULL
+          WHEN EXISTS (
+            SELECT 1 FROM spare_list sl
+            WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM products_list pl
+            WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(psr.product_code))
+          ) THEN (
+            SELECT sl.type FROM spare_list sl
+            WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+            LIMIT 1
+          )
+          ELSE NULL
+        END AS item_sub_category,
+        CASE 
           WHEN psr.status = 'requested' THEN 'Pending'
           WHEN psr.status = 'in_warehouse' THEN 'In Warehouse'
           WHEN psr.status = 'fulfilled' THEN 'Fulfilled'
@@ -310,7 +338,20 @@ export async function GET(req) {
 
     const [requests] = await db.execute(query, params);
 
-    return NextResponse.json(requests);
+    const normalized = requests.map((row) => {
+      const category =
+        row.item_category === "Product" || row.item_category === "Spare"
+          ? row.item_category
+          : null;
+      const { item_category, item_sub_category, ...rest } = row;
+      return {
+        ...rest,
+        category,
+        sub_category: category === "Spare" ? item_sub_category || null : null,
+      };
+    });
+
+    return NextResponse.json(normalized);
   } catch (error) {
     console.error("Error fetching stock requests:", error);
     return NextResponse.json(

@@ -234,6 +234,14 @@ const GenerateSalaryPage = () => {
                             empAtt.pay_period_days !== ""
                                 ? {
                                       periodDays: Number(empAtt.pay_period_days),
+                                      salaryPeriodCap:
+                                          empAtt.pay_salary_period_cap != null &&
+                                          empAtt.pay_salary_period_cap !== ""
+                                              ? Number(empAtt.pay_salary_period_cap)
+                                              : Math.min(
+                                                    30,
+                                                    Number(empAtt.pay_period_days) || 0
+                                                ),
                                       sundaysInPeriod: Number(empAtt.pay_sundays_in_period) || 0,
                                       sundaysInPeriodDates: empAtt.pay_sundays_in_period_dates || [],
                                       holidayWeekdaysInPeriod:
@@ -245,8 +253,10 @@ const GenerateSalaryPage = () => {
                                       payDaysBase:
                                           empAtt.pay_days_base != null && empAtt.pay_days_base !== ""
                                               ? Number(empAtt.pay_days_base)
-                                              : Number(empAtt.pay_period_days) -
-                                                (Number(empAtt.pay_deduction_days) || 0),
+                                              : Math.min(
+                                                    30,
+                                                    Number(empAtt.pay_period_days) || 0
+                                                ) - (Number(empAtt.pay_deduction_days) || 0),
                                       sundaysUnpaidWholeWeekOff:
                                           empAtt.pay_sundays_unpaid_whole_week_off != null &&
                                           empAtt.pay_sundays_unpaid_whole_week_off !== ""
@@ -982,7 +992,33 @@ const GenerateSalaryPage = () => {
                                         </span>
                                     </li>
                                     <li>
-                                        Pay days (before weekly-off rule) = period − deduction ={" "}
+                                        Salary period cap (for payout) = min(30, period days) ={" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.salaryPeriodCap
+                                            )}
+                                        </span>
+                                    </li>
+                                    <li>
+                                        Pay days (before weekly-off rule) = salary cap − deduction ={" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.salaryPeriodCap
+                                            )}
+                                        </span>{" "}
+                                        −{" "}
+                                        <span className="font-semibold tabular-nums">
+                                            {formatPayCalcNumber(
+                                                attendanceDisplayAllZero
+                                                    ? 0
+                                                    : attendanceBreakdown.payCalc.deductionDays
+                                            )}
+                                        </span>{" "}
+                                        ={" "}
                                         <span className="font-semibold tabular-nums">
                                             {formatPayCalcNumber(
                                                 attendanceDisplayAllZero
@@ -1035,12 +1071,12 @@ const GenerateSalaryPage = () => {
                                             </>
                                         ) : (
                                             <>
-                                                period − deduction ={" "}
+                                                min(30, period) − deduction ={" "}
                                                 <span className="font-semibold tabular-nums">
                                                     {formatPayCalcNumber(
                                                         attendanceDisplayAllZero
                                                             ? 0
-                                                            : attendanceBreakdown.payCalc.periodDays
+                                                            : attendanceBreakdown.payCalc.salaryPeriodCap
                                                     )}
                                                 </span>{" "}
                                                 −{" "}

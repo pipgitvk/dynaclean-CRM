@@ -55,26 +55,47 @@ export default function DirectInForm() {
         } catch { }
     }, []);
 
-    // Product search
+    // Product & Spare search
     useEffect(() => {
         if (search.length >= 2) {
-            fetch(`/api/products/search?q=${search}`)
-                .then((res) => res.json())
-                .then(setSuggestions)
-                .catch(() => setSuggestions([]));
+            Promise.all([
+                fetch(`/api/products/search?q=${encodeURIComponent(search)}`)
+                    .then((res) => res.json())
+                    .catch(() => []),
+                fetch(`/api/spare/search?q=${encodeURIComponent(search)}`)
+                    .then((res) => res.json())
+                    .catch(() => []),
+            ]).then(([products, spares]) => {
+                const productItems = (Array.isArray(products) ? products : []).map((p) => ({
+                    ...p,
+                    itemType: "product",
+                    displayLabel: p.item_code,
+                }));
+                const spareItems = (Array.isArray(spares) ? spares : []).map((s) => ({
+                    ...s,
+                    itemType: "spare",
+                    item_code: String(s.id),
+                    displayLabel: s.item_name,
+                    price_per_unit: s.purchase_price || s.last_negotiation_price || s.sale_price || "",
+                    gst_rate: s.tax || "",
+                    hsn_sac: "",
+                    unit: s.type || "",
+                }));
+                setSuggestions([...productItems, ...spareItems]);
+            });
         } else {
             setSuggestions([]);
         }
     }, [search]);
 
-    const handleSelect = (selectedProduct) => {
-        setProduct(selectedProduct);
-        setSearch(selectedProduct.item_code);
+    const handleSelect = (selectedItem) => {
+        setProduct(selectedItem);
+        setSearch(selectedItem.itemType === "spare" ? selectedItem.item_name : selectedItem.item_code);
         setSuggestions([]);
         setFormData((f) => ({
             ...f,
-            price_per_unit: selectedProduct.price_per_unit,
-            gst_rate: selectedProduct.gst_rate,
+            price_per_unit: selectedItem.price_per_unit || "",
+            gst_rate: selectedItem.gst_rate || selectedItem.tax || "",
         }));
     };
 
@@ -142,7 +163,7 @@ export default function DirectInForm() {
         if (isSubmitting) return;
 
         if (!product) {
-            toast.error("Please select a product");
+            toast.error("Please select a product or spare");
             return;
         }
 
@@ -158,12 +179,16 @@ export default function DirectInForm() {
 
         const submitData = new FormData();
 
-        // Product details
+        // Item details
+        submitData.append("item_type", product.itemType || "product");
         submitData.append("product_code", product.item_code);
         submitData.append("product_name", product.item_name);
         submitData.append("specification", product.specification || "");
         submitData.append("hsn", product.hsn_sac || "");
         submitData.append("unit", product.unit || "");
+        if (product.itemType === "spare") {
+            submitData.append("spare_id", product.id);
+        }
 
         // Form data
         Object.keys(formData).forEach((key) => {
@@ -249,28 +274,47 @@ export default function DirectInForm() {
         <form onSubmit={handleSubmit} className="space-y-4 bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-6">
             <h3 className="text-lg font-semibold mb-4">Direct In - Purchase & Receive Stock</h3>
             <p className="text-sm text-gray-600 mb-4">
-                This form combines purchase request and warehouse receipt into a single entry for direct stock intake.
+                Search and add both products and spares. Purchase record goes to product stock request; spare stock updates in stock_list and stock_summary.
             </p>
 
-            {/* Product Search */}
+            {/* Product / Spare Search */}
             <div>
-                <label className="block mb-1 font-medium">Product Code *</label>
+                <label className="block mb-1 font-medium">Search Product or Spare *</label>
                 <input
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full border rounded p-2"
-                    placeholder="Type product code..."
+                    placeholder="Type product code, spare name or spare number..."
                 />
                 {suggestions.length > 0 && (
-                    <ul className="border rounded mt-1 bg-white shadow max-h-40 overflow-auto">
+                    <ul className="border rounded mt-1 bg-white shadow max-h-48 overflow-auto">
                         {suggestions.map((sug) => (
                             <li
-                                key={sug.item_code}
+                                key={`${sug.itemType}-${sug.itemType === "spare" ? sug.id : sug.item_code}`}
                                 onClick={() => handleSelect(sug)}
                                 className="p-2 cursor-pointer hover:bg-gray-100"
                             >
-                                <p><span className="font-bold">Code:</span> {sug.item_code}</p>
+                                <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                        sug.itemType === "spare"
+                                            ? "bg-orange-100 text-orange-700"
+                                            : "bg-green-100 text-green-700"
+                                    }`}>
+                                        {sug.itemType === "spare" ? "Spare" : "Product"}
+                                    </span>
+                                    {sug.itemType === "spare" ? (
+                                        <>
+                                            <span className="font-bold">ID:</span> {sug.id}
+                                            <span className="mx-1">|</span>
+                                            <span className="font-bold">No:</span> {sug.spare_number}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="font-bold">Code:</span> {sug.item_code}
+                                        </>
+                                    )}
+                                </div>
                                 <p><span className="font-bold">Name:</span> {sug.item_name}</p>
                             </li>
                         ))}
@@ -280,11 +324,24 @@ export default function DirectInForm() {
 
             {product && (
                 <>
+                    <div className="mt-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            product.itemType === "spare"
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-green-100 text-green-700"
+                        }`}>
+                            Selected: {product.itemType === "spare" ? "Spare" : "Product"}
+                        </span>
+                    </div>
                     {/* 1. Item */}
                     <h4 className="text-md font-semibold mt-4 mb-2">1. Item Details</h4>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block mb-1">Product Name</label>
+                            <label className="block mb-1">{product.itemType === "spare" ? "Spare ID" : "Product Code"}</label>
+                            <input value={product.item_code} disabled className="w-full border p-2 rounded bg-gray-100" />
+                        </div>
+                        <div>
+                            <label className="block mb-1">{product.itemType === "spare" ? "Spare Name" : "Product Name"}</label>
                             <input value={product.item_name} disabled className="w-full border p-2 rounded bg-gray-100" />
                         </div>
                         <div>
