@@ -164,9 +164,15 @@ export default function QuotationForm() {
     // For compatibility with submit payload: split tax into cgst/sgst or igst based on interstate flag
     const isInterstate = (() => {
       const gstinValue = form.gstin_no?.trim();
-      if (!gstinValue) return false;
-      const code = gstinValue.slice(0, 2);
-      return code !== SUPPLIER_STATE_CODE;
+      if (gstinValue) {
+        // GSTIN provided → use its first 2 digits
+        const code = gstinValue.slice(0, 2);
+        return code !== SUPPLIER_STATE_CODE;
+      }
+      // No GSTIN → check manually selected state
+      const stateCode = parseCodeFromDisplay(form.state_name);
+      if (!stateCode) return false; // no state = intrastate default
+      return stateCode !== SUPPLIER_STATE_CODE;
     })();
 
     const cgst = isInterstate ? 0 : totalTax / 2;
@@ -183,7 +189,7 @@ export default function QuotationForm() {
     const grandTotal = totalBeforeRound + finalRoundOff;
 
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no]);
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -225,34 +231,16 @@ export default function QuotationForm() {
   useEffect(() => {
     const gstinValue = form.gstin_no?.trim();
 
-    // Case 1: GSTIN is provided - use GSTIN to determine tax
     if (gstinValue) {
+      // GSTIN provided → use its first 2 digits to determine tax type
       const result = getStateFromGSTIN(gstinValue);
       if (result) {
         if (form.state_name !== result.display) {
           setForm((prev) => ({ ...prev, state_name: result.display }));
         }
-        // Set tax rates based on interstate vs intrastate
-        if (result.code === SUPPLIER_STATE_CODE) {
-          // Same state → CGST+SGST, no IGST
-          // Don't set fixed rates - let items define their own GST
-          setCgstRate(0);
-          setSgstRate(0);
-          setIgstRate(0);
-        } else {
-          // Different state → IGST only
-          setCgstRate(0);
-          setSgstRate(0);
-          setIgstRate(0);
-        }
       }
     }
-    // Case 2: No GSTIN - always use CGST+SGST (regardless of state)
-    else {
-      setCgstRate(0);
-      setSgstRate(0);
-      setIgstRate(0);
-    }
+    // No GSTIN → state determines tax type (handled by taxSummary + interstate prop)
   }, [form.gstin_no]);
 
   // shared handler
@@ -491,20 +479,32 @@ export default function QuotationForm() {
       const totalGST = taxSummary.cgst + taxSummary.sgst + taxSummary.igst;
       const grandTotal = taxSummary.grandTotal;
 
+      // Derive effective rates from actual taxSummary amounts
+      // taxSummary already correctly splits into cgst/sgst (intrastate) or igst (interstate)
+      const effectiveIgstRate = subtotal > 0 && taxSummary.igst > 0
+        ? parseFloat(((taxSummary.igst / subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveCgstRate = subtotal > 0 && taxSummary.cgst > 0
+        ? parseFloat(((taxSummary.cgst / subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveSgstRate = subtotal > 0 && taxSummary.sgst > 0
+        ? parseFloat(((taxSummary.sgst / subtotal) * 100).toFixed(2))
+        : 0;
+
       const dataToSend = {
         ...form,
         quote_number: quoteNumber,
         quote_date: quoteDate,
-        items: itemsWithTotals, // Use the new array with totals
+        items: itemsWithTotals,
         subtotal,
         cgst: taxSummary.cgst,
         sgst: taxSummary.sgst,
         igst: taxSummary.igst,
         round_off: parseFloat(roundOff) || 0,
         grand_total: grandTotal,
-        cgstRate,
-        sgstRate,
-        igstRate,
+        cgstRate: effectiveCgstRate,
+        sgstRate: effectiveSgstRate,
+        igstRate: effectiveIgstRate,
         terms: editableTerms,
       };
 
@@ -859,13 +859,16 @@ export default function QuotationForm() {
           setIgstRate={setIgstRate}
           interstate={(() => {
             const gstinValue = form.gstin_no?.trim();
-            // If GSTIN is empty, default to intrastate (CGST+SGST)
-            if (!gstinValue) return false;
-
-            const gstState = getStateFromGSTIN(gstinValue);
-            const buyerCode =
-              gstState?.code || parseCodeFromDisplay(form.state_name);
-            return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+            if (gstinValue) {
+              // GSTIN provided → use its first 2 digits
+              const gstState = getStateFromGSTIN(gstinValue);
+              const buyerCode = gstState?.code;
+              return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+            }
+            // No GSTIN → use manually selected state
+            const stateCode = parseCodeFromDisplay(form.state_name);
+            if (!stateCode) return false;
+            return stateCode !== SUPPLIER_STATE_CODE;
           })()}
         />
 

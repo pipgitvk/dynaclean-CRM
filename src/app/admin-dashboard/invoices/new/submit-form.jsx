@@ -182,64 +182,50 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
 
   const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(true);
 
-  // Auto-set state + state_code from GSTIN when valid.
-  // Skip when form is pre-filled from a quotation (quotation already has correct state + GST rates).
+  // Auto-set state from GSTIN + apply CGST/SGST vs IGST — skip if loaded from quotation
   useEffect(() => {
     if (isFromQuotation) return;
-    const st = getStateFromGSTIN(form.gst_number?.trim());
-    if (!st) return;
-    setForm((prev) => ({
-      ...prev,
-      state: st.display,
-      state_code: st.code,
-    }));
-    setStateSearch(st.display);
-    setShowStateSuggestions(false);
-  }, [form.gst_number, isFromQuotation]);
 
-  // State-based rate setting - only when NOT from quotation
-  useEffect(() => {
-    console.log("[State Effect]", { isFromQuotation, state: form.state, state_code: form.state_code });
-    
-    if (isFromQuotation) {
-      console.log("[State Effect] Skipping because isFromQuotation=true");
-      return; // Skip entirely if from quotation
-    }
+    const gstinValue = form.gst_number?.trim();
 
-    const code = form.state_code || parseCodeFromDisplay(form.state);
-    if (!code) return;
+    if (gstinValue) {
+      // GSTIN provided → use its first 2 digits to determine tax type
+      const st = getStateFromGSTIN(gstinValue);
+      if (!st) return;
 
-    console.log("[State Effect] Setting rates based on state code:", code);
+      // Auto-fill state field
+      setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
+      setStateSearch(st.display);
+      setShowStateSuggestions(false);
 
-    if (code === SUPPLIER_STATE_CODE) {
-      setCgstRate(9);
-      setSgstRate(9);
-      setIgstRate(0);
-
-      setItems((prev) =>
-        prev.map((item) => ({
-          ...item,
-          cgst_percent: 9,
-          sgst_percent: 9,
-          igst_percent: 0,
-        })),
-      );
+      // Same state as supplier (07 Delhi) → CGST + SGST; else → IGST
+      if (st.code === SUPPLIER_STATE_CODE) {
+        setCgstRate(9); setSgstRate(9); setIgstRate(0);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
+      } else {
+        setCgstRate(0); setSgstRate(0); setIgstRate(18);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      }
     } else {
-      console.log("[State Effect] State code", code, "!= SUPPLIER_STATE_CODE", SUPPLIER_STATE_CODE, "-> setting 18%");
-      setCgstRate(0);
-      setSgstRate(0);
-      setIgstRate(18);
+      // No GSTIN → use manually selected state to decide
+      // Try: state_code field → parse code from "Name (XX)" format → match by state name
+      const code = form.state_code?.trim()
+        || parseCodeFromDisplay(form.state)
+        || Object.entries(stateCodeToName).find(
+            ([, name]) => name.toLowerCase() === form.state?.trim().toLowerCase()
+          )?.[0];
 
-      setItems((prev) =>
-        prev.map((item) => ({
-          ...item,
-          cgst_percent: 0,
-          sgst_percent: 0,
-          igst_percent: 18,
-        })),
-      );
+      if (!code || code === SUPPLIER_STATE_CODE) {
+        // No state or same state (Delhi 07) → CGST + SGST
+        setCgstRate(9); setSgstRate(9); setIgstRate(0);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
+      } else {
+        // Different state, no GSTIN → IGST (interstate supply)
+        setCgstRate(0); setSgstRate(0); setIgstRate(18);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      }
     }
-  }, [form.state, form.state_code, isFromQuotation, SUPPLIER_STATE_CODE]);
+  }, [form.gst_number, form.state, form.state_code, isFromQuotation]);
 
   const [editableTerms, setEditableTerms] = useState(
     `1. Payment due within specified due date.

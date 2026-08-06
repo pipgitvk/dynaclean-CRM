@@ -139,29 +139,50 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
     }
   }, [taxSummary.finalRoundOff, isAutoRoundOff]);
 
-  // Auto-set state + state_code from GSTIN
-  useEffect(() => {
-    const st = getStateFromGSTIN(form.gst_number?.trim());
-    if (!st) return;
-    setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
-    setStateSearch(st.display);
-    setShowStateSuggestions(false);
-  }, [form.gst_number]);
-
-  // State-based rate setting — skip if from quotation
+  // Auto-set state from GSTIN + apply CGST/SGST vs IGST — skip if loaded from quotation
   useEffect(() => {
     if (isFromQuotation) return;
-    const code = form.state_code || parseCodeFromDisplay(form.state);
-    if (!code) return;
 
-    if (code === SUPPLIER_STATE_CODE) {
-      setCgstRate(9); setSgstRate(9); setIgstRate(0);
-      setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
+    const gstinValue = form.gst_number?.trim();
+
+    if (gstinValue) {
+      // GSTIN provided → use its first 2 digits to determine tax type
+      const st = getStateFromGSTIN(gstinValue);
+      if (!st) return;
+
+      // Auto-fill state field
+      setForm((prev) => ({ ...prev, state: st.display, state_code: st.code }));
+      setStateSearch(st.display);
+      setShowStateSuggestions(false);
+
+      // Same state as supplier (07 Delhi) → CGST + SGST; else → IGST
+      if (st.code === SUPPLIER_STATE_CODE) {
+        setCgstRate(9); setSgstRate(9); setIgstRate(0);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
+      } else {
+        setCgstRate(0); setSgstRate(0); setIgstRate(18);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      }
     } else {
-      setCgstRate(0); setSgstRate(0); setIgstRate(18);
-      setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      // No GSTIN → use manually selected state to decide
+      // Try: state_code field → parse code from "Name (XX)" format → match by state name
+      const code = form.state_code?.trim()
+        || parseCodeFromDisplay(form.state)
+        || Object.entries(stateCodeToName).find(
+            ([, name]) => name.toLowerCase() === form.state?.trim().toLowerCase()
+          )?.[0];
+
+      if (!code || code === SUPPLIER_STATE_CODE) {
+        // No state or same state (Delhi 07) → CGST + SGST
+        setCgstRate(9); setSgstRate(9); setIgstRate(0);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 9, sgst_percent: 9, igst_percent: 0 })));
+      } else {
+        // Different state, no GSTIN → IGST (interstate supply)
+        setCgstRate(0); setSgstRate(0); setIgstRate(18);
+        setItems((prev) => prev.map((item) => ({ ...item, cgst_percent: 0, sgst_percent: 0, igst_percent: 18 })));
+      }
     }
-  }, [form.state, form.state_code, isFromQuotation, SUPPLIER_STATE_CODE]);
+  }, [form.gst_number, form.state, form.state_code, isFromQuotation]);
 
   const [editableTerms, setEditableTerms] = useState(
     `1. Payment due within specified due date.

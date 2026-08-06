@@ -228,9 +228,17 @@ export default function QuotationForm() {
     // Split tax into cgst/sgst or igst based on interstate flag
     const isInterstate = (() => {
       const gstinValue = form.gstin_no?.trim();
-      if (!gstinValue) return false;
-      const code = gstinValue.slice(0, 2);
-      return code !== SUPPLIER_STATE_CODE;
+      if (gstinValue) {
+        const code = gstinValue.slice(0, 2);
+        return code !== SUPPLIER_STATE_CODE;
+      }
+      // No GSTIN → check manually selected state
+      const stateCode = parseCodeFromDisplay(form.state_name)
+        || Object.entries(stateCodeToName).find(
+            ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
+          )?.[0];
+      if (!stateCode) return false;
+      return stateCode !== SUPPLIER_STATE_CODE;
     })();
 
     const cgst = isInterstate ? 0 : totalTax / 2;
@@ -247,7 +255,7 @@ export default function QuotationForm() {
     const grandTotal = totalBeforeRound + finalRoundOff;
 
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no]);
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -289,34 +297,32 @@ export default function QuotationForm() {
   useEffect(() => {
     const gstinValue = form.gstin_no?.trim();
 
-    // Case 1: GSTIN is provided - use GSTIN to determine tax
     if (gstinValue) {
       const result = getStateFromGSTIN(gstinValue);
       if (result) {
         if (form.state_name !== result.display) {
           setForm((prev) => ({ ...prev, state_name: result.display }));
         }
-        // Set tax rates based on interstate vs intrastate
         if (result.code === SUPPLIER_STATE_CODE) {
-          // Same state → CGST+SGST, no IGST
-          setCgstRate(9);
-          setSgstRate(9);
-          setIgstRate(0);
+          setCgstRate(9); setSgstRate(9); setIgstRate(0);
         } else {
-          // Different state → IGST only
-          setCgstRate(0);
-          setSgstRate(0);
-          setIgstRate(18);
+          setCgstRate(0); setSgstRate(0); setIgstRate(18);
         }
       }
+    } else {
+      // No GSTIN → check state
+      const stateCode = parseCodeFromDisplay(form.state_name)
+        || Object.entries(stateCodeToName).find(
+            ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
+          )?.[0];
+
+      if (!stateCode || stateCode === SUPPLIER_STATE_CODE) {
+        setCgstRate(9); setSgstRate(9); setIgstRate(0);
+      } else {
+        setCgstRate(0); setSgstRate(0); setIgstRate(18);
+      }
     }
-    // Case 2: No GSTIN - always use CGST+SGST (regardless of state)
-    else {
-      setCgstRate(9);
-      setSgstRate(9);
-      setIgstRate(0);
-    }
-  }, [form.gstin_no]);
+  }, [form.gstin_no, form.state_name]);
 
   const handleCustomerSearch = async (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -494,43 +500,31 @@ Thanks for doing business with us!`,
       const totalGST = taxSummary.cgst + taxSummary.sgst + taxSummary.igst;
       const grandTotal = taxSummary.grandTotal;
 
-      // Calculate actual GST rates from items (for multi-rate quotations)
-      let finalCgstRate = 0, finalSgstRate = 0, finalIgstRate = 0;
-      
-      if (items.length > 0 && items[0].gst) {
-        // Get the GST rate from the first item (all items should have same rate ideally)
-        const itemGstRate = parseFloat(items[0].gst) || 0;
-        
-        // Determine if interstate or intrastate
-        const gstinValue = form.gstin_no?.trim();
-        let isInterstate = false;
-        if (gstinValue) {
-          const code = gstinValue.slice(0, 2);
-          isInterstate = code !== SUPPLIER_STATE_CODE;
-        }
-        
-        if (isInterstate) {
-          finalIgstRate = itemGstRate;
-        } else {
-          finalCgstRate = itemGstRate / 2;
-          finalSgstRate = itemGstRate / 2;
-        }
-      }
+      // Derive effective rates from actual computed taxSummary amounts
+      const effectiveIgstRate = taxSummary.subtotal > 0 && taxSummary.igst > 0
+        ? parseFloat(((taxSummary.igst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveCgstRate = taxSummary.subtotal > 0 && taxSummary.cgst > 0
+        ? parseFloat(((taxSummary.cgst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveSgstRate = taxSummary.subtotal > 0 && taxSummary.sgst > 0
+        ? parseFloat(((taxSummary.sgst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
 
       const dataToSend = {
         ...form,
         quote_number: quoteNumber,
         quote_date: quoteDate,
-        items: itemsWithTotals, // Use the new array with totals
+        items: itemsWithTotals,
         subtotal,
         cgst: taxSummary.cgst,
         sgst: taxSummary.sgst,
         igst: taxSummary.igst,
         round_off: parseFloat(roundOff) || 0,
         grand_total: grandTotal,
-        cgstRate: finalCgstRate,
-        sgstRate: finalSgstRate,
-        igstRate: finalIgstRate,
+        cgstRate: effectiveCgstRate,
+        sgstRate: effectiveSgstRate,
+        igstRate: effectiveIgstRate,
         terms: editableTerms,
       };
 
@@ -858,13 +852,18 @@ Thanks for doing business with us!`,
           grandTotal={taxSummary.grandTotal}
           interstate={(() => {
             const gstinValue = form.gstin_no?.trim();
-            // If GSTIN is empty, default to intrastate (CGST+SGST)
-            if (!gstinValue) return false;
-
-            const gstState = getStateFromGSTIN(gstinValue);
-            const buyerCode =
-              gstState?.code || parseCodeFromDisplay(form.state_name);
-            return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+            if (gstinValue) {
+              const gstState = getStateFromGSTIN(gstinValue);
+              const buyerCode = gstState?.code;
+              return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+            }
+            // No GSTIN → check manually selected state
+            const stateCode = parseCodeFromDisplay(form.state_name)
+              || Object.entries(stateCodeToName).find(
+                  ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
+                )?.[0];
+            if (!stateCode) return false;
+            return stateCode !== SUPPLIER_STATE_CODE;
           })()}
         />
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-6">

@@ -151,9 +151,17 @@ export default function QuotationEditForm({ quoteId }) {
 
     const isInterstate = (() => {
       const gstinValue = form.gstin_no?.trim();
-      if (!gstinValue) return false;
-      const code = gstinValue.slice(0, 2);
-      return code !== SUPPLIER_STATE_CODE;
+      if (gstinValue) {
+        const code = gstinValue.slice(0, 2);
+        return code !== SUPPLIER_STATE_CODE;
+      }
+      // No GSTIN → check state
+      const stateCode = parseCodeFromDisplay(form.state_name)
+        || Object.entries(stateCodeToName).find(
+            ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
+          )?.[0];
+      if (!stateCode) return false;
+      return stateCode !== SUPPLIER_STATE_CODE;
     })();
 
     const cgst = isInterstate ? 0 : totalTax / 2;
@@ -169,7 +177,7 @@ export default function QuotationEditForm({ quoteId }) {
 
     const grandTotal = totalBeforeRound + finalRoundOff;
     return { subtotal, cgst, sgst, igst, totalTax, grandTotal, finalRoundOff };
-  }, [items, roundOff, isAutoRoundOff, form.gstin_no]);
+  }, [items, roundOff, isAutoRoundOff, form.gstin_no, form.state_name]);
 
   useEffect(() => {
     if (isAutoRoundOff) {
@@ -189,11 +197,18 @@ export default function QuotationEditForm({ quoteId }) {
         return { ...item, taxable_amount: taxable, total_amount: total, IGSTamt: gstAmount };
       });
 
-      const isInterstate = igstRate > 0 || (() => {
-        const gstinValue = form.gstin_no?.trim();
-        if (!gstinValue) return false;
-        return gstinValue.slice(0, 2) !== SUPPLIER_STATE_CODE;
-      })();
+      const isInterstate = taxSummary.igst > 0;
+
+      // Derive effective rates from actual computed amounts
+      const effectiveIgstRate = taxSummary.subtotal > 0 && taxSummary.igst > 0
+        ? parseFloat(((taxSummary.igst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveCgstRate = taxSummary.subtotal > 0 && taxSummary.cgst > 0
+        ? parseFloat(((taxSummary.cgst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
+      const effectiveSgstRate = taxSummary.subtotal > 0 && taxSummary.sgst > 0
+        ? parseFloat(((taxSummary.sgst / taxSummary.subtotal) * 100).toFixed(2))
+        : 0;
 
       const dataToSend = {
         ...form,
@@ -205,9 +220,9 @@ export default function QuotationEditForm({ quoteId }) {
         igst: taxSummary.igst,
         round_off: parseFloat(roundOff) || 0,
         grand_total: taxSummary.grandTotal,
-        cgstRate: isInterstate ? 0 : cgstRate,
-        sgstRate: isInterstate ? 0 : sgstRate,
-        igstRate: isInterstate ? igstRate : 0,
+        cgstRate: effectiveCgstRate,
+        sgstRate: effectiveSgstRate,
+        igstRate: effectiveIgstRate,
         terms: editableTerms,
       };
 
@@ -242,10 +257,18 @@ export default function QuotationEditForm({ quoteId }) {
 
   const isInterstate = (() => {
     const gstinValue = form.gstin_no?.trim();
-    if (!gstinValue) return false;
-    const gstState = getStateFromGSTIN(gstinValue);
-    const buyerCode = gstState?.code || parseCodeFromDisplay(form.state_name);
-    return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+    if (gstinValue) {
+      const gstState = getStateFromGSTIN(gstinValue);
+      const buyerCode = gstState?.code;
+      return buyerCode ? buyerCode !== SUPPLIER_STATE_CODE : false;
+    }
+    // No GSTIN → check state
+    const stateCode = parseCodeFromDisplay(form.state_name)
+      || Object.entries(stateCodeToName).find(
+          ([, name]) => name.toLowerCase() === form.state_name?.trim().toLowerCase()
+        )?.[0];
+    if (!stateCode) return false;
+    return stateCode !== SUPPLIER_STATE_CODE;
   })();
 
   return (
