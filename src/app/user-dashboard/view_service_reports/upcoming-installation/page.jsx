@@ -83,6 +83,23 @@ export default function UpcomingInstallationsPage() {
       ? "Today"
       : `In ${days} days`;
 
+  // ========= FILTERED RECORDS ==========
+  const filteredRecords = records.filter((r) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      String(r.model ?? "").toLowerCase().includes(q) ||
+      String(r.company_name ?? "").toLowerCase().includes(q) ||
+      String(r.emp_name ?? "").toLowerCase().includes(q) ||
+      String(r.name ?? "").toLowerCase().includes(q) ||
+      String(r.contact ?? "").toLowerCase().includes(q) ||
+      String(r.invoice_number ?? "").toLowerCase().includes(q) ||
+      String(r.order_id ?? "").toLowerCase().includes(q) ||
+      String(r.serial_number ?? "").toLowerCase().includes(q) ||
+      String(r.delivery_address ?? "").toLowerCase().includes(q)
+    );
+  });
+
   // ================= UI START ===================
   return (
     <div className="w-full max-w-full p-6">
@@ -154,7 +171,7 @@ export default function UpcomingInstallationsPage() {
 
       {/** ================= MOBILE VIEW (CARDS) ================= */}
       <div className="md:hidden space-y-4">
-        {records.map((r, i) => (
+        {filteredRecords.map((r, i) => (
           <div
             key={i}
             className={`rounded-xl shadow p-4 border ${getRowClass(
@@ -247,7 +264,7 @@ export default function UpcomingInstallationsPage() {
             </tr>
           </thead>
           <tbody>
-            {records.map((r, i) => (
+            {filteredRecords.map((r, i) => (
               <tr key={i} className={getRowClass(r.installation_status)}>
                 <td className="p-3 font-semibold">
                   <div className="space-y-1 text-xs">
