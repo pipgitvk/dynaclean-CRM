@@ -15,6 +15,7 @@ export default function ServiceTable({ serviceRecords, role }) {
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("PENDING");
   const [assignedFilter, setAssignedFilter] = useState("");
+  const [assignedToFilter, setAssignedToFilter] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,6 +126,11 @@ export default function ServiceTable({ serviceRecords, role }) {
       return false;
     }
 
+    // Assigned-to engineer filter
+    if (assignedToFilter && record.assigned_to !== assignedToFilter) {
+      return false;
+    }
+
     return true;
   });
 
@@ -167,6 +173,7 @@ export default function ServiceTable({ serviceRecords, role }) {
     setServiceTypeFilter("");
     setStatusFilter("");
     setAssignedFilter("");
+    setAssignedToFilter("");
     setCurrentPage(1);
   };
 
@@ -177,6 +184,9 @@ export default function ServiceTable({ serviceRecords, role }) {
   const uniqueStatuses = [
     ...new Set(records.map((r) => r.status).filter(Boolean)),
   ];
+  const uniqueEngineers = [
+    ...new Set(records.map((r) => r.assigned_to).filter(Boolean)),
+  ].sort();
 
   // Status options for the change-status modal (ensure Pending By Customer is available)
   const statusOptions = Array.from(
@@ -460,106 +470,93 @@ export default function ServiceTable({ serviceRecords, role }) {
           </div>
 
           {/* Filters Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-4 gap-4">
-            {/* <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Complaint Date
-              </label>
-              <input
-                type="date"
-                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                value={complaintDateFilter}
-                onChange={(e) => {
-                  setComplaintDateFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
-            </div> */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* Date range — wider */}
+            <div className="flex-1 min-w-[260px]">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 Complaint Date (Range)
               </label>
-
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex items-center gap-2">
                 <input
                   type="date"
-                  className="p-2 w-full border border-gray-300 rounded-lg shadow-sm
-      focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                   value={complaintDateFrom}
-                  onChange={(e) => {
-                    setComplaintDateFrom(e.target.value);
-                    setCurrentPage(1);
-                  }}
+                  onChange={(e) => { setComplaintDateFrom(e.target.value); setCurrentPage(1); }}
                 />
-
+                <span className="text-gray-400 text-xs shrink-0">to</span>
                 <input
                   type="date"
-                  className="p-2 w-full border border-gray-300 rounded-lg shadow-sm
-      focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                   value={complaintDateTo}
-                  onChange={(e) => {
-                    setComplaintDateTo(e.target.value);
-                    setCurrentPage(1);
-                  }}
+                  onChange={(e) => { setComplaintDateTo(e.target.value); setCurrentPage(1); }}
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            {/* Service Type */}
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 Service Type
               </label>
               <select
-                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                 value={serviceTypeFilter}
-                onChange={(e) => {
-                  setServiceTypeFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => { setServiceTypeFilter(e.target.value); setCurrentPage(1); }}
               >
-                <option value="">All Service Types</option>
+                <option value="">All Types</option>
                 {uniqueServiceTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
+                  <option key={type} value={type}>{type}</option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+
+            {/* Status */}
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 Status
               </label>
               <select
-                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
               >
                 <option value="">All Statuses</option>
                 {uniqueStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
+                  <option key={status} value={status}>{status}</option>
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+
+            {/* Assigned */}
+            <div className="flex-1 min-w-[130px]">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
                 Assigned
               </label>
               <select
-                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                 value={assignedFilter}
-                onChange={(e) => {
-                  setAssignedFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => { setAssignedFilter(e.target.value); setCurrentPage(1); }}
               >
                 <option value="">All</option>
                 <option value="ASSIGNED">Assigned</option>
                 <option value="NOT_ASSIGNED">Not Assigned</option>
+              </select>
+            </div>
+
+            {/* Engineer */}
+            <div className="flex-1 min-w-[160px]">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+                Engineer
+              </label>
+              <select
+                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                value={assignedToFilter}
+                onChange={(e) => { setAssignedToFilter(e.target.value); setCurrentPage(1); }}
+              >
+                <option value="">All Engineers</option>
+                {uniqueEngineers.map((eng) => (
+                  <option key={eng} value={eng}>{eng}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -575,6 +572,12 @@ export default function ServiceTable({ serviceRecords, role }) {
                   className="px-6 py-3 text-left cursor-pointer"
                 >
                   Service ID {getSortIndicator("service_id")}
+                </th>
+                <th
+                  onClick={() => handleSort("serial_number")}
+                  className="px-6 py-3 text-left cursor-pointer"
+                >
+                  Serial No. {getSortIndicator("serial_number")}
                 </th>
                 <th
                   onClick={() => handleSort("complaint_date")}
@@ -642,7 +645,7 @@ export default function ServiceTable({ serviceRecords, role }) {
               {uniqueRecords.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={role === "ADMIN" ? 11 : 10}
+                    colSpan={role === "ADMIN" ? 12 : 11}
                     className="px-6 py-3 text-center text-gray-500"
                   >
                     No service records found.
@@ -665,6 +668,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                       className={`hover:bg-blue-50 transition-all duration-200 ${rowBackgroundColor}`}
                     >
                       <td className="px-6 py-3">{record.service_id}</td>
+                      <td className="px-6 py-3">{record.serial_number || "—"}</td>
                       <td className="px-6 py-3">
                         {formatDate(record.complaint_date)}
                       </td>
