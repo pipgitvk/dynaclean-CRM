@@ -255,6 +255,7 @@ export default function WarrantyPage() {
   const [pageSize] = useState(50);
   const [modelFilter, setModelFilter] = useState("");
   const [stateFilter, setStateFilter] = useState("");
+  const [latFilter, setLatFilter] = useState(""); // "with" | "without" | ""
 
   // Modal state: null | { type: "install" | "complaint", serial: string }
   const [modal, setModal] = useState(null);
@@ -332,8 +333,15 @@ export default function WarrantyPage() {
 
   const TABLE_HEADERS = [
     "Product / Model", "Spec", "Serial", "Warranty", "State", "AMC",
-    "Company", "Installation", "Site", "Invoice", "Reports", "Actions",
+    "Company", "Installation", "Location", "Site", "Invoice", "Reports", "Actions",
   ];
+
+  // Client-side lat filter on already-fetched products
+  const displayProducts = latFilter === "with"
+    ? products.filter(r => r.lat && r.longt)
+    : latFilter === "without"
+    ? products.filter(r => !r.lat || !r.longt)
+    : products;
 
   const renderPagination = () => {
     const pages = [];
@@ -397,6 +405,12 @@ export default function WarrantyPage() {
         <input type="text" placeholder="Filter by state" value={stateFilter}
           onChange={(e) => setStateFilter(e.target.value)}
           className="w-full md:w-1/4 px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <select value={latFilter} onChange={(e) => setLatFilter(e.target.value)}
+          className="w-full md:w-auto px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+          <option value="">All (Lat/Long)</option>
+          <option value="with">With Latitude</option>
+          <option value="without">Without Latitude</option>
+        </select>
       </div>
 
       <div className="flex flex-col w-full">
@@ -462,7 +476,7 @@ export default function WarrantyPage() {
                 {loading ? (
                   Array.from({ length: pageSize }).map((_, idx) => <SkeletonRow key={idx} />)
                 ) : products.length > 0 ? (
-                  products.map((r, i) => (
+                  displayProducts.map((r, i) => (
                     <tr key={i} className="odd:bg-white even:bg-gray-50 hover:bg-gray-100 transition-colors duration-150">
                       <td className="p-3 border-b border-gray-200">
                         <div className="font-semibold">{r.product_name}</div>
@@ -498,11 +512,20 @@ export default function WarrantyPage() {
                             <>
                               <div><span className="font-semibold">Address:</span> {r.installed_address}</div>
                               {r.installation_date && <div><span className="font-semibold">Date:</span> {r.installation_date}</div>}
-                              {r.lat && <div><span className="font-semibold">Lat:</span> {r.lat}</div>}
-                              {r.longt && <div><span className="font-semibold">Long:</span> {r.longt}</div>}
                             </>
                           ) : <div className="text-gray-400">Not installed</div>}
                         </div>
+                      </td>
+                      <td className="p-3 border-b border-gray-200 hidden md:table-cell text-xs">
+                        {r.lat && r.longt ? (
+                          <div className="space-y-1">
+                            <div><span className="font-semibold">Lat:</span> {r.lat}</div>
+                            <div><span className="font-semibold">Long:</span> {r.longt}</div>
+                            <a href={`https://www.google.com/maps?q=${r.lat},${r.longt}`}
+                              target="_blank" rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline">Maps ↗</a>
+                          </div>
+                        ) : <div className="text-gray-400">—</div>}
                       </td>
                       <td className="p-3 border-b border-gray-200 hidden md:table-cell">
                         <div className="space-y-1 text-xs">
