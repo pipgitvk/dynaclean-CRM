@@ -86,7 +86,7 @@ export default function Modal({
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-md bg-white rounded-lg shadow-xl"
+        className="relative w-full max-w-2xl bg-white rounded-lg shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-lg">
@@ -100,7 +100,7 @@ export default function Modal({
             </button>
           </div>
         </div>
-        <div className="px-6 py-4 max-h-96 overflow-y-auto">
+        <div className="px-6 py-4 max-h-[75vh] overflow-y-auto">
           <div className="space-y-3 text-gray-700 text-sm">
             <p>
               <strong>Service Type:</strong> {selectedService.service_type}

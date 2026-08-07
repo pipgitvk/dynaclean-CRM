@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import toast from "react-hot-toast";
 import Link from "next/link";
 
@@ -163,7 +164,15 @@ export default function WarrantyForm() {
     <div className="max-w-7xl mx-auto mt-10 px-4 sm:px-6 lg:px-8">
       {showModeModal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg relative">
+            <button
+              type="button"
+              onClick={() => setShowModeModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 transition-colors"
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
             <h3 className="text-lg font-semibold mb-2">Warranty Registration</h3>
             <p className="text-sm text-gray-600 mb-4">
               Choose how you want to register the warranty.

@@ -31,6 +31,14 @@ export default function ServiceTable({ serviceRecords, role }) {
   const [statusError, setStatusError] = useState("");
   const [isStatusSubmitting, setIsStatusSubmitting] = useState(false);
 
+  // Assign modal state
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [assignServiceId, setAssignServiceId] = useState(null);
+  const [assignEngineer, setAssignEngineer] = useState("NOT ASSIGNED");
+  const [engineers, setEngineers] = useState([]);
+  const [isAssignSubmitting, setIsAssignSubmitting] = useState(false);
+  const [assignError, setAssignError] = useState("");
+
   useEffect(() => {
     setRecords(serviceRecords || []);
   }, [serviceRecords]);
@@ -282,6 +290,56 @@ export default function ServiceTable({ serviceRecords, role }) {
       setStatusError(err.message || "Something went wrong.");
     } finally {
       setIsStatusSubmitting(false);
+    }
+  };
+
+  const openAssignModal = async (record) => {
+    setAssignServiceId(record.service_id);
+    setAssignEngineer(record.assigned_to || "NOT ASSIGNED");
+    setAssignError("");
+    setIsAssignModalOpen(true);
+    try {
+      const res = await fetch("/api/reps");
+      const data = await res.json();
+      setEngineers(data.users?.map((u) => u.username) || []);
+    } catch {
+      setEngineers([]);
+    }
+  };
+
+  const closeAssignModal = () => {
+    if (isAssignSubmitting) return;
+    setIsAssignModalOpen(false);
+    setAssignError("");
+  };
+
+  const handleAssignSubmit = async () => {
+    if (!assignServiceId || !assignEngineer) {
+      setAssignError("Please select an engineer.");
+      return;
+    }
+    setIsAssignSubmitting(true);
+    setAssignError("");
+    try {
+      const res = await fetch("/api/service-status/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_id: assignServiceId, assigned_to: assignEngineer }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.message || "Failed to assign.");
+      }
+      setRecords((prev) =>
+        prev.map((r) =>
+          r.service_id === assignServiceId ? { ...r, assigned_to: assignEngineer } : r
+        )
+      );
+      setIsAssignModalOpen(false);
+    } catch (err) {
+      setAssignError(err.message || "Something went wrong.");
+    } finally {
+      setIsAssignSubmitting(false);
     }
   };
 
@@ -678,12 +736,12 @@ export default function ServiceTable({ serviceRecords, role }) {
                               {(role === "ADMIN" ||
                                 role === "SERVICE HEAD" ||
                                 role === "SERVICE SUPPORT") && (
-                                <Link
-                                  href={`/${dashboardPath}/assign-service/${record.service_id}`}
+                                <button
+                                  onClick={() => openAssignModal(record)}
                                   className="inline-block px-3 py-1 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-center"
                                 >
                                   Assign
-                                </Link>
+                                </button>
                               )}
                               <Link
                                 href={`/${dashboardPath}/complete-service/${record.service_id}`}
@@ -936,12 +994,12 @@ export default function ServiceTable({ serviceRecords, role }) {
                     {record.status?.toUpperCase() !== "COMPLETED" ? (
                       <>
                         {role === "ADMIN" && (
-                          <Link
-                            href={`/${dashboardPath}/assign-service/${record.service_id}`}
+                          <button
+                            onClick={() => openAssignModal(record)}
                             className="px-3 py-2 text-sm bg-indigo-500 text-white rounded-md hover:bg-indigo-600 text-center"
                           >
                             Assign
-                          </Link>
+                          </button>
                         )}
                         <Link
                           href={`/${dashboardPath}/complete-service/${record.service_id}`}
@@ -1061,7 +1119,7 @@ export default function ServiceTable({ serviceRecords, role }) {
 
       {/* Status Change Modal */}
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">
               Change Status (Service ID: {statusForm.service_id})
@@ -1139,6 +1197,67 @@ export default function ServiceTable({ serviceRecords, role }) {
                   disabled={isStatusSubmitting}
                 >
                   {isStatusSubmitting ? "Updating..." : "Update Status"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Modal */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6 relative">
+            <button
+              type="button"
+              onClick={closeAssignModal}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Assign Service (ID: {assignServiceId})
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Assign To
+                </label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  value={assignEngineer}
+                  onChange={(e) => setAssignEngineer(e.target.value)}
+                >
+                  <option value="NOT ASSIGNED">NOT ASSIGNED</option>
+                  {engineers.length > 0 ? (
+                    engineers.map((eng) => (
+                      <option key={eng} value={eng}>{eng}</option>
+                    ))
+                  ) : (
+                    <option disabled>Loading...</option>
+                  )}
+                </select>
+              </div>
+              {assignError && (
+                <p className="text-sm text-red-600">{assignError}</p>
+              )}
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={closeAssignModal}
+                  className="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                  disabled={isAssignSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAssignSubmit}
+                  className="px-4 py-2 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+                  disabled={isAssignSubmitting}
+                >
+                  {isAssignSubmitting ? "Assigning..." : "Assign"}
                 </button>
               </div>
             </div>
