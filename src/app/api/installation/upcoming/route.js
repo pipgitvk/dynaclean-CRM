@@ -54,7 +54,15 @@ export async function GET(req) {
           WHEN no.delivery_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 10 DAY) THEN 'upcoming'
           ELSE 'scheduled'
         END AS installation_status,
-        DATEDIFF(no.delivery_date, CURDATE()) AS days_until_installation
+        DATEDIFF(no.delivery_date, CURDATE()) AS days_until_installation,
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM warranty_products wp
+            WHERE TRIM(wp.serial_number) COLLATE utf8mb4_unicode_ci
+                = TRIM(d.serial_no) COLLATE utf8mb4_unicode_ci
+          ) THEN 1
+          ELSE 0
+        END AS warranty_registered
       FROM neworder no
        JOIN dispatch d ON d.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
        LEFT JOIN quotation_items qi ON qi.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
