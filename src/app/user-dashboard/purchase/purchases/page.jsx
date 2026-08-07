@@ -1544,8 +1544,6 @@ export default function PurchasesPage() {
                           </div>
                           {(() => {
                             const isChild = !!purchase.parent_id;
-                            const isParent = purchases.some(p => p.parent_id === purchase.id);
-                            if (isChild) return null;
                             return (
                               <button
                                 onClick={() => { setEditCustomerRecord(purchase); setEditCustomerOpen(true); }}
