@@ -518,6 +518,12 @@ const allMenuItems = [
     roles: ["SUPERADMIN"],
     icon: "ShoppingCart",
     children: [
+      // {
+      //   path: "/admin-dashboard/purchase-products",
+      //   name: "Purchase Products",
+      //   roles: ["SUPERADMIN"],
+      //   icon: "ShoppingBag",
+      // },
       {
         name: "Purchase – Products",
         roles: ["SUPERADMIN"],
@@ -556,37 +562,37 @@ const allMenuItems = [
           // },
         ],
       },
-      {
-        name: "Purchase – Spares",
-        roles: ["SUPERADMIN"],
-        icon: "ShoppingCart",
-        children: [
-          {
-            path: "/admin-dashboard/spare/purchase/direct-in",
-            name: "Direct In",
-            roles: ["SUPERADMIN"],
-            icon: "PackageCheck",
-          },
-          {
-            path: "/admin-dashboard/spare/purchase/generate-request",
-            name: "Generate Request",
-            roles: ["SUPERADMIN"],
-            icon: "FilePlus",
-          },
-          {
-            path: "/admin-dashboard/spare/purchase/warehouse-in",
-            name: "Warehouse In",
-            roles: ["SUPERADMIN"],
-            icon: "PackageCheck",
-          },
-          {
-            path: "/admin-dashboard/spare/purchase/purchases",
-            name: "Purchases",
-            roles: ["SUPERADMIN"],
-            icon: "ShoppingBag",
-          },
-        ],
-      },
+      // {
+      //   name: "Purchase – Spares",
+      //   roles: ["SUPERADMIN"],
+      //   icon: "ShoppingCart",
+      //   children: [
+      //     {
+      //       path: "/admin-dashboard/spare/purchase/direct-in",
+      //       name: "Direct In",
+      //       roles: ["SUPERADMIN"],
+      //       icon: "PackageCheck",
+      //     },
+      //     {
+      //       path: "/admin-dashboard/spare/purchase/generate-request",
+      //       name: "Generate Request",
+      //       roles: ["SUPERADMIN"],
+      //       icon: "FilePlus",
+      //     },
+      //     {
+      //       path: "/admin-dashboard/spare/purchase/warehouse-in",
+      //       name: "Warehouse In",
+      //       roles: ["SUPERADMIN"],
+      //       icon: "PackageCheck",
+      //     },
+      //     {
+      //       path: "/admin-dashboard/spare/purchase/purchases",
+      //       name: "Purchases",
+      //       roles: ["SUPERADMIN"],
+      //       icon: "ShoppingBag",
+      //     },
+      //   ],
+      // },
     ],
   },
   {

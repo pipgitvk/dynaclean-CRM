@@ -790,6 +790,9 @@ export default function PurchasesPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [invoiceNumberFilter, setInvoiceNumberFilter] = useState("");
+  const [invoiceDateStart, setInvoiceDateStart] = useState("");
+  const [invoiceDateEnd, setInvoiceDateEnd] = useState("");
   const [sortColumn, setSortColumn] = useState("created_at");
   const [sortDirection, setSortDirection] = useState("desc");
   const [showExportOptions, setShowExportOptions] = useState(false);
@@ -992,6 +995,26 @@ export default function PurchasesPage() {
       filtered = filtered.filter((p) => new Date(p.created_at) <= new Date(endDate + 'T23:59:59'));
     }
 
+    // Invoice number filter
+    if (invoiceNumberFilter.trim()) {
+      const q = invoiceNumberFilter.trim().toLowerCase();
+      filtered = filtered.filter((p) =>
+        String(p.invoice_number || "").toLowerCase().includes(q)
+      );
+    }
+
+    // Invoice date filter
+    if (invoiceDateStart) {
+      filtered = filtered.filter((p) =>
+        p.invoice_date && new Date(p.invoice_date) >= new Date(invoiceDateStart)
+      );
+    }
+    if (invoiceDateEnd) {
+      filtered = filtered.filter((p) =>
+        p.invoice_date && new Date(p.invoice_date) <= new Date(invoiceDateEnd + 'T23:59:59')
+      );
+    }
+
     // Sorting
     filtered = [...filtered].sort((a, b) => {
       let aVal = a[sortColumn];
@@ -1042,7 +1065,7 @@ export default function PurchasesPage() {
       .sort((a, b) => b.id - a.id)
       .forEach(p => sortedFiltered.push(p));
     return sortedFiltered;
-  }, [purchases, search, statusFilter, categoryFilter, paymentTransByPurchaseId, startDate, endDate, sortColumn, sortDirection]);
+  }, [purchases, search, statusFilter, categoryFilter, paymentTransByPurchaseId, startDate, endDate, invoiceNumberFilter, invoiceDateStart, invoiceDateEnd, sortColumn, sortDirection]);
 
   const totals = useMemo(() => {
     return filteredPurchases.reduce((acc, p) => {
@@ -1236,13 +1259,15 @@ export default function PurchasesPage() {
                 className="pl-8 pr-3 py-1.5 border rounded-md text-sm w-64"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-gray-500 whitespace-nowrap">Created Date:</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="px-3 py-1.5 border rounded-md text-sm"
               />
+              <span className="text-xs text-gray-400">to</span>
               <input
                 type="date"
                 value={endDate}
@@ -1252,9 +1277,51 @@ export default function PurchasesPage() {
               {(startDate || endDate) && (
                 <button
                   onClick={() => { setStartDate(""); setEndDate(""); }}
-                  className="px-3 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
+                  className="px-2 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
                 >
-                  Clear Dates
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-gray-500 whitespace-nowrap">Invoice No:</span>
+              <input
+                type="text"
+                placeholder="Search invoice no..."
+                value={invoiceNumberFilter}
+                onChange={(e) => setInvoiceNumberFilter(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm w-44"
+              />
+              {invoiceNumberFilter && (
+                <button
+                  onClick={() => setInvoiceNumberFilter("")}
+                  className="px-2 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-gray-500 whitespace-nowrap">Invoice Date:</span>
+              <input
+                type="date"
+                value={invoiceDateStart}
+                onChange={(e) => setInvoiceDateStart(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
+              <span className="text-xs text-gray-400">to</span>
+              <input
+                type="date"
+                value={invoiceDateEnd}
+                onChange={(e) => setInvoiceDateEnd(e.target.value)}
+                className="px-3 py-1.5 border rounded-md text-sm"
+              />
+              {(invoiceDateStart || invoiceDateEnd) && (
+                <button
+                  onClick={() => { setInvoiceDateStart(""); setInvoiceDateEnd(""); }}
+                  className="px-2 py-1.5 text-sm rounded bg-red-100 text-red-700 hover:bg-red-200"
+                >
+                  ✕
                 </button>
               )}
             </div>
