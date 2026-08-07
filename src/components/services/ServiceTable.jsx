@@ -350,10 +350,10 @@ export default function ServiceTable({ serviceRecords, role }) {
 
   // Pie chart data — always from full records, unaffected by filters
   const pieData = [
-    { name: "Completed",           value: records.filter(r => r.status?.toUpperCase() === "COMPLETED").length,           fill: "#22c55e" },
-    { name: "Pending",             value: records.filter(r => r.status?.toUpperCase() === "PENDING").length,             fill: "#eab308" },
+   
+    { name: "Pending",             value: records.filter(r => r.status?.toUpperCase() === "PENDING").length,             fill: "#f11532ff" },
     { name: "Pending Spares",      value: records.filter(r => r.status?.toUpperCase() === "PENDING FOR SPARES").length,  fill: "#f97316" },
-    { name: "Pending by Customer", value: records.filter(r => r.status?.toUpperCase() === "PENDING BY CUSTOMER").length, fill: "#ef4444" },
+    { name: "Pending by Customer", value: records.filter(r => r.status?.toUpperCase() === "PENDING BY CUSTOMER").length, fill: "#e6e95bff" },
   ].filter(d => d.value > 0);
 
   return (
@@ -361,8 +361,8 @@ export default function ServiceTable({ serviceRecords, role }) {
       {/* KPI Section */}
       <div className="flex flex-wrap gap-4 mb-4 items-stretch">
         {/* Stats Card */}
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-5 py-4">
-          <div className="grid grid-cols-2 gap-x-10 gap-y-3">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-5 py-4 min-w-[450px]">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-2">
             {[
               { label: "Total", value: kpiData.total, color: "text-gray-900", dot: "bg-blue-500" },
               { label: "Pending Spares", value: kpiData.pendingSpares, color: "text-orange-600", dot: "bg-orange-500" },
@@ -371,12 +371,12 @@ export default function ServiceTable({ serviceRecords, role }) {
               { label: "Pending", value: kpiData.pending, color: "text-yellow-600", dot: "bg-yellow-500" },
               { label: "Completion %", value: `${completionPercentage}%`, color: "text-indigo-600", dot: "bg-indigo-500" },
             ].map(({ label, value, color, dot }) => (
-              <div key={label} className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
-                <div>
-                  <p className="text-[11px] text-gray-500 uppercase tracking-wide leading-tight">{label}</p>
-                  <p className={`text-xl font-bold leading-tight ${color}`}>{value}</p>
+              <div key={label} className="flex items-center justify-between gap-6">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                  <span className="text-sm text-gray-500 whitespace-nowrap">{label}</span>
                 </div>
+                <span className={`text-base font-bold ${color}`}>{value}</span>
               </div>
             ))}
           </div>
@@ -384,13 +384,13 @@ export default function ServiceTable({ serviceRecords, role }) {
 
         {/* Pie Chart — uses permanent (unfiltered) counts */}
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-3 flex items-center">
-          <ResponsiveContainer width={260} height={200}>
+          <ResponsiveContainer width={220} height={130}>
             <PieChart>
               <Pie
                 data={pieData}
                 cx="50%"
                 cy="50%"
-                outerRadius={95}
+                outerRadius={58}
                 dataKey="value"
                 labelLine={false}
                 label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
@@ -501,12 +501,6 @@ export default function ServiceTable({ serviceRecords, role }) {
                   Service ID {getSortIndicator("service_id")}
                 </th>
                 <th
-                  onClick={() => handleSort("serial_number")}
-                  className="px-6 py-3 text-left cursor-pointer"
-                >
-                  Serial No. {getSortIndicator("serial_number")}
-                </th>
-                <th
                   onClick={() => handleSort("complaint_date")}
                   className="px-6 py-3 text-left cursor-pointer"
                 >
@@ -536,6 +530,7 @@ export default function ServiceTable({ serviceRecords, role }) {
                 >
                   Installed Address {getSortIndicator("installed_address")}
                 </th>
+                <th className="px-6 py-3 text-left">Location</th>
                 <th
                   onClick={() => handleSort("assigned_to")}
                   className="px-6 py-3 text-left cursor-pointer"
@@ -594,8 +589,12 @@ export default function ServiceTable({ serviceRecords, role }) {
                       key={record.service_id}
                       className={`hover:bg-blue-50 transition-all duration-200 ${rowBackgroundColor}`}
                     >
-                      <td className="px-6 py-3">{record.service_id}</td>
-                      <td className="px-6 py-3">{record.serial_number || "—"}</td>
+                      <td className="px-6 py-3">
+                        <div>{record.service_id}</div>
+                        {record.serial_number && (
+                          <div className="text-xs text-green-600 font-medium mt-0.5">{record.serial_number}</div>
+                        )}
+                      </td>
                       <td className="px-6 py-3">
                         {formatDate(record.complaint_date)}
                       </td>
@@ -621,11 +620,28 @@ export default function ServiceTable({ serviceRecords, role }) {
                       </td>
                       <td className="px-6 py-3 max-w-[180px] whitespace-normal break-words relative group">
                         <span>{record.installed_address}</span>
-
                         {/* Tooltip */}
                         <div className="absolute left-0 bottom-full mb-1 hidden group-hover:block bg-black text-white text-xs p-2 rounded shadow-lg max-w-xs z-50 whitespace-normal break-words">
                           {record.installed_address}
                         </div>
+                      </td>
+                      <td className="px-6 py-3 text-xs">
+                        {record.lat && record.longt ? (
+                          <div className="space-y-1">
+                            <div><span className="font-semibold text-gray-500">Lat:</span> {record.lat}</div>
+                            <div><span className="font-semibold text-gray-500">Long:</span> {record.longt}</div>
+                            <a
+                              href={`https://www.google.com/maps?q=${record.lat},${record.longt}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              Maps ↗
+                            </a>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-3">{record.assigned_to}</td>
                       <td className="px-6 py-3">{record.service_type}</td>

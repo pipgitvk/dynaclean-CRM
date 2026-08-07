@@ -29,6 +29,7 @@ export default async function UserViewServiceReportsPage() {
         wp.contact_person AS contact_person_from_wp,
         wp.installed_address AS installed_address_from_wp,
         wp.email, wp.contact, wp.invoice_date, wp.product_name, wp.specification, wp.model,
+        wp.lat, wp.longt,
         CASE
             WHEN sr_report.service_id IS NOT NULL THEN 1
             ELSE 0
