@@ -39,7 +39,7 @@ function LayoutContent({
         <Navbar onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <UserProvider>
           <main
-            className={`min-h-0 min-w-0 w-full flex-1 overflow-auto p-3 sm:p-4 md:p-6 lg:p-8 ${theme.body.text}`}
+            className={`min-h-0 min-w-0 w-full flex-1 overflow-auto p-2 sm:p-3 md:p-4 ${theme.body.text}`}
           >
             {children}
           </main>

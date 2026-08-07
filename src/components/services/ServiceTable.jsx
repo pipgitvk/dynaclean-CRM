@@ -175,7 +175,7 @@ export default function ServiceTable({ serviceRecords, role }) {
     new Set([...uniqueStatuses.filter(Boolean), "PENDING BY CUSTOMER"]),
   );
 
-  // Calculate KPIs based on filtered status
+  // Calculate KPIs based on filtered records, except pendingByCustomer which is always from all records
   const kpiData = {
     total: filteredRecords.length,
     completed: filteredRecords.filter((r) => r.status?.toUpperCase() === "COMPLETED")
@@ -185,7 +185,7 @@ export default function ServiceTable({ serviceRecords, role }) {
     pendingSpares: filteredRecords.filter(
       (r) => r.status?.toUpperCase() === "PENDING FOR SPARES",
     ).length,
-    pendingByCustomer: filteredRecords.filter(
+    pendingByCustomer: records.filter(
       (r) => r.status?.toUpperCase() === "PENDING BY CUSTOMER",
     ).length,
   };

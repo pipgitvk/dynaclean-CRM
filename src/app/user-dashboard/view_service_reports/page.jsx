@@ -60,8 +60,8 @@ export default async function UserViewServiceReportsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-4 lg:p-8">
-      <div className="mx-auto max-w-7xl">
+    <div className="min-h-screen bg-gray-100 p-2 sm:p-4 lg:p-6">
+      <div className="w-full">
         <h2 className="text-xl sm:text-2xl lg:text-3xl text-gray-800 text-center mb-4">Service Reports</h2>
         <ServiceTable serviceRecords={serviceRecords} role={role} />
       </div>
