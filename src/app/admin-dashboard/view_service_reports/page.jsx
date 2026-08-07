@@ -67,11 +67,9 @@ ORDER BY sr.service_id DESC;
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-2 sm:p-4">
-      <div className="w-full">
-        <h2 className="text-3xl text-gray-800 text-center">Service Reports</h2>
-        <ServiceTable serviceRecords={serviceRecords} role={role} />
-      </div>
+    <div className="p-2 sm:p-4 lg:p-6">
+      <h2 className="text-xl sm:text-2xl lg:text-3xl text-gray-800 mb-4">Service Reports</h2>
+      <ServiceTable serviceRecords={serviceRecords} role={role} />
     </div>
   );
 }

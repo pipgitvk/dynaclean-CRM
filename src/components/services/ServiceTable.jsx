@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 export default function ServiceTable({ serviceRecords, role }) {
   const [records, setRecords] = useState(serviceRecords || []);
@@ -193,19 +194,13 @@ export default function ServiceTable({ serviceRecords, role }) {
     new Set([...uniqueStatuses.filter(Boolean), "PENDING BY CUSTOMER"]),
   );
 
-  // Calculate KPIs based on filtered records, except pendingByCustomer which is always from all records
+  // Calculate KPIs — all from full unfiltered records so they never change with filters
   const kpiData = {
-    total: filteredRecords.length,
-    completed: filteredRecords.filter((r) => r.status?.toUpperCase() === "COMPLETED")
-      .length,
-    pending: filteredRecords.filter((r) => r.status?.toUpperCase() === "PENDING")
-      .length,
-    pendingSpares: filteredRecords.filter(
-      (r) => r.status?.toUpperCase() === "PENDING FOR SPARES",
-    ).length,
-    pendingByCustomer: records.filter(
-      (r) => r.status?.toUpperCase() === "PENDING BY CUSTOMER",
-    ).length,
+    total: records.length,
+    completed: records.filter((r) => r.status?.toUpperCase() === "COMPLETED").length,
+    pending: records.filter((r) => r.status?.toUpperCase() === "PENDING").length,
+    pendingSpares: records.filter((r) => r.status?.toUpperCase() === "PENDING FOR SPARES").length,
+    pendingByCustomer: records.filter((r) => r.status?.toUpperCase() === "PENDING BY CUSTOMER").length,
   };
 
   // Calculate completion percentage
@@ -353,217 +348,149 @@ export default function ServiceTable({ serviceRecords, role }) {
     }
   };
 
+  // Pie chart data — always from full records, unaffected by filters
+  const pieData = [
+    { name: "Completed",           value: records.filter(r => r.status?.toUpperCase() === "COMPLETED").length,           fill: "#22c55e" },
+    { name: "Pending",             value: records.filter(r => r.status?.toUpperCase() === "PENDING").length,             fill: "#eab308" },
+    { name: "Pending Spares",      value: records.filter(r => r.status?.toUpperCase() === "PENDING FOR SPARES").length,  fill: "#f97316" },
+    { name: "Pending by Customer", value: records.filter(r => r.status?.toUpperCase() === "PENDING BY CUSTOMER").length, fill: "#ef4444" },
+  ].filter(d => d.value > 0);
+
   return (
-    <div className="flex justify-center items-center bg-gray-50 py-2 sm:py-4 lg:py-6 px-2 sm:px-4">
-      <div className="bg-white shadow-xl rounded-lg w-full overflow-hidden">
-        {/* KPI Section */}
-        <div className="bg-linear-to-r from-blue-50 to-indigo-50 p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">
-            Service Status Overview
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
+    <div className="w-full">
+      {/* KPI Section */}
+      <div className="flex flex-wrap gap-4 mb-4 items-stretch">
+        {/* Stats Card */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-5 py-4">
+          <div className="grid grid-cols-2 gap-x-10 gap-y-3">
+            {[
+              { label: "Total", value: kpiData.total, color: "text-gray-900", dot: "bg-blue-500" },
+              { label: "Pending Spares", value: kpiData.pendingSpares, color: "text-orange-600", dot: "bg-orange-500" },
+              { label: "Completed", value: kpiData.completed, color: "text-green-600", dot: "bg-green-500" },
+              { label: "Pending by Customer", value: kpiData.pendingByCustomer, color: "text-red-600", dot: "bg-red-500" },
+              { label: "Pending", value: kpiData.pending, color: "text-yellow-600", dot: "bg-yellow-500" },
+              { label: "Completion %", value: `${completionPercentage}%`, color: "text-indigo-600", dot: "bg-indigo-500" },
+            ].map(({ label, value, color, dot }) => (
+              <div key={label} className="flex items-center gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Total
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {kpiData.total}
-                  </p>
+                  <p className="text-[11px] text-gray-500 uppercase tracking-wide leading-tight">{label}</p>
+                  <p className={`text-xl font-bold leading-tight ${color}`}>{value}</p>
                 </div>
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
               </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Completed
-                  </p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {kpiData.completed}
-                  </p>
-                </div>
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Pending
-                  </p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {kpiData.pending}
-                  </p>
-                </div>
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Pending Spares
-                  </p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {kpiData.pendingSpares}
-                  </p>
-                </div>
-                <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Pending by Customer
-                  </p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {kpiData.pendingByCustomer}
-                  </p>
-                </div>
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                    Completion %
-                  </p>
-                  <p className="text-2xl font-bold text-indigo-600">
-                    {completionPercentage}%
-                  </p>
-                </div>
-                <div className="w-3 h-3 bg-indigo-500 rounded-full"></div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Search + Filters */}
-        <div className="px-2 sm:px-4 py-3 sm:py-4 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              placeholder="Search records (including company name)..."
-              className="p-2 sm:p-3 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-            <button
-              onClick={handleResetSearch}
-              className="px-3 sm:px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition-colors duration-200 whitespace-nowrap text-sm"
-            >
-              Reset
-            </button>
-          </div>
-
-          {/* Filters Row */}
-          <div className="flex flex-wrap gap-3 items-end">
-            {/* Date range — wider */}
-            <div className="flex-1 min-w-[260px]">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                Complaint Date (Range)
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                  value={complaintDateFrom}
-                  onChange={(e) => { setComplaintDateFrom(e.target.value); setCurrentPage(1); }}
-                />
-                <span className="text-gray-400 text-xs shrink-0">to</span>
-                <input
-                  type="date"
-                  className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                  value={complaintDateTo}
-                  onChange={(e) => { setComplaintDateTo(e.target.value); setCurrentPage(1); }}
-                />
-              </div>
-            </div>
-
-            {/* Service Type */}
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                Service Type
-              </label>
-              <select
-                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                value={serviceTypeFilter}
-                onChange={(e) => { setServiceTypeFilter(e.target.value); setCurrentPage(1); }}
+        {/* Pie Chart — uses permanent (unfiltered) counts */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-3 flex items-center">
+          <ResponsiveContainer width={260} height={200}>
+            <PieChart>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                outerRadius={95}
+                dataKey="value"
+                labelLine={false}
+                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+                  const RADIAN = Math.PI / 180;
+                  const radius = innerRadius + (outerRadius - innerRadius) * 0.55;
+                  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                  if (percent < 0.05) return null;
+                  return (
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fill="#1f2937" fontSize={11} fontWeight="600">
+                      <tspan x={x} dy="-6">{name}</tspan>
+                      <tspan x={x} dy="14">{`${(percent * 100).toFixed(0)}%`}</tspan>
+                    </text>
+                  );
+                }}
               >
-                <option value="">All Types</option>
-                {uniqueServiceTypes.map((type) => (
-                  <option key={type} value={type}>{type}</option>
+                {pieData.map((entry, index) => (
+                  <Cell key={index} fill={entry.fill} stroke="#fff" strokeWidth={2} />
                 ))}
-              </select>
-            </div>
+              </Pie>
+              <Tooltip
+                formatter={(value, name) => [value, name]}
+                contentStyle={{ fontSize: 12 }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
-            {/* Status */}
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                Status
-              </label>
-              <select
-                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              >
-                <option value="">All Statuses</option>
-                {uniqueStatuses.map((status) => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Assigned */}
-            <div className="flex-1 min-w-[130px]">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                Assigned
-              </label>
-              <select
-                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                value={assignedFilter}
-                onChange={(e) => { setAssignedFilter(e.target.value); setCurrentPage(1); }}
-              >
-                <option value="">All</option>
-                <option value="ASSIGNED">Assigned</option>
-                <option value="NOT_ASSIGNED">Not Assigned</option>
-              </select>
-            </div>
-
-            {/* Engineer */}
-            <div className="flex-1 min-w-[160px]">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
-                Engineer
-              </label>
-              <select
-                className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                value={assignedToFilter}
-                onChange={(e) => { setAssignedToFilter(e.target.value); setCurrentPage(1); }}
-              >
-                <option value="">All Engineers</option>
-                {uniqueEngineers.map((eng) => (
-                  <option key={eng} value={eng}>{eng}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+      {/* Search + Filters */}
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-3 mb-4 space-y-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Search records (including company name)..."
+            className="p-2 w-full border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+          />
+          <button
+            onClick={handleResetSearch}
+            className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors text-sm whitespace-nowrap"
+          >
+            Reset
+          </button>
         </div>
 
+        {/* Filters Row */}
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[240px]">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date Range</label>
+            <div className="flex items-center gap-2">
+              <input type="date"
+                className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={complaintDateFrom}
+                onChange={(e) => { setComplaintDateFrom(e.target.value); setCurrentPage(1); }} />
+              <span className="text-gray-400 text-xs shrink-0">to</span>
+              <input type="date"
+                className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                value={complaintDateTo}
+                onChange={(e) => { setComplaintDateTo(e.target.value); setCurrentPage(1); }} />
+            </div>
+          </div>
+          <div className="flex-1 min-w-[130px]">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Service Type</label>
+            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={serviceTypeFilter} onChange={(e) => { setServiceTypeFilter(e.target.value); setCurrentPage(1); }}>
+              <option value="">All Types</option>
+              {uniqueServiceTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[130px]">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</label>
+            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}>
+              <option value="">All Statuses</option>
+              {uniqueStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Assigned</label>
+            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={assignedFilter} onChange={(e) => { setAssignedFilter(e.target.value); setCurrentPage(1); }}>
+              <option value="">All</option>
+              <option value="ASSIGNED">Assigned</option>
+              <option value="NOT_ASSIGNED">Not Assigned</option>
+            </select>
+          </div>
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Engineer</label>
+            <select className="p-2 w-full border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={assignedToFilter} onChange={(e) => { setAssignedToFilter(e.target.value); setCurrentPage(1); }}>
+              <option value="">All Engineers</option>
+              {uniqueEngineers.map((eng) => <option key={eng} value={eng}>{eng}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
         {/* Table (visible on larger screens) */}
-        <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[500px] lg:max-h-[600px]">
+        <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[82vh] bg-white rounded-lg border border-gray-200 shadow-sm">
           <table className="min-w-full text-sm text-gray-700">
             <thead className="bg-blue-600 text-white sticky top-0">
               <tr>
@@ -875,7 +802,7 @@ export default function ServiceTable({ serviceRecords, role }) {
         </div>
 
         {/* Card view (visible on small screens) */}
-        <div className="md:hidden p-2 sm:p-4 space-y-3 sm:space-y-4">
+        <div className="md:hidden mt-4 space-y-3">
           {paginatedRecords.length === 0 ? (
             <div className="text-center text-gray-500 py-4">
               No service records found.
@@ -1110,7 +1037,6 @@ export default function ServiceTable({ serviceRecords, role }) {
             </button>
           </div>
         </div>
-      </div>
 
       {/* Details Modal */}
       <Modal
