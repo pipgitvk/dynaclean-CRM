@@ -531,6 +531,12 @@ export default function ServiceTable({ serviceRecords, role }) {
                   Company {getSortIndicator("customer_name")}
                 </th>
                 <th
+                  onClick={() => handleSort("model")}
+                  className="px-6 py-3 text-left cursor-pointer"
+                >
+                  Model {getSortIndicator("model")}
+                </th>
+                <th
                   onClick={() => handleSort("complaint_summary")}
                   className="px-6 py-3 text-left cursor-pointer"
                 >
@@ -578,7 +584,7 @@ export default function ServiceTable({ serviceRecords, role }) {
               {uniqueRecords.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={role === "ADMIN" ? 10 : 9}
+                    colSpan={role === "ADMIN" ? 11 : 10}
                     className="px-6 py-3 text-center text-gray-500"
                   >
                     No service records found.
@@ -607,20 +613,20 @@ export default function ServiceTable({ serviceRecords, role }) {
                       <td className="px-6 py-3">
                         {record.customer_name || "N/A"}
                       </td>
-                      <td className="px-6 py-3 max-w-[350px] whitespace-normal break-words relative group">
+                      <td className="px-6 py-3 max-w-[160px] whitespace-normal break-words">
+                        <div className="text-sm text-gray-700">
+                          {record.model || "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 max-w-[300px] whitespace-normal break-words">
                         <div className="space-y-1">
-                          {record.model && (
-                            <div className="text-sm text-gray-700">
-                              <span className="font-semibold">Model:</span> {record.model}
-                            </div>
-                          )}
                           {record.state && (
                             <div className="text-sm text-gray-700">
                               <span className="font-semibold">State:</span> {record.state}
                             </div>
                           )}
                           <div className="text-sm">
-                            <span className="font-semibold">Issue:</span> {record.complaint_summary}
+                            {record.complaint_summary}
                           </div>
                         </div>
                       </td>
