@@ -65,11 +65,15 @@ export async function decideSpecialPrice(prevState, formData) {
   }
 
   const id = fd.get("id");
+  const itemType = String(fd.get("itemType") || "product").toLowerCase().trim();
   const decision = String(fd.get("decision") || "").toLowerCase().trim();
   const note = String(fd.get("note") || "").trim();
 
   if (!id || Number.isNaN(Number(id))) {
     return { error: "Invalid record." };
+  }
+  if (!["product", "spare"].includes(itemType)) {
+    return { error: "Invalid item type." };
   }
   if (decision !== "approve" && decision !== "reject") {
     return { error: "Invalid decision." };
@@ -79,7 +83,7 @@ export async function decideSpecialPrice(prevState, formData) {
   }
 
   const payload = await getSessionPayload();
-  if (!payload || payload.role !== "SUPERADMIN") {
+  if (!payload || !["SUPERADMIN", "DIRECTOR"].includes(String(payload.role).toUpperCase())) {
     return { error: "Unauthorized." };
   }
 
@@ -90,6 +94,7 @@ export async function decideSpecialPrice(prevState, formData) {
 
   const conn = await getDbConnection();
   const numericId = Number(id);
+  // Both products and spares are now in the same special_price table
 
   if (decision === "approve") {
     try {
@@ -119,10 +124,6 @@ export async function decideSpecialPrice(prevState, formData) {
         [actor, numericId],
       );
     }
-
-    // Note: Removed automatic price update to products_list
-    // Special pricing should only apply to specific customers,
-    // not update the general product prices in the product stock
   } else {
     try {
       await conn.execute(

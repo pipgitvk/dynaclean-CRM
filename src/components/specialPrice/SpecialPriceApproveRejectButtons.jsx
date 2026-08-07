@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { decideSpecialPrice } from "@/app/admin-dashboard/special-pricing/_actions";
 
-export default function SpecialPriceApproveRejectButtons({ id, variant = "table" }) {
+export default function SpecialPriceApproveRejectButtons({ id, itemType = "product", variant = "table" }) {
   const [modal, setModal] = useState(null);
   const [state, formAction, pending] = useActionState(decideSpecialPrice, null);
 
@@ -64,6 +64,11 @@ export default function SpecialPriceApproveRejectButtons({ id, variant = "table"
 
             <form action={formAction} className="px-4 py-3 space-y-3">
               <input type="hidden" name="id" value={id} />
+              <input
+                type="hidden"
+                name="itemType"
+                value={itemType}
+              />
               <input
                 type="hidden"
                 name="decision"
