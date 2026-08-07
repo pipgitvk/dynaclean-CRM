@@ -88,6 +88,10 @@ export async function POST(req) {
         const location = formData.get("location");
         const remarks = formData.get("remarks");
 
+        // Invoice Details
+        const invoice_number = formData.get("invoice_number") || null;
+        const invoice_date = formData.get("invoice_date") || null;
+
         // Handle file uploads
         const quotation_upload = await saveFile(formData.get("quotation_upload"));
         const payment_proof_upload = await saveFile(formData.get("payment_proof_upload"));
@@ -102,6 +106,12 @@ export async function POST(req) {
         }
         if (!received_image) {
             return NextResponse.json({ error: "Received image is mandatory" }, { status: 400 });
+        }
+        if (!invoice_number) {
+            return NextResponse.json({ error: "Invoice number is mandatory" }, { status: 400 });
+        }
+        if (!invoice_date) {
+            return NextResponse.json({ error: "Invoice date is mandatory" }, { status: 400 });
         }
 
         // Start transaction
@@ -119,7 +129,8 @@ export async function POST(req) {
           porter_tracking_id, porter_contact, truck_number, driver_name, driver_number,
           status, created_by,
           received_by, received_date, received_quantity, received_image, supporting_doc,
-          remarks, warehouse_name, location
+          remarks, warehouse_name, location,
+          invoice_number, invoice_date
         ) VALUES (
           ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?,
@@ -129,7 +140,8 @@ export async function POST(req) {
           ?, ?, ?, ?, ?,
           'fulfilled', ?,
           ?, ?, ?, ?, ?,
-          ?, ?, ?
+          ?, ?, ?,
+          ?, ?
         )
       `;
 
@@ -142,7 +154,8 @@ export async function POST(req) {
                 porter_tracking_id, porter_contact, truck_number, driver_name, driver_number,
                 username,
                 username, received_date, received_quantity, received_image, supporting_doc,
-                remarks, warehouse_name, location
+                remarks, warehouse_name, location,
+                invoice_number, invoice_date || null
             ];
 
             const [reqResult] = await conn.execute(insertRequestQuery, requestValues);

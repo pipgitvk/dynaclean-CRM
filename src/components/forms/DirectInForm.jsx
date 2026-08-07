@@ -30,6 +30,9 @@ export default function DirectInForm() {
         truck_number: "",
         driver_name: "",
         driver_number: "",
+        // Invoice fields
+        invoice_number: "",
+        invoice_date: "",
         // Warehouse In fields
         received_date: new Date().toISOString().split("T")[0],
         received_quantity: "",
@@ -242,6 +245,8 @@ export default function DirectInForm() {
                     truck_number: "",
                     driver_name: "",
                     driver_number: "",
+                    invoice_number: "",
+                    invoice_date: "",
                     received_date: new Date().toISOString().split("T")[0],
                     received_quantity: "",
                     warehouse_name: "",
@@ -418,8 +423,36 @@ export default function DirectInForm() {
                         </div>
                     </div>
 
-                    {/* 3. Attachments */}
-                    <h4 className="text-md font-semibold mt-6 mb-2">3. Attachments</h4>
+                    {/* 3. Invoice Details */}
+                    <h4 className="text-md font-semibold mt-6 mb-2">3. Invoice Details</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block mb-1">Invoice Number *</label>
+                            <input
+                                type="text"
+                                name="invoice_number"
+                                value={formData.invoice_number}
+                                onChange={handleChange}
+                                className="w-full border p-2 rounded"
+                                placeholder="Enter invoice number"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block mb-1">Invoice Date *</label>
+                            <input
+                                type="date"
+                                name="invoice_date"
+                                value={formData.invoice_date}
+                                onChange={handleChange}
+                                className="w-full border p-2 rounded"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    {/* 4. Attachments */}
+                    <h4 className="text-md font-semibold mt-6 mb-2">4. Attachments</h4>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block mb-1">Quotation Upload</label>
@@ -444,7 +477,7 @@ export default function DirectInForm() {
                     </div>
 
                     {/* 4. Company & Delivery */}
-                    <h4 className="text-md font-semibold mt-6 mb-2">4. Company & Delivery</h4>
+                    <h4 className="text-md font-semibold mt-6 mb-2">5. Company & Delivery</h4>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block mb-1">From Company *</label>
@@ -465,7 +498,7 @@ export default function DirectInForm() {
                     </div>
 
                     {/* 5. Transport */}
-                    <h4 className="text-md font-semibold mt-6 mb-2">5. Transport</h4>
+                    <h4 className="text-md font-semibold mt-6 mb-2">6. Transport</h4>
                     <div>
                         <label className="block mb-1">Mode of Transport *</label>
                         <select name="mode_of_transport" value={formData.mode_of_transport} onChange={handleChange} className="w-full border p-2 rounded" required>
@@ -531,7 +564,7 @@ export default function DirectInForm() {
                     )}
 
                     {/* 6. Warehouse Receipt */}
-                    <h4 className="text-md font-semibold mt-6 mb-2">6. Warehouse Receipt</h4>
+                    <h4 className="text-md font-semibold mt-6 mb-2">7. Warehouse Receipt</h4>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block mb-1 font-medium">Received By</label>
