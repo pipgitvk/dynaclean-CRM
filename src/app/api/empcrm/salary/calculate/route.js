@@ -237,10 +237,17 @@ export async function POST(request) {
     if (existingRecord.length > 0) {
       const existingStatus = (existingRecord[0].status || "").toLowerCase();
       if (existingStatus === "approved" || existingStatus === "paid") {
-        return NextResponse.json(
-          { message: `This salary record is already ${existingStatus} and cannot be modified.` },
-          { status: 403 }
-        );
+        // Allow edits up to the 10th of the month following the salary month.
+        // e.g. July salary → editable until 10th August 23:59:59
+        const [syear, smonth] = String(salary_month).split("-").map(Number);
+        const editDeadline = new Date(syear, smonth, 10, 23, 59, 59); // smonth is already next month (0-indexed)
+        if (new Date() > editDeadline) {
+          return NextResponse.json(
+            { message: `This salary record is already ${existingStatus} and cannot be modified.` },
+            { status: 403 }
+          );
+        }
+        // Within deadline — fall through to update
       }
 
       // Update existing record
