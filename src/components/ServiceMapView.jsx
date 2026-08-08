@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { loadGoogleMaps } from "@/lib/loadGoogleMaps";
 
+const DEFAULT_STATUS_FILTERS = ["PENDING", "PENDING FOR SPARES", "PENDING BY CUSTOMER"];
+
 export default function ServiceMapView({ services = [] }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -11,7 +13,7 @@ export default function ServiceMapView({ services = [] }) {
   
   // Filter states
   const [serviceTypeFilter, setServiceTypeFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilters, setStatusFilters] = useState(new Set(DEFAULT_STATUS_FILTERS));
 
   useEffect(() => {
     loadGoogleMaps().then(() => setIsLoading(false));
@@ -32,10 +34,10 @@ export default function ServiceMapView({ services = [] }) {
   const filteredServices = useMemo(() => {
     return services.filter(service => {
       const matchesType = !serviceTypeFilter || service.service_type === serviceTypeFilter;
-      const matchesStatus = !statusFilter || service.status === statusFilter;
+      const matchesStatus = statusFilters.size === 0 || statusFilters.has(service.status);
       return matchesType && matchesStatus;
     });
-  }, [services, serviceTypeFilter, statusFilter]);
+  }, [services, serviceTypeFilter, statusFilters]);
 
   // Helper function to get marker color and shape based on service type and status
   const getMarkerStyle = (service) => {
@@ -244,23 +246,40 @@ export default function ServiceMapView({ services = [] }) {
         {/* Status Filter */}
         <div className="mb-3">
           <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-          <select
-            className="w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All Statuses</option>
+          <div className="space-y-1 max-h-36 overflow-y-auto">
             {uniqueStatuses.map((status) => (
-              <option key={status} value={status}>{status}</option>
+              <label key={status} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:text-gray-900">
+                <input
+                  type="checkbox"
+                  checked={statusFilters.has(status)}
+                  onChange={(e) => {
+                    setStatusFilters(prev => {
+                      const next = new Set(prev);
+                      e.target.checked ? next.add(status) : next.delete(status);
+                      return next;
+                    });
+                  }}
+                  className="w-3.5 h-3.5 accent-blue-600 cursor-pointer"
+                />
+                {status}
+              </label>
             ))}
-          </select>
+          </div>
+          {statusFilters.size > 0 && (
+            <button
+              onClick={() => setStatusFilters(new Set())}
+              className="mt-1 text-[11px] text-blue-600 hover:underline"
+            >
+              Clear all
+            </button>
+          )}
         </div>
         
         {/* Reset Button */}
         <button
           onClick={() => {
             setServiceTypeFilter("");
-            setStatusFilter("");
+            setStatusFilters(new Set(DEFAULT_STATUS_FILTERS));
           }}
           className="w-full px-3 py-2 text-sm bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
         >
