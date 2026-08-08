@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
-import { getApprovedSpecialPrice } from "@/lib/getApprovedSpecialPrice";
+import {
+  getApprovedSpecialPrice,
+  resolveProductByCode,
+} from "@/lib/getApprovedSpecialPrice";
 
 function normCode(value) {
   return String(value ?? "").trim();
@@ -26,48 +29,49 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
-    const codeLower = productCodeInput.toLowerCase();
+    const product = await resolveProductByCode(conn, productCodeInput);
 
-    const [productRows] = await conn.execute(
-      `SELECT id, item_code, price_per_unit, gst_rate
-       FROM products_list
-       WHERE LOWER(TRIM(item_code)) = ?
-          OR LOWER(TRIM(COALESCE(product_number, ''))) = ?
-       LIMIT 1`,
-      [codeLower, codeLower]
-    );
+    let originalPrice = null;
+    let gstRate = null;
+    if (product?.productId) {
+      const [productRows] = await conn.execute(
+        `SELECT price_per_unit, gst_rate FROM products_list WHERE id = ? LIMIT 1`,
+        [product.productId]
+      );
+      if (productRows[0]) {
+        originalPrice =
+          productRows[0].price_per_unit != null
+            ? Number(productRows[0].price_per_unit)
+            : null;
+        gstRate = productRows[0].gst_rate ?? null;
+      }
+    }
 
-    const product = productRows[0] || null;
-    const productId = product?.id ?? null;
-    const resolvedCode = product?.item_code ?? productCodeInput;
-
+    const resolvedCode = product?.itemCode ?? productCodeInput;
     const specialPrice = await getApprovedSpecialPrice(
       conn,
       customerId,
-      productId,
+      product?.productId ?? null,
       resolvedCode
     );
 
-    const originalPrice =
-      product?.price_per_unit != null ? Number(product.price_per_unit) : null;
+    if (product == null && specialPrice == null) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    }
 
     const finalPrice =
       specialPrice != null && Number.isFinite(specialPrice)
         ? specialPrice
         : originalPrice;
 
-    if (product == null && specialPrice == null) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
-
     return NextResponse.json({
       success: true,
-      product_id: productId,
+      product_id: product?.productId ?? null,
       product_code: resolvedCode,
       original_price: originalPrice,
       special_price: specialPrice,
       final_price: finalPrice,
-      gst_rate: product?.gst_rate ?? null,
+      gst_rate: gstRate,
       has_special_price: specialPrice != null && Number.isFinite(specialPrice),
     });
   } catch (err) {

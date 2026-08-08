@@ -61,7 +61,10 @@
 
 // app/api/get-product-details/route.js
 import { getDbConnection } from "@/lib/db";
-import { getApprovedSpecialPrice } from "@/lib/getApprovedSpecialPrice";
+import {
+  getApprovedSpecialPrice,
+  resolveProductByCode,
+} from "@/lib/getApprovedSpecialPrice";
 
 export const dynamic = "force-dynamic";
 
@@ -154,7 +157,7 @@ export async function GET(req) {
             product_images pi ON p.item_code = pi.item_code
           WHERE
             LOWER(TRIM(p.item_code)) = ?
-            OR LOWER(TRIM(COALESCE(p.product_number, ''))) = ?
+            OR CAST(p.product_number AS CHAR) = ?
           LIMIT 1`,
           [codeLower, codeLower]
         );
@@ -187,11 +190,12 @@ export async function GET(req) {
     if (mode !== "suggestion" && customerId && rows.length > 0) {
       try {
         const row = rows[0];
+        const product = await resolveProductByCode(conn, row.item_code || code);
         const specialPrice = await getApprovedSpecialPrice(
           conn,
           customerId,
-          null,
-          row.item_code || code
+          product?.productId ?? null,
+          product?.itemCode ?? row.item_code ?? code
         );
         if (specialPrice != null) {
           rows[0] = {

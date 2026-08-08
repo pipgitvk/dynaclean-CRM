@@ -19,7 +19,7 @@ async function resolvePriceWithSpecial(customerId, productCode, basePrice) {
     });
 
     const specialData = await specialRes.json();
-    if (specialRes.ok && specialData?.special_price != null) {
+    if (specialRes.ok && specialData?.special_price != null && specialData.special_price !== "") {
       const specialPrice = parseFloat(specialData.special_price);
       if (Number.isFinite(specialPrice)) {
         return { finalPrice: specialPrice, specialPrice };
@@ -94,19 +94,18 @@ export default function QuotationTable({ items, setItems, customerId }) {
       const resolvedCode = item.item_code || code;
       const basePrice = parseFloat(item.price_per_unit) || 0;
 
-      let specialPrice =
-        item.special_price != null ? parseFloat(item.special_price) : null;
-      if (specialPrice != null && !Number.isFinite(specialPrice)) {
-        specialPrice = null;
-      }
-
-      if (specialPrice == null) {
+      // Always load live price from special_price table when customer is selected
+      let specialPrice = null;
+      if (customerId) {
         const resolved = await resolvePriceWithSpecial(
           customerId,
           resolvedCode,
           basePrice
         );
         specialPrice = resolved.specialPrice;
+      } else if (item.special_price != null) {
+        const parsed = parseFloat(item.special_price);
+        if (Number.isFinite(parsed)) specialPrice = parsed;
       }
 
       const finalPrice =

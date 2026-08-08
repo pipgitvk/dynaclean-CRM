@@ -1,6 +1,32 @@
 /**
- * Fetch approved special_price.special_price for a customer + product.
- * Never throws — returns null on any DB mismatch or missing row.
+ * Resolve product id + item_code from products_list (case-insensitive).
+ */
+export async function resolveProductByCode(conn, productCodeInput) {
+  const code = String(productCodeInput ?? "").trim();
+  if (!code) return null;
+
+  const codeLower = code.toLowerCase();
+
+  const [rows] = await conn.execute(
+    `SELECT id, item_code
+     FROM products_list
+     WHERE LOWER(TRIM(item_code)) = ?
+        OR CAST(product_number AS CHAR) = ?
+     LIMIT 1`,
+    [codeLower, code]
+  );
+
+  if (!rows?.length) return null;
+
+  return {
+    productId: rows[0].id,
+    itemCode: rows[0].item_code || code,
+  };
+}
+
+/**
+ * Dynamic approved price from special_price.special_price column.
+ * Never throws.
  */
 export async function getApprovedSpecialPrice(conn, customerId, productId, productCodeInput) {
   try {
@@ -9,14 +35,45 @@ export async function getApprovedSpecialPrice(conn, customerId, productId, produ
       return null;
     }
 
-    const codeLower = String(productCodeInput ?? "").trim().toLowerCase();
-    const pid =
+    let pid =
       productId != null && productId !== "" && Number.isFinite(Number(productId))
         ? Number(productId)
         : null;
 
-    if (!codeLower && pid == null) {
+    let code = String(productCodeInput ?? "").trim();
+
+    if (!code && pid == null) {
       return null;
+    }
+
+    if (pid == null && code) {
+      const product = await resolveProductByCode(conn, code);
+      if (product) {
+        pid = product.productId;
+        code = product.itemCode;
+      }
+    }
+
+    const codes = [...new Set([code, productCodeInput].filter(Boolean))].map((c) =>
+      String(c).trim().toLowerCase()
+    );
+
+    if (pid == null && codes.length === 0) {
+      return null;
+    }
+
+    const codePlaceholders = codes.map(() => "?").join(", ");
+    const params = [customerIdNum];
+
+    let matchSql = "";
+    if (pid != null) {
+      matchSql += "(product_id = ?)";
+      params.push(pid);
+    }
+    if (codes.length > 0) {
+      if (matchSql) matchSql += " OR ";
+      matchSql += `LOWER(TRIM(COALESCE(product_code, ''))) IN (${codePlaceholders})`;
+      params.push(...codes);
     }
 
     const [rows] = await conn.execute(
@@ -24,13 +81,10 @@ export async function getApprovedSpecialPrice(conn, customerId, productId, produ
        FROM special_price
        WHERE customer_id = ?
          AND LOWER(TRIM(status)) = 'approved'
-         AND (
-           (? IS NOT NULL AND product_id = ?)
-           OR (? <> '' AND LOWER(TRIM(COALESCE(product_code, ''))) = ?)
-         )
+         AND (${matchSql})
        ORDER BY id DESC
        LIMIT 1`,
-      [customerIdNum, pid, pid, codeLower, codeLower]
+      params
     );
 
     if (!rows?.length) return null;
