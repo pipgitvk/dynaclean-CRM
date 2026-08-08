@@ -61,7 +61,7 @@
 
 // app/api/get-product-details/route.js
 import { getDbConnection } from "@/lib/db";
-import { log } from "console";
+import { getApprovedSpecialPrice } from "@/lib/getApprovedSpecialPrice";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +69,7 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code")?.trim();
   const mode = searchParams.get("mode") || "full"; // 'suggestion' or 'full'
+  const customerId = searchParams.get("customerId")?.trim() || "";
 
   if (!code) {
     return new Response(JSON.stringify({ error: "Missing product code" }), {
@@ -114,6 +115,7 @@ export async function GET(req) {
       [rows] = await conn.execute(
         `
         SELECT
+          p.id,
           p.item_code,
           p.item_name,
           p.hsn_sac,
@@ -138,6 +140,7 @@ export async function GET(req) {
         [rows] = await conn.execute(
           `
           SELECT
+            p.id,
             p.item_code,
             p.item_name,
             p.hsn_sac,
@@ -183,7 +186,20 @@ export async function GET(req) {
       }
     }
 
-    // await conn.end();
+    if (mode !== "suggestion" && customerId && rows.length > 0) {
+      const row = rows[0];
+      const specialPrice = await getApprovedSpecialPrice(
+        conn,
+        customerId,
+        row.id ?? null,
+        row.item_code || code
+      );
+      if (specialPrice != null) {
+        rows[0].special_price = specialPrice;
+        rows[0].original_price = row.price_per_unit;
+      }
+    }
+
     console.log("Fetched rows:", rows);
     return new Response(JSON.stringify(rows), { status: 200 });
   } catch (err) {

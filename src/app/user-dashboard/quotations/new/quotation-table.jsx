@@ -70,8 +70,11 @@ export default function QuotationTable({ items, setItems, customerId }) {
 
   const fetchProductDetails = async (code, index, isSuggestion = false) => {
     try {
+      const customerParam = customerId
+        ? `&customerId=${encodeURIComponent(customerId)}`
+        : "";
       const res = await fetch(
-        `/api/get-product-details?code=${code}&mode=${isSuggestion ? "suggestion" : "full"}`
+        `/api/get-product-details?code=${encodeURIComponent(code)}&mode=${isSuggestion ? "suggestion" : "full"}${customerParam}`
       );
       const data = await res.json();
       if (!data || data.length === 0) return;
@@ -86,11 +89,25 @@ export default function QuotationTable({ items, setItems, customerId }) {
       const resolvedCode = item.item_code || code;
       const basePrice = parseFloat(item.price_per_unit) || 0;
 
-      const { finalPrice, specialPrice } = await resolvePriceWithSpecial(
-        customerId,
-        resolvedCode,
-        basePrice
-      );
+      let specialPrice =
+        item.special_price != null ? parseFloat(item.special_price) : null;
+      if (specialPrice != null && !Number.isFinite(specialPrice)) {
+        specialPrice = null;
+      }
+
+      if (specialPrice == null) {
+        const resolved = await resolvePriceWithSpecial(
+          customerId,
+          resolvedCode,
+          basePrice
+        );
+        specialPrice = resolved.specialPrice;
+      }
+
+      const finalPrice =
+        specialPrice != null && Number.isFinite(specialPrice)
+          ? specialPrice
+          : basePrice;
 
       const imageUrl = item.image_path || "";
 
@@ -104,7 +121,10 @@ export default function QuotationTable({ items, setItems, customerId }) {
           specification: item.specification || "",
           unit: item.unit || "",
           price: finalPrice,
-          original_price: parseFloat(item.price_per_unit) || 0,
+          original_price:
+            parseFloat(item.original_price) ||
+            parseFloat(item.price_per_unit) ||
+            0,
           special_price: specialPrice,
           last_negotiation_price: parseFloat(item.last_negotiation_price) || 0,
           gst: parseFloat(item.gst_rate) || 18,

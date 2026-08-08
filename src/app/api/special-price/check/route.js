@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { getApprovedSpecialPrice } from "@/lib/getApprovedSpecialPrice";
 
 function normCode(value) {
   return String(value ?? "").trim();
@@ -27,7 +28,6 @@ export async function POST(req) {
     const conn = await getDbConnection();
     const codeLower = productCodeInput.toLowerCase();
 
-    // Resolve product (case-insensitive item_code or product_number)
     const [productRows] = await conn.execute(
       `SELECT id, item_code, price_per_unit, gst_rate
        FROM products_list
@@ -41,30 +41,15 @@ export async function POST(req) {
     const productId = product?.id ?? null;
     const resolvedCode = product?.item_code ?? productCodeInput;
 
-    // Approved special price for this customer + product (by product_id or product_code)
-    const [specialRows] = await conn.execute(
-      `SELECT special_price, status, product_id, product_code
-       FROM special_price
-       WHERE customer_id = ?
-         AND LOWER(TRIM(status)) = 'approved'
-         AND (item_type = 'product' OR item_type IS NULL)
-         AND (
-           (? IS NOT NULL AND product_id = ?)
-           OR LOWER(TRIM(COALESCE(product_code, ''))) = ?
-           OR LOWER(TRIM(COALESCE(product_code, ''))) = ?
-         )
-       ORDER BY approved_date DESC, id DESC
-       LIMIT 1`,
-      [customerId, productId, productId, codeLower, resolvedCode.toLowerCase()]
+    const specialPrice = await getApprovedSpecialPrice(
+      conn,
+      customerId,
+      productId,
+      resolvedCode
     );
 
     const originalPrice =
       product?.price_per_unit != null ? Number(product.price_per_unit) : null;
-    let specialPrice = null;
-
-    if (specialRows.length > 0) {
-      specialPrice = Number(specialRows[0].special_price);
-    }
 
     const finalPrice =
       specialPrice != null && Number.isFinite(specialPrice)
