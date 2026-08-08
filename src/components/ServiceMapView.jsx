@@ -141,6 +141,7 @@ export default function ServiceMapView({ services = [] }) {
           <div style="font-size: 13px; color: #4b5563; line-height: 1.6;">
             <p style="margin: 4px 0;"><strong>Service ID:</strong> ${service.service_id || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Serial:</strong> ${service.serial_number || "N/A"}</p>
+            <p style="margin: 4px 0;"><strong>Model:</strong> ${service.model || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Type:</strong> ${service.service_type || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Company:</strong> ${service.customer_name || "N/A"}</p>
             <p style="margin: 4px 0;"><strong>Address:</strong> ${service.installed_address || service.customer_address || "N/A"}</p>
@@ -380,6 +381,7 @@ export default function ServiceMapView({ services = [] }) {
           </div>
           <div className="text-sm text-gray-600 space-y-1">
             <p><strong>Serial:</strong> {selectedService.serial_number}</p>
+            <p><strong>Model:</strong> {selectedService.model || "N/A"}</p>
             <p><strong>Company:</strong> {selectedService.customer_name}</p>
             <p><strong>Status:</strong> <span className={`font-semibold ${
               selectedService.status === "COMPLETED" ? "text-green-600" :
