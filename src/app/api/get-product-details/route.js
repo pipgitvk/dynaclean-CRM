@@ -115,7 +115,6 @@ export async function GET(req) {
       [rows] = await conn.execute(
         `
         SELECT
-          p.id,
           p.item_code,
           p.item_name,
           p.hsn_sac,
@@ -140,7 +139,6 @@ export async function GET(req) {
         [rows] = await conn.execute(
           `
           SELECT
-            p.id,
             p.item_code,
             p.item_name,
             p.hsn_sac,
@@ -187,16 +185,23 @@ export async function GET(req) {
     }
 
     if (mode !== "suggestion" && customerId && rows.length > 0) {
-      const row = rows[0];
-      const specialPrice = await getApprovedSpecialPrice(
-        conn,
-        customerId,
-        row.id ?? null,
-        row.item_code || code
-      );
-      if (specialPrice != null) {
-        rows[0].special_price = specialPrice;
-        rows[0].original_price = row.price_per_unit;
+      try {
+        const row = rows[0];
+        const specialPrice = await getApprovedSpecialPrice(
+          conn,
+          customerId,
+          null,
+          row.item_code || code
+        );
+        if (specialPrice != null) {
+          rows[0] = {
+            ...row,
+            special_price: specialPrice,
+            original_price: row.price_per_unit,
+          };
+        }
+      } catch (specialErr) {
+        console.error("❌ Special price lookup skipped:", specialErr);
       }
     }
 

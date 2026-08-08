@@ -77,7 +77,12 @@ export default function QuotationTable({ items, setItems, customerId }) {
         `/api/get-product-details?code=${encodeURIComponent(code)}&mode=${isSuggestion ? "suggestion" : "full"}${customerParam}`
       );
       const data = await res.json();
-      if (!data || data.length === 0) return;
+      if (!res.ok || !Array.isArray(data) || data.length === 0) {
+        if (!res.ok) {
+          console.error("❌ Product fetch failed:", data);
+        }
+        return;
+      }
 
       if (isSuggestion) {
         setProductSuggestions(data);
