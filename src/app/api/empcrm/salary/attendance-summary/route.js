@@ -86,6 +86,8 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
       stats.sundays_unpaid_whole_week_off != null
         ? Number(stats.sundays_unpaid_whole_week_off)
         : null,
+    pay_sunday_work_credits:
+      stats.sunday_work_pay_credits != null ? Number(stats.sunday_work_pay_credits) : null,
     attendance_log_days: logs.length,
     dates_worked: logs.map((l) => l.date),
     sunday_worked_dates: stats.sunday_worked_dates,

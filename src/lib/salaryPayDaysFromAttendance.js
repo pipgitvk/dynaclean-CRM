@@ -14,7 +14,8 @@
  *   pay_days_base = salaryPeriodCap − deductionDays
  *   Weekly-off Sunday unpaid if Mon–Sat of that calendar week had no meaningful punch on any
  *   non‑holiday weekday (whole week absent); if that week had at least one such punch, WO Sunday stays paid.
- *   pay_days = pay_days_base − count(such Sundays).
+ *   pay_days = pay_days_base − count(such Sundays) + Sunday work credits
+ *   (each Sunday punch adds 1 day, or 0.5 if half-day by rules — extra pay for working weekly off).
  *
  * - Days before date_of_joining are skipped (not LOP, not paid).
  * - Fetch logs from a few days before month start (`getPayrollAttendanceLogDateRange`) so cross‑month weeks resolve.
@@ -215,6 +216,8 @@ export function computeSalaryPayDaysForUser(p) {
 
   /** Mon–Sat (non‑holiday) payroll credits toward required slots: 1 or 0.5 for structural half-days. */
   let weekdayPayCredits = 0;
+  /** Extra pay credits for punching on a weekly-off Sunday (not counted in requiredWorkingDays). */
+  let sundayWorkPayCredits = 0;
 
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, monthIndex, day);
@@ -258,6 +261,7 @@ export function computeSalaryPayDaysForUser(p) {
       }
       if (isSunday) {
         sundayWorkedDates.push(dateString);
+        sundayWorkPayCredits += isHalfDay ? 0.5 : 1;
       }
       continue;
     }
@@ -303,7 +307,7 @@ export function computeSalaryPayDaysForUser(p) {
     }
   }
 
-  const payDays = payDaysBase - sundaysUnpaidNoWeekPresence;
+  const payDays = payDaysBase - sundaysUnpaidNoWeekPresence + sundayWorkPayCredits;
 
   /** Every day with a meaningful punch is either `present` (regular) or `late_days` (salary classifier). Sum matches attendance “Present” when ranges align. */
   const total_punched_days = present + late_days;
@@ -323,6 +327,7 @@ export function computeSalaryPayDaysForUser(p) {
     pay_days_base: payDaysBase,
     sundays_unpaid_whole_week_off: sundaysUnpaidNoWeekPresence,
     sunday_worked_dates: sundayWorkedDates,
+    sunday_work_pay_credits: sundayWorkPayCredits,
     sundays_in_period_dates: sundaysInPeriodDates,
     period_days: periodDays,
     salary_period_cap: salaryPeriodCap,

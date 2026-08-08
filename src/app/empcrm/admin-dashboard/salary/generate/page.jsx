@@ -262,6 +262,11 @@ const GenerateSalaryPage = () => {
                                           empAtt.pay_sundays_unpaid_whole_week_off !== ""
                                               ? Number(empAtt.pay_sundays_unpaid_whole_week_off)
                                               : 0,
+                                      sundayWorkCredits:
+                                          empAtt.pay_sunday_work_credits != null &&
+                                          empAtt.pay_sunday_work_credits !== ""
+                                              ? Number(empAtt.pay_sunday_work_credits)
+                                              : 0,
                                       salaryFullDays: presN,
                                       salaryHalfDays: Number(empAtt.half_day_count) || 0,
                                       salaryLateDays: lateN,
@@ -1043,31 +1048,76 @@ const GenerateSalaryPage = () => {
                                             </span>
                                         </li>
                                     )}
+                                    {(attendanceDisplayAllZero
+                                        ? 0
+                                        : Number(attendanceBreakdown.payCalc.sundayWorkCredits) ||
+                                          0) > 0 && (
+                                        <li>
+                                            Sunday work bonus (worked on weekly off) ={" "}
+                                            <span className="font-semibold tabular-nums text-emerald-800">
+                                                +{formatPayCalcNumber(
+                                                    attendanceDisplayAllZero
+                                                        ? 0
+                                                        : attendanceBreakdown.payCalc
+                                                              .sundayWorkCredits
+                                                )}
+                                            </span>
+                                            {sundaysWorked.length > 0 && (
+                                                <span className="text-slate-500">
+                                                    {" "}
+                                                    (
+                                                    {sundaysWorked
+                                                        .map((d) => formatDate(d))
+                                                        .join(", ")}
+                                                    )
+                                                </span>
+                                            )}
+                                        </li>
+                                    )}
                                     <li className="pt-1 border-t border-purple-200/80 text-slate-800">
                                         Pay days (for salary) ={" "}
                                         {(attendanceDisplayAllZero
                                             ? 0
                                             : Number(attendanceBreakdown.payCalc.sundaysUnpaidWholeWeekOff) ||
+                                              0) > 0 ||
+                                        (attendanceDisplayAllZero
+                                            ? 0
+                                            : Number(attendanceBreakdown.payCalc.sundayWorkCredits) ||
                                               0) > 0 ? (
                                             <>
-                                                pay days before rule − weekly-off unpaid ={" "}
-                                                <span className="font-semibold tabular-nums">
-                                                    {formatPayCalcNumber(
-                                                        attendanceDisplayAllZero
-                                                            ? 0
-                                                            : attendanceBreakdown.payCalc.payDaysBase
-                                                    )}
-                                                </span>{" "}
-                                                −{" "}
-                                                <span className="font-semibold tabular-nums">
-                                                    {formatPayCalcNumber(
-                                                        attendanceDisplayAllZero
-                                                            ? 0
-                                                            : attendanceBreakdown.payCalc
-                                                                  .sundaysUnpaidWholeWeekOff
-                                                    )}
-                                                </span>{" "}
-                                                ={" "}
+                                                {Number(attendanceBreakdown.payCalc.sundaysUnpaidWholeWeekOff) > 0 ? (
+                                                    <>
+                                                        pay days before rule − weekly-off unpaid ={" "}
+                                                        <span className="font-semibold tabular-nums">
+                                                            {formatPayCalcNumber(
+                                                                attendanceDisplayAllZero
+                                                                    ? 0
+                                                                    : attendanceBreakdown.payCalc.payDaysBase
+                                                            )}
+                                                        </span>{" "}
+                                                        −{" "}
+                                                        <span className="font-semibold tabular-nums">
+                                                            {formatPayCalcNumber(
+                                                                attendanceDisplayAllZero
+                                                                    ? 0
+                                                                    : attendanceBreakdown.payCalc
+                                                                          .sundaysUnpaidWholeWeekOff
+                                                            )}
+                                                        </span>
+                                                        {Number(attendanceBreakdown.payCalc.sundayWorkCredits) > 0
+                                                            ? " + Sunday work"
+                                                            : ""}{" "}
+                                                        ={" "}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        min(30, period) − deduction
+                                                        {Number(attendanceBreakdown.payCalc.sundayWorkCredits) > 0
+                                                            ? " + Sunday work"
+                                                            : ""}{" "}
+                                                        ={" "}
+                                                    </>
+                                                )}
                                             </>
                                         ) : (
                                             <>
@@ -1142,6 +1192,22 @@ const GenerateSalaryPage = () => {
                                                     {z(c.sundays)}
                                                 </dd>
                                             </div>
+                                            {!attendanceDisplayAllZero &&
+                                                Number(attendanceBreakdown.payCalc?.sundayWorkCredits) > 0 && (
+                                                <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                    <dt className="text-slate-600">
+                                                        Sunday work bonus
+                                                        {sundaysWorked.length > 0 && (
+                                                            <span className="block text-[11px] text-slate-400 leading-snug">
+                                                                {sundaysWorked.map((d) => formatDate(d)).join(", ")}
+                                                            </span>
+                                                        )}
+                                                    </dt>
+                                                    <dd className="font-semibold text-emerald-600 tabular-nums shrink-0">
+                                                        +{formatPayCalcNumber(attendanceBreakdown.payCalc.sundayWorkCredits)}
+                                                    </dd>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
                                                 <dt className="text-slate-600">Holidays</dt>
                                                 <dd className="font-semibold text-indigo-600 tabular-nums">
