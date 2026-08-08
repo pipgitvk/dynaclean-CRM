@@ -50,7 +50,7 @@ export default function ServiceMapView({ services = [] }) {
     } else if (service.status === "PENDING") {
       color = "#f59e0b"; // Orange
     } else if (service.status === "PENDING FOR SPARES") {
-      color = "#ef4444"; // Red
+      color = "#ffff00"; // Yellow
     } else if (service.status === "IN PROGRESS") {
       color = "#6366f1"; // Indigo
     }
@@ -300,7 +300,7 @@ export default function ServiceMapView({ services = [] }) {
               Pending
             </div>
             <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+              <span className="inline-block w-3 h-3 rounded-full bg-yellow-300 mr-2"></span>
               Pending for Spares
             </div>
             <div className="flex items-center text-xs text-gray-600">
@@ -352,7 +352,7 @@ export default function ServiceMapView({ services = [] }) {
               <span className={`inline-block w-2 h-2 rounded-full mr-1 ${
                 status === "COMPLETED" ? "bg-green-500" :
                 status === "PENDING" ? "bg-orange-500" :
-                status === "PENDING FOR SPARES" ? "bg-red-500" :
+                status === "PENDING FOR SPARES" ? "bg-yellow-300" :
                 status === "IN PROGRESS" ? "bg-indigo-500" :
                 "bg-blue-500"
               }`}></span>
