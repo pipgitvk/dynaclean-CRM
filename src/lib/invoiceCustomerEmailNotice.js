@@ -318,7 +318,7 @@ export function buildInvoicePdfDocumentData(invoice) {
     terms: parseTerms(invo.terms_conditions),
     notes: invo.notes || "",
     bank: {
-      accountHolderName: "Dynaclean Industries Private Limited",
+      accountHolderName: "Dynaclean Industries Pvt Ltd",
       name: "ICICI Bank",
       accountNo: "343405500379",
       IFSC: "ICIC0003434",

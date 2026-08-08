@@ -1088,7 +1088,7 @@ const InvoicePDFDocument = ({ data, logoSrc, signatureSrc }) => {
               <Text style={{ fontSize: 8, lineHeight: 1.25 }}>A/C Holder Name : {data.bank.accountHolderName}</Text>
               <Text style={{ fontSize: 8, lineHeight: 1.25 }}>Bank Name : {data.bank.name}</Text>
               <Text style={{ fontSize: 8, lineHeight: 1.25 }}>A/c No. : {data.bank.accountNo}</Text>
-              <Text style={{ fontSize: 8, lineHeight: 1.25 }}>Branch & IFS Code: {data.bank.IFSC}</Text>
+              <Text style={{ fontSize: 8, lineHeight: 1.25 }}>Branch &amp; IFSC Code: {data.bank.IFSC}</Text>
             </View>
           </View>
 
