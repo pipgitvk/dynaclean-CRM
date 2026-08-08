@@ -255,7 +255,7 @@ const AttendancePage = () => {
       existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
 
     if (hasRealPunch) {
-      allDates.push({ ...existingLog, type: "present" });
+      allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend });
     } else {
       const base = existingLog ? { ...existingLog } : {};
       if (isWeekend) {
@@ -532,15 +532,22 @@ const AttendancePage = () => {
                       ? "bg-purple-50"
                       : log.type === "holiday"
                         ? "bg-indigo-50"
-                        : "bg-white"
+                        : log.workedSunday
+                          ? "bg-pink-200"
+                          : "bg-white"
                   }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-gray-900">
                     Date:
                   </span>
-                  <span className="text-sm text-gray-700">
+                  <span className="text-sm text-gray-700 flex items-center gap-1.5">
                     {new Date(log.date).toLocaleDateString()}
+                    {log.workedSunday && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                        Working Sunday
+                      </span>
+                    )}
                   </span>
                 </div>
                 {log.type === "present" ? (
@@ -728,10 +735,15 @@ const AttendancePage = () => {
                 filteredLogs.map((log, index) => (
                   <tr
                     key={index}
-                    className="hover:bg-gray-50 transition-colors duration-150"
+                    className={`transition-colors duration-150 ${log.workedSunday ? "bg-pink-200 hover:bg-pink-300" : "hover:bg-gray-50"}`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {new Date(log.date).toLocaleDateString()}
+                      {log.workedSunday && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                          Working Sunday
+                        </span>
+                      )}
                     </td>
                     {log.type === "present" ? (
                       <>
