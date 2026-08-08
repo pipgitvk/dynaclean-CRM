@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2, Building2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import ExcelJS from "exceljs";
 
 export default function StatementTable({ rows }) {
   const router = useRouter();
@@ -468,6 +469,87 @@ export default function StatementTable({ rows }) {
     toast.success("PDF exported");
   };
 
+  const handleExportExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Statements");
+
+      // Define columns
+      worksheet.columns = [
+        { header: "ID", key: "id", width: 10 },
+        { header: "Trans ID", key: "trans_id", width: 18 },
+        { header: "Date", key: "date", width: 12 },
+        { header: "Txn Dated Deb", key: "txn_dated_deb", width: 14 },
+        { header: "Txn Posted Date", key: "txn_posted_date", width: 16 },
+        { header: "Cheq No", key: "cheq_no", width: 12 },
+        { header: "Description", key: "description", width: 25 },
+        { header: "Debit", key: "debit", width: 12 },
+        { header: "Credit", key: "credit", width: 12 },
+        { header: "Status", key: "status", width: 12 },
+        { header: "Invoice No", key: "invoice_number", width: 14 },
+        { header: "Purchase IDs", key: "purchase_ids", width: 16 },
+        { header: "DD ID", key: "dd_id", width: 10 },
+        { header: "Expense ID", key: "expense_id", width: 12 },
+        { header: "Bank Account", key: "account_number", width: 16 },
+        { header: "Balance", key: "balance", width: 14 },
+      ];
+
+      // Style header row
+      worksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF3B82F6" },
+      };
+      worksheet.getRow(1).font = {
+        bold: true,
+        color: { argb: "FFFFFFFF" },
+      };
+
+      // Add data rows
+      sortedRows.forEach((row) => {
+        worksheet.addRow({
+          id: row.id,
+          trans_id: row.trans_id || "-",
+          date: row.date ? dayjs(row.date).format("DD MMM YYYY") : "-",
+          txn_dated_deb: row.txn_dated_deb && row.txn_dated_deb !== "0000-00-00" ? dayjs(row.txn_dated_deb).format("DD MMM YYYY") : "-",
+          txn_posted_date: row.txn_posted_date && row.txn_posted_date !== "0000-00-00" ? dayjs(row.txn_posted_date).format("DD MMM YYYY") : "-",
+          cheq_no: row.cheq_no || "-",
+          description: row.description || "-",
+          debit: row.type === "Debit" ? formatPdfAmount(row.amount) : "-",
+          credit: row.type === "Credit" ? formatPdfAmount(row.amount) : "-",
+          status: displayInvoiceStatus(row),
+          invoice_number: row.invoice_number || "-",
+          purchase_ids: getLinkedPurchaseRefs(row).map(x => `${x.prefix}${x.id}`).join(", ") || "-",
+          dd_id: row.dd_id ? `DD#${row.dd_id}` : "-",
+          expense_id: row.client_expense_id ? `EXP#${row.client_expense_id}` : "-",
+          account_number: row.account_number || "-",
+          balance: displayBalance(row) != null ? formatPdfAmount(displayBalance(row)) : "-",
+        });
+      });
+
+      // Center align numeric columns
+      worksheet.columns.forEach((col) => {
+        if (["id", "debit", "credit", "balance"].includes(col.key)) {
+          worksheet.getColumn(col.key).alignment = { horizontal: "right" };
+        }
+      });
+
+      // Generate and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `statements_${dayjs().format("YYYY-MM-DD")}.xlsx`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Excel exported");
+    } catch (err) {
+      toast.error("Failed to export Excel: " + (err.message || "Unknown error"));
+    }
+  };
+
   // Opens the import modal
   const openImportModal = () => {
     setSelectedBankId("");
@@ -723,6 +805,15 @@ export default function StatementTable({ rows }) {
           >
             <Download size={16} />
             Export PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
+            title="Download filtered data as Excel"
+          >
+            <Download size={16} />
+            Export Excel
           </button>
           <button
             type="button"
