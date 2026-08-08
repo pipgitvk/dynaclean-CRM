@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
-import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2 } from "lucide-react";
+import { Eye, Pencil, X, Upload, Download, FileSpreadsheet, Search, Trash2, Building2 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -54,6 +54,13 @@ export default function StatementTable({ rows }) {
   const [expenseTxnForIdSearch, setExpenseTxnForIdSearch] = useState(null);
   const [expenseIdResolved, setExpenseIdResolved] = useState(null);
   const [purchaseTypeByLegacyId, setPurchaseTypeByLegacyId] = useState({});
+
+  // --- Import modal state ---
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [banks, setBanks] = useState([]);
+  const [selectedBankId, setSelectedBankId] = useState("");
+  const [importFile, setImportFile] = useState(null);
+  const importFileRef = useRef(null);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -201,8 +208,17 @@ export default function StatementTable({ rows }) {
     };
   }, [rows]);
 
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
+  // Fetch banks for import modal
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/bank-masters", { credentials: "include" })
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setBanks(data.banks || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const filteredRows = useMemo(() => {    return rows.filter((row) => {
       const qRaw = searchQuery.trim();
       const q = qRaw.toLowerCase();
       const isNumericSearch = /^\d+$/.test(qRaw);
@@ -452,13 +468,35 @@ export default function StatementTable({ rows }) {
     toast.success("PDF exported");
   };
 
-  const handleImport = async (e) => {
-    const file = e?.target?.files?.[0];
-    if (!file) return;
+  // Opens the import modal
+  const openImportModal = () => {
+    setSelectedBankId("");
+    setImportFile(null);
+    if (importFileRef.current) importFileRef.current.value = "";
+    setShowImportModal(true);
+  };
+
+  const closeImportModal = () => {
+    setShowImportModal(false);
+    setSelectedBankId("");
+    setImportFile(null);
+    if (importFileRef.current) importFileRef.current.value = "";
+  };
+
+  const handleImport = async () => {
+    if (!selectedBankId) {
+      toast.error("Please select a bank before importing");
+      return;
+    }
+    if (!importFile) {
+      toast.error("Please choose a CSV or Excel file");
+      return;
+    }
     setImporting(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", importFile);
+      formData.append("bank_id", selectedBankId);
       const res = await fetch("/api/statements/import", {
         method: "POST",
         body: formData,
@@ -466,6 +504,8 @@ export default function StatementTable({ rows }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import failed");
+
+      closeImportModal();
 
       if (data.warning) {
         toast(`⚠ ${data.warning}`, { icon: "⚠️", duration: 6000 });
@@ -483,7 +523,6 @@ export default function StatementTable({ rows }) {
       toast.error(err.message || "Import failed");
     } finally {
       setImporting(false);
-      e.target.value = "";
     }
   };
 
@@ -669,23 +708,15 @@ export default function StatementTable({ rows }) {
           Reset
         </button>
         <div className="flex flex-wrap gap-2 ml-auto">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            className="hidden"
-            onChange={handleImport}
-          />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={openImportModal}
             disabled={importing}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
           >
             <Upload size={16} />
             {importing ? "Importing..." : "Import (CSV/Excel)"}
-          </button>
-          <button
+          </button>          <button
             type="button"
             onClick={handleExportPDF}
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
@@ -729,6 +760,7 @@ export default function StatementTable({ rows }) {
               <th onClick={() => handleSort("debit")} className="p-3 cursor-pointer select-none">Debit<SortIcon column="debit" /></th>
               <th onClick={() => handleSort("credit")} className="p-3 cursor-pointer select-none">Credit<SortIcon column="credit" /></th>
               <th onClick={() => handleSort("status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="status" /></th>
+              <th className="p-3">Bank</th>
               <th className="p-3">Invoice, Purchases, DD, Expense</th>
               <th
                 onClick={() => handleSort("balance")}
@@ -786,6 +818,16 @@ export default function StatementTable({ rows }) {
                       <span className={isSettledRow(row) ? "text-green-600 font-medium text-sm" : "text-amber-600 font-medium text-sm"}>
                         {isSettledRow(row) ? "Settled" : "Unsettled"}
                       </span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {row.account_number ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-800 text-xs font-medium rounded-full whitespace-nowrap">
+                        <Building2 size={11} />
+                        {row.account_number}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
                     )}
                   </td>
                   <td className="p-3">
@@ -906,7 +948,7 @@ export default function StatementTable({ rows }) {
               ))
             ) : (
               <tr>
-                <td colSpan="15" className="p-4 text-center text-gray-500">
+                <td colSpan="16" className="p-4 text-center text-gray-500">
                   No entries found.
                 </td>
               </tr>
@@ -1033,6 +1075,14 @@ export default function StatementTable({ rows }) {
                 {displayBalance(row) != null ? `₹${displayBalance(row).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
               </span>
             </div>
+            <div>
+              <strong>Bank Account:</strong>{" "}
+              {row.account_number ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-800 text-xs font-medium rounded-full">
+                  <Building2 size={11} />{row.account_number}
+                </span>
+              ) : <span className="text-gray-400 text-xs">—</span>}
+            </div>
             <div className="flex items-center gap-4 pt-2">
               <button type="button" onClick={() => setModalId(row.id)} className="text-blue-600 hover:underline">
                 <Eye size={16} /> View
@@ -1044,6 +1094,95 @@ export default function StatementTable({ rows }) {
           </div>
         ))}
       </div>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <Upload size={18} className="text-emerald-600" />
+                Import Bank Statement
+              </h3>
+              <button onClick={closeImportModal} className="p-1 hover:bg-gray-100 rounded">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              {/* Bank selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Bank <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedBankId}
+                  onChange={(e) => setSelectedBankId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Select Bank —</option>
+                  {banks.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.bank_name}{b.account_number ? ` (A/C: ${b.account_number})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {banks.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No banks found. <a href="/admin-dashboard/bank-masters" className="underline font-medium">Add a bank first →</a>
+                  </p>
+                )}
+              </div>
+
+              {/* File selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select CSV / Excel File <span className="text-red-500">*</span>
+                </label>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 focus:outline-none"
+                />
+                {importFile && (
+                  <p className="text-xs text-gray-500 mt-1 truncate">Selected: {importFile.name}</p>
+                )}
+              </div>
+
+              {/* Info callout */}
+              {selectedBankId && (() => {
+                const bank = banks.find((b) => String(b.id) === String(selectedBankId));
+                if (!bank) return null;
+                return (
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-800 space-y-0.5">
+                    <p className="font-semibold">{bank.bank_name}</p>
+                    {bank.account_number && <p>Account: <span className="font-mono">{bank.account_number}</span></p>}
+                    {bank.ifsc && <p>IFSC: <span className="font-mono">{bank.ifsc}</span></p>}
+                    <p className="text-blue-600 mt-1">All imported rows will be tagged with this bank and account number automatically.</p>
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="px-6 pb-6 flex justify-end gap-3">
+              <button
+                onClick={closeImportModal}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importing || !selectedBankId || !importFile}
+                className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload size={14} />
+                {importing ? "Importing..." : "Import"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Skipped Rows Modal */}
       {showSkippedModal && (

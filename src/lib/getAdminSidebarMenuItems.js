@@ -685,6 +685,12 @@ const allMenuItems = [
         icon: "Receipt",
       },
       {
+        path: "/admin-dashboard/bank-masters",
+        name: "Bank Management",
+        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        icon: "Landmark",
+      },
+      {
         path: "/admin-dashboard/statements",
         name: "Statements",
         roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],

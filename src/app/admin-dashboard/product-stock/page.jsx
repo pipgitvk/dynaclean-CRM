@@ -485,16 +485,15 @@ function ProductAndSpareLists({ type }) {
                   <th className="p-2 text-left">Image</th>
                   <th className="p-2 text-left">Code</th>
                   <th className="p-2 text-left">Name</th>
-                  <th className="p-2 text-left">Product No</th>
                   <th className="p-2 text-left">Min Qty</th>
                   <th className="p-2 text-left">Price</th>
+                  <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">GEM Price</th>
                   <th className="p-2 text-left">GEM Last Neg. Price</th>
                   <th className="p-2 text-left">Dealer Price</th>
                   <th className="p-2 text-left">DP NO-warranty</th>
                   <th className="p-2 text-left">DP</th>
                   <th className="p-2 text-left">GST Rate (%)</th>
-                  <th className="p-2 text-left">Last Neg. Price</th>
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Spares</th>
                   <th className="p-2 text-left">Actions</th>
@@ -537,9 +536,13 @@ function ProductAndSpareLists({ type }) {
 
                     {type === "product" ? (
                       <>
-                        <td className="p-2">{r.item_code}</td>
+                        <td className="p-2">
+                          <div className="space-y-2">
+                            <div className="font-semibold">{r.item_code}</div>
+                            <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded inline-block font-semibold">{r.product_number}</div>
+                          </div>
+                        </td>
                         <td className="p-2">{r.item_name}</td>
-                        <td className="p-2">{r.product_number}</td>
                         <td className="p-2">{r.min_qty}</td>
                         <td className="p-2">
                           {editingPrice.key === r.item_code && editingPrice.field === 'price' ? (
@@ -557,6 +560,25 @@ function ProductAndSpareLists({ type }) {
                             <div className="flex items-center gap-2 group">
                               <span>{r.price_per_unit || 0}</span>
                               <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'price', value: r.price_per_unit || 0 })} />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-2">
+                          {editingPrice.key === r.item_code && editingPrice.field === 'last_negotiation_price' ? (
+                            <div className="flex gap-1 items-center">
+                              <input
+                                type="number"
+                                className="w-20 border rounded px-1 text-xs"
+                                value={editingPrice.value}
+                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
+                              />
+                              <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
+                              <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 group">
+                              <span>{r.last_negotiation_price || 0}</span>
+                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
                             </div>
                           )}
                         </td>
@@ -672,25 +694,6 @@ function ProductAndSpareLists({ type }) {
                             <div className="flex items-center gap-2 group">
                               <span>{r.gst_rate || '-'}</span>
                               <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingGst({ key: r.item_code, value: r.gst_rate || '' })} />
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-2">
-                          {editingPrice.key === r.item_code && editingPrice.field === 'last_negotiation_price' ? (
-                            <div className="flex gap-1 items-center">
-                              <input
-                                type="number"
-                                className="w-20 border rounded px-1 text-xs"
-                                value={editingPrice.value}
-                                onChange={(e) => setEditingPrice(prev => ({ ...prev, value: e.target.value }))}
-                              />
-                              <button disabled={savingPrice} onClick={() => handleSavePrice(r, 'last_negotiation_price')} className="text-green-600 text-xs">Save</button>
-                              <button disabled={savingPrice} onClick={() => setEditingPrice({ key: null, field: null, value: "" })} className="text-gray-500 text-xs">X</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 group">
-                              <span>{r.last_negotiation_price || 0}</span>
-                              <Pencil className="w-3 h-3 text-gray-400 cursor-pointer opacity-0 group-hover:opacity-100" onClick={() => setEditingPrice({ key: r.item_code, field: 'last_negotiation_price', value: r.last_negotiation_price || 0 })} />
                             </div>
                           )}
                         </td>
