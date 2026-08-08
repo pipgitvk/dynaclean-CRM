@@ -110,8 +110,7 @@ export async function GET(req) {
         [likeCode, likeCode, likeCode, likeCode]
       );
     } else {
-      // Full product fetch
-      // First, try to get the product from the products_list table
+      // Full product fetch (exact code, then case-insensitive item_code / product_number)
       [rows] = await conn.execute(
         `
         SELECT
@@ -134,7 +133,33 @@ export async function GET(req) {
         [code]
       );
 
-      // If no product is found, try to get it from the spare_list table
+      if (rows.length === 0) {
+        const codeLower = code.toLowerCase();
+        [rows] = await conn.execute(
+          `
+          SELECT
+            p.item_code,
+            p.item_name,
+            p.hsn_sac,
+            p.specification,
+            p.unit,
+            p.price_per_unit,
+            p.gst_rate,
+            p.last_negotiation_price,
+            p.product_image as image_path
+          FROM
+            products_list p
+          LEFT JOIN
+            product_images pi ON p.item_code = pi.item_code
+          WHERE
+            LOWER(TRIM(p.item_code)) = ?
+            OR LOWER(TRIM(COALESCE(p.product_number, ''))) = ?
+          LIMIT 1`,
+          [codeLower, codeLower]
+        );
+      }
+
+      // If no product is found, try spare_list
       if (rows.length === 0) {
         [rows] = await conn.execute(
           `

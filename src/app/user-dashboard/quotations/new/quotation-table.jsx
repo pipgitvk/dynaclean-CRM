@@ -1,11 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
+
+async function resolvePriceWithSpecial(customerId, productCode, basePrice) {
+  if (!customerId || !productCode) {
+    return { finalPrice: basePrice, specialPrice: null };
+  }
+
+  try {
+    const specialRes = await fetch("/api/special-price/check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer_id: Number(customerId) || customerId,
+        product_code: productCode,
+      }),
+    });
+
+    const specialData = await specialRes.json();
+    if (specialRes.ok && specialData?.special_price != null) {
+      const specialPrice = parseFloat(specialData.special_price);
+      if (Number.isFinite(specialPrice)) {
+        return { finalPrice: specialPrice, specialPrice };
+      }
+    }
+  } catch (err) {
+    console.error("❌ Special price fetch error", err);
+  }
+
+  return { finalPrice: basePrice, specialPrice: null };
+}
 
 export default function QuotationTable({ items, setItems, customerId }) {
   const [productSuggestions, setProductSuggestions] = useState([]);
   const [activeRowIndex, setActiveRowIndex] = useState(null);
+  const itemsRef = useRef(items);
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const handleChange = (index, field, value) => {
     setItems(prev => {
@@ -49,27 +83,14 @@ export default function QuotationTable({ items, setItems, customerId }) {
       }
 
       const item = data[0];
-      let finalPrice = parseFloat(item.price_per_unit) || 0;
-      let specialPrice = null;
+      const resolvedCode = item.item_code || code;
+      const basePrice = parseFloat(item.price_per_unit) || 0;
 
-      try {
-        const specialRes = await fetch("/api/special-price/check", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customer_id: customerId,
-            product_code: item.item_code || code,
-          }),
-        });
-
-        const specialData = await specialRes.json();
-        if (specialData?.special_price) {
-          specialPrice = parseFloat(specialData.special_price);
-          finalPrice = specialPrice;
-        }
-      } catch (err) {
-        console.error("❌ Special price fetch error", err);
-      }
+      const { finalPrice, specialPrice } = await resolvePriceWithSpecial(
+        customerId,
+        resolvedCode,
+        basePrice
+      );
 
       const imageUrl = item.image_path || "";
 
@@ -77,7 +98,7 @@ export default function QuotationTable({ items, setItems, customerId }) {
         const updated = [...prev];
         updated[index] = {
           ...updated[index],
-          productCode: item.item_code || code,
+          productCode: resolvedCode,
           name: item.item_name || "",
           hsn: item.hsn_sac || "",
           specification: item.specification || "",
@@ -96,6 +117,35 @@ export default function QuotationTable({ items, setItems, customerId }) {
       console.error("❌ Product fetch error", err);
     }
   };
+
+  const reapplySpecialPrices = useCallback(async () => {
+    if (!customerId) return;
+
+    const prev = itemsRef.current;
+    if (!prev.some((i) => String(i.productCode ?? "").trim())) return;
+
+    const next = await Promise.all(
+      prev.map(async (row) => {
+        const code = String(row.productCode ?? "").trim();
+        if (!code) return row;
+        const base =
+          parseFloat(row.original_price) || parseFloat(row.price) || 0;
+        const { specialPrice } = await resolvePriceWithSpecial(
+          customerId,
+          code,
+          base
+        );
+        if (specialPrice == null) return row;
+        return { ...row, price: specialPrice, special_price: specialPrice };
+      })
+    );
+
+    setItems(next);
+  }, [customerId, setItems]);
+
+  useEffect(() => {
+    reapplySpecialPrices();
+  }, [customerId, reapplySpecialPrices]);
 
   const addRow = () => {
     setItems(prev => [
