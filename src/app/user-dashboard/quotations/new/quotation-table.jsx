@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 
-async function resolvePriceWithSpecial(customerId, productCode, basePrice) {
+async function resolvePriceWithSpecial(customerId, productCode, basePrice, itemType = null) {
   if (!customerId || !productCode) {
     return { finalPrice: basePrice, specialPrice: null };
   }
@@ -15,6 +15,7 @@ async function resolvePriceWithSpecial(customerId, productCode, basePrice) {
       body: JSON.stringify({
         customer_id: Number(customerId) || customerId,
         product_code: productCode,
+        item_type: itemType || undefined,
       }),
     });
 
@@ -68,7 +69,7 @@ export default function QuotationTable({ items, setItems, customerId }) {
     });
   };
 
-  const fetchProductDetails = async (code, index, isSuggestion = false) => {
+  const fetchProductDetails = async (code, index, isSuggestion = false, itemType = null) => {
     try {
       const customerParam = customerId
         ? `&customerId=${encodeURIComponent(customerId)}`
@@ -92,15 +93,17 @@ export default function QuotationTable({ items, setItems, customerId }) {
 
       const item = data[0];
       const resolvedCode = item.item_code || code;
+      const resolvedType = itemType || item.item_type || item.source || "product";
       const basePrice = parseFloat(item.price_per_unit) || 0;
 
-      // Always load live price from special_price table when customer is selected
+      // Live price from special_price table (product + spare)
       let specialPrice = null;
       if (customerId) {
         const resolved = await resolvePriceWithSpecial(
           customerId,
           resolvedCode,
-          basePrice
+          basePrice,
+          resolvedType
         );
         specialPrice = resolved.specialPrice;
       } else if (item.special_price != null) {
@@ -120,6 +123,7 @@ export default function QuotationTable({ items, setItems, customerId }) {
         updated[index] = {
           ...updated[index],
           productCode: resolvedCode,
+          item_type: resolvedType,
           name: item.item_name || "",
           hsn: item.hsn_sac || "",
           specification: item.specification || "",
@@ -157,7 +161,8 @@ export default function QuotationTable({ items, setItems, customerId }) {
         const { specialPrice } = await resolvePriceWithSpecial(
           customerId,
           code,
-          base
+          base,
+          row.item_type || null
         );
         if (specialPrice == null) return row;
         return { ...row, price: specialPrice, special_price: specialPrice };
@@ -266,14 +271,28 @@ export default function QuotationTable({ items, setItems, customerId }) {
                         <ul className="absolute z-10 bg-white border rounded shadow-sm mt-1 max-h-40 overflow-y-auto w-48 text-xs">
                           {productSuggestions.map((p, i) => (
                             <li
-                              key={i}
+                              key={`${p.source || "product"}-${p.item_code}-${i}`}
                               onClick={() => {
                                 handleChange(idx, "productCode", p.item_code);
-                                fetchProductDetails(p.item_code, idx);
+                                fetchProductDetails(
+                                  p.item_code,
+                                  idx,
+                                  false,
+                                  p.source || "product"
+                                );
                                 setProductSuggestions([]);
                               }}
                               className="px-2 py-1 cursor-pointer hover:bg-emerald-100"
                             >
+                              <span
+                                className={`mr-1 px-1 rounded text-[10px] font-semibold ${
+                                  p.source === "spare"
+                                    ? "bg-purple-100 text-purple-700"
+                                    : "bg-blue-100 text-blue-700"
+                                }`}
+                              >
+                                {p.source === "spare" ? "Spare" : "Product"}
+                              </span>
                               <span className="font-semibold">
                                 {p.item_code}
                               </span>{" "}
@@ -361,7 +380,7 @@ export default function QuotationTable({ items, setItems, customerId }) {
           onClick={addRow}
           className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700 text-sm"
         >
-          + Add Product
+          + Add Product / Spare
         </button>
       </div>
     </div>

@@ -3,7 +3,8 @@ import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import {
   getApprovedSpecialPrice,
-  resolveProductByCode,
+  getQuotationItemBasePricing,
+  resolveQuotationItemByCode,
 } from "@/lib/getApprovedSpecialPrice";
 
 function normCode(value) {
@@ -19,7 +20,8 @@ export async function POST(req) {
 
     const body = await req.json();
     const customerId = String(body.customer_id ?? "").trim();
-    const productCodeInput = normCode(body.product_code);
+    const productCodeInput = normCode(body.product_code || body.item_code);
+    const itemTypeInput = normCode(body.item_type).toLowerCase() || null;
 
     if (!customerId || !productCodeInput) {
       return NextResponse.json(
@@ -29,34 +31,26 @@ export async function POST(req) {
     }
 
     const conn = await getDbConnection();
-    const product = await resolveProductByCode(conn, productCodeInput);
+    const item = await resolveQuotationItemByCode(conn, productCodeInput);
 
-    let originalPrice = null;
-    let gstRate = null;
-    if (product?.productId) {
-      const [productRows] = await conn.execute(
-        `SELECT price_per_unit, gst_rate FROM products_list WHERE id = ? LIMIT 1`,
-        [product.productId]
-      );
-      if (productRows[0]) {
-        originalPrice =
-          productRows[0].price_per_unit != null
-            ? Number(productRows[0].price_per_unit)
-            : null;
-        gstRate = productRows[0].gst_rate ?? null;
-      }
-    }
+    const { originalPrice, gstRate } = await getQuotationItemBasePricing(
+      conn,
+      item
+    );
 
-    const resolvedCode = product?.itemCode ?? productCodeInput;
+    const resolvedCode = item?.itemCode ?? productCodeInput;
+    const resolvedType = item?.itemType ?? itemTypeInput;
+
     const specialPrice = await getApprovedSpecialPrice(
       conn,
       customerId,
-      product?.productId ?? null,
-      resolvedCode
+      item?.itemId ?? null,
+      resolvedCode,
+      resolvedType
     );
 
-    if (product == null && specialPrice == null) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    if (item == null && specialPrice == null) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
     const finalPrice =
@@ -66,7 +60,8 @@ export async function POST(req) {
 
     return NextResponse.json({
       success: true,
-      product_id: product?.productId ?? null,
+      item_type: resolvedType,
+      product_id: item?.itemId ?? null,
       product_code: resolvedCode,
       original_price: originalPrice,
       special_price: specialPrice,
