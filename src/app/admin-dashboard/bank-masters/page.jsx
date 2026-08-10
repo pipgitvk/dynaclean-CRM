@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { Pencil, Trash2, Plus, X, Building2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const EMPTY_FORM = {
   bank_name: "",
@@ -13,6 +14,7 @@ const EMPTY_FORM = {
 };
 
 export default function BankMastersPage() {
+  const router = useRouter();
   const [banks, setBanks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -20,11 +22,17 @@ export default function BankMastersPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const fetchBanks = async () => {
     try {
       const res = await fetch("/api/bank-masters", { credentials: "include" });
       const data = await res.json();
+      if (res.status === 403) {
+        setAccessDenied(true);
+        setLoading(false);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setBanks(data.banks || []);
     } catch (err) {
@@ -113,6 +121,17 @@ export default function BankMastersPage() {
       setDeletingId(null);
     }
   };
+
+  if (accessDenied) {
+    return (
+      <div className="max-w-5xl mx-auto p-6 w-full">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h2 className="text-red-800 font-semibold mb-2">Access Denied</h2>
+          <p className="text-red-700">You don't have permission to access Bank Management. This page is only accessible to Accountants and Administrators.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto p-6 w-full space-y-6">

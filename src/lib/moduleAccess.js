@@ -122,6 +122,7 @@ export const MODULE_TREE = [
       { key: "other-income", label: "Other Income", icon: "📈" },
       { key: "import-billing", label: "Billing" },
       { key: "ledger", label: "Ledger" },
+      { key: "bank-management", label: "Bank Management" },
     ],
   },
   {
@@ -354,6 +355,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "other-income", label: "📈 Other Income" },
       { kind: "leaf", key: "import-billing", label: "Billing" },
       { kind: "leaf", key: "ledger", label: "Ledger" },
+      { kind: "leaf", key: "bank-management", label: "Bank Management" },
     ],
   },
   {

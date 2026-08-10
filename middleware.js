@@ -111,6 +111,7 @@ export async function middleware(request) {
         "/admin-dashboard/delivery-challan",
         "/admin-dashboard/credit-notes",
         "/admin-dashboard/ledger",
+        "/admin-dashboard/bank-masters",
       ];
       if (ACCOUNTANT_ADMIN_PREFIXES.some((p) => pathname.startsWith(p))) {
         if (isJwtAccountingRole(role) || role === "ADMIN") {
