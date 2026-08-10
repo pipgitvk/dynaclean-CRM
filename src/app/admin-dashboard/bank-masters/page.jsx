@@ -192,14 +192,6 @@ export default function BankMastersPage() {
                         >
                           <Pencil size={16} />
                         </button>
-                        <button
-                          onClick={() => handleDelete(bank)}
-                          disabled={deletingId === bank.id}
-                          className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
                     </td>
                   </tr>
