@@ -33,7 +33,7 @@ const ALLOWED_USER_ROLES = new Set([
 
 export async function POST(request) {
   try {
-    const { username, email, gender, dob, password, number, userRole } = await request.json();
+    const { username, email, gender, dob, password, number, userRole, employeeType } = await request.json();
 
     // Basic validation
     if (!username || !email || !password ) {
@@ -45,12 +45,18 @@ export async function POST(request) {
       return NextResponse.json({ error: "Invalid user role." }, { status: 400 });
     }
 
+    // Validate employee type
+    const empTypeStr = String(employeeType ?? "").trim();
+    if (!empTypeStr || empTypeStr === "Select Type") {
+      return NextResponse.json({ error: "Please select a valid employee type." }, { status: 400 });
+    }
+
     const conn = await getDbConnection();
     const query = `
-      INSERT INTO rep_list (username, email, gender, dob, password, number, userRole , status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO rep_list (username, email, gender, dob, password, number, userRole, employeeType, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const values = [username, email, gender, dob, password, number, roleStr, 1];
+    const values = [username, email, gender, dob, password, number, roleStr, empTypeStr, 1];
     
     const [result] = await conn.execute(query, values);
         // await conn.end();

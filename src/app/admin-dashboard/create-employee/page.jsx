@@ -32,6 +32,12 @@ const USER_ROLE_OPTIONS = [
   "EA",
 ];
 
+const EMPLOYEE_TYPE_OPTIONS = [
+  "Select Type",
+  "Company Person",
+  "Third Party",
+];
+
 export default function CreateEmployeeForm() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -43,6 +49,7 @@ export default function CreateEmployeeForm() {
     number: "",
     profile_pic: "default.png",
     userRole: USER_ROLE_OPTIONS[0] ?? "",
+    employeeType: EMPLOYEE_TYPE_OPTIONS[0] ?? "",
   });
   const [isCreating, setIsCreating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -85,6 +92,13 @@ export default function CreateEmployeeForm() {
     setIsCreating(true);
     setStatusMessage("");
 
+    // Validate employee type selection
+    if (formData.employeeType === "Select Type") {
+      setStatusMessage("❌ Please select a valid employee type.");
+      setIsCreating(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/create-employee", {
         method: "POST",
@@ -105,6 +119,7 @@ export default function CreateEmployeeForm() {
           number: "",
           profile_pic: "default.png",
           userRole: USER_ROLE_OPTIONS[0] || "",
+          employeeType: "Select Type",
         });
         setTimeout(() => {
           router.push("/admin-dashboard/employees");
@@ -307,6 +322,28 @@ export default function CreateEmployeeForm() {
             {USER_ROLE_OPTIONS.map((role) => (
               <option key={role} value={role}>
                 {role}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label
+            htmlFor="employeeType"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Employee Type
+          </label>
+          <select
+            id="employeeType"
+            name="employeeType"
+            value={formData.employeeType}
+            onChange={handleChange}
+            required
+            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+          >
+            {EMPLOYEE_TYPE_OPTIONS.map((type) => (
+              <option key={type} value={type} disabled={type === "Select Type"}>
+                {type}
               </option>
             ))}
           </select>
