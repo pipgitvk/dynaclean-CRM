@@ -46,6 +46,12 @@ export default async function CustomerPage({ params }) {
     [customerId],
   );
 
+  // Fetch orders count for this customer
+  const [[{ orderCount }]] = await conn.execute(
+    `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`,
+    [customerId],
+  );
+
   let cust_analysis_external = {};
   const phone = customer.phone != null ? String(customer.phone).trim() : "";
   if (phone) {
@@ -306,6 +312,16 @@ export default async function CustomerPage({ params }) {
             >
               View Ledger
             </Link>
+
+            {/* Orders button - visible only if customer has orders */}
+            {orderCount > 0 && (
+              <Link
+                href={`/user-dashboard/view-customer/${customerId}/orders`}
+                className="btn text-white bg-teal-600 hover:bg-teal-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                Orders ({orderCount})
+              </Link>
+            )}
           </div>
 
           <section>

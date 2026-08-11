@@ -16,6 +16,7 @@ export default async function CustomerPage({ params }) {
   // Fetch current user info
   const payload = await getSessionPayload();
   const userRole = payload?.role || "";
+  const username = payload?.username || "";
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
@@ -43,6 +44,12 @@ export default async function CustomerPage({ params }) {
      WHERE customer_id = ?
      ORDER BY time_stamp DESC`,
     [customerId],
+  );
+
+  // Fetch orders count for this customer (only orders created by current logged-in user)
+  const [[{ orderCount }]] = await conn.execute(
+    `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`,
+    [customerId, username],
   );
 
   let cust_analysis_external = {};
@@ -290,6 +297,14 @@ export default async function CustomerPage({ params }) {
               >
                 View Ledger
               </Link>
+              {orderCount > 0 && (
+                <Link
+                  href={`/admin-dashboard/view-customer/${customerId}/orders`}
+                  className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-teal-600 hover:bg-teal-700 py-2 px-4 rounded-md text-center transition duration-300"
+                >
+                  Orders ({orderCount})
+                </Link>
+              )}
             </div>
           </div>
 
