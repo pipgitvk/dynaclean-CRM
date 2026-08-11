@@ -75,16 +75,16 @@ export default async function CustomerOrdersPage({ params }) {
                 credit_notes cn ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci AND cn.is_saved = 1
             WHERE no.customer_id = ?`;
 
-  const paramsList = [customerId];
-
-  if (!["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase())) {
+  const ordersParams = [customerId];
+  const isPrivilegedRole = ["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase());
+  if (!isPrivilegedRole) {
     sql += " AND no.created_by = ?";
-    paramsList.push(username);
+    ordersParams.push(username);
   }
 
   sql += " GROUP BY no.order_id ORDER BY no.created_at DESC";
 
-  const [orders] = await conn.execute(sql, paramsList);
+  const [orders] = await conn.execute(sql, ordersParams);
 
   const customerName = `${customer.first_name || ""} ${customer.last_name || ""}`.trim() || "Customer";
 

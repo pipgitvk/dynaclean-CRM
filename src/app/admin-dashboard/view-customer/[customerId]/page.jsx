@@ -46,11 +46,14 @@ export default async function CustomerPage({ params }) {
     [customerId],
   );
 
-  // Fetch orders count for this customer (only orders created by current logged-in user)
-  const [[{ orderCount }]] = await conn.execute(
-    `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`,
-    [customerId, username],
-  );
+  // Fetch orders count for this customer
+  // SUPERADMIN/DIRECTOR: see all orders for customer; others: only their own orders
+  const isPrivilegedRole = ["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase());
+  const orderCountQuery = isPrivilegedRole
+    ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`
+    : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
+  const orderCountParams = isPrivilegedRole ? [customerId] : [customerId, username];
+  const [[{ orderCount }]] = await conn.execute(orderCountQuery, orderCountParams);
 
   let cust_analysis_external = {};
   const phone = customer.phone != null ? String(customer.phone).trim() : "";
