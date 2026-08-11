@@ -8,14 +8,21 @@ import MultiInvoiceLinkModal from "./MultiInvoiceLinkModal";
 const InvoiceEditModal = dynamic(() => import("@/app/admin-dashboard/invoices/InvoiceEditModal"), { ssr: false });
 
 export default function InvoiceTable({ onSummaryUpdate }) {
-  // Get current month's start and end dates
-  const now = new Date();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const getMonthStartEnd = () => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { firstDay, lastDay };
+  };
   
   const formatDateForInput = (date) => {
-    return date.toISOString().split('T')[0];
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
+
+  const { firstDay: firstDayOfMonth, lastDay: lastDayOfMonth } = getMonthStartEnd();
 
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -166,9 +173,10 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   }, [search]);
 
   const handleReset = () => {
+    const { firstDay, lastDay } = getMonthStartEnd();
     setSearch("");
-    setFromDate("");
-    setToDate("");
+    setFromDate(formatDateForInput(firstDay));
+    setToDate(formatDateForInput(lastDay));
     setInvoiceTypeFilter("");
     setSortBy("created_at");
     setSortOrder("desc");

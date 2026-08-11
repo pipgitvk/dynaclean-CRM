@@ -66,7 +66,9 @@ export async function GET(req) {
     const limit = Number(searchParams.get("limit")) || 20;
     const offset = (page - 1) * limit;
 
-    const sortBy = searchParams.get("sort") || "created_at";
+    const sortByRaw = searchParams.get("sort") || "created_at";
+    const allowedSort = ["created_at", "invoice_date", "invoice_number"];
+    const sortBy = allowedSort.includes(sortByRaw) ? sortByRaw : "created_at";
     const sortOrder = searchParams.get("order") === "asc" ? "ASC" : "DESC";
 
     const search = searchParams.get("search");
@@ -86,12 +88,12 @@ export async function GET(req) {
     }
 
     if (fromDate) {
-      where += " AND DATE(created_at) >= ?";
+      where += " AND DATE(invoice_date) >= DATE(?)";
       values.push(fromDate);
     }
 
     if (toDate) {
-      where += " AND DATE(created_at) <= ?";
+      where += " AND DATE(invoice_date) <= DATE(?)";
       values.push(toDate);
     }
 
@@ -133,7 +135,8 @@ export async function GET(req) {
         gst_number,
         employee_name,
         parent_id,
-        COALESCE(order_date, invoice_date) AS order_date,
+        invoice_date,
+        invoice_date AS order_date,
         (cgst + sgst + igst) AS tax_amount,
         grand_total,
         amount_paid,
