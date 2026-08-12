@@ -29,6 +29,10 @@ function ProductAndSpareLists({ type }) {
   const [sparesTypeFilter, setSparesTypeFilter] = useState("all");
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [showPreBookingModal, setShowPreBookingModal] = useState(false);
+  const [preBookingDetails, setPreBookingDetails] = useState([]);
+  const [loadingPreBookings, setLoadingPreBookings] = useState(false);
+  const [selectedProductForPreBooking, setSelectedProductForPreBooking] = useState(null);
   const [editFormData, setEditFormData] = useState({
     item_code: '',
     item_name: '',
@@ -46,6 +50,37 @@ function ProductAndSpareLists({ type }) {
     image: null,
     productImages: [] // To store all product images
   });
+
+  const handleViewPreBookings = async (row) => {
+    if (!row.item_name) return;
+    
+    setLoadingPreBookings(true);
+    setSelectedProductForPreBooking(row);
+    setShowPreBookingModal(true);
+    
+    try {
+      const params = new URLSearchParams();
+      params.append('product_name', row.item_name);
+      if (row.product_code) {
+        params.append('item_code', row.product_code);
+      }
+      
+      const response = await fetch(`/api/pre-booking-by-product?${params}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setPreBookingDetails(data.bookings || []);
+      } else {
+        console.error('Failed to fetch pre-bookings:', data.error);
+        setPreBookingDetails([]);
+      }
+    } catch (error) {
+      console.error('Error fetching pre-bookings:', error);
+      setPreBookingDetails([]);
+    } finally {
+      setLoadingPreBookings(false);
+    }
+  };
 
   const refreshProducts = () => {
     const url = type === 'product' ? '/api/products/list' : '/api/spare/list';
@@ -1431,6 +1466,10 @@ export default function ProductStockForm() {
   const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
   const [transferHistoryData, setTransferHistoryData] = useState([]);
   const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
+  const [showPreBookingModal, setShowPreBookingModal] = useState(false);
+  const [preBookingDetails, setPreBookingDetails] = useState([]);
+  const [loadingPreBookings, setLoadingPreBookings] = useState(false);
+  const [selectedProductForPreBooking, setSelectedProductForPreBooking] = useState(null);
 
 
 
@@ -1493,6 +1532,37 @@ export default function ProductStockForm() {
       console.error("Error updating location", e);
     } finally {
       setSavingLocation(false);
+    }
+  };
+
+  const handleViewPreBookings = async (row) => {
+    if (!row.item_name) return;
+    
+    setLoadingPreBookings(true);
+    setSelectedProductForPreBooking(row);
+    setShowPreBookingModal(true);
+    
+    try {
+      const params = new URLSearchParams();
+      params.append('product_name', row.item_name);
+      if (row.product_code) {
+        params.append('item_code', row.product_code);
+      }
+      
+      const response = await fetch(`/api/pre-booking-by-product?${params}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setPreBookingDetails(data.bookings || []);
+      } else {
+        console.error('Failed to fetch pre-bookings:', data.error);
+        setPreBookingDetails([]);
+      }
+    } catch (error) {
+      console.error('Error fetching pre-bookings:', error);
+      setPreBookingDetails([]);
+    } finally {
+      setLoadingPreBookings(false);
     }
   };
 
@@ -1804,7 +1874,18 @@ export default function ProductStockForm() {
                       </div>
                       <div>
                         <p className="text-gray-500">Pre-booked</p>
-                        <p className="font-semibold text-orange-600">{row.pre_booked || 0}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-orange-600">{row.pre_booked || 0}</p>
+                          {(row.pre_booked > 0) && (
+                            <button
+                              onClick={() => handleViewPreBookings(row)}
+                              className="text-blue-600 hover:text-blue-800 transition-colors"
+                              title="View pre-booking details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="bg-yellow-200 rounded p-2">
                         <p className="text-gray-500">Net Qty</p>
@@ -1935,7 +2016,20 @@ export default function ProductStockForm() {
                         </td>
                         <td className="p-2 sm:p-3">{row.item_name}</td>
                         <td className="p-2 sm:p-3 font-semibold">{row.total}</td>
-                        <td className="p-2 sm:p-3 font-semibold text-orange-600">{row.pre_booked || 0}</td>
+                        <td className="p-2 sm:p-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-orange-600">{row.pre_booked || 0}</span>
+                            {(row.pre_booked > 0) && (
+                              <button
+                                onClick={() => handleViewPreBookings(row)}
+                                className="text-blue-600 hover:text-blue-800 transition-colors"
+                                title="View pre-booking details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-2 sm:p-3 font-semibold text-green-600 bg-yellow-200 rounded">{row.net_qty || 0}</td>
                         <td className="p-2 sm:p-3">{row.delhi}</td>
                         <td className="p-2 sm:p-3">{row.south}</td>
@@ -2647,6 +2741,95 @@ export default function ProductStockForm() {
                             <div>Delhi: {record.delhi}</div>
                             <div>South: {record.south}</div>
                           </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Pre-Booking Details Modal */}
+      {showPreBookingModal && selectedProductForPreBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => {
+          setShowPreBookingModal(false);
+          setSelectedProductForPreBooking(null);
+          setPreBookingDetails([]);
+        }}>
+          <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Pre-Booking Details</h3>
+              <button 
+                onClick={() => {
+                  setShowPreBookingModal(false);
+                  setSelectedProductForPreBooking(null);
+                  setPreBookingDetails([]);
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">Product Code</p>
+              <p className="font-semibold">{selectedProductForPreBooking.product_code}</p>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-600">Item Name</p>
+              <p className="font-medium">{selectedProductForPreBooking.item_name}</p>
+            </div>
+
+            {loadingPreBookings ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">Loading pre-booking details...</p>
+              </div>
+            ) : preBookingDetails.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No pre-booking records found for this product.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200 rounded">
+                  <thead className="bg-gray-100 text-left">
+                    <tr>
+                      <th className="p-3 border-b font-semibold">Customer ID</th>
+                      <th className="p-3 border-b font-semibold">Customer Name</th>
+                      <th className="p-3 border-b font-semibold">Company</th>
+                      <th className="p-3 border-b font-semibold">Phone</th>
+                      <th className="p-3 border-b font-semibold">Quantity</th>
+                      <th className="p-3 border-b font-semibold">Expected Date</th>
+                      <th className="p-3 border-b font-semibold">Booking Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preBookingDetails.map((booking, idx) => (
+                      <tr key={idx} className="border-t hover:bg-gray-50">
+                        <td className="p-3 font-semibold">{booking.customer_id || "--"}</td>
+                        <td className="p-3 font-medium">{booking.customer_name || "--"}</td>
+                        <td className="p-3">{booking.company || "--"}</td>
+                        <td className="p-3">{booking.phone || "--"}</td>
+                        <td className="p-3 font-semibold text-center">{booking.quantity || 1}</td>
+                        <td className="p-3">
+                          {booking.expected_date ? 
+                            new Date(booking.expected_date).toLocaleDateString('en-IN', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
+                            }) : "--"
+                          }
+                        </td>
+                        <td className="p-3">
+                          {booking.created_at ? 
+                            new Date(booking.created_at).toLocaleDateString('en-IN', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit'
+                            }) : "--"
+                          }
                         </td>
                       </tr>
                     ))}
