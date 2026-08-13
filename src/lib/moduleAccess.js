@@ -85,6 +85,7 @@ export const MODULE_TREE = [
     key: "products",
     label: "Products & inventory",
     children: [
+      { key: "parties", label: "Parties" },
       { key: "product-stock", label: "Product Stock" },
       { key: "product-accessories", label: "Product Accessories" },
       { key: "purchase-direct-in", label: "Purchase – Direct In" },
@@ -308,6 +309,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     id: "procurement",
     label: "Procurement",
     children: [
+      { kind: "leaf", key: "parties", label: "Parties" },
       {
         kind: "group",
         id: "purchase-products",

@@ -518,18 +518,27 @@ const allMenuItems = [
     roles: ["SUPERADMIN"],
     icon: "ShoppingCart",
     children: [
-      // {
-      //   path: "/admin-dashboard/purchase-products",
-      //   name: "Purchase Products",
-      //   roles: ["SUPERADMIN"],
-      //   icon: "ShoppingBag",
-      // },
       {
-        name: "Purchase – Products",
+        path: "/admin-dashboard/parties",
+        name: "Parties",
+        accessKey: "parties",
         roles: ["SUPERADMIN"],
-        icon: "ShoppingCart",
-        children: [
+        icon: "Users",
+      },
+      {
+        path: "/admin-dashboard/purchase-products",
+        name: "Purchase Bills",
+        roles: ["SUPERADMIN"],
+        icon: "ShoppingBag",
+      },
           {
+            path: "/admin-dashboard/purchase/purchases",
+            name: "Purchases",
+            roles: ["SUPERADMIN"],
+            icon: "ShoppingBag",
+          },
+     
+       {
             path: "/admin-dashboard/purchase/direct-in",
             name: "Direct In",
             roles: ["SUPERADMIN"],
@@ -547,12 +556,14 @@ const allMenuItems = [
             roles: ["SUPERADMIN"],
             icon: "PackageCheck",
           },
-          {
-            path: "/admin-dashboard/purchase/purchases",
-            name: "Purchases",
-            roles: ["SUPERADMIN"],
-            icon: "ShoppingBag",
-          },
+          
+
+      {
+        name: "Purchase – Products",
+        roles: ["SUPERADMIN"],
+        icon: "ShoppingCart",
+        children: [
+         
           // {
           //   path: "/admin-dashboard/purchase/ledger",
           //   name: "Purchase Ledger",

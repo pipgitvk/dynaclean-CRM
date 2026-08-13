@@ -14,6 +14,79 @@ import {
   parseLinkedPurchaseTokens,
 } from "@/lib/statementLinkedPurchases";
 
+// Helper function to update product_stock_request linked_statement_ids
+async function updateProductStockRequestLinks(conn, purchaseId, statementId, action) {
+  try {
+    // First, check if there's a table column for linked_statement_ids
+    try {
+      await conn.execute("SELECT linked_statement_ids FROM product_stock_request LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE product_stock_request ADD COLUMN linked_statement_ids TEXT NULL");
+      } catch (__) {
+        console.warn("Could not add linked_statement_ids column to product_stock_request");
+        return;
+      }
+    }
+
+    // Get trans_id for this statement
+    const [stmtRows] = await conn.execute(
+      "SELECT trans_id FROM statements WHERE id = ?",
+      [statementId]
+    );
+
+    if (stmtRows.length === 0) {
+      console.warn(`No statement found with id ${statementId}`);
+      return;
+    }
+
+    const transId = stmtRows[0].trans_id;
+
+    // Get current linked statement trans_ids from product_stock_request
+    const [rows] = await conn.execute(
+      "SELECT linked_statement_ids FROM product_stock_request WHERE id = ?",
+      [purchaseId]
+    );
+
+    if (rows.length === 0) {
+      console.warn(`No product_stock_request found with id ${purchaseId}`);
+      return;
+    }
+
+    let currentTransIds = [];
+    try {
+      const raw = rows[0]?.linked_statement_ids;
+      if (raw) {
+        currentTransIds = JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn("Invalid JSON in linked_statement_ids, resetting to empty array");
+      currentTransIds = [];
+    }
+
+    // Update the array based on action
+    if (action === "link") {
+      if (!currentTransIds.includes(transId)) {
+        currentTransIds.push(transId);
+      }
+    } else if (action === "unlink") {
+      currentTransIds = currentTransIds.filter(id => id !== transId);
+    }
+
+    // Update the database
+    const newLinkedIds = currentTransIds.length > 0 ? JSON.stringify(currentTransIds) : null;
+    await conn.execute(
+      "UPDATE product_stock_request SET linked_statement_ids = ? WHERE id = ?",
+      [newLinkedIds, purchaseId]
+    );
+
+    console.log(`Updated product_stock_request ${purchaseId} linked_statement_ids (trans_ids):`, currentTransIds);
+  } catch (error) {
+    console.error("Error updating product_stock_request links:", error);
+    // Don't throw error to prevent main transaction rollback
+  }
+}
+
 export async function GET(req, { params }) {
   try {
     const token = req.cookies.get("token")?.value;
@@ -528,6 +601,9 @@ export async function PATCH(req, { params }) {
         "UPDATE statements SET linked_purchase_ids = ?, invoice_status = ? WHERE id = ?",
         [nextLinkedIds, nextStatus, id],
       );
+
+      // Update product_stock_request table as well
+      await updateProductStockRequestLinks(conn, purchaseId, id, action);
 
       await conn.commit();
       committed = true;
