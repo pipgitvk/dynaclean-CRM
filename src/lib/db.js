@@ -90,31 +90,42 @@ function createMysqlPool() {
 }
 
 async function recreatePool() {
-  // If we're already creating a pool, wait for the existing one to finish
   if (isCreatingPool && poolCreationLock) {
     console.log("⚠️ [DB] Waiting for existing pool creation to complete...");
     await poolCreationLock;
     return;
   }
 
-  // Acquire the lock by setting our own promise
   let resolveLock;
   poolCreationLock = new Promise((resolve) => {
     resolveLock = resolve;
   });
+
   isCreatingPool = true;
 
   try {
     console.log("⚠️ [DB] Recreating MySQL pool...");
 
-    // Remove old pool reference immediately so new requests wait for the new one
+    // IMPORTANT: old pool ko properly close karo
+    const oldPool = g.__mysqlPool;
+
+    if (oldPool) {
+      try {
+        await oldPool.end();
+        console.log("✅ [DB] Old MySQL pool closed");
+      } catch (err) {
+        console.error("⚠️ [DB] Error closing old pool:", err.message);
+      }
+    }
+
     delete g.__mysqlPool;
 
-    // Create new pool
     g.__mysqlPool = createMysqlPool();
+
   } finally {
     isCreatingPool = false;
     resolveLock();
+    poolCreationLock = null;
   }
 }
 
