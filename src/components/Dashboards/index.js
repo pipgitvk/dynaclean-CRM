@@ -6,6 +6,7 @@ import TeamLeaderDashboard from "./TeamLeaderDashboard";
 import DefaultDashboard from "./DefaultDashboard";
 import ServiceHeadDashboard from "./ServiceHeadDashboard";
 import DirectorDashboard from "./DirectorDashboard";
+import AccountantDashboard from "./AccountantDashboard";
 
 export const DASHBOARD_MAP = {
   "WAREHOUSE INCHARGE": WarehouseInchargeDashboard,
@@ -15,5 +16,7 @@ export const DASHBOARD_MAP = {
   "TEAM LEADER": TeamLeaderDashboard,
   "SERVICE HEAD": ServiceHeadDashboard,
   "DIRECTOR": DirectorDashboard,
+  "ACCOUNTANT": AccountantDashboard,
+  "PRODUCTION ACCOUNTANT": AccountantDashboard,
   DEFAULT: DefaultDashboard
 };

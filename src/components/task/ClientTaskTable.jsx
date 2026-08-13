@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
@@ -17,6 +18,7 @@ dayjs.extend(isSameOrBefore);
 dayjs.extend(isSameOrAfter);
 
 export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
+  const searchParams = useSearchParams();
   const [reassignOpen, setReassignOpen] = useState(false);
   const [modalTask, setModalTask] = useState(null);
   const [search, setSearch] = useState("");
@@ -27,6 +29,20 @@ export default function ClientTaskTable({ initialTasks, currentUser = "" }) {
   const [sortBy, setSortBy] = useState("task_id");
   const [sortOrder, setSortOrder] = useState("desc");
   const [filteredTasks, setFilteredTasks] = useState(initialTasks);
+
+  useEffect(() => {
+    const statusFromCard = searchParams.get("status");
+    const fromCard = searchParams.get("fromCard");
+    if (statusFromCard === "Pending" || statusFromCard === "Working" || statusFromCard === "Completed") {
+      setStatusFilter(statusFromCard);
+    }
+    if (fromCard === "1") {
+      setSearch("");
+      setAssignedToFilter("");
+      setFromDate("");
+      setToDate("");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     let filtered = initialTasks.filter((task) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
 import { useState, useEffect, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
@@ -12,6 +12,7 @@ import ExcelJS from "exceljs";
 
 export default function StatementTable({ rows }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef(null);
   const STORAGE_KEY = "statements.filters.v1";
   const readPersisted = () => {
@@ -55,6 +56,20 @@ export default function StatementTable({ rows }) {
   const [expenseTxnForIdSearch, setExpenseTxnForIdSearch] = useState(null);
   const [expenseIdResolved, setExpenseIdResolved] = useState(null);
   const [purchaseTypeByLegacyId, setPurchaseTypeByLegacyId] = useState({});
+
+  useEffect(() => {
+    const statusFromCard = searchParams.get("status");
+    const fromCard = searchParams.get("fromCard");
+    if (statusFromCard === "Settled" || statusFromCard === "Unsettled") {
+      setStatusFilter(statusFromCard);
+    }
+    if (fromCard === "1") {
+      setSearchQuery("");
+      setLinkedTypeFilter("");
+      setDateFrom("");
+      setDateTo("");
+    }
+  }, [searchParams]);
 
   // --- Import modal state ---
   const [showImportModal, setShowImportModal] = useState(false);

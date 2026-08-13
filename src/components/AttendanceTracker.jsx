@@ -680,25 +680,23 @@ const AttendanceTracker = ({ username, role }) => {
         />
       )}
 
-      <div className="flex items-center justify-center p-4">
-        <div className="w-full max-w-sm p-6 bg-white rounded-xl shadow-lg space-y-4">
-          <h2 className="text-xl font-bold text-center text-gray-800">
-            Attendance Tracker
-          </h2>
-          {endBreakNotification && (
-            <div className="animate-pulse bg-red-100 text-red-700 border border-red-300 p-3 rounded-lg text-sm text-center">
-              Your {endBreakNotification.breakName} break is ending in{" "}
-              {formatTime(endBreakNotification.timeToEnd)}!
-            </div>
-          )}
-          {preBreakTime && (
-            <div className="animate-pulse bg-yellow-100 text-yellow-700 border border-yellow-300 p-3 rounded-lg text-sm text-center">
-              {preBreakTime.breakName} break is starting in{" "}
-              {formatTime(preBreakTime.timeToStart)}!
-            </div>
-          )}
-          <div className="pt-2">{renderActionButton()}</div>
-        </div>
+      <div className="w-full max-w-sm mx-auto space-y-2">
+        <h2 className="text-lg font-bold text-center text-gray-800 leading-tight">
+          Attendance Tracker
+        </h2>
+        {endBreakNotification && (
+          <div className="animate-pulse bg-red-100 text-red-700 border border-red-300 p-3 rounded-lg text-sm text-center">
+            Your {endBreakNotification.breakName} break is ending in{" "}
+            {formatTime(endBreakNotification.timeToEnd)}!
+          </div>
+        )}
+        {preBreakTime && (
+          <div className="animate-pulse bg-yellow-100 text-yellow-700 border border-yellow-300 p-3 rounded-lg text-sm text-center">
+            {preBreakTime.breakName} break is starting in{" "}
+            {formatTime(preBreakTime.timeToStart)}!
+          </div>
+        )}
+        <div>{renderActionButton()}</div>
       </div>
     </>
   );

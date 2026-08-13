@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   FileText,
   UploadCloud,
@@ -58,6 +58,7 @@ const SkeletonLoader = () => (
 );
 
 export default function OrderTable({ orders, userRole }) {
+  const searchParams = useSearchParams();
   // Initialize from localStorage with defaults
   const [searchQuery, setSearchQuery] = useState(() => {
     if (typeof window !== "undefined") {
@@ -99,6 +100,23 @@ export default function OrderTable({ orders, userRole }) {
   const [openMenuId, setOpenMenuId] = useState(null); // State to track which menu is open
   const [paymentPendingData, setPaymentPendingData] = useState({}); // Maps order_id to remaining amount
   const [loadingPendingData, setLoadingPendingData] = useState(true);
+  useEffect(() => {
+    const statusFromCard = searchParams.get("status");
+    const fromCard = searchParams.get("fromCard");
+
+    if (statusFromCard) {
+      setStatusFilter(statusFromCard);
+    }
+
+    if (fromCard === "1") {
+      setSearchQuery("");
+      setDateFrom("");
+      setDateTo("");
+      setCreatedByFilter("");
+      setPaymentTermsFilter("");
+    }
+  }, [searchParams]);
+
   // const canShowInstall = ["ADMIN", "SALES", "SERVICE"].includes(userRole);
 
   // Save filter states to localStorage whenever they change
