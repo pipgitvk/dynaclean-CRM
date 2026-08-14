@@ -4,6 +4,67 @@ const { getDbConnection } = require('../db');
  * Meta Lead Model (MySQL)
  */
 
+function normalizeFormIds(rawValue) {
+  if (rawValue === null || rawValue === undefined) return [];
+
+  const coerceArray = (value) => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  };
+
+  if (Array.isArray(rawValue)) {
+    return coerceArray(rawValue);
+  }
+
+  if (typeof rawValue === 'number') {
+    return [String(rawValue)];
+  }
+
+  if (typeof rawValue === 'string') {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return [];
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      return normalizeFormIds(parsed);
+    } catch (error) {
+      if (trimmed.includes(',')) {
+        return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+      }
+      return [trimmed];
+    }
+  }
+
+  if (typeof rawValue === 'object') {
+    if (Array.isArray(rawValue.formIds)) return coerceArray(rawValue.formIds);
+    if (Array.isArray(rawValue.form_ids)) return coerceArray(rawValue.form_ids);
+  }
+
+  return [];
+}
+
+function parseJsonValue(rawValue, fallback) {
+  if (rawValue === null || rawValue === undefined) return fallback;
+
+  if (typeof rawValue === 'string') {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return fallback;
+    try {
+      return JSON.parse(trimmed);
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  if (typeof rawValue === 'object') {
+    return rawValue;
+  }
+
+  return fallback;
+}
+
 async function createLead(data) {
   const conn = await getDbConnection();
   try {
@@ -44,8 +105,8 @@ async function getLeadByLeadgenId(leadgenId) {
   const row = rows[0];
   return {
     ...row,
-    leadData: JSON.parse(row.lead_data),
-    fieldData: JSON.parse(row.field_data || '[]'),
+    leadData: parseJsonValue(row.lead_data, {}),
+    fieldData: parseJsonValue(row.field_data, []),
     isImportedToCRM: Boolean(row.is_imported_to_crm),
     _id: row.id.toString()
   };
@@ -99,8 +160,8 @@ async function getAllLeads(filters = {}) {
   const [rows] = await conn.execute(query, values);
   return rows.map(row => ({
     ...row,
-    leadData: JSON.parse(row.lead_data),
-    fieldData: JSON.parse(row.field_data || '[]'),
+    leadData: parseJsonValue(row.lead_data, {}),
+    fieldData: parseJsonValue(row.field_data, []),
     isImportedToCRM: Boolean(row.is_imported_to_crm),
     _id: row.id.toString()
   }));
@@ -146,7 +207,7 @@ async function countLeadsByCredentialId(credentialId) {
   
   if (credRows.length === 0) return 0;
   
-  const formIds = JSON.parse(credRows[0].form_ids);
+  const formIds = normalizeFormIds(credRows[0].form_ids);
   if (!Array.isArray(formIds) || formIds.length === 0) return 0;
   
   // Count leads for these specific form_ids
@@ -177,7 +238,7 @@ async function findCredentialByFormId(formId) {
   const row = rows[0];
   return {
     ...row,
-    formIds: JSON.parse(row.form_ids),
+    formIds: normalizeFormIds(row.form_ids),
     isActive: Boolean(row.is_active),
     _id: row.id.toString()
   };
