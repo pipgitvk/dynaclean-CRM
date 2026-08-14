@@ -101,6 +101,7 @@ export default function DDManagementPage() {
         mode_of_payment: "DD",
         contract_no: "",
         security_type: "",
+        overdue_date: "",
         bid_document: null,
         remark: "",
 
@@ -469,6 +470,7 @@ export default function DDManagementPage() {
                 sent_to_client_date: dd.sent_to_client_date ? dayjs(dd.sent_to_client_date).format("YYYY-MM-DD") : "",
                 expiry_date: dd.expiry_date ? dayjs(dd.expiry_date).format("YYYY-MM-DD") : "",
                 claim_expiry_date: dd.claim_expiry_date ? dayjs(dd.claim_expiry_date).format("YYYY-MM-DD") : "",
+                overdue_date: dd.overdue_date ? dayjs(dd.overdue_date).format("YYYY-MM-DD") : "",
                 claim_from_bank: !!dd.claim_from_bank,
                 payment_date: dd.payment_date ? dayjs(dd.payment_date).format("YYYY-MM-DD") : "",
                 dd_date: dd.dd_date ? dayjs(dd.dd_date).format("YYYY-MM-DD") : "",
@@ -505,6 +507,7 @@ export default function DDManagementPage() {
             mode_of_payment: type === "EPAYMENT" ? "EPAYMENT" : type,
             contract_no: "",
             security_type: "",
+            overdue_date: "",
             bid_document: null,
             remark: "",
             beneficiary_name: "",
@@ -731,6 +734,7 @@ export default function DDManagementPage() {
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Amount & Date</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Bank Info & Docs</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Issued Details</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Overdue Date</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Claimed From Bank</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -738,7 +742,7 @@ export default function DDManagementPage() {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {isLoading ? (
-                                <tr><td colSpan="7" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
+                                <tr><td colSpan="8" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
                             ) : data.length > 0 ? (
                                 data.map((dd) => (
                                     <tr key={dd.id} className="hover:bg-gray-50/80 transition-colors group">
@@ -800,6 +804,20 @@ export default function DDManagementPage() {
                                                     )}
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {dd.overdue_date ? (
+                                                <div className="text-xs">
+                                                    <div className={`font-bold ${(!dd.claim_from_bank && dayjs(dd.overdue_date).isBefore(dayjs(), 'day')) ? 'text-red-600' : 'text-gray-800'}`}>
+                                                        {dayjs(dd.overdue_date).format("DD MMM YYYY")}
+                                                    </div>
+                                                    {!dd.claim_from_bank && dayjs(dd.overdue_date).isBefore(dayjs(), 'day') && (
+                                                        <div className="text-red-500 font-bold mt-0.5">⚠ Overdue</div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-gray-400">N/A</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4">
                                             <StatusBadge status={dd.status} />
@@ -898,7 +916,7 @@ export default function DDManagementPage() {
                                     </tr>
                                 ))
                             ) : (
-                                <tr><td colSpan="5" className="px-6 py-10 text-center text-gray-400">No records found matching your filters.</td></tr>
+                                <tr><td colSpan="8" className="px-6 py-10 text-center text-gray-400">No records found matching your filters.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -1011,6 +1029,10 @@ export default function DDManagementPage() {
                                         </div>
                                     </div>
                                     <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Overdue Date</label>
+                                        <input name="overdue_date" type="date" value={formData.overdue_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" />
+                                    </div>
+                                    <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Upload BG Format</label>
                                         <div className="flex items-center gap-2">
                                             <input type="file" name="bg_format_upload" onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 disabled:opacity-50" />
@@ -1082,6 +1104,10 @@ export default function DDManagementPage() {
                                                 <option value="BG">BG</option>
                                             </select>
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Overdue Date</label>
+                                        <input name="overdue_date" type="date" value={formData.overdue_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Bid Document</label>
