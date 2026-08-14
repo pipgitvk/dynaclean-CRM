@@ -219,6 +219,57 @@ async function countLeadsByCredentialId(credentialId) {
   return rows[0].count;
 }
 
+/**
+ * Latest non-empty products_interest per form_id (most recent meta_leads row).
+ * @param {string[]} formIds
+ * @returns {Promise<Map<string, { products_interest: string, created_at: Date }>>}
+ */
+async function getLatestProductInterestMap(formIds = []) {
+  const unique = [...new Set(
+    (formIds || []).map((id) => String(id || '').trim()).filter(Boolean)
+  )];
+  const map = new Map();
+  if (unique.length === 0) return map;
+
+  const conn = await getDbConnection();
+  const placeholders = unique.map(() => '?').join(',');
+  const [rows] = await conn.execute(
+    `SELECT ml.form_id, ml.products_interest, ml.created_at
+     FROM meta_leads ml
+     INNER JOIN (
+       SELECT form_id, MAX(id) AS max_id
+       FROM meta_leads
+       WHERE form_id IN (${placeholders})
+         AND products_interest IS NOT NULL
+         AND products_interest != ''
+       GROUP BY form_id
+     ) latest ON ml.id = latest.max_id`,
+    unique
+  );
+
+  for (const row of rows) {
+    const interest = String(row.products_interest || '').trim();
+    if (!interest) continue;
+    map.set(String(row.form_id), {
+      products_interest: interest,
+      created_at: row.created_at
+    });
+  }
+  return map;
+}
+
+function pickLatestProductInterest(formIds, latestByFormId) {
+  let best = null;
+  for (const formId of formIds || []) {
+    const row = latestByFormId.get(String(formId));
+    if (!row?.products_interest) continue;
+    if (!best || new Date(row.created_at) > new Date(best.created_at)) {
+      best = row;
+    }
+  }
+  return best?.products_interest || null;
+}
+
 async function markLeadAsImported(leadgenId, customerId) {
   const conn = await getDbConnection();
   await conn.execute(
@@ -250,5 +301,7 @@ module.exports = {
   getLeadByLeadgenId,
   markLeadAsImported,
   countLeads,
-  countLeadsByCredentialId
+  countLeadsByCredentialId,
+  getLatestProductInterestMap,
+  pickLatestProductInterest
 };

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { Plus, Edit2, Trash2, Power, PowerOff, RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Database, Eye, ArrowRight } from 'lucide-react';
+import { Plus, Edit2, Trash2, Power, PowerOff, RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Database, Eye, ArrowRight, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -329,6 +329,15 @@ export default function MetaCredentialsPage() {
                       {getStatusIcon(cred.lastSyncStatus)}
                       <span className="text-sm text-gray-600 capitalize">{cred.lastSyncStatus}</span>
                     </div>
+                    {cred.latestProductInterest && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 max-w-[240px] sm:max-w-[360px] truncate"
+                        title={cred.latestProductInterest}
+                      >
+                        <Tag className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{cred.latestProductInterest}</span>
+                      </span>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-4">

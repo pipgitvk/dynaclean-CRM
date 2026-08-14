@@ -1,5 +1,5 @@
 const { getDbConnection } = require('../db');
-const { countLeadsByCredentialId } = require('./metaLeadModel');
+const { countLeadsByCredentialId, getLatestProductInterestMap, pickLatestProductInterest } = require('./metaLeadModel');
 
 /**
  * Meta Credential Model (MySQL)
@@ -99,8 +99,21 @@ async function getAllCredentials(activeOnly = false) {
     ? 'SELECT * FROM meta_credentials WHERE is_active = 1 ORDER BY created_at DESC'
     : 'SELECT * FROM meta_credentials ORDER BY created_at DESC';
   const [rows] = await conn.execute(query);
+
+  const parsedRows = rows.map((row) => ({
+    row,
+    formIds: normalizeFormIds(row.form_ids)
+  }));
+  const allFormIds = parsedRows.flatMap(({ formIds }) => formIds);
+  let latestByFormId = new Map();
+  try {
+    latestByFormId = await getLatestProductInterestMap(allFormIds);
+  } catch (error) {
+    console.error('Error fetching latest product interest:', error);
+  }
   
-  const credentials = await Promise.all(rows.map(async (row) => {
+  const credentials = await Promise.all(parsedRows.map(async ({ row, formIds }) => {
+    const latestProductInterest = pickLatestProductInterest(formIds, latestByFormId);
     try {
       const leadsCount = await countLeadsByCredentialId(row.id);
       return {
@@ -109,11 +122,12 @@ async function getAllCredentials(activeOnly = false) {
         verifyToken: row.verify_token,
         pageId: row.page_id,
         pageToken: row.page_token,
-        formIds: normalizeFormIds(row.form_ids),
+        formIds,
         isActive: Boolean(row.is_active),
         lastSyncAt: row.last_sync_at,
         lastSyncStatus: row.last_sync_status,
         lastSyncMessage: row.last_sync_message,
+        latestProductInterest,
         totalLeadsFetched: row.total_leads_fetched,
         totalLeadsImported: leadsCount,
         createdAt: row.created_at,
@@ -133,6 +147,7 @@ async function getAllCredentials(activeOnly = false) {
         lastSyncAt: row.last_sync_at,
         lastSyncStatus: row.last_sync_status,
         lastSyncMessage: row.last_sync_message,
+        latestProductInterest: null,
         totalLeadsFetched: row.total_leads_fetched,
         totalLeadsImported: 0,
         createdAt: row.created_at,
