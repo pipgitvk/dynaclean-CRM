@@ -4,6 +4,7 @@ const { createLead, getLeadByLeadgenId, markLeadAsImported } = require('../mysql
 const { createSyncLog } = require('../mysql/metaSyncLogModel');
 const { normalizePhone, PHONE_LAST10_WHERE } = require('../phone-check');
 const { resolveAssigneeFromFormAssignments, resolveAssigneeFromLeadDistribution } = require('../leadDistributionResolver');
+const { handleDuplicateNotImportedLead } = require('./metaDuplicateLeadHandler');
 
 /**
  * Fetch leads from Meta Graph API for a specific form
@@ -337,11 +338,35 @@ async function syncLeadsForCredential(credential, options = {}) {
               console.error('Error importing lead to CRM:', err);
             }
           } else {
-            leadsSkipped++;
-            if (existsInCRM) {
-              console.log(`⚠️ Skipped lead ${leadgenId} - phone ${parsedLead.phone} already exists in CRM`);
-            } else if (existsInMetaLeads) {
-              console.log(`⚠️ Skipped lead ${leadgenId} - lead already imported to CRM (by leadgenId or phone)`);
+            if (existsInCRM && parsedLead.phone) {
+              try {
+                const duplicateResult = await handleDuplicateNotImportedLead({
+                  phone: parsedLead.phone,
+                  formId,
+                  lead: parsedLead,
+                  productsInterest,
+                  leadArrivedAt: rawLead.created_time || new Date(),
+                });
+
+                if (duplicateResult.handled) {
+                  console.log(
+                    `♻️ Duplicate CRM lead updated for ${leadgenId} (customer ${duplicateResult.customerId})`
+                  );
+                } else {
+                  leadsSkipped++;
+                  console.log(
+                    `⚠️ Skipped lead ${leadgenId} - phone ${parsedLead.phone} already exists in CRM`
+                  );
+                }
+              } catch (dupErr) {
+                leadsSkipped++;
+                console.error(`❌ Failed duplicate handling for lead ${leadgenId}:`, dupErr);
+              }
+            } else {
+              leadsSkipped++;
+              if (existsInMetaLeads) {
+                console.log(`⚠️ Skipped lead ${leadgenId} - lead already imported to CRM (by leadgenId or phone)`);
+              }
             }
           }
         }

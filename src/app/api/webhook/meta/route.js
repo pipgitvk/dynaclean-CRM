@@ -3,6 +3,7 @@ import { findCredentialByFormId } from '@/lib/mysql/metaLeadModel';
 import { createLead, getLeadByLeadgenId, markLeadAsImported } from '@/lib/mysql/metaLeadModel';
 const { getDbConnection } = require('@/lib/db');
 const { normalizePhone, PHONE_LAST10_WHERE } = require('@/lib/phone-check');
+const { handleDuplicateNotImportedLead } = require('@/lib/services/metaDuplicateLeadHandler');
 
 const GLOBAL_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || 'dynaclean-secret';
 
@@ -224,7 +225,21 @@ export async function POST(request) {
                   console.log(`✅ Lead imported to CRM: ${customerId}`);
                 } else {
                   if (custRows.length > 0) {
-                    console.log(`⚠️ Lead phone already exists in CRM: ${normalizedPhone}`);
+                    const duplicateResult = await handleDuplicateNotImportedLead({
+                      phone: normalizedPhone,
+                      formId,
+                      lead: parsedLead,
+                      productsInterest,
+                      leadArrivedAt: leadData.created_time || new Date(),
+                    });
+
+                    if (duplicateResult.handled) {
+                      console.log(
+                        `♻️ Duplicate CRM lead updated via webhook (customer ${duplicateResult.customerId})`
+                      );
+                    } else {
+                      console.log(`⚠️ Lead phone already exists in CRM: ${normalizedPhone}`);
+                    }
                   } else if (metaRows.length > 0) {
                     console.log(`⚠️ Lead phone already exists in meta_leads (imported): ${normalizedPhone}`);
                   }

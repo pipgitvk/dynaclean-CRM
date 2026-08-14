@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { Plus, Edit2, Trash2, Power, PowerOff, RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Database, Eye, ArrowRight, Tag } from 'lucide-react';
+import { Plus, Edit2, Trash2, Power, PowerOff, RefreshCw, Clock, CheckCircle, XCircle, AlertCircle, Database, Eye, ArrowRight, Tag, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -273,6 +273,13 @@ export default function MetaCredentialsPage() {
         >
           <Database className="w-4 h-4" />
           Skipped Leads
+        </Link>
+        <Link
+          href="/admin-dashboard/meta-credentials/duplicate-leads"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+        >
+          <Copy className="w-4 h-4" />
+          Duplicate Leads
         </Link>
         <Link
           href="/admin-dashboard/imported-leads"
