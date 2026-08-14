@@ -133,7 +133,8 @@ export default function DDManagementPage() {
         status: "Assigned",
         original_dd_location: "Self",
         sent_to_client_date: "",
-        claim_from_bank: false
+        claim_from_bank: false,
+        claim_date: ""
     });
 
     const fetchUser = async () => {
@@ -457,6 +458,7 @@ export default function DDManagementPage() {
                 expiry_date: dd.expiry_date ? dayjs(dd.expiry_date).format("YYYY-MM-DD") : "",
                 claim_expiry_date: dd.claim_expiry_date ? dayjs(dd.claim_expiry_date).format("YYYY-MM-DD") : "",
                 claim_from_bank: !!dd.claim_from_bank,
+                claim_date: dd.claim_date ? dayjs(dd.claim_date).format("YYYY-MM-DD") : "",
                 payment_date: dd.payment_date ? dayjs(dd.payment_date).format("YYYY-MM-DD") : "",
                 dd_date: dd.dd_date ? dayjs(dd.dd_date).format("YYYY-MM-DD") : "",
                 cheque_upload: dd.cheque_upload,
@@ -536,7 +538,8 @@ export default function DDManagementPage() {
             status: "Assigned",
             original_dd_location: "Self",
             sent_to_client_date: "",
-            claim_from_bank: false
+            claim_from_bank: false,
+            claim_date: ""
         });
 
     const resetForm = () => {
@@ -561,6 +564,7 @@ export default function DDManagementPage() {
         setFormData(prev => ({
             ...prev,
             claim_from_bank: checked,
+            claim_date: checked ? dayjs().format("YYYY-MM-DD") : "",
             status: checked ? "Claimed" : prev.status
         }));
     };
@@ -622,12 +626,13 @@ export default function DDManagementPage() {
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Issued Details</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Claimed From Bank</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Claim Date</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {isLoading ? (
-                                <tr><td colSpan="8" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
+                                <tr><td colSpan="9" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
                             ) : data.length > 0 ? (
                                 data.map((dd) => (
                                     <tr key={dd.id} className="hover:bg-gray-50/80 transition-colors group">
@@ -714,6 +719,17 @@ export default function DDManagementPage() {
                                                 </span>
                                             </div>
                                         </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex justify-center items-center">
+                                                {dd.claim_date ? (
+                                                    <span className="text-xs text-gray-700 font-medium">
+                                                        {dayjs(dd.claim_date).format("DD MMM YYYY")}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">—</span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-1">
                                                 <button
@@ -798,7 +814,7 @@ export default function DDManagementPage() {
                                     </tr>
                                 ))
                             ) : (
-                                <tr><td colSpan="5" className="px-6 py-10 text-center text-gray-400">No records found matching your filters.</td></tr>
+                                <tr><td colSpan="9" className="px-6 py-10 text-center text-gray-400">No records found matching your filters.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -1510,6 +1526,12 @@ export default function DDManagementPage() {
                                                     <input disabled={!isAuthorized} type="checkbox" id="claim_from_bank" name="claim_from_bank" checked={formData.claim_from_bank} onChange={handleClaimFromBankChange} className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
                                                     <label htmlFor="claim_from_bank" className="text-sm font-medium text-gray-700">Claim from bank?</label>
                                                 </div>
+                                                {formData.claim_from_bank && (
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Date</label>
+                                                        <input disabled={!isAuthorized} type="date" name="claim_date" value={formData.claim_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
+                                                    </div>
+                                                )}
                                                 {formData.original_dd_location === "Client" && (
                                                     <div className="space-y-4 pt-4 border-t">
                                                         <div>
@@ -1628,6 +1650,12 @@ export default function DDManagementPage() {
                                         <input disabled={!isAuthorized} type="checkbox" id="claim_from_bank" name="claim_from_bank" checked={formData.claim_from_bank} onChange={handleInputChange} className="w-4 h-4 text-blue-600 rounded disabled:opacity-50" />
                                         <label htmlFor="claim_from_bank" className="text-sm font-medium text-gray-700">Claim from bank?</label>
                                     </div>
+                                    {formData.claim_from_bank && (
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Claim Date</label>
+                                            <input disabled={!isAuthorized} type="date" name="claim_date" value={formData.claim_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100" />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="space-y-4">
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Status Update</label>

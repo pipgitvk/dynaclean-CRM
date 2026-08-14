@@ -49,6 +49,14 @@ async function ensureDDRecordsColumns(pool) {
             console.warn("Could not add overdue_date column:", error.message);
         }
     }
+    // Add claim_date column
+    try {
+        await pool.execute("ALTER TABLE dd_records ADD COLUMN claim_date DATE NULL AFTER claim_from_bank");
+    } catch (error) {
+        if (error.code !== "ER_DUP_FIELDNAME") {
+            console.warn("Could not add claim_date column:", error.message);
+        }
+    }
     const ddColumns = [
         ["dd_no", "VARCHAR(255) NULL"],
         ["dd_date", "DATE NULL"],
@@ -148,7 +156,7 @@ export async function GET(req) {
 export async function POST(req) {
     try {
         const body = await req.json();
-        const { type = "DD", dd_location, party_name, amount, assign_date, beneficiary_name, beneficiary_address, expiry_date, claim_expiry_date, bg_format_upload, mode_of_payment, bid_document, remark, contract_no, security_type, overdue_date, dd_no, dd_date, dd_beneficiary_name, expiry_bank, issuing_branch, dd_scan_copy, dd_receipt } = body;
+        const { type = "DD", dd_location, party_name, amount, assign_date, beneficiary_name, beneficiary_address, expiry_date, claim_expiry_date, bg_format_upload, mode_of_payment, bid_document, remark, contract_no, security_type, overdue_date, claim_date, dd_no, dd_date, dd_beneficiary_name, expiry_bank, issuing_branch, dd_scan_copy, dd_receipt } = body;
         let { assigned_by } = body;
 
         // Fallback to session if assigned_by is missing
@@ -166,9 +174,9 @@ export async function POST(req) {
                 return NextResponse.json({ error: "Missing required fields for BG assignment" }, { status: 400 });
             }
             const [result] = await pool.execute(
-                `INSERT INTO dd_records (type, beneficiary_name, beneficiary_address, amount, expiry_date, claim_expiry_date, bg_format_upload, assign_date, assigned_by, status, mode_of_payment, bid_document, remark, contract_no, security_type, overdue_date) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Assigned', ?, ?, ?, ?, ?, ?)`,
-                [type, beneficiary_name, beneficiary_address, amount, expiry_date, claim_expiry_date, bg_format_upload, assign_date, assigned_by, mode_of_payment || 'BG', bid_document || null, remark || null, contract_no || null, security_type || null, overdue_date || null]
+                `INSERT INTO dd_records (type, beneficiary_name, beneficiary_address, amount, expiry_date, claim_expiry_date, bg_format_upload, assign_date, assigned_by, status, mode_of_payment, bid_document, remark, contract_no, security_type, overdue_date, claim_date) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Assigned', ?, ?, ?, ?, ?, ?, ?)`,
+                [type, beneficiary_name, beneficiary_address, amount, expiry_date, claim_expiry_date, bg_format_upload, assign_date, assigned_by, mode_of_payment || 'BG', bid_document || null, remark || null, contract_no || null, security_type || null, overdue_date || null, claim_date || null]
             );
             return NextResponse.json({ success: true, data: { id: result.insertId } });
         } else {
@@ -176,9 +184,9 @@ export async function POST(req) {
                 return NextResponse.json({ error: "Missing required fields for DD assignment" }, { status: 400 });
             }
             const [result] = await pool.execute(
-                `INSERT INTO dd_records (type, dd_location, party_name, amount, assign_date, assigned_by, status, mode_of_payment, bid_document, remark, contract_no, security_type, overdue_date, dd_no, dd_date, dd_beneficiary_name, expiry_bank, issuing_branch, dd_scan_copy, dd_receipt) 
-         VALUES (?, ?, ?, ?, ?, ?, 'Assigned', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [type || 'DD', dd_location, party_name, amount, assign_date, assigned_by, mode_of_payment || 'DD', bid_document || null, remark || null, contract_no || null, security_type || null, overdue_date || null, dd_no || null, dd_date || null, dd_beneficiary_name || null, expiry_bank || null, issuing_branch || null, dd_scan_copy || null, dd_receipt || null]
+                `INSERT INTO dd_records (type, dd_location, party_name, amount, assign_date, assigned_by, status, mode_of_payment, bid_document, remark, contract_no, security_type, overdue_date, claim_date, dd_no, dd_date, dd_beneficiary_name, expiry_bank, issuing_branch, dd_scan_copy, dd_receipt) 
+         VALUES (?, ?, ?, ?, ?, ?, 'Assigned', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [type || 'DD', dd_location, party_name, amount, assign_date, assigned_by, mode_of_payment || 'DD', bid_document || null, remark || null, contract_no || null, security_type || null, overdue_date || null, claim_date || null, dd_no || null, dd_date || null, dd_beneficiary_name || null, expiry_bank || null, issuing_branch || null, dd_scan_copy || null, dd_receipt || null]
             );
             return NextResponse.json({ success: true, data: { id: result.insertId } });
         }

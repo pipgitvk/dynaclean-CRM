@@ -16,6 +16,14 @@ async function ensureDDRecordsColumns(pool) {
             console.warn("Could not add overdue_date column:", error.message);
         }
     }
+    // Add claim_date column
+    try {
+        await pool.execute("ALTER TABLE dd_records ADD COLUMN claim_date DATE NULL AFTER claim_from_bank");
+    } catch (error) {
+        if (error.code !== "ER_DUP_FIELDNAME") {
+            console.warn("Could not add claim_date column:", error.message);
+        }
+    }
     const ddColumns = [
         ["dd_no", "VARCHAR(255) NULL"],
         ["dd_date", "DATE NULL"],
@@ -110,7 +118,8 @@ export async function PUT(req, { params }) {
             status,
             original_dd_location,
             sent_to_client_date,
-            claim_from_bank
+            claim_from_bank,
+            claim_date
         } = body;
 
         const pool = await getDbConnection();
@@ -178,6 +187,7 @@ export async function PUT(req, { params }) {
         if (original_dd_location !== undefined) { fields.push("original_dd_location = ?"); updateParams.push(original_dd_location); }
         if (sent_to_client_date !== undefined) { fields.push("sent_to_client_date = ?"); updateParams.push(sent_to_client_date); }
         if (claim_from_bank !== undefined) { fields.push("claim_from_bank = ?"); updateParams.push(claim_from_bank ? 1 : 0); }
+        if (claim_date !== undefined) { fields.push("claim_date = ?"); updateParams.push(claim_date); }
 
         // NEFT/RTGS/IMPS Payment Details
         if (reference_no !== undefined) { fields.push("reference_no = ?"); updateParams.push(reference_no); }
