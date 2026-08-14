@@ -1,79 +1,119 @@
 const { getDbConnection } = require('../db');
 const { checkPhoneDuplicate, normalizePhone } = require('../phone-check');
-const {
-  resolveAssigneeFromFormAssignments,
-  resolveAssigneeFromLeadDistribution,
-} = require('../leadDistributionResolver');
 
-const HIDDEN_CUSTOMER_STATUSES = ['Invalid', 'Denied', 'DENIED'];
+const CUSTOMER_PHONE_LAST10 = `
+  RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.phone, ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', ''), ',', ''), 10)
+`;
 
-async function isEmployeeActive(username) {
-  if (!username || username === 'Automatic') return false;
+const META_LEAD_PHONE_EXPR = `
+  COALESCE(
+    NULLIF(JSON_UNQUOTE(JSON_EXTRACT(ml.lead_data, '$.phone')), ''),
+    NULLIF(JSON_UNQUOTE(JSON_EXTRACT(ml.lead_data, '$.phone_number')), '')
+  )
+`;
+
+const META_LEAD_PHONE_LAST10 = `
+  RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${META_LEAD_PHONE_EXPR}, ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', ''), ',', ''), 10)
+`;
+
+const DUPLICATE_JOIN = `${META_LEAD_PHONE_LAST10} = ${CUSTOMER_PHONE_LAST10}`;
+
+function isValidDateString(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+}
+
+function resolveLeadArrivalDate(leadArrivedAt) {
+  const now = new Date();
+  if (!leadArrivedAt) return now;
+  const arrivedAt = new Date(leadArrivedAt);
+  return Number.isNaN(arrivedAt.getTime()) ? now : arrivedAt;
+}
+
+function addTwoMinutes(fromDate) {
+  return new Date(fromDate.getTime() + 2 * 60 * 1000);
+}
+
+/**
+ * Set only next_followup_date to 2 minutes after lead arrival (customers + latest followup row).
+ */
+async function setDuplicateLeadFollowupDate({ customerId, leadArrivedAt, customer = null }) {
+  if (!customerId) {
+    return { handled: false, reason: 'missing_customer_id' };
+  }
 
   const conn = await getDbConnection();
-  const [rows] = await conn.execute(
-    'SELECT status FROM rep_list WHERE username = ? LIMIT 1',
-    [username]
+  const arrivedAt = resolveLeadArrivalDate(leadArrivedAt);
+  const nextFollowupDate = addTwoMinutes(arrivedAt);
+
+  let customerRow = customer;
+  if (!customerRow) {
+    const [rows] = await conn.execute(
+      `SELECT customer_id, first_name, phone, email, lead_source, sales_representative
+       FROM customers WHERE customer_id = ? LIMIT 1`,
+      [customerId]
+    );
+    if (!rows.length) {
+      return { handled: false, reason: 'customer_not_found' };
+    }
+    customerRow = rows[0];
+  }
+
+  await conn.execute(
+    `UPDATE customers SET next_follow_date = ? WHERE customer_id = ?`,
+    [nextFollowupDate, customerId]
   );
 
-  return rows.length > 0 && Number(rows[0].status) === 1;
-}
-
-async function resolveNextActiveAssignee(formId) {
-  const candidates = [];
-
-  const fromForm = await resolveAssigneeFromFormAssignments(formId);
-  if (fromForm) candidates.push(fromForm);
-
-  try {
-    const fromDistribution = await resolveAssigneeFromLeadDistribution();
-    if (fromDistribution) candidates.push(fromDistribution);
-  } catch (error) {
-    console.warn('Lead distribution fallback unavailable:', error.message);
-  }
-
-  for (const username of candidates) {
-    if (await isEmployeeActive(username)) return username;
-  }
-
-  const conn = await getDbConnection();
-  const [rows] = await conn.execute(
-    `SELECT username FROM rep_list WHERE status = 1 ORDER BY username ASC LIMIT 1`
+  const [latestFollowupRows] = await conn.execute(
+    `SELECT \`S.No.\` AS id FROM customers_followup
+     WHERE customer_id = ?
+     ORDER BY time_stamp DESC
+     LIMIT 1`,
+    [customerId]
   );
 
-  return rows[0]?.username || candidates[0] || null;
-}
+  if (latestFollowupRows.length > 0) {
+    await conn.execute(
+      `UPDATE customers_followup SET next_followup_date = ? WHERE \`S.No.\` = ?`,
+      [nextFollowupDate, latestFollowupRows[0].id]
+    );
+  } else {
+    const assignee =
+      customerRow.lead_source && customerRow.lead_source !== 'Automatic'
+        ? customerRow.lead_source
+        : customerRow.sales_representative || 'Automatic';
 
-function getCustomerAssignee(customer) {
-  const candidates = [
-    customer.lead_source,
-    customer.sales_representative,
-    customer.assigned_to,
-  ];
-
-  for (const username of candidates) {
-    if (username && username !== 'Automatic') return username;
+    await conn.execute(
+      `INSERT INTO customers_followup (
+          customer_id, name, contact, next_followup_date, followed_by,
+          followed_date, communication_mode, notes, email
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        customerId,
+        customerRow.first_name || '',
+        customerRow.phone || '',
+        nextFollowupDate,
+        assignee,
+        new Date(),
+        'Facebook',
+        '',
+        customerRow.email || '',
+      ]
+    );
   }
 
-  return null;
-}
-
-function buildModelLabel(productsInterest, customer) {
-  const label = String(productsInterest || customer.products_interest || '').trim();
-  return label || 'Unknown';
+  return {
+    handled: true,
+    customerId,
+    nextFollowupDate,
+  };
 }
 
 /**
  * Handle duplicate Meta lead where phone already exists in CRM (not imported).
- * - Active assignee: next follow-up 2 min after lead arrival, same user
- * - Inactive assignee: reassign to next active user + urgent follow-up (now, Automatic)
- * - Invalid/Denied status: reset to New so lead shows on employee dashboard
+ * Only updates next_followup_date to 2 minutes after lead arrival.
  */
 async function handleDuplicateNotImportedLead({
   phone,
-  formId,
-  lead = {},
-  productsInterest = '',
   leadArrivedAt = null,
 }) {
   const dup = await checkPhoneDuplicate(phone);
@@ -86,120 +126,80 @@ async function handleDuplicateNotImportedLead({
     return { handled: false, reason: 'invalid_phone' };
   }
 
+  return setDuplicateLeadFollowupDate({
+    customerId: dup.customerId,
+    leadArrivedAt,
+  });
+}
+
+/**
+ * Backfill follow-up dates for existing duplicate leads in a date range.
+ */
+async function processHistoricalDuplicateFollowups({ startDate, endDate } = {}) {
   const conn = await getDbConnection();
-  const now = new Date();
-  const arrivedAt = leadArrivedAt ? new Date(leadArrivedAt) : now;
-  const safeArrivedAt = Number.isNaN(arrivedAt.getTime()) ? now : arrivedAt;
 
-  const [custRows] = await conn.execute(
-    `SELECT customer_id, status, stage, assigned_to, lead_source, sales_representative,
-            first_name, phone, email, products_interest
-     FROM customers
-     WHERE customer_id = ?`,
-    [dup.customerId]
-  );
+  const whereParts = [
+    'ml.is_imported_to_crm = 0',
+    `${META_LEAD_PHONE_EXPR} IS NOT NULL`,
+    `${META_LEAD_PHONE_EXPR} != ''`,
+  ];
+  const queryParams = [];
 
-  if (!custRows.length) {
-    return { handled: false, reason: 'customer_not_found' };
+  if (isValidDateString(startDate)) {
+    whereParts.push('DATE(ml.created_at) >= ?');
+    queryParams.push(startDate);
+  }
+  if (isValidDateString(endDate)) {
+    whereParts.push('DATE(ml.created_at) <= ?');
+    queryParams.push(endDate);
   }
 
-  const customer = custRows[0];
-  const modelLabel = buildModelLabel(productsInterest, customer);
-  let assignee = getCustomerAssignee(customer);
-  let reassigned = false;
+  const [rows] = await conn.execute(
+    `SELECT
+        ml.id,
+        ml.created_at,
+        c.customer_id,
+        c.first_name,
+        c.phone,
+        c.email,
+        c.lead_source,
+        c.sales_representative
+     FROM meta_leads ml
+     INNER JOIN customers c ON ${DUPLICATE_JOIN}
+     WHERE ${whereParts.join(' AND ')}
+     ORDER BY ml.created_at ASC`,
+    queryParams
+  );
 
-  const employeeActive = assignee ? await isEmployeeActive(assignee) : false;
+  let processed = 0;
+  let failed = 0;
+  const errors = [];
 
-  let nextFollowupDate;
-  let followedBy;
-  let followupNote;
-
-  if (!employeeActive) {
-    const newAssignee = await resolveNextActiveAssignee(formId);
-    if (!newAssignee) {
-      return { handled: false, reason: 'no_active_assignee' };
+  for (const row of rows) {
+    try {
+      const result = await setDuplicateLeadFollowupDate({
+        customerId: row.customer_id,
+        leadArrivedAt: row.created_at,
+        customer: row,
+      });
+      if (result.handled) processed += 1;
+      else failed += 1;
+    } catch (error) {
+      failed += 1;
+      errors.push({ metaLeadId: row.id, customerId: row.customer_id, error: error.message });
     }
-
-    assignee = newAssignee;
-    reassigned = true;
-    nextFollowupDate = now;
-    followedBy = 'Automatic';
-    followupNote = `Lead inquiry for ${modelLabel}`;
-
-    await conn.execute(
-      `UPDATE customers
-       SET lead_source = ?, sales_representative = ?, assigned_to = 'Automatic'
-       WHERE customer_id = ?`,
-      [assignee, assignee, customer.customer_id]
-    );
-
-    await conn.execute(
-      `UPDATE lead_distribution
-       SET assigned_count = assigned_count + 1,
-           last_assigned_at = ?
-       WHERE UPPER(TRIM(username)) = UPPER(?)`,
-      [now, assignee]
-    );
-  } else {
-    nextFollowupDate = new Date(safeArrivedAt.getTime() + 2 * 60 * 1000);
-    followedBy = assignee;
-    followupNote = `Lead inquiry for ${modelLabel}`;
   }
-
-  const statusNeedsReset = HIDDEN_CUSTOMER_STATUSES.includes(String(customer.status || '').trim());
-
-  if (statusNeedsReset) {
-    await conn.execute(
-      `UPDATE customers
-       SET status = 'New', stage = 'New', next_follow_date = ?
-       WHERE customer_id = ?`,
-      [nextFollowupDate, customer.customer_id]
-    );
-  } else {
-    await conn.execute(
-      `UPDATE customers SET next_follow_date = ? WHERE customer_id = ?`,
-      [nextFollowupDate, customer.customer_id]
-    );
-  }
-
-  const contactName = lead.first_name || customer.first_name || '';
-  const contactPhone = normalizedPhone;
-  const contactEmail = lead.email || customer.email || '';
-
-  await conn.execute(
-    `INSERT INTO customers_followup (
-        customer_id, name, contact, next_followup_date, followed_by,
-        followed_date, communication_mode, notes, email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      customer.customer_id,
-      contactName,
-      contactPhone,
-      nextFollowupDate,
-      followedBy,
-      now,
-      'Facebook',
-      followupNote,
-      contactEmail,
-    ]
-  );
-
-  console.log(
-    `♻️ Duplicate lead handled for customer ${customer.customer_id}: assignee=${assignee}, reassigned=${reassigned}, followup=${nextFollowupDate.toISOString()}`
-  );
 
   return {
-    handled: true,
-    customerId: customer.customer_id,
-    assignee,
-    reassigned,
-    statusReset: statusNeedsReset,
-    nextFollowupDate,
+    total: rows.length,
+    processed,
+    failed,
+    errors: errors.slice(0, 20),
   };
 }
 
 module.exports = {
   handleDuplicateNotImportedLead,
-  isEmployeeActive,
-  resolveNextActiveAssignee,
+  setDuplicateLeadFollowupDate,
+  processHistoricalDuplicateFollowups,
 };

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Copy, Search, Users } from 'lucide-react';
+import { ArrowLeft, Calendar, Copy, RefreshCw, Search, Users } from 'lucide-react';
 
 function formatDateInput(date) {
   const y = date.getFullYear();
@@ -45,6 +45,16 @@ function formatIstDateTime(value) {
   });
 }
 
+function getFollowupDateTwoMinutesAfter(createdAt) {
+  if (!createdAt) return null;
+  const raw = String(createdAt).trim();
+  const hasTimezone = /[zZ]$/.test(raw) || /[+-]\d{2}:\d{2}$/.test(raw);
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const date = new Date(hasTimezone ? raw : `${normalized}Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getTime() + 2 * 60 * 1000);
+}
+
 export default function DuplicateMetaLeadsPage() {
   const defaultRange = getDefaultMonthRange();
   const [leads, setLeads] = useState([]);
@@ -55,6 +65,7 @@ export default function DuplicateMetaLeadsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState(defaultRange.startDate);
   const [endDate, setEndDate] = useState(defaultRange.endDate);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     fetchDuplicates();
@@ -104,6 +115,29 @@ export default function DuplicateMetaLeadsPage() {
     setStartDate(range.startDate);
     setEndDate(range.endDate);
     setPage(1);
+  };
+
+  const handleProcessFollowups = async () => {
+    if (!confirm(`Apply 2-minute follow-up dates for duplicates from ${startDate} to ${endDate}?`)) {
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      const response = await axios.post('/api/meta-leads/duplicates/process-followups', {
+        startDate,
+        endDate,
+      });
+
+      if (response.data.success) {
+        toast.success(response.data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to process duplicate follow-ups');
+      console.error(error);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const filteredLeads = useMemo(() => {
@@ -225,6 +259,15 @@ export default function DuplicateMetaLeadsPage() {
           >
             This Month (1–31)
           </button>
+          <button
+            type="button"
+            onClick={handleProcessFollowups}
+            disabled={processing}
+            className="px-4 py-3 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 whitespace-nowrap inline-flex items-center justify-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${processing ? 'animate-spin' : ''}`} />
+            {processing ? 'Processing...' : 'Apply 2 Min Follow-up'}
+          </button>
         </div>
 
         <div className="relative">
@@ -252,12 +295,13 @@ export default function DuplicateMetaLeadsPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CRM Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CRM ID</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next Follow-up</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan="9" className="px-4 py-12 text-center text-gray-500">
                     {searchQuery ? 'No duplicate leads match your search' : 'No duplicate leads found'}
                   </td>
                 </tr>
@@ -312,6 +356,9 @@ export default function DuplicateMetaLeadsPage() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-gray-600">
                       {formatIstDateTime(lead.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-indigo-700 font-medium">
+                      {formatIstDateTime(getFollowupDateTwoMinutesAfter(lead.createdAt))}
                     </td>
                   </tr>
                 ))
