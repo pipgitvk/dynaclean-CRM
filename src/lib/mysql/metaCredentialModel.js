@@ -5,6 +5,77 @@ const { countLeadsByCredentialId } = require('./metaLeadModel');
  * Meta Credential Model (MySQL)
  */
 
+function normalizeFormIds(rawValue) {
+  if (rawValue === null || rawValue === undefined) return [];
+
+  const coerceArray = (value) => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  };
+
+  if (Array.isArray(rawValue)) {
+    return coerceArray(rawValue);
+  }
+
+  if (typeof rawValue === 'number') {
+    return [String(rawValue)];
+  }
+
+  if (typeof rawValue === 'string') {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return [];
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return coerceArray(parsed);
+      }
+      if (typeof parsed === 'string') {
+        const nested = parsed.trim();
+        if ((nested.startsWith('[') && nested.endsWith(']')) || (nested.startsWith('{') && nested.endsWith('}'))) {
+          return normalizeFormIds(nested);
+        }
+        return [nested].filter(Boolean);
+      }
+      if (typeof parsed === 'number') {
+        return [String(parsed)];
+      }
+      if (parsed && typeof parsed === 'object') {
+        if (Array.isArray(parsed.formIds)) {
+          return coerceArray(parsed.formIds);
+        }
+        if (Array.isArray(parsed.form_ids)) {
+          return coerceArray(parsed.form_ids);
+        }
+      }
+    } catch (error) {
+      // Fallback to CSV/single value parsing
+    }
+
+    if (trimmed.includes(',')) {
+      return trimmed
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [trimmed];
+  }
+
+  if (typeof rawValue === 'object') {
+    if (Array.isArray(rawValue.formIds)) {
+      return coerceArray(rawValue.formIds);
+    }
+    if (Array.isArray(rawValue.form_ids)) {
+      return coerceArray(rawValue.form_ids);
+    }
+  }
+
+  return [];
+}
+
 async function createCredential(data) {
   const conn = await getDbConnection();
   const [result] = await conn.execute(
@@ -38,7 +109,7 @@ async function getAllCredentials(activeOnly = false) {
         verifyToken: row.verify_token,
         pageId: row.page_id,
         pageToken: row.page_token,
-        formIds: Array.isArray(JSON.parse(row.form_ids)) ? JSON.parse(row.form_ids) : [],
+        formIds: normalizeFormIds(row.form_ids),
         isActive: Boolean(row.is_active),
         lastSyncAt: row.last_sync_at,
         lastSyncStatus: row.last_sync_status,
@@ -89,7 +160,7 @@ async function getCredentialById(id) {
       verifyToken: row.verify_token,
       pageId: row.page_id,
       pageToken: row.page_token,
-      formIds: Array.isArray(JSON.parse(row.form_ids)) ? JSON.parse(row.form_ids) : [],
+      formIds: normalizeFormIds(row.form_ids),
       isActive: Boolean(row.is_active),
       lastSyncAt: row.last_sync_at,
       lastSyncStatus: row.last_sync_status,
