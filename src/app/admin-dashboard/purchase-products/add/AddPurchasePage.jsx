@@ -956,6 +956,11 @@ export default function   AddPurchasePage() {
   };
 
   const handleSave = async () => {
+    // Prevent multiple submissions
+    if (saving) {
+      return;
+    }
+    
     try {
       setSaving(true);
       
@@ -2000,9 +2005,13 @@ export default function   AddPurchasePage() {
                 </div>
                 <button
                   type="button"
-                  onClick={handleSave}
+                  onClick={saving ? null : handleSave}
                   disabled={saving}
-                  className="flex items-center gap-2 px-7 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold text-sm shadow-sm disabled:opacity-60"
+                  className={`flex items-center gap-2 px-7 py-2 rounded font-semibold text-sm shadow-sm transition-all ${
+                    saving 
+                      ? "bg-gray-400 text-gray-700 cursor-not-allowed opacity-60" 
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
                 >
                   <Save size={16} />
                   {saving ? (isEditMode ? "Updating..." : "Saving...") : (isEditMode ? "Update" : "Save")}
