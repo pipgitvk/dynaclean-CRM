@@ -9,6 +9,13 @@ async function ensureDDRecordsColumns(pool) {
             console.warn("Could not add bid_document column:", error.message);
         }
     }
+    try {
+        await pool.execute("ALTER TABLE dd_records ADD COLUMN overdue_date DATE NULL AFTER security_type");
+    } catch (error) {
+        if (error.code !== "ER_DUP_FIELDNAME") {
+            console.warn("Could not add overdue_date column:", error.message);
+        }
+    }
     const ddColumns = [
         ["dd_no", "VARCHAR(255) NULL"],
         ["dd_date", "DATE NULL"],
@@ -55,6 +62,7 @@ export async function PUT(req, { params }) {
             remark,
             contract_no,
             security_type,
+            overdue_date,
 
             // Step 2 (DD & BG shared/specific)
             cheque_no,
@@ -125,6 +133,7 @@ export async function PUT(req, { params }) {
         if (remark !== undefined) { fields.push("remark = ?"); updateParams.push(remark || null); }
         if (contract_no !== undefined) { fields.push("contract_no = ?"); updateParams.push(contract_no || null); }
         if (security_type !== undefined) { fields.push("security_type = ?"); updateParams.push(security_type || null); }
+        if (overdue_date !== undefined) { fields.push("overdue_date = ?"); updateParams.push(overdue_date || null); }
 
         // Step 2 fields (DD & shared)
         if (cheque_no !== undefined) { fields.push("cheque_no = ?"); updateParams.push(cheque_no); }

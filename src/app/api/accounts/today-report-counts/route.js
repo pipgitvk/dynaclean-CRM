@@ -267,6 +267,80 @@ export async function GET() {
       }
     }
 
+    // 6. DD/EMD Cards counts
+    let ddEmdOverdueCount = 0;
+    let ddEmdOverdueValue = 0;
+    let ddEmdTotalAmount = 0;
+    const hasDdRecordsTable = await tableExists(conn, "dd_records");
+    if (hasDdRecordsTable) {
+      // Apply role-based filtering similar to DD management API
+      const userRole = session?.role?.toUpperCase() || "GUEST";
+      const username = session?.username || session?.name;
+      const isPrivileged = ["SUPERADMIN", "ADMIN", "ACCOUNTANT", "DIRECTOR"].includes(userRole);
+      
+      let roleCondition = "";
+      let roleParams = [];
+      if (!isPrivileged && username) {
+        roleCondition = " AND assigned_by = ?";
+        roleParams.push(username);
+      }
+
+      // Check which date columns actually exist to avoid SQL errors
+      const hasExpiryDate = await columnExists(conn, "dd_records", "expiry_date");
+      const hasClaimExpiryDate = await columnExists(conn, "dd_records", "claim_expiry_date");
+      const hasOverdueDate = await columnExists(conn, "dd_records", "overdue_date");
+
+      const dateConditions = [];
+      if (hasExpiryDate) dateConditions.push(`(expiry_date IS NOT NULL AND expiry_date != '0000-00-00' AND DATE(expiry_date) < CURDATE())`);
+      if (hasClaimExpiryDate) dateConditions.push(`(claim_expiry_date IS NOT NULL AND claim_expiry_date != '0000-00-00' AND DATE(claim_expiry_date) < CURDATE())`);
+      if (hasOverdueDate) dateConditions.push(`(overdue_date IS NOT NULL AND overdue_date != '0000-00-00' AND DATE(overdue_date) < CURDATE())`);
+
+      // DD/EMD Overdue - records that are NOT yet Claimed/Unclaimed AND have any date before today
+      // Count ALL non-claimed records (Assigned / Filled / Issued / Sent to Client) whose any date has passed
+      // IMPORTANT: Only run overdue query if at least one date column exists,
+      // otherwise all non-claimed records would be incorrectly counted as overdue
+      if (dateConditions.length > 0) {
+        const dateWhere = ` AND (${dateConditions.join(" OR ")})`;
+        const ddOverdueQuery = `SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total_value
+           FROM dd_records 
+           WHERE (
+             claim_from_bank = 0 
+             AND (status IS NULL OR status NOT IN ('Claimed', 'Unclaimed'))
+             ${dateWhere}
+           )${roleCondition}`;
+        
+        console.log("DD Overdue Count Query:", ddOverdueQuery);
+        console.log("DD Overdue Count Params:", roleParams);
+        
+        let ddOverdueRows;
+        try {
+          [ddOverdueRows] = await conn.execute(ddOverdueQuery, roleParams);
+          ddEmdOverdueCount = ddOverdueRows?.[0]?.count || 0;
+          ddEmdOverdueValue = Number(ddOverdueRows?.[0]?.total_value || 0);
+        } catch (ddErr) {
+          console.warn("DD overdue count query failed (fallback to 0):", ddErr.message);
+          ddEmdOverdueCount = 0;
+          ddEmdOverdueValue = 0;
+        }
+      } else {
+        console.warn("No date columns found for DD overdue check - keeping count as 0");
+      }
+
+      // DD/EMD Total Amount - sum of ALL records in dd_records table
+      try {
+        const [ddTotalRows] = await conn.execute(
+          `SELECT COALESCE(SUM(amount), 0) AS total_amount
+           FROM dd_records 
+           WHERE 1=1${roleCondition}`,
+          roleParams
+        );
+        ddEmdTotalAmount = Number(ddTotalRows?.[0]?.total_amount || 0);
+      } catch (ddTotalErr) {
+        console.warn("DD total amount query failed (fallback to 0):", ddTotalErr.message);
+        ddEmdTotalAmount = 0;
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -276,6 +350,9 @@ export async function GET() {
         taskPending: taskPendingCount,
         expensePaymentPending: expensePaymentPendingCount,
         expenseApprovePending: expenseApprovePendingCount,
+        ddEmdOverdueCount: ddEmdOverdueCount,
+        ddEmdOverdueValue: ddEmdOverdueValue,
+        ddEmdTotalAmount: ddEmdTotalAmount,
         // Backward-compat key for any old consumer.
         expensePending: expenseApprovePendingCount,
       },

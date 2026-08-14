@@ -190,6 +190,17 @@ export default function DDManagementPage() {
         fetchCreditStatements();
     }, [statusFilter, search]);
 
+    // Handle URL parameters on component mount
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const statusParam = urlParams.get('status');
+        const fromCardParam = urlParams.get('fromCard');
+        
+        if (statusParam && fromCardParam === '1') {
+            setStatusFilter(statusParam);
+        }
+    }, []);
+
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target;
         // Prevent non-authorized users from changing Step 2/3 fields if they somehow bypass UI
@@ -590,6 +601,7 @@ export default function DDManagementPage() {
                     <option value="Filled">Filled</option>
                     <option value="Issued">Issued</option>
                     <option value="Sent to Client">Sent to Client</option>
+                    <option value="overdue">Overdue</option>
                 </select>
                 <div className="flex items-center gap-2 text-sm text-gray-500 justify-end">
                     <Clock size={16} /> Total Records: <span className="font-bold text-gray-900">{data.length}</span>

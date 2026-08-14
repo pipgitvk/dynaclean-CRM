@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Wallet, Clock, ClipboardList, Receipt } from "lucide-react";
+import { FileText, Wallet, Clock, ClipboardList, Receipt, AlertTriangle, DollarSign, CreditCard } from "lucide-react";
 
 const CARDS = [
   {
@@ -41,6 +41,26 @@ const CARDS = [
     icon: Receipt,
     href: "/accounts-dashboard/all-expenses?status=Pending&fromCard=1",
   },
+  {
+    key: "ddEmdOverdueCount",
+    label: "DD/EMD Overdue Nos",
+    icon: AlertTriangle,
+    href: "/accounts-dashboard/dd-management?status=overdue&fromCard=1",
+  },
+  {
+    key: "ddEmdOverdueValue",
+    label: "DD/EMD Overdue Value",
+    icon: DollarSign,
+    href: "/accounts-dashboard/dd-management?status=overdue&fromCard=1",
+    isAmount: true,
+  },
+  {
+    key: "ddEmdTotalAmount",
+    label: "DD/EMD Total Amount",
+    icon: CreditCard,
+    href: "/accounts-dashboard/dd-management?fromCard=1",
+    isAmount: true,
+  },
 ];
 
 export default function AccountantPendingCards() {
@@ -74,8 +94,8 @@ export default function AccountantPendingCards() {
         <h3 className="text-base font-semibold text-gray-800">Summary</h3>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5">
-        {CARDS.map(({ key, label, icon: Icon, href }) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 2xl:grid-cols-9 gap-2.5">
+        {CARDS.map(({ key, label, icon: Icon, href, isAmount }) => {
           const value = counts?.[key] ?? 0;
           
           // Determine color based on value: green for 0, red for >0
@@ -85,6 +105,9 @@ export default function AccountantPendingCards() {
           const textColor = isZero ? "text-green-600" : "text-red-600";
           const iconBg = isZero ? "bg-green-100" : "bg-red-100";
           const iconColor = isZero ? "text-green-500" : "text-red-500";
+          
+          // Format display value
+          const displayValue = isAmount ? `₹${Number(value).toLocaleString('en-IN')}` : value;
           
           return (
             <div
@@ -100,7 +123,9 @@ export default function AccountantPendingCards() {
                   {key === 'invoicePending' ? '📄' : 
                    key === 'unsettledPayment' ? '💸' : 
                    key === 'paymentPending' ? '⏳' : 
-                   key === 'taskPending' ? '✓' : '💰'}
+                   key === 'taskPending' ? '✓' : 
+                   key === 'ddEmdOverdueCount' || key === 'ddEmdOverdueValue' ? '⚠️' :
+                   key === 'ddEmdTotalAmount' ? '💳' : '💰'}
                 </span>
               </div>
               
@@ -108,11 +133,11 @@ export default function AccountantPendingCards() {
                 <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-0.5">
                   {label}
                 </p>
-                <p className={`text-2xl font-bold leading-none ${textColor}`}>
+                <p className={`${isAmount ? 'text-lg' : 'text-2xl'} font-bold leading-none ${textColor}`}>
                   {loading ? (
                     <span className="inline-block w-6 h-6 bg-gray-200 animate-pulse rounded" />
                   ) : (
-                    value
+                    displayValue
                   )}
                 </p>
                 <p className="text-[10px] text-gray-400 mt-0.5">Click to view</p>
