@@ -260,6 +260,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN", "DIGITAL MARKETER"],
         icon: "FileText",
       },
+      {
+        path: "/digital-marketing-dashboard/meta-credentials/add",
+        name: "Meta Credentials",
+        moduleKey: "meta-credentials-add",
+        roles: ["DIGITAL MARKETER"],
+        icon: "ShieldCheck",
+      },
     ],
   },
   {

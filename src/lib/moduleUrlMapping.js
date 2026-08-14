@@ -107,6 +107,7 @@ export const MODULE_KEY_TO_URL = {
   "keywords-management": "/admin-dashboard/keywords",
   "backlinks-management": "/admin-dashboard/backlinks",
   "backlinks-excel-data": "/admin-dashboard/backlinks-excel",
+  "meta-credentials-add": "/digital-marketing-dashboard/meta-credentials/add",
 
   // Import CRM
   "import-agents": "/admin-dashboard/import-crm/agents",
