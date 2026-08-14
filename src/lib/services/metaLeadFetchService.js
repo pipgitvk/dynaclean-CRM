@@ -343,6 +343,7 @@ async function syncLeadsForCredential(credential, options = {}) {
                 const duplicateResult = await handleDuplicateNotImportedLead({
                   phone: parsedLead.phone,
                   leadArrivedAt: rawLead.created_time || new Date(),
+                  formId,
                 });
 
                 if (duplicateResult.handled) {

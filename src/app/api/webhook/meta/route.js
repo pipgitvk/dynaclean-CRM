@@ -228,6 +228,7 @@ export async function POST(request) {
                     const duplicateResult = await handleDuplicateNotImportedLead({
                       phone: normalizedPhone,
                       leadArrivedAt: leadData.created_time || new Date(),
+                      formId,
                     });
 
                     if (duplicateResult.handled) {
