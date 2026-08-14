@@ -142,12 +142,18 @@ export async function middleware(request) {
         const isBulkReassignRoute = pathname.startsWith("/admin-dashboard/bulk-reassign");
         const isAccountingLedgerRoute = pathname.startsWith("/admin-dashboard/accounting/ledger");
         const isInvoicesBuyerRoute = pathname.startsWith("/admin-dashboard/invoices/buyer");
+        const isPartiesRoute = pathname.startsWith("/admin-dashboard/parties");
+        const isPurchaseProductsRoute = pathname.startsWith("/admin-dashboard/purchase-products");
         const isPaymentPendingReportRoute = pathname.startsWith("/admin-dashboard/reports/payment-pending");
         const isManualPaymentsRoute = pathname.startsWith("/admin-dashboard/manual-payments");
         const isSalesDashboardManualPaymentsRoute = pathname.startsWith("/sales-dashboard/manual-payments");
         
-        // Allow everyone to access accounting/ledger and invoices/buyer routes
-        const isEveryoneAllowedRoute = isAccountingLedgerRoute || isInvoicesBuyerRoute;
+        // Allow everyone to access allowed admin routes that are module-gated in sidebar.
+        const isEveryoneAllowedRoute =
+          isAccountingLedgerRoute ||
+          isInvoicesBuyerRoute ||
+          isPartiesRoute ||
+          isPurchaseProductsRoute;
         
         if (
           !(roleNorm === "EA" && isEaAllowed) &&

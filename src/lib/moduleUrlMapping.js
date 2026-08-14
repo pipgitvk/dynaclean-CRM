@@ -40,6 +40,8 @@ export const MODULE_KEY_TO_URL = {
   "demo-details": "/admin-dashboard/demo_details",
 
   // Products & Inventory
+  "parties": "/admin-dashboard/parties",
+  "purchase-products": "/admin-dashboard/purchase-products",
   "product-stock": "/admin-dashboard/product-stock",
   "product-accessories": "/admin-dashboard/product-accessories",
   "purchase-direct-in": "/admin-dashboard/purchase/direct-in",

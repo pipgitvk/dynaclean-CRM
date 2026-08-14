@@ -515,20 +515,21 @@ const allMenuItems = [
   {
     name: "Procurement",
     moduleKey: "products",
-    roles: ["SUPERADMIN"],
+    roles: ["ALL"],
     icon: "ShoppingCart",
     children: [
       {
         path: "/admin-dashboard/parties",
         name: "Parties",
         accessKey: "parties",
-        roles: ["SUPERADMIN"],
+        roles: ["ALL"],
         icon: "Users",
       },
       {
         path: "/admin-dashboard/purchase-products",
-        name: "Purchase Bills",
-        roles: ["SUPERADMIN"],
+        name: "Purchase Billings",
+        accessKey: "purchase-products",
+        roles: ["ALL"],
         icon: "ShoppingBag",
       },
           {

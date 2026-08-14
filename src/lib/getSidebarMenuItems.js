@@ -524,13 +524,27 @@ const allMenuItems = [
   {
     name: "Procurement",
     moduleKey: "products",
-    roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "SERVICE SUPPORT"],
+    roles: ["ALL"],
     icon: "ShoppingCart",
     children: [
       {
+        path: "/admin-dashboard/parties",
+        name: "Parties",
+        moduleKey: "parties",
+        roles: ["ALL"],
+        icon: "Users",
+      },
+      {
+        path: "/admin-dashboard/purchase-products",
+        name: "Purchase Billings",
+        moduleKey: "purchase-products",
+        roles: ["ALL"],
+        icon: "ShoppingBag",
+      },
+      {
         name: "Purchase – Products",
         moduleKey: "products",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "SERVICE SUPPORT"],
+        roles: ["ALL"],
         icon: "ShoppingCart",
         children: [
           {
@@ -573,7 +587,7 @@ const allMenuItems = [
       {
         name: "Purchase – Spares",
         moduleKey: "products",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "SERVICE SUPPORT"],
+        roles: ["ALL"],
         icon: "ShoppingCart",
         children: [
           {
