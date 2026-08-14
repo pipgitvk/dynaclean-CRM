@@ -194,6 +194,11 @@ export async function POST(request) {
                   );
                   
                   const customerId = customerResult.insertId;
+
+                  const productInterestText = String(productsInterest || '').trim();
+                  const followupNote = productInterestText
+                    ? `Lead from Facebook webhook (multi-credential). Product interest: ${productInterestText}`
+                    : 'Lead from Facebook webhook (multi-credential)';
                   
                   await conn.execute(
                     `INSERT INTO customers_followup (
@@ -208,7 +213,7 @@ export async function POST(request) {
                       credential.employeeName,
                       now,
                       'Facebook',
-                      'Lead from Facebook webhook (multi-credential)',
+                      followupNote,
                       parsedLead.email || ''
                     ]
                   );

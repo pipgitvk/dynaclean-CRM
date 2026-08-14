@@ -187,6 +187,11 @@ async function importLeadToCRM(lead, assignedTo) {
   );
   
   const customerId = customerResult.insertId;
+
+  const productInterest = String(lead.products_interest || '').trim();
+  const followupNote = productInterest
+    ? `Lead from Facebook ad (multi-credential). Product interest: ${productInterest}`
+    : 'Lead from Facebook ad (multi-credential)';
   
   await conn.execute(
     `INSERT INTO customers_followup (
@@ -201,7 +206,7 @@ async function importLeadToCRM(lead, assignedTo) {
       assignedTo,
       now,
       'Facebook',
-      'Lead from Facebook ad (multi-credential)',
+      followupNote,
       lead.email || ''
     ]
   );
