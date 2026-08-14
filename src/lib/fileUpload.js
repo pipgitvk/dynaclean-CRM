@@ -23,6 +23,15 @@ function isImage(filename) {
   return IMAGE_EXTENSIONS.includes(path.extname(filename).toLowerCase());
 }
 
+function sanitizeFilename(filename) {
+  if (!filename) return "unnamed";
+  const ext = path.extname(filename);
+  let base = filename.slice(0, -ext.length) || "unnamed";
+  base = base.replace(/[#?[\]{}<>|\\^`~:;@&=+$,"'/*\s]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!base) base = "file";
+  return base + ext;
+}
+
 async function saveLocally(file, buffer, folder, filename) {
   const uploadDir = path.join(process.cwd(), "public", folder);
   try {
@@ -61,8 +70,8 @@ export async function uploadFiles(files, folder = "uploads") {
       const timestamp = Date.now();
       const random = Math.floor(Math.random() * 10000);
       const ext = path.extname(file.name);
-      const basename = path.basename(file.name, ext);
-      const filename = `${basename}_${timestamp}_${random}${ext}`;
+      const safeBase = sanitizeFilename(path.basename(file.name, ext));
+      const filename = `${safeBase}_${timestamp}_${random}${ext}`;
 
       let storedPath;
 

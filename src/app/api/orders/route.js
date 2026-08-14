@@ -8,6 +8,15 @@ import { sendTemplatedEmail } from "@/lib/template-utils";
 
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
+function sanitizeFilename(filename) {
+  if (!filename) return "unnamed";
+  const ext = path.extname(filename);
+  let base = filename.slice(0, -ext.length) || "unnamed";
+  base = base.replace(/[#?[\]{}<>|\\^`~:;@&=+$,"'/*\s]+/g, "_").replace(/^_+|_+$/g, "");
+  if (!base) base = "file";
+  return base + ext;
+}
+
 // Helper function to save a file locally
 async function saveFileLocally(file, subfolder) {
   if (!file || !file.filepath || !file.originalFilename) {
@@ -19,7 +28,8 @@ async function saveFileLocally(file, subfolder) {
   const targetSubfolder = path.join(UPLOAD_DIR, subfolder);
   await fs.mkdir(targetSubfolder, { recursive: true });
 
-  const fileName = `${Date.now()}-${file.originalFilename}`; // Ensure unique filename
+  const safeName = sanitizeFilename(file.originalFilename);
+  const fileName = `${Date.now()}-${safeName}`; // Ensure unique filename
   const targetPath = path.join(targetSubfolder, fileName);
 
   try {

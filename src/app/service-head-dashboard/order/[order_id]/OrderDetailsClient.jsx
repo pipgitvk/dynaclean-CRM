@@ -360,20 +360,29 @@ function FileSection({ label, file }) {
 }
 
 function DocCell({ label, file, optional, required }) {
+  let displayUrl = file;
+  if (file && file.startsWith('/uploads/')) {
+    const parts = file.split('/');
+    if (parts.length >= 3) {
+      const folder = parts[2];
+      const filename = parts.slice(3).join('/');
+      displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
+    }
+  }
   return (
     <div>
       <p className="font-medium">{label}</p>
       {file ? (
         <div className="space-x-3">
           <a
-            href={file}
+            href={displayUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 underline"
           >
             View
           </a>
-          <a href={file} download className="text-blue-600 underline">
+          <a href={displayUrl} download className="text-blue-600 underline">
             Download
           </a>
         </div>
