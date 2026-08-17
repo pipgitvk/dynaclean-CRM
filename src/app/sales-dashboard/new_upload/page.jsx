@@ -10,6 +10,8 @@ export default function LeadDistributionPage() {
   const [showModal, setShowModal] = useState(false);
   const [fromDate, setFromDate] = useState(""); // YYYY-MM-DD
   const [toDate, setToDate] = useState("");   // YYYY-MM-DD
+  const [assignedTo, setAssignedTo] = useState(""); // Filter by assigned_to
+  const [assignedToOptions, setAssignedToOptions] = useState([]); // Unique assigned_to values
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
@@ -17,12 +19,18 @@ export default function LeadDistributionPage() {
         const params = new URLSearchParams();
         if (fromDate) params.set("from", fromDate);
         if (toDate) params.set("to", toDate);
+        // Don't filter by assignedTo in API - fetch all and filter frontend
         const qs = params.toString();
         const url = qs ? `/api/assigned-customers?${qs}` : "/api/assigned-customers";
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to load");
         const data = await res.json();
-        if (isMounted) setCustomers(data.data || []);
+        if (isMounted) {
+          setCustomers(data.data || []);
+          // Extract unique assigned_to values for dropdown - always from all data
+          const uniqueAssignedTo = [...new Set((data.data || []).map(c => c.sales_representative).filter(Boolean))];
+          setAssignedToOptions(uniqueAssignedTo.sort());
+        }
       } catch (e) {
         if (isMounted) setCustomers([]);
       } finally {
@@ -72,6 +80,21 @@ export default function LeadDistributionPage() {
               className="border border-gray-300 rounded px-3 py-2"
             />
           </div>
+          <div className="flex flex-col">
+            <label className="text-xs text-gray-600 mb-1">Assigned To</label>
+            <select
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-2"
+            >
+              <option value="">All</option>
+              {assignedToOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
           {/* <button
             onClick={() => {
               // Trigger useEffect by just toggling state (already bound to from/to)
@@ -81,9 +104,9 @@ export default function LeadDistributionPage() {
           >
             Apply
           </button> */}
-          {(fromDate || toDate) && (
+          {(fromDate || toDate || assignedTo) && (
             <button
-              onClick={() => { setFromDate(""); setToDate(""); setIsLoading(true); }}
+              onClick={() => { setFromDate(""); setToDate(""); setAssignedTo(""); setIsLoading(true); }}
               className="bg-gray-200 text-gray-800 px-4 py-2 rounded shadow"
             >
               Clear
@@ -110,8 +133,8 @@ export default function LeadDistributionPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {customers.length > 0 ? (
-                  customers.map((c, i) => (
+                {customers.filter(c => !assignedTo || c.sales_representative === assignedTo).length > 0 ? (
+                  customers.filter(c => !assignedTo || c.sales_representative === assignedTo).map((c, i) => (
                     <tr key={c.customer_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-3 py-3 text-center">{i + 1}</td>
                       <td className="px-3 py-3">{new Date(c.date_created).toLocaleDateString()}</td>
