@@ -23,6 +23,7 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get("mode") || "table";
+    const globalSearch = searchParams.get("global") === "1";
 
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
@@ -72,13 +73,16 @@ export async function GET(req) {
 
     // Data visibility:
     // Privileged roles (incl. SALES CUM BACKOFFICE) → all rows incl. Denied
+    // When globalSearch=1 (header search): SERVICE SUPPORT / GEM also see all customers
     // SERVICE SUPPORT → rows where service_lead_source = their username
     // GEM → rows where gem_lead_source = their username
     // everyone else → only rows assigned/owned by them (or deny if username missing)
     if (!canViewAllCustomers(role)) {
       const normalizedRole = normalizeRoleKey(role);
 
-      if (normalizedRole === "SERVICE SUPPORT") {
+      if (globalSearch && (normalizedRole === "SERVICE SUPPORT" || normalizedRole === "GEM")) {
+        // Skip ownership scoping for SERVICE SUPPORT / GEM when using global header search
+      } else if (normalizedRole === "SERVICE SUPPORT") {
         // SERVICE SUPPORT sees only customers assigned to them via service_lead_source
         if (username) {
           whereClause += ` AND service_lead_source = ?`;

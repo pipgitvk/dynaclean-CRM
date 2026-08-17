@@ -164,7 +164,7 @@ export default function Navbar({ onToggleSidebar }) {
     try {
       setLoading(true);
       const res = await fetch(
-        `/api/customers-data?search=${encodeURIComponent(q)}&pageSize=5`,
+        `/api/customers-data?search=${encodeURIComponent(q)}&pageSize=5&global=1`,
         { credentials: "include" }
       );
       const data = await res.json();
