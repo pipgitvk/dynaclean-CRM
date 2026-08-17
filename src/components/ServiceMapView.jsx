@@ -52,7 +52,7 @@ export default function ServiceMapView({ services = [] }) {
     } else if (service.status === "PENDING FOR SPARES") {
       color = "#ffff00"; // Yellow
     } else if (service.status === "PENDING BY CUSTOMER") {
-      color = "#ef4444"; // Red
+      color = "#3b82f6"; // Blue
     } else if (service.status === "IN PROGRESS") {
       color = "#6366f1"; // Indigo
     }
@@ -156,9 +156,9 @@ export default function ServiceMapView({ services = [] }) {
             ${service.completed_date ? `<p style="margin: 4px 0;"><strong>Completed:</strong> ${service.completed_date}</p>` : ''}
           </div>
           ${showComplaintHighlight && service.complaint_summary ? `
-            <div style="margin-top: 10px; padding: 8px; background-color: ${isPendingByCustomer ? '#fef2f2' : '#fff7ed'}; border-left: 4px solid ${isPendingByCustomer ? '#ef4444' : '#f59e0b'}; border-radius: 4px;">
-              <p style="margin: 0; font-size: 12px; font-weight: 600; color: ${isPendingByCustomer ? '#dc2626' : '#ea580c'}; margin-bottom: 4px;">
-                ${isPendingByCustomer ? '🔴' : '🟠'} Complaint Summary:
+            <div style="margin-top: 10px; padding: 8px; background-color: ${isPendingByCustomer ? '#eff6ff' : '#fff7ed'}; border-left: 4px solid ${isPendingByCustomer ? '#3b82f6' : '#f59e0b'}; border-radius: 4px;">
+              <p style="margin: 0; font-size: 12px; font-weight: 600; color: ${isPendingByCustomer ? '#1d4ed8' : '#ea580c'}; margin-bottom: 4px;">
+                ${isPendingByCustomer ? '🔵' : '🟠'} Complaint Summary:
               </p>
               <p style="margin: 0; font-size: 12px; color: #374151; line-height: 1.4;">
                 ${service.complaint_summary}
@@ -334,7 +334,7 @@ export default function ServiceMapView({ services = [] }) {
               Pending for Spares
             </div>
             <div className="flex items-center text-xs text-gray-600">
-              <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+              <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
               Pending by Customer
             </div>
             <div className="flex items-center text-xs text-gray-600">
@@ -387,7 +387,7 @@ export default function ServiceMapView({ services = [] }) {
                 status === "COMPLETED" ? "bg-green-500" :
                 status === "PENDING" ? "bg-orange-500" :
                 status === "PENDING FOR SPARES" ? "bg-yellow-300" :
-                status === "PENDING BY CUSTOMER" ? "bg-red-500" :
+                status === "PENDING BY CUSTOMER" ? "bg-blue-500" :
                 status === "IN PROGRESS" ? "bg-indigo-500" :
                 "bg-blue-500"
               }`}></span>
