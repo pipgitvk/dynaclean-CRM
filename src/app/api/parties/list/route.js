@@ -242,6 +242,77 @@ export async function GET(req) {
       console.warn("[parties list] ledger_entries:", e?.message);
     }
 
+    // ── 6. Return Completed credit notes (warehouse-in done)
+    const returnCrByName = new Map();
+    const returnCrByCid = new Map();
+    try {
+      const existingReturnVch = new Set();
+      try {
+        const [retRows] = await conn.execute(
+          `SELECT LOWER(TRIM(buyer_name)) AS buyer, LOWER(TRIM(vch_no)) AS vch_no
+           FROM ledger_entries
+           WHERE vch_type IN ('Return', 'Return Completed')
+             AND buyer_name IS NOT NULL`
+        );
+        for (const r of retRows) {
+          existingReturnVch.add(`${r.buyer || ""}|${r.vch_no || ""}`);
+        }
+      } catch (_) {}
+
+      const [cnRows] = await conn.execute(
+        `SELECT
+           cn.id,
+           cn.grand_total,
+           cn.invoice_no,
+           cn.credit_note_number,
+           TRIM(cn.company_name) AS cn_company,
+           TRIM(qr.company_name) AS qr_company,
+           TRIM(no.client_name) AS client_name,
+           qr.customer_id
+         FROM credit_notes cn
+         LEFT JOIN neworder no
+           ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci
+            = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci
+         LEFT JOIN quotations_records qr
+           ON no.quote_number = qr.quote_number
+         WHERE COALESCE(no.warehouse_in_done, 0) = 1`
+      );
+
+      for (const r of cnRows) {
+        const names = [r.cn_company, r.qr_company, r.client_name]
+          .filter(Boolean)
+          .map((s) => String(s).trim().toLowerCase());
+        const vchNos = [r.invoice_no, r.credit_note_number]
+          .filter(Boolean)
+          .map((s) => String(s).trim().toLowerCase());
+        const alreadyInLedger = names.some((n) =>
+          vchNos.some((v) => existingReturnVch.has(`${n}|${v}`))
+        );
+        if (alreadyInLedger) continue;
+
+        const amt = Number(r.grand_total) || 0;
+        if (amt <= 0) continue;
+
+        const primaryName = (
+          r.cn_company ||
+          r.qr_company ||
+          r.client_name ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
+        if (primaryName) {
+          returnCrByName.set(primaryName, (returnCrByName.get(primaryName) || 0) + amt);
+        }
+        if (r.customer_id != null && String(r.customer_id).trim() !== "") {
+          const ck = String(r.customer_id).trim();
+          returnCrByCid.set(ck, (returnCrByCid.get(ck) || 0) + amt);
+        }
+      }
+    } catch (e) {
+      console.warn("[parties list] return completed:", e?.message);
+    }
+
     const partiesArr = Array.from(rows.values());
 
     // ── Per-party balance
@@ -268,8 +339,17 @@ export async function GET(req) {
       const mDr = manualDrByName.get(nmLow) || 0;
       const mCr = manualCrByName.get(nmLow) || 0;
 
+      let returnCr = returnCrByName.get(nmLow) || 0;
+      if (
+        returnCr === 0 &&
+        p.customer_id != null &&
+        String(p.customer_id).trim() !== ""
+      ) {
+        returnCr = returnCrByCid.get(String(p.customer_id).trim()) || 0;
+      }
+
       const debitSide = receivableFromInvoices + mDr;
-      const creditSide = purchasesPayable + mCr;
+      const creditSide = purchasesPayable + mCr + returnCr;
       const net = debitSide - creditSide;
 
       let amountType = "flat";
