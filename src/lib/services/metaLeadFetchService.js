@@ -342,7 +342,6 @@ async function syncLeadsForCredential(credential, options = {}) {
               try {
                 const duplicateResult = await handleDuplicateNotImportedLead({
                   phone: parsedLead.phone,
-                  leadArrivedAt: rawLead.created_time || new Date(),
                   formId,
                 });
 

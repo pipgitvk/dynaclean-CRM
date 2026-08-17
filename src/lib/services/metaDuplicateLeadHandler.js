@@ -27,17 +27,6 @@ function isValidDateString(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
 }
 
-function resolveLeadArrivalDate(leadArrivedAt) {
-  const now = new Date();
-  if (!leadArrivedAt) return now;
-  const arrivedAt = new Date(leadArrivedAt);
-  return Number.isNaN(arrivedAt.getTime()) ? now : arrivedAt;
-}
-
-function addTwoMinutes(fromDate) {
-  return new Date(fromDate.getTime() + 2 * 60 * 1000);
-}
-
 async function isEmployeeActive(username) {
   if (!username || username === 'Automatic') return false;
 
@@ -97,14 +86,14 @@ function shouldResetCustomerStatus(status) {
 
 /**
  * Duplicate lead handling:
- * - next_followup_date = lead arrival + 2 minutes
+ * - next_followup_date = now (when duplicate is processed)
+ * - followed_date = null, followed_by = '' (follow-up not done yet)
  * - inactive assignee -> reassign to next active sales person
  * - Denied/Invalid status -> reset to New
  * - always inserts a new customers_followup row (never updates latest row)
  */
 async function setDuplicateLeadFollowupDate({
   customerId,
-  leadArrivedAt,
   customer = null,
   formId = null,
 }) {
@@ -114,8 +103,7 @@ async function setDuplicateLeadFollowupDate({
 
   const conn = await getDbConnection();
   const now = new Date();
-  const arrivedAt = resolveLeadArrivalDate(leadArrivedAt);
-  const nextFollowupDate = addTwoMinutes(arrivedAt);
+  const nextFollowupDate = now;
 
   let customerRow = customer;
   if (!customerRow || customerRow.status === undefined) {
@@ -175,19 +163,20 @@ async function setDuplicateLeadFollowupDate({
 
   await conn.execute(
     `INSERT INTO customers_followup (
-        customer_id, name, contact, next_followup_date, followed_by,
-        followed_date, communication_mode, notes, email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        customer_id, name, contact, email, next_followup_date,
+        followed_date, comm_mode, notes, followed_by, communication_mode
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       customerId,
       customerRow.first_name || '',
       customerRow.phone || '',
+      customerRow.email || '',
       nextFollowupDate,
-      assignee,
-      now,
+      null,
       'Facebook',
       'Duplicate Meta lead re-enquiry',
-      customerRow.email || '',
+      '',
+      'Facebook',
     ]
   );
 
@@ -203,7 +192,6 @@ async function setDuplicateLeadFollowupDate({
 
 async function handleDuplicateNotImportedLead({
   phone,
-  leadArrivedAt = null,
   formId = null,
 }) {
   const dup = await checkPhoneDuplicate(phone);
@@ -218,7 +206,6 @@ async function handleDuplicateNotImportedLead({
 
   return setDuplicateLeadFollowupDate({
     customerId: dup.customerId,
-    leadArrivedAt,
     formId,
   });
 }
@@ -271,7 +258,6 @@ async function processHistoricalDuplicateFollowups({ startDate, endDate } = {}) 
     try {
       const result = await setDuplicateLeadFollowupDate({
         customerId: row.customer_id,
-        leadArrivedAt: row.created_at,
         customer: row,
         formId: row.form_id,
       });

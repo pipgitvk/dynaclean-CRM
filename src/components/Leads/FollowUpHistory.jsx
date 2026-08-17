@@ -280,23 +280,29 @@ const mergedMap = {};
 
 // 1️⃣ Add followups (support multiple per date safely)
 entries.forEach((entry) => {
+  const sortSource =
+    entry.followed_date || entry.time_stamp || entry.next_followup_date || null;
   const dateKey = entry.followed_date
     ? getCrmDateKeyIST(entry.followed_date)
-    : "no-date";
+    : sortSource
+      ? getCrmDateKeyIST(sortSource)
+      : "no-date";
 
   if (!mergedMap[dateKey]) {
     mergedMap[dateKey] = {
       followups: [],
       uploads: [],
-      sortDate: entry.followed_date || null,
+      sortDate: sortSource,
     };
   }
 
   mergedMap[dateKey].followups.push(entry);
 
-  // Keep latest date for sorting
-  if (!mergedMap[dateKey].sortDate && entry.followed_date) {
-    mergedMap[dateKey].sortDate = entry.followed_date;
+  if (
+    sortSource &&
+    getCrmInstantMs(sortSource) > getCrmInstantMs(mergedMap[dateKey].sortDate)
+  ) {
+    mergedMap[dateKey].sortDate = sortSource;
   }
 });
 

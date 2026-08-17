@@ -45,16 +45,6 @@ function formatIstDateTime(value) {
   });
 }
 
-function getFollowupDateTwoMinutesAfter(createdAt) {
-  if (!createdAt) return null;
-  const raw = String(createdAt).trim();
-  const hasTimezone = /[zZ]$/.test(raw) || /[+-]\d{2}:\d{2}$/.test(raw);
-  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
-  const date = new Date(hasTimezone ? raw : `${normalized}Z`);
-  if (Number.isNaN(date.getTime())) return null;
-  return new Date(date.getTime() + 2 * 60 * 1000);
-}
-
 export default function DuplicateMetaLeadsPage() {
   const defaultRange = getDefaultMonthRange();
   const [leads, setLeads] = useState([]);
@@ -266,7 +256,7 @@ export default function DuplicateMetaLeadsPage() {
             className="px-4 py-3 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 whitespace-nowrap inline-flex items-center justify-center gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${processing ? 'animate-spin' : ''}`} />
-            {processing ? 'Processing...' : 'Apply 2 Min Follow-up'}
+            {processing ? 'Processing...' : 'Apply Follow-up'}
           </button>
         </div>
 
@@ -358,7 +348,7 @@ export default function DuplicateMetaLeadsPage() {
                       {formatIstDateTime(lead.createdAt)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-indigo-700 font-medium">
-                      {formatIstDateTime(getFollowupDateTwoMinutesAfter(lead.createdAt))}
+                      On process
                     </td>
                   </tr>
                 ))
