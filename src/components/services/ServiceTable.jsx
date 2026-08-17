@@ -356,6 +356,9 @@ export default function ServiceTable({ serviceRecords, role }) {
     { name: "Pending by Customer", value: records.filter(r => r.status?.toUpperCase() === "PENDING BY CUSTOMER").length, fill: "#e6e95bff" },
   ].filter(d => d.value > 0);
 
+  // Get pending by customer records for complaint summary
+  const pendingByCustomerRecords = records.filter(r => r.status?.toUpperCase() === "PENDING BY CUSTOMER");
+
   return (
     <div className="w-full">
       {/* KPI Section */}
@@ -380,6 +383,38 @@ export default function ServiceTable({ serviceRecords, role }) {
               </div>
             ))}
           </div>
+          
+          {/* Complaint Summary Section - Below Pending by Customer */}
+          {kpiData.pendingByCustomer > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500" />
+                Pending by Customer - Complaint Summary
+              </h4>
+              <div className="max-h-32 overflow-y-auto space-y-2">
+                {pendingByCustomerRecords.slice(0, 5).map((record, index) => (
+                  <div key={record.service_id} className="text-xs border-l-2 border-red-300 pl-2">
+                    <div className="font-medium text-gray-800">
+                      Service ID: {record.service_id} | {record.customer_name || 'N/A'}
+                    </div>
+                    <div className="text-gray-600 truncate">
+                      {record.complaint_summary || 'No complaint summary available'}
+                    </div>
+                    {record.status_description && (
+                      <div className="text-gray-500 italic mt-1">
+                        Note: {record.status_description}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {pendingByCustomerRecords.length > 5 && (
+                  <div className="text-xs text-gray-500 text-center pt-1">
+                    +{pendingByCustomerRecords.length - 5} more pending by customer
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pie Chart — uses permanent (unfiltered) counts */}
