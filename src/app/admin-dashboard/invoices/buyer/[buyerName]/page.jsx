@@ -6,6 +6,7 @@ import BuyerLedgerTable from "./BuyerLedgerTable";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { appendReturnCompletedEntries } from "@/lib/partyLedger";
+import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -96,7 +97,8 @@ export default async function BuyerInvoicesPage({ params }) {
          DATE(created_at) AS created_date,
          created_at
        FROM invoices
-       WHERE TRIM(customer_name) = ? OR customer_name = ?
+       WHERE (TRIM(customer_name) = ? OR customer_name = ?)
+         AND ${EXCLUDE_PROFORMA_INVOICE_SQL}
        ORDER BY COALESCE(order_date, invoice_date) DESC, id DESC`,
       [decodedBuyer, decodedBuyer]
     );
@@ -217,7 +219,7 @@ export default async function BuyerInvoicesPage({ params }) {
         const [allInvRows] = await conn.execute(
           `SELECT id, grand_total, linked_trans_ids, invoice_number
            FROM invoices
-           WHERE ${queryParts.join(" OR ")}`,
+           WHERE (${queryParts.join(" OR ")}) AND ${EXCLUDE_PROFORMA_INVOICE_SQL}`,
           queryParams
         );
         allLinkedInvoices = allInvRows;

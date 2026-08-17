@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { EXCLUDE_PROFORMA_INVOICE_SQL_I } from "@/lib/ledgerInvoiceFilters";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,7 @@ export async function GET(req) {
          FROM invoices i
          WHERE i.customer_name IS NOT NULL
            AND TRIM(i.customer_name) != ''
+           AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
          GROUP BY TRIM(i.customer_name)`
       );
       for (const r of invNameRows) {
@@ -100,6 +102,7 @@ export async function GET(req) {
            OR LOWER(TRIM(c.first_name)) = LOWER(TRIM(i.customer_name))
          WHERE i.customer_name IS NOT NULL
            AND TRIM(i.customer_name) != ''
+           AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
          GROUP BY TRIM(i.customer_name), COALESCE(i.customer_id, c.customer_id)`
       );
       for (const r of invBuyerRows) {
