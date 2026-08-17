@@ -100,6 +100,7 @@ function shouldResetCustomerStatus(status) {
  * - next_followup_date = lead arrival + 2 minutes
  * - inactive assignee -> reassign to next active sales person
  * - Denied/Invalid status -> reset to New
+ * - always inserts a new customers_followup row (never updates latest row)
  */
 async function setDuplicateLeadFollowupDate({
   customerId,
@@ -172,40 +173,23 @@ async function setDuplicateLeadFollowupDate({
     );
   }
 
-  const [latestFollowupRows] = await conn.execute(
-    `SELECT \`S.No.\` AS id FROM customers_followup
-     WHERE customer_id = ?
-     ORDER BY time_stamp DESC
-     LIMIT 1`,
-    [customerId]
+  await conn.execute(
+    `INSERT INTO customers_followup (
+        customer_id, name, contact, next_followup_date, followed_by,
+        followed_date, communication_mode, notes, email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      customerId,
+      customerRow.first_name || '',
+      customerRow.phone || '',
+      nextFollowupDate,
+      assignee,
+      now,
+      'Facebook',
+      'Duplicate Meta lead re-enquiry',
+      customerRow.email || '',
+    ]
   );
-
-  if (latestFollowupRows.length > 0) {
-    await conn.execute(
-      `UPDATE customers_followup
-       SET next_followup_date = ?, followed_by = ?
-       WHERE \`S.No.\` = ?`,
-      [nextFollowupDate, assignee, latestFollowupRows[0].id]
-    );
-  } else {
-    await conn.execute(
-      `INSERT INTO customers_followup (
-          customer_id, name, contact, next_followup_date, followed_by,
-          followed_date, communication_mode, notes, email
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        customerId,
-        customerRow.first_name || '',
-        customerRow.phone || '',
-        nextFollowupDate,
-        assignee,
-        now,
-        'Facebook',
-        '',
-        customerRow.email || '',
-      ]
-    );
-  }
 
   return {
     handled: true,
