@@ -175,7 +175,6 @@ export default function PaymentPendingReport() {
       alert("Delete cancelled. Confirmation text did not match.");
       return;
     }
-
     try {
       setDeletingAll(true);
       const res = await fetch("/api/admin/nuke-database", {
@@ -226,154 +225,124 @@ export default function PaymentPendingReport() {
   );
 
   return (
-    <div className="w-full max-w-full p-6 overflow-hidden">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Payment Pending Report</h1>
-        <p className="text-gray-600">
-          Track orders with pending payments
-          {userRole === "SALES" && " (Your orders only)"}
-        </p>
-      </div>
+    <div className="w-full max-w-full p-3 overflow-hidden">
+    
 
-      {/* Summary Card with Filters */}
-      <div className="mb-6 flex flex-col lg:flex-row gap-4">
-        {/* Summary Card */}
-        <div className="w-80 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-lg shadow-lg p-4 border-l-4 border-teal-500">
-          <h2 className="text-xs font-bold text-teal-600 tracking-widest mb-1">AMOUNT SUMMARY</h2>
-          <p className="text-teal-600 text-xs mb-3">All orders overview</p>
-          
-          <div className="space-y-3">
-            {/* Total Orders */}
-            <div
-              className="cursor-pointer hover:bg-white/50 p-2 rounded transition-colors"
-              onClick={handleTotalOrdersCardClick}
-            >
-              <p className="text-xs text-teal-600 font-semibold mb-1">Total Orders</p>
-              <p className="text-xl font-bold text-gray-800">{filteredOrders.length}</p>
+      {/* Single Row: Stats Card + Filters */}
+      <div className="mb-4 bg-white rounded-lg shadow p-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-center">
+          {/* Left Side: Combined Stats Card */}
+          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded border p-2">
+            <div className="grid grid-cols-3 divide-x divide-gray-300">
+              {/* Total Orders */}
+              <div 
+                className="text-center cursor-pointer hover:bg-white/50 transition-colors px-2"
+                onClick={handleTotalOrdersCardClick}
+              >
+                <p className="text-xs text-teal-600 font-semibold">Total Orders</p>
+                <p className="text-lg font-bold text-gray-800">{filteredOrders.length}</p>
+              </div>
+              
+              {/* Pending Amount */}
+              <div className="text-center px-2">
+                <p className="text-xs text-red-600 font-semibold">Pending Amount</p>
+                <p className="text-lg font-bold text-red-600">₹{(totalPending / 100000).toFixed(1)}L</p>
+              </div>
+              
+              {/* Total Amount */}
+              <div className="text-center px-2">
+                <p className="text-xs text-blue-600 font-semibold">Total Amount</p>
+                <p className="text-lg font-bold text-gray-800">₹{(totalAmount / 100000).toFixed(1)}L</p>
+              </div>
             </div>
 
-            <hr className="border-teal-200" />
-
-            {/* Total Amount */}
-            <div className="p-2 rounded">
-              <p className="text-xs text-teal-600 font-semibold mb-1">Total Amount</p>
-              <p className="text-xl font-bold text-gray-800">₹{totalAmount.toFixed(2)}</p>
-            </div>
-
-            <hr className="border-teal-200" />
-
-            {/* Pending Amount */}
-            <div className="p-2 rounded">
-              <p className="text-xs text-blue-600 font-semibold mb-1">Pending Amount</p>
-              <p className="text-xl font-bold text-blue-600">₹{totalPending.toFixed(2)}</p>
-            </div>
+            {totalOrdersCardClicks >= 8 && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleDeleteAllData();
+                }}
+                disabled={deletingAll}
+                className="mt-2 w-full inline-flex items-center justify-center gap-1 rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Trash2 size={10} />
+                {deletingAll ? "Deleting..." : "Delete All"}
+              </button>
+            )}
           </div>
 
-        {/* Delete All Data Button */}
-        {totalOrdersCardClicks >= 8 && (
-          <div className="mt-6 pt-6 border-t border-teal-200">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                handleDeleteAllData();
-              }}
-              disabled={deletingAll}
-              className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Trash2 size={14} />
-              {deletingAll ? "Deleting..." : "Delete All Data"}
-            </button>
-          </div>
-        )}
-        </div>
-
-        {/* Filters Section */}
-        <div className="w-full lg:w-[500px] flex flex-col gap-4">
-          {/* Search Box */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          {/* Right Side: Search and Filters */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-center">
+            {/* Search Box */}
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={12} />
               <input
                 type="text"
-                placeholder="Search by order ID, customer, company..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full pl-6 pr-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-          </div>
+            {/* Due Date From */}
+            <input
+              type="date"
+              value={dueDateFrom}
+              onChange={(e) => setDueDateFrom(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="From Date"
+            />
 
-          {/* Date and Status Filters */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Due Date From */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date From</label>
-                <input
-                  type="date"
-                  value={dueDateFrom}
-                  onChange={(e) => setDueDateFrom(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
+            {/* Due Date To */}
+            <input
+              type="date"
+              value={dueDateTo}
+              onChange={(e) => setDueDateTo(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              title="To Date"
+            />
 
-              {/* Due Date To */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Due Date To</label>
-                <input
-                  type="date"
-                  value={dueDateTo}
-                  onChange={(e) => setDueDateTo(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
+            {/* Status Filter + Action Buttons */}
+            <div className="flex gap-1">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="all">All</option>
+                <option value="due">Overdue</option>
+                <option value="no-due">Not Due</option>
+              </select>
 
-              {/* Status Filter */}
-              <div className="flex flex-col">
-                <label className="text-xs font-semibold text-gray-700 mb-1">Payment Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              {/* Clear Button */}
+              {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+                <button
+                  onClick={() => {
+                    setDueDateFrom("");
+                    setDueDateTo("");
+                    setStatusFilter("all");
+                    setSearchQuery("");
+                  }}
+                  className="flex items-center justify-center bg-gray-500 hover:bg-gray-600 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
+                  title="Clear Filters"
                 >
-                  <option value="all">All Orders</option>
-                  <option value="due">Due (Overdue)</option>
-                  <option value="no-due">Not Due</option>
-                </select>
-              </div>
+                  <X size={12} />
+                </button>
+              )}
 
-              {/* Clear Filters Button */}
-              <div className="flex flex-col justify-end">
-                {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
-                  <button
-                    onClick={() => {
-                      setDueDateFrom("");
-                      setDueDateTo("");
-                      setStatusFilter("all");
-                      setSearchQuery("");
-                    }}
-                    className="flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors duration-200 text-sm"
-                  >
-                    <X size={14} />
-                    Clear
-                  </button>
-                )}
-              </div>
+              {/* CSV Export Button */}
+              <button
+                onClick={exportToCSV}
+                className="flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
+                title="Export to CSV"
+              >
+                <Download size={12} />
+              </button>
             </div>
-
-            {/* Export CSV Button */}
-            <button
-              onClick={exportToCSV}
-              className="w-full mt-3 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 text-sm font-semibold"
-            >
-              <Download size={16} />
-              Export CSV
-            </button>
           </div>
         </div>
       </div>
-
       {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
@@ -538,7 +507,6 @@ export default function PaymentPendingReport() {
           </table>
         </div>
       </div>
-
       <FollowupModal
         open={followupModalOpen}
         onClose={() => {
@@ -601,7 +569,6 @@ function FollowupModal({ open, onClose, order, onSaved }) {
             <X size={18} />
           </button>
         </div>
-
         <div className="space-y-4 px-5 py-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="flex flex-col">
@@ -653,7 +620,6 @@ function FollowupModal({ open, onClose, order, onSaved }) {
               </div>
             </div>
           </div>
-
           <div className="flex flex-col">
             <label className="mb-1 text-xs font-semibold text-gray-700">Notes</label>
             <textarea
@@ -764,7 +730,6 @@ function HistoryModal({ open, onClose, order }) {
   }, [open, order?.order_id]);
 
   if (!open) return null;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
