@@ -329,8 +329,8 @@ export default function OrderTable({ orders, userRole }) {
       if (Number(order.warehouse_in_done) === 1) {
         return {
           text: "Return Completed",
-          bg: "bg-teal-100",
-          textCol: "text-teal-800",
+          bg: "bg-orange-100",
+          textCol: "text-orange-800",
           icon: <CheckCircle size={14} className="mr-1" />,
         };
       }

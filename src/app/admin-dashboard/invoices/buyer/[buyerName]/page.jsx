@@ -5,6 +5,7 @@ import BuyerInvoiceTable from "./BuyerInvoiceTable";
 import BuyerLedgerTable from "./BuyerLedgerTable";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { appendReturnCompletedEntries } from "@/lib/partyLedger";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -586,6 +587,14 @@ export default async function BuyerInvoicesPage({ params }) {
       return true;
     });
 
+    await appendReturnCompletedEntries(conn, {
+      partyName: decodedBuyer,
+      customerId: customerIdForBuyer,
+      invoiceNumbers: buyerInvoiceNumbers,
+      existingRows: filteredManualRows,
+      derivedLedger,
+    });
+
     // ── 9. Merge + sort by date asc ─────────────────────────────
     const combined = [
       ...derivedLedger,
@@ -597,11 +606,13 @@ export default async function BuyerInvoicesPage({ params }) {
       if (da > db) return 1;
       const orderMap = {
         Sales: 0,
-        Purchase: 1,
-        "Spare Purchase": 1,
-        Spare: 2,
-        Payment: 2,
-        Receipt: 3,
+        Return: 1,
+        "Return Completed": 1,
+        Purchase: 2,
+        "Spare Purchase": 2,
+        Spare: 3,
+        Payment: 3,
+        Receipt: 4,
       };
       const aOrder = orderMap[a.vch_type] !== undefined ? orderMap[a.vch_type] : 99;
       const bOrder = orderMap[b.vch_type] !== undefined ? orderMap[b.vch_type] : 99;

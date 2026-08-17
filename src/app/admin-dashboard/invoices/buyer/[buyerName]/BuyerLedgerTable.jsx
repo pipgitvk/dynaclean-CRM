@@ -959,6 +959,8 @@ function VchBadge({ type }) {
     "Credit Note": "bg-teal-100 text-teal-700",
     "Debit Note": "bg-pink-100 text-pink-700",
     Opening: "bg-gray-100 text-gray-700",
+    Return: "bg-rose-100 text-rose-700",
+    "Return Completed": "bg-orange-100 text-orange-800",
     Other: "bg-slate-100 text-slate-700",
   };
 

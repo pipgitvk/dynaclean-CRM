@@ -44,6 +44,152 @@ function parseLinkedPurchaseIds(raw) {
 }
 
 /**
+ * Append Return Completed ledger rows from warehouse-in credit notes.
+ * Shared by parties ledger, buyer invoice ledger, and company ledger.
+ */
+export async function appendReturnCompletedEntries(conn, {
+  partyName,
+  customerId = null,
+  invoiceNumbers = [],
+  gstins = [],
+  existingRows = [],
+  derivedLedger,
+}) {
+  try {
+    const partyGstinList = Array.from(
+      new Set(
+        (gstins || [])
+          .map((g) => (g ? String(g).trim().toUpperCase() : ""))
+          .filter(Boolean)
+      )
+    );
+
+    if (partyGstinList.length === 0 && partyName) {
+      try {
+        const [gstRows] = await conn.execute(
+          `SELECT DISTINCT UPPER(TRIM(gst_number)) AS gstin
+           FROM invoices
+           WHERE (TRIM(customer_name) = ? OR customer_name = ?)
+             AND gst_number IS NOT NULL AND TRIM(gst_number) <> ''`,
+          [partyName, partyName]
+        );
+        for (const r of gstRows) {
+          if (r.gstin) partyGstinList.push(r.gstin);
+        }
+      } catch (_) {}
+    }
+
+    const whereParts = [
+      "LOWER(TRIM(cn.company_name)) = LOWER(?)",
+      "LOWER(TRIM(qr.company_name)) = LOWER(?)",
+      "LOWER(TRIM(no.client_name)) = LOWER(?)",
+    ];
+    const whereParams = [partyName, partyName, partyName];
+
+    const invs = Array.from(invoiceNumbers || []).filter(Boolean).map(String);
+    if (invs.length > 0) {
+      const ph = invs.map(() => "?").join(",");
+      whereParts.push(`TRIM(cn.invoice_no) IN (${ph})`);
+      whereParams.push(...invs);
+      whereParts.push(`TRIM(no.invoice_number) IN (${ph})`);
+      whereParams.push(...invs);
+    }
+
+    if (customerId) {
+      whereParts.push("CAST(qr.customer_id AS CHAR) = ?");
+      whereParams.push(String(customerId));
+    }
+
+    if (partyGstinList.length > 0) {
+      const ph = partyGstinList.map(() => "?").join(",");
+      whereParts.push(`UPPER(TRIM(cn.customer_gstin)) IN (${ph})`);
+      whereParams.push(...partyGstinList);
+      whereParts.push(`UPPER(TRIM(qr.gstin)) IN (${ph})`);
+      whereParams.push(...partyGstinList);
+    }
+
+    const [cnRows] = await conn.execute(
+      `SELECT
+         cn.id,
+         cn.order_id,
+         cn.credit_note_number,
+         cn.invoice_no,
+         cn.grand_total,
+         cn.return_type,
+         cn.is_saved,
+         COALESCE(no.warehouse_in_date, cn.credit_note_date, DATE(cn.saved_at), DATE(cn.created_at)) AS entry_date
+       FROM credit_notes cn
+       LEFT JOIN neworder no
+         ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci
+          = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci
+       LEFT JOIN quotations_records qr
+         ON no.quote_number = qr.quote_number
+       WHERE COALESCE(no.warehouse_in_done, 0) = 1
+         AND (${whereParts.join(" OR ")})`,
+      whereParams
+    );
+
+    const existingReturnVchNos = new Set();
+    for (const row of existingRows || []) {
+      const t = String(row.vch_type || "");
+      if (t === "Return" || t === "Return Completed") {
+        if (row.vch_no) existingReturnVchNos.add(String(row.vch_no).trim().toLowerCase());
+      }
+    }
+
+    const bestByOrder = new Map();
+    for (const cn of cnRows) {
+      const key = String(cn.order_id || cn.id);
+      const prev = bestByOrder.get(key);
+      if (!prev) {
+        bestByOrder.set(key, cn);
+        continue;
+      }
+      const prevSaved = Number(prev.is_saved) === 1 ? 1 : 0;
+      const curSaved = Number(cn.is_saved) === 1 ? 1 : 0;
+      if (curSaved > prevSaved || (curSaved === prevSaved && Number(cn.id) > Number(prev.id))) {
+        bestByOrder.set(key, cn);
+      }
+    }
+
+    for (const cn of bestByOrder.values()) {
+      const invNo = cn.invoice_no ? String(cn.invoice_no).trim().toLowerCase() : "";
+      const cnNo = cn.credit_note_number
+        ? String(cn.credit_note_number).trim().toLowerCase()
+        : "";
+      if (
+        (invNo && existingReturnVchNos.has(invNo)) ||
+        (cnNo && existingReturnVchNos.has(cnNo))
+      ) {
+        continue;
+      }
+
+      const entryDate = cn.entry_date ? String(cn.entry_date).slice(0, 10) : null;
+      if (!entryDate) continue;
+      const amt = Number(cn.grand_total) || 0;
+      if (amt <= 0) continue;
+
+      const invLabel = cn.invoice_no || cn.credit_note_number || "";
+      const isFull = String(cn.return_type || "").toLowerCase() === "full";
+      derivedLedger.push({
+        id: `cn-return-${cn.id}`,
+        entry_date: entryDate,
+        particulars: `Return Completed (${isFull ? "Full" : "Partial"})${
+          invLabel ? ` – ${invLabel}` : ""
+        }`,
+        vch_type: "Return Completed",
+        vch_no: cn.credit_note_number || cn.invoice_no || String(cn.id),
+        debit: 0,
+        credit: amt,
+        source: "credit_note",
+      });
+    }
+  } catch (e) {
+    console.warn("[appendReturnCompletedEntries]", e?.message);
+  }
+}
+
+/**
  * Compute ledger entries for a buyer/party.
  * Reuses the exact same logic as /admin-dashboard/ledger/[companyName] page.
  * @param {string} decodedCompany - Party name
@@ -460,125 +606,14 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     return true;
   });
 
-  // Return Completed — saved credit notes whose order has warehouse-in done
-  try {
-    const partyGstinList = Array.from(
-      new Set(
-        invoices
-          .map((i) => (i.gst_number ? String(i.gst_number).trim().toUpperCase() : ""))
-          .filter(Boolean)
-      )
-    );
-
-    const whereParts = [
-      "LOWER(TRIM(cn.company_name)) = LOWER(?)",
-      "LOWER(TRIM(qr.company_name)) = LOWER(?)",
-      "LOWER(TRIM(no.client_name)) = LOWER(?)",
-    ];
-    const whereParams = [decodedCompany, decodedCompany, decodedCompany];
-
-    if (buyerInvoiceNumbers.size > 0) {
-      const invs = Array.from(buyerInvoiceNumbers);
-      const ph = invs.map(() => "?").join(",");
-      whereParts.push(`TRIM(cn.invoice_no) IN (${ph})`);
-      whereParams.push(...invs);
-      whereParts.push(`TRIM(no.invoice_number) IN (${ph})`);
-      whereParams.push(...invs);
-    }
-
-    if (customerIdForCompany) {
-      whereParts.push("CAST(qr.customer_id AS CHAR) = ?");
-      whereParams.push(String(customerIdForCompany));
-    }
-
-    if (partyGstinList.length > 0) {
-      const ph = partyGstinList.map(() => "?").join(",");
-      whereParts.push(`UPPER(TRIM(cn.customer_gstin)) IN (${ph})`);
-      whereParams.push(...partyGstinList);
-      whereParts.push(`UPPER(TRIM(qr.gstin)) IN (${ph})`);
-      whereParams.push(...partyGstinList);
-    }
-
-    const [cnRows] = await conn.execute(
-      `SELECT
-         cn.id,
-         cn.order_id,
-         cn.credit_note_number,
-         cn.invoice_no,
-         cn.grand_total,
-         cn.return_type,
-         cn.is_saved,
-         COALESCE(no.warehouse_in_date, cn.credit_note_date, DATE(cn.saved_at), DATE(cn.created_at)) AS entry_date
-       FROM credit_notes cn
-       LEFT JOIN neworder no
-         ON CAST(cn.order_id AS CHAR) COLLATE utf8mb4_unicode_ci
-          = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci
-       LEFT JOIN quotations_records qr
-         ON no.quote_number = qr.quote_number
-       WHERE COALESCE(no.warehouse_in_done, 0) = 1
-         AND (${whereParts.join(" OR ")})`,
-      whereParams
-    );
-
-    const existingReturnVchNos = new Set();
-    for (const row of filteredManualRows) {
-      const t = String(row.vch_type || "");
-      if (t === "Return" || t === "Return Completed") {
-        if (row.vch_no) existingReturnVchNos.add(String(row.vch_no).trim().toLowerCase());
-      }
-    }
-
-    const bestByOrder = new Map();
-    for (const cn of cnRows) {
-      const key = String(cn.order_id || cn.id);
-      const prev = bestByOrder.get(key);
-      if (!prev) {
-        bestByOrder.set(key, cn);
-        continue;
-      }
-      const prevSaved = Number(prev.is_saved) === 1 ? 1 : 0;
-      const curSaved = Number(cn.is_saved) === 1 ? 1 : 0;
-      if (curSaved > prevSaved || (curSaved === prevSaved && Number(cn.id) > Number(prev.id))) {
-        bestByOrder.set(key, cn);
-      }
-    }
-
-    for (const cn of bestByOrder.values()) {
-
-      const invNo = cn.invoice_no ? String(cn.invoice_no).trim().toLowerCase() : "";
-      const cnNo = cn.credit_note_number
-        ? String(cn.credit_note_number).trim().toLowerCase()
-        : "";
-      if (
-        (invNo && existingReturnVchNos.has(invNo)) ||
-        (cnNo && existingReturnVchNos.has(cnNo))
-      ) {
-        continue;
-      }
-
-      const entryDate = cn.entry_date ? String(cn.entry_date).slice(0, 10) : null;
-      if (!entryDate) continue;
-      const amt = Number(cn.grand_total) || 0;
-      if (amt <= 0) continue;
-
-      const invLabel = cn.invoice_no || cn.credit_note_number || "";
-      const isFull = String(cn.return_type || "").toLowerCase() === "full";
-      derivedLedger.push({
-        id: `cn-return-${cn.id}`,
-        entry_date: entryDate,
-        particulars: `Return Completed (${isFull ? "Full" : "Partial"})${
-          invLabel ? ` – ${invLabel}` : ""
-        }`,
-        vch_type: "Return Completed",
-        vch_no: cn.credit_note_number || cn.invoice_no || String(cn.id),
-        debit: 0,
-        credit: amt,
-        source: "credit_note",
-      });
-    }
-  } catch (e) {
-    console.warn("[partyLedger] return completed:", e?.message);
-  }
+  await appendReturnCompletedEntries(conn, {
+    partyName: decodedCompany,
+    customerId: customerIdForCompany,
+    invoiceNumbers: buyerInvoiceNumbers,
+    gstins: invoices.map((i) => i.gst_number).filter(Boolean),
+    existingRows: filteredManualRows,
+    derivedLedger,
+  });
 
   const combined = [
     ...derivedLedger,

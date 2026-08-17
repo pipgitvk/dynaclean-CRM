@@ -4,6 +4,7 @@ import { jwtVerify } from "jose";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import LedgerTableClient from "./LedgerTableClient";
+import { appendReturnCompletedEntries } from "@/lib/partyLedger";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -486,6 +487,14 @@ export default async function LedgerPage({ params }) {
       return true;
     });
 
+    await appendReturnCompletedEntries(conn, {
+      partyName: decodedCompany,
+      customerId: customerIdForCompany,
+      invoiceNumbers: buyerInvoiceNumbers,
+      existingRows: filteredManualRows,
+      derivedLedger,
+    });
+
     // ── 8. Merge + sort by date
     const combined = [
       ...derivedLedger,
@@ -497,11 +506,13 @@ export default async function LedgerPage({ params }) {
       if (da > db) return 1;
       const orderMap = {
         Sales: 0,
-        Purchase: 1,
-        "Spare Purchase": 1,
-        Spare: 2,
-        Payment: 2,
-        Receipt: 3,
+        Return: 1,
+        "Return Completed": 1,
+        Purchase: 2,
+        "Spare Purchase": 2,
+        Spare: 3,
+        Payment: 3,
+        Receipt: 4,
       };
       const aOrder = orderMap[a.vch_type] !== undefined ? orderMap[a.vch_type] : 99;
       const bOrder = orderMap[b.vch_type] !== undefined ? orderMap[b.vch_type] : 99;
