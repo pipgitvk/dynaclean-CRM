@@ -20,7 +20,7 @@ export default async function CustomerPage({ params }) {
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
-    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
+    `SELECT c.customer_id, c.first_name, c.last_name, c.email, c.phone, c.company, c.address, c.tags, c.status, c.stage, c.lead_source, c.assigned_to, c.service_lead_source, c.lead_campaign, c.date_created, c.notes, c.parent_customer_id,
       p.customer_id AS parent_id,
       CONCAT(TRIM(p.first_name), ' ', TRIM(COALESCE(p.last_name, ''))) AS parent_name,
       p.phone AS parent_phone,
@@ -47,12 +47,17 @@ export default async function CustomerPage({ params }) {
   );
 
   // Fetch orders count for this customer
-  // SUPERADMIN/DIRECTOR: see all orders for customer; others: only their own orders
+  // SUPERADMIN/DIRECTOR: see all orders for customer
+  // Assigned user (assigned_to) or lead_source = username: also see all orders for customer
+  // Others: only their own orders (created_by = username)
   const isPrivilegedRole = ["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase());
-  const orderCountQuery = isPrivilegedRole
+  const isAssignedOrLeadSourceOwner =
+    customer.assigned_to === username || customer.lead_source === username;
+  const canSeeAllOrders = isPrivilegedRole || isAssignedOrLeadSourceOwner;
+  const orderCountQuery = canSeeAllOrders
     ? `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ?`
     : `SELECT COUNT(*) AS orderCount FROM neworder WHERE customer_id = ? AND created_by = ?`;
-  const orderCountParams = isPrivilegedRole ? [customerId] : [customerId, username];
+  const orderCountParams = canSeeAllOrders ? [customerId] : [customerId, username];
   const [[{ orderCount }]] = await conn.execute(orderCountQuery, orderCountParams);
 
   let cust_analysis_external = {};

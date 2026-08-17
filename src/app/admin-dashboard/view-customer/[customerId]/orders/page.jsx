@@ -21,9 +21,9 @@ export default async function CustomerOrdersPage({ params }) {
 
   const conn = await getDbConnection();
 
-  // Fetch customer details
+  // Fetch customer details (also get assigned_to and lead_source for access check)
   const [custs] = await conn.execute(
-    `SELECT customer_id, first_name, last_name, company, phone, email 
+    `SELECT customer_id, first_name, last_name, company, phone, email, assigned_to, lead_source 
      FROM customers WHERE customer_id = ?`,
     [customerId],
   );
@@ -37,6 +37,9 @@ export default async function CustomerOrdersPage({ params }) {
   const userRole = roleRows[0]?.userRole || "";
 
   // Fetch orders for this specific customer
+  // SUPERADMIN/DIRECTOR: see all orders for customer
+  // Assigned user (assigned_to) or lead_source = username: also see all orders for customer
+  // Others: only their own orders (created_by = username)
   let sql = `SELECT 
                 no.order_id, no.report_file, no.po_file, no.payment_proof, no.booking_url,
                 no.client_name, no.contact, no.is_cancelled, no.dispatch_status,
@@ -77,7 +80,10 @@ export default async function CustomerOrdersPage({ params }) {
 
   const ordersParams = [customerId];
   const isPrivilegedRole = ["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase());
-  if (!isPrivilegedRole) {
+  const isAssignedOrLeadSourceOwner =
+    customer.assigned_to === username || customer.lead_source === username;
+  const canSeeAllOrders = isPrivilegedRole || isAssignedOrLeadSourceOwner;
+  if (!canSeeAllOrders) {
     sql += " AND no.created_by = ?";
     ordersParams.push(username);
   }
