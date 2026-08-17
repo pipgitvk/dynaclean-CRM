@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
 
 async function columnExists(conn, tableName, columnName) {
   const [rows] = await conn.query(`SHOW COLUMNS FROM \`${tableName}\` LIKE ?`, [columnName]);
@@ -21,9 +22,7 @@ async function getPaymentPendingCountLikeReport(conn) {
       o.payment_amount,
       o.is_returned
      FROM neworder AS o
-     WHERE (o.payment_status IS NULL OR o.payment_status COLLATE utf8mb4_unicode_ci != 'paid')
-       AND (o.is_returned = 0 OR o.is_returned = 2 OR o.is_returned IS NULL)
-       AND (o.is_cancelled = 0 OR o.is_cancelled IS NULL)`
+     WHERE ${PAYMENT_PENDING_ORDER_SQL_WHERE}`
   );
 
   let pendingCount = 0;

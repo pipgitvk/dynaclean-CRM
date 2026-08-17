@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensurePaymentPendingFollowupsTable } from "@/lib/ensurePaymentPendingFollowupsTable";
+import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
 
 export async function GET() {
     try {
@@ -50,9 +51,7 @@ export async function GET() {
           GROUP BY order_id
         ) t ON t.order_id = ppf.order_id AND t.max_id = ppf.id
       ) ppf_latest ON ppf_latest.order_id COLLATE utf8mb4_unicode_ci = o.order_id COLLATE utf8mb4_unicode_ci
-      WHERE (o.payment_status IS NULL OR o.payment_status COLLATE utf8mb4_unicode_ci != 'paid')
-        AND (o.is_returned = 0 OR o.is_returned = 2 OR o.is_returned IS NULL)
-        AND (o.is_cancelled = 0 or o.is_cancelled IS NULL)
+      WHERE ${PAYMENT_PENDING_ORDER_SQL_WHERE}
     `;
 
         // Filter for SALES and GEM roles - only their own orders
