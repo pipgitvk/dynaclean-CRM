@@ -443,11 +443,11 @@ export default function WarrantyPage() {
                     className="bg-red-500 hover:bg-red-600 text-white text-[11px] py-1 px-2 rounded-md">
                     Complaint
                   </button>
-                  <a href={`/user-dashboard/warranty/service-records/${r.serial_number}`}
+                  <a href={`/user-dashboard/warranty/service-records/${encodeURIComponent(r.serial_number)}`}
                     className="text-center bg-blue-500 hover:bg-blue-600 text-white text-[11px] py-1 px-2 rounded-md">
                     History
                   </a>
-                  <a href={`/user-dashboard/warranty/edit/${r.serial_number}`}
+                  <a href={`/user-dashboard/warranty/edit/${encodeURIComponent(r.serial_number)}`}
                     className="text-center bg-yellow-500 hover:bg-yellow-600 text-white text-[11px] py-1 px-2 rounded-md">
                     Edit
                   </a>
@@ -560,11 +560,11 @@ export default function WarrantyPage() {
                           className="block w-full text-center bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded-md mb-1">
                           Complaint
                         </button>
-                        <a href={`/user-dashboard/warranty/service-records/${r.serial_number}`}
+                        <a href={`/user-dashboard/warranty/service-records/${encodeURIComponent(r.serial_number)}`}
                           className="block text-center bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded-md mb-1">
                           History
                         </a>
-                        <a href={`/user-dashboard/warranty/edit/${r.serial_number}`}
+                        <a href={`/user-dashboard/warranty/edit/${encodeURIComponent(r.serial_number)}`}
                           className="block text-center bg-yellow-500 hover:bg-yellow-600 text-white text-xs py-1 px-2 rounded-md">
                           Edit
                         </a>
