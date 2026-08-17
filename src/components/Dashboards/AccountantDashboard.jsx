@@ -6,7 +6,7 @@ import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import AccountantPendingCards from "@/components/AccountantPendingCards";
 
-export default function AccountantDashboard({ user, counts }) {
+export default function AccountantDashboard({ user, reportingManager, counts }) {
   const welcomeNameClass = "text-green-700";
 
   return (
@@ -24,6 +24,11 @@ export default function AccountantDashboard({ user, counts }) {
                   Welcome, <span className={welcomeNameClass}>{user.username}</span>
                 </h1>
                 <p className="text-gray-500 text-xs">Role: {user.userRole}</p>
+                {reportingManager && (
+                  <p className="text-gray-500 text-xs">
+                    Reporting Manager: {reportingManager}
+                  </p>
+                )}
               </div>
             </div>
 

@@ -7,7 +7,7 @@ import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
 
-export default function ServiceSupportDashboard({ user }) {
+export default function ServiceSupportDashboard({ user, reportingManager }) {
   return (
     <div className="space-y-4 md:space-y-6">
 

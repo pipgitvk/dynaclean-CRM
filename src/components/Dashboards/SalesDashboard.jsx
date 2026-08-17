@@ -11,7 +11,7 @@ import TodaysReportingButton from "@/components/TodaysReportingButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import PaymentPendingButton from "@/components/PaymentPendingCircle";
 
-export default function SalesDashboard({ user }) {
+export default function SalesDashboard({ user, reportingManager }) {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Welcome, Attendance & Target */}
@@ -27,6 +27,11 @@ export default function SalesDashboard({ user }) {
                   <span className="text-green-700">{user.username}</span>
                 </h1>
                 <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
+                {reportingManager && (
+                  <p className="text-gray-500 text-sm">
+                    Reporting Manager: {reportingManager}
+                  </p>
+                )}
               </div>
             </div>
 

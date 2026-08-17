@@ -9,7 +9,7 @@ import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
 
-export default function ServiceHeadDashboard({ user, counts }) {
+export default function ServiceHeadDashboard({ user, reportingManager, counts }) {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header Section */}
@@ -24,6 +24,11 @@ export default function ServiceHeadDashboard({ user, counts }) {
                   Welcome, <span className="text-green-700">{user.username}</span>
                 </h1>
                 <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
+                {reportingManager && (
+                  <p className="text-gray-500 text-sm">
+                    Reporting Manager: {reportingManager}
+                  </p>
+                )}
               </div>
             </div>
 

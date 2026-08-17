@@ -1,7 +1,7 @@
 import ProfilePicUploader from "@/app/user-dashboard/ProfilePicUploader";
 import AttendanceTracker from "@/components/AttendanceTracker";
 
-export default function WelderDashboard({ user }) {
+export default function WelderDashboard({ user, reportingManager }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
       <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-4 md:p-6">
@@ -12,6 +12,11 @@ export default function WelderDashboard({ user }) {
               Welcome, <span className="text-green-700">{user.username}</span>
             </h1>
             <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
+            {reportingManager && (
+              <p className="text-gray-500 text-sm">
+                Reporting Manager: {reportingManager}
+              </p>
+            )}
           </div>
         </div>
       </div>

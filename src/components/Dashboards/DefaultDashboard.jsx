@@ -12,7 +12,7 @@ import HrTodayReportButton from "@/components/HrTodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
 
-export default function DefaultDashboard({ user, counts }) {
+export default function DefaultDashboard({ user, reportingManager, counts }) {
   const showHrTargetChart = canViewHrTargetChart(user?.userRole);
   const showHrCandidatesFollowUp = canAccessHiringModule(user?.userRole);
   const isHrRole = String(user?.userRole || "").trim() === "HR";
@@ -33,6 +33,11 @@ export default function DefaultDashboard({ user, counts }) {
                   Welcome, <span className={welcomeNameClass}>{user.username}</span>
                 </h1>
                 <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
+                {reportingManager && (
+                  <p className="text-gray-500 text-sm">
+                    Reporting Manager: {reportingManager}
+                  </p>
+                )}
               </div>
             </div>
 

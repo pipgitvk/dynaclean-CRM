@@ -155,7 +155,7 @@ const KPICard = ({ title, value, icon: Icon, subtext, gradient, buttonText, onCl
   );
 };
 
-export default function DirectorDashboard({ user, regTotal = 0, regPending = 0 }) {
+export default function DirectorDashboard({ user, reportingManager, regTotal = 0, regPending = 0 }) {
   const router = useRouter();
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().slice(0, 7) + "-01");
   const [dateTo, setDateTo] = useState(new Date().toISOString().slice(0, 10));

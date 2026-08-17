@@ -8,7 +8,7 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 
-export default function TeamLeaderDashboard({ user }) {
+export default function TeamLeaderDashboard({ user, reportingManager }) {
   return (
     <div className="space-y-4 md:space-y-6">
 
@@ -25,6 +25,11 @@ export default function TeamLeaderDashboard({ user }) {
                   Welcome, <span className="text-green-700">{user.username}</span>
                 </h1>
                 <p className="text-sm text-gray-500">Role: {user.userRole}</p>
+                {reportingManager && (
+                  <p className="text-sm text-gray-500">
+                    Reporting Manager: {reportingManager}
+                  </p>
+                )}
               </div>
             </div>
 
