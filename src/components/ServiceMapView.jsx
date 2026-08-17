@@ -51,6 +51,8 @@ export default function ServiceMapView({ services = [] }) {
       color = "#f59e0b"; // Orange
     } else if (service.status === "PENDING FOR SPARES") {
       color = "#ffff00"; // Yellow
+    } else if (service.status === "PENDING BY CUSTOMER") {
+      color = "#ef4444"; // Red
     } else if (service.status === "IN PROGRESS") {
       color = "#6366f1"; // Indigo
     }
@@ -128,8 +130,12 @@ export default function ServiceMapView({ services = [] }) {
       });
 
       // Create info window content
+      const isPendingByCustomer = service.status && service.status.toUpperCase() === "PENDING BY CUSTOMER";
+      const isPendingForSpares = service.status && service.status.toUpperCase() === "PENDING FOR SPARES";
+      const showComplaintHighlight = isPendingByCustomer || isPendingForSpares;
+      
       const infoContent = `
-        <div style="min-width: 280px; font-family: system-ui, -apple-system, sans-serif;">
+        <div style="min-width: 320px; font-family: system-ui, -apple-system, sans-serif;">
           <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
             <h3 style="font-size: 16px; font-weight: 600; margin: 0; color: #1f2937;">
               ${service.product_name || "Service Record"}
@@ -149,6 +155,30 @@ export default function ServiceMapView({ services = [] }) {
             <p style="margin: 4px 0;"><strong>Assigned To:</strong> ${service.assigned_to || "N/A"}</p>
             ${service.completed_date ? `<p style="margin: 4px 0;"><strong>Completed:</strong> ${service.completed_date}</p>` : ''}
           </div>
+          ${showComplaintHighlight && service.complaint_summary ? `
+            <div style="margin-top: 10px; padding: 8px; background-color: ${isPendingByCustomer ? '#fef2f2' : '#fff7ed'}; border-left: 4px solid ${isPendingByCustomer ? '#ef4444' : '#f59e0b'}; border-radius: 4px;">
+              <p style="margin: 0; font-size: 12px; font-weight: 600; color: ${isPendingByCustomer ? '#dc2626' : '#ea580c'}; margin-bottom: 4px;">
+                ${isPendingByCustomer ? '🔴' : '🟠'} Complaint Summary:
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #374151; line-height: 1.4;">
+                ${service.complaint_summary}
+              </p>
+              ${service.status_description ? `
+                <p style="margin: 6px 0 0 0; font-size: 11px; color: #6b7280; font-style: italic;">
+                  <strong>Note:</strong> ${service.status_description}
+                </p>
+              ` : ''}
+            </div>
+          ` : service.complaint_summary ? `
+            <div style="margin-top: 10px; padding: 8px; background-color: #f9fafb; border-left: 4px solid #6b7280; border-radius: 4px;">
+              <p style="margin: 0; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px;">
+                Complaint Summary:
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #4b5563; line-height: 1.4;">
+                ${service.complaint_summary}
+              </p>
+            </div>
+          ` : ''}
           <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb;">
             <a href="/user-dashboard/view_service_reports" 
                style="color: #3b82f6; text-decoration: none; font-size: 13px; font-weight: 500;">
@@ -304,6 +334,10 @@ export default function ServiceMapView({ services = [] }) {
               Pending for Spares
             </div>
             <div className="flex items-center text-xs text-gray-600">
+              <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+              Pending by Customer
+            </div>
+            <div className="flex items-center text-xs text-gray-600">
               <span className="inline-block w-3 h-3 rounded-full bg-indigo-500 mr-2"></span>
               In Progress
             </div>
@@ -353,6 +387,7 @@ export default function ServiceMapView({ services = [] }) {
                 status === "COMPLETED" ? "bg-green-500" :
                 status === "PENDING" ? "bg-orange-500" :
                 status === "PENDING FOR SPARES" ? "bg-yellow-300" :
+                status === "PENDING BY CUSTOMER" ? "bg-red-500" :
                 status === "IN PROGRESS" ? "bg-indigo-500" :
                 "bg-blue-500"
               }`}></span>
