@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Eye, Pencil, Search, RefreshCw, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 
 export default function CustomerTable({ 
   data, 
@@ -26,6 +27,7 @@ export default function CustomerTable({
     from: searchParams?.from || "",
     to: searchParams?.to || "",
     tags: searchParams?.tags || "",
+    notes_language: searchParams?.notes_language || "",
   });
 
   const handleSearch = (e) => {
@@ -40,6 +42,7 @@ export default function CustomerTable({
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
       if (filters.tags) params.set("tags", filters.tags);
+      if (filters.notes_language) params.set("notes_language", filters.notes_language);
       router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
   };
@@ -55,6 +58,7 @@ export default function CustomerTable({
         from: "",
         to: "",
         tags: "",
+        notes_language: "",
       });
       router.push("/admin-dashboard/customers");
     });
@@ -71,6 +75,7 @@ export default function CustomerTable({
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
       if (filters.tags) params.set("tags", filters.tags);
+      if (filters.notes_language) params.set("notes_language", filters.notes_language);
       params.set("page", newPage.toString());
       router.push(`/admin-dashboard/customers?${params.toString()}`);
     });
@@ -181,6 +186,21 @@ export default function CustomerTable({
             <option value="Running Order">Running Order</option>
             <option value="Strong Follow-Up">Strong Follow-Up</option>
             <option value="N/A">N/A</option>
+          </select>
+
+          <select
+            value={filters.notes_language}
+            onChange={(e) =>
+              setFilters({ ...filters, notes_language: e.target.value })
+            }
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[140px] sm:min-w-0"
+          >
+            <option value="">All Notes Languages</option>
+            {NOTES_LANGUAGE_OPTIONS.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.name}
+              </option>
+            ))}
           </select>
           <input
             type="date"

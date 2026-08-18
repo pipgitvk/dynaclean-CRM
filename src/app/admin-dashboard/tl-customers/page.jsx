@@ -8,6 +8,7 @@ import {
   mysqlLowerBoundIstDayStart,
   mysqlUpperBoundIstDayEnd,
 } from "@/lib/timezone";
+import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     nextFromDate,
     nextToDate,
     lead_campaign,
+    notes_language,
     page = "1",
     tlOnly,
     preBookingOnly = "false",
@@ -193,6 +195,11 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     params.push(`%${model}%`);
   }
 
+  if (notes_language) {
+    query += ` AND ${notesLanguageExistsSql("?")}`;
+    params.push(notes_language);
+  }
+
   // Get total count for pagination (without LIMIT)
   let countQuery = query.replace(
     /SELECT[\s\S]*?FROM customers c/,
@@ -331,6 +338,11 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   if (model) {
     kpiQuery += ` AND tlf.model LIKE ?`;
     kpiParams.push(`%${model}%`);
+  }
+
+  if (notes_language) {
+    kpiQuery += ` AND ${notesLanguageExistsSql("?")}`;
+    kpiParams.push(notes_language);
   }
 
   const [allCustomersForKPI] = await conn.execute(kpiQuery, kpiParams);

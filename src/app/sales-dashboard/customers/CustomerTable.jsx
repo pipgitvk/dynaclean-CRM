@@ -14,6 +14,28 @@ const LEGACY_STATUS_SLUGS = {
   denied: "Denied",
 };
 
+const NOTES_LANGUAGE_OPTIONS = [
+  { code: "en", name: "English" },
+  { code: "as", name: "Assamese" },
+  { code: "bn", name: "Bengali" },
+  { code: "gu", name: "Gujarati" },
+  { code: "gom", name: "Konkani" },
+  { code: "hi", name: "Hindi" },
+  { code: "kn", name: "Kannada" },
+  { code: "mai", name: "Maithili" },
+  { code: "ml", name: "Malayalam" },
+  { code: "mr", name: "Marathi" },
+  { code: "ne", name: "Nepali" },
+  { code: "or", name: "Odia" },
+  { code: "pa", name: "Punjabi" },
+  { code: "sa", name: "Sanskrit" },
+  { code: "sd", name: "Sindhi" },
+  { code: "si", name: "Sinhala" },
+  { code: "ta", name: "Tamil" },
+  { code: "te", name: "Telugu" },
+  { code: "ur", name: "Urdu" },
+];
+
 function normalizeStatusFromParams(raw) {
   if (!raw) return "";
   return LEGACY_STATUS_SLUGS[raw] ?? raw;
@@ -47,6 +69,7 @@ export default function CustomerTable({
     employee: searchParams.employee ?? "",
     tags: searchParams.tags ?? "",
     tag_filter: searchParams.tag_filter ?? "",
+    notes_language: searchParams.notes_language ?? "",
   });
   const [isInputVisible, setIsInputVisible] = useState(false);
 
@@ -71,6 +94,7 @@ export default function CustomerTable({
       employee: searchParams.employee ?? "",
       tags: searchParams.tags ?? "",
       tag_filter: searchParams.tag_filter ?? "",
+      notes_language: searchParams.notes_language ?? "",
     }));
   }, [searchParams]);
 
@@ -89,6 +113,7 @@ export default function CustomerTable({
       employee: "",
       tags: "",
       tag_filter: "",
+      notes_language: "",
     };
     setFilters(cleared);
     router.push("?");
@@ -234,6 +259,18 @@ export default function CustomerTable({
           <option value="Running Order">Running Order</option>
           <option value="Strong Follow-Up">Strong Follow-Up</option>
           <option value="N/A">N/A</option>
+        </select>
+        <select
+          value={filters.notes_language}
+          onChange={(e) => update("notes_language", e.target.value)}
+          className="p-2 border rounded w-full"
+        >
+          <option value="">All Notes Languages</option>
+          {NOTES_LANGUAGE_OPTIONS.map((lang) => (
+            <option key={lang.code} value={lang.code}>
+              {lang.name}
+            </option>
+          ))}
         </select>
         <select
           value={filters.tag_filter}

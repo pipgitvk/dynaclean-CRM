@@ -502,7 +502,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       // ✅ Send datetime-local values directly (no UTC conversion)
       const payload = {
         ...formData,
-        multi_tag: formData.multi_tag.join(", "), // Convert array to comma-separated string
+        multi_tag: formData.multi_tag.join(", "),
+        notes_language: notesLanguage,
       };
 
       // SERVICE SUPPORT को next_followup_date की जरूरत नहीं, सिर्फ service_next_followup भेजेंगे

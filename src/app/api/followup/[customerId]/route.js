@@ -39,6 +39,7 @@ export async function GET(req, { params }) {
       next_followup_date,
       comm_mode,
       notes,
+      notes_language,
       followed_by,
       time_stamp
      FROM customers_followup
@@ -174,10 +175,12 @@ export async function POST(req, { params }) {
     insertGemNext = latestDates.gem_next_followup || null;         // preserve GEM date
   }
 
+  const notesLanguage = (data.notes_language || "en").slice(0, 10);
+
   await conn.execute(
     `INSERT INTO customers_followup 
-    (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, followed_by, multi_tag)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       customerId,
       name,
@@ -189,6 +192,7 @@ export async function POST(req, { params }) {
       followedDateUTC,
       data.communication_mode,
       data.notes,
+      notesLanguage,
       followedBy,
       data.multi_tag || null,
     ],
@@ -200,8 +204,8 @@ export async function POST(req, { params }) {
     const secondRowNotes = `(${followedBy}) marked (${name}-${contact}) as Denied dated (${currentDateTime}), ${data.notes}`;
     await conn.execute(
       `INSERT INTO customers_followup 
-      (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, followed_by, multi_tag)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerId,
         name,
@@ -213,6 +217,7 @@ export async function POST(req, { params }) {
         followedDateUTC,
         data.communication_mode,
         secondRowNotes,
+        notesLanguage,
         followedBy,
         data.multi_tag || null,
       ],

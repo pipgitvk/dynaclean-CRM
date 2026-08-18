@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { Loader2, Users, CheckSquare, Square } from "lucide-react";
+import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
 
 export default function BulkReassignTable() {
     const [customers, setCustomers] = useState([]);
@@ -20,6 +21,7 @@ export default function BulkReassignTable() {
         lead_source: "",
         lead_campaign: "",
         products_interest: "",
+        notes_language: "",
     });
 
     // Target employee for reassignment
@@ -238,6 +240,19 @@ export default function BulkReassignTable() {
                         onChange={(e) => setFilters({ ...filters, products_interest: e.target.value })}
                         className="border rounded px-3 py-2"
                     />
+
+                    <select
+                        value={filters.notes_language}
+                        onChange={(e) => setFilters({ ...filters, notes_language: e.target.value })}
+                        className="border rounded px-3 py-2"
+                    >
+                        <option value="">All Notes Languages</option>
+                        {NOTES_LANGUAGE_OPTIONS.map((lang) => (
+                            <option key={lang.code} value={lang.code}>
+                                {lang.name}
+                            </option>
+                        ))}
+                    </select>
 
                     <select
                         value={filters.lead_source}

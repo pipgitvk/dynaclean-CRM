@@ -3,6 +3,7 @@ import CustomerTable from "./CustomerTable";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { getSessionPayload } from "@/lib/auth";
+import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export default async function CustomersPage({ searchParams }) {
     next_follow_date,
     employee,
     tags,
+    notes_language,
     filter,
     reporting_date_from,
     reporting_date_to,
@@ -104,7 +106,7 @@ export default async function CustomersPage({ searchParams }) {
     followupParams.push(today);
   }
 
-  // Build INNER JOIN for filtering by next_follow_date or tags
+  // Build INNER JOIN for filtering by next_follow_date or tags (latest follow-up)
   if (next_follow_date || tags) {
     joinClause = `
       INNER JOIN (
@@ -126,6 +128,12 @@ export default async function CustomersPage({ searchParams }) {
       followupConditions.push("cf_filter.multi_tag LIKE ?");
       followupParams.push(`%${tags}%`);
     }
+  }
+
+  // Notes language: any follow-up row with matching notes_language
+  if (notes_language) {
+    customerConditions.push(notesLanguageExistsSql("?"));
+    customerParams.push(notes_language);
   }
 
   if (effectiveStatus) {

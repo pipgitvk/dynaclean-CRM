@@ -18,6 +18,7 @@
     "migrate:meta-multi-credential": "node scripts/migrate-meta-multi-credential.js",
     "migrate:gem-price-dp-warranty": "node scripts/migrate-gem-price-dp-warranty.js",
     "migrate:return-products": "node scripts/migrate-return-products.js",
+    "migrate:notes-language": "node scripts/migrate-notes-language-column.js",
     "build": "next build",
     "start": "node --no-deprecation ./node_modules/next/dist/bin/next start -p 3001",
     "lint": "next lint"
