@@ -366,6 +366,17 @@ export default function DDManagementPage() {
 
     const handleSubmit = async (step, shouldClose = true) => {
         try {
+            // Validation: If deduction amount > 0, remark is mandatory
+            if (step === 2) {
+                const deductionAmount = Number(formData.other_deduction_amount) || 0;
+                const remark = (formData.other_deduction_remark || "").trim();
+                
+                if (deductionAmount > 0 && !remark) {
+                    toast.error("Remark is mandatory when Other Deduction Amount is greater than 0");
+                    return false;
+                }
+            }
+
             const uploadedPaths = await uploadFiles();
 
             const payload = { ...formData, ...uploadedPaths };
@@ -1296,8 +1307,8 @@ export default function DDManagementPage() {
                                                 <input type="number" name="other_deduction_amount" value={formData.other_deduction_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="0.00" step="0.01" />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark</label>
-                                                <input type="text" name="other_deduction_remark" value={formData.other_deduction_remark} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Enter deduction reason" />
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark {Number(formData.other_deduction_amount) > 0 && <span className="text-red-500">*</span>}</label>
+                                                <input type="text" name="other_deduction_remark" value={formData.other_deduction_remark} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none ${Number(formData.other_deduction_amount) > 0 && !formData.other_deduction_remark ? "border-red-500 bg-red-50" : ""}`} placeholder="Enter deduction reason" />
                                             </div>
                                         </div>
                                     </div>
@@ -1637,8 +1648,8 @@ export default function DDManagementPage() {
                                                 <input type="number" name="other_deduction_amount" value={formData.other_deduction_amount} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="0.00" step="0.01" />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark</label>
-                                                <input type="text" name="other_deduction_remark" value={formData.other_deduction_remark} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter deduction reason" />
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark {Number(formData.other_deduction_amount) > 0 && <span className="text-red-500">*</span>}</label>
+                                                <input type="text" name="other_deduction_remark" value={formData.other_deduction_remark} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"} ${Number(formData.other_deduction_amount) > 0 && !formData.other_deduction_remark ? "border-red-500 bg-red-50" : ""}`} placeholder="Enter deduction reason" />
                                             </div>
                                         </div>
                                     </div>
