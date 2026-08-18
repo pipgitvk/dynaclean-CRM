@@ -120,15 +120,8 @@ export async function POST(req) {
   } catch (err) {
     console.error("[other-income-api] ERROR:", err?.message || err);
     return NextResponse.json({ error: "Server error", details: err.message }, { status: 500 });
-  } finally {
-    if (conn) {
-      try {
-        await conn.end();
-      } catch (e) {
-        console.error("[other-income-api] Error closing connection:", e);
-      }
-    }
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }
 
 // GET - Fetch all other income entries for the logged-in user
@@ -179,13 +172,6 @@ export async function GET(req) {
   } catch (err) {
     console.error("[other-income-api] ERROR:", err?.message || err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
-  } finally {
-    if (conn) {
-      try {
-        await conn.end();
-      } catch (e) {
-        console.error("[other-income-api] Error closing connection:", e);
-      }
-    }
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }

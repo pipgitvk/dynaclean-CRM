@@ -98,7 +98,6 @@ export async function GET(req, { params }) {
         [bid_id, currentEmpId]
       );
       if (allowedBids.length === 0) {
-        await conn.end();
         return NextResponse.json({ error: "Bid not found" }, { status: 404 });
       }
     }
@@ -112,8 +111,6 @@ export async function GET(req, { params }) {
       [bid_id]
     );
 
-    await conn.end();
-
     return NextResponse.json({
       success: true,
       data: documents,
@@ -125,6 +122,7 @@ export async function GET(req, { params }) {
       { status: 500 }
     );
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }
 
 // POST - Upload document for a bid
@@ -176,7 +174,6 @@ export async function POST(req, { params }) {
         [bid_id, currentEmpId]
       );
       if (allowedBids.length === 0) {
-        await conn.end();
         return NextResponse.json({ error: "Bid not found" }, { status: 404 });
       }
     }
@@ -193,8 +190,6 @@ export async function POST(req, { params }) {
       ]
     );
 
-    await conn.end();
-
     return NextResponse.json({
       success: true,
       message: "Document uploaded successfully",
@@ -207,4 +202,5 @@ export async function POST(req, { params }) {
       { status: 500 }
     );
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }

@@ -41,7 +41,6 @@ export async function DELETE(req, { params }) {
         [bid_id, currentEmpId]
       );
       if (allowedBids.length === 0) {
-        await conn.end();
         return NextResponse.json({ error: "Document not found" }, { status: 404 });
       }
     }
@@ -53,7 +52,6 @@ export async function DELETE(req, { params }) {
     );
 
     if (documents.length === 0) {
-      await conn.end();
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
@@ -90,8 +88,6 @@ export async function DELETE(req, { params }) {
       [document_id, bid_id]
     );
 
-    await conn.end();
-
     return NextResponse.json({
       success: true,
       message: "Document deleted successfully",
@@ -103,4 +99,5 @@ export async function DELETE(req, { params }) {
       { status: 500 }
     );
   }
+  // Note: Do NOT call conn.end() here - the pool is global and shared across requests
 }

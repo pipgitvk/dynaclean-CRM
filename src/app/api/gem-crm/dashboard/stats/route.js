@@ -247,7 +247,8 @@ export async function GET(req) {
       console.log("Employee stats query failed:", e.message);
     }
 
-    await conn.end();
+    // Note: Do NOT call conn.end() here - the pool is global and shared across requests
+    // Calling end() would close all connections and break subsequent requests
 
     // Format status counts into object
     const statusMap = {};
