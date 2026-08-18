@@ -1,314 +1,7 @@
+  
 "use client";
 
-// import { useState, useEffect } from "react";
-// import { useRouter } from "next/navigation";
-// import toast from "react-hot-toast";
-
-// export default function FollowupForm({ customerId }) {
-//   const router = useRouter();
-//   const [formData, setFormData] = useState({
-//     followed_date: "",
-//     next_followup_date: "",
-//     notes: "",
-//     communication_mode: "",
-//   });
-
-//   const [isSubmitting, setIsSubmitting] = useState(false); // NEW state
-
-//   const formatLocalDateTime = (date) => {
-//     const year = date.getFullYear();
-//     const month = String(date.getMonth() + 1).padStart(2, "0");
-//     const day = String(date.getDate()).padStart(2, "0");
-//     const hours = String(date.getHours()).padStart(2, "0");
-//     const minutes = String(date.getMinutes()).padStart(2, "0");
-//     return `${year}-${month}-${day}T${hours}:${minutes}`;
-//   };
-
-//   useEffect(() => {
-//     const now = new Date();
-//     setFormData((prevData) => ({
-//       ...prevData,
-//       followed_date: formatLocalDateTime(now),
-//       next_followup_date: formatLocalDateTime(now),
-//     }));
-//   }, []);
-
-//   const handleChange = (e) => {
-//     setFormData({ ...formData, [e.target.name]: e.target.value });
-//   };
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-
-//     setIsSubmitting(true); // Disable button
-
-//     try {
-//       const res = await fetch(`/api/followup/${customerId}`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify(formData),
-//       });
-
-//       if (res.ok) {
-//         router.push(`/user-dashboard/view-customer/${customerId}`);
-//       } else {
-//         toast.error("Something went wrong.");
-//       }
-//     } catch (error) {
-//       toast.error("Submission failed.");
-//     } finally {
-//       setIsSubmitting(false); // Optional: set false only if staying on form
-//     }
-//   };
-
-//   return (
-//     <form onSubmit={handleSubmit} className="space-y-4 text-gray-700">
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">
-//           Followed Date
-//         </label>
-//         <input
-//           type="datetime-local"
-//           name="followed_date"
-//           value={formData.followed_date}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         />
-//       </div>
-
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">Notes</label>
-//         <textarea
-//           name="notes"
-//           rows={4}
-//           value={formData.notes}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         />
-//       </div>
-
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">
-//           Communication Mode
-//         </label>
-//         <select
-//           name="communication_mode"
-//           value={formData.communication_mode}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         >
-//           <option value="" disabled>
-//             Select
-//           </option>
-//           <option value="Call">Call</option>
-//           <option value="WhatsApp">WhatsApp</option>
-//           <option value="Visit">Visit</option>
-//           <option value="Email">Email</option>
-//         </select>
-//       </div>
-
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">
-//           Next Follow-up Date
-//         </label>
-//         <input
-//           type="datetime-local"
-//           name="next_followup_date"
-//           value={formData.next_followup_date}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         />
-//       </div>
-
-//       <button
-//         type="submit"
-//         disabled={isSubmitting}
-//         className={`w-full py-2 rounded-lg text-white ${
-//           isSubmitting
-//             ? "bg-gray-400 cursor-not-allowed"
-//             : "bg-gray-600 hover:bg-gray-700"
-//         }`}
-//       >
-//         {isSubmitting ? "Submitting..." : "Submit"}
-//       </button>
-//     </form>
-//   );
-// }
-
-// "use client";
-
-// import { useState, useEffect } from "react";
-// import { useRouter } from "next/navigation";
-// import toast from "react-hot-toast";
-
-// export default function FollowupForm({ customerId }) {
-//   const router = useRouter();
-//   const [formData, setFormData] = useState({
-//     followed_date: "",
-//     next_followup_date: "",
-//     notes: "",
-//     communication_mode: "",
-//     status: "", // NEW field
-//   });
-
-//   const [isSubmitting, setIsSubmitting] = useState(false);
-
-//   const statusList = ["Very Good", "Average", "Poor", "Denied"];
-
-//   const formatLocalDateTime = (date) => {
-//     const year = date.getFullYear();
-//     const month = String(date.getMonth() + 1).padStart(2, "0");
-//     const day = String(date.getDate()).padStart(2, "0");
-//     const hours = String(date.getHours()).padStart(2, "0");
-//     const minutes = String(date.getMinutes()).padStart(2, "0");
-//     return `${year}-${month}-${day}T${hours}:${minutes}`;
-//   };
-
-//   useEffect(() => {
-//     const now = new Date();
-//     setFormData((prevData) => ({
-//       ...prevData,
-//       followed_date: formatLocalDateTime(now),
-//       next_followup_date: formatLocalDateTime(now),
-//     }));
-//   }, []);
-
-//   const handleChange = (e) => {
-//     setFormData({ ...formData, [e.target.name]: e.target.value });
-//   };
-
-//   const handleSubmit = async (e) => {
-//     e.preventDefault();
-
-//     setIsSubmitting(true);
-
-//     try {
-//       const res = await fetch(`/api/followup/${customerId}`, {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify(formData),
-//       });
-
-//       if (res.ok) {
-//         router.push(`/user-dashboard/view-customer/${customerId}`);
-//       } else {
-//         toast.error("Something went wrong.");
-//       }
-//     } catch (error) {
-//       toast.error("Submission failed.");
-//     } finally {
-//       setIsSubmitting(false);
-//     }
-//   };
-
-//   return (
-//     <form onSubmit={handleSubmit} className="space-y-4 text-gray-700">
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">
-//           Followed Date
-//         </label>
-//         <input
-//           type="datetime-local"
-//           name="followed_date"
-//           value={formData.followed_date}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         />
-//       </div>
-
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">Notes</label>
-//         <textarea
-//           name="notes"
-//           rows={4}
-//           value={formData.notes}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         />
-//       </div>
-
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">
-//           Communication Mode
-//         </label>
-//         <select
-//           name="communication_mode"
-//           value={formData.communication_mode}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         >
-//           <option value="" disabled>
-//             Select
-//           </option>
-//           <option value="Call">Call</option>
-//           <option value="WhatsApp">WhatsApp</option>
-//           <option value="Visit">Visit</option>
-//           <option value="Email">Email</option>
-//         </select>
-//       </div>
-
-//       {/* ✅ New Status Dropdown */}
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">
-//           Status
-//         </label>
-//         <select
-//           name="status"
-//           value={formData.status}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         >
-//           <option value="" disabled>
-//             Select Status
-//           </option>
-//           {statusList.map((status) => (
-//             <option key={status} value={status}>
-//               {status}
-//             </option>
-//           ))}
-//         </select>
-//       </div>
-
-//       <div>
-//         <label className="block text-sm font-medium text-gray-700">
-//           Next Follow-up Date
-//         </label>
-//         <input
-//           type="datetime-local"
-//           name="next_followup_date"
-//           value={formData.next_followup_date}
-//           onChange={handleChange}
-//           className="w-full px-4 py-2 border rounded-lg"
-//           required
-//         />
-//       </div>
-
-//       <button
-//         type="submit"
-//         disabled={isSubmitting}
-//         className={`w-full py-2 rounded-lg text-white ${
-//           isSubmitting
-//             ? "bg-gray-400 cursor-not-allowed"
-//             : "bg-gray-600 hover:bg-gray-700"
-//         }`}
-//       >
-//         {isSubmitting ? "Submitting..." : "Submit"}
-//       </button>
-//     </form>
-//   );
-// }
-
-"use client";
-
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -337,7 +30,201 @@ export default function FollowupForm({ customerId, userRole = "" }) {
   const [customerCreatedAt, setCustomerCreatedAt] = useState(null);
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(true);
   const [hasOrder, setHasOrder] = useState(false);
-  
+  const [notesLanguage, setNotesLanguage] = useState("en");
+
+  // Languages supported by Google Input Tools (GOOGLE_ITC map in transliterate API)
+  const notesLanguageOptions = [
+    { code: "en", name: "English" },
+    { code: "as", name: "Assamese" },
+    { code: "bn", name: "Bengali" },
+    { code: "gu", name: "Gujarati" },
+    { code: "gom", name: "Konkani" },
+    { code: "hi", name: "Hindi" },
+    { code: "kn", name: "Kannada" },
+    { code: "mai", name: "Maithili" },
+    { code: "ml", name: "Malayalam" },
+    { code: "mr", name: "Marathi" },
+    { code: "ne", name: "Nepali" },
+    { code: "or", name: "Odia" },
+    { code: "pa", name: "Punjabi" },
+    { code: "sa", name: "Sanskrit" },
+    { code: "sd", name: "Sindhi" },
+    { code: "si", name: "Sinhala" },
+    { code: "ta", name: "Tamil" },
+    { code: "te", name: "Telugu" },
+    { code: "ur", name: "Urdu" },
+  ];
+
+  const notesTextareaRef = useRef(null);
+  const notesFetchTimerRef = useRef(null);
+  const XLIT_API = "/api/transliterate/tl/";
+
+  const fetchTransliteration = async (phrase, lang) => {
+    if (!phrase || !lang || lang === "en") return [];
+    try {
+      const res = await fetch(
+        `${XLIT_API}${lang}/${encodeURIComponent(phrase.trim()).replace(".", "%2E")}`
+      );
+      const data = await res.json();
+      return data?.result?.length ? data.result : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const transliterateFullText = async (text, lang) => {
+    if (!text || lang === "en") return text;
+
+    const regex = /[a-zA-Z]+(?:\s+[a-zA-Z]+)*/g;
+    let result = text;
+    const matches = [...text.matchAll(regex)];
+
+    for (let i = matches.length - 1; i >= 0; i--) {
+      const match = matches[i];
+      const suggestions = await fetchTransliteration(match[0], lang);
+      if (suggestions[0]) {
+        result =
+          result.slice(0, match.index) +
+          suggestions[0] +
+          result.slice(match.index + match[0].length);
+      }
+    }
+
+    return result;
+  };
+
+  const [notesSuggestions, setNotesSuggestions] = useState([]);
+  const [notesSuggestionIndex, setNotesSuggestionIndex] = useState(0);
+  const [notesPhraseRange, setNotesPhraseRange] = useState({ start: -1, end: -1 });
+  const [isNotesTransliterating, setIsNotesTransliterating] = useState(false);
+
+  const getRomanPhraseBeforeCursor = (text, cursorPos) => {
+    const textBefore = text.slice(0, cursorPos);
+    const lastBreak = Math.max(
+      textBefore.lastIndexOf(" "),
+      textBefore.lastIndexOf("\n"),
+      -1
+    );
+    const phraseStart = lastBreak + 1;
+    const phrase = textBefore.slice(phraseStart);
+    if (!phrase || !/^[a-zA-Z\s]+$/.test(phrase)) return null;
+    return { phrase, start: phraseStart, end: cursorPos };
+  };
+
+  const loadNotesSuggestions = (text, cursorPos, lang) => {
+    if (lang === "en") {
+      setNotesSuggestions([]);
+      return;
+    }
+
+    clearTimeout(notesFetchTimerRef.current);
+    notesFetchTimerRef.current = setTimeout(async () => {
+      const info = getRomanPhraseBeforeCursor(text, cursorPos);
+      if (!info?.phrase.trim()) {
+        setNotesSuggestions([]);
+        setNotesPhraseRange({ start: -1, end: -1 });
+        return;
+      }
+
+      const suggestions = await fetchTransliteration(info.phrase, lang);
+      if (suggestions.length) {
+        setNotesPhraseRange({ start: info.start, end: info.end });
+        setNotesSuggestions(suggestions);
+        setNotesSuggestionIndex(0);
+      } else {
+        setNotesSuggestions([]);
+        setNotesPhraseRange({ start: -1, end: -1 });
+      }
+    }, 120);
+  };
+
+  const applyNotesSuggestion = (suffixChar = " ", index = notesSuggestionIndex) => {
+    const replacement = notesSuggestions[index] ?? notesSuggestions[0];
+    if (!replacement || notesPhraseRange.start < 0) return;
+
+    const fullText = notesTextareaRef.current?.value ?? formData.notes;
+    const { start, end } = notesPhraseRange;
+    const newText =
+      fullText.slice(0, start) +
+      replacement +
+      suffixChar +
+      fullText.slice(end);
+
+    setFormData((prev) => ({ ...prev, notes: newText }));
+    setNotesCursor(start + replacement.length + suffixChar.length);
+    setNotesSuggestions([]);
+    setNotesPhraseRange({ start: -1, end: -1 });
+  };
+
+  const handleNotesLanguageChange = async (e) => {
+    const newLang = e.target.value;
+    const currentNotes = formData.notes;
+    setNotesLanguage(newLang);
+    setNotesSuggestions([]);
+
+    if (!currentNotes.trim() || newLang === "en") return;
+
+    setIsNotesTransliterating(true);
+    try {
+      const converted = await transliterateFullText(currentNotes, newLang);
+      setFormData((prev) => ({ ...prev, notes: converted }));
+    } finally {
+      setIsNotesTransliterating(false);
+    }
+  };
+
+  const handleNotesChange = (e) => {
+    handleChange(e);
+    const { value, selectionStart } = e.target;
+    loadNotesSuggestions(value, selectionStart ?? value.length, notesLanguage);
+  };
+
+  const handleNotesKeyDown = (e) => {
+    if (notesLanguage === "en") return;
+
+    if (notesSuggestions.length > 0) {
+      if (e.key === " " || e.key === "Tab") {
+        e.preventDefault();
+        applyNotesSuggestion(" ");
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyNotesSuggestion("\n");
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        setNotesSuggestionIndex(
+          (prev) => (prev + 1) % notesSuggestions.length
+        );
+        return;
+      }
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        setNotesSuggestionIndex(
+          (prev) => (prev - 1 + notesSuggestions.length) % notesSuggestions.length
+        );
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setNotesSuggestions([]);
+        return;
+      }
+    }
+  };
+
+  const [notesCursor, setNotesCursor] = useState(null);
+
+  useEffect(() => {
+    if (notesCursor !== null && notesTextareaRef.current) {
+      notesTextareaRef.current.selectionStart = notesCursor;
+      notesTextareaRef.current.selectionEnd = notesCursor;
+      setNotesCursor(null);
+    }
+  }, [formData.notes, notesCursor]);
+
   const statusList = ["Very Good", "Average", "Poor", "Denied", "Invalid"];
   const tagOptions = ["Visiting factory", "Service Issue", "Payment Follow-Up", "Trucks Follow-Up", "Cancel Order", "Order received", "Prime", "Repeat Order", "Running Order", "Strong Follow-Up", "N/A"];
   const stageOptions = [
@@ -682,15 +569,70 @@ export default function FollowupForm({ customerId, userRole = "" }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Notes</label>
-        <textarea
-          name="notes"
-          rows={4}
-          value={formData.notes}
-          onChange={handleChange}
-          className="w-full px-4 py-2 border rounded-lg"
-          required
-        />
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-sm font-medium text-gray-700">Notes</label>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-600">Language:</label>
+            <select
+              value={notesLanguage}
+              onChange={handleNotesLanguageChange}
+              disabled={isNotesTransliterating}
+              className="text-sm px-2 py-1 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-60"
+            >
+              {notesLanguageOptions.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="relative">
+          <textarea
+            ref={notesTextareaRef}
+            name="notes"
+            rows={4}
+            value={formData.notes}
+            onChange={handleNotesChange}
+            onKeyDown={handleNotesKeyDown}
+            onClick={(e) =>
+              loadNotesSuggestions(
+                e.target.value,
+                e.target.selectionStart ?? e.target.value.length,
+                notesLanguage
+              )
+            }
+            disabled={isNotesTransliterating}
+            className="w-full px-4 py-2 border rounded-lg disabled:opacity-60"
+            required
+          />
+          {notesSuggestions.length > 0 && notesLanguage !== "en" && (
+            <ul className="absolute left-0 right-0 top-full z-50 mt-1 flex flex-wrap gap-1 rounded-md border border-gray-200 bg-white p-1 shadow-lg text-sm">
+              {notesSuggestions.map((item, index) => (
+                <li
+                  key={`${item}-${index}`}
+                  onMouseEnter={() => setNotesSuggestionIndex(index)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    applyNotesSuggestion(" ", index);
+                  }}
+                  className={`cursor-pointer rounded px-2 py-1 ${
+                    index === notesSuggestionIndex
+                      ? "bg-sky-500 text-white"
+                      : "hover:bg-gray-100"
+                  }`}
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
+          )}
+          {notesLanguage !== "en" && (
+            <p className="mt-1 text-xs text-gray-500">
+              Type in English letters, use ↑↓ to pick suggestions, Space to confirm
+            </p>
+          )}
+        </div>
       </div>
 
       <div>
