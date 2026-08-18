@@ -31,7 +31,9 @@ async function ensureDDRecordsColumns(pool) {
         ["expiry_bank", "DATE NULL"],
         ["issuing_branch", "VARCHAR(255) NULL"],
         ["dd_scan_copy", "VARCHAR(500) NULL"],
-        ["dd_receipt", "VARCHAR(500) NULL"]
+        ["dd_receipt", "VARCHAR(500) NULL"],
+        ["other_deduction_amount", "DECIMAL(10, 2) NULL DEFAULT 0"],
+        ["other_deduction_remark", "TEXT NULL"]
     ];
     for (const [column, definition] of ddColumns) {
         try {
@@ -113,6 +115,10 @@ export async function PUT(req, { params }) {
             payment_proof,
             receipt,
             from_bank_account_no,
+
+            // Other Deduction
+            other_deduction_amount,
+            other_deduction_remark,
 
             // Metadata
             status,
@@ -196,6 +202,10 @@ export async function PUT(req, { params }) {
         if (payment_proof !== undefined) { fields.push("payment_proof = ?"); updateParams.push(payment_proof); }
         if (receipt !== undefined) { fields.push("receipt = ?"); updateParams.push(receipt); }
         if (from_bank_account_no !== undefined) { fields.push("from_bank_account_no = ?"); updateParams.push(from_bank_account_no); }
+
+        // Other Deduction
+        if (other_deduction_amount !== undefined) { fields.push("other_deduction_amount = ?"); updateParams.push(other_deduction_amount || 0); }
+        if (other_deduction_remark !== undefined) { fields.push("other_deduction_remark = ?"); updateParams.push(other_deduction_remark || null); }
 
         if (fields.length === 0) {
             return NextResponse.json({ error: "No fields to update" }, { status: 400 });

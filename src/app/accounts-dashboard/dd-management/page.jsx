@@ -134,7 +134,9 @@ export default function DDManagementPage() {
         original_dd_location: "Self",
         sent_to_client_date: "",
         claim_from_bank: false,
-        claim_date: ""
+        claim_date: "",
+        other_deduction_amount: "",
+        other_deduction_remark: ""
     });
 
     const fetchUser = async () => {
@@ -219,6 +221,13 @@ export default function DDManagementPage() {
         }));
     };
 
+    // Helper function to calculate net amount after deduction
+    const getNetAmount = (mainAmount, deductionAmount) => {
+        const main = Number(mainAmount) || 0;
+        const deduction = Number(deductionAmount) || 0;
+        return main - deduction;
+    };
+
     const handleFileChange = (e) => {
         const { name, files } = e.target;
         const bgFiles = ["bg_format_upload", "original_bg_upload", "docs_upload"];
@@ -296,11 +305,13 @@ export default function DDManagementPage() {
     const linkPayment = async (statementId, type, action = 'link') => {
         const isUnlink = action === 'unlink';
         const selectedStatement = (type === 'debit' ? statements : creditStatements).find((s) => Number(s.id) === Number(statementId));
-        const ddAmount = Number(selectedDD?.amount || 0);
+        const mainAmount = Number(selectedDD?.amount || 0);
+        const deductionAmount = Number(selectedDD?.other_deduction_amount || 0);
+        const netAmount = getNetAmount(mainAmount, deductionAmount);
         const statementAmount = Math.abs(Number(selectedStatement?.amount || 0));
 
-        if (!isUnlink && ddAmount !== statementAmount) {
-            toast.error(`Amount mismatch: DD net amount ₹${ddAmount.toLocaleString('en-IN')} and statement amount ₹${statementAmount.toLocaleString('en-IN')} must match`);
+        if (!isUnlink && netAmount !== statementAmount) {
+            toast.error(`Amount mismatch: DD net amount ₹${netAmount.toLocaleString('en-IN')} (₹${mainAmount.toLocaleString('en-IN')} - ₹${deductionAmount.toLocaleString('en-IN')}) and statement amount ₹${statementAmount.toLocaleString('en-IN')} must match`);
             return;
         }
 
@@ -539,7 +550,9 @@ export default function DDManagementPage() {
             original_dd_location: "Self",
             sent_to_client_date: "",
             claim_from_bank: false,
-            claim_date: ""
+            claim_date: "",
+            other_deduction_amount: "",
+            other_deduction_remark: ""
         });
 
     const resetForm = () => {
@@ -625,6 +638,7 @@ export default function DDManagementPage() {
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Bank Info & Docs</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Issued Details</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Other Deduction</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Claimed From Bank</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Claim Date</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -632,7 +646,7 @@ export default function DDManagementPage() {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {isLoading ? (
-                                <tr><td colSpan="9" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
+                                <tr><td colSpan="10" className="px-6 py-10 text-center animate-pulse text-gray-400">Loading records...</td></tr>
                             ) : data.length > 0 ? (
                                 data.map((dd) => (
                                     <tr key={dd.id} className="hover:bg-gray-50/80 transition-colors group">
@@ -651,7 +665,10 @@ export default function DDManagementPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-xs">
-                                                <div className="font-bold text-gray-800">₹{parseFloat(dd.amount).toLocaleString()}</div>
+                                                <div className="font-bold text-gray-800">₹{parseFloat(getNetAmount(dd.amount, dd.other_deduction_amount)).toLocaleString()}</div>
+                                                {dd.other_deduction_amount && Number(dd.other_deduction_amount) > 0 && (
+                                                    <div className="text-orange-600 text-[11px] font-semibold">(₹{parseFloat(dd.amount).toLocaleString()} - ₹{parseFloat(dd.other_deduction_amount).toLocaleString()})</div>
+                                                )}
                                                 <div className="text-gray-500 font-medium">{dayjs(dd.assign_date).format("DD MMM YYYY")}</div>
                                             </div>
                                         </td>
@@ -710,6 +727,24 @@ export default function DDManagementPage() {
                                             <StatusBadge status={dd.status} />
                                             <div className="text-[12px] text-gray-400 mt-1">
                                                 By: {dd.assigned_by}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col items-center gap-1">
+                                                {dd.other_deduction_amount ? (
+                                                    <>
+                                                        <span className="text-sm font-bold text-orange-600">
+                                                            ₹{parseFloat(dd.other_deduction_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                        {dd.other_deduction_remark && (
+                                                            <span className="text-xs text-gray-600 italic max-w-[150px] truncate" title={dd.other_deduction_remark}>
+                                                                {dd.other_deduction_remark}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">—</span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -1253,6 +1288,19 @@ export default function DDManagementPage() {
                                             <input type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg outline-none" />
                                         </div>
                                     </div>
+                                    <div className="space-y-4 pt-4 border-t">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Other Deduction</label>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Deduction Amount</label>
+                                                <input type="number" name="other_deduction_amount" value={formData.other_deduction_amount} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="0.00" step="0.01" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark</label>
+                                                <input type="text" name="other_deduction_remark" value={formData.other_deduction_remark} onChange={handleInputChange} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Enter deduction reason" />
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div className="pt-4 border-t">
                                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Original BG Location</label>
                                         <div className="flex gap-4">
@@ -1581,6 +1629,19 @@ export default function DDManagementPage() {
                                             <input disabled={selectedDD?.filled_date} type="date" name="filled_date" value={formData.filled_date} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} />
                                         </div>
                                     </div>
+                                    <div className="space-y-4 pt-4 border-t">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Other Deduction</label>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Deduction Amount</label>
+                                                <input type="number" name="other_deduction_amount" value={formData.other_deduction_amount} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="0.00" step="0.01" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Remark</label>
+                                                <input type="text" name="other_deduction_remark" value={formData.other_deduction_remark} onChange={handleInputChange} className={`w-full p-2.5 border rounded-lg focus:ring-2 outline-none ${formData.type === "EPAYMENT" ? "focus:ring-emerald-500" : "focus:ring-blue-500"}`} placeholder="Enter deduction reason" />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </>
                             )}
                         </div>
@@ -1708,7 +1769,7 @@ export default function DDManagementPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <span className="text-xs font-medium text-emerald-600 uppercase">Net Amount:</span>
-                                        <div className="text-lg font-bold text-emerald-900">₹{Number(selectedDD?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-emerald-900">₹{Number(getNetAmount(selectedDD?.amount, selectedDD?.other_deduction_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-emerald-600 uppercase">Total Linked:</span>
@@ -1716,7 +1777,7 @@ export default function DDManagementPage() {
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-emerald-600 uppercase">Remaining:</span>
-                                        <div className="text-lg font-bold text-emerald-900">₹{(Number(selectedDD?.amount || 0) - statements.filter(s => s.type === "Debit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-emerald-900">₹{(getNetAmount(selectedDD?.amount, selectedDD?.other_deduction_amount) - statements.filter(s => s.type === "Debit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                             </div>
@@ -1892,7 +1953,7 @@ export default function DDManagementPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
                                         <span className="text-xs font-medium text-blue-600 uppercase">Net Amount:</span>
-                                        <div className="text-lg font-bold text-blue-900">₹{Number(selectedDD?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-blue-900">₹{Number(getNetAmount(selectedDD?.amount, selectedDD?.other_deduction_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-blue-600 uppercase">Total Linked:</span>
@@ -1900,7 +1961,7 @@ export default function DDManagementPage() {
                                     </div>
                                     <div>
                                         <span className="text-xs font-medium text-blue-600 uppercase">Remaining:</span>
-                                        <div className="text-lg font-bold text-blue-900">₹{(Number(selectedDD?.amount || 0) - creditStatements.filter(s => s.type === "Credit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                                        <div className="text-lg font-bold text-blue-900">₹{(getNetAmount(selectedDD?.amount, selectedDD?.other_deduction_amount) - creditStatements.filter(s => s.type === "Credit" && Number(s.dd_id) === Number(selectedDD?.id)).reduce((sum, s) => sum + Number(s.amount || 0), 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                                     </div>
                                 </div>
                             </div>
