@@ -386,6 +386,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
               <th onClick={() => handleSort("Tolocation")} className="p-3 cursor-pointer select-none">To<SortIcon column="Tolocation" /></th>
               <th onClick={() => handleSort("Total")} className="p-3 cursor-pointer select-none">Total<SortIcon column="Total" /></th>
               <th onClick={() => handleSort("approved_amount")} className="p-3 cursor-pointer select-none">Approved Amt<SortIcon column="approved_amount" /></th>
+              <th className="p-3">Approved By</th>
               <th onClick={() => handleSort("payment_date")} className="p-3 cursor-pointer select-none">Payment Date<SortIcon column="payment_date" /></th>
               <th onClick={() => handleSort("approval_status")} className="p-3 cursor-pointer select-none">Status<SortIcon column="approval_status" /></th>
               <th className="p-3">Linked Statements</th>
@@ -428,6 +429,7 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
                         ? "-"
                         : `₹${Number(row.approved_amount).toFixed(2)}`}
                     </td>
+                    <td className="p-3">{row.approved_by || "-"}</td>
                     <td className="p-3">
                       {row.payment_date && row.payment_date !== "0000-00-00"
                         ? dayjs(row.payment_date).format("DD MMM YYYY")
@@ -566,6 +568,9 @@ export default function ExpenseTable({ rows, role, activeEmployeesList }) {
                 !(Number(row.approved_amount) > 0)
                   ? "-"
                   : `₹${Number(row.approved_amount).toFixed(2)}`}
+              </div>
+              <div>
+                <strong>Approved By:</strong> {row.approved_by || "-"}
               </div>
               <div>
                 <strong>Payment Date:</strong>{" "}

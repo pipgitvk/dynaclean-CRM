@@ -9,6 +9,7 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import TodaysReportingButton from "@/components/TodaysReportingButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
+import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
 import PaymentPendingButton from "@/components/PaymentPendingCircle";
 
 export default function SalesDashboard({ user, reportingManager }) {
@@ -41,6 +42,7 @@ export default function SalesDashboard({ user, reportingManager }) {
               <PaymentPendingButton />
               <TodayReportButton />
               <LeaveApprovalButton />
+              <ExpenseApprovalButton />
             </div>
 
             {/* Fast Cards inline */}

@@ -10,6 +10,7 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import HrTodayReportButton from "@/components/HrTodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
+import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
 
 export default function DefaultDashboard({ user, reportingManager, counts }) {
@@ -45,6 +46,7 @@ export default function DefaultDashboard({ user, reportingManager, counts }) {
             <div className="flex flex-row gap-2 justify-start sm:justify-end">
               <TodayReportButton />
               <LeaveApprovalButton />
+              <ExpenseApprovalButton />
             </div>
 
             {/* Fast Cards */}

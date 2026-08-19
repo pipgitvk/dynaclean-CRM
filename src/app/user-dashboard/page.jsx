@@ -116,6 +116,30 @@ export default async function UserDashboardPage() {
       `
     );
 
+    // Check if user is a reporting manager and fetch pending expenses count
+    const { getReportees } = await import("@/lib/reportingManager");
+    const reportees = await getReportees(username);
+    const hasReportees = reportees.length > 0;
+    
+    let pendingExpensesCount = 0;
+    if (hasReportees) {
+      const today = new Date();
+      const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      const currentMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      const fromDate = currentMonthStart.toISOString().split('T')[0];
+      const toDate = currentMonthEnd.toISOString().split('T')[0];
+      
+      const placeholders = reportees.map(() => "?").join(", ");
+      const [expenseRows] = await connection.execute(
+        `SELECT COUNT(*) as cnt FROM expenses 
+         WHERE username IN (${placeholders}) 
+         AND approval_status = 'Pending'
+         AND TravelDate >= ? AND TravelDate <= ?`,
+        [...reportees, fromDate, toDate]
+      );
+      pendingExpensesCount = expenseRows[0]?.cnt || 0;
+    }
+
     // Fetch purchase price data (latest per product)
     const [purchasePrices] = await connection.execute(
       `
@@ -164,6 +188,8 @@ export default async function UserDashboardPage() {
       pending: pendingCount,
       pendingSpares: pendingSparesCount,
       totalAvailableStockPrice: totalAvailableStockPrice,
+      hasReportees: hasReportees,
+      pendingExpensesCount: pendingExpensesCount,
     };
 
     return <DashboardComponent user={user} reportingManager={reportingManager} counts={counts} />;

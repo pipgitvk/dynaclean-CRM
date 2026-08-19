@@ -5,6 +5,7 @@ import UpcomingTasks from "@/components/task/UpcomingTasks";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
+import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
 
 export default function ServiceSupportDashboard({ user, reportingManager }) {
@@ -27,6 +28,7 @@ export default function ServiceSupportDashboard({ user, reportingManager }) {
             <div className="flex flex-row gap-2 justify-start sm:justify-end">
               <TodayReportButton />
               <LeaveApprovalButton />
+              <ExpenseApprovalButton />
             </div>
             <div className="mt-2">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fast Cards</p>

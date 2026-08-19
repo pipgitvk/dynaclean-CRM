@@ -7,6 +7,7 @@ import UpcomingTeamLeaderFollowups from "@/components/Leads/UpcomingTeamLeaderFo
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
+import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
 
 export default function TeamLeaderDashboard({ user, reportingManager }) {
   return (
@@ -37,6 +38,7 @@ export default function TeamLeaderDashboard({ user, reportingManager }) {
             <div className="flex flex-row gap-2 justify-start sm:justify-end">
               <TodayReportButton />
               <LeaveApprovalButton />
+              <ExpenseApprovalButton />
             </div>
 
             {/* Fast Cards */}
