@@ -459,4 +459,3 @@ function DocCell({ label, file, optional, required }) {
     </div>
   );
 }
-}
