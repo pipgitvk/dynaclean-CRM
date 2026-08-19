@@ -200,7 +200,9 @@ export default function InvoiceTable({ onSummaryUpdate }) {
 
   useEffect(() => {
     if (!onSummaryUpdate) return;
-    const filteredForSummary = invoices.filter((inv) => inv.type !== "performa");
+    const filteredForSummary = invoices.filter(
+      (inv) => inv.type !== "performa" && inv.status !== "CANCELLED",
+    );
     onSummaryUpdate({
       grandTotal: filteredForSummary.reduce(
         (sum, inv) => sum + Number(inv.grand_total || 0),

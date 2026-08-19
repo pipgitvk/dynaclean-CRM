@@ -132,8 +132,10 @@ export default function InvoiceTable({ onSummaryUpdate }) {
         setInvoices(sortedData);
         setMeta(response.meta);
 
-        // Calculate and update summary data - exclude performa invoices
-        const filteredForSummary = sortedData.filter(inv => inv.type !== 'performa');
+        // Calculate and update summary data - exclude performa and cancelled invoices
+        const filteredForSummary = sortedData.filter(
+          (inv) => inv.type !== "performa" && inv.status !== "CANCELLED",
+        );
         const summaryData = {
           grandTotal: filteredForSummary.reduce((sum, inv) => sum + Number(inv.grand_total || 0), 0),
           balanceAmount: filteredForSummary.reduce((sum, inv) => sum + Number(inv.balance_amount || 0), 0),
