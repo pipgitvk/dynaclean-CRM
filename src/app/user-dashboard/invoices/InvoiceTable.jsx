@@ -30,6 +30,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
   const [fromDate, setFromDate] = useState(formatDateForInput(firstDayOfMonth));
   const [toDate, setToDate] = useState(formatDateForInput(lastDayOfMonth));
   const [invoiceTypeFilter, setInvoiceTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   // Single page — fetch all records
   const [currentPage] = useState(1);
@@ -65,6 +66,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     if (toDate) params.append("toDate", toDate);
     if (search) params.append("search", search);
     if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
+    if (statusFilter) params.append("status", statusFilter);
 
     try {
       setFetchError(null);
@@ -163,7 +165,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
 
   useEffect(() => {
     fetchData();
-  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter]);
+  }, [fromDate, toDate, sortBy, sortOrder, invoiceTypeFilter, statusFilter]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -178,6 +180,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     setFromDate(formatDateForInput(firstDay));
     setToDate(formatDateForInput(lastDay));
     setInvoiceTypeFilter("");
+    setStatusFilter("");
     setSortBy("created_at");
     setSortOrder("desc");
     setFetchError(null);
@@ -295,6 +298,16 @@ export default function InvoiceTable({ onSummaryUpdate }) {
             <option value="tax">Tax Invoice</option>
             <option value="performa">Performa Invoice</option>
           </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border px-3 py-1 rounded"
+          >
+            <option value="">All Status</option>
+            <option value="PAID">Paid</option>
+            <option value="PARTIAL PAID">Partial Paid</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 items-center">
           <input
@@ -359,6 +372,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                 Order Date <SortIcon column="order_date" />
               </th>
               <th className="px-4 py-2">Type</th>
+              <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Tax</th>
               <th className="px-4 py-2">Grand Total</th>
               <th className="px-4 py-2">Balance Amount</th>
@@ -374,13 +388,13 @@ export default function InvoiceTable({ onSummaryUpdate }) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="12" className="text-center py-4">
+                <td colSpan="13" className="text-center py-4">
                   Loading...
                 </td>
               </tr>
             ) : fetchError ? (
               <tr>
-                <td colSpan="12" className="text-center py-6 text-red-600">
+                <td colSpan="13" className="text-center py-6 text-red-600">
                   {fetchError}
                 </td>
               </tr>
@@ -433,6 +447,24 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                       }`}>
                         {i.type === 'performa' ? 'Performa Invoice' : 'Tax Invoice'}
                       </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className={`px-3 py-1 rounded text-sm font-semibold ${
+                        i.status === 'PAID'
+                          ? 'bg-green-100 text-green-800'
+                          : i.status === 'PARTIAL PAID'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : i.status === 'CANCELLED'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {i.status || '—'}
+                      </span>
+                      {i.order_id && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          Ord: {i.order_id}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       ₹{Number(i.tax_amount).toLocaleString("en-IN")}
@@ -498,7 +530,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
                   </tr>
                   {expandedInvoiceId === i.id && i.linkedStatements && i.linkedStatements.length > 0 && (
                     <tr>
-                      <td colSpan="12" className="px-8 py-4 bg-gray-50">
+                      <td colSpan="13" className="px-8 py-4 bg-gray-50">
                         <div className="flex justify-between items-center mb-3">
                           <h4 className="font-semibold text-gray-700">Linked Payments:</h4>
                           <div className="text-right">
@@ -557,7 +589,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
               ))
             ) : (
               <tr>
-                <td colSpan="12" className="text-center py-6 text-gray-500">
+                <td colSpan="13" className="text-center py-6 text-gray-500">
                   No invoices found
                 </td>
               </tr>
