@@ -259,7 +259,7 @@ export async function GET(req) {
   const invoicesWithItems = await Promise.all(
     rows.map(async (invoice) => {
       const [items] = await conn.execute(
-        "SELECT item_code as product_code, item_name, quantity, rate as price_per_unit, image_url as imageUrl, hsn_code, taxable_value, cgst_amount, sgst_amount, igst_amount FROM invoice_items WHERE invoice_id = ?",
+        "SELECT item_code as product_code, product_number, item_name, quantity, rate as price_per_unit, image_url as imageUrl, hsn_code, taxable_value, cgst_amount, sgst_amount, igst_amount FROM invoice_items WHERE invoice_id = ?",
         [invoice.id]
       );
       
@@ -728,13 +728,14 @@ export async function POST(req) {
 
       await conn.execute(
         `INSERT INTO invoice_items 
-         (invoice_id, item_code, item_name, description, hsn_code, quantity, rate, discount_percent, 
+         (invoice_id, item_code, product_number, item_name, description, hsn_code, quantity, rate, discount_percent, 
           discount_amount, taxable_value, cgst_percent, sgst_percent, igst_percent, 
           cgst_amount, sgst_amount, igst_amount, total_amount, image_url, created_at) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           invoiceId,
           item_code,
+          item.product_number || null,
           item_name,
           description,
           hsn_code,

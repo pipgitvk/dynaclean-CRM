@@ -118,8 +118,10 @@ export async function GET(req) {
       [rows] = await conn.execute(
         `
         SELECT
+          p.id,
           p.item_code,
           p.item_name,
+          p.product_number,
           p.hsn_sac,
           p.specification,
           p.unit,
@@ -130,8 +132,6 @@ export async function GET(req) {
           'product' AS item_type
         FROM
           products_list p
-        LEFT JOIN
-          product_images pi ON p.item_code = pi.item_code
         WHERE
           p.item_code = ?
         LIMIT 1`,
@@ -143,8 +143,10 @@ export async function GET(req) {
         [rows] = await conn.execute(
           `
           SELECT
+            p.id,
             p.item_code,
             p.item_name,
+            p.product_number,
             p.hsn_sac,
             p.specification,
             p.unit,
@@ -155,8 +157,6 @@ export async function GET(req) {
             'product' AS item_type
           FROM
             products_list p
-          LEFT JOIN
-            product_images pi ON p.item_code = pi.item_code
           WHERE
             LOWER(TRIM(p.item_code)) = ?
             OR CAST(p.product_number AS CHAR) = ?

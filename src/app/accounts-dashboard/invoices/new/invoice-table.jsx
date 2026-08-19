@@ -18,7 +18,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
       field === "discount_amount"
     ) {
       newValue = parseFloat(value) || 0;
-    }
+    } 
 
     updated[index][field] = newValue;
 
@@ -84,6 +84,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
       updated[index] = {
         ...updated[index],
         item_code: item.item_code || code,
+        product_number: item.product_number || "",
         item_name: item.item_name || "",
         description: item.specification || "",
         hsn_code: item.hsn_sac || "",
@@ -111,6 +112,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
       ...items,
       {
         item_code: "",
+        product_number: "",
         imageUrl: "",
         item_name: "",
         description: "",
@@ -159,6 +161,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
             <th className="border px-2 py-2">Image</th>
             <th className="border px-2 py-2">Item Name</th>
             <th className="border px-2 py-2">Code</th>
+            <th className="border px-2 py-2">Product #</th>
             <th className="border px-2 py-2">HSN</th>
             <th className="border px-2 py-2">Description</th>
             <th className="border px-2 py-2">Qty</th>
@@ -213,6 +216,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
                   )}
                 </div>
               </td>
+              <td className="border px-2 py-2 bg-gray-50">{item.product_number || "-"}</td>
               <td className="border px-2 py-2">{item.hsn_code || "-"}</td>
               <td className="border px-2 py-2 align-top">
                 <textarea
@@ -269,7 +273,7 @@ export default function InvoiceItemsTable({ items, setItems, isEditMode = false 
             </tr>
           ))}
           <tr className="font-semibold bg-gray-100">
-            <td className="border px-2 py-2 text-center" colSpan={6}>Total</td>
+            <td className="border px-2 py-2 text-center" colSpan={7}>Total</td>
             <td className="border px-2 py-2">{totals.totalQty.toFixed(2)}</td>
             <td className="border px-2 py-2"></td>
             <td className="border px-2 py-2"></td>
