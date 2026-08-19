@@ -312,33 +312,6 @@ function applyOrderMetaToRows(rows, orderMap) {
   });
 }
 
-async function fetchInvoicesWithStatusFilter(
-  conn,
-  {
-    where,
-    values,
-    sortBy,
-    sortOrder,
-    limit,
-    offset,
-    derivedStatusSql,
-    latestOrderIdSql,
-  },
-) {
-  const [rows] = await conn.execute(
-    `
-    SELECT ${buildInvoiceSelectSql(derivedStatusSql, latestOrderIdSql)}
-    FROM invoices
-    ${where}
-    ORDER BY ${sortBy} ${sortOrder}
-    LIMIT ? OFFSET ?
-    `,
-    [...values, limit, offset],
-  );
-
-  return rows;
-}
-
 async function fetchInvoicesFast(
   conn,
   { where, values, sortBy, sortOrder, limit, offset },
@@ -359,6 +332,78 @@ async function fetchInvoicesFast(
   console.timeEnd("[invoice-table] bulk-orders");
 
   return applyOrderMetaToRows(rows, orderMap);
+}
+
+async function fetchInvoicesFastWithStatusFilter(
+  conn,
+  { where, values, sortBy, sortOrder, limit, offset, statusFilter },
+) {
+  const [[countRow]] = await conn.execute(
+    `SELECT COUNT(*) AS total FROM invoices ${where}`,
+    values,
+  );
+  const candidateTotal = Number(countRow.total || 0);
+
+  if (candidateTotal === 0) return [];
+
+  // Small date/filter windows: one query + one bulk order lookup beats correlated SQL.
+  if (candidateTotal <= 3000) {
+    const [candidates] = await conn.execute(
+      `
+      SELECT ${buildSimpleInvoiceSelectSql()}
+      FROM invoices
+      ${where}
+      ORDER BY ${sortBy} ${sortOrder}
+      `,
+      values,
+    );
+
+    console.time("[invoice-table] bulk-orders-filtered");
+    const orderMap = await bulkFetchLatestOrdersForInvoices(conn, candidates);
+    console.timeEnd("[invoice-table] bulk-orders-filtered");
+
+    return applyOrderMetaToRows(candidates, orderMap)
+      .filter((row) => row.status === statusFilter)
+      .slice(offset, offset + limit);
+  }
+
+  const batchSize = Math.max(limit * 5, 300);
+  let dbOffset = 0;
+  let skipped = 0;
+  const matched = [];
+
+  while (matched.length < limit) {
+    const [batch] = await conn.execute(
+      `
+      SELECT ${buildSimpleInvoiceSelectSql()}
+      FROM invoices
+      ${where}
+      ORDER BY ${sortBy} ${sortOrder}
+      LIMIT ? OFFSET ?
+      `,
+      [...values, batchSize, dbOffset],
+    );
+
+    if (!batch.length) break;
+
+    const orderMap = await bulkFetchLatestOrdersForInvoices(conn, batch);
+    const enriched = applyOrderMetaToRows(batch, orderMap);
+
+    for (const row of enriched) {
+      if (row.status !== statusFilter) continue;
+      if (skipped < offset) {
+        skipped++;
+        continue;
+      }
+      matched.push(row);
+      if (matched.length >= limit) break;
+    }
+
+    dbOffset += batch.length;
+    if (batch.length < batchSize) break;
+  }
+
+  return matched;
 }
 
 function getRelatedInvoicesForRow(invoice, relatedById) {
@@ -642,44 +687,20 @@ export async function GET(req) {
       values.push(invoiceType);
     }
 
-    const latestOrderStatusSql = buildLatestOrderStatusSql();
-    const latestOrderIdSql = buildLatestOrderIdSql();
-    const derivedStatusSql = buildDerivedStatusSql(latestOrderStatusSql);
-    const useSlowStatusSql = Boolean(statusFilter);
-
-    let statusWhere = where;
-    const statusValues = [...values];
-    if (useSlowStatusSql) {
-      statusWhere += ` AND (${derivedStatusSql}) = ?`;
-      statusValues.push(statusFilter);
-    }
-
     let total = null;
     let totalPages = null;
     let rows;
 
     console.time("[invoice-table] main-query");
-    if (useSlowStatusSql) {
-      if (includeCount) {
-        console.time("[invoice-table] count");
-        const [[countRow]] = await conn.execute(
-          `SELECT COUNT(*) AS total FROM invoices ${statusWhere}`,
-          statusValues,
-        );
-        console.timeEnd("[invoice-table] count");
-        total = Number(countRow.total || 0);
-        totalPages = Math.ceil(total / limit);
-      }
-
-      rows = await fetchInvoicesWithStatusFilter(conn, {
-        where: statusWhere,
-        values: statusValues,
+    if (statusFilter) {
+      rows = await fetchInvoicesFastWithStatusFilter(conn, {
+        where,
+        values,
         sortBy,
         sortOrder,
         limit,
         offset,
-        derivedStatusSql,
-        latestOrderIdSql,
+        statusFilter,
       });
     } else {
       rows = await fetchInvoicesFast(conn, {
