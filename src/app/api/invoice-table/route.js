@@ -47,6 +47,543 @@ function parseLinkedPurchaseIds(raw) {
   return keys;
 }
 
+const LATEST_ORDER_JOIN = `
+  LEFT JOIN quotations_records qr
+    ON qr.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
+`;
+
+const LATEST_ORDER_MATCH = `
+  (
+    no.invoice_number COLLATE utf8mb4_unicode_ci = invoices.invoice_number COLLATE utf8mb4_unicode_ci
+    OR no.quote_number COLLATE utf8mb4_unicode_ci = CAST(invoices.quotation_id AS CHAR) COLLATE utf8mb4_unicode_ci
+    OR CAST(qr.\`S.No.\` AS CHAR) = CAST(invoices.quotation_id AS CHAR)
+  )
+`;
+
+const LATEST_ORDER_ORDER = `
+  COALESCE(no.invoice_date, DATE(no.created_at)) DESC,
+  no.created_at DESC,
+  no.id DESC
+`;
+
+function buildLatestOrderStatusSql() {
+  return `
+    (
+      SELECT
+        CASE
+          WHEN no.is_cancelled = 1
+               OR LOWER(COALESCE(no.approval_status, '')) = 'rejected'
+          THEN 'CANCELLED'
+          WHEN LOWER(COALESCE(no.payment_status, '')) IN ('paid')
+          THEN 'PAID'
+          WHEN LOWER(COALESCE(no.payment_status, '')) IN ('partial', 'partial paid', 'partially paid')
+          THEN 'PARTIAL PAID'
+          ELSE NULL
+        END
+      FROM neworder no
+      ${LATEST_ORDER_JOIN}
+      WHERE ${LATEST_ORDER_MATCH}
+      ORDER BY ${LATEST_ORDER_ORDER}
+      LIMIT 1
+    )
+  `;
+}
+
+function buildLatestOrderIdSql() {
+  return `
+    (
+      SELECT no.order_id
+      FROM neworder no
+      ${LATEST_ORDER_JOIN}
+      WHERE ${LATEST_ORDER_MATCH}
+      ORDER BY ${LATEST_ORDER_ORDER}
+      LIMIT 1
+    )
+  `;
+}
+
+function buildDerivedStatusSql(latestOrderStatusSql) {
+  return `
+    COALESCE(
+      ${latestOrderStatusSql},
+      CASE
+        WHEN COALESCE(status, '') <> '' THEN status
+        WHEN COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) = 0 AND grand_total > 0 THEN 'PAID'
+        WHEN COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) > 0
+             AND COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) < grand_total THEN 'PARTIAL PAID'
+        ELSE NULL
+      END
+    )
+  `;
+}
+
+function buildInvoiceSelectSql(derivedStatusSql, latestOrderIdSql) {
+  return `
+    id,
+    invoice_number,
+    quotation_id,
+    customer_name AS buyer_name,
+    customer_id,
+    gst_number,
+    gst_consignee,
+    employee_name,
+    parent_id,
+    invoice_date,
+    invoice_date AS order_date,
+    (cgst + sgst + igst) AS tax_amount,
+    grand_total,
+    amount_paid,
+    COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) AS balance_amount,
+    created_at,
+    type,
+    (${derivedStatusSql}) AS status,
+    (${latestOrderIdSql}) AS order_id
+  `;
+}
+
+function buildSimpleInvoiceSelectSql() {
+  return `
+    id,
+    invoice_number,
+    quotation_id,
+    customer_name AS buyer_name,
+    customer_id,
+    gst_number,
+    gst_consignee,
+    employee_name,
+    parent_id,
+    invoice_date,
+    invoice_date AS order_date,
+    (cgst + sgst + igst) AS tax_amount,
+    grand_total,
+    amount_paid,
+    COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) AS balance_amount,
+    created_at,
+    type,
+    status
+  `;
+}
+
+function mapOrderToStatus(order) {
+  if (!order) return null;
+  if (
+    order.is_cancelled === 1 ||
+    String(order.approval_status || "").toLowerCase() === "rejected"
+  ) {
+    return "CANCELLED";
+  }
+  const paymentStatus = String(order.payment_status || "").toLowerCase();
+  if (paymentStatus === "paid") return "PAID";
+  if (
+    paymentStatus === "partial" ||
+    paymentStatus === "partial paid" ||
+    paymentStatus === "partially paid"
+  ) {
+    return "PARTIAL PAID";
+  }
+  return null;
+}
+
+function deriveInvoiceStatus(invoice, order) {
+  const fromOrder = mapOrderToStatus(order);
+  if (fromOrder) return fromOrder;
+
+  if (invoice.status && String(invoice.status).trim() !== "") {
+    return invoice.status;
+  }
+
+  const grandTotal = Number(invoice.grand_total) || 0;
+  const balance =
+    Number(invoice.balance_amount) ||
+    grandTotal - Number(invoice.amount_paid || 0);
+
+  if (balance === 0 && grandTotal > 0) return "PAID";
+  if (balance > 0 && balance < grandTotal) return "PARTIAL PAID";
+  return null;
+}
+
+function orderMatchesInvoice(invoice, order) {
+  if (
+    invoice.invoice_number &&
+    order.invoice_number &&
+    invoice.invoice_number === order.invoice_number
+  ) {
+    return true;
+  }
+
+  if (invoice.quotation_id == null || invoice.quotation_id === "") {
+    return false;
+  }
+
+  const quotationId = String(invoice.quotation_id);
+  if (order.quote_number != null && String(order.quote_number) === quotationId) {
+    return true;
+  }
+  if (order.qr_sno != null && String(order.qr_sno) === quotationId) {
+    return true;
+  }
+  return false;
+}
+
+function compareOrdersLatest(a, b) {
+  const dateA = a.invoice_date || String(a.created_at || "").slice(0, 10);
+  const dateB = b.invoice_date || String(b.created_at || "").slice(0, 10);
+  if (dateA !== dateB) return dateB.localeCompare(dateA);
+
+  const createdA = String(a.created_at || "");
+  const createdB = String(b.created_at || "");
+  if (createdA !== createdB) return createdB.localeCompare(createdA);
+
+  return Number(b.id || 0) - Number(a.id || 0);
+}
+
+async function bulkFetchLatestOrdersForInvoices(conn, invoices) {
+  if (!invoices.length) return new Map();
+
+  const invoiceNumbers = [
+    ...new Set(invoices.map((inv) => inv.invoice_number).filter(Boolean)),
+  ];
+  const quotationIds = [
+    ...new Set(
+      invoices
+        .map((inv) => inv.quotation_id)
+        .filter((value) => value != null && value !== ""),
+    ),
+  ];
+
+  if (!invoiceNumbers.length && !quotationIds.length) return new Map();
+
+  const conditions = [];
+  const values = [];
+
+  if (invoiceNumbers.length) {
+    conditions.push(
+      `no.invoice_number COLLATE utf8mb4_unicode_ci IN (${invoiceNumbers.map(() => "?").join(",")})`,
+    );
+    values.push(...invoiceNumbers);
+  }
+
+  if (quotationIds.length) {
+    const placeholders = quotationIds.map(() => "?").join(",");
+    conditions.push(
+      `no.quote_number COLLATE utf8mb4_unicode_ci IN (${placeholders})`,
+    );
+    values.push(...quotationIds.map(String));
+    conditions.push(`CAST(qr.\`S.No.\` AS CHAR) IN (${placeholders})`);
+    values.push(...quotationIds.map(String));
+  }
+
+  const [orders] = await conn.execute(
+    `SELECT
+      no.id,
+      no.order_id,
+      no.invoice_number,
+      no.quote_number,
+      no.invoice_date,
+      no.created_at,
+      no.is_cancelled,
+      no.approval_status,
+      no.payment_status,
+      CAST(qr.\`S.No.\` AS CHAR) AS qr_sno
+    FROM neworder no
+    ${LATEST_ORDER_JOIN}
+    WHERE ${conditions.join(" OR ")}`,
+    values,
+  );
+
+  const result = new Map();
+  for (const invoice of invoices) {
+    const matches = orders.filter((order) => orderMatchesInvoice(invoice, order));
+    if (!matches.length) continue;
+    matches.sort(compareOrdersLatest);
+    result.set(invoice.id, matches[0]);
+  }
+  return result;
+}
+
+function applyOrderMetaToRows(rows, orderMap) {
+  return rows.map((invoice) => {
+    const order = orderMap.get(invoice.id);
+    return {
+      ...invoice,
+      status: deriveInvoiceStatus(invoice, order),
+      order_id: order?.order_id ?? null,
+    };
+  });
+}
+
+async function fetchInvoicesWithStatusFilter(
+  conn,
+  {
+    where,
+    values,
+    sortBy,
+    sortOrder,
+    limit,
+    offset,
+    derivedStatusSql,
+    latestOrderIdSql,
+  },
+) {
+  const [rows] = await conn.execute(
+    `
+    SELECT ${buildInvoiceSelectSql(derivedStatusSql, latestOrderIdSql)}
+    FROM invoices
+    ${where}
+    ORDER BY ${sortBy} ${sortOrder}
+    LIMIT ? OFFSET ?
+    `,
+    [...values, limit, offset],
+  );
+
+  return rows;
+}
+
+async function fetchInvoicesFast(
+  conn,
+  { where, values, sortBy, sortOrder, limit, offset },
+) {
+  const [rows] = await conn.execute(
+    `
+    SELECT ${buildSimpleInvoiceSelectSql()}
+    FROM invoices
+    ${where}
+    ORDER BY ${sortBy} ${sortOrder}
+    LIMIT ? OFFSET ?
+    `,
+    [...values, limit, offset],
+  );
+
+  console.time("[invoice-table] bulk-orders");
+  const orderMap = await bulkFetchLatestOrdersForInvoices(conn, rows);
+  console.timeEnd("[invoice-table] bulk-orders");
+
+  return applyOrderMetaToRows(rows, orderMap);
+}
+
+function getRelatedInvoicesForRow(invoice, relatedById) {
+  const relatedInvoices = [{ id: invoice.id, number: invoice.invoice_number }];
+  if (invoice.parent_id) {
+    const parent = relatedById.get(invoice.parent_id);
+    if (parent) {
+      relatedInvoices.push({ id: parent.id, number: parent.invoice_number });
+    }
+    for (const inv of relatedById.values()) {
+      if (inv.parent_id === invoice.parent_id && inv.id !== invoice.id) {
+        relatedInvoices.push({ id: inv.id, number: inv.invoice_number });
+      }
+    }
+  } else {
+    for (const inv of relatedById.values()) {
+      if (inv.parent_id === invoice.id) {
+        relatedInvoices.push({ id: inv.id, number: inv.invoice_number });
+      }
+    }
+  }
+
+  const uniqueRelatedInvoices = [];
+  const seenInvoiceIds = new Set();
+  for (const inv of relatedInvoices) {
+    if (!seenInvoiceIds.has(inv.id)) {
+      seenInvoiceIds.add(inv.id);
+      uniqueRelatedInvoices.push(inv);
+    }
+  }
+  return uniqueRelatedInvoices;
+}
+
+function statementMatchesInvoice(stmt, inv) {
+  if (inv.number && stmt.invoice_number === inv.number) return true;
+  const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
+  return tokens.includes(`IP${inv.id}`);
+}
+
+async function enrichInvoicesWithDetails(conn, rows) {
+  if (!rows.length) return [];
+
+  const invoiceMap = {};
+  const invoiceNumberToIdMap = {};
+  for (const inv of rows) {
+    invoiceMap[inv.id] = { ...inv };
+    if (inv.invoice_number) invoiceNumberToIdMap[inv.invoice_number] = inv.id;
+  }
+
+  const pageIds = rows.map((inv) => inv.id);
+  const parentIds = [...new Set(rows.map((inv) => inv.parent_id).filter(Boolean))];
+  const anchorIds = [...new Set([...pageIds, ...parentIds])];
+
+  console.time("[invoice-table] related-invoices");
+  let relatedRows = [];
+  if (anchorIds.length > 0) {
+    const placeholders = anchorIds.map(() => "?").join(",");
+    const [result] = await conn.execute(
+      `SELECT id, invoice_number, grand_total, parent_id
+       FROM invoices
+       WHERE id IN (${placeholders}) OR parent_id IN (${placeholders})`,
+      [...anchorIds, ...anchorIds],
+    );
+    relatedRows = result;
+  }
+  console.timeEnd("[invoice-table] related-invoices");
+
+  const relatedById = new Map();
+  for (const inv of relatedRows) {
+    relatedById.set(inv.id, inv);
+    if (!invoiceMap[inv.id]) invoiceMap[inv.id] = inv;
+    if (inv.invoice_number) invoiceNumberToIdMap[inv.invoice_number] = inv.id;
+  }
+
+  const relatedInvoiceIds = Object.keys(invoiceMap).map(Number);
+  const relatedInvoiceNumbers = [
+    ...new Set(
+      Object.values(invoiceMap)
+        .map((inv) => inv.invoice_number)
+        .filter(Boolean),
+    ),
+  ];
+
+  console.time("[invoice-table] statements");
+  let allLinkedStatements = [];
+  if (relatedInvoiceIds.length > 0 || relatedInvoiceNumbers.length > 0) {
+    const stmtWhere = [];
+    const stmtValues = [];
+    if (relatedInvoiceNumbers.length > 0) {
+      stmtWhere.push(
+        `invoice_number IN (${relatedInvoiceNumbers.map(() => "?").join(",")})`,
+      );
+      stmtValues.push(...relatedInvoiceNumbers);
+    }
+    if (relatedInvoiceIds.length > 0) {
+      const likeParts = relatedInvoiceIds.map(() => "linked_purchase_ids LIKE ?");
+      stmtWhere.push(`(${likeParts.join(" OR ")})`);
+      stmtValues.push(...relatedInvoiceIds.map((id) => `%IP${id}%`));
+    }
+    const [statements] = await conn.execute(
+      `SELECT id, trans_id, date, description, amount, invoice_status, linked_purchase_ids, invoice_number
+       FROM statements
+       WHERE ${stmtWhere.join(" OR ")}`,
+      stmtValues,
+    );
+    allLinkedStatements = statements;
+  }
+  console.timeEnd("[invoice-table] statements");
+
+  const transToInvoiceIdsMap = {};
+  for (const stmt of allLinkedStatements) {
+    const linkedIds = [];
+    const seenIds = new Set();
+    const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
+    for (const token of tokens) {
+      if (token.startsWith("IP")) {
+        const invId = parseInt(token.replace("IP", ""), 10);
+        if (invoiceMap[invId] && !seenIds.has(invId)) {
+          linkedIds.push(invId);
+          seenIds.add(invId);
+        }
+      }
+    }
+    if (stmt.invoice_number && invoiceNumberToIdMap[stmt.invoice_number]) {
+      const invId = invoiceNumberToIdMap[stmt.invoice_number];
+      if (!seenIds.has(invId)) {
+        linkedIds.push(invId);
+        seenIds.add(invId);
+      }
+    }
+    transToInvoiceIdsMap[stmt.trans_id] = linkedIds;
+  }
+
+  const allocationMap = {};
+  const invoiceRemainingMap = {};
+  for (const invId in invoiceMap) {
+    invoiceRemainingMap[invId] = Number(invoiceMap[invId].grand_total) || 0;
+  }
+
+  for (const stmt of allLinkedStatements) {
+    const linkedInvIds = transToInvoiceIdsMap[stmt.trans_id] || [];
+    if (linkedInvIds.length === 0) continue;
+
+    let remainingToAllocate = Math.abs(Number(stmt.amount) || 0);
+    const invoicePaidForStmt = {};
+    for (const invId of linkedInvIds) {
+      if (remainingToAllocate <= 0) break;
+      const invRemaining = invoiceRemainingMap[invId] || 0;
+      if (invRemaining <= 0) continue;
+      const toAllocate = Math.min(invRemaining, remainingToAllocate);
+      if (toAllocate > 0) {
+        invoicePaidForStmt[invId] = toAllocate;
+        invoiceRemainingMap[invId] -= toAllocate;
+        remainingToAllocate -= toAllocate;
+      }
+    }
+    for (const invId of linkedInvIds) {
+      const key = `${invId}-${stmt.trans_id}`;
+      allocationMap[key] = invoicePaidForStmt[invId] || 0;
+    }
+  }
+
+  console.time("[invoice-table] invoice-items");
+  const itemsByInvoiceId = new Map();
+  if (pageIds.length > 0) {
+    const placeholders = pageIds.map(() => "?").join(",");
+    const [items] = await conn.execute(
+      `SELECT invoice_id, item_code as product_code, product_number, item_name, quantity, rate as price_per_unit, image_url as imageUrl, hsn_code, taxable_value, cgst_amount, sgst_amount, igst_amount
+       FROM invoice_items
+       WHERE invoice_id IN (${placeholders})`,
+      pageIds,
+    );
+    for (const item of items) {
+      if (!itemsByInvoiceId.has(item.invoice_id)) {
+        itemsByInvoiceId.set(item.invoice_id, []);
+      }
+      itemsByInvoiceId.get(item.invoice_id).push(item);
+    }
+  }
+  console.timeEnd("[invoice-table] invoice-items");
+
+  return rows.map((invoice) => {
+    const uniqueRelatedInvoices = getRelatedInvoicesForRow(invoice, relatedById);
+    const linkedStatements = [];
+    const seenStmtIds = new Set();
+    for (const inv of uniqueRelatedInvoices) {
+      for (const stmt of allLinkedStatements) {
+        if (!seenStmtIds.has(stmt.id) && statementMatchesInvoice(stmt, inv)) {
+          seenStmtIds.add(stmt.id);
+          linkedStatements.push(stmt);
+        }
+      }
+    }
+
+    const totalLinkedAmount = linkedStatements.reduce((sum, stmt) => {
+      const key = `${invoice.id}-${stmt.trans_id}`;
+      return sum + (allocationMap[key] || 0);
+    }, 0);
+    const newBalanceAmount = Math.max(
+      0,
+      Number(invoice.grand_total) - totalLinkedAmount,
+    );
+
+    const grandTotal = Number(invoice.grand_total) || 0;
+    let derivedPaymentStatus = invoice.payment_status || "UNPAID";
+    if (grandTotal > 0) {
+      if (newBalanceAmount === 0) {
+        derivedPaymentStatus = "PAID";
+      } else if (newBalanceAmount < grandTotal) {
+        derivedPaymentStatus = "PARTIAL";
+      } else {
+        derivedPaymentStatus = "UNPAID";
+      }
+    }
+
+    return {
+      ...invoice,
+      items: itemsByInvoiceId.get(invoice.id) || [],
+      linkedStatements,
+      balance_amount: newBalanceAmount,
+      payment_status: derivedPaymentStatus,
+    };
+  });
+}
+
 export async function GET(req) {
   try {
     // const cookieStore = cookies();
@@ -76,10 +613,12 @@ export async function GET(req) {
     const toDate = searchParams.get("toDate");
     const invoiceType = searchParams.get("invoiceType");
     const statusFilter = searchParams.get("status");
+    const includeDetails = searchParams.get("includeDetails") !== "0";
+    const includeCount = searchParams.get("includeCount") !== "0";
 
+    console.time("[invoice-table] total");
     const conn = await getDbConnection();
 
-    // 🔎 Filters
     let where = "WHERE 1=1";
     const values = [];
 
@@ -89,12 +628,12 @@ export async function GET(req) {
     }
 
     if (fromDate) {
-      where += " AND DATE(invoice_date) >= DATE(?)";
+      where += " AND invoice_date >= ?";
       values.push(fromDate);
     }
 
     if (toDate) {
-      where += " AND DATE(invoice_date) <= DATE(?)";
+      where += " AND invoice_date <= ?";
       values.push(toDate);
     }
 
@@ -103,345 +642,82 @@ export async function GET(req) {
       values.push(invoiceType);
     }
 
-    const latestOrderStatusSql = `
-      (
-        SELECT
-          CASE
-            WHEN no.is_cancelled = 1
-                 OR LOWER(COALESCE(no.approval_status, '')) = 'rejected'
-            THEN 'CANCELLED'
-            WHEN LOWER(COALESCE(no.payment_status, '')) IN ('paid')
-            THEN 'PAID'
-            WHEN LOWER(COALESCE(no.payment_status, '')) IN ('partial', 'partial paid', 'partially paid')
-            THEN 'PARTIAL PAID'
-            ELSE NULL
-          END
-        FROM neworder no
-        LEFT JOIN quotations_records qr
-          ON qr.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
-        WHERE (
-          no.invoice_number COLLATE utf8mb4_unicode_ci = invoices.invoice_number COLLATE utf8mb4_unicode_ci
-          OR no.quote_number COLLATE utf8mb4_unicode_ci = CAST(invoices.quotation_id AS CHAR) COLLATE utf8mb4_unicode_ci
-          OR CAST(qr.\`S.No.\` AS CHAR) = CAST(invoices.quotation_id AS CHAR)
-        )
-        ORDER BY
-          COALESCE(no.invoice_date, DATE(no.created_at)) DESC,
-          no.created_at DESC,
-          no.id DESC
-        LIMIT 1
-      )
-    `;
+    const latestOrderStatusSql = buildLatestOrderStatusSql();
+    const latestOrderIdSql = buildLatestOrderIdSql();
+    const derivedStatusSql = buildDerivedStatusSql(latestOrderStatusSql);
+    const useSlowStatusSql = Boolean(statusFilter);
 
-    const latestOrderIdSql = `
-      (
-        SELECT no.order_id
-        FROM neworder no
-        LEFT JOIN quotations_records qr
-          ON qr.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
-        WHERE (
-          no.invoice_number COLLATE utf8mb4_unicode_ci = invoices.invoice_number COLLATE utf8mb4_unicode_ci
-          OR no.quote_number COLLATE utf8mb4_unicode_ci = CAST(invoices.quotation_id AS CHAR) COLLATE utf8mb4_unicode_ci
-          OR CAST(qr.\`S.No.\` AS CHAR) = CAST(invoices.quotation_id AS CHAR)
-        )
-        ORDER BY
-          COALESCE(no.invoice_date, DATE(no.created_at)) DESC,
-          no.created_at DESC,
-          no.id DESC
-        LIMIT 1
-      )
-    `;
-
-    const derivedStatusSql = `
-      COALESCE(
-        ${latestOrderStatusSql},
-        CASE
-          WHEN COALESCE(status, '') <> '' THEN status
-          WHEN COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) = 0 AND grand_total > 0 THEN 'PAID'
-          WHEN COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) > 0
-               AND COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) < grand_total THEN 'PARTIAL PAID'
-          ELSE NULL
-        END
-      )
-    `;
-
-    if (statusFilter) {
-      where += ` AND (${derivedStatusSql}) = ?`;
-      values.push(statusFilter);
+    let statusWhere = where;
+    const statusValues = [...values];
+    if (useSlowStatusSql) {
+      statusWhere += ` AND (${derivedStatusSql}) = ?`;
+      statusValues.push(statusFilter);
     }
 
-    // 📊 Count
-    const [[countRow]] = await conn.execute(
-      `SELECT COUNT(*) AS total FROM invoices ${where}`,
-      values,
-    );
-    const total = Number(countRow.total || 0);
-    const totalPages = Math.ceil(total / limit);
+    let total = null;
+    let totalPages = null;
+    let rows;
 
-    // Check if employee_name column exists in invoices table
-    try {
-      await conn.execute("SELECT employee_name FROM invoices LIMIT 1");
-      console.log("employee_name column exists in invoices table");
-    } catch (_) {
-      try {
-        await conn.execute("ALTER TABLE invoices ADD COLUMN employee_name VARCHAR(255) NULL DEFAULT NULL AFTER gst_number");
-        console.log("Added employee_name column to invoices table");
-      } catch (__) {
-        console.error("Failed to add employee_name column to invoices table");
-      }
-    }
-
-    // Ensure status column exists in invoices table
-    try {
-      await conn.execute("SELECT status FROM invoices LIMIT 1");
-    } catch (_) {
-      try {
-        await conn.execute("ALTER TABLE invoices ADD COLUMN status ENUM('PAID', 'PARTIAL PAID', 'CANCELLED') NULL DEFAULT NULL");
-      } catch (__) {}
-    }
-
-    // Data buyer_name
-    const [rows] = await conn.execute(
-      `
-      SELECT
-        id,
-        invoice_number,
-        customer_name AS buyer_name,
-        customer_id,
-        gst_number,
-        employee_name,
-        parent_id,
-        invoice_date,
-        invoice_date AS order_date,
-        (cgst + sgst + igst) AS tax_amount,
-        grand_total,
-        amount_paid,
-        COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) AS balance_amount,
-        created_at,
-        type,
-        (${derivedStatusSql}) AS status,
-        (${latestOrderIdSql}) AS order_id
-      FROM invoices
-      ${where}
-      ORDER BY ${sortBy} ${sortOrder}
-      LIMIT ? OFFSET ?
-      `,
-      [...values, limit, offset],
-    );
-
-    // Check if item_code column exists in invoice_items table
-    try {
-      await conn.execute("SELECT item_code FROM invoice_items LIMIT 1");
-    } catch (_) {
-      try {
-        await conn.execute("ALTER TABLE invoice_items ADD COLUMN item_code VARCHAR(100) NULL");
-      } catch (__) {}
-    }
-
-    // First, fetch ALL statements that are linked to ANY of the invoices (for allocation)
-    const allInvoiceIds = rows.map(inv => inv.id);
-    const [allLinkedStatements] = await conn.execute(
-      "SELECT id, trans_id, date, description, amount, invoice_status, linked_purchase_ids, invoice_number FROM statements"
-    );
-    
-    // Build invoice map
-    const invoiceMap = {};
-    const invoiceNumberToIdMap = {};
-    rows.forEach(inv => {
-      invoiceMap[inv.id] = inv;
-      if (inv.invoice_number) invoiceNumberToIdMap[inv.invoice_number] = inv.id;
-    });
-    
-    // Also get parent/child invoices for allocation completeness
-    const allRelatedInvoiceIds = new Set(allInvoiceIds);
-    for (const inv of rows) {
-      if (inv.parent_id) allRelatedInvoiceIds.add(inv.parent_id);
-      const [children] = await conn.execute("SELECT id FROM invoices WHERE parent_id = ?", [inv.id]);
-      children.forEach(c => allRelatedInvoiceIds.add(c.id));
-    }
-    let allRelatedInvoices = [];
-    const relatedInvoiceIdsArr = [...allRelatedInvoiceIds];
-    if (relatedInvoiceIdsArr.length > 0) {
-      const placeholders = relatedInvoiceIdsArr.map(() => '?').join(',');
-      const [result] = await conn.execute(
-        `SELECT id, grand_total, invoice_number FROM invoices WHERE id IN (${placeholders})`,
-        relatedInvoiceIdsArr
-      );
-      allRelatedInvoices = result;
-    }
-    allRelatedInvoices.forEach(inv => {
-      if (!invoiceMap[inv.id]) invoiceMap[inv.id] = inv;
-      if (inv.invoice_number) invoiceNumberToIdMap[inv.invoice_number] = inv.id;
-    });
-    
-    // Build transToInvoiceIdsMap for all statements (PRESERVING ORDER from linked_purchase_ids)
-    const transToInvoiceIdsMap = {};
-    for (const stmt of allLinkedStatements) {
-      const linkedIds = [];
-      const seenIds = new Set();
-      // Add from linked_purchase_ids (IN ORDER)
-      const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
-      for (const token of tokens) {
-        if (token.startsWith("IP")) {
-          const invId = parseInt(token.replace("IP", ""));
-          if (invoiceMap[invId] && !seenIds.has(invId)) {
-            linkedIds.push(invId);
-            seenIds.add(invId);
-          }
-        }
-      }
-      // Add from invoice_number (at the end, if not already added)
-      if (stmt.invoice_number && invoiceNumberToIdMap[stmt.invoice_number]) {
-        const invId = invoiceNumberToIdMap[stmt.invoice_number];
-        if (!seenIds.has(invId)) {
-          linkedIds.push(invId);
-          seenIds.add(invId);
-        }
-      }
-      transToInvoiceIdsMap[stmt.trans_id] = linkedIds;
-    }
-    
-    // Calculate allocation map
-    const allocationMap = {};
-    const invoiceRemainingMap = {};
-    for (const invId in invoiceMap) {
-      invoiceRemainingMap[invId] = Number(invoiceMap[invId].grand_total) || 0;
-    }
-    
-    // Process all statements for allocation
-    for (const stmt of allLinkedStatements) {
-      const linkedInvIds = transToInvoiceIdsMap[stmt.trans_id] || [];
-      if (linkedInvIds.length === 0) continue;
-      
-      let remainingToAllocate = Math.abs(Number(stmt.amount) || 0);
-      const invoicePaidForStmt = {};
-      for (const invId of linkedInvIds) {
-        if (remainingToAllocate <= 0) break;
-        const invRemaining = invoiceRemainingMap[invId] || 0;
-        if (invRemaining <= 0) continue;
-        const toAllocate = Math.min(invRemaining, remainingToAllocate);
-        if (toAllocate > 0) {
-          invoicePaidForStmt[invId] = toAllocate;
-          invoiceRemainingMap[invId] -= toAllocate;
-          remainingToAllocate -= toAllocate;
-        }
-      }
-      // Save to allocation map
-      for (const invId of linkedInvIds) {
-        const key = `${invId}-${stmt.trans_id}`;
-        allocationMap[key] = invoicePaidForStmt[invId] || 0;
-      }
-    }
-    
-    // Fetch items and linked statements for each invoice
-  const invoicesWithItems = await Promise.all(
-    rows.map(async (invoice) => {
-      const [items] = await conn.execute(
-        "SELECT item_code as product_code, product_number, item_name, quantity, rate as price_per_unit, image_url as imageUrl, hsn_code, taxable_value, cgst_amount, sgst_amount, igst_amount FROM invoice_items WHERE invoice_id = ?",
-        [invoice.id]
-      );
-      
-      // Get all related invoice IDs and invoice numbers: this invoice, parent, and children
-      let relatedInvoices = [{id: invoice.id, number: invoice.invoice_number}];
-      if (invoice.parent_id) {
-        // If this invoice has a parent, get parent and all siblings
-        const [parent] = await conn.execute(
-          "SELECT id, invoice_number FROM invoices WHERE id = ?",
-          [invoice.parent_id]
+    console.time("[invoice-table] main-query");
+    if (useSlowStatusSql) {
+      if (includeCount) {
+        console.time("[invoice-table] count");
+        const [[countRow]] = await conn.execute(
+          `SELECT COUNT(*) AS total FROM invoices ${statusWhere}`,
+          statusValues,
         );
-        if (parent.length > 0) {
-          relatedInvoices.push({id: parent[0].id, number: parent[0].invoice_number});
-        }
-        // Get all siblings (invoices with same parent)
-        const [siblings] = await conn.execute(
-          "SELECT id, invoice_number FROM invoices WHERE parent_id = ?",
-          [invoice.parent_id]
-        );
-        siblings.forEach(s => relatedInvoices.push({id: s.id, number: s.invoice_number}));
-      } else {
-        // If this invoice is a parent, get all its children
-        const [children] = await conn.execute(
-          "SELECT id, invoice_number FROM invoices WHERE parent_id = ?",
-          [invoice.id]
-        );
-        children.forEach(c => relatedInvoices.push({id: c.id, number: c.invoice_number}));
+        console.timeEnd("[invoice-table] count");
+        total = Number(countRow.total || 0);
+        totalPages = Math.ceil(total / limit);
       }
-      // Remove duplicates
-      const uniqueRelatedInvoices = [];
-      const seenInvoiceIds = new Set();
-      for (const inv of relatedInvoices) {
-        if (!seenInvoiceIds.has(inv.id)) {
-          seenInvoiceIds.add(inv.id);
-          uniqueRelatedInvoices.push(inv);
-        }
-      }
-      
-      // Fetch linked statements for all related invoices (by ID or number)
-      let linkedStatements = [];
-      for (const inv of uniqueRelatedInvoices) {
-        const [stmts] = await conn.execute(
-          "SELECT id, trans_id, date, description, amount, invoice_status, linked_purchase_ids FROM statements WHERE linked_purchase_ids LIKE ? OR invoice_number = ?",
-          [`%IP${inv.id}%`, inv.number]
-        );
-        linkedStatements.push(...stmts);
-      }
-      
-      // Remove duplicate statements (in case a statement is linked to multiple related invoices)
-      const uniqueLinkedStatements = [];
-      const seenStmtIds = new Set();
-      for (const stmt of linkedStatements) {
-        if (!seenStmtIds.has(stmt.id)) {
-          seenStmtIds.add(stmt.id);
-          uniqueLinkedStatements.push(stmt);
-        }
-      }
-      linkedStatements = uniqueLinkedStatements;
-      
-      // Calculate total linked amount using allocation map
-      const totalLinkedAmount = linkedStatements.reduce(
-        (sum, stmt) => {
-          const key = `${invoice.id}-${stmt.trans_id}`;
-          return sum + (allocationMap[key] || 0);
-        },
-        0
-      );
-      const newBalanceAmount = Math.max(0, Number(invoice.grand_total) - totalLinkedAmount);
 
-      // Derive payment_status dynamically from the runtime-calculated balance
-      // (DB payment_status may be stale if balance was recalculated via linked statements)
-      const grandTotal = Number(invoice.grand_total) || 0;
-      let derivedPaymentStatus = invoice.payment_status || "UNPAID";
-      if (grandTotal > 0) {
-        if (newBalanceAmount === 0) {
-          derivedPaymentStatus = "PAID";
-        } else if (newBalanceAmount < grandTotal) {
-          derivedPaymentStatus = "PARTIAL";
-        } else {
-          derivedPaymentStatus = "UNPAID";
-        }
-      }
-      
-      // Log for debugging
-      console.log(`Invoice ${invoice.id} (${invoice.invoice_number}) related invoices:`, uniqueRelatedInvoices);
-      console.log(`Linked statements:`, linkedStatements.map(s => ({id: s.id, trans_id: s.trans_id, invoice_number: s.invoice_number})));
-      
-      return {
+      rows = await fetchInvoicesWithStatusFilter(conn, {
+        where: statusWhere,
+        values: statusValues,
+        sortBy,
+        sortOrder,
+        limit,
+        offset,
+        derivedStatusSql,
+        latestOrderIdSql,
+      });
+    } else {
+      rows = await fetchInvoicesFast(conn, {
+        where,
+        values,
+        sortBy,
+        sortOrder,
+        limit,
+        offset,
+      });
+    }
+    console.timeEnd("[invoice-table] main-query");
+
+    let data;
+    if (!includeDetails) {
+      data = rows.map((invoice) => ({
         ...invoice,
-        items: items || [],
-        linkedStatements: linkedStatements || [],
-        balance_amount: newBalanceAmount,
-        payment_status: derivedPaymentStatus
-      };
-    })
-  );
+        items: [],
+        linkedStatements: [],
+      }));
+    } else {
+      console.time("[invoice-table] enrich");
+      data = await enrichInvoicesWithDetails(conn, rows);
+      console.timeEnd("[invoice-table] enrich");
+    }
+
+    const hasMore = rows.length === limit;
+    console.timeEnd("[invoice-table] total");
 
     return NextResponse.json({
       success: true,
-      data: invoicesWithItems,
+      data,
       meta: {
         page,
         limit,
         total,
         totalPages,
+        hasMore,
       },
     });
   } catch (err) {

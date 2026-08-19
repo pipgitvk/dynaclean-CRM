@@ -14,6 +14,31 @@ function keyFor(name, customerId) {
   return n + "|" + c;
 }
 
+function buildCustomerNameLookup(custRows) {
+  const lookup = new Map();
+  for (const row of custRows) {
+    if (row.customer_id == null || String(row.customer_id).trim() === "") {
+      continue;
+    }
+    const names = [row.company, row.full_name, row.first_name].filter(Boolean);
+    for (const name of names) {
+      const normalized = String(name).trim().toLowerCase();
+      if (normalized) lookup.set(normalized, row.customer_id);
+    }
+  }
+  return lookup;
+}
+
+async function safeQuery(conn, label, sql, params = []) {
+  try {
+    const [rows] = await conn.execute(sql, params);
+    return rows;
+  } catch (e) {
+    console.warn(`[parties list] ${label}:`, e?.message);
+    return [];
+  }
+}
+
 export async function GET(req) {
   const payload = await getSessionPayload();
   if (!payload) {
@@ -21,9 +46,9 @@ export async function GET(req) {
   }
 
   try {
+    console.time("[parties-list] total");
     const conn = await getDbConnection();
 
-    // Map key = name.toLowerCase() + '|' + customer_id (or 'n_' + name if no cid)
     const rows = new Map();
 
     const addRow = (rawName, customerId, extras = {}) => {
@@ -38,23 +63,31 @@ export async function GET(req) {
           ...existing,
           ...Object.fromEntries(
             Object.entries(extras).filter(
-              ([, v]) => v != null && v !== "" && v !== 0
-            )
+              ([, v]) => v != null && v !== "" && v !== 0,
+            ),
           ),
         });
       }
     };
 
-    // ── Per-name aggregates (no customer_id granularity) ──────────────
     const manualDrByName = new Map();
     const manualCrByName = new Map();
     const invoicesByName = new Map();
 
-    // ── 1a. INVOICES — name-level total (exact same filter as buildLedgerForParty)
-    // buildLedgerForParty matches invoices by NAME ONLY, so use name-level sums
-    // for the invoice/receivable side of every row with that name.
-    try {
-      const [invNameRows] = await conn.execute(
+    console.time("[parties-list] queries");
+    const [
+      invNameRows,
+      invBuyerRows,
+      custRows,
+      psrRows,
+      spareRows,
+      leRows,
+      retLedgerRows,
+      cnRows,
+    ] = await Promise.all([
+      safeQuery(
+        conn,
+        "invoices by name",
         `SELECT
            TRIM(i.customer_name) AS buyer_name,
            COUNT(*) AS invoice_count,
@@ -68,82 +101,41 @@ export async function GET(req) {
          WHERE i.customer_name IS NOT NULL
            AND TRIM(i.customer_name) != ''
            AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
-         GROUP BY TRIM(i.customer_name)`
-      );
-      for (const r of invNameRows) {
-        invoicesByName.set(String(r.buyer_name).trim().toLowerCase(), {
-          phone: r.customer_phone || undefined,
-          billing_address: r.billing_address || undefined,
-          gstin: r.gstin || undefined,
-          _invTotal: Number(r.total_amount || 0),
-          _invPaid: Number(r.total_paid || 0),
-          _invBalance: Number(r.total_balance_amount || 0),
-          _invCount: Number(r.invoice_count || 0),
-        });
-      }
-    } catch (e) {
-      console.warn("[parties list] invoices by name:", e?.message);
-    }
-
-    // ── 1b. INVOICE BUYERS — authoritative grouping per (name, customer_id)
-    // Only used to seed the distinct (name, cid) rows, no amount aggregation here.
-    try {
-      const [invBuyerRows] = await conn.execute(
-        `SELECT DISTINCT
-           COALESCE(i.customer_id, c.customer_id) AS customer_id,
+         GROUP BY TRIM(i.customer_name)`,
+      ),
+      safeQuery(
+        conn,
+        "invoice buyers",
+        `SELECT
+           i.customer_id,
            TRIM(i.customer_name) AS buyer_name,
            MAX(NULLIF(TRIM(i.customer_phone), '')) AS customer_phone,
            MAX(NULLIF(TRIM(i.billing_address), '')) AS billing_address,
            MAX(NULLIF(TRIM(i.gst_number), '')) AS gstin
          FROM invoices i
-         LEFT JOIN customers c
-           ON LOWER(TRIM(CONCAT(c.first_name, ' ', COALESCE(c.last_name, '')))) = LOWER(TRIM(i.customer_name))
-           OR LOWER(TRIM(c.company)) = LOWER(TRIM(i.customer_name))
-           OR LOWER(TRIM(c.first_name)) = LOWER(TRIM(i.customer_name))
          WHERE i.customer_name IS NOT NULL
            AND TRIM(i.customer_name) != ''
            AND ${EXCLUDE_PROFORMA_INVOICE_SQL_I}
-         GROUP BY TRIM(i.customer_name), COALESCE(i.customer_id, c.customer_id)`
-      );
-      for (const r of invBuyerRows) {
-        addRow(r.buyer_name, r.customer_id, {
-          phone: r.customer_phone || undefined,
-          billing_address: r.billing_address || undefined,
-          gstin: r.gstin || undefined,
-        });
-      }
-    } catch (e) {
-      console.warn("[parties list] invoice buyers:", e?.message);
-    }
-
-    // ── 2. Customers table — (name, customer_id) pair
-    try {
-      const [custRows] = await conn.execute(
+         GROUP BY TRIM(i.customer_name), i.customer_id`,
+      ),
+      safeQuery(
+        conn,
+        "customers",
         `SELECT
            customer_id,
            TRIM(company) AS company,
            TRIM(CONCAT_WS(' ', first_name, last_name)) AS full_name,
+           TRIM(first_name) AS first_name,
            phone,
            address AS billing_address,
            gstin
          FROM customers
          WHERE (company IS NOT NULL AND TRIM(company) <> '')
-            OR (first_name IS NOT NULL AND TRIM(first_name) <> '')`
-      );
-      for (const r of custRows) {
-        addRow(r.company || r.full_name, r.customer_id, {
-          phone: r.phone,
-          billing_address: r.billing_address,
-          gstin: r.gstin,
-        });
-      }
-    } catch (e) {
-      console.warn("[parties list] customers:", e?.message);
-    }
-
-    // ── 3. product_stock_request — suppliers, group by (name, cid)
-    try {
-      const [psrRows] = await conn.execute(
+            OR (first_name IS NOT NULL AND TRIM(first_name) <> '')`,
+      ),
+      safeQuery(
+        conn,
+        "product_stock_request",
         `SELECT
            TRIM(client_company_name) AS client_company_name,
            TRIM(client_name) AS client_name,
@@ -162,24 +154,11 @@ export async function GET(req) {
            TRIM(client_number),
            TRIM(client_gstin),
            TRIM(customer_address),
-           customer_id`
-      );
-      for (const r of psrRows) {
-        addRow(r.client_company_name || r.client_name, r.customer_id, {
-          phone: r.client_number,
-          gstin: r.client_gstin,
-          billing_address: r.customer_address,
-          _psrTotal: Number(r.total_purchase || 0),
-          _psrCount: Number(r.purchase_count || 0),
-        });
-      }
-    } catch (e) {
-      console.warn("[parties list] psr:", e?.message);
-    }
-
-    // ── 4. spare_stock_request
-    try {
-      const [spareRows] = await conn.execute(
+           customer_id`,
+      ),
+      safeQuery(
+        conn,
+        "spare_stock_request",
         `SELECT
            TRIM(client_company_name) AS client_company_name,
            TRIM(client_name) AS client_name,
@@ -198,71 +177,30 @@ export async function GET(req) {
            TRIM(client_number),
            TRIM(client_gstin),
            TRIM(customer_address),
-           customer_id`
-      );
-      for (const r of spareRows) {
-        const nm = r.client_company_name || r.client_name;
-        const k = keyFor(nm, r.customer_id);
-        addRow(nm, r.customer_id, {
-          phone: r.client_number,
-          gstin: r.client_gstin,
-          billing_address: r.customer_address,
-        });
-        const existing = rows.get(k);
-        if (existing) {
-          existing._spareTotal =
-            Number(existing._spareTotal || 0) + Number(r.total_purchase || 0);
-        }
-      }
-    } catch (_) {
-      // table may not exist
-    }
-
-    // ── 5. ledger_entries — per buyer_name (no cid), also fill manual maps
-    try {
-      const [leRows] = await conn.execute(
+           customer_id`,
+      ),
+      safeQuery(
+        conn,
+        "ledger_entries",
         `SELECT
            TRIM(buyer_name) AS buyer_name,
            COALESCE(SUM(debit), 0) AS dr,
            COALESCE(SUM(credit), 0) AS cr
          FROM ledger_entries
          WHERE buyer_name IS NOT NULL AND TRIM(buyer_name) <> ''
-         GROUP BY TRIM(buyer_name)`
-      );
-      for (const r of leRows) {
-        const nm = String(r.buyer_name).trim();
-        const nmLow = nm.toLowerCase();
-        manualDrByName.set(nmLow, Number(r.dr) || 0);
-        manualCrByName.set(nmLow, Number(r.cr) || 0);
-        // Also ensure a row exists for this name (customer_id = null bucket)
-        // only if no rows exist for this name at all
-        const hasAny = Array.from(rows.keys()).some((k) =>
-          k.startsWith(nmLow + "|")
-        );
-        if (!hasAny) addRow(nm, null, {});
-      }
-    } catch (e) {
-      console.warn("[parties list] ledger_entries:", e?.message);
-    }
-
-    // ── 6. Return Completed credit notes (warehouse-in done)
-    const returnCrByName = new Map();
-    const returnCrByCid = new Map();
-    try {
-      const existingReturnVch = new Set();
-      try {
-        const [retRows] = await conn.execute(
-          `SELECT LOWER(TRIM(buyer_name)) AS buyer, LOWER(TRIM(vch_no)) AS vch_no
-           FROM ledger_entries
-           WHERE vch_type IN ('Return', 'Return Completed')
-             AND buyer_name IS NOT NULL`
-        );
-        for (const r of retRows) {
-          existingReturnVch.add(`${r.buyer || ""}|${r.vch_no || ""}`);
-        }
-      } catch (_) {}
-
-      const [cnRows] = await conn.execute(
+         GROUP BY TRIM(buyer_name)`,
+      ),
+      safeQuery(
+        conn,
+        "return ledger vch",
+        `SELECT LOWER(TRIM(buyer_name)) AS buyer, LOWER(TRIM(vch_no)) AS vch_no
+         FROM ledger_entries
+         WHERE vch_type IN ('Return', 'Return Completed')
+           AND buyer_name IS NOT NULL`,
+      ),
+      safeQuery(
+        conn,
+        "credit_notes warehouse",
         `SELECT
            cn.id,
            cn.grand_total,
@@ -278,42 +216,121 @@ export async function GET(req) {
             = CAST(no.order_id AS CHAR) COLLATE utf8mb4_unicode_ci
          LEFT JOIN quotations_records qr
            ON no.quote_number = qr.quote_number
-         WHERE COALESCE(no.warehouse_in_done, 0) = 1`
-      );
+         WHERE COALESCE(no.warehouse_in_done, 0) = 1`,
+      ),
+    ]);
+    console.timeEnd("[parties-list] queries");
 
-      for (const r of cnRows) {
-        const names = [r.cn_company, r.qr_company, r.client_name]
-          .filter(Boolean)
-          .map((s) => String(s).trim().toLowerCase());
-        const vchNos = [r.invoice_no, r.credit_note_number]
-          .filter(Boolean)
-          .map((s) => String(s).trim().toLowerCase());
-        const alreadyInLedger = names.some((n) =>
-          vchNos.some((v) => existingReturnVch.has(`${n}|${v}`))
-        );
-        if (alreadyInLedger) continue;
+    console.time("[parties-list] merge");
+    for (const r of invNameRows) {
+      invoicesByName.set(String(r.buyer_name).trim().toLowerCase(), {
+        phone: r.customer_phone || undefined,
+        billing_address: r.billing_address || undefined,
+        gstin: r.gstin || undefined,
+        _invTotal: Number(r.total_amount || 0),
+        _invPaid: Number(r.total_paid || 0),
+        _invBalance: Number(r.total_balance_amount || 0),
+        _invCount: Number(r.invoice_count || 0),
+      });
+    }
 
-        const amt = Number(r.grand_total) || 0;
-        if (amt <= 0) continue;
+    const customerNameLookup = buildCustomerNameLookup(custRows);
 
-        const primaryName = (
-          r.cn_company ||
-          r.qr_company ||
-          r.client_name ||
-          ""
-        )
-          .trim()
-          .toLowerCase();
-        if (primaryName) {
-          returnCrByName.set(primaryName, (returnCrByName.get(primaryName) || 0) + amt);
-        }
-        if (r.customer_id != null && String(r.customer_id).trim() !== "") {
-          const ck = String(r.customer_id).trim();
-          returnCrByCid.set(ck, (returnCrByCid.get(ck) || 0) + amt);
-        }
+    for (const r of custRows) {
+      addRow(r.company || r.full_name, r.customer_id, {
+        phone: r.phone,
+        billing_address: r.billing_address,
+        gstin: r.gstin,
+      });
+    }
+
+    for (const r of invBuyerRows) {
+      const buyerName = String(r.buyer_name || "").trim();
+      let customerId = r.customer_id;
+      if (customerId == null || String(customerId).trim() === "") {
+        customerId = customerNameLookup.get(buyerName.toLowerCase());
       }
-    } catch (e) {
-      console.warn("[parties list] return completed:", e?.message);
+      addRow(buyerName, customerId, {
+        phone: r.customer_phone || undefined,
+        billing_address: r.billing_address || undefined,
+        gstin: r.gstin || undefined,
+      });
+    }
+
+    for (const r of psrRows) {
+      addRow(r.client_company_name || r.client_name, r.customer_id, {
+        phone: r.client_number,
+        gstin: r.client_gstin,
+        billing_address: r.customer_address,
+        _psrTotal: Number(r.total_purchase || 0),
+        _psrCount: Number(r.purchase_count || 0),
+      });
+    }
+
+    for (const r of spareRows) {
+      const nm = r.client_company_name || r.client_name;
+      const k = keyFor(nm, r.customer_id);
+      addRow(nm, r.customer_id, {
+        phone: r.client_number,
+        gstin: r.client_gstin,
+        billing_address: r.customer_address,
+      });
+      const existing = rows.get(k);
+      if (existing) {
+        existing._spareTotal =
+          Number(existing._spareTotal || 0) + Number(r.total_purchase || 0);
+      }
+    }
+
+    for (const r of leRows) {
+      const nm = String(r.buyer_name).trim();
+      const nmLow = nm.toLowerCase();
+      manualDrByName.set(nmLow, Number(r.dr) || 0);
+      manualCrByName.set(nmLow, Number(r.cr) || 0);
+      const hasAny = Array.from(rows.keys()).some((k) => k.startsWith(nmLow + "|"));
+      if (!hasAny) addRow(nm, null, {});
+    }
+
+    const returnCrByName = new Map();
+    const returnCrByCid = new Map();
+    const existingReturnVch = new Set();
+    for (const r of retLedgerRows) {
+      existingReturnVch.add(`${r.buyer || ""}|${r.vch_no || ""}`);
+    }
+
+    for (const r of cnRows) {
+      const names = [r.cn_company, r.qr_company, r.client_name]
+        .filter(Boolean)
+        .map((s) => String(s).trim().toLowerCase());
+      const vchNos = [r.invoice_no, r.credit_note_number]
+        .filter(Boolean)
+        .map((s) => String(s).trim().toLowerCase());
+      const alreadyInLedger = names.some((n) =>
+        vchNos.some((v) => existingReturnVch.has(`${n}|${v}`)),
+      );
+      if (alreadyInLedger) continue;
+
+      const amt = Number(r.grand_total) || 0;
+      if (amt <= 0) continue;
+
+      const primaryName = (
+        r.cn_company ||
+        r.qr_company ||
+        r.client_name ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+      if (primaryName) {
+        returnCrByName.set(
+          primaryName,
+          (returnCrByName.get(primaryName) || 0) + amt,
+        );
+      }
+      if (r.customer_id != null && String(r.customer_id).trim() !== "") {
+        const ck = String(r.customer_id).trim();
+        returnCrByCid.set(ck, (returnCrByCid.get(ck) || 0) + amt);
+      }
     }
 
     const partiesArr = Array.from(rows.values());
@@ -393,6 +410,8 @@ export async function GET(req) {
       });
     }
 
+    console.timeEnd("[parties-list] merge");
+
     const filtered = out.filter((p) => Math.abs(Number(p.balance || 0)) > 0.01);
 
     filtered.sort((a, b) => {
@@ -406,6 +425,7 @@ export async function GET(req) {
       return ac.localeCompare(bc);
     });
 
+    console.timeEnd("[parties-list] total");
     return NextResponse.json({ success: true, parties: filtered });
   } catch (err) {
     console.error("[parties list GET]", err?.message);

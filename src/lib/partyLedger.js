@@ -44,6 +44,51 @@ function parseLinkedPurchaseIds(raw) {
   return keys;
 }
 
+async function fetchRelevantStatements(conn, {
+  invoiceIds = [],
+  invoiceNumbers = [],
+  transIds = [],
+  purchaseTokens = [],
+}) {
+  const where = [];
+  const values = [];
+
+  if (invoiceNumbers.length > 0) {
+    where.push(
+      `invoice_number IN (${invoiceNumbers.map(() => "?").join(",")})`,
+    );
+    values.push(...invoiceNumbers);
+  }
+
+  if (invoiceIds.length > 0) {
+    where.push(
+      `(${invoiceIds.map(() => "linked_purchase_ids LIKE ?").join(" OR ")})`,
+    );
+    values.push(...invoiceIds.map((id) => `%IP${id}%`));
+  }
+
+  if (transIds.length > 0) {
+    where.push(`trans_id IN (${transIds.map(() => "?").join(",")})`);
+    values.push(...transIds);
+  }
+
+  for (const token of purchaseTokens) {
+    where.push("linked_purchase_ids LIKE ?");
+    values.push(`%${token}%`);
+  }
+
+  if (where.length === 0) return [];
+
+  const [rows] = await conn.execute(
+    `SELECT id, trans_id, date, amount, description, type, linked_purchase_ids, invoice_number, invoice_status
+     FROM statements
+     WHERE ${where.join(" OR ")}
+     ORDER BY date ASC, id ASC`,
+    values,
+  );
+  return rows;
+}
+
 /**
  * Append Return Completed ledger rows from warehouse-in credit notes.
  * Shared by parties ledger, buyer invoice ledger, and company ledger.
@@ -247,16 +292,98 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
 
   const buyerInvoiceIds = new Set(invoices.map((i) => i.id));
   const buyerInvoiceNumbers = new Set(
-    invoices.map((i) => i.invoice_number).filter(Boolean)
+    invoices.map((i) => i.invoice_number).filter(Boolean),
   );
 
-  const [allStatements] = await conn.execute(
-    `SELECT id, trans_id, date, amount, description, type, linked_purchase_ids, invoice_number, invoice_status
-     FROM statements
-     ORDER BY date ASC, id ASC`
-  );
+  const purchaseSelect = `
+    SELECT
+      id,
+      COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
+      invoice_number,
+      net_amount,
+      client_name,
+      CASE
+        WHEN EXISTS (
+          SELECT 1 FROM spare_list sl
+          WHERE CAST(sl.id AS CHAR) = TRIM(CAST(product_code AS CHAR))
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM products_list pl
+          WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(product_code))
+        ) THEN 'spare'
+        ELSE 'product'
+      END AS purchase_source
+  `;
 
-  let statementRows = allStatements.filter((stmt) => {
+  const purchaseById = new Map();
+  const addPurchases = (rows) => {
+    for (const row of rows) {
+      const key = `${row.purchase_source}-${row.id}`;
+      if (!purchaseById.has(key)) purchaseById.set(key, row);
+    }
+  };
+
+  if (customerIdForCompany) {
+    const [pRows] = await conn.execute(
+      `${purchaseSelect}
+       FROM product_stock_request
+       WHERE customer_id = ?
+       ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
+      [customerIdForCompany],
+    );
+    addPurchases(pRows);
+    try {
+      const [spareRows] = await conn.execute(
+        `SELECT
+           id,
+           DATE(created_at) AS invoice_date,
+           NULL AS invoice_number,
+           net_amount,
+           client_name,
+           'spare' AS purchase_source
+         FROM spare_stock_request
+         WHERE customer_id = ?
+         ORDER BY created_at DESC, id DESC`,
+        [customerIdForCompany],
+      );
+      addPurchases(spareRows);
+    } catch (_) {}
+  }
+
+  const [supplierPurchases] = await conn.execute(
+    `${purchaseSelect}
+     FROM product_stock_request
+     WHERE TRIM(client_company_name) = ?
+     ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
+    [decodedCompany],
+  );
+  addPurchases(supplierPurchases);
+
+  const purchaseRows = Array.from(purchaseById.values());
+  const purchaseTokenSet = new Set();
+  const tokenToSource = {};
+  for (const purch of purchaseRows) {
+    const token =
+      purch.purchase_source === "spare" ? `PS${purch.id}` : `PP${purch.id}`;
+    purchaseTokenSet.add(token);
+    tokenToSource[token] = purch.purchase_source;
+  }
+
+  const transIdsFromInvoices = new Set();
+  for (const inv of invoices) {
+    for (const transId of parseTransIds(inv.linked_trans_ids)) {
+      transIdsFromInvoices.add(transId);
+    }
+  }
+
+  const relevantStatements = await fetchRelevantStatements(conn, {
+    invoiceIds: [...buyerInvoiceIds],
+    invoiceNumbers: [...buyerInvoiceNumbers],
+    transIds: [...transIdsFromInvoices],
+    purchaseTokens: [...purchaseTokenSet],
+  });
+
+  let statementRows = relevantStatements.filter((stmt) => {
     const inLinkedTransIds = invoices.some((inv) => {
       const invLinkedTransIds = parseTransIds(inv.linked_trans_ids);
       return invLinkedTransIds.includes(stmt.trans_id);
@@ -379,72 +506,6 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     }
   }
 
-  const purchaseSelect = `
-    SELECT
-      id,
-      COALESCE(invoice_date, DATE(created_at)) AS invoice_date,
-      invoice_number,
-      net_amount,
-      client_name,
-      CASE
-        WHEN EXISTS (
-          SELECT 1 FROM spare_list sl
-          WHERE CAST(sl.id AS CHAR) = TRIM(CAST(product_code AS CHAR))
-        )
-        AND NOT EXISTS (
-          SELECT 1 FROM products_list pl
-          WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(product_code))
-        ) THEN 'spare'
-        ELSE 'product'
-      END AS purchase_source
-  `;
-
-  const purchaseById = new Map();
-  const addPurchases = (rows) => {
-    for (const row of rows) {
-      const key = `${row.purchase_source}-${row.id}`;
-      if (!purchaseById.has(key)) purchaseById.set(key, row);
-    }
-  };
-
-  if (customerIdForCompany) {
-    const [pRows] = await conn.execute(
-      `${purchaseSelect}
-       FROM product_stock_request
-       WHERE customer_id = ?
-       ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
-      [customerIdForCompany]
-    );
-    addPurchases(pRows);
-    try {
-      const [spareRows] = await conn.execute(
-        `SELECT
-           id,
-           DATE(created_at) AS invoice_date,
-           NULL AS invoice_number,
-           net_amount,
-           client_name,
-           'spare' AS purchase_source
-         FROM spare_stock_request
-         WHERE customer_id = ?
-         ORDER BY created_at DESC, id DESC`,
-        [customerIdForCompany]
-      );
-      addPurchases(spareRows);
-    } catch (_) {}
-  }
-
-  const [supplierPurchases] = await conn.execute(
-    `${purchaseSelect}
-     FROM product_stock_request
-     WHERE TRIM(client_company_name) = ?
-     ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
-    [decodedCompany]
-  );
-  addPurchases(supplierPurchases);
-
-  const purchaseRows = Array.from(purchaseById.values());
-
   const derivedLedger = [];
 
   for (const inv of invoices) {
@@ -480,17 +541,8 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     });
   }
 
-  const purchaseTokenSet = new Set();
-  const tokenToSource = {};
-  for (const purch of purchaseRows) {
-    const token =
-      purch.purchase_source === "spare" ? `PS${purch.id}` : `PP${purch.id}`;
-    purchaseTokenSet.add(token);
-    tokenToSource[token] = purch.purchase_source;
-  }
-
   const seenPaymentStmtIds = new Set();
-  for (const stmt of allStatements) {
+  for (const stmt of relevantStatements) {
     const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
     const matchingTokens = tokens.filter(
       (t) =>
