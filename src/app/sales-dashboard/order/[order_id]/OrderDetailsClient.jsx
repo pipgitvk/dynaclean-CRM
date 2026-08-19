@@ -360,37 +360,103 @@ function FileSection({ label, file }) {
 }
 
 function DocCell({ label, file, optional, required }) {
-  let displayUrl = file;
-  if (file && file.startsWith('/uploads/')) {
-    const parts = file.split('/');
-    if (parts.length >= 3) {
-      const folder = parts[2];
-      const filename = parts.slice(3).join('/');
-      displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
-    }
+  if (!file) {
+    return (
+      <div>
+        <p className="font-medium">{label}</p>
+        <p className={`italic ${required ? "text-red-600" : "text-gray-500"}`}>
+          {required ? "Required but not uploaded" : "Not uploaded"}
+        </p>
+      </div>
+    );
   }
-  return (
-    <div>
-      <p className="font-medium">{label}</p>
-      {file ? (
+
+  // Handle multiple files (comma-separated)
+  const fileUrls = file
+    .split(",")
+    .map((url) => url.trim())
+    .filter((url) => url.length > 0);
+
+  // If there's only one file, show simple view
+  if (fileUrls.length === 1) {
+    let displayUrl = fileUrls[0];
+    if (displayUrl.startsWith('/uploads/')) {
+      const parts = displayUrl.split('/');
+      if (parts.length >= 3) {
+        const folder = parts[2];
+        const filename = parts.slice(3).join('/');
+        displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
+      }
+    }
+    return (
+      <div>
+        <p className="font-medium">{label}</p>
         <div className="space-x-3">
           <a
             href={displayUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 underline"
+            className="text-blue-600 underline hover:text-blue-800"
           >
             View
           </a>
-          <a href={displayUrl} download className="text-blue-600 underline">
+          <a href={displayUrl} download className="text-blue-600 underline hover:text-blue-800">
             Download
           </a>
         </div>
-      ) : (
-        <p className={`italic ${required ? "text-red-600" : "text-gray-500"}`}>
-          {required ? "Required but not uploaded" : "Not uploaded"}
-        </p>
-      )}
+      </div>
+    );
+  }
+
+  // Multiple files - show dropdown/expandable list
+  return (
+    <div>
+      <p className="font-medium">{label}</p>
+      <details className="cursor-pointer">
+        <summary className="text-blue-600 underline hover:text-blue-800">
+          📁 {fileUrls.length} Files
+        </summary>
+        <div className="mt-2 space-y-2 bg-gray-50 p-2 rounded border border-gray-200">
+          {fileUrls.map((fileUrl, idx) => {
+            let displayUrl = fileUrl;
+            if (displayUrl.startsWith('/uploads/')) {
+              const parts = displayUrl.split('/');
+              if (parts.length >= 3) {
+                const folder = parts[2];
+                const filename = parts.slice(3).join('/');
+                displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
+              }
+            }
+            
+            // Extract filename from URL
+            const filename = fileUrl.split('/').pop() || `File ${idx + 1}`;
+            
+            return (
+              <div key={idx} className="flex items-center justify-between text-sm p-2 bg-white rounded">
+                <span className="truncate flex-1">{idx + 1}. {filename}</span>
+                <div className="space-x-2 flex-shrink-0">
+                  <a
+                    href={displayUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline hover:text-blue-800 text-xs"
+                  >
+                    View
+                  </a>
+                  <a
+                    href={displayUrl}
+                    download
+                    className="text-blue-600 underline hover:text-blue-800 text-xs"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </details>
     </div>
   );
+}
 }

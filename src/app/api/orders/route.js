@@ -216,7 +216,7 @@ export async function POST(req) {
       );
     }
 
-    if (!files.paymentProof || !files.paymentProof[0]) {
+    if (!files.paymentProofFiles || files.paymentProofFiles.length === 0) {
       return NextResponse.json(
         { error: "Payment Proof is required" },
         { status: 400 },
@@ -224,18 +224,27 @@ export async function POST(req) {
     }
 
     // 3. Save files locally instead of uploading to Cloudinary
-    let poFileUrl = "";
-    if (files.poFile && files.poFile[0]) {
-      poFileUrl = await saveFileLocally(files.poFile[0], "po_files");
+    // Handle multiple PO files
+    let poFileUrls = [];
+    if (files.poFiles && files.poFiles.length > 0) {
+      for (const file of files.poFiles) {
+        const url = await saveFileLocally(file, "po_files");
+        poFileUrls.push(url);
+      }
     }
 
-    let paymentProofUrl = "";
-    if (files.paymentProof && files.paymentProof[0]) {
-      paymentProofUrl = await saveFileLocally(
-        files.paymentProof[0],
-        "payment_files",
-      );
+    // Handle multiple payment proof files
+    let paymentProofUrls = [];
+    if (files.paymentProofFiles && files.paymentProofFiles.length > 0) {
+      for (const file of files.paymentProofFiles) {
+        const url = await saveFileLocally(file, "payment_files");
+        paymentProofUrls.push(url);
+      }
     }
+
+    // Join URLs into comma-separated strings for storage
+    const poFileUrl = poFileUrls.join(", ");
+    const paymentProofUrl = paymentProofUrls.join(", ");
 
     // 4. Approval Logic
     const isAutoApproved = ["SUPERADMIN"].includes(userRole);

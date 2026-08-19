@@ -6,8 +6,8 @@ export default function OrderForm({ quotation, reset }) {
   const { user } = useUser();
   const isGemRole = user?.userRole === "GEM";
   const [formData, setFormData] = useState({
-    paymentProof: null,
-    poFile: null,
+    paymentProofFiles: [],
+    poFiles: [],
     salesRemark: "",
     clientDeliveryDate: "",
     poNumber: "",
@@ -18,6 +18,8 @@ export default function OrderForm({ quotation, reset }) {
   });
   const [hasPO, setHasPO] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [paymentProofPreviews, setPaymentProofPreviews] = useState([]);
+  const [poFilePreviews, setPoFilePreviews] = useState([]);
 
   // Compute duedate = today + payment_term_days
   const computedDueDateISO = useMemo(() => {
@@ -44,12 +46,72 @@ export default function OrderForm({ quotation, reset }) {
 
   console.log("this is the quotation: ", quotation);
 
+  // Handle multiple payment proof uploads
+  const handlePaymentProofChange = (e) => {
+    const files = Array.from(e.target.files);
+    setFormData((fd) => ({ ...fd, paymentProofFiles: files }));
+    
+    // Generate previews
+    const previews = files.map((file) => ({
+      name: file.name,
+      size: (file.size / 1024).toFixed(2),
+      type: file.type,
+      url: URL.createObjectURL(file),
+    }));
+    setPaymentProofPreviews(previews);
+  };
+
+  // Handle multiple PO file uploads
+  const handlePoFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    setFormData((fd) => ({ ...fd, poFiles: files }));
+    
+    // Generate previews
+    const previews = files.map((file) => ({
+      name: file.name,
+      size: (file.size / 1024).toFixed(2),
+      type: file.type,
+      url: URL.createObjectURL(file),
+    }));
+    setPoFilePreviews(previews);
+  };
+
+  // Remove payment proof file
+  const removePaymentProofFile = (index) => {
+    setFormData((fd) => ({
+      ...fd,
+      paymentProofFiles: fd.paymentProofFiles.filter((_, i) => i !== index),
+    }));
+    const newPreviews = paymentProofPreviews.filter((_, i) => i !== index);
+    setPaymentProofPreviews(newPreviews);
+  };
+
+  // Remove PO file
+  const removePoFile = (index) => {
+    setFormData((fd) => ({
+      ...fd,
+      poFiles: fd.poFiles.filter((_, i) => i !== index),
+    }));
+    const newPreviews = poFilePreviews.filter((_, i) => i !== index);
+    setPoFilePreviews(newPreviews);
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (submitting) return;
+
     const fd = new FormData();
     for (const key in formData) {
-      if (formData[key] !== null) fd.append(key, formData[key]);
+      if (key === "paymentProofFiles" || key === "poFiles") {
+        // Handle arrays of files
+        if (formData[key].length > 0) {
+          formData[key].forEach((file, idx) => {
+            fd.append(key, file);
+          });
+        }
+      } else if (formData[key] !== null) {
+        fd.append(key, formData[key]);
+      }
     }
     // Include computed duedate
     if (computedDueDateISO) fd.append("duedate", computedDueDateISO);
@@ -347,28 +409,78 @@ export default function OrderForm({ quotation, reset }) {
           </div>
           {hasPO === 'yes' && (
             <div>
-              <label className="block font-medium mb-1">PO File *</label>
+              <label className="block font-medium mb-1">PO Files * (Multiple)</label>
               <input
                 type="file"
                 required
-                onChange={(e) =>
-                  setFormData((fd) => ({ ...fd, poFile: e.target.files[0] }))
-                }
-                className="w-full"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                onChange={handlePoFileChange}
+                className="w-full mb-2"
               />
+              <p className="text-xs text-gray-500 mb-2">Upload images, PDFs, or documents</p>
+              
+              {/* PO Files Preview */}
+              {poFilePreviews.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  <p className="font-semibold text-sm">Uploaded PO Files:</p>
+                  <div className="space-y-1">
+                    {poFilePreviews.map((preview, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-gray-100 p-2 rounded">
+                        <div className="flex-1">
+                          <p className="text-xs font-medium truncate">{preview.name}</p>
+                          <p className="text-xs text-gray-600">{preview.size} KB</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removePoFile(idx)}
+                          className="ml-2 text-red-600 hover:text-red-800 font-medium text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
         <div>
-          <label className="block font-medium mb-1">Payment Proof *</label>
+          <label className="block font-medium mb-1">Payment Proof * (Multiple)</label>
           <input
             type="file"
             required
-            onChange={(e) =>
-              setFormData((fd) => ({ ...fd, paymentProof: e.target.files[0] }))
-            }
-            className="w-full"
+            multiple
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+            onChange={handlePaymentProofChange}
+            className="w-full mb-2"
           />
+          <p className="text-xs text-gray-500 mb-2">Upload images, PDFs, or documents</p>
+          
+          {/* Payment Proof Files Preview */}
+          {paymentProofPreviews.length > 0 && (
+            <div className="mt-2 space-y-2">
+              <p className="font-semibold text-sm">Uploaded Payment Proofs:</p>
+              <div className="space-y-1">
+                {paymentProofPreviews.map((preview, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-gray-100 p-2 rounded">
+                    <div className="flex-1">
+                      <p className="text-xs font-medium truncate">{preview.name}</p>
+                      <p className="text-xs text-gray-600">{preview.size} KB</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePaymentProofFile(idx)}
+                      className="ml-2 text-red-600 hover:text-red-800 font-medium text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
