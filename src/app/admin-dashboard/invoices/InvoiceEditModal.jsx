@@ -104,6 +104,7 @@ export default function InvoiceEditModal({
     due_date: "",
     amount_paid: 0,
     payment_status: "UNPAID",
+    status: "",
     quotation_id: "",
     buyers_order_no: "",
     eway_bill_no: "",
@@ -194,6 +195,7 @@ export default function InvoiceEditModal({
           due_date: dateInputValue(inv.due_date) || "",
           amount_paid: Number(inv.amount_paid) || 0,
           payment_status: inv.payment_status || "UNPAID",
+          status: inv.status || "",
           quotation_id:
             inv.quotation_id != null && inv.quotation_id !== ""
               ? String(inv.quotation_id)
@@ -328,6 +330,7 @@ export default function InvoiceEditModal({
         amount_paid: amountPaid,
         balance_amount: balanceAmount,
         payment_status: finalPaymentStatus,
+        status: form.status || null,
         notes: notes || null,
         terms_conditions: editableTerms || null,
         buyers_order_no: form.buyers_order_no?.trim() || null,
@@ -727,6 +730,23 @@ export default function InvoiceEditModal({
                     <option value="UNPAID">Unpaid</option>
                     <option value="PARTIAL">Partial</option>
                     <option value="PAID">Paid</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-gray-600 mb-1">
+                    Status
+                  </label>
+                  <select
+                    className="w-full border rounded px-2 py-1.5"
+                    value={form.status}
+                    onChange={(e) =>
+                      setForm({ ...form, status: e.target.value })
+                    }
+                  >
+                    <option value="">Select Status</option>
+                    <option value="PAID">Paid</option>
+                    <option value="PARTIAL PAID">Partial Paid</option>
+                    <option value="CANCELLED">Cancelled</option>
                   </select>
                 </div>
               </div>

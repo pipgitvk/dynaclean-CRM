@@ -50,6 +50,7 @@ export default function InvoiceForm({ invoiceNumber, invoiceDate, invoiceType = 
     state_code: "",
     customer_id: "",
     payment_status: "UNPAID",
+    status: "",
     due_date: "",
     amount_paid: 0,
     buyers_order_no: "",
@@ -319,6 +320,7 @@ Thanks for doing business with us!`,
         amount_paid: amountPaid,
         balance_amount: balanceAmount < 0 ? 0 : balanceAmount,
         payment_status: finalPaymentStatus,
+        status: form.status || null,
         notes: notes,
         terms_conditions: editableTerms,
         cgst_rate: cgstRate,
@@ -809,6 +811,22 @@ const fetchQuotationAndFill = async () => {
             <option value="UNPAID">Unpaid</option>
             <option value="PARTIAL">Partial</option>
             <option value="PAID">Paid</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-sm text-gray-600">Status</label>
+          <select
+            className="input w-full"
+            value={form.status}
+            onChange={(e) =>
+              setForm({ ...form, status: e.target.value })
+            }
+          >
+            <option value="">Select Status</option>
+            <option value="PAID">Paid</option>
+            <option value="PARTIAL PAID">Partial Paid</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
 

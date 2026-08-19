@@ -75,6 +75,7 @@ export async function GET(req) {
     const fromDate = searchParams.get("fromDate");
     const toDate = searchParams.get("toDate");
     const invoiceType = searchParams.get("invoiceType");
+    const statusFilter = searchParams.get("status");
 
     const conn = await getDbConnection();
 
@@ -102,13 +103,78 @@ export async function GET(req) {
       values.push(invoiceType);
     }
 
+    const latestOrderStatusSql = `
+      (
+        SELECT
+          CASE
+            WHEN no.is_cancelled = 1
+                 OR LOWER(COALESCE(no.approval_status, '')) = 'rejected'
+            THEN 'CANCELLED'
+            WHEN LOWER(COALESCE(no.payment_status, '')) IN ('paid')
+            THEN 'PAID'
+            WHEN LOWER(COALESCE(no.payment_status, '')) IN ('partial', 'partial paid', 'partially paid')
+            THEN 'PARTIAL PAID'
+            ELSE NULL
+          END
+        FROM neworder no
+        LEFT JOIN quotations_records qr
+          ON qr.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
+        WHERE (
+          no.invoice_number COLLATE utf8mb4_unicode_ci = invoices.invoice_number COLLATE utf8mb4_unicode_ci
+          OR no.quote_number COLLATE utf8mb4_unicode_ci = CAST(invoices.quotation_id AS CHAR) COLLATE utf8mb4_unicode_ci
+          OR CAST(qr.\`S.No.\` AS CHAR) = CAST(invoices.quotation_id AS CHAR)
+        )
+        ORDER BY
+          COALESCE(no.invoice_date, DATE(no.created_at)) DESC,
+          no.created_at DESC,
+          no.id DESC
+        LIMIT 1
+      )
+    `;
+
+    const latestOrderIdSql = `
+      (
+        SELECT no.order_id
+        FROM neworder no
+        LEFT JOIN quotations_records qr
+          ON qr.quote_number COLLATE utf8mb4_unicode_ci = no.quote_number COLLATE utf8mb4_unicode_ci
+        WHERE (
+          no.invoice_number COLLATE utf8mb4_unicode_ci = invoices.invoice_number COLLATE utf8mb4_unicode_ci
+          OR no.quote_number COLLATE utf8mb4_unicode_ci = CAST(invoices.quotation_id AS CHAR) COLLATE utf8mb4_unicode_ci
+          OR CAST(qr.\`S.No.\` AS CHAR) = CAST(invoices.quotation_id AS CHAR)
+        )
+        ORDER BY
+          COALESCE(no.invoice_date, DATE(no.created_at)) DESC,
+          no.created_at DESC,
+          no.id DESC
+        LIMIT 1
+      )
+    `;
+
+    const derivedStatusSql = `
+      COALESCE(
+        ${latestOrderStatusSql},
+        CASE
+          WHEN COALESCE(status, '') <> '' THEN status
+          WHEN COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) = 0 AND grand_total > 0 THEN 'PAID'
+          WHEN COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) > 0
+               AND COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) < grand_total THEN 'PARTIAL PAID'
+          ELSE NULL
+        END
+      )
+    `;
+
+    if (statusFilter) {
+      where += ` AND (${derivedStatusSql}) = ?`;
+      values.push(statusFilter);
+    }
+
     // 📊 Count
     const [[countRow]] = await conn.execute(
       `SELECT COUNT(*) AS total FROM invoices ${where}`,
       values,
     );
-
-    const total = countRow.total;
+    const total = Number(countRow.total || 0);
     const totalPages = Math.ceil(total / limit);
 
     // Check if employee_name column exists in invoices table
@@ -122,6 +188,15 @@ export async function GET(req) {
       } catch (__) {
         console.error("Failed to add employee_name column to invoices table");
       }
+    }
+
+    // Ensure status column exists in invoices table
+    try {
+      await conn.execute("SELECT status FROM invoices LIMIT 1");
+    } catch (_) {
+      try {
+        await conn.execute("ALTER TABLE invoices ADD COLUMN status ENUM('PAID', 'PARTIAL PAID', 'CANCELLED') NULL DEFAULT NULL");
+      } catch (__) {}
     }
 
     // Data buyer_name
@@ -142,7 +217,9 @@ export async function GET(req) {
         amount_paid,
         COALESCE(balance_amount, grand_total - COALESCE(amount_paid, 0)) AS balance_amount,
         created_at,
-        type
+        type,
+        (${derivedStatusSql}) AS status,
+        (${latestOrderIdSql}) AS order_id
       FROM invoices
       ${where}
       ORDER BY ${sortBy} ${sortOrder}
@@ -432,6 +509,7 @@ export async function POST(req) {
       sgst_rate: bodySgstRate = 0,
       igst_rate: bodyIgstRate = 0,
       invoice_type = "tax",
+      status: bodyStatus = null,
     } = body;
 
     const customerIdSql =
@@ -589,9 +667,69 @@ export async function POST(req) {
           }
         }
 
+        // Ensure status column exists
+        let statusColumnExists = false;
+        try {
+          await conn.execute("SELECT status FROM invoices LIMIT 1");
+          statusColumnExists = true;
+        } catch (_) {
+          try {
+            await conn.execute("ALTER TABLE invoices ADD COLUMN status ENUM('PAID', 'PARTIAL PAID', 'CANCELLED') NULL DEFAULT NULL");
+            statusColumnExists = true;
+          } catch (__) {}
+        }
+
         // Conditionally build INSERT statement based on whether employee_name column exists
         let insertQuery, insertValues;
-        if (employeeNameColumnExists) {
+        if (employeeNameColumnExists && statusColumnExists) {
+          insertQuery = `INSERT INTO invoices 
+           (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
+            customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, employee_name, state, state_code, 
+            subtotal, cgst, sgst, igst, total_tax, round_off, grand_total, amount_paid, balance_amount, 
+            payment_status, notes, terms_conditions, buyers_order_no, eway_bill_no, delivery_challan_no,
+            customer_id, linked_trans_ids, cgst_rate, sgst_rate, igst_rate, type, status, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+          insertValues = [
+            quotation_id,
+            finalInvoiceNumber,
+            serverInvoiceDate,
+            serverOrderDate,
+            due_date,
+            customer_name,
+            customer_email,
+            customer_phone,
+            billing_address,
+            shipping_address,
+            Consignee,
+            Consignee_Contact,
+            gst_number,
+            employeeName,
+            state,
+            state_code,
+            subtotal,
+            cgst,
+            sgst,
+            igst,
+            total_tax,
+            round_off || 0,
+            grand_total,
+            amount_paid,
+            balance_amount,
+            payment_status,
+            notes,
+            terms_conditions,
+            buyers_order_no,
+            eway_bill_no,
+            delivery_challan_no,
+            customerIdSql,
+            linkedTransIdsJson,
+            bodyCgstRate,
+            bodySgstRate,
+            bodyIgstRate,
+            invoice_type,
+            bodyStatus,
+          ];
+        } else if (employeeNameColumnExists) {
           insertQuery = `INSERT INTO invoices 
            (quotation_id, invoice_number, invoice_date, order_date, due_date, customer_name, customer_email, 
             customer_phone, billing_address, shipping_address, Consignee, Consignee_Contact, gst_number, employee_name, state, state_code, 
