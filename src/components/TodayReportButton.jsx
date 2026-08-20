@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, ArrowRight } from "lucide-react";
 
 export default function TodayReportButton() {
   const [allowed, setAllowed] = useState(true);
@@ -33,11 +33,19 @@ export default function TodayReportButton() {
   return (
     <Link
       href="/user-dashboard/today-reports"
-      className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 sm:gap-2 bg-blue-600 text-white text-[10px] sm:text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors shrink-0 whitespace-nowrap"
+      className="group flex h-[82px] min-w-[180px] items-center gap-3 rounded-2xl border border-indigo-200 bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
-      <FileText size={14} className="sm:w-4 sm:h-4" />
-      <span className="hidden sm:inline">Today Report</span>
-      <span className="sm:hidden">Report</span>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[11px] font-medium text-slate-500">Today Report</span>
+        <span className="text-2xl font-bold leading-tight text-slate-800">Open</span>
+        <span className="text-[11px] text-slate-400">Reports</span>
+      </div>
+      <div className="flex flex-col items-center gap-2">
+        <div className="rounded-xl bg-indigo-100 p-2 text-indigo-600">
+          <FileText size={16} />
+        </div>
+        <ArrowRight size={12} className="text-indigo-500 transition-transform group-hover:translate-x-0.5" />
+      </div>
     </Link>
   );
 }

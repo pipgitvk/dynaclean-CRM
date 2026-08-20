@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { DollarSign } from "lucide-react";
+import { DollarSign, ArrowRight } from "lucide-react";
 import dayjs from "dayjs";
 
 export default function PaymentPendingButton() {
@@ -46,16 +46,19 @@ export default function PaymentPendingButton() {
   return (
     <Link
       href="/sales-dashboard/reports/payment-pending"
-      className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 sm:gap-2 bg-red-600 text-white text-[10px] sm:text-xs font-medium rounded-lg hover:bg-red-700 transition-colors shrink-0 whitespace-nowrap relative"
+      className="group flex h-[82px] min-w-[180px] items-center gap-3 rounded-2xl border border-rose-200 bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
-      <DollarSign size={14} className="sm:w-4 sm:h-4" />
-      <span className="hidden sm:inline">Payment Pending</span>
-      <span className="sm:hidden">Pending</span>
-      {overdueCount > 0 && (
-        <span className="ml-1 inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 text-[9px] sm:text-xs font-bold bg-white text-red-600 rounded-full">
-          {overdueCount > 99 ? "99+" : overdueCount}
-        </span>
-      )}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[11px] font-medium text-slate-500">Payment Pending</span>
+        <span className="text-2xl font-bold leading-tight text-slate-800">{overdueCount > 99 ? "99+" : overdueCount}</span>
+        <span className="text-[11px] text-slate-400">Pending</span>
+      </div>
+      <div className="flex flex-col items-center gap-2">
+        <div className="rounded-xl bg-rose-100 p-2 text-rose-600">
+          <DollarSign size={16} />
+        </div>
+        <ArrowRight size={12} className="text-rose-500 transition-transform group-hover:translate-x-0.5" />
+      </div>
     </Link>
   );
 }

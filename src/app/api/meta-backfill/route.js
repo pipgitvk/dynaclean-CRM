@@ -1,5 +1,6 @@
 import { getDbConnection } from "@/lib/db";
-import { normalizePhone, PHONE_LAST10_WHERE } from "@/lib/phone-check";
+import { normalizePhone } from "@/lib/phone-check";
+import { importMetaLeadToCrm } from "@/lib/services/importMetaLeadToCrm";
 import { resolveTamilAssigneeUsername } from "@/lib/tamilAssigneeResolve";
 import {
   extractProductFromMetaFieldData,
@@ -375,21 +376,6 @@ export async function insertLeadIntoDb(lead, options = {}) {
     assignedTo = selectedRep.username;
   }
 
-  const now = new Date();
-
-  // Final safety: skip if phone already exists (last 10 digits only)
-  const normalizedLeadPhone = normalizePhone(lead.phone);
-  if (normalizedLeadPhone && normalizedLeadPhone.length === 10) {
-    const [rows] = await conn.execute(
-      `SELECT customer_id FROM customers WHERE ${PHONE_LAST10_WHERE} LIMIT 1`,
-      [normalizedLeadPhone],
-    );
-    if (rows.length) {
-      console.log("ℹ️ Skipping lead, phone already exists:", lead.phone);
-      return { skipped: true, reason: "phone_exists" };
-    }
-  }
-
   const {
     first_name,
     email,
@@ -399,60 +385,30 @@ export async function insertLeadIntoDb(lead, options = {}) {
     products_interest = "",
   } = lead;
 
-  // Store normalized phone (last 10 digits) when valid
-  const phoneToStore = (normalizedLeadPhone && normalizedLeadPhone.length === 10) ? normalizedLeadPhone : phone;
+  const importResult = await importMetaLeadToCrm({
+    first_name,
+    email,
+    phone,
+    address,
+    lead_campaign,
+    assignedTo,
+    products_interest,
+    followupNote: "Lead from Facebook ad (backfill)",
+    incrementLeadDistribution: !skipLeadDistributionUpdate,
+    duplicateMode: "skip",
+  });
 
-  const [customerResult] = await conn.execute(
-    `INSERT INTO customers (
-        first_name, email, phone, address, lead_campaign,
-        lead_source, sales_representative, assigned_to, status, date_created, products_interest
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      first_name,
-      email,
-      phoneToStore,
-      address || "",
-      lead_campaign,
-      assignedTo,
-      assignedTo,
-      "Automatic",
-      "New",
-      now,
-      products_interest,
-    ],
-  );
-
-  const customerId = await customerResult.insertId;
-
-  await conn.execute(
-    `INSERT INTO customers_followup (
-        customer_id, name, contact, next_followup_date, followed_by,
-        followed_date, communication_mode, notes, email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      customerId,
-      first_name,
-      phoneToStore,
-      null,
-      assignedTo,
-      now,
-      "Facebook",
-      "Lead from Facebook ad (backfill)",
-      email || "",
-    ],
-  );
-
-  if (!skipLeadDistributionUpdate) {
-    await conn.execute(
-      `UPDATE lead_distribution
-         SET assigned_count = assigned_count + 1,
-             last_assigned_at = ?
-       WHERE UPPER(TRIM(username)) = UPPER(?)`,
-      [now, assignedTo],
-    );
+  if (importResult.duplicate) {
+    console.log("ℹ️ Skipping lead, phone already exists:", lead.phone);
+    return { skipped: true, reason: "phone_exists" };
   }
 
-  return { skipped: false, customerId };
+  if (!importResult.imported) {
+    console.log("ℹ️ Skipping lead:", importResult.reason, lead.phone);
+    return { skipped: true, reason: importResult.reason || "not_imported" };
+  }
+
+  return { skipped: false, customerId: importResult.customerId };
 }
 
 // POST /api/meta-backfill

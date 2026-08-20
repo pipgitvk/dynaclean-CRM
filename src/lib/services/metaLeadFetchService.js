@@ -1,10 +1,9 @@
-const { getDbConnection } = require('../db');
 const { getActiveCredentials, updateCredentialSync } = require('../mysql/metaCredentialModel');
 const { createLead, getLeadByLeadgenId, markLeadAsImported } = require('../mysql/metaLeadModel');
 const { createSyncLog } = require('../mysql/metaSyncLogModel');
-const { normalizePhone, PHONE_LAST10_WHERE } = require('../phone-check');
+const { normalizePhone } = require('../phone-check');
 const { resolveAssigneeFromFormAssignments, resolveAssigneeFromLeadDistribution } = require('../leadDistributionResolver');
-const { handleDuplicateNotImportedLead } = require('./metaDuplicateLeadHandler');
+const { importMetaLeadToCrm } = require('./importMetaLeadToCrm');
 
 /**
  * Fetch leads from Meta Graph API for a specific form
@@ -99,123 +98,28 @@ async function resolveCampaignNameForAd(adId, token) {
 }
 
 /**
- * Check if lead already exists in customers table (MySQL)
+ * Import lead into CRM once per phone (locked against webhook/cron races).
  */
-async function checkLeadExistsInCRM(phone) {
-  if (!phone) return false;
-  
-  const normalizedPhone = normalizePhone(phone);
-  if (normalizedPhone.length !== 10) return false;
-  
-  try {
-    const conn = await getDbConnection();
-    const [rows] = await conn.execute(
-      `SELECT customer_id FROM customers WHERE ${PHONE_LAST10_WHERE} LIMIT 1`,
-      [normalizedPhone]
-    );
-    return rows.length > 0;
-  } catch (error) {
-    console.error('Error checking lead in CRM:', error);
-    return false;
-  }
-}
-
-/**
- * Check if lead already exists in meta_leads table (by leadgenId or phone)
- */
-async function checkLeadExistsInMetaLeads(leadgenId, phone) {
-  try {
-    const conn = await getDbConnection();
-    let query = 'SELECT id FROM meta_leads WHERE is_imported_to_crm = 1';
-    const params = [];
-
-    if (leadgenId) {
-      query += ' AND leadgen_id = ?';
-      params.push(leadgenId);
-    }
-
-    if (phone) {
-      const normalizedPhone = normalizePhone(phone);
-      if (normalizedPhone.length === 10) {
-        query += ` OR JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone_number')) IS NOT NULL AND RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone_number')), ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', ''), ',', ''), 10) = ?`;
-        params.push(normalizedPhone);
-      }
-    }
-
-    query += ' LIMIT 1';
-
-    const [rows] = await conn.execute(query, params);
-    return rows.length > 0;
-  } catch (error) {
-    console.error('Error checking lead in meta_leads:', error);
-    return false;
-  }
-}
-
-/**
- * Import lead into CRM (MySQL customers table)
- */
-async function importLeadToCRM(lead, assignedTo) {
-  const conn = await getDbConnection();
-  const now = new Date();
-  
-  const normalizedPhone = normalizePhone(lead.phone);
-  const phoneToStore = (normalizedPhone && normalizedPhone.length === 10) ? normalizedPhone : lead.phone;
-  
-  // ✅ Calculate next_followup_date: now + 2 hours
-  const nextFollowupDate = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-  
-  const [customerResult] = await conn.execute(
-    `INSERT INTO customers (
-        first_name, email, phone, address, lead_campaign,
-        lead_source, sales_representative, assigned_to, status, date_created, products_interest,
-        next_follow_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      lead.first_name,
-      lead.email,
-      phoneToStore,
-      lead.address || '',
-      'social_media',
-      assignedTo,
-      assignedTo,
-      'Automatic',
-      'New',
-      now,
-      lead.products_interest || '',
-      nextFollowupDate
-    ]
-  );
-  
-  const customerId = customerResult.insertId;
-
+async function importLeadToCRM(lead, assignedTo, formId = null) {
   const productInterest = String(lead.products_interest || '').trim();
   const followupNote = productInterest
     ? `Lead from Facebook ad (multi-credential). Product interest: ${productInterest}`
     : 'Lead from Facebook ad (multi-credential)';
-  
-  await conn.execute(
-    `INSERT INTO customers_followup (
-        customer_id, name, contact, next_followup_date, followed_by,
-        followed_date, communication_mode, notes, email
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      customerId,
-      lead.first_name,
-      phoneToStore,
-      nextFollowupDate,
-      assignedTo,
-      now,
-      'Facebook',
-      followupNote,
-      lead.email || ''
-    ]
-  );
+  const nextFollowupDate = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
-  // ❌ Do NOT insert into TL_followups on auto-import.
-  //    TL_followups is only populated when a TL manually follows up via the form.
-
-  return customerId;
+  return importMetaLeadToCrm({
+    first_name: lead.first_name,
+    email: lead.email,
+    phone: lead.phone,
+    address: lead.address,
+    assignedTo,
+    products_interest: lead.products_interest || '',
+    followupNote,
+    nextFollowupDate,
+    formId,
+    incrementLeadDistribution: false,
+    duplicateMode: 'handler',
+  });
 }
 
 /**
@@ -317,54 +221,40 @@ async function syncLeadsForCredential(credential, options = {}) {
 
         // Auto-import to CRM if requested
         if (autoImport) {
-          const existsInCRM = await checkLeadExistsInCRM(parsedLead.phone);
-          const existsInMetaLeads = await checkLeadExistsInMetaLeads(leadgenId, parsedLead.phone);
+          try {
+            const importResult = await importLeadToCRM(
+              {
+                ...parsedLead,
+                products_interest: productsInterest
+              },
+              assignedTo,
+              formId
+            );
 
-          if (!existsInCRM && !existsInMetaLeads && parsedLead.phone) {
-            try {
-              const customerId = await importLeadToCRM(
-                {
-                  ...parsedLead,
-                  products_interest: productsInterest
-                },
-                assignedTo
-              );
-
-              await markLeadAsImported(leadgenId, customerId);
-
+            if (importResult.imported) {
+              await markLeadAsImported(leadgenId, importResult.customerId);
               leadsImported++;
               console.log(`✅ Imported lead ${leadgenId} to CRM (phone: ${parsedLead.phone})`);
-            } catch (err) {
-              console.error('Error importing lead to CRM:', err);
-            }
-          } else {
-            if (existsInCRM && parsedLead.phone) {
-              try {
-                const duplicateResult = await handleDuplicateNotImportedLead({
-                  phone: parsedLead.phone,
-                  formId,
-                });
-
-                if (duplicateResult.handled) {
-                  console.log(
-                    `♻️ Duplicate CRM lead updated for ${leadgenId} (customer ${duplicateResult.customerId})`
-                  );
-                } else {
-                  leadsSkipped++;
-                  console.log(
-                    `⚠️ Skipped lead ${leadgenId} - phone ${parsedLead.phone} already exists in CRM`
-                  );
-                }
-              } catch (dupErr) {
+            } else if (importResult.duplicate) {
+              if (importResult.handled) {
+                console.log(
+                  `♻️ Duplicate CRM lead updated for ${leadgenId} (customer ${importResult.customerId})`
+                );
+              } else {
                 leadsSkipped++;
-                console.error(`❌ Failed duplicate handling for lead ${leadgenId}:`, dupErr);
+                console.log(
+                  `⚠️ Skipped lead ${leadgenId} - phone ${parsedLead.phone} already exists in CRM`
+                );
               }
             } else {
               leadsSkipped++;
-              if (existsInMetaLeads) {
-                console.log(`⚠️ Skipped lead ${leadgenId} - lead already imported to CRM (by leadgenId or phone)`);
-              }
+              console.log(
+                `⚠️ Skipped lead ${leadgenId} - ${importResult.reason || 'not imported'}`
+              );
             }
+          } catch (err) {
+            leadsSkipped++;
+            console.error('Error importing lead to CRM:', err);
           }
         }
       }

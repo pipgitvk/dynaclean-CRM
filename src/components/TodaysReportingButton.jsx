@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Calendar } from "lucide-react";
+import { Calendar, ArrowRight } from "lucide-react";
 
 export default function TodaysReportingButton() {
   const [count, setCount] = useState(0);
@@ -48,16 +48,19 @@ export default function TodaysReportingButton() {
   return (
     <Link
       href="/sales-dashboard/customers?filter=today_reporting"
-      className="flex items-center gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 sm:gap-2 bg-amber-500 text-white text-[10px] sm:text-xs font-medium rounded-lg hover:bg-amber-600 transition-colors shrink-0 whitespace-nowrap relative"
+      className="group flex h-[82px] min-w-[180px] items-center gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
     >
-      <Calendar size={14} className="sm:w-4 sm:h-4" />
-      <span className="hidden sm:inline">Today's Reporting</span>
-      <span className="sm:hidden">Reporting</span>
-      {count > 0 && (
-        <span className="ml-1 inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 text-[9px] sm:text-xs font-bold bg-white text-amber-600 rounded-full">
-          {count > 99 ? "99+" : count}
-        </span>
-      )}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-[11px] font-medium text-slate-500">Today's Reporting</span>
+        <span className="text-2xl font-bold leading-tight text-slate-800">{count > 99 ? "99+" : count}</span>
+        <span className="text-[11px] text-slate-400">Reports</span>
+      </div>
+      <div className="flex flex-col items-center gap-2">
+        <div className="rounded-xl bg-amber-100 p-2 text-amber-600">
+          <Calendar size={16} />
+        </div>
+        <ArrowRight size={12} className="text-amber-500 transition-transform group-hover:translate-x-0.5" />
+      </div>
     </Link>
   );
 }
