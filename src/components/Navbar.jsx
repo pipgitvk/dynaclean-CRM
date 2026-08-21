@@ -6,13 +6,15 @@ import { Menu, LogOut, User, Plus, UserPlus, Search, Bell, X, DollarSign } from 
 import { useTheme } from "@/context/ThemeContext";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import AttendanceStatusTracker from "@/components/AttendanceStatusTracker";
 
-export default function Navbar({ onToggleSidebar }) {
+export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
   const router = useRouter();
   const pathname = usePathname();
   const { theme } = useTheme();
   const [username, setUsername] = useState("");
   const [userRole, setUserRole] = useState("");
+  const [reportingManager, setReportingManager] = useState("");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
@@ -56,6 +58,35 @@ export default function Navbar({ onToggleSidebar }) {
       handleUser();
     }
   }, []);
+
+  useEffect(() => {
+    const fetchReportingManager = async () => {
+      if (!username) return;
+      try {
+        const res = await fetch("/api/user/reporting-manager", { credentials: "include" });
+        const data = await res.json();
+        const managerName =
+          data?.reportingManager?.name || data?.reportingManager?.username || "";
+        if (managerName) {
+          setReportingManager(managerName);
+          return;
+        }
+
+        const fallbackRes = await fetch(
+          `/api/empcrm/manager-email?username=${encodeURIComponent(username)}`,
+          { credentials: "include" }
+        );
+        const fallbackData = await fallbackRes.json();
+        setReportingManager(
+          fallbackData?.manager_name || fallbackData?.manager_username || ""
+        );
+      } catch {
+        setReportingManager("");
+      }
+    };
+
+    fetchReportingManager();
+  }, [username]);
 
   // search with debounce
   useEffect(() => {
@@ -224,6 +255,9 @@ export default function Navbar({ onToggleSidebar }) {
     );
   };
 
+  const shouldShowAttendanceTracker =
+    Boolean(username) && normalizeRoleKey(userRole) !== "SUPERADMIN";
+
   const searchDropdown =
     typeof window !== "undefined" &&
     showDropdown &&
@@ -299,41 +333,75 @@ export default function Navbar({ onToggleSidebar }) {
 
   return (
     <nav
-      className={`w-full min-h-16 h-auto py-2 min-[1100px]:py-0 min-[1100px]:h-16 bg-gradient-to-r ${
-        theme.navbar?.gradient || theme.sidebar.gradient
-      } ${
-        theme.navbar?.textureClass || ""
-      } shadow-lg flex flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-4 md:px-6 lg:px-8 border-b ${
-        theme.sidebar.border
-      } transition-colors duration-300 flex-shrink-0`}
+      className={
+        showSalesMeta
+          ? "w-full min-h-16 h-auto border-b border-slate-200 bg-white py-2 shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex flex-col gap-2 min-[1100px]:min-h-16 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-5 md:px-6 lg:px-8 flex-shrink-0"
+          : `w-full min-h-16 h-auto py-2 min-[1100px]:py-0 min-[1100px]:h-16 bg-gradient-to-r ${
+              theme.navbar?.gradient || theme.sidebar.gradient
+            } ${theme.navbar?.textureClass || ""} shadow-lg flex flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-between px-3 min-[1100px]:px-4 md:px-6 lg:px-8 border-b ${
+              theme.sidebar.border
+            } transition-colors duration-300 flex-shrink-0`
+      }
     >
       <div className="flex items-center gap-4 min-w-0 flex-shrink-0">
         <button
           onClick={onToggleSidebar}
-          className={`${theme.sidebar.text} ${theme.sidebar.hover} p-2 rounded-lg transition-all flex-shrink-0`}
+          className={
+            showSalesMeta
+              ? "rounded-lg border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 flex-shrink-0"
+              : `${theme.sidebar.text} ${theme.sidebar.hover} p-2 rounded-lg transition-all flex-shrink-0`
+          }
           aria-label="Toggle Sidebar"
         >
           <Menu size={24} />
         </button>
 
-        <div className="hidden min-[1100px]:flex items-center gap-2 min-w-0">
-          <User size={20} className={`${theme.sidebar.text} flex-shrink-0`} />
-          <span className={`font-medium ${theme.sidebar.text} truncate`}>
-            {username ? `Welcome, ${username}` : "Welcome"} - {userRole}
-          </span>
-        </div>
+        {showSalesMeta ? (
+          <div className="hidden min-w-0 items-center gap-2.5 min-[1100px]:flex">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+              <User size={16} />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm font-semibold text-slate-800">
+                {username ? `Welcome, ${username} 👋` : "Welcome 👋"}
+              </p>
+              <p className="truncate text-xs text-slate-500">
+                {userRole || "—"}
+                {reportingManager ? ` | Reporting Manager: ${reportingManager}` : ""}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="hidden min-[1100px]:flex items-center gap-2 min-w-0">
+            <User size={20} className={`${theme.sidebar.text} flex-shrink-0`} />
+            <span className={`font-medium ${theme.sidebar.text} truncate`}>
+              {username ? `Welcome, ${username}` : "Welcome"} - {userRole}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-1 min-w-0 flex-col gap-2 min-[1100px]:flex-row min-[1100px]:items-center min-[1100px]:justify-end min-[1100px]:gap-4 min-[1100px]:overflow-visible overflow-x-auto">
+        {shouldShowAttendanceTracker && (
+          <AttendanceStatusTracker username={username} />
+        )}
         {shouldShowSearch() && (
           <div
             ref={searchRef}
             className="relative flex-1 min-w-0 w-full min-[1100px]:w-72 min-[1100px]:flex-none min-[1100px]:flex-shrink-0"
           >
-            <div className="flex items-center gap-1 min-[1100px]:gap-2 border rounded-lg px-2 min-[1100px]:px-3 py-2 min-[1100px]:py-2.5 w-full bg-white min-h-[44px] min-[1100px]:min-h-0 min-[1100px]:h-10">
+            <div className={`flex min-h-[44px] w-full items-center gap-2 rounded-xl border px-3 py-2 min-[1100px]:min-h-0 min-[1100px]:h-10 ${
+              showSalesMeta
+                ? "border-slate-200 bg-slate-50"
+                : "border-gray-200 bg-white"
+            }`}>
               <input
                 type="text"
-                placeholder="Search customers by name, phone, company, or ID..."
+                placeholder={
+                  showSalesMeta
+                    ? "Search customers by name, phone, etc..."
+                    : "Search customers by name, phone, company, or ID..."
+                }
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onFocus={() => {
@@ -347,22 +415,34 @@ export default function Navbar({ onToggleSidebar }) {
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 md:gap-4 flex-shrink-0">
+        <div className="flex shrink-0 items-center justify-end gap-2 md:gap-3">
           <Link
-            href="/admin-dashboard/add-customer"
-            className="flex items-center justify-center gap-2 text-white bg-green-600 hover:bg-green-700 px-3 py-2.5 min-[1100px]:px-4 min-[1100px]:py-2.5 rounded-lg transition-all shadow-md hover:shadow-lg font-medium min-h-[44px] min-[1100px]:min-h-0 min-w-[44px] min-[1100px]:min-w-0"
+            href={
+              showSalesMeta
+                ? "/sales-dashboard/add-customer"
+                : "/admin-dashboard/add-customer"
+            }
+            className={`grid h-10 w-10 min-h-[44px] min-w-[44px] place-items-center rounded-xl text-white transition min-[1100px]:min-h-0 min-[1100px]:min-w-0 ${
+              showSalesMeta
+                ? "bg-emerald-500 hover:bg-emerald-600"
+                : "bg-green-600 px-3 py-2.5 hover:bg-green-700 min-[1100px]:px-4 min-[1100px]:py-2.5 shadow-md hover:shadow-lg font-medium"
+            }`}
             aria-label="Add Customer"
           >
-            <UserPlus size={20} />
+            <UserPlus size={18} />
           </Link>
           <button
             type="button"
             onClick={handleNewTask}
-            className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 min-[1100px]:px-4 min-[1100px]:py-2 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px] min-[1100px]:min-h-0"
+            className={`grid h-10 w-10 min-h-[44px] min-w-[44px] place-items-center rounded-xl text-white transition min-[1100px]:min-h-0 min-[1100px]:min-w-0 ${
+              showSalesMeta
+                ? "bg-blue-500 hover:bg-blue-600"
+                : "bg-blue-600 px-3 py-2 min-[1100px]:px-4 hover:bg-blue-700 shadow-md hover:shadow-lg"
+            }`}
             aria-label="New Task"
+            title="New Task"
           >
             <Plus size={18} />
-            <span className="hidden sm:inline font-medium">New Task</span>
           </button>
           
           {/* Notification Icon */}
@@ -370,7 +450,11 @@ export default function Navbar({ onToggleSidebar }) {
             <button
               type="button"
               onClick={() => setShowNotificationDropdown(!showNotificationDropdown)}
-              className="relative flex items-center justify-center text-white bg-gray-700 hover:bg-gray-800 px-3 py-2 min-[1100px]:px-3 min-[1100px]:py-2 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px] min-[1100px]:min-h-0"
+              className={`relative grid h-10 w-10 min-h-[44px] min-w-[44px] place-items-center rounded-xl transition min-[1100px]:min-h-0 min-[1100px]:min-w-0 ${
+                showSalesMeta
+                  ? "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  : "bg-gray-700 px-3 py-2 text-white shadow-md hover:bg-gray-800 min-[1100px]:px-3"
+              }`}
               aria-label="Notifications"
             >
               <Bell size={18} />
@@ -498,11 +582,18 @@ export default function Navbar({ onToggleSidebar }) {
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center gap-2 text-white bg-red-500 hover:bg-red-600 px-3 py-2 min-[1100px]:px-4 min-[1100px]:py-2 rounded-lg transition-all shadow-md hover:shadow-lg min-h-[44px] min-[1100px]:min-h-0"
+            className={
+              showSalesMeta
+                ? "grid h-10 w-10 min-h-[44px] min-w-[44px] place-items-center rounded-xl bg-red-500 text-white transition hover:bg-red-600 min-[1100px]:min-h-0 min-[1100px]:min-w-0"
+                : "flex min-h-[44px] items-center gap-2 rounded-lg bg-red-500 px-3 py-2 text-white shadow-md transition hover:bg-red-600 min-[1100px]:min-h-0 min-[1100px]:px-4"
+            }
             aria-label="Logout"
+            title="Logout"
           >
             <LogOut size={18} />
-            <span className="hidden sm:inline font-medium">Logout</span>
+            {!showSalesMeta && (
+              <span className="hidden font-medium sm:inline">Logout</span>
+            )}
           </button>
         </div>
       </div>

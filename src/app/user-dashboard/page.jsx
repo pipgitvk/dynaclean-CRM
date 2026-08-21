@@ -1,7 +1,9 @@
 // app/user-dashboard/page.jsx
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
+import { redirect } from "next/navigation";
 import { getDbConnection } from "@/lib/db";
+import { isSalesRole } from "@/lib/isSalesRole";
 import { DASHBOARD_MAP } from "@/components/Dashboards";
 import GemCrmDashboardWrapper from "@/components/GemCrmDashboardWrapper";
 import { getReportingManagerForEmployee } from "@/lib/reportingManager";
@@ -27,6 +29,15 @@ export default async function UserDashboardPage() {
 
     const username = payload.username;
     const role = payload.role;
+    const roleKey = String(role || "").toUpperCase();
+
+    if (roleKey === "SUPERADMIN") {
+      redirect("/admin-dashboard");
+    }
+
+    if (isSalesRole(role)) {
+      redirect("/sales-dashboard");
+    }
 
     const connection = await getDbConnection();
 

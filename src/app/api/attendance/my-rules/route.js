@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSessionPayload } from "@/lib/auth";
-import { fetchMergedAttendanceRulesForUser } from "@/lib/fetchMergedAttendanceRules";
+import { getEmployeeAttendanceSchedule } from "@/lib/employeeAttendanceSchedule";
 
-/** GET — merged company + per-employee rules for the logged-in user (same as /api/empcrm/attendance-rules) */
+/** GET — logged-in user's schedule from employee_attendance_schedule */
 export async function GET() {
   try {
     const payload = await getSessionPayload();
@@ -10,8 +10,15 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const rules = await fetchMergedAttendanceRulesForUser(payload.username);
-    return NextResponse.json({ rules });
+    const { rules, source } = await getEmployeeAttendanceSchedule(
+      payload.username
+    );
+
+    return NextResponse.json({
+      rules,
+      source,
+      table: "employee_attendance_schedule",
+    });
   } catch (error) {
     console.error("attendance/my-rules GET:", error);
     return NextResponse.json({ message: "Server error" }, { status: 500 });

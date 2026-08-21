@@ -2,29 +2,39 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { DollarSign, ArrowRight } from "lucide-react";
+import { DollarSign } from "lucide-react";
 import dayjs from "dayjs";
+import SummaryStatCard from "@/components/sales/SummaryStatCard";
 
-export default function PaymentPendingButton() {
+export default function PaymentPendingButton({
+  variant = "default",
+  monthly = false,
+}) {
   const [overdueCount, setOverdueCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch payment pending data
         const reportRes = await fetch("/api/reports/payment-pending");
         if (reportRes.ok) {
           const { orders } = await reportRes.json();
-          
-          // Count only overdue orders (due_date < today)
-          const overdue = orders.filter(order => {
-            return dayjs(order.due_date).isBefore(dayjs(), 'day');
+          const monthStart = dayjs().startOf("month");
+          const monthEnd = dayjs().endOf("month");
+          const overdue = orders.filter((order) => {
+            const isOverdue = dayjs(order.due_date).isBefore(dayjs(), "day");
+            if (!isOverdue) return false;
+            if (!monthly) return true;
+            const createdAt = order.created_at
+              ? dayjs(order.created_at)
+              : null;
+            return (
+              createdAt &&
+              !createdAt.isBefore(monthStart, "day") &&
+              !createdAt.isAfter(monthEnd, "day")
+            );
           });
-          
           setOverdueCount(overdue.length);
-        } else {
-          console.error("Failed to fetch payment pending report");
         }
       } catch (error) {
         console.error("Error fetching payment pending data:", error);
@@ -34,31 +44,40 @@ export default function PaymentPendingButton() {
     };
 
     fetchData();
-
-    // Refresh count every 30 seconds
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [monthly]);
 
-  // Don't render while loading
+  if (variant === "sales") {
+    return (
+      <SummaryStatCard
+        href="/sales-dashboard/reports/payment-pending"
+        label="Payment Pending"
+        count={overdueCount}
+        suffix={monthly ? dayjs().format("MMM YYYY") : "Pending"}
+        icon={DollarSign}
+        iconWrapClass="bg-red-500"
+        arrowClass="text-red-500"
+        loading={loading}
+      />
+    );
+  }
+
   if (loading) return null;
 
   return (
     <Link
       href="/sales-dashboard/reports/payment-pending"
-      className="group flex h-[82px] min-w-[180px] items-center gap-3 rounded-2xl border border-rose-200 bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className="relative flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-red-600 px-2 py-1.5 text-[10px] font-medium text-white transition-colors hover:bg-red-700 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
     >
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[11px] font-medium text-slate-500">Payment Pending</span>
-        <span className="text-2xl font-bold leading-tight text-slate-800">{overdueCount > 99 ? "99+" : overdueCount}</span>
-        <span className="text-[11px] text-slate-400">Pending</span>
-      </div>
-      <div className="flex flex-col items-center gap-2">
-        <div className="rounded-xl bg-rose-100 p-2 text-rose-600">
-          <DollarSign size={16} />
-        </div>
-        <ArrowRight size={12} className="text-rose-500 transition-transform group-hover:translate-x-0.5" />
-      </div>
+      <DollarSign size={14} className="sm:h-4 sm:w-4" />
+      <span className="hidden sm:inline">Payment Pending</span>
+      <span className="sm:hidden">Pending</span>
+      {overdueCount > 0 && (
+        <span className="ml-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[9px] font-bold text-red-600 sm:h-6 sm:w-6 sm:text-xs">
+          {overdueCount > 99 ? "99+" : overdueCount}
+        </span>
+      )}
     </Link>
   );
 }

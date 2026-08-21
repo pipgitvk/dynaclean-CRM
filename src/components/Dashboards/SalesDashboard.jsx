@@ -1,81 +1,82 @@
 // components/Dashboards/SalesDashboard.jsx
-import ProfilePicUploader from "@/app/user-dashboard/ProfilePicUploader";
-import AttendanceTracker from "@/components/AttendanceTracker";
+
 import EmployeeTargetGraph from "@/components/targets/EmployeeTargetGraph";
 import UpcomingTasks from "@/components/task/UpcomingTasks";
 import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import HotLeadsCards from "@/components/Leads/HotLeadsCards";
-import FastCardsWidget from "@/components/FastCardsWidget";
+import FastCardButton from "@/components/FastCardButton";
 import TodayReportButton from "@/components/TodayReportButton";
 import TodaysReportingButton from "@/components/TodaysReportingButton";
-import LeaveApprovalButton from "@/components/LeaveApprovalButton";
-import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
 import PaymentPendingButton from "@/components/PaymentPendingCircle";
 
-export default function SalesDashboard({ user, reportingManager }) {
+const salesCard =
+  "flex min-h-0 flex-col rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] md:p-5";
+
+export default function SalesDashboard({ user }) {
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Welcome, Attendance & Target */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-md p-4 md:p-6">
-          <div className="flex flex-col gap-4">
-            {/* Top row: profile pic + name */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <ProfilePicUploader user={user} />
-              <div className="space-y-2 flex-1">
-                <h1 className="text-3xl font-semibold">
-                  Welcome,{" "}
-                  <span className="text-green-700">{user.username}</span>
-                </h1>
-                <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
-                {reportingManager && (
-                  <p className="text-gray-500 text-sm">
-                    Reporting Manager: {reportingManager}
-                  </p>
-                )}
-              </div>
-            </div>
+    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+      {/* Top stats — full width */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <TodaysReportingButton variant="sales" />
+        <PaymentPendingButton variant="sales" monthly />
+        <TodayReportButton variant="sales" />
+        <FastCardButton
+          variant="sales"
+          monthly
+          type="customers"
+          label="Good Customers"
+          iconName="Users"
+          href="/sales-dashboard/customers"
+          iconColor="border-green-200"
+        />
+        <FastCardButton
+          variant="sales"
+          monthly
+          type="sales"
+          label="Sales"
+          iconName="TrendingUp"
+          href="/sales-dashboard/order"
+          iconColor="border-purple-200"
+        />
+      </div>
 
-            {/* Buttons row - separate on mobile */}
-            <div className="flex flex-row gap-2 justify-start sm:justify-end">
-              <TodaysReportingButton />
-              <PaymentPendingButton />
-              <TodayReportButton />
-              <LeaveApprovalButton />
-              <ExpenseApprovalButton />
-            </div>
+      {/* Main + right sidebar layout */}
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
+        {/* Left: Target + Upcoming Enquiry */}
+        <div className="flex min-w-0 flex-col gap-5 xl:col-span-8">
+          <div className={salesCard}>
+            <EmployeeTargetGraph variant="sales" />
+          </div>
 
-            {/* Fast Cards inline */}
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                Fast Cards
-              </p>
-              <FastCardsWidget />
-            </div>
+          <div className={`${salesCard} min-h-[380px]`}>
+            <UpcomingLeads
+              leadSource={user.username}
+              userRole={user.userRole}
+              compact
+              variant="sales"
+              dashboardPrefix="/sales-dashboard"
+            />
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
-          <AttendanceTracker username={user.username} role={user.userRole} />
-        </div>
+        {/* Right: Hot Leads + Tasks */}
+        <div className="flex min-w-0 flex-col gap-5 xl:col-span-4">
+          <div className={`${salesCard} min-h-[320px]`}>
+            <HotLeadsCards
+              leadSource={user.username}
+              compact
+              dashboardPrefix="/sales-dashboard"
+            />
+          </div>
 
-        <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
-          <EmployeeTargetGraph />
-        </div>
-      </div>
-
-      {/* Leads + Tasks */}
-      <div className="grid grid-cols-1 gap-4 md:gap-6">
-        <div className="bg-white rounded-xl shadow-md">
-          <HotLeadsCards leadSource={user.username} />
-        </div>
-
-        <div className="bg-white rounded-xl shadow-md">
-          <UpcomingLeads leadSource={user.username} userRole={user.userRole} />
-        </div>
-
-        <div className="bg-white rounded-xl shadow-md">
-          <UpcomingTasks leadSource={user.username} />
+          <div className={`${salesCard} min-h-[280px]`}>
+            <UpcomingTasks
+              leadSource={user.username}
+              compact
+              variant="sales"
+              dashboardPrefix="/sales-dashboard"
+            />
+          </div>
         </div>
       </div>
     </div>

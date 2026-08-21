@@ -6,40 +6,84 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { getSessionPayload } from "@/lib/auth";
 
+function getMonthDateRange(searchParams) {
+  const period = searchParams.get("period");
+  let month = searchParams.get("month");
+  let year = searchParams.get("year");
+
+  if (period === "month") {
+    const now = new Date();
+    month = String(now.getMonth() + 1);
+    year = String(now.getFullYear());
+  }
+
+  if (!month || !year) return null;
+
+  const m = parseInt(month, 10);
+  const y = parseInt(year, 10);
+  if (m < 1 || m > 12 || Number.isNaN(y) || y < 2000) return null;
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const lastDay = new Date(y, m, 0).getDate();
+
+  return {
+    startDate: `${y}-${pad(m)}-01`,
+    endDate: `${y}-${pad(m)}-${pad(lastDay)}`,
+  };
+}
+
 export async function GET(req) {
-  // ✅ Extract username from JWT in cookies
-
-
   const payload = await getSessionPayload();
   if (!payload) {
-    // You can handle unauthorized access here, e.g., redirect or return an error
-    return null;
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const username = payload.username;
+  const { searchParams } = new URL(req.url);
+  const monthRange = getMonthDateRange(searchParams);
 
   try {
     const db = await getDbConnection();
 
     // 1. Get the number of distinct quotations
+    let quotationsQuery =
+      "SELECT COUNT(DISTINCT quote_number) as count FROM quotations_records WHERE emp_name = ?";
+    const quotationsParams = [username];
+    if (monthRange) {
+      quotationsQuery +=
+        " AND DATE(created_at) >= ? AND DATE(created_at) <= ?";
+      quotationsParams.push(monthRange.startDate, monthRange.endDate);
+    }
     const [quotationsCountResult] = await db.execute(
-      "SELECT COUNT(DISTINCT quote_number) as count FROM quotations_records WHERE emp_name = ?",
-      [username]
+      quotationsQuery,
+      quotationsParams
     );
     const quotationsCount = quotationsCountResult[0].count;
 
     // 2. Get the number of "very good" customers
+    let customersQuery =
+      'SELECT COUNT(*) as count FROM customers WHERE lead_source = ? AND status = "Very Good"';
+    const customersParams = [username];
+    if (monthRange) {
+      customersQuery +=
+        " AND DATE(date_created) >= ? AND DATE(date_created) <= ?";
+      customersParams.push(monthRange.startDate, monthRange.endDate);
+    }
     const [customersCountResult] = await db.execute(
-      'SELECT COUNT(*) as count FROM customers WHERE lead_source = ? AND status = "Very Good"',
-      [username]
+      customersQuery,
+      customersParams
     );
     const customersCount = customersCountResult[0].count;
 
     // 3. Get the number of new orders with an invoice
-    const [ordersCountResult] = await db.execute(
-      'SELECT COUNT(*) as count FROM neworder WHERE invoice_number IS NOT NULL AND invoice_number != "" AND created_by = ?',
-      [username]
-    );
+    let ordersQuery =
+      'SELECT COUNT(*) as count FROM neworder WHERE invoice_number IS NOT NULL AND invoice_number != "" AND created_by = ?';
+    const ordersParams = [username];
+    if (monthRange) {
+      ordersQuery += " AND DATE(created_at) >= ? AND DATE(created_at) <= ?";
+      ordersParams.push(monthRange.startDate, monthRange.endDate);
+    }
+    const [ordersCountResult] = await db.execute(ordersQuery, ordersParams);
     const ordersCount = ordersCountResult[0].count;
 
     return NextResponse.json({
@@ -47,6 +91,9 @@ export async function GET(req) {
       quotationsCount,
       customersCount,
       ordersCount,
+      period: monthRange ? "month" : "all",
+      monthStart: monthRange?.startDate ?? null,
+      monthEnd: monthRange?.endDate ?? null,
     });
   } catch (error) {
     console.error("Database query error:", error);

@@ -281,7 +281,20 @@ function getCardColor(nextFollowupDate) {
   return { bg: "bg-green-50", border: "border-green-300", badge: "bg-green-500", text: "text-green-700", label: "Scheduled" };
 }
 
-export default function UpcomingFollowupsClient({ initialRows, username, userRole }) {
+function getSalesCardTone(nextFollowupDate) {
+  const hours = (new Date(nextFollowupDate).getTime() - Date.now()) / 3600000;
+  if (hours <= 24) return "bg-amber-100 border-amber-300";
+  if (hours <= 72) return "bg-yellow-100 border-yellow-300";
+  return "bg-emerald-100 border-emerald-300";
+}
+
+export default function UpcomingFollowupsClient({
+  initialRows,
+  username,
+  userRole,
+  variant = "default",
+  dashboardPrefix = "/user-dashboard",
+}) {
   const [rows, setRows] = useState(initialRows);
   const [followUpTarget, setFollowUpTarget] = useState(null);
   const [historySerial, setHistorySerial] = useState(null);
@@ -291,17 +304,36 @@ export default function UpcomingFollowupsClient({ initialRows, username, userRol
     // Re-fetch data by reloading (simple approach)
     window.location.reload();
   };
+  const isSales = variant === "sales";
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-md p-4 md:p-6">
+      <div
+        className={
+          isSales
+            ? "rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] md:p-5"
+            : "bg-white rounded-xl shadow-md p-4 md:p-6"
+        }
+      >
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-          <h2 className="text-2xl sm:text-3xl font-semibold text-gray-700 flex items-center gap-2">
-            <ClipboardList className="text-indigo-500" size={26} />
+          <h2
+            className={
+              isSales
+                ? "text-base font-bold text-slate-800 flex items-center gap-2"
+                : "text-2xl sm:text-3xl font-semibold text-gray-700 flex items-center gap-2"
+            }
+          >
+            <ClipboardList className="text-indigo-500" size={isSales ? 18 : 26} />
             Upcoming Follow-ups ({rows.length})
           </h2>
-          <Link href="/user-dashboard/service-followups">
-            <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-800 text-white rounded-md transition text-sm">
+          <Link href={`${dashboardPrefix}/service-followups`}>
+            <button
+              className={
+                isSales
+                  ? "rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-violet-700"
+                  : "px-4 py-2 bg-indigo-600 hover:bg-indigo-800 text-white rounded-md transition text-sm"
+              }
+            >
               View All
             </button>
           </Link>
@@ -314,9 +346,15 @@ export default function UpcomingFollowupsClient({ initialRows, username, userRol
             <div className="flex flex-row gap-4 flex-nowrap min-w-max">
               {rows.map((fu) => {
                 const color = getCardColor(fu.next_followup_date);
+                const salesTone = getSalesCardTone(fu.next_followup_date);
                 return (
                   <div key={fu.id}
-                    className={`w-[280px] flex-shrink-0 rounded-2xl border-2 p-4 shadow-sm hover:shadow-md transition duration-300 ${color.bg} ${color.border}`}>
+                    className={
+                      isSales
+                        ? `w-[280px] flex-shrink-0 rounded-xl border p-4 shadow-sm transition duration-300 hover:shadow-md ${salesTone}`
+                        : `w-[280px] flex-shrink-0 rounded-2xl border-2 p-4 shadow-sm hover:shadow-md transition duration-300 ${color.bg} ${color.border}`
+                    }
+                  >
                     <div className="flex items-center justify-between mb-3">
                       <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${color.badge}`}>{color.label}</span>
                       <span className="text-xs text-gray-400 font-medium">#{fu.id}</span>

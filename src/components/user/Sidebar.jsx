@@ -77,6 +77,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -172,6 +173,11 @@ export default function Sidebar({
 }) {
   const [openMenus, setOpenMenus] = useState({});
   const { theme } = useTheme();
+  const pathname = usePathname();
+  const isAdminDashboardRoute = pathname?.includes("/admin-dashboard");
+  const sidebarTitle = isAdminDashboardRoute
+    ? "Admin Dashboard"
+    : "User Dashboard";
 
   const toggleMenu = (key) => {
     setOpenMenus((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -256,7 +262,7 @@ export default function Sidebar({
           <h2
             className={`text-xl font-bold mb-4 ${theme.sidebar.text} border-b ${theme.sidebar.border} pb-3`}
           >
-            User Dashboard
+            {sidebarTitle}
           </h2>
           {showBackButton && backButtonPath && (
             <Link

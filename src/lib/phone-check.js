@@ -20,7 +20,7 @@ export async function checkPhoneDuplicate(phone) {
 
   // Compare last 10 digits only - handles different stored formats (0, 91, +91, etc.)
   const [custRows] = await conn.execute(
-    `SELECT customer_id FROM customers WHERE ${PHONE_LAST10_WHERE} ORDER BY customer_id ASC LIMIT 1`,
+    `SELECT customer_id FROM customers WHERE ${PHONE_LAST10_WHERE} LIMIT 1`,
     [normalized]
   );
   if (custRows.length > 0) {

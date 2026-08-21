@@ -13,7 +13,13 @@ function SkeletonCard() {
   );
 }
 
-export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
+export default function UpcomingLeadsCards({
+  leadSource,
+  userRole = "",
+  compact = false,
+  variant = "default",
+  dashboardPrefix = "/user-dashboard",
+}) {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState("soonest"); // soonest | latest | name
@@ -124,18 +130,32 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
     return filtered;
   })();
 
+  const isSales = variant === "sales";
+  const shellClass = compact || isSales
+    ? ""
+    : "bg-white lg:p-6 rounded-xl shadow-md mx-auto mt-2";
+  const controlClass = isSales
+    ? "rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-violet-200"
+    : compact
+      ? "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-violet-200"
+      : "rounded-md border px-3 py-2 text-sm";
+  const scrollClass = isSales
+    ? "hide-scrollbar w-full overflow-x-auto py-2"
+    : compact
+      ? "w-full overflow-x-auto py-3 hide-scrollbar"
+      : "w-full md:w-[77vw] lg:w-[71vw] overflow-x-scroll py-5 hide-scrollbar";
+
   return (
-    <div className="bg-white lg:p-6 rounded-xl shadow-md mx-auto mt-2">
-      {/* Controls */}
-      <div className="flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
-        <p className="text-sm text-gray-500">
+    <div className={shellClass}>
+      <div className={`mb-4 flex flex-col gap-3 ${isSales ? "" : "lg:flex-row lg:items-end lg:justify-between"}`}>
+        <p className={`${isSales ? "text-xs" : "text-sm"} text-slate-500`}>
           Showing {processedLeads.length} of {leads.length} leads
         </p>
-        <div className="flex flex-wrap items-end gap-3">
+        <div className={`flex flex-wrap items-end gap-2 ${isSales ? "md:gap-2" : "gap-3"}`}>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">Status</label>
+            <label className="mb-1 text-xs text-slate-500">Status</label>
             <select
-              className="border rounded-md px-3 py-2 text-sm"
+              className={controlClass}
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -150,9 +170,9 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">Stage</label>
+            <label className="mb-1 text-xs text-slate-500">Stage</label>
             <select
-              className="border rounded-md px-3 py-2 text-sm"
+              className={controlClass}
               value={stageFilter}
               onChange={(e) => setStageFilter(e.target.value)}
             >
@@ -167,9 +187,9 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">All Multi-tag</label>
+            <label className="mb-1 text-xs text-slate-500">All Multi-tag</label>
             <select
-              className="border rounded-md px-3 py-2 text-sm"
+              className={controlClass}
               value={multiTagFilter}
               onChange={(e) => setMultiTagFilter(e.target.value)}
             >
@@ -188,9 +208,9 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">All Tags</label>
+            <label className="mb-1 text-xs text-slate-500">All Tags</label>
             <select
-              className="border rounded-md px-3 py-2 text-sm"
+              className={controlClass}
               value={tagFilter}
               onChange={(e) => setTagFilter(e.target.value)}
             >
@@ -207,9 +227,9 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">Sort by</label>
+            <label className="mb-1 text-xs text-slate-500">Sort by</label>
             <select
-              className="border rounded-md px-3 py-2 text-sm"
+              className={controlClass}
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
             >
@@ -219,19 +239,19 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">Start date</label>
+            <label className="mb-1 text-xs text-slate-500">Start date</label>
             <input
               type="date"
-              className="border rounded-md px-3 py-2 text-sm"
+              className={controlClass}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
           </div>
           <div className="flex flex-col">
-            <label className="text-xs text-gray-600 mb-1">End date</label>
+            <label className="mb-1 text-xs text-slate-500">End date</label>
             <input
               type="date"
-              className="border rounded-md px-3 py-2 text-sm"
+              className={controlClass}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
@@ -250,9 +270,8 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
         </div>
       </div>
 
-      {/* Horizontal slider */}
-      <div className="w-full md:w-[77vw] lg:w-[71vw] overflow-x-scroll py-5 hide-scrollbar">
-        <div className="flex flex-row gap-4 flex-nowrap min-w-max">
+      <div className={scrollClass}>
+        <div className="flex min-w-max flex-row flex-nowrap gap-3">
           {loading ? (
             [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
           ) : processedLeads.length > 0 ? (
@@ -265,10 +284,7 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
                 ? getGradientColor(hours)
                 : "rgb(255, 165, 0)";
               return (
-                <div
-                  key={cust.customer_id}
-                  className="w-[300px] flex-shrink-0"
-                >
+                <div key={cust.customer_id} className="flex-shrink-0">
                   <TaskCard
                     customerId={cust.customer_id}
                     name={cust.first_name}
@@ -284,6 +300,8 @@ export default function UpcomingLeadsCards({ leadSource, userRole = "" }) {
                     notes={cust.notes}
                     status={cust.status}
                     bgColor={bgColor}
+                    dashboardPrefix={dashboardPrefix}
+                    variant={isSales ? "sales" : "default"}
                   />
                 </div>
               );

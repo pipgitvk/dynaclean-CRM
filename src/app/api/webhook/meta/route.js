@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { findCredentialByFormId } from '@/lib/mysql/metaLeadModel';
 import { createLead, getLeadByLeadgenId, markLeadAsImported } from '@/lib/mysql/metaLeadModel';
-const { normalizePhone } = require('@/lib/phone-check');
-const { importMetaLeadToCrm } = require('@/lib/services/importMetaLeadToCrm');
+const { getDbConnection } = require('@/lib/db');
+const { normalizePhone, PHONE_LAST10_WHERE } = require('@/lib/phone-check');
+const { handleDuplicateNotImportedLead } = require('@/lib/services/metaDuplicateLeadHandler');
 
 const GLOBAL_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || 'dynaclean-secret';
 
@@ -146,49 +147,103 @@ export async function POST(request) {
             campaignName,
             productsInterest
           });
-
-          if (!metaLead) {
-            console.log(`⚠️ Lead ${leadgenId} already exists in meta_leads, skipping CRM import`);
-            continue;
-          }
           
           console.log(`✅ MetaLead created: ${metaLead.id}`);
           
-          // Auto-import to CRM (phone lock prevents duplicate customers vs cron/other webhook)
+          // Auto-import to CRM
           if (parsedLead.phone) {
-            try {
-              const productInterestText = String(productsInterest || '').trim();
-              const followupNote = productInterestText
-                ? `Lead from Facebook webhook (multi-credential). Product interest: ${productInterestText}`
-                : 'Lead from Facebook webhook (multi-credential)';
-
-              const importResult = await importMetaLeadToCrm({
-                first_name: parsedLead.first_name,
-                email: parsedLead.email,
-                phone: parsedLead.phone,
-                address: parsedLead.address,
-                assignedTo: credential.employeeName,
-                products_interest: productsInterest,
-                followupNote,
-                formId,
-                incrementLeadDistribution: false,
-                duplicateMode: 'handler',
-              });
-
-              if (importResult.imported) {
-                await markLeadAsImported(leadgenId, importResult.customerId);
-                console.log(`✅ Lead imported to CRM: ${importResult.customerId}`);
-              } else if (importResult.duplicate && importResult.handled) {
-                console.log(
-                  `♻️ Duplicate CRM lead updated via webhook (customer ${importResult.customerId})`
+            const normalizedPhone = normalizePhone(parsedLead.phone);
+            if (normalizedPhone.length === 10) {
+              try {
+                const conn = await getDbConnection();
+                
+                // Check if phone exists in customers table
+                const [custRows] = await conn.execute(
+                  `SELECT customer_id FROM customers WHERE ${PHONE_LAST10_WHERE} LIMIT 1`,
+                  [normalizedPhone]
                 );
-              } else {
-                console.log(
-                  `⚠️ Lead not imported (${importResult.reason || 'unknown'}): ${parsedLead.phone}`
+                
+                // Check if phone exists in meta_leads table (already imported)
+                const [metaRows] = await conn.execute(
+                  `SELECT id FROM meta_leads WHERE ${PHONE_LAST10_WHERE} AND is_imported_to_crm = 1 LIMIT 1`,
+                  [normalizedPhone]
                 );
+                
+                if (custRows.length === 0 && metaRows.length === 0) {
+                  // Import to CRM
+                  const now = new Date();
+                  const phoneToStore = normalizedPhone;
+                  
+                  const [customerResult] = await conn.execute(
+                    `INSERT INTO customers (
+                        first_name, email, phone, address, lead_campaign,
+                        lead_source, sales_representative, assigned_to, status, date_created, products_interest
+                      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      parsedLead.first_name,
+                      parsedLead.email,
+                      phoneToStore,
+                      parsedLead.address || '',
+                      'social_media',
+                      credential.employeeName,
+                      credential.employeeName,
+                      'Automatic',
+                      'New',
+                      now,
+                      productsInterest
+                    ]
+                  );
+                  
+                  const customerId = customerResult.insertId;
+
+                  const productInterestText = String(productsInterest || '').trim();
+                  const followupNote = productInterestText
+                    ? `Lead from Facebook webhook (multi-credential). Product interest: ${productInterestText}`
+                    : 'Lead from Facebook webhook (multi-credential)';
+                  
+                  await conn.execute(
+                    `INSERT INTO customers_followup (
+                        customer_id, name, contact, next_followup_date, followed_by,
+                        followed_date, communication_mode, notes, email
+                      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      customerId,
+                      parsedLead.first_name,
+                      phoneToStore,
+                      null,
+                      credential.employeeName,
+                      now,
+                      'Facebook',
+                      followupNote,
+                      parsedLead.email || ''
+                    ]
+                  );
+                  
+                  // Update meta_leads with CRM customer ID
+                  await markLeadAsImported(leadgenId, customerId);
+                  
+                  console.log(`✅ Lead imported to CRM: ${customerId}`);
+                } else {
+                  if (custRows.length > 0) {
+                    const duplicateResult = await handleDuplicateNotImportedLead({
+                      phone: normalizedPhone,
+                      formId,
+                    });
+
+                    if (duplicateResult.handled) {
+                      console.log(
+                        `♻️ Duplicate CRM lead updated via webhook (customer ${duplicateResult.customerId})`
+                      );
+                    } else {
+                      console.log(`⚠️ Lead phone already exists in CRM: ${normalizedPhone}`);
+                    }
+                  } else if (metaRows.length > 0) {
+                    console.log(`⚠️ Lead phone already exists in meta_leads (imported): ${normalizedPhone}`);
+                  }
+                }
+              } catch (err) {
+                console.error('❌ Error importing lead to CRM:', err);
               }
-            } catch (err) {
-              console.error('❌ Error importing lead to CRM:', err);
             }
           }
         }

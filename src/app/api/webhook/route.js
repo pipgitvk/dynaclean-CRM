@@ -1,6 +1,5 @@
 import { getDbConnection } from "@/lib/db";
-import { normalizePhone } from "@/lib/phone-check";
-import { importMetaLeadToCrm } from "@/lib/services/importMetaLeadToCrm";
+import { checkPhoneDuplicate, normalizePhone } from "@/lib/phone-check";
 import {
   extractProductFromMetaFieldData,
   buildProductsInterestLabel,
@@ -151,6 +150,8 @@ export async function POST(request) {
         formProduct: productFromForm,
         campaignName,
       }) || "";
+    const now = new Date();
+
     if (!phone && !email)
       return new Response("Missing contact info", { status: 400 });
 
@@ -187,87 +188,105 @@ export async function POST(request) {
     }
 
 
-    const importResult = await importMetaLeadToCrm({
-      first_name,
-      email,
-      phone,
-      address,
-      lead_campaign,
-      assignedTo,
-      products_interest,
-      followupNote: "Lead from Facebook ad",
-      formId: formIdForRouting,
-      incrementLeadDistribution: !skipWebhookLeadDistributionUpdate,
-      duplicateMode: "average",
-    });
+    // --- Check if customer already exists (PHONE - last 10 digits only) ---
+let customerId = null;
 
-    if (importResult.duplicate) {
-      console.log(
-        `⚡ Existing customer ${importResult.customerId} → status updated + urgent followup added`,
+if (phone) {
+  const dupCheck = await checkPhoneDuplicate(phone);
+  if (dupCheck.duplicate) {
+    customerId = dupCheck.customerId;
+
+    // ✅ 1️⃣ Update customer status to 'Average'
+    await conn.execute(
+      `UPDATE customers SET status = ? WHERE customer_id = ?`,
+      ["Average", customerId]
+    );
+
+    // ✅ 2️⃣ Insert urgent followup
+    await conn.execute(
+      `INSERT INTO customers_followup (
+        customer_id, name, contact, next_followup_date,
+        followed_by, followed_date, communication_mode,
+        notes, email
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        customerId,
+        first_name,
+        phone,
+        new Date(), // immediate followup
+        assignedTo,
+        now,
+        "Facebook",
+        "Re-Enquiry: urgent customer follow",
+        email || ""
+      ]
+    );
+
+    console.log("⚡ Existing customer → status updated + urgent followup added");
+
+    return new Response("EXISTING_CUSTOMER_UPDATED_AND_FOLLOWUP_ADDED", { status: 200 });
+  }
+}
+
+
+// Step 6: Insert into customers table
+const [customerResult] = await conn.execute(
+  `INSERT INTO customers (
+    first_name, email, phone, address, lead_campaign,
+    lead_source, sales_representative, assigned_to,
+    status, date_created, products_interest
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  [
+    first_name,
+    email,
+    phone,
+    address || "",
+    lead_campaign,
+    assignedTo,
+    assignedTo,
+    "Automatic",
+    "New",
+    now,
+    products_interest,
+  ],
+);
+
+customerId =await customerResult.insertId; // ✅ FIXED
+
+
+    // Step 7: Insert into followup table
+    await conn.execute(
+      `INSERT INTO customers_followup (
+        customer_id, name, contact, next_followup_date,followed_by,
+        followed_date, communication_mode, notes, email
+      ) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        customerId,
+        first_name,
+        phone,
+        null,
+        assignedTo,
+        now,
+        "Facebook",
+        "Lead from Facebook ad",
+        email || "",
+      ],
+    );
+
+    // Step 8: Update lead_distribution only when assignee is on that list
+    if (!skipWebhookLeadDistributionUpdate) {
+      await conn.execute(
+        `
+      UPDATE lead_distribution
+      SET assigned_count = assigned_count + 1,
+          last_assigned_at = ?
+      WHERE UPPER(TRIM(username)) = UPPER(?)
+    `,
+        [now, assignedTo],
       );
-      return new Response("EXISTING_CUSTOMER_UPDATED_AND_FOLLOWUP_ADDED", {
-        status: 200,
-      });
     }
 
-    if (!importResult.imported) {
-      if (importResult.reason === "invalid_phone" && email) {
-        const now = new Date();
-        const [customerResult] = await conn.execute(
-          `INSERT INTO customers (
-            first_name, email, phone, address, lead_campaign,
-            lead_source, sales_representative, assigned_to,
-            status, date_created, products_interest
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            first_name,
-            email,
-            phone || "",
-            address || "",
-            lead_campaign,
-            assignedTo,
-            assignedTo,
-            "Automatic",
-            "New",
-            now,
-            products_interest,
-          ],
-        );
-        const customerId = customerResult.insertId;
-        await conn.execute(
-          `INSERT INTO customers_followup (
-            customer_id, name, contact, next_followup_date, followed_by,
-            followed_date, communication_mode, notes, email
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            customerId,
-            first_name,
-            phone || "",
-            null,
-            assignedTo,
-            now,
-            "Facebook",
-            "Lead from Facebook ad",
-            email || "",
-          ],
-        );
-        if (!skipWebhookLeadDistributionUpdate) {
-          await conn.execute(
-            `UPDATE lead_distribution
-             SET assigned_count = assigned_count + 1, last_assigned_at = ?
-             WHERE UPPER(TRIM(username)) = UPPER(?)`,
-            [now, assignedTo],
-          );
-        }
-        console.log(
-          `✅ Lead assigned to ${assignedTo} for campaign: ${campaignName} (email-only)`,
-        );
-        return new Response("EVENT_RECEIVED", { status: 200 });
-      }
-
-      console.error("❌ Meta lead CRM import skipped:", importResult.reason);
-      return new Response("Lead import skipped", { status: 200 });
-    }
+    // await conn.end();
 
     console.log(
       `✅ Lead assigned to ${assignedTo} for campaign: ${campaignName}`,

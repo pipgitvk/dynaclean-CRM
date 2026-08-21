@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Wallet } from "lucide-react";
+import SummaryStatCard from "@/components/sales/SummaryStatCard";
 
-export default function ExpenseApprovalButton() {
+export default function ExpenseApprovalButton({ variant = "default" }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [hasReportees, setHasReportees] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -26,6 +27,35 @@ export default function ExpenseApprovalButton() {
       setLoading(false);
     }
   };
+
+  if (variant === "sales") {
+    if (loading) {
+      return (
+        <SummaryStatCard
+          href="/empcrm/user-dashboard/employee-expenses"
+          label="Expenses"
+          count={0}
+          suffix="Pending"
+          icon={Wallet}
+          iconWrapClass="bg-emerald-500"
+          arrowClass="text-emerald-500"
+          loading
+        />
+      );
+    }
+    if (!hasReportees) return null;
+    return (
+      <SummaryStatCard
+        href="/empcrm/user-dashboard/employee-expenses"
+        label="Expenses"
+        count={pendingCount}
+        suffix="Pending"
+        icon={Wallet}
+        iconWrapClass="bg-emerald-500"
+        arrowClass="text-emerald-500"
+      />
+    );
+  }
 
   // Don't show if no reportees or loading
   if (loading || !hasReportees) return null;

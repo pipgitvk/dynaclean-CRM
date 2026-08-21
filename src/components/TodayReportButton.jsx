@@ -2,25 +2,52 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { FileText, ArrowRight } from "lucide-react";
+import { FileText } from "lucide-react";
+import dayjs from "dayjs";
+import SummaryStatCard from "@/components/sales/SummaryStatCard";
 
-export default function TodayReportButton() {
+export default function TodayReportButton({ variant = "default" }) {
   const [allowed, setAllowed] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [count, setCount] = useState(0);
 
   useEffect(() => {
     const check = async () => {
       try {
-        const res = await fetch("/api/my-modules");
-        if (res.ok) {
-          const { allowedModules } = await res.json();
-          // null = all allowed; otherwise check daily-report key
-          if (allowedModules !== null && !allowedModules.includes("daily-report")) {
+        const today = dayjs().format("YYYY-MM-DD");
+        const startDate = `${today} 00:00:00`;
+        const endDate = `${today} 23:59:59`;
+
+        const [modulesRes, dataRes] = await Promise.all([
+          fetch("/api/my-modules"),
+          fetch(
+            `/api/dashboard-data?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+          ),
+        ]);
+
+        if (modulesRes.ok) {
+          const { allowedModules } = await modulesRes.json();
+          if (
+            allowedModules !== null &&
+            !allowedModules.includes("daily-report")
+          ) {
             setAllowed(false);
+            setLoading(false);
+            return;
           }
         }
+
+        if (dataRes.ok) {
+          const data = await dataRes.json();
+          const total =
+            (data.followups?.length || 0) +
+            (data.quotations?.length || 0) +
+            (data.newOrders?.length || 0) +
+            (data.demos?.length || 0);
+          setCount(total);
+        }
       } catch {
-        // on error, show the button (fail open)
+        setCount(0);
       } finally {
         setLoading(false);
       }
@@ -28,24 +55,38 @@ export default function TodayReportButton() {
     check();
   }, []);
 
-  if (loading || !allowed) return null;
+  const href =
+    variant === "sales"
+      ? "/sales-dashboard/today-reports"
+      : "/user-dashboard/today-reports";
+
+  if (!loading && !allowed) return null;
+
+  if (variant === "sales") {
+    return (
+      <SummaryStatCard
+        href={href}
+        label="Today Report"
+        count={count}
+        suffix="Reports"
+        icon={FileText}
+        iconWrapClass="bg-violet-500"
+        arrowClass="text-violet-500"
+        loading={loading}
+      />
+    );
+  }
+
+  if (loading) return null;
 
   return (
     <Link
-      href="/user-dashboard/today-reports"
-      className="group flex h-[82px] min-w-[180px] items-center gap-3 rounded-2xl border border-indigo-200 bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      href={href}
+      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-blue-600 px-2 py-1.5 text-[10px] font-medium text-white transition-colors hover:bg-blue-700 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
     >
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[11px] font-medium text-slate-500">Today Report</span>
-        <span className="text-2xl font-bold leading-tight text-slate-800">Open</span>
-        <span className="text-[11px] text-slate-400">Reports</span>
-      </div>
-      <div className="flex flex-col items-center gap-2">
-        <div className="rounded-xl bg-indigo-100 p-2 text-indigo-600">
-          <FileText size={16} />
-        </div>
-        <ArrowRight size={12} className="text-indigo-500 transition-transform group-hover:translate-x-0.5" />
-      </div>
+      <FileText size={14} className="sm:h-4 sm:w-4" />
+      <span className="hidden sm:inline">Today Report</span>
+      <span className="sm:hidden">Report</span>
     </Link>
   );
 }

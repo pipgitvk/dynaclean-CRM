@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Search, Edit, Plus, Mail } from "lucide-react";
 import toast from "react-hot-toast";
 import EditBacklinkModal from "./EditBacklinkModal";
 import AddBacklinkModal from "./AddBacklinkModal";
 import EmailManagementModal from "./EmailManagementModal";
 import BacklinksStatsCards from "./BacklinksStatsCards";
+
+const PAGE_SIZE = 20;
 
 const BacklinksTableReadOnly = () => {
   const [backlinks, setBacklinks] = useState([]);
@@ -25,6 +27,7 @@ const BacklinksTableReadOnly = () => {
   const [currentUser, setCurrentUser] = useState("");
   const [currentRole, setCurrentRole] = useState("");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchBacklinks();
@@ -90,34 +93,73 @@ const BacklinksTableReadOnly = () => {
 
   // Filter backlinks based on search term and filters
   // Users see only their own backlinks, superadmin sees all
-  const filteredBacklinks = backlinks.filter(
-    (bl) => {
-      const matchesSearch = bl.website.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (bl.keyword && bl.keyword.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesStatus = filterStatus === "" || bl.status === filterStatus;
-      const matchesAssignedTo = filterAssignedTo === "" || bl.assigned_to === filterAssignedTo;
-      
-      // Date range filter
-      let matchesDateRange = true;
-      if (dateFrom || dateTo) {
-        const blDate = new Date(bl.followup_date);
-        if (dateFrom) {
-          const fromDate = new Date(dateFrom);
-          matchesDateRange = matchesDateRange && blDate >= fromDate;
+  const filteredBacklinks = useMemo(
+    () =>
+      backlinks.filter((bl) => {
+        const matchesSearch =
+          bl.website.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (bl.keyword &&
+            bl.keyword.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesStatus = filterStatus === "" || bl.status === filterStatus;
+        const matchesAssignedTo =
+          filterAssignedTo === "" || bl.assigned_to === filterAssignedTo;
+
+        // Date range filter
+        let matchesDateRange = true;
+        if (dateFrom || dateTo) {
+          const blDate = new Date(bl.followup_date);
+          if (dateFrom) {
+            const fromDate = new Date(dateFrom);
+            matchesDateRange = matchesDateRange && blDate >= fromDate;
+          }
+          if (dateTo) {
+            const toDate = new Date(dateTo);
+            matchesDateRange = matchesDateRange && blDate <= toDate;
+          }
         }
-        if (dateTo) {
-          const toDate = new Date(dateTo);
-          matchesDateRange = matchesDateRange && blDate <= toDate;
-        }
-      }
-      
-      // If superadmin, show all; otherwise show only current user's backlinks
-      const matchesUser = isSuperAdmin || bl.assigned_to === currentUser;
-      
-      const passes = matchesSearch && matchesStatus && matchesAssignedTo && matchesUser && matchesDateRange;
-      return passes;
-    }
+
+        // If superadmin, show all; otherwise show only current user's backlinks
+        const matchesUser = isSuperAdmin || bl.assigned_to === currentUser;
+
+        return (
+          matchesSearch &&
+          matchesStatus &&
+          matchesAssignedTo &&
+          matchesUser &&
+          matchesDateRange
+        );
+      }),
+    [
+      backlinks,
+      searchTerm,
+      filterStatus,
+      filterAssignedTo,
+      dateFrom,
+      dateTo,
+      isSuperAdmin,
+      currentUser,
+    ]
   );
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredBacklinks.length / PAGE_SIZE)
+  );
+
+  const paginatedBacklinks = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredBacklinks.slice(start, start + PAGE_SIZE);
+  }, [filteredBacklinks, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, filterAssignedTo, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -324,10 +366,10 @@ const BacklinksTableReadOnly = () => {
                 </td>
               </tr>
             ) : (
-              filteredBacklinks.map((backlink, index) => (
+              paginatedBacklinks.map((backlink, index) => (
                 <tr key={backlink.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
                   <td style={{ padding: "12px 24px", fontWeight: "600", color: "#374151", textAlign: "center" }}>
-                    {index + 1}
+                    {(currentPage - 1) * PAGE_SIZE + index + 1}
                   </td>
                   <td style={{ padding: "12px 24px", fontWeight: "500", color: "#1f2937", wordBreak: "break-all" }}>
                     <a href={backlink.website} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "none" }} onMouseOver={(e) => e.target.style.textDecoration = "underline"} onMouseOut={(e) => e.target.style.textDecoration = "none"}>
@@ -378,7 +420,7 @@ const BacklinksTableReadOnly = () => {
             No backlinks found.
           </div>
         ) : (
-          filteredBacklinks.map((backlink) => (
+          paginatedBacklinks.map((backlink) => (
             <div
               key={backlink.id}
               className="bg-white rounded-lg shadow p-4 space-y-3"
@@ -419,6 +461,72 @@ const BacklinksTableReadOnly = () => {
           ))
         )}
       </div>
+
+      {filteredBacklinks.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-600">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1} to{" "}
+            {Math.min(currentPage * PAGE_SIZE, filteredBacklinks.length)} of{" "}
+            {filteredBacklinks.length} backlinks
+          </p>
+
+          {totalPages > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                disabled={currentPage === 1}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((page) => {
+                  return (
+                    page === 1 ||
+                    page === totalPages ||
+                    Math.abs(page - currentPage) <= 1
+                  );
+                })
+                .map((page, index, pages) => {
+                  const prevPage = pages[index - 1];
+                  const showEllipsis = prevPage && page - prevPage > 1;
+
+                  return (
+                    <span key={page} className="flex items-center gap-2">
+                      {showEllipsis ? (
+                        <span className="px-1 text-gray-400">...</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
+                          page === currentPage
+                            ? "border-blue-600 bg-blue-600 text-white"
+                            : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </span>
+                  );
+                })}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setCurrentPage((page) => Math.min(page + 1, totalPages))
+                }
+                disabled={currentPage === totalPages}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modals */}
       <AddBacklinkModal

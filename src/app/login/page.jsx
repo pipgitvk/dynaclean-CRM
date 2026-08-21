@@ -7,6 +7,25 @@ import { Eye, EyeOff, Mail, Lock, ShieldAlert } from "lucide-react";
 const ACCENT_COLOR = "#1F454A";
 const SERVICE_APP_LOGIN_URL = "https://service.dynacleanindustries.com/login";
 
+const getDashboardRouteByRole = (roleNorm) => {
+  if (roleNorm === "SUPERADMIN" || roleNorm === "EA") {
+    return "/admin-dashboard";
+  }
+  if (roleNorm === "ADMIN") return "/user-dashboard";
+  if (roleNorm === "DIRECTOR") return "/director-dashboard";
+  if (roleNorm === "GEM" || roleNorm.includes("GEM")) return "/user-dashboard";
+  if (roleNorm.includes("SALES")) return "/sales-dashboard";
+  if (roleNorm.includes("SERVICE") && roleNorm.includes("HEAD")) {
+    return "/service-head-dashboard";
+  }
+  if (roleNorm.includes("HR")) return "/hr-dashboard";
+  if (roleNorm.includes("DIGITAL") || roleNorm.includes("MARKETER")) {
+    return "/digital-marketing-dashboard";
+  }
+  if (roleNorm.includes("ACCOUNTANT")) return "/accounts-dashboard";
+  return "/user-dashboard";
+};
+
 const LoginPage = () => {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -53,13 +72,15 @@ const LoginPage = () => {
         return;
       }
 
-      if (data.role === "SUPERADMIN") {
-        router.push("/admin-dashboard");
-      } else if (roleNorm === "DIRECTOR") {
-        router.push("/director-dashboard");
-      } else {
-        router.push("/user-dashboard");
-      }
+      const isSalesUser =
+        roleNorm === "SALES" ||
+        roleNorm === "SALES EXECUTIVE" ||
+        roleNorm === "SALES REPRESENTATIVE" ||
+        roleNorm === "SALES CUM BACKOFFICE";
+      const targetRoute = isSalesUser
+        ? "/sales-dashboard"
+        : getDashboardRouteByRole(roleNorm);
+      router.push(targetRoute);
     } catch (err) {
       console.error("Login error:", err);
       setError("An unexpected error occurred");
