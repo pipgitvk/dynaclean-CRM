@@ -226,6 +226,10 @@ export default function Sidebar({
         );
       }
 
+      if (!item.path) {
+        return null;
+      }
+
       return (
         <li key={itemKey} className="m-2">
           <Link

@@ -551,60 +551,12 @@ const allMenuItems = [
             roles: ["SUPERADMIN"],
             icon: "FilePlus",
           },
-          {
-            path: "/admin-dashboard/purchase/warehouse-in",
-            name: "Warehouse In",
-            roles: ["SUPERADMIN"],
-            icon: "PackageCheck",
-          },
-          
-
       {
-        name: "Purchase – Products",
+        path: "/admin-dashboard/purchase/warehouse-in",
+        name: "Warehouse In",
         roles: ["SUPERADMIN"],
-        icon: "ShoppingCart",
-        children: [
-         
-          // {
-          //   path: "/admin-dashboard/purchase/ledger",
-          //   name: "Purchase Ledger",
-          //   accessKey: "purchase-ledger",
-          //   roles: ["SUPERADMIN"],
-          //   icon: "ScrollText",
-          // },
-        ],
+        icon: "PackageCheck",
       },
-      // {
-      //   name: "Purchase – Spares",
-      //   roles: ["SUPERADMIN"],
-      //   icon: "ShoppingCart",
-      //   children: [
-      //     {
-      //       path: "/admin-dashboard/spare/purchase/direct-in",
-      //       name: "Direct In",
-      //       roles: ["SUPERADMIN"],
-      //       icon: "PackageCheck",
-      //     },
-      //     {
-      //       path: "/admin-dashboard/spare/purchase/generate-request",
-      //       name: "Generate Request",
-      //       roles: ["SUPERADMIN"],
-      //       icon: "FilePlus",
-      //     },
-      //     {
-      //       path: "/admin-dashboard/spare/purchase/warehouse-in",
-      //       name: "Warehouse In",
-      //       roles: ["SUPERADMIN"],
-      //       icon: "PackageCheck",
-      //     },
-      //     {
-      //       path: "/admin-dashboard/spare/purchase/purchases",
-      //       name: "Purchases",
-      //       roles: ["SUPERADMIN"],
-      //       icon: "ShoppingBag",
-      //     },
-      //   ],
-      // },
     ],
   },
   {
@@ -970,6 +922,7 @@ function filterMenuItemsByRole(items, roleKeyNormalized) {
       if (!roleOk) return null;
 
       if (!item.children?.length) {
+        if (!item.path) return null;
         return item;
       }
 
