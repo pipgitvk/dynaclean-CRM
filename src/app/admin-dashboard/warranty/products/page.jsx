@@ -4,6 +4,121 @@ import { CheckCircle, AlertTriangle, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast, Toaster } from "react-hot-toast";
 
+// ─── AMC Tooltip Component ────────────────────────────────────────────────────
+function AMCTooltip({ amcDetails, children }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  if (!amcDetails) {
+    return children;
+  }
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    try {
+      return new Date(dateStr).toLocaleDateString("en-GB");
+    } catch {
+      return "—";
+    }
+  };
+
+  const getAMCStatus = () => {
+    if (!amcDetails.end_date) return { text: "Active", color: "text-green-600" };
+    
+    const endDate = new Date(amcDetails.end_date);
+    const now = new Date();
+    
+    if (now <= endDate) {
+      const daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+      if (daysLeft <= 30) {
+        return { text: `Expiring in ${daysLeft} days`, color: "text-orange-600" };
+      }
+      return { text: "Active", color: "text-green-600" };
+    } else {
+      const daysOverdue = Math.ceil((now - endDate) / (1000 * 60 * 60 * 24));
+      return { text: `Expired ${daysOverdue} days ago`, color: "text-red-600" };
+    }
+  };
+
+  const handleMouseEnter = (e) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+    setShowTooltip(true);
+  };
+
+  const handleMouseMove = (e) => {
+    if (showTooltip) {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const status = getAMCStatus();
+
+  return (
+    <>
+      <div
+        onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setShowTooltip(false)}
+        className="inline-block"
+      >
+        {children}
+      </div>
+      
+      {showTooltip && (
+        <div 
+          className="fixed z-[9999] w-72 p-3 bg-white border border-gray-300 rounded-lg shadow-xl pointer-events-none"
+          style={{
+            left: `${mousePos.x + 15}px`,
+            top: `${mousePos.y - 10}px`,
+            maxWidth: '300px'
+          }}
+        >
+          <div className="text-sm">
+            <div className="font-semibold text-gray-800 mb-2 border-b pb-1">
+              AMC/CMC Details
+            </div>
+            
+            <div className="space-y-1.5">
+              <div>
+                <span className="font-medium text-gray-600">Status: </span>
+                <span className={`${status.color} font-medium`}>{status.text}</span>
+              </div>
+              
+              <div>
+                <span className="font-medium text-gray-600">Period: </span>
+                <span className="text-gray-800">
+                  {formatDate(amcDetails.start_date)} - {formatDate(amcDetails.end_date)}
+                </span>
+              </div>
+              
+              {amcDetails.model && (
+                <div>
+                  <span className="font-medium text-gray-600">Model: </span>
+                  <span className="text-gray-800">{amcDetails.model}</span>
+                </div>
+              )}
+              
+              {amcDetails.contact && (
+                <div>
+                  <span className="font-medium text-gray-600">Contact: </span>
+                  <span className="text-gray-800">{amcDetails.contact}</span>
+                </div>
+              )}
+              
+              {amcDetails.company_name && (
+                <div>
+                  <span className="font-medium text-gray-600">Company: </span>
+                  <span className="text-gray-800">{amcDetails.company_name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
 function ModalWrapper({ title, onClose, children }) {
   function handleBackdrop(e) {
@@ -449,12 +564,14 @@ export default function WarrantyPage() {
                         <span className="font-semibold">State:</span> {r.state}
                       </div>
                     )}
-                    <div className="flex items-center gap-1">
-                      <span className="font-semibold">AMC:</span>
-                      {r.has_amc
-                        ? <CheckCircle size={16} className="text-green-600" />
-                        : <AlertTriangle size={16} className="text-yellow-500" />}
-                    </div>
+                    <AMCTooltip amcDetails={r.amc_details}>
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold">AMC:</span>
+                        {r.has_amc
+                          ? <CheckCircle size={16} className="text-green-600 cursor-help" />
+                          : <AlertTriangle size={16} className="text-yellow-500" />}
+                      </div>
+                    </AMCTooltip>
                   </div>
                   <div className={`text-[11px] text-right ${getWarrantyStatus(r.installation_date, r.warranty_period).color}`}>
                     {getWarrantyStatus(r.installation_date, r.warranty_period).status}
@@ -590,9 +707,11 @@ export default function WarrantyPage() {
                       </td>
                       <td className="p-3 border-b border-gray-200">{r.state || "—"}</td>
                       <td className="p-3 border-b border-gray-200 text-center">
-                        {r.has_amc
-                          ? <div className="flex justify-center"><CheckCircle size={20} className="text-green-600" title="AMC/CMC Active" /></div>
-                          : <div className="flex justify-center"><AlertTriangle size={20} className="text-yellow-500" title="No AMC/CMC" /></div>}
+                        <AMCTooltip amcDetails={r.amc_details}>
+                          {r.has_amc
+                            ? <div className="flex justify-center"><CheckCircle size={20} className="text-green-600 cursor-help" /></div>
+                            : <div className="flex justify-center"><AlertTriangle size={20} className="text-yellow-500" title="No AMC/CMC" /></div>}
+                        </AMCTooltip>
                       </td>
                       <td className="p-3 border-b border-gray-200">
                         <div className="space-y-1 text-xs">
