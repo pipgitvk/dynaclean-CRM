@@ -126,18 +126,7 @@ export default function DigitalMarketingQuickCards({ username }) {
           loading={loading}
         />
       )}
-      {canViewBacklinks && (
-        <SummaryStatCard
-          href="/digital-marketing-dashboard/backlinks"
-          label="Today Total Added"
-          count={todayTotalBacklinksCount}
-          suffix="Backlinks"
-          icon={Link2}
-          iconWrapClass="bg-indigo-500"
-          arrowClass="text-indigo-500"
-          loading={loading}
-        />
-      )}
+
     </>
   );
 }
