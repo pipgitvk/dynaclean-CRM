@@ -1,5 +1,11 @@
+export const BID_DOCUMENT_MAX_FILE_SIZE_MB = 20;
+export const BID_DOCUMENT_MAX_FILE_SIZE =
+  BID_DOCUMENT_MAX_FILE_SIZE_MB * 1024 * 1024;
+
 export const BID_DOCUMENT_PARSE_OPTIONS = {
   multiples: true,
+  maxFileSize: BID_DOCUMENT_MAX_FILE_SIZE,
+  maxTotalFileSize: BID_DOCUMENT_MAX_FILE_SIZE * 5,
   allowedExt: [".jpg", ".jpeg", ".png", ".pdf", ".doc", ".docx"],
   allowedMime: [
     "image/jpeg",

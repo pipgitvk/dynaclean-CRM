@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { BID_DOCUMENT_MAX_FILE_SIZE_MB } from "@/lib/bidDocuments";
 
 export default function NewBidPage() {
   const router = useRouter();
@@ -352,7 +353,7 @@ export default function NewBidPage() {
                   />
                   <Upload className="w-5 h-5 text-gray-400" />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX — you can select multiple files (Max 10MB each)</p>
+                <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX — you can select multiple files (Max {BID_DOCUMENT_MAX_FILE_SIZE_MB}MB each)</p>
                 {Array.isArray(formData.bid_document) && formData.bid_document.length > 0 && (
                   <ul className="mt-2 space-y-1">
                     {formData.bid_document.map((file, index) => (

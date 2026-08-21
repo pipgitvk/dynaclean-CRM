@@ -45,12 +45,14 @@ export async function parseFormData(request, options = {}) {
   const allowedExt = new Set(options.allowedExt || ALLOWED_EXT);
   const allowedMime = new Set(options.allowedMime || ALLOWED_MIME);
   const multiples = options.multiples === true;
+  const maxFileSize = options.maxFileSize || MAX_FILE_SIZE;
 
   return new Promise((resolve, reject) => {
     const form = new IncomingForm({
       multiples,
-      maxFileSize: MAX_FILE_SIZE,
-      maxTotalFileSize: options.maxTotalFileSize || (multiples ? MAX_FILE_SIZE * 5 : MAX_FILE_SIZE),
+      maxFileSize,
+      maxTotalFileSize:
+        options.maxTotalFileSize || (multiples ? maxFileSize * 5 : maxFileSize),
       uploadDir: UPLOAD_ROOT,
       keepExtensions: false,
 
