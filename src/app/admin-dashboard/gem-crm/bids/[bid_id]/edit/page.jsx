@@ -11,8 +11,10 @@ import {
   Calendar,
   User,
   Eye,
+  Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { parseBidDocuments } from "@/lib/bidDocuments";
 
 export default function EditBidPage({ params }) {
   const router = useRouter();
@@ -21,6 +23,7 @@ export default function EditBidPage({ params }) {
   const [employees, setEmployees] = useState([]);
   const [bidId, setBidId] = useState(null);
   const [bid, setBid] = useState(null);
+  const [existingDocuments, setExistingDocuments] = useState([]);
   const [formData, setFormData] = useState({
     bidding_platform: "",
     bid_number: "",
@@ -56,7 +59,7 @@ export default function EditBidPage({ params }) {
     assigned_employee_id: "",
     dd_id: "",
     remarks: "",
-    bid_document: null,
+    bid_document: [],
     ra_start_date: "",
     ra_end_date: "",
     ra_last_price: "",
@@ -161,6 +164,7 @@ export default function EditBidPage({ params }) {
         });
         
         setBid(bid);
+        setExistingDocuments(parseBidDocuments(bid.bid_documents || bid.bid_document));
         
         setFormData({
         bidding_platform: bid.bidding_platform || "",
@@ -197,7 +201,7 @@ export default function EditBidPage({ params }) {
         assigned_employee_id: bid.assigned_employee_id || "",
         dd_id: bid.dd_id || "",
         remarks: bid.remarks || "",
-        bid_document: null,
+        bid_document: [],
         ra_participated: bid.ra_participated || "no",
         ra_start_date: formatDateForInput(bid.ra_start_date) || "",
         ra_end_date: formatDateForInput(bid.ra_end_date) || "",
@@ -238,7 +242,11 @@ export default function EditBidPage({ params }) {
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
     if (type === "file") {
-      setFormData((prev) => ({ ...prev, [name]: files[0] }));
+      if (name === "bid_document") {
+        setFormData((prev) => ({ ...prev, [name]: Array.from(files) }));
+      } else {
+        setFormData((prev) => ({ ...prev, [name]: files[0] }));
+      }
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -278,10 +286,17 @@ export default function EditBidPage({ params }) {
     try {
       const formDataToSend = new FormData();
       Object.keys(formData).forEach((key) => {
+        if (key === "bid_document") {
+          (formData.bid_document || []).forEach((file) => {
+            formDataToSend.append("bid_document", file);
+          });
+          return;
+        }
         if (formData[key] !== null && formData[key] !== "") {
           formDataToSend.append(key, formData[key]);
         }
       });
+      formDataToSend.append("keep_bid_documents", JSON.stringify(existingDocuments));
 
       const res = await fetch(`/api/gem-crm/bids/${bidId}`, {
         method: "PUT",
@@ -589,28 +604,77 @@ export default function EditBidPage({ params }) {
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Replace Bid Document
+                  Bid Documents
                 </label>
+                {existingDocuments.length > 0 && (
+                  <ul className="mb-3 space-y-1">
+                    {existingDocuments.map((doc) => (
+                      <li
+                        key={doc.url}
+                        className="flex items-center justify-between text-sm bg-white px-3 py-2 rounded-lg border border-gray-200"
+                      >
+                        <span className="truncate">{doc.name}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleViewFile(doc.url)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View Document"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExistingDocuments((prev) => prev.filter((d) => d.url !== doc.url))
+                            }
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remove"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
                     name="bid_document"
                     onChange={handleChange}
                     accept=".pdf,.doc,.docx"
+                    multiple
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                   <Upload className="w-5 h-5 text-gray-400" />
-                  {bid && bid.bid_document && (
-                    <button
-                      onClick={() => handleViewFile(bid.bid_document)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="View Document"
-                    >
-                      <Eye className="w-5 h-5" />
-                    </button>
-                  )}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Leave empty to keep existing document</p>
+                <p className="text-xs text-gray-500 mt-1">Select more files to add. Existing documents stay unless you remove them.</p>
+                {Array.isArray(formData.bid_document) && formData.bid_document.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {formData.bid_document.map((file, index) => (
+                      <li
+                        key={`${file.name}-${index}`}
+                        className="flex items-center justify-between text-sm bg-blue-50 px-3 py-2 rounded-lg"
+                      >
+                        <span className="truncate">New: {file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              bid_document: prev.bid_document.filter((_, i) => i !== index),
+                            }))
+                          }
+                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                          title="Remove"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           </div>

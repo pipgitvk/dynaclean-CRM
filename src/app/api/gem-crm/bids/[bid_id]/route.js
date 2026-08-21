@@ -3,6 +3,12 @@ import { withPool } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseFormData } from "@/lib/parseForm";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
+import {
+  BID_DOCUMENT_PARSE_OPTIONS,
+  normalizeFormidableFiles,
+  parseBidDocuments,
+  stringifyBidDocuments,
+} from "@/lib/bidDocuments";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs/promises";
 import path from "path";
@@ -26,7 +32,7 @@ function isImageFile(file) {
 }
 
 // Helper function to save bid document (images to Cloudinary, PDFs locally)
-async function saveBidDocument(file) {
+async function saveBidDocument(file, index = 0) {
   if (!file || !file.filepath || !file.originalFilename) {
     throw new Error("File is missing or invalid");
   }
@@ -54,7 +60,7 @@ async function saveBidDocument(file) {
 
   // For PDFs and other documents, save locally
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  const fileName = `${Date.now()}-${file.originalFilename}`;
+  const fileName = `${Date.now()}-${index}-${file.originalFilename}`;
   const targetPath = path.join(UPLOAD_DIR, fileName);
 
   try {
@@ -66,6 +72,29 @@ async function saveBidDocument(file) {
     await fs.unlink(file.filepath).catch((err) => {
       console.error("Failed to delete temp file:", err);
     });
+  }
+}
+
+async function deleteStoredBidFile(documentFile) {
+  if (!documentFile) return;
+
+  if (documentFile.includes("cloudinary.com")) {
+    try {
+      const urlObj = new URL(documentFile);
+      const pathname = urlObj.pathname;
+      const parts = pathname.split("/");
+      const versionIndex = parts.findIndex((p) => p.startsWith("v"));
+      if (versionIndex !== -1 && versionIndex < parts.length - 1) {
+        const publicIdWithFolder = parts.slice(versionIndex + 1).join("/").replace(/\.[^/.]+$/, "");
+        await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
+        console.log("✅ Deleted bid document from Cloudinary:", publicIdWithFolder);
+      }
+    } catch (err) {
+      console.error("Failed to delete bid document from Cloudinary:", err);
+    }
+  } else if (documentFile.startsWith("/uploads/")) {
+    const oldPath = path.join(process.cwd(), "public", documentFile);
+    await fs.unlink(oldPath).catch(() => {});
   }
 }
 
@@ -194,6 +223,8 @@ export async function GET(req, { params }) {
         return { notFound: true };
       }
 
+      bids[0].bid_documents = parseBidDocuments(bids[0].bid_document);
+
       // Get bid documents (safe query)
       let documents = [];
       try {
@@ -277,7 +308,7 @@ export async function PUT(req, { params }) {
     if (!bid_id) {
       return NextResponse.json({ error: "Bid ID is required" }, { status: 400 });
     }
-    const { fields, files } = await parseFormData(req);
+    const { fields, files } = await parseFormData(req, BID_DOCUMENT_PARSE_OPTIONS);
     
     // Normalize field values
     for (const key in fields) {
@@ -348,6 +379,16 @@ export async function PUT(req, { params }) {
       const [tableInfo] = await conn.execute("DESCRIBE bids");
       const existingColumns = tableInfo.map(row => row.Field);
 
+      const bidDocCol = tableInfo.find((row) => row.Field === "bid_document");
+      if (bidDocCol && !String(bidDocCol.Type).toLowerCase().includes("text")) {
+        try {
+          await conn.execute("ALTER TABLE bids MODIFY COLUMN bid_document TEXT NULL");
+          console.log("✅ Widened bid_document column to TEXT");
+        } catch (alterError) {
+          console.error("❌ Failed to widen bid_document column:", alterError.message);
+        }
+      }
+
       for (const { name, type } of columnsToCheck) {
         if (!existingColumns.includes(name)) {
           try {
@@ -359,32 +400,29 @@ export async function PUT(req, { params }) {
         }
       }
 
-      // Handle bid document upload if provided
-      let bid_document = fields.bid_document || currentBid.bid_document;
-      if (files.bid_document && files.bid_document[0]) {
-        // Delete old file
-        if (currentBid.bid_document) {
-          if (currentBid.bid_document.includes("cloudinary.com")) {
-            try {
-              const urlObj = new URL(currentBid.bid_document);
-              const pathname = urlObj.pathname;
-              const parts = pathname.split('/');
-              const versionIndex = parts.findIndex(p => p.startsWith('v'));
-              if (versionIndex !== -1 && versionIndex < parts.length - 1) {
-                const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
-                await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
-                console.log("✅ Deleted old bid document from Cloudinary:", publicIdWithFolder);
-              }
-            } catch (err) {
-              console.error("Failed to delete old document from Cloudinary:", err);
-            }
-          } else if (currentBid.bid_document.startsWith('/uploads/')) {
-            const oldPath = path.join(process.cwd(), "public", currentBid.bid_document);
-            await fs.unlink(oldPath).catch(() => {});
-          }
+      // Handle bid document upload if provided (append, keep remaining files)
+      let existingDocs = parseBidDocuments(currentBid.bid_document);
+      if (fields.keep_bid_documents !== undefined) {
+        const keepDocs = parseBidDocuments(fields.keep_bid_documents);
+        const keepUrls = new Set(keepDocs.map((doc) => doc.url));
+        const removedDocs = existingDocs.filter((doc) => !keepUrls.has(doc.url));
+        for (const doc of removedDocs) {
+          await deleteStoredBidFile(doc.url);
         }
-        bid_document = await saveBidDocument(files.bid_document[0]);
+        existingDocs = keepDocs;
       }
+
+      const uploadedFiles = normalizeFormidableFiles(files.bid_document);
+      const newDocs = [];
+      for (let i = 0; i < uploadedFiles.length; i++) {
+        const url = await saveBidDocument(uploadedFiles[i], i);
+        newDocs.push({
+          url,
+          name: uploadedFiles[i].originalFilename || `document-${i + 1}`,
+        });
+      }
+
+      fields.bid_document = stringifyBidDocuments([...existingDocs, ...newDocs]);
 
       // Build update query dynamically
       const updateFields = [];
@@ -523,27 +561,9 @@ export async function DELETE(req, { params }) {
         [bid_id]
       );
 
-      // Delete main bid document
-      if (bids.length > 0 && bids[0].bid_document) {
-        const documentFile = bids[0].bid_document;
-        if (documentFile.includes("cloudinary.com")) {
-          try {
-            const urlObj = new URL(documentFile);
-            const pathname = urlObj.pathname;
-            const parts = pathname.split('/');
-            const versionIndex = parts.findIndex(p => p.startsWith('v'));
-            if (versionIndex !== -1 && versionIndex < parts.length - 1) {
-              const publicIdWithFolder = parts.slice(versionIndex + 1).join('/').replace(/\.[^/.]+$/, "");
-              await cloudinary.uploader.destroy(publicIdWithFolder, { resource_type: "auto" });
-              console.log("✅ Deleted bid document from Cloudinary:", publicIdWithFolder);
-            }
-          } catch (err) {
-            console.error("Failed to delete bid document from Cloudinary:", err);
-          }
-        } else if (documentFile.startsWith('/uploads/')) {
-          const docPath = path.join(process.cwd(), "public", documentFile);
-          await fs.unlink(docPath).catch(() => {});
-        }
+      // Delete main bid documents
+      for (const doc of parseBidDocuments(bids[0].bid_document)) {
+        await deleteStoredBidFile(doc.url);
       }
 
       // Delete all additional bid documents' files

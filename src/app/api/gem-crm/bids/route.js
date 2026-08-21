@@ -3,6 +3,11 @@ import { getDbConnection, withPool, dbExecute } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { parseFormData } from "@/lib/parseForm";
 import { resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
+import {
+  BID_DOCUMENT_PARSE_OPTIONS,
+  normalizeFormidableFiles,
+  stringifyBidDocuments,
+} from "@/lib/bidDocuments";
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs/promises";
 import path from "path";
@@ -26,7 +31,7 @@ function isImageFile(file) {
 }
 
 // Helper function to save bid document (images to Cloudinary, PDFs locally)
-async function saveBidDocument(file) {
+async function saveBidDocument(file, index = 0) {
   if (!file || !file.filepath || !file.originalFilename) {
     throw new Error("File is missing or invalid");
   }
@@ -54,7 +59,7 @@ async function saveBidDocument(file) {
 
   // For PDFs and other documents, save locally
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  const fileName = `${Date.now()}-${file.originalFilename}`;
+  const fileName = `${Date.now()}-${index}-${file.originalFilename}`;
   const targetPath = path.join(UPLOAD_DIR, fileName);
 
   try {
@@ -288,7 +293,7 @@ export async function POST(req) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const { fields, files } = await parseFormData(req);
+    const { fields, files } = await parseFormData(req, BID_DOCUMENT_PARSE_OPTIONS);
     console.log("Parsed formData, fields:", Object.keys(fields));
     
     // Normalize field values
@@ -357,11 +362,17 @@ export async function POST(req) {
       reverse_auction
     });
 
-    // Handle bid document upload
-    let bid_document = null;
-    if (files.bid_document && files.bid_document[0]) {
-      bid_document = await saveBidDocument(files.bid_document[0]);
+    // Handle bid document upload (multiple files)
+    const uploadedFiles = normalizeFormidableFiles(files.bid_document);
+    const savedDocs = [];
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const url = await saveBidDocument(uploadedFiles[i], i);
+      savedDocs.push({
+        url,
+        name: uploadedFiles[i].originalFilename || `document-${i + 1}`,
+      });
     }
+    const bid_document = stringifyBidDocuments(savedDocs);
 
     const currentEmpId = await resolveGemCrmEmployeeId(payload);
     if (payload.role === "GEM" && !currentEmpId) {
@@ -373,6 +384,16 @@ export async function POST(req) {
       const [tableInfo] = await conn.execute("DESCRIBE bids");
       const existingColumns = tableInfo.map(row => row.Field);
       console.log("Existing columns in bids table:", existingColumns);
+
+      const bidDocCol = tableInfo.find((row) => row.Field === "bid_document");
+      if (bidDocCol && !String(bidDocCol.Type).toLowerCase().includes("text")) {
+        try {
+          await conn.execute("ALTER TABLE bids MODIFY COLUMN bid_document TEXT NULL");
+          console.log("✅ Widened bid_document column to TEXT");
+        } catch (alterError) {
+          console.error("❌ Failed to widen bid_document column:", alterError.message);
+        }
+      }
 
       // Ensure all required columns exist
       const columnsToCheck = [

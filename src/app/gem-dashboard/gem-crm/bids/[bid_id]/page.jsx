@@ -18,6 +18,7 @@ import {
   History,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { parseBidDocuments } from "@/lib/bidDocuments";
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -296,19 +297,25 @@ export default function BidDetailsPage({ params }) {
                 }
               />
             )}
-            {bid.bid_document && (
-              <DetailRow
-                label="Bid Document"
-                value={
-                  <button
-                    onClick={() => handleViewFile(bid.bid_document)}
-                    className="text-blue-600 hover:underline flex items-center gap-1"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download
-                  </button>
-                }
-              />
+            {parseBidDocuments(bid.bid_documents || bid.bid_document).length > 0 && (
+              <div className="py-2 border-b border-gray-100 last:border-0">
+                <div className="flex justify-between items-start gap-4">
+                  <span className="text-sm text-gray-500">Bid Documents</span>
+                  <div className="flex flex-col items-end gap-1 max-w-xs">
+                    {parseBidDocuments(bid.bid_documents || bid.bid_document).map((doc, index) => (
+                      <button
+                        key={`${doc.url}-${index}`}
+                        type="button"
+                        onClick={() => handleViewFile(doc.url)}
+                        className="text-blue-600 hover:underline flex items-center gap-1 text-sm font-medium"
+                      >
+                        <Download className="w-4 h-4" />
+                        {doc.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
