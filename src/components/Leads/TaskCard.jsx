@@ -15,6 +15,9 @@ const TaskCard = ({
   dashboardPrefix = "/user-dashboard",
   variant = "default",
 }) => {
+  const detailsBasePath =
+    variant === "sales" ? "/user-dashboard" : dashboardPrefix;
+
   if (variant === "sales") {
     return (
       <div
@@ -62,13 +65,13 @@ const TaskCard = ({
 
         <div className="mt-4 flex items-center gap-4 border-t border-white/20 pt-3">
           <Link
-            href={`${dashboardPrefix}/view-customer/${customerId}`}
+            href={`${detailsBasePath}/view-customer/${customerId}`}
             className="text-xs font-semibold text-white/90 transition hover:text-white"
           >
             View
           </Link>
           <Link
-            href={`${dashboardPrefix}/view-customer/${customerId}/follow-up?source=upcoming`}
+            href={`${detailsBasePath}/view-customer/${customerId}/follow-up?source=upcoming`}
             className="text-xs font-semibold text-white/90 transition hover:text-white"
           >
             Follow
@@ -121,13 +124,13 @@ const TaskCard = ({
 
       <div className="mt-6 flex items-center justify-between gap-2">
         <a
-          href={`${dashboardPrefix}/view-customer/${customerId}`}
+          href={`${detailsBasePath}/view-customer/${customerId}`}
           className="text-s flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 font-semibold text-gray-600 transition"
         >
           View
         </a>
         <a
-          href={`${dashboardPrefix}/view-customer/${customerId}/follow-up?source=upcoming`}
+          href={`${detailsBasePath}/view-customer/${customerId}/follow-up?source=upcoming`}
           className="text-s flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 font-semibold text-gray-600 transition"
         >
           Follow

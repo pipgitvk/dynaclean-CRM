@@ -20,6 +20,9 @@ function getUrgencyLabel(ageHours) {
 }
 
 function HotLeadCard({ cust, dashboardPrefix = "/user-dashboard" }) {
+  const detailsBasePath = dashboardPrefix.includes("/sales-dashboard")
+    ? "/user-dashboard"
+    : dashboardPrefix;
   const ageHours = cust.lead_age_hours || 0;
   const ageDays  = Math.floor(ageHours / 24);
   const ageLabel = ageDays === 0
@@ -102,13 +105,13 @@ function HotLeadCard({ cust, dashboardPrefix = "/user-dashboard" }) {
       {/* Actions */}
       <div className="px-4 pb-4 flex gap-2">
         <a
-          href={`${dashboardPrefix}/view-customer/${cust.customer_id}`}
+          href={`${detailsBasePath}/view-customer/${cust.customer_id}`}
           className="flex-1 text-center text-xs font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg py-2 transition-colors"
         >
           View
         </a>
         <a
-          href={`${dashboardPrefix}/view-customer/${cust.customer_id}/follow-up`}
+          href={`${detailsBasePath}/view-customer/${cust.customer_id}/follow-up`}
           className="flex-1 text-center text-xs font-medium text-white rounded-lg py-2 transition-colors"
           style={{ backgroundColor: barColor }}
         >

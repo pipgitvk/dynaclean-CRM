@@ -9,6 +9,7 @@ import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
 import DigitalMarketingQuickCards from "@/components/DigitalMarketingQuickCards";
+import TopBacklinksKeywordsCards from "@/components/digital-marketing/TopBacklinksKeywordsCards";
 
 const salesCard =
   "flex min-h-0 flex-col rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] md:p-5";
@@ -42,35 +43,51 @@ export default function DefaultDashboard({ user, reportingManager, counts }) {
         </div>
       )}
 
-      {/* Enquiry left, Tasks right */}
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
-        <div className={`${salesCard} min-h-[380px] xl:col-span-8`}>
-          <UpcomingLeads
-            leadSource={user.username}
-            userRole={user.userRole}
-            compact
-            variant="sales"
-            dashboardPrefix="/user-dashboard"
-          />
+      {isDigitalRole ? (
+        <div className="space-y-5">
+          <TopBacklinksKeywordsCards username={user.username} />
+          <div className={`${salesCard} min-h-[280px]`}>
+            <UpcomingTasks
+              leadSource={user.username}
+              compact
+              variant="sales"
+              dashboardPrefix="/digital-marketing-dashboard"
+            />
+          </div>
         </div>
-        <div className={`${salesCard} min-h-[280px] xl:col-span-4`}>
-          <UpcomingTasks
-            leadSource={user.username}
-            compact
-            variant="sales"
-            dashboardPrefix="/user-dashboard"
-          />
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* Enquiry left, Tasks right */}
+          <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
+            <div className={`${salesCard} min-h-[380px] xl:col-span-8`}>
+              <UpcomingLeads
+                leadSource={user.username}
+                userRole={user.userRole}
+                compact
+                variant="sales"
+                dashboardPrefix="/user-dashboard"
+              />
+            </div>
+            <div className={`${salesCard} min-h-[280px] xl:col-span-4`}>
+              <UpcomingTasks
+                leadSource={user.username}
+                compact
+                variant="sales"
+                dashboardPrefix="/user-dashboard"
+              />
+            </div>
+          </div>
 
-      {/* Upcoming Follow-ups - Hidden for EA role */}
-      {!isEaRole && (
-        <UpcomingFollowupsWidget
-          username={user.username}
-          userRole={user.userRole}
-          variant="sales"
-          dashboardPrefix="/user-dashboard"
-        />
+          {/* Upcoming Follow-ups - Hidden for EA role */}
+          {!isEaRole && (
+            <UpcomingFollowupsWidget
+              username={user.username}
+              userRole={user.userRole}
+              variant="sales"
+              dashboardPrefix="/user-dashboard"
+            />
+          )}
+        </>
       )}
 
     </div>
