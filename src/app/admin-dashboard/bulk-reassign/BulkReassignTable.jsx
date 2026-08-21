@@ -1,8 +1,93 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
-import { Loader2, Users, CheckSquare, Square } from "lucide-react";
+import { Loader2, Users, CheckSquare, Square, ChevronDown, Search } from "lucide-react";
 import { NOTES_LANGUAGE_OPTIONS } from "@/constants/notesLanguageOptions";
+
+// Searchable Dropdown Component
+function SearchableDropdown({ options, value, onChange, placeholder, className = "" }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const dropdownRef = useRef(null);
+
+    const filteredOptions = options.filter(option =>
+        option.username.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setIsOpen(false);
+                setSearchTerm("");
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const handleSelect = (optionValue) => {
+        onChange(optionValue);
+        setIsOpen(false);
+        setSearchTerm("");
+    };
+
+    const selectedOption = options.find(opt => opt.username === value);
+
+    return (
+        <div className={`relative ${className}`} ref={dropdownRef}>
+            <div
+                className="border rounded px-3 py-2 cursor-pointer bg-white flex items-center justify-between"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                <span className={value ? "text-gray-900" : "text-gray-500"}>
+                    {selectedOption ? selectedOption.username : placeholder}
+                </span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            {isOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-hidden">
+                    <div className="p-2 border-b">
+                        <div className="relative">
+                            <Search className="absolute left-2 top-2.5 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search..."
+                                className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+                    
+                    <div className="max-h-48 overflow-y-auto">
+                        <div
+                            className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-gray-500"
+                            onClick={() => handleSelect("")}
+                        >
+                            {placeholder}
+                        </div>
+                        {filteredOptions.map((option) => (
+                            <div
+                                key={option.username}
+                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() => handleSelect(option.username)}
+                            >
+                                {option.username}
+                            </div>
+                        ))}
+                        {filteredOptions.length === 0 && searchTerm && (
+                            <div className="px-3 py-2 text-gray-500 text-sm">
+                                No results found
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 export default function BulkReassignTable() {
     const [customers, setCustomers] = useState([]);
@@ -34,7 +119,7 @@ export default function BulkReassignTable() {
 
     const fetchEmployees = async () => {
         try {
-            const response = await fetch("/api/tl-assign-lead");
+            const response = await fetch("/api/lead-sources");
             const data = await response.json();
             if (data.success) {
                 setEmployees(data.employees);
@@ -254,18 +339,13 @@ export default function BulkReassignTable() {
                         ))}
                     </select>
 
-                    <select
+                    <SearchableDropdown
+                        options={employees}
                         value={filters.lead_source}
-                        onChange={(e) => setFilters({ ...filters, lead_source: e.target.value })}
-                        className="border rounded px-3 py-2"
-                    >
-                        <option value="">All Employees</option>
-                        {employees.map((emp) => (
-                            <option key={emp.username} value={emp.username}>
-                                {emp.username}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(value) => setFilters({ ...filters, lead_source: value })}
+                        placeholder="All Lead Sources"
+                        className="w-full"
+                    />
                 </div>
 
                 <button
@@ -288,18 +368,13 @@ export default function BulkReassignTable() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Select Target Employee
                             </label>
-                            <select
+                            <SearchableDropdown
+                                options={employees}
                                 value={targetEmployee}
-                                onChange={(e) => setTargetEmployee(e.target.value)}
-                                className="w-full border rounded px-3 py-2"
-                            >
-                                <option value="">-- Select Employee --</option>
-                                {employees.map((emp) => (
-                                    <option key={emp.username} value={emp.username}>
-                                        {emp.username}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setTargetEmployee}
+                                placeholder="-- Select Employee --"
+                                className="w-full"
+                            />
                         </div>
 
                         <div className="flex-1">
