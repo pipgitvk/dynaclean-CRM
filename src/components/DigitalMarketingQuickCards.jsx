@@ -4,11 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, Link2 } from "lucide-react";
 import SummaryStatCard from "@/components/sales/SummaryStatCard";
 
+function isTodayDate(value) {
+  if (!value) return false;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return false;
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 export default function DigitalMarketingQuickCards({ username }) {
   const [loading, setLoading] = useState(true);
   const [allowedModules, setAllowedModules] = useState(null);
   const [taskPendingCount, setTaskPendingCount] = useState(0);
-  const [backlinksPendingCount, setBacklinksPendingCount] = useState(0);
+  const [todayBacklinksCount, setTodayBacklinksCount] = useState(0);
+  const [todayTotalBacklinksCount, setTodayTotalBacklinksCount] = useState(0);
 
   useEffect(() => {
     const init = async () => {
@@ -35,11 +48,7 @@ export default function DigitalMarketingQuickCards({ username }) {
         const requests = [];
         if (canViewBacklinks) {
           requests.push(
-            fetch(
-              `/api/backlinks?assigned_to=${encodeURIComponent(
-                username
-              )}&status=pending`
-            ).then((res) => (res.ok ? res.json() : []))
+            fetch("/api/backlinks").then((res) => (res.ok ? res.json() : []))
           );
         } else {
           requests.push(Promise.resolve([]));
@@ -56,12 +65,20 @@ export default function DigitalMarketingQuickCards({ username }) {
         }
 
         const [backlinksRows, tasksRows] = await Promise.all(requests);
-        setBacklinksPendingCount(
-          Array.isArray(backlinksRows) ? backlinksRows.length : 0
+        const allTodayRows = Array.isArray(backlinksRows)
+          ? backlinksRows.filter((row) => isTodayDate(row.created_at))
+          : [];
+        const todayUserRows = allTodayRows.filter(
+          (row) =>
+            String(row?.assigned_to || "").trim().toLowerCase() ===
+            String(username || "").trim().toLowerCase()
         );
+        setTodayBacklinksCount(todayUserRows.length);
+        setTodayTotalBacklinksCount(allTodayRows.length);
         setTaskPendingCount(Array.isArray(tasksRows) ? tasksRows.length : 0);
       } catch {
-        setBacklinksPendingCount(0);
+        setTodayBacklinksCount(0);
+        setTodayTotalBacklinksCount(0);
         setTaskPendingCount(0);
       } finally {
         setLoading(false);
@@ -88,9 +105,9 @@ export default function DigitalMarketingQuickCards({ username }) {
       {canViewBacklinks && (
         <SummaryStatCard
           href="/digital-marketing-dashboard/backlinks"
-          label="Backlinks Pending"
-          count={backlinksPendingCount}
-          suffix="Backlinks"
+          label="Today Backlinks"
+          count={todayBacklinksCount}
+          suffix="Added Today"
           icon={Link2}
           iconWrapClass="bg-sky-500"
           arrowClass="text-sky-500"
@@ -106,6 +123,18 @@ export default function DigitalMarketingQuickCards({ username }) {
           icon={ClipboardList}
           iconWrapClass="bg-amber-500"
           arrowClass="text-amber-500"
+          loading={loading}
+        />
+      )}
+      {canViewBacklinks && (
+        <SummaryStatCard
+          href="/digital-marketing-dashboard/backlinks"
+          label="Today Total Added"
+          count={todayTotalBacklinksCount}
+          suffix="Backlinks"
+          icon={Link2}
+          iconWrapClass="bg-indigo-500"
+          arrowClass="text-indigo-500"
           loading={loading}
         />
       )}
