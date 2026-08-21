@@ -15,8 +15,18 @@ export default function ManualLeadModal({ show, onClose }) {
     if (show) {
       fetch("/api/lead-sources")
         .then((res) => res.json())
-        .then((data) => setLeadSources(data))
-        .catch(console.error);
+        .then((data) => {
+          // Handle the API response structure correctly
+          if (data.success && data.employees) {
+            setLeadSources(data.employees.map(emp => emp.username));
+          } else {
+            setLeadSources([]);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching lead sources:", error);
+          setLeadSources([]);
+        });
     }
   }, [show]);
 
@@ -269,7 +279,7 @@ export default function ManualLeadModal({ show, onClose }) {
                   className="w-full border p-1 rounded text-sm sm:text-base"
                 >
                   <option value="">Select source</option>
-                  {leadSources.map((src) => (
+                  {Array.isArray(leadSources) && leadSources.map((src) => (
                     <option key={src} value={src}>
                       {src}
                     </option>
