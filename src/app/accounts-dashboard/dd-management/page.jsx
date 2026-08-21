@@ -795,23 +795,15 @@ export default function DDManagementPage() {
                                                             Step 2
                                                         </button>
                                                         {(() => {
-                                                            const hasDirectPayment = dd.reference_no && dd.payment_amount && dd.payment_date;
+                                                            // Only show statement-linked payments, not reference_no field data
                                                             const linkedDebitPayment = creditStatements.find(s => s.type === "Debit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
                                                             
-                                                            if (hasDirectPayment) {
-                                                                return (
-                                                                    <div className="flex flex-col items-start gap-1 text-[10px] text-emerald-700">
-                                                                        <span className="font-semibold">TransID: {dd.reference_no}</span>
-                                                                        <span className="font-semibold">Amount: {dd.payment_amount}</span>
-                                                                        <span className="font-semibold">Date: {dayjs(dd.payment_date).format('DD-MM-YYYY')}</span>
-                                                                    </div>
-                                                                );
-                                                            } else if (linkedDebitPayment) {
+                                                            if (linkedDebitPayment) {
                                                                 return (
                                                                     <div className="flex flex-col items-start gap-1 text-[10px] text-emerald-700">
                                                                         <span className="font-semibold">TransID: {linkedDebitPayment.trans_id}</span>
-                                                                        <span className="font-semibold">Amount: {linkedDebitPayment.amount}</span>
-                                                                        <span className="font-semibold">Date: {dayjs().format('DD-MM-YYYY')}</span>
+                                                                        <span className="font-semibold">Amount: {Math.abs(linkedDebitPayment.amount).toLocaleString('en-IN')}</span>
+                                                                        <span className="font-semibold">Date: {dayjs(linkedDebitPayment.date).format('DD-MM-YYYY')}</span>
                                                                     </div>
                                                                 );
                                                             } else {
@@ -830,9 +822,8 @@ export default function DDManagementPage() {
                                                         })()}
                                                         {(() => {
                                                             const linkedPayment = creditStatements.find(s => s.type === "Credit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
-                                                            const hasDirectPayment = dd.reference_no && dd.payment_amount && dd.payment_date;
                                                             const hasDebitPayment = creditStatements.some(s => s.type === "Debit" && Number(s.dd_id) === Number(dd.id) && String(s.invoice_status || "").trim() === "DD Management Linked");
-                                                            const canLinkPayment = hasDirectPayment || hasDebitPayment;
+                                                            const canLinkPayment = hasDebitPayment; // Remove reference_no dependency
                                                             if (linkedPayment) {
                                                                 return (
                                                                     <div className="flex flex-col items-start gap-1 text-[10px] text-blue-700">
