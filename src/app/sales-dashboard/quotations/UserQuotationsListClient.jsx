@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 
@@ -90,13 +91,23 @@ export default function UserQuotationsListClient({ quotations }) {
                     )}
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setModalQuote(q.quote_number)}
-                      className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
-                    >
-                      View
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setModalQuote(q.quote_number)}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                      >
+                        View
+                      </button>
+                      {!q.has_order ? (
+                        <Link
+                          href={`/sales-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                        >
+                          Edit
+                        </Link>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -156,7 +167,7 @@ export default function UserQuotationsListClient({ quotations }) {
                   </span>
                 )}
               </div>
-              <div className="text-right">
+              <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setModalQuote(q.quote_number)}
@@ -164,6 +175,14 @@ export default function UserQuotationsListClient({ quotations }) {
                 >
                   View
                 </button>
+                {!q.has_order ? (
+                  <Link
+                    href={`/sales-dashboard/quotations/${encodeURIComponent(q.quote_number)}/edit`}
+                    className="inline-block bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Edit
+                  </Link>
+                ) : null}
               </div>
             </div>
           ))
