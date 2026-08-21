@@ -113,10 +113,10 @@ function KeywordGraphCard({ title, icon: Icon, items, href }) {
                 tick={{ fontSize: 11, fill: "#475569" }}
               />
               <Tooltip
-                formatter={(value, name) => [value, name === "rank" ? "Rank" : name]}
+                formatter={(value) => [value, "Current Rank"]}
                 labelFormatter={(label) => `Keyword: ${label}`}
               />
-              <Bar dataKey="rank" name="rank" fill="#7c3aed" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="rank" name="Current Rank" fill="#7c3aed" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -149,7 +149,7 @@ export default function TopBacklinksKeywordsCards({ username }) {
           .filter((row) => isTodayDate(row.created_at))
           .sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at));
 
-        const latestTenTodayBacklinks = allTodayBacklinks.slice(0, 10);
+        const latestTodayBacklinks = allTodayBacklinks.slice(0, 5);
 
         const filteredKeywords = (Array.isArray(keywordsData) ? keywordsData : [])
           .filter((row) => normalizeText(row.assigned_to) === currentUser)
@@ -157,11 +157,14 @@ export default function TopBacklinksKeywordsCards({ username }) {
           .slice(0, 10)
           .map((row) => ({
             ...row,
-            rank: Number(row.rank ?? 0),
+            rank:
+              row.latest_followup_rank != null
+                ? Number(row.latest_followup_rank)
+                : Number(row.rank ?? 0),
             keywordLabel: String(row.keyword || "-").slice(0, 20),
           }));
 
-        setTodayBacklinks(latestTenTodayBacklinks);
+        setTodayBacklinks(latestTodayBacklinks);
         setKeywords(filteredKeywords);
       } catch {
         setTodayBacklinks([]);
@@ -179,11 +182,11 @@ export default function TopBacklinksKeywordsCards({ username }) {
   }, [username]);
 
   const todayBacklinksTitle = useMemo(
-    () => "Today Backlinks (Latest 10)",
+    () => "Today Backlinks (Latest 5)",
     []
   );
   const keywordsTitle = useMemo(
-    () => "Latest 10 Keywords Graph",
+    () => "Keywords Current Rank",
     []
   );
 
