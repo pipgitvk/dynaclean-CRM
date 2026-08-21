@@ -229,13 +229,24 @@ export default function AttendanceStatusTracker({ username }) {
     const durationMin = getBreakDurationMinutes(breakInfo.type);
     const endMs = startedAt.getTime() + durationMin * 60 * 1000;
     const remaining = Math.ceil((endMs - nowMs) / 1000);
-    setBreakRemainingSec(Math.max(0, remaining));
+    // Keep signed value:
+    //  - positive/zero => countdown remaining
+    //  - negative => overtime seconds after break duration
+    setBreakRemainingSec(remaining);
   }, [breakInfo, nowMs, getBreakDurationMinutes, status]);
 
   const isBreakReadyToStart =
     breakInfo.status === "ready" && breakInfo.type.startsWith("break_");
   const isBreakInProgress =
     breakInfo.status === "in_progress" && breakInfo.type.startsWith("break_");
+  const isBreakOvertime =
+    isBreakInProgress && breakRemainingSec != null && breakRemainingSec < 0;
+  const displayedBreakSec =
+    breakRemainingSec == null
+      ? null
+      : breakRemainingSec >= 0
+        ? breakRemainingSec
+        : Math.max(1, Math.abs(breakRemainingSec));
 
   const getBreakIconColor = (state) => {
     switch (state) {
@@ -405,7 +416,9 @@ export default function AttendanceStatusTracker({ username }) {
 
   const buttonTitle = actionLoading
     ? "Processing..."
-    : `${breakInfo.label}${scheduleHint ? ` | ${scheduleHint}` : ""}`;
+    : `${breakInfo.label}${isBreakOvertime ? " (Overtime)" : ""}${
+        scheduleHint ? ` | ${scheduleHint}` : ""
+      }`;
 
   const isPassiveWorking = breakInfo.type === "working";
   const isWaitingCheckin = breakInfo.type === "waiting";
@@ -442,24 +455,29 @@ export default function AttendanceStatusTracker({ username }) {
                 (breakInfo.type === "checkin" &&
                   breakInfo.status === "completed") ||
                 isBreakInProgress
-              ? "bg-green-500 text-white hover:bg-green-600"
+              ? isBreakOvertime
+                ? "bg-red-500 text-white hover:bg-red-600"
+                : "bg-green-500 text-white hover:bg-green-600"
               : breakInfo.type === "checkout" && breakInfo.status === "ready"
                 ? "bg-red-500 hover:bg-red-600 text-white"
                 : "hover:bg-gray-100"
       } ${
         isBreakInProgress &&
         breakRemainingSec != null &&
+        breakRemainingSec >= 0 &&
         breakRemainingSec <= warnAtSeconds
           ? "animate-pulse ring-2 ring-amber-400"
           : ""
+      } ${
+        isBreakOvertime ? "animate-pulse ring-2 ring-red-300" : ""
       }`}
       title={buttonTitle}
     >
       {actionLoading ? (
         <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-      ) : isBreakInProgress && breakRemainingSec != null ? (
+      ) : isBreakInProgress && displayedBreakSec != null ? (
         <span className="text-[11px] font-bold tabular-nums leading-none text-white">
-          {formatCountdown(breakRemainingSec)}
+          {formatCountdown(displayedBreakSec)}
         </span>
       ) : (
         renderIcon()
