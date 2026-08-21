@@ -97,26 +97,28 @@ function KeywordGraphCard({ title, icon: Icon, items, href }) {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={items}
-              layout="vertical"
-              margin={{ top: 8, right: 10, left: 10, bottom: 8 }}
+              margin={{ top: 8, right: 10, left: 10, bottom: 48 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis
+                type="category"
+                dataKey="keywordLabel"
+                tick={{ fontSize: 10, fill: "#475569" }}
+                angle={-25}
+                textAnchor="end"
+                height={56}
+                interval={0}
+              />
+              <YAxis
                 type="number"
                 tick={{ fontSize: 11, fill: "#64748b" }}
                 allowDecimals={false}
-              />
-              <YAxis
-                type="category"
-                dataKey="keywordLabel"
-                width={130}
-                tick={{ fontSize: 11, fill: "#475569" }}
               />
               <Tooltip
                 formatter={(value) => [value, "Current Rank"]}
                 labelFormatter={(label) => `Keyword: ${label}`}
               />
-              <Bar dataKey="rank" name="Current Rank" fill="#7c3aed" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="rank" name="Current Rank" fill="#7c3aed" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
