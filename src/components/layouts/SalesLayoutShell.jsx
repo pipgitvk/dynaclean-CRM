@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/sales/Sidebar";
 import { UserProvider } from "@/context/UserContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import ImpersonationWrapper from "@/components/ImpersonationWrapper";
 
 function LayoutContent({
   children,
@@ -39,9 +40,11 @@ function LayoutContent({
           showSalesMeta
         />
         <UserProvider>
-          <main className="min-h-0 min-w-0 w-full flex-1 overflow-auto p-3 sm:p-4 md:p-5 text-slate-900">
-            {children}
-          </main>
+          <ImpersonationWrapper>
+            <main className="min-h-0 min-w-0 w-full flex-1 overflow-auto p-3 sm:p-4 md:p-5 text-slate-900">
+              {children}
+            </main>
+          </ImpersonationWrapper>
         </UserProvider>
       </div>
     </div>

@@ -196,6 +196,7 @@ import { getDbConnection } from "@/lib/db";
 import UpcomingTasks from "@/components/task/UpcomingTasksAdmin";
 import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
 import OverduePaymentCard from "@/components/OverduePaymentCard";
+import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanceQuickCard";
 import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText } from "lucide-react";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
@@ -393,7 +394,8 @@ export default async function UserDashboardPage() {
 
           {/* Profile Approvals - Dynamic Card Component */}
           <ProfileApprovalsCard />
-             <OverduePaymentCard />
+          <OverduePaymentCard />
+          <KeywordPerformanceQuickCard />
  <a href="/admin-dashboard/stats" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-purple-500 min-h-[140px]">
             <div className="flex flex-col h-full justify-between">
               <div className="flex items-center gap-2 mb-2">

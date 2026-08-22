@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2, MinusCircle } from "lucide-react";
 
 export default function PaymentPendingReport() {
   const [orders, setOrders] = useState([]);
@@ -20,7 +20,9 @@ export default function PaymentPendingReport() {
   const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [deductionModalOpen, setDeductionModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const canAddDeduction = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
 
   useEffect(() => {
     fetchReport();
@@ -103,7 +105,7 @@ export default function PaymentPendingReport() {
           bVal = dayjs(bVal).unix();
         }
         // Handle numeric sorting
-        else if (['total_amount', 'paid_amount', 'remaining_amount'].includes(sortConfig.key)) {
+        else if (['total_amount', 'paid_amount', 'remaining_amount', 'deduction_amount'].includes(sortConfig.key)) {
           aVal = parseFloat(aVal) || 0;
           bVal = parseFloat(bVal) || 0;
         }
@@ -137,7 +139,7 @@ export default function PaymentPendingReport() {
   };
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
+    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Deduction Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
     const csvData = filteredOrders.map(order => [
       order.order_id,
       order.client_name,
@@ -146,6 +148,7 @@ export default function PaymentPendingReport() {
       order.created_by,
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
+      Number(order.deduction_amount || 0).toFixed(2),
       order.remaining_amount.toFixed(2),
       dayjs(order.due_date).format("DD/MM/YYYY"),
       order.latest_deduction || "",
@@ -438,7 +441,12 @@ export default function PaymentPendingReport() {
                         ₹{order.paid_amount.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 border-b text-right font-semibold text-red-600">
-                        ₹{order.remaining_amount.toFixed(2)}
+                        <div>₹{order.remaining_amount.toFixed(2)}</div>
+                        {Number(order.deduction_amount || 0) > 0 && (
+                          <div className="text-[11px] font-medium text-orange-600">
+                            Deducted ₹{Number(order.deduction_amount).toFixed(2)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -491,6 +499,19 @@ export default function PaymentPendingReport() {
                             <History size={14} />
                             History
                           </button>
+                          {canAddDeduction && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedOrder(order);
+                                setDeductionModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+                            >
+                              <MinusCircle size={14} />
+                              Deduction
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -528,6 +549,231 @@ export default function PaymentPendingReport() {
         }}
         order={selectedOrder}
       />
+
+      <DeductionModal
+        open={deductionModalOpen}
+        onClose={() => {
+          setDeductionModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        order={selectedOrder}
+        onSaved={() => {
+          setDeductionModalOpen(false);
+          setSelectedOrder(null);
+          fetchReport();
+        }}
+      />
+    </div>
+  );
+}
+
+function DeductionModal({ open, onClose, order, onSaved }) {
+  const [deductionType, setDeductionType] = useState("TDS");
+  const [amount, setAmount] = useState("");
+  const [remarks, setRemarks] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [deductions, setDeductions] = useState([]);
+
+  useEffect(() => {
+    if (!open || !order?.order_id) return;
+    setDeductionType("TDS");
+    setAmount("");
+    setRemarks("");
+    let cancelled = false;
+
+    async function loadDeductions() {
+      try {
+        setLoadingHistory(true);
+        const res = await fetch(`/api/payment-deduction/${encodeURIComponent(order.order_id)}`);
+        const data = await res.json();
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.error || "Failed to fetch deductions");
+        }
+        if (!cancelled) setDeductions(data.deductions || []);
+      } catch {
+        if (!cancelled) setDeductions([]);
+      } finally {
+        if (!cancelled) setLoadingHistory(false);
+      }
+    }
+
+    loadDeductions();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, order?.order_id]);
+
+  if (!open) return null;
+
+  const remainingBeforeNew = Number(order?.remaining_amount || 0);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <div>
+            <div className="text-lg font-bold text-gray-900">Add Deduction</div>
+            <div className="text-xs text-gray-600">
+              {order?.order_id ? `Order: ${order.order_id}` : ""}
+              {order?.client_name ? ` | ${order.client_name}` : ""}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-4">
+          <div className="grid grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+            <div>
+              <div className="text-xs text-gray-500">Current Remaining</div>
+              <div className="font-semibold text-red-600">₹{remainingBeforeNew.toFixed(2)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Already Deducted</div>
+              <div className="font-semibold text-orange-600">₹{Number(order?.deduction_amount || 0).toFixed(2)}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">Deduction Type</label>
+              <select
+                value={deductionType}
+                onChange={(e) => setDeductionType(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="TDS">TDS</option>
+                <option value="LD">LD</option>
+                <option value="SD">SD</option>
+                <option value="Others">Others</option>
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="mb-1 text-xs font-semibold text-gray-700">Deduction Amount</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          {Number(amount) > 0 && (
+            <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm">
+              Remaining after deduction:{" "}
+              <span className="font-semibold text-orange-800">
+                ₹{Math.max(remainingBeforeNew - Number(amount), 0).toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-col">
+            <label className="mb-1 text-xs font-semibold text-gray-700">Remark</label>
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              rows={3}
+              className="resize-none rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              placeholder="Reason for deduction..."
+            />
+          </div>
+
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Previous Deductions</div>
+            {loadingHistory ? (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 size={14} className="animate-spin" />
+                Loading...
+              </div>
+            ) : deductions.length === 0 ? (
+              <div className="rounded-md bg-gray-50 px-3 py-3 text-sm text-gray-500">No deductions yet</div>
+            ) : (
+              <div className="max-h-40 space-y-2 overflow-y-auto">
+                {deductions.map((item) => (
+                  <div key={item.id} className="rounded-md border border-gray-200 px-3 py-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-gray-800">{item.deduction_type}</span>
+                      <span className="font-semibold text-orange-600">₹{Number(item.amount || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600">{item.remarks || "-"}</div>
+                    <div className="mt-1 text-[11px] text-gray-400">
+                      {item.recorded_by || "Unknown"}
+                      {item.recorded_date ? ` • ${dayjs(item.recorded_date).format("DD/MM/YYYY hh:mm A")}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={async () => {
+              if (!order?.order_id) return;
+              const deductionAmount = Number(amount);
+              if (!Number.isFinite(deductionAmount) || deductionAmount <= 0) {
+                alert("Enter a valid deduction amount");
+                return;
+              }
+              if (deductionAmount > remainingBeforeNew) {
+                alert("Deduction cannot be more than remaining amount");
+                return;
+              }
+              if (!remarks.trim()) {
+                alert("Remark is required");
+                return;
+              }
+              try {
+                setSubmitting(true);
+                const res = await fetch("/api/payment-deduction", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    order_id: order.order_id,
+                    deduction_type: deductionType,
+                    amount: deductionAmount,
+                    remarks: remarks.trim(),
+                  }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data?.success) {
+                  throw new Error(data?.error || "Failed to save deduction");
+                }
+                alert("Deduction saved");
+                onSaved?.();
+              } catch (e) {
+                alert(e?.message || "Failed to save deduction");
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {submitting ? <Loader2 size={16} className="animate-spin" /> : <MinusCircle size={16} />}
+            Save Deduction
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,21 +1,15 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
+import { getSessionPayload } from "@/lib/auth";
 
 export async function GET(req, { params }) {
   const { orderId } = await params;
 
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("token")?.value;
-    if (!token) {
+    const payload = await getSessionPayload();
+    if (!payload) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
 
     const conn = await getDbConnection();
 

@@ -24,7 +24,6 @@ import SalesLayoutShell from "@/components/layouts/SalesLayoutShell";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
-import ImpersonationWrapper from './ImpersonationWrapper';
 import IpGuard from "@/components/IpGuard";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
@@ -58,9 +57,7 @@ export default async function UserDashboardLayout({ children }) {
   return (
     <SalesLayoutShell menuItems={menuItems} showBackToUserCrm={false}>
       <IpGuard />
-      <ImpersonationWrapper>
-        {children}
-      </ImpersonationWrapper>
+      {children}
     </SalesLayoutShell>
   );
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Link from "next/link";
 import { LogIn, Key, Edit, Shield, UserPlus, X, ExternalLink } from "lucide-react";
+import { getRoleDashboardPath } from "@/lib/getRoleDashboardPath";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import toast from "react-hot-toast";
 import {
@@ -233,7 +234,7 @@ const EmployeeCard = ({
 
     <div className="flex flex-wrap gap-2 sm:gap-3 justify-between items-center pt-2 border-t border-gray-100">
       <button
-        onClick={() => handleImpersonateLogin(employee.empId)}
+        onClick={() => handleImpersonateLogin(employee.empId, employee.userRole)}
         className="text-blue-600 hover:text-blue-900 font-medium flex items-center space-x-1 text-sm"
       >
         <LogIn size={16} />
@@ -371,7 +372,7 @@ const EmpTable = ({ employees }) => {
     }
   };
 
-  const handleImpersonateLogin = async (empId) => {
+  const handleImpersonateLogin = async (empId, userRole) => {
     console.log("Impersonate login for empId:", empId);
     try {
       const response = await fetch("/api/impersonate", {
@@ -384,7 +385,7 @@ const EmpTable = ({ employees }) => {
 
       if (response.ok) {
         Cookies.set("impersonation_token", data.token, { expires: 1 / 24 });
-        router.push("/user-dashboard");
+        router.push(getRoleDashboardPath(userRole));
       } else {
         console.log("error data :", data.error);
         // alert(data.error);
@@ -1299,7 +1300,9 @@ const EmpTable = ({ employees }) => {
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="flex flex-wrap gap-2 sm:gap-4">
                         <button
-                          onClick={() => handleImpersonateLogin(employee.empId)}
+                          onClick={() =>
+                            handleImpersonateLogin(employee.empId, employee.userRole)
+                          }
                           className="text-blue-600"
                         >
                           <LogIn size={20} />

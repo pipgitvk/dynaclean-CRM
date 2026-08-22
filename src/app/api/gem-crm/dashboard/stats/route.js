@@ -1,23 +1,27 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { isGemCrmRoleAllowed, resolveGemCrmEmployeeId } from "@/lib/gemCrmAuth";
 
 export async function GET(req) {
   try {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    
-    const role = payload.role;
-    if (!["SUPERADMIN", "GEM"].includes(role)) {
+
+    const role = String(payload.role || "").trim().toUpperCase();
+    if (!isGemCrmRoleAllowed(role)) {
       return NextResponse.json({ error: "Forbidden - SUPERADMIN/GEM only" }, { status: 403 });
     }
-    const currentEmpId = payload.empId || payload.id || null;
+
+    const currentEmpId = await resolveGemCrmEmployeeId(payload);
     if (role === "GEM" && !currentEmpId) {
       return NextResponse.json({ error: "Employee id missing in session." }, { status: 403 });
     }
-    const bidWhere = role === "GEM" ? "WHERE assigned_employee_id = ?" : "";
-    const bidAnd = role === "GEM" ? "AND assigned_employee_id = ?" : "";
-    const bidParams = role === "GEM" ? [currentEmpId] : [];
+
+    const isGemUser = role === "GEM";
+    const bidWhere = isGemUser ? "WHERE assigned_employee_id = ?" : "";
+    const bidAnd = isGemUser ? "AND assigned_employee_id = ?" : "";
+    const bidParams = isGemUser ? [currentEmpId] : [];
 
     const conn = await getDbConnection();
 
@@ -70,7 +74,7 @@ export async function GET(req) {
         WHERE bid_status = 'won'
         AND order_id IS NOT NULL
         AND order_id != ''
-        ${role === "GEM" ? "AND assigned_employee_id = ?" : ""}
+        ${isGemUser ? "AND assigned_employee_id = ?" : ""}
       `, bidParams);
 
       if (wonBidsOrders.length > 0) {
@@ -115,7 +119,7 @@ export async function GET(req) {
         WHERE bid_status = 'won' 
         AND order_id IS NOT NULL 
         AND order_id != ''
-        ${role === "GEM" ? "AND assigned_employee_id = ?" : ""}
+        ${isGemUser ? "AND assigned_employee_id = ?" : ""}
       `, bidParams);
 
       if (wonBidsOrders.length > 0) {
@@ -145,7 +149,7 @@ export async function GET(req) {
         FROM dd_records dd
         INNER JOIN bids b ON dd.id = b.dd_id
         WHERE dd.type = 'DD' AND dd.status IN ('Assigned', 'Filled', 'Issued')
-        ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
+        ${isGemUser ? "AND b.assigned_employee_id = ?" : ""}
       `, bidParams);
       emdStats = emdResult;
     } catch (e) {
@@ -162,7 +166,7 @@ export async function GET(req) {
         FROM dd_records dd
         INNER JOIN bids b ON dd.id = b.dd_id
         WHERE dd.type = 'BG' AND dd.status IN ('Assigned', 'Filled', 'Issued')
-        ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
+        ${isGemUser ? "AND b.assigned_employee_id = ?" : ""}
       `, bidParams);
       bgStats = bgResult;
     } catch (e) {
@@ -237,7 +241,7 @@ export async function GET(req) {
         FROM bids b
         LEFT JOIN emplist e ON b.assigned_employee_id = e.empId
         LEFT JOIN rep_list r ON b.assigned_employee_id = r.empId
-        WHERE b.assigned_employee_id IS NOT NULL ${role === "GEM" ? "AND b.assigned_employee_id = ?" : ""}
+        WHERE b.assigned_employee_id IS NOT NULL ${isGemUser ? "AND b.assigned_employee_id = ?" : ""}
         GROUP BY b.assigned_employee_id, r.username, e.username
         ORDER BY bid_count DESC
         LIMIT 10

@@ -25,6 +25,26 @@ async function getPaymentPendingCountLikeReport(conn) {
      WHERE ${PAYMENT_PENDING_ORDER_SQL_WHERE}`
   );
 
+  const deductionByOrder = new Map();
+  if (rows.length > 0) {
+    try {
+      const orderIds = rows.map((order) => order.order_id);
+      const placeholders = orderIds.map(() => "?").join(",");
+      const [deductionRows] = await conn.query(
+        `SELECT order_id, COALESCE(SUM(amount), 0) AS total
+         FROM payment_deductions
+         WHERE order_id IN (${placeholders})
+         GROUP BY order_id`,
+        orderIds
+      );
+      for (const row of deductionRows) {
+        deductionByOrder.set(row.order_id, parseFloat(row.total || 0));
+      }
+    } catch {
+      // Keep remaining without deductions if table is missing.
+    }
+  }
+
   let pendingCount = 0;
 
   for (const order of rows) {
@@ -72,7 +92,8 @@ async function getPaymentPendingCountLikeReport(conn) {
       .map((s) => parseFloat(s.trim()) || 0)
       .reduce((sum, amt) => sum + amt, 0);
 
-    const remaining = totalAmt - paidAmount;
+    const deductionAmount = deductionByOrder.get(order.order_id) || 0;
+    const remaining = totalAmt - paidAmount - deductionAmount;
     if (remaining > 0) pendingCount += 1;
   }
 

@@ -1,47 +1,54 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
+import { getSessionPayload } from "@/lib/auth";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
+const ALLOWED_ROLES = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"];
 
 export async function POST(request) {
   try {
-    // Verify user
-    const cookieStore = await cookies();
-    const token = cookieStore.get("token")?.value;
-    if (!token) {
+    const payload = await getSessionPayload();
+    if (!payload) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let currentUser = null;
-    try {
-      const { payload } = await jwtVerify(
-        token,
-        new TextEncoder().encode(JWT_SECRET)
-      );
-      currentUser = payload.username || null;
-    } catch (e) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    const currentUser = payload.username || null;
+    const role = payload.role || "";
+    if (!ALLOWED_ROLES.includes(role)) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     const { order_id, deduction_type, remarks, amount } = await request.json();
+    const deductionAmount = parseFloat(amount);
 
-    if (!order_id || !deduction_type || !remarks) {
+    if (!order_id || !deduction_type || !String(remarks || "").trim()) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       );
     }
 
+    if (!Number.isFinite(deductionAmount) || deductionAmount <= 0) {
+      return NextResponse.json(
+        { error: "Deduction amount must be greater than 0" },
+        { status: 400 }
+      );
+    }
+
+    const allowedTypes = ["LD", "SD", "TDS", "Others"];
+    if (!allowedTypes.includes(deduction_type)) {
+      return NextResponse.json(
+        { error: "Invalid deduction type" },
+        { status: 400 }
+      );
+    }
+
     const conn = await getDbConnection();
 
-    // Insert deduction record
     await conn.execute(
       `INSERT INTO payment_deductions 
        (order_id, deduction_type, remarks, amount, recorded_by, recorded_date)
        VALUES (?, ?, ?, ?, ?, NOW())`,
-      [order_id, deduction_type, remarks, amount || 0, currentUser]
+      [order_id, deduction_type, String(remarks).trim(), deductionAmount, currentUser]
     );
 
     return NextResponse.json(
