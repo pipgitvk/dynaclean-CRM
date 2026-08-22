@@ -23,8 +23,16 @@ export default function UpcomingLeadsCards({
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState("soonest"); // soonest | latest | name
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(() => {
+    // Default to current date
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    // Default to current date
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
   const [statusFilter, setStatusFilter] = useState("ALL"); // ALL or specific status
   const [stageFilter, setStageFilter] = useState("ALL"); // ALL or specific stage
   const [multiTagFilter, setMultiTagFilter] = useState("ALL"); // ALL or specific multi-tag
@@ -35,7 +43,13 @@ export default function UpcomingLeadsCards({
     async function fetchLeads() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/upcoming-leads?leadSource=${leadSource}`);
+        let url = `/api/upcoming-leads?leadSource=${leadSource}`;
+        
+        // Add date parameters if they are set
+        if (startDate) url += `&startDate=${startDate}`;
+        if (endDate) url += `&endDate=${endDate}`;
+        
+        const res = await fetch(url);
         const data = await res.json();
         setLeads(data.leads || []);
         console.log("Fetched leads:", data.leads);
@@ -46,7 +60,7 @@ export default function UpcomingLeadsCards({
       }
     }
     fetchLeads();
-  }, [leadSource]);
+  }, [leadSource, startDate, endDate]);
 
   // Prepare filtered and sorted leads
   const processedLeads = (() => {
@@ -95,21 +109,21 @@ export default function UpcomingLeadsCards({
       });
     }
 
-    // Date filtering (by next_followup_date or service_next_followup)
-    if (startDate || endDate) {
-      const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
-      const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
-      const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
-      filtered = filtered.filter((cust) => {
-        if (!cust[dateField]) return false; // hide if no date when filter applied
-        const ms = getCrmInstantMs(cust[dateField]);
-        if (!ms) return false;
-        const d = new Date(ms);
-        if (start && d < start) return false;
-        if (end && d > end) return false;
-        return true;
-      });
-    }
+    // Date filtering (now handled by API, so remove frontend filtering)
+    // if (startDate || endDate) {
+    //   const start = startDate ? new Date(`${startDate}T00:00:00`) : null;
+    //   const end = endDate ? new Date(`${endDate}T23:59:59`) : null;
+    //   const dateField = isServiceSupport ? "service_next_followup" : "next_followup_date";
+    //   filtered = filtered.filter((cust) => {
+    //     if (!cust[dateField]) return false; // hide if no date when filter applied
+    //     const ms = getCrmInstantMs(cust[dateField]);
+    //     if (!ms) return false;
+    //     const d = new Date(ms);
+    //     if (start && d < start) return false;
+    //     if (end && d > end) return false;
+    //     return true;
+    //   });
+    // }
 
     // Sorting
     filtered.sort((a, b) => {
@@ -256,15 +270,16 @@ export default function UpcomingLeadsCards({
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
-          {(startDate || endDate) && (
+          {(startDate !== new Date().toISOString().split('T')[0] || endDate !== new Date().toISOString().split('T')[0]) && (
             <button
               className="border rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               onClick={() => {
-                setStartDate("");
-                setEndDate("");
+                const today = new Date().toISOString().split('T')[0];
+                setStartDate(today);
+                setEndDate(today);
               }}
             >
-              Clear dates
+              Reset to today
             </button>
           )}
         </div>

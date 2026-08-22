@@ -20,17 +20,24 @@ export async function GET(request) {
   }
 
   const istNow = getISTTime();
-  const sixHoursAhead = new Date(istNow.getTime() + 6 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 19)
-    .replace("T", " ");
+  
+  // Get date filters from query params
+  const startDate = searchParams.get("startDate");
+  const endDate = searchParams.get("endDate");
+  
+  // If no date filter provided, default to current date
+  const currentDateIST = istNow.toISOString().slice(0, 10); // YYYY-MM-DD format
+  const defaultStartDate = startDate || currentDateIST;
+  const defaultEndDate = endDate || currentDateIST;
+  
+  console.log("Date filters - Start:", defaultStartDate, "End:", defaultEndDate);
 
   try {
     const connection = await getDbConnection();
     console.log("Database connection established.");
 
-    // 2. Log the final SQL query and its parameters
-    const sqlQuery = `
+    // 2. Updated SQL query with date filtering instead of 6-hour limit
+    let sqlQuery = `
       SELECT *
 FROM (
   SELECT
@@ -49,9 +56,11 @@ FROM (
     AND (c.stage IS NULL OR c.stage != 'Disqualified / Invalid Lead')
 ) AS T
 WHERE T.rn = 1
-  AND (T.next_followup_date <= ? OR T.next_followup_date IS NULL);
+  AND T.next_followup_date IS NOT NULL
+  AND DATE(T.next_followup_date) >= ?
+  AND DATE(T.next_followup_date) <= ?;
     `;
-    const queryParams = [leadSource, sixHoursAhead];
+    const queryParams = [leadSource, defaultStartDate, defaultEndDate];
     console.log("Executing SQL query:", sqlQuery);
     console.log("With parameters:", queryParams);
 
