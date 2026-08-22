@@ -4,6 +4,58 @@ import { getSessionPayload } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+function parseItemsJson(raw) {
+  if (raw == null || raw === "") return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "object") {
+    const str = typeof raw.toString === "function" ? raw.toString() : "";
+    if (str && str !== "[object Object]") {
+      try {
+        const parsed = JSON.parse(str);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+async function loadBomForProduct(db, productCode) {
+  const code = String(productCode || "").trim();
+  if (!code) return null;
+
+  let [[bomRow]] = await db.query(
+    `SELECT id as bom_id, items_json, created_by, modified_by, status
+       FROM bom
+      WHERE TRIM(product_code) = ? AND status = 'active'
+      LIMIT 1`,
+    [code]
+  );
+
+  if (!bomRow) {
+    [[bomRow]] = await db.query(
+      `SELECT id as bom_id, items_json, created_by, modified_by, status
+         FROM bom
+        WHERE TRIM(product_code) = ?
+        ORDER BY updated_at DESC
+        LIMIT 1`,
+      [code]
+    );
+  }
+
+  return bomRow || null;
+}
+
 // GET /api/productions/bom/compare?production_id=ID
 // Returns current production BOM snapshot items and current active BOM items for that product.
 export async function GET(req) {
@@ -28,29 +80,11 @@ export async function GET(req) {
     if (!prod) return NextResponse.json({ error: "Production not found" }, { status: 404 });
 
     // Snapshot currently stored on production row
-    let currentItemsRaw = [];
-    try {
-      currentItemsRaw = prod.items_json ? JSON.parse(prod.items_json || "[]") : [];
-    } catch {
-      currentItemsRaw = [];
-    }
+    const currentItemsRaw = parseItemsJson(prod.items_json);
 
-    // Load active BOM for comparison
-    const [[bomRow]] = await db.query(
-      `SELECT id as bom_id, items_json, created_by, modified_by
-         FROM bom
-        WHERE product_code = ? AND status = 'active'
-        LIMIT 1`,
-      [prod.product_code]
-    );
-    let bomItemsRaw = [];
-    if (bomRow) {
-      try {
-        bomItemsRaw = JSON.parse(bomRow.items_json || "[]");
-      } catch {
-        bomItemsRaw = [];
-      }
-    }
+    // Load active BOM for comparison (fallback to latest BOM if none active)
+    const bomRow = await loadBomForProduct(db, prod.product_code);
+    const bomItemsRaw = bomRow ? parseItemsJson(bomRow.items_json) : [];
 
     // Enrich items with spare details
     const allSpareIds = Array.from(
@@ -107,9 +141,15 @@ export async function GET(req) {
         bom_id: bomRow?.bom_id || null,
         created_by: bomRow?.created_by || null,
         modified_by: bomRow?.modified_by || null,
+        status: bomRow?.status || null,
       },
       current_items,
       bom_items,
+      meta: {
+        bom_found: Boolean(bomRow),
+        snapshot_count: current_items.length,
+        bom_count: bom_items.length,
+      },
     });
   } catch (e) {
     console.error("/api/productions/bom/compare GET error", e);
@@ -156,33 +196,20 @@ export async function POST(req) {
 
       const product_code = prod.product_code;
 
-      const [[bomRow]] = await conn.query(
-        `SELECT items_json FROM bom WHERE product_code = ? AND status = 'active' LIMIT 1`,
-        [product_code]
-      );
+      const bomRow = await loadBomForProduct(conn, product_code);
       if (!bomRow) {
         await conn.rollback();
         return NextResponse.json({ error: "Active BOM not found for this product" }, { status: 400 });
       }
 
-      let bomItems = [];
-      try {
-        bomItems = JSON.parse(bomRow.items_json || "[]");
-      } catch {
-        bomItems = [];
-      }
+      const bomItems = parseItemsJson(bomRow.items_json);
       if (!Array.isArray(bomItems) || bomItems.length === 0) {
         await conn.rollback();
         return NextResponse.json({ error: "Active BOM has no items" }, { status: 400 });
       }
 
       // Parse current snapshot from production (baseline)
-      let currentItems = [];
-      try {
-        currentItems = prod.items_json ? JSON.parse(prod.items_json || "[]") : [];
-      } catch {
-        currentItems = [];
-      }
+      const currentItems = parseItemsJson(prod.items_json);
 
       const currentMap = new Map(
         currentItems.map((it) => [Number(it.spare_id), { ...it }])
