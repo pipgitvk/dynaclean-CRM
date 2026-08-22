@@ -24,12 +24,20 @@ export default function UpcomingLeadsCards({
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState("soonest"); // soonest | latest | name
   const [startDate, setStartDate] = useState(() => {
-    // Default to current date
+    // Try to get from localStorage first, otherwise default to current date
+    if (typeof window !== 'undefined') {
+      const savedStartDate = localStorage.getItem('upcomingLeads_startDate');
+      if (savedStartDate) return savedStartDate;
+    }
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(() => {
-    // Default to current date
+    // Try to get from localStorage first, otherwise default to current date
+    if (typeof window !== 'undefined') {
+      const savedEndDate = localStorage.getItem('upcomingLeads_endDate');
+      if (savedEndDate) return savedEndDate;
+    }
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
@@ -38,6 +46,31 @@ export default function UpcomingLeadsCards({
   const [multiTagFilter, setMultiTagFilter] = useState("ALL"); // ALL or specific multi-tag
   const [tagFilter, setTagFilter] = useState(""); // empty or specific tag
   const isServiceSupport = userRole === "SERVICE SUPPORT";
+
+  // Functions to handle date changes and save to localStorage
+  const handleStartDateChange = (newDate) => {
+    setStartDate(newDate);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('upcomingLeads_startDate', newDate);
+    }
+  };
+
+  const handleEndDateChange = (newDate) => {
+    setEndDate(newDate);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('upcomingLeads_endDate', newDate);
+    }
+  };
+
+  const resetToToday = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setStartDate(today);
+    setEndDate(today);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('upcomingLeads_startDate', today);
+      localStorage.setItem('upcomingLeads_endDate', today);
+    }
+  };
 
   useEffect(() => {
     async function fetchLeads() {
@@ -258,7 +291,7 @@ export default function UpcomingLeadsCards({
               type="date"
               className={controlClass}
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(e) => handleStartDateChange(e.target.value)}
             />
           </div>
           <div className="flex flex-col">
@@ -267,17 +300,13 @@ export default function UpcomingLeadsCards({
               type="date"
               className={controlClass}
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(e) => handleEndDateChange(e.target.value)}
             />
           </div>
           {(startDate !== new Date().toISOString().split('T')[0] || endDate !== new Date().toISOString().split('T')[0]) && (
             <button
               className="border rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              onClick={() => {
-                const today = new Date().toISOString().split('T')[0];
-                setStartDate(today);
-                setEndDate(today);
-              }}
+              onClick={resetToToday}
             >
               Reset to today
             </button>
