@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import Link from "next/link";
-import ScheduleVisitModal from "./ScheduleVisitModal";
+// import ScheduleVisitModal from "./ScheduleVisitModal";
 
 const STATUS_STYLES = {
   pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -171,11 +171,13 @@ export default function ScheduleVisitsClient({ dashboardPrefix = "user-dashboard
         >
           Apply Filters
         </button>
+        {/* + Schedule Visit — use customer profile page instead
         <ScheduleVisitModal
           buttonLabel="+ Schedule Visit"
           variant="primary"
           onCreated={fetchData}
         />
+        */}
       </div>
 
       <div className="overflow-x-auto bg-white rounded-lg shadow">
