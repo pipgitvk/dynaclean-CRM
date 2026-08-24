@@ -49,19 +49,51 @@ export async function POST(request) {
             // Update customers in bulk
             for (const customer_id of customer_ids) {
                 try {
-                    // Update the customer's lead_source to the new employee
+                    const [existing] = await connection.execute(
+                        `SELECT customer_id, lead_source, first_name, last_name, phone, email
+                         FROM customers WHERE customer_id = ?`,
+                        [customer_id]
+                    );
+
+                    if (!existing.length) {
+                        failureCount++;
+                        errors.push({ customer_id, error: "Customer not found" });
+                        continue;
+                    }
+
+                    const prev = existing[0];
+                    const previousEmployee = prev.lead_source || "—";
+                    const customerName =
+                        [prev.first_name, prev.last_name].filter(Boolean).join(" ") || "—";
+
+                    // Reassign lead: reset status/stage to New for the new assignee
                     await connection.execute(
                         `UPDATE customers
                          SET
                            lead_source = ?,
                            assigned_to = ?,
                            sales_representative = ?,
-                           status = CASE
-                             WHEN LOWER(COALESCE(status, '')) = 'denied' THEN 'old_reassign'
-                             ELSE status
-                           END
+                           status = 'New',
+                           stage = 'New',
+                           next_follow_date = NOW()
                          WHERE customer_id = ?`,
                         [employee_username, payload.username, employee_username, customer_id]
+                    );
+
+                    const reassignNote = `Re-assigned lead from ${previousEmployee} to ${employee_username} by ${payload.username}`;
+                    await connection.execute(
+                        `INSERT INTO customers_followup
+                         (customer_id, name, contact, email, next_followup_date, followed_date, comm_mode, notes, followed_by)
+                         VALUES (?, ?, ?, ?, NOW(), NULL, ?, ?, ?)`,
+                        [
+                            customer_id,
+                            customerName,
+                            prev.phone || "",
+                            prev.email || "",
+                            "System",
+                            reassignNote,
+                            payload.username,
+                        ]
                     );
 
                     // Also update in TL_followups if exists
