@@ -8,6 +8,7 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
+import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
 export default function TeamLeaderDashboard({ user, reportingManager }) {
   return (
@@ -35,10 +36,11 @@ export default function TeamLeaderDashboard({ user, reportingManager }) {
             </div>
 
             {/* Buttons row - separate on mobile */}
-            <div className="flex flex-row gap-2 justify-start sm:justify-end">
+            <div className="flex flex-row gap-2 justify-start sm:justify-end flex-wrap">
               <TodayReportButton />
               <LeaveApprovalButton />
               <ExpenseApprovalButton />
+              <ScheduleVisitCard variant="sales" href="/user-dashboard/schedule-visits" />
             </div>
 
             {/* Fast Cards */}

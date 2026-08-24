@@ -5,6 +5,7 @@ import {
   parseModuleAccess,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
+  isModuleKeyAllowed,
 } from "@/lib/moduleAccess";
 
 function uniqueStrings(arr) {
@@ -71,11 +72,10 @@ export async function userHasModuleKey(username, role, moduleKey) {
 
   const allowed = await getEffectiveAllowedModuleKeys(username, role);
   if (allowed === null) {
-    // Legacy: module_access not configured yet → treat as full access (minus superadmin-only etc.)
     const base = applySuperadminOnlyModuleRestrictions([...ALL_MODULE_KEYS], roleKey) ?? [];
     const base2 = applyRoleDenyModuleRestrictions(base, roleKey) ?? [];
-    return uniqueStrings(base2).includes(key);
+    return isModuleKeyAllowed(key, uniqueStrings(base2));
   }
 
-  return allowed.includes(key);
+  return isModuleKeyAllowed(key, allowed);
 }

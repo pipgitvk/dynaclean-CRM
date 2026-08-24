@@ -63,7 +63,7 @@ function ModuleUiBlock({
             <input
               type="checkbox"
               checked={isChecked}
-              onChange={() => !disabled && onToggleChild(node.key)}
+              onChange={(e) => !disabled && onToggleChild(node.key, e.target.checked)}
               disabled={disabled}
               className="w-4 h-4 accent-blue-600 flex-shrink-0"
             />
@@ -162,7 +162,7 @@ function ModuleUiBlock({
                     <input
                       type="checkbox"
                       checked={selected.includes(ch.key)}
-                      onChange={() => !disabled && onToggleChild(ch.key)}
+                      onChange={(e) => !disabled && onToggleChild(ch.key, e.target.checked)}
                       disabled={disabled}
                       className="w-3.5 h-3.5 accent-blue-600 flex-shrink-0"
                     />
@@ -296,6 +296,7 @@ const EmpTable = ({ employees }) => {
   const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkModuleSearch, setBulkModuleSearch] = useState("");
+  const bulkUserEditedRef = useRef(false);
   const router = useRouter();
 
   const persistBulkSelectionForRole = useCallback((role, modules) => {
@@ -307,7 +308,7 @@ const EmpTable = ({ employees }) => {
     }));
   }, []);
 
-  const fetchRoleModulesFromDB = useCallback(async (role) => {
+  const fetchRoleModulesFromDB = useCallback(async (role, { applyToSelection = false } = {}) => {
     const key = String(role || "").trim();
     if (!key) return [];
     setBulkRoleLoading(true);
@@ -320,6 +321,9 @@ const EmpTable = ({ employees }) => {
       const data = await res.json();
       const modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
       setBulkRoleSelections((prev) => ({ ...(prev || {}), [key]: modules }));
+      if (applyToSelection && !bulkUserEditedRef.current) {
+        setBulkSelectedModules(modules);
+      }
       return modules;
     } catch {
       return [];
@@ -489,6 +493,7 @@ const EmpTable = ({ employees }) => {
   const setRoleAndResetSelection = async (role) => {
     // Persist the in-progress selection for the current role before switching.
     persistBulkSelectionForRole(bulkRole, bulkSelectedModules);
+    bulkUserEditedRef.current = false;
     setBulkRole(role);
     setBulkTouched(false);
     const key = String(role || "").trim();
@@ -496,19 +501,23 @@ const EmpTable = ({ employees }) => {
     if (Array.isArray(cached)) {
       setBulkSelectedModules(cached);
     } else {
-      const fromDB = await fetchRoleModulesFromDB(role);
-      setBulkSelectedModules(fromDB);
+      await fetchRoleModulesFromDB(role, { applyToSelection: true });
     }
   };
 
-  const toggleBulkChild = (key) => {
+  const toggleBulkChild = (key, checked) => {
+    bulkUserEditedRef.current = true;
     setBulkTouched(true);
-    setBulkSelectedModules((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-    );
+    setBulkSelectedModules((prev) => {
+      if (checked) {
+        return prev.includes(key) ? prev : [...prev, key];
+      }
+      return prev.filter((k) => k !== key);
+    });
   };
 
   const toggleBulkGroup = (node) => {
+    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const keys = collectModuleKeysFromUiNode(node);
     if (keys.length === 0) return;
@@ -524,6 +533,7 @@ const EmpTable = ({ employees }) => {
   };
 
   const toggleBulkAll = () => {
+    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const allSelected = ALL_MODULE_KEYS.every((k) => bulkSelectedModules.includes(k));
     setBulkSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
@@ -814,6 +824,7 @@ const EmpTable = ({ employees }) => {
       "attendance-details",
       "regularization-approvals",
       "fast-card",
+      "schedule-visits",
       "tl-customers",
       "add-customer",
       "view-customers",
@@ -895,6 +906,7 @@ const EmpTable = ({ employees }) => {
   };
 
   const applyDefaultModules = () => {
+    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const trimmedRole = String(bulkRole || "").trim();
     const defaults = roleDefaultModules[trimmedRole] || [];
@@ -923,13 +935,11 @@ const EmpTable = ({ employees }) => {
         throw new Error(data?.message || "Failed to apply module access.");
       }
       toast.success(`Applied to ${data.updated ?? 0} users`);
-      // Clear cached state so next open fetches fresh from DB
       const key = String(bulkRole || "").trim();
-      setBulkRoleSelections((prev) => {
-        const next = { ...(prev || {}) };
-        delete next[key];
-        return next;
-      });
+      setBulkRoleSelections((prev) => ({
+        ...(prev || {}),
+        [key]: [...bulkSelectedModules],
+      }));
       setShowGlobalModulesModal(false);
       router.refresh();
     } catch (e) {
@@ -976,16 +986,17 @@ const EmpTable = ({ employees }) => {
         <button
           type="button"
           onClick={async () => {
+            bulkUserEditedRef.current = false;
             setBulkTouched(false);
             const key = String(bulkRole || "").trim();
             const cached = bulkRoleSelections?.[key];
             if (Array.isArray(cached)) {
               setBulkSelectedModules(cached);
+              setShowGlobalModulesModal(true);
             } else {
-              const fromDB = await fetchRoleModulesFromDB(bulkRole);
-              setBulkSelectedModules(fromDB);
+              setShowGlobalModulesModal(true);
+              await fetchRoleModulesFromDB(bulkRole, { applyToSelection: true });
             }
-            setShowGlobalModulesModal(true);
           }}
           className="text-white bg-emerald-600 hover:bg-emerald-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
         >
@@ -1110,7 +1121,7 @@ const EmpTable = ({ employees }) => {
                       key={node.id}
                       node={node}
                       selected={bulkSelectedModules}
-                      disabled={bulkSaving}
+                      disabled={bulkSaving || bulkRoleLoading}
                       onToggleGroup={toggleBulkGroup}
                       onToggleChild={toggleBulkChild}
                     />

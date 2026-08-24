@@ -21,6 +21,7 @@ export const MODULE_TREE = [
       { key: "dm-fresh-leads", label: "24h Fresh Leads (DM)" },
       { key: "task-manager", label: "Task Manager" },
       { key: "demo-details", label: "Demo Details" },
+      { key: "schedule-visits", label: "Schedule Visits" },
       { key: "attendance-details", label: "Attendance details" },
       { key: "regularization-approvals", label: "Overtime" },
       { key: "fast-card", label: "Fast Card" },
@@ -204,6 +205,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "fast-card", label: "Fast Card" },
       { kind: "leaf", key: "attendance-details", label: "Attendance details" },
       { kind: "leaf", key: "regularization-approvals", label: "Overtime" },
+      { kind: "leaf", key: "schedule-visits", label: "Schedule Visits" },
     ],
   },
   {
@@ -267,6 +269,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "demo-followups", label: "Demo Followups" },
       { kind: "leaf", key: "demo-details", label: "Demo Details" },
+      { kind: "leaf", key: "schedule-visits", label: "Schedule Visits" },
     ],
   },
   {
@@ -666,4 +669,21 @@ export function isSectionAllowed(sectionKey, allowedKeys) {
   if (allowedKeys.includes(sectionKey)) return true;
   const childKeys = getChildKeys(sectionKey);
   return childKeys.some((k) => allowedKeys.includes(k));
+}
+
+/**
+ * Whether a leaf module key is allowed — direct key, child-of-section, or parent section granted.
+ */
+export function isModuleKeyAllowed(moduleKey, allowedKeys) {
+  if (!allowedKeys) return true;
+  const key = String(moduleKey || "").trim();
+  if (!key) return false;
+  if (allowedKeys.includes(key)) return true;
+  if (isSectionAllowed(key, allowedKeys)) return true;
+  for (const section of MODULE_TREE) {
+    if (allowedKeys.includes(section.key)) {
+      if (getChildKeys(section.key).includes(key)) return true;
+    }
+  }
+  return false;
 }

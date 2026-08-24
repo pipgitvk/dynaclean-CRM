@@ -375,6 +375,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "PlayCircle",
       },
+      {
+        path: "/admin-dashboard/schedule-visits",
+        name: "Schedule Visits",
+        accessKey: "schedule-visits",
+        roles: ["SUPERADMIN"],
+        icon: "MapPin",
+      },
     ],
   },
   {

@@ -7,6 +7,7 @@ import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
+import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
 export default function BackOfficeDashboard({ user, reportingManager }) {
   return (
@@ -34,9 +35,10 @@ export default function BackOfficeDashboard({ user, reportingManager }) {
             </div>
 
             {/* Buttons row - separate on mobile */}
-            <div className="flex flex-row gap-2 justify-start sm:justify-end">
+            <div className="flex flex-row gap-2 justify-start sm:justify-end flex-wrap">
               <TodayReportButton />
               <LeaveApprovalButton />
+              <ScheduleVisitCard variant="sales" href="/user-dashboard/schedule-visits" />
             </div>
 
             {/* Fast Cards */}

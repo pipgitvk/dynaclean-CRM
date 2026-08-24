@@ -4,6 +4,7 @@ import { normalizeRoleKey } from "@/lib/adminAttendanceRulesAuth";
 import {
   parseModuleAccess,
   isSectionAllowed,
+  isModuleKeyAllowed,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
   SUPERADMIN_ONLY_MODULE_KEYS,
@@ -13,6 +14,7 @@ import { getDbConnection } from "@/lib/db";
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
   const role = String(roleKey || "").toUpperCase();
+  if (role === "DIRECTOR") return "/director-dashboard";
   if (role.includes("SALES")) return "/sales-dashboard";
   if (role.includes("SERVICE") && role.includes("HEAD")) return "/service-head-dashboard";
   if (role.includes("HR")) return "/hr-dashboard";
@@ -316,6 +318,13 @@ const allMenuItems = [
           "HR",
         ],
         icon: "PlayCircle",
+      },
+      {
+        path: "/user-dashboard/schedule-visits",
+        name: "Schedule Visits",
+        moduleKey: "schedule-visits",
+        roles: ["ALL"],
+        icon: "MapPin",
       },
     ],
   },
@@ -1087,7 +1096,7 @@ export default async function getSidebarMenuItems() {
             // Otherwise older menu entries would "leak" through and ignore module_access.
             // My Leads is accessible to anyone who has the my-leads module key in their module_access
             const allowed = item?.moduleKey
-              ? isSectionAllowed(item.moduleKey, allowedModules)
+              ? isModuleKeyAllowed(item.moduleKey, allowedModules)
               : item?.path
                 ? false
                 : true;
