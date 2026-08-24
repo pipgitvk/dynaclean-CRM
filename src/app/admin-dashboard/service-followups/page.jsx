@@ -3,8 +3,16 @@ import { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
-import { Search, Plus, X, Calendar, Image as ImageIcon, Eye } from "lucide-react";
+import { Search, Plus, X, Eye, ClipboardList, History } from "lucide-react";
 import toast from "react-hot-toast";
+import {
+  FollowUpModal,
+  HistoryModal,
+  ImagePreviewModal,
+  getISTNow,
+  toLocalDT,
+  IST,
+} from "@/components/service/MachineFollowupModals";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -15,50 +23,41 @@ export default function ServiceFollowupsPage() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
   const [pageSize] = useState(50);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    serial_number: "",
-    product_model: "",
-    notes: "",
-    next_followup_date: "",
-    image: null,
-    followed_at: "",
-    contact: ""
-  });
-  const [serialSearch, setSerialSearch] = useState("");
-  const [serialSuggestions, setSerialSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [followUpTarget, setFollowUpTarget] = useState(null);
+  const [historySerial, setHistorySerial] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
 
-  const fetchFollowups = useCallback(async (page, search = "") => {
-    setLoading(true);
-    try {
-      const url = `/api/machines-followup?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      
-      if (data.success) {
-        setFollowups(data.followups || []);
-        setTotalPages(data.totalPages || 1);
-        setTotal(data.total || 0);
-        setCurrentPage(data.currentPage || 1);
-      } else {
-        toast.error(data.error || "Failed to fetch followups");
+  const fetchFollowups = useCallback(
+    async (page, search = "") => {
+      setLoading(true);
+      try {
+        const url = `/api/machines-followup?page=${page}&limit=${pageSize}&search=${encodeURIComponent(search)}&latest_only=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.success) {
+          setFollowups(data.followups || []);
+          setTotalPages(data.totalPages || 1);
+          setCurrentPage(data.currentPage || 1);
+        } else {
+          toast.error(data.error || "Failed to fetch followups");
+        }
+      } catch (error) {
+        console.error("Error fetching followups:", error);
+        toast.error("Failed to fetch followups");
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching followups:", error);
-      toast.error("Failed to fetch followups");
-    } finally {
-      setLoading(false);
-    }
-  }, [pageSize]);
+    },
+    [pageSize]
+  );
 
   useEffect(() => {
     fetchFollowups(currentPage, searchQuery);
-  }, [currentPage, fetchFollowups, searchQuery]);
+  }, [currentPage, fetchFollowups]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -68,105 +67,80 @@ export default function ServiceFollowupsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery, fetchFollowups]);
 
+  const nowIST = getISTNow();
+  const [addMin] = useState(toLocalDT(new Date(nowIST.getTime() - 24 * 3600 * 1000)));
+  const [addMax] = useState(toLocalDT(new Date(nowIST.getTime() - 60 * 1000)));
+  const [addForm, setAddForm] = useState({
+    serial_number: "",
+    product_model: "",
+    contact: "",
+    followed_at: toLocalDT(new Date(nowIST.getTime() - 60 * 1000)),
+    notes: "",
+    next_followup_date: "",
+    image: null,
+  });
+  const [addSerialSearch, setAddSerialSearch] = useState("");
+  const [addSuggestions, setAddSuggestions] = useState([]);
+  const [addShowSugg, setAddShowSugg] = useState(false);
+  const [addSubmitting, setAddSubmitting] = useState(false);
+
   useEffect(() => {
-    const searchSerials = async () => {
-      if (serialSearch.length < 2) {
-        setSerialSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
+    if (addSerialSearch.length < 2) {
+      setAddSuggestions([]);
+      setAddShowSugg(false);
+      return;
+    }
+    const t = setTimeout(async () => {
       try {
         const res = await fetch("/api/machines-followup", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ search: serialSearch })
+          body: JSON.stringify({ search: addSerialSearch }),
         });
         const data = await res.json();
         if (data.success) {
-          setSerialSuggestions(data.products || []);
-          setShowSuggestions(true);
+          setAddSuggestions(data.products || []);
+          setAddShowSugg(true);
         }
       } catch (error) {
         console.error("Error searching serials:", error);
       }
-    };
-    const timer = setTimeout(searchSerials, 300);
-    return () => clearTimeout(timer);
-  }, [serialSearch]);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [addSerialSearch]);
 
-  const handleSelectProduct = (product) => {
-    setFormData(prev => ({
-      ...prev,
-      serial_number: product.serial_number,
-      product_model: product.model
-    }));
-    setSerialSearch(product.serial_number);
-    setShowSuggestions(false);
-  };
-
-  const [minFollowedAt, setMinFollowedAt] = useState("");
-  const [maxFollowedAt, setMaxFollowedAt] = useState("");
-  
-  const formatLocalDateTime = (date) => {
-    // Convert to Asia/Kolkata (IST) timezone
-    const istDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    const year = istDate.getFullYear();
-    const month = String(istDate.getMonth() + 1).padStart(2, "0");
-    const day = String(istDate.getDate()).padStart(2, "0");
-    const hours = String(istDate.getHours()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:00`; // Only hours, 00 minutes in IST
-  };
-
-  const getISTDate = (date) => {
-    const istDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    return istDate;
-  };
-
-  const handleOpenModal = () => {
-    const now = new Date();
-    const nowIST = getISTDate(now);
-    const oneDayAgoIST = new Date(nowIST.getTime() - 24 * 60 * 60 * 1000);
-    const maxTimeIST = new Date(nowIST.getTime() - 1 * 60 * 1000); // 1 minute earlier to avoid issues
-    setMinFollowedAt(formatLocalDateTime(oneDayAgoIST));
-    setMaxFollowedAt(formatLocalDateTime(maxTimeIST));
-    setFormData({
+  const handleOpenAddModal = () => {
+    setAddForm({
       serial_number: "",
       product_model: "",
+      contact: "",
+      followed_at: addMax,
       notes: "",
       next_followup_date: "",
       image: null,
-      followed_at: formatLocalDateTime(maxTimeIST),
-      contact: ""
     });
-    setSerialSearch("");
-    setIsModalOpen(true);
+    setAddSerialSearch("");
+    setAddModalOpen(true);
   };
 
-  const handleSubmit = async (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setAddSubmitting(true);
+    const fd = new FormData();
+    fd.append("serial_number", addForm.serial_number);
+    fd.append("product_model", addForm.product_model);
+    fd.append("contact", addForm.contact);
+    fd.append("followed_at", addForm.followed_at);
+    fd.append("notes", addForm.notes);
+    fd.append("next_followup_date", addForm.next_followup_date);
+    if (addForm.image) fd.append("image", addForm.image);
 
     try {
-      const formDataToSend = new FormData();
-      formDataToSend.append("serial_number", formData.serial_number);
-      formDataToSend.append("product_model", formData.product_model);
-      formDataToSend.append("notes", formData.notes);
-      formDataToSend.append("next_followup_date", formData.next_followup_date);
-      formDataToSend.append("followed_at", formData.followed_at);
-      formDataToSend.append("contact", formData.contact);
-      if (formData.image) {
-        formDataToSend.append("image", formData.image);
-      }
-
-      const res = await fetch("/api/machines-followup", {
-        method: "POST",
-        body: formDataToSend
-      });
-
+      const res = await fetch("/api/machines-followup", { method: "POST", body: fd });
       const data = await res.json();
       if (data.success) {
         toast.success("Follow-up added successfully!");
-        setIsModalOpen(false);
+        setAddModalOpen(false);
         fetchFollowups(currentPage, searchQuery);
       } else {
         toast.error(data.error || "Something went wrong");
@@ -175,20 +149,19 @@ export default function ServiceFollowupsPage() {
       console.error("Error submitting followup:", error);
       toast.error("Submission failed");
     } finally {
-      setIsSubmitting(false);
+      setAddSubmitting(false);
     }
   };
 
   const SkeletonRow = () => (
     <tr className="odd:bg-white even:bg-gray-50 animate-pulse">
-      <td className="p-3 border-b border-gray-200"><div className="h-4 bg-gray-300 rounded w-20"></div></td>
-      <td className="p-3 border-b border-gray-200"><div className="h-4 bg-gray-300 rounded w-32"></div></td>
-      <td className="p-3 border-b border-gray-200"><div className="h-4 bg-gray-300 rounded w-32"></div></td>
-      <td className="p-3 border-b border-gray-200"><div className="h-4 bg-gray-300 rounded w-32"></div></td>
-      <td className="p-3 border-b border-gray-200"><div className="h-4 bg-gray-300 rounded w-32"></div></td>
-      <td className="p-3 border-b border-gray-200"><div className="h-4 bg-gray-300 rounded w-32"></div></td>
-      <td className="p-3 border-b border-gray-200"><div className="h-4 bg-gray-300 rounded w-32"></div></td>
-      <td className="p-3 border-b border-gray-200"><div className="h-4 bg-gray-300 rounded w-24"></div></td>
+      {Array(9)
+        .fill(0)
+        .map((_, i) => (
+          <td key={i} className="p-3 border-b border-gray-200">
+            <div className="h-4 bg-gray-300 rounded w-24"></div>
+          </td>
+        ))}
     </tr>
   );
 
@@ -197,7 +170,7 @@ export default function ServiceFollowupsPage() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-3xl font-bold">Service Follow-ups</h2>
         <button
-          onClick={handleOpenModal}
+          onClick={handleOpenAddModal}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
         >
           <Plus size={18} />
@@ -224,14 +197,13 @@ export default function ServiceFollowupsPage() {
             <table className="w-full text-sm text-left border-collapse table-auto">
               <thead className="bg-gray-800 text-white sticky top-0 z-10 shadow-md">
                 <tr>
-                  <th className="p-3 border-b border-gray-700">ID</th>
-                  <th className="p-3 border-b border-gray-700">Serial Number</th>
-                  <th className="p-3 border-b border-gray-700">Product Model</th>
-                  <th className="p-3 border-b border-gray-700">Contact</th>
-                  <th className="p-3 border-b border-gray-700">Followed At</th>
-                  <th className="p-3 border-b border-gray-700">Next Follow-up</th>
-                  <th className="p-3 border-b border-gray-700">Added By</th>
-                  <th className="p-3 border-b border-gray-700">Image</th>
+                  {["ID", "Serial Number", "Product Model", "Contact", "Followed At", "Next Follow-up", "Added By", "Image", "Action"].map(
+                    (h) => (
+                      <th key={h} className="p-3 border-b border-gray-700 whitespace-nowrap">
+                        {h}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -242,13 +214,13 @@ export default function ServiceFollowupsPage() {
                     <tr key={i} className="odd:bg-white even:bg-gray-50 hover:bg-gray-100 transition-colors">
                       <td className="p-3 border-b border-gray-200 font-medium">{fu.id}</td>
                       <td className="p-3 border-b border-gray-200">{fu.serial_number}</td>
-                      <td className="p-3 border-b border-gray-200">{fu.product_model || "-"}</td>
-                      <td className="p-3 border-b border-gray-200">{fu.contact || "-"}</td>
-                      <td className="p-3 border-b border-gray-200">
-                        {dayjs(fu.followed_at).tz("Asia/Kolkata").format("DD/MM/YYYY HH:00")}
+                      <td className="p-3 border-b border-gray-200">{fu.product_model || "—"}</td>
+                      <td className="p-3 border-b border-gray-200">{fu.contact || "—"}</td>
+                      <td className="p-3 border-b border-gray-200 whitespace-nowrap">
+                        {dayjs(fu.followed_at).tz(IST).format("DD/MM/YYYY HH:mm")}
                       </td>
-                      <td className="p-3 border-b border-gray-200">
-                        {fu.next_followup_date ? dayjs(fu.next_followup_date).tz("Asia/Kolkata").format("DD/MM/YYYY HH:00") : "-"}
+                      <td className="p-3 border-b border-gray-200 whitespace-nowrap">
+                        {fu.next_followup_date ? dayjs(fu.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm") : "—"}
                       </td>
                       <td className="p-3 border-b border-gray-200">{fu.added_by}</td>
                       <td className="p-3 border-b border-gray-200">
@@ -257,16 +229,33 @@ export default function ServiceFollowupsPage() {
                             onClick={() => setPreviewImage(fu.image)}
                             className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
                           >
-                            <Eye size={16} />
-                            View
+                            <Eye size={15} /> View
                           </button>
-                        ) : "-"}
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="p-3 border-b border-gray-200">
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => setFollowUpTarget(fu)}
+                            className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-xs whitespace-nowrap"
+                          >
+                            <ClipboardList size={13} /> Follow Up
+                          </button>
+                          <button
+                            onClick={() => setHistorySerial(fu.serial_number)}
+                            className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg text-xs whitespace-nowrap"
+                          >
+                            <History size={13} /> History
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="text-center p-4 text-gray-500">
+                    <td colSpan={9} className="text-center p-4 text-gray-500">
                       No follow-ups found
                     </td>
                   </tr>
@@ -277,88 +266,110 @@ export default function ServiceFollowupsPage() {
         </div>
       </div>
 
-      {/* Add Follow-up Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-4">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((p) => p - 1)}
+            className="px-3 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+          >
+            Prev
+          </button>
+          <span className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage((p) => p + 1)}
+            className="px-3 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      {addModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-xl font-bold text-gray-800">Add Service Follow-up</h3>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-full hover:bg-gray-200 transition-colors"
-              >
+              <button onClick={() => setAddModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200">
                 <X size={24} className="text-gray-600" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number *</label>
                 <input
                   type="text"
-                  value={serialSearch}
-                  onChange={(e) => setSerialSearch(e.target.value)}
+                  value={addSerialSearch}
+                  required
+                  onChange={(e) => {
+                    setAddSerialSearch(e.target.value);
+                    setAddForm((p) => ({ ...p, serial_number: e.target.value }));
+                  }}
                   placeholder="Search serial number..."
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
                 />
-                {showSuggestions && serialSuggestions.length > 0 && (
-                  <div className="absolute z-20 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
-                    {serialSuggestions.map((product, idx) => (
+                {addShowSugg && addSuggestions.length > 0 && (
+                  <div className="absolute z-30 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                    {addSuggestions.map((p, i) => (
                       <div
-                        key={idx}
+                        key={i}
                         className="p-2 hover:bg-gray-100 cursor-pointer"
-                        onClick={() => handleSelectProduct(product)}
+                        onClick={() => {
+                          setAddSerialSearch(p.serial_number);
+                          setAddForm((prev) => ({
+                            ...prev,
+                            serial_number: p.serial_number,
+                            product_model: p.model,
+                            contact: p.contact || p.email || "",
+                          }));
+                          setAddShowSugg(false);
+                        }}
                       >
-                        <div className="font-medium">{product.serial_number}</div>
-                        <div className="text-sm text-gray-600">{product.model} - {product.product_name}</div>
+                        <div className="font-medium">{p.serial_number}</div>
+                        <div className="text-sm text-gray-600">
+                          {p.model} - {p.product_name}
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Product Model</label>
-                <input
-                  type="text"
-                  value={formData.product_model}
-                  onChange={(e) => setFormData(prev => ({ ...prev, product_model: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+              {[["Product Model", "product_model"], ["Contact", "contact"]].map(([label, key]) => (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+                  <input
+                    type="text"
+                    value={addForm[key]}
+                    readOnly
+                    disabled
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
+                  />
+                </div>
+              ))}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contact</label>
-                <input
-                  type="text"
-                  value={formData.contact}
-                  onChange={(e) => setFormData(prev => ({ ...prev, contact: e.target.value }))}
-                  placeholder="Enter email or phone number"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Followed At (within last 24h) *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Followed At (within last 24h) *</label>
                 <input
                   type="datetime-local"
-                  value={formData.followed_at}
-                  onChange={(e) => setFormData(prev => ({ ...prev, followed_at: e.target.value }))}
-                  min={minFollowedAt}
-                  max={maxFollowedAt}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={addForm.followed_at}
+                  min={addMin}
+                  max={addMax}
                   required
+                  onChange={(e) => setAddForm((p) => ({ ...p, followed_at: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={3}
+                  value={addForm.notes}
+                  onChange={(e) => setAddForm((p) => ({ ...p, notes: e.target.value }))}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -367,42 +378,37 @@ export default function ServiceFollowupsPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Next Follow-up Date *</label>
                 <input
                   type="datetime-local"
-                  value={formData.next_followup_date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, next_followup_date: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={addForm.next_followup_date}
                   required
+                  onChange={(e) => setAddForm((p) => ({ ...p, next_followup_date: e.target.value }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Upload Image</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.files[0] }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                  />
-                  {formData.image && (
-                    <span className="text-sm text-gray-600">{formData.image.name}</span>
-                  )}
-                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setAddForm((p) => ({ ...p, image: e.target.files[0] || null }))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                />
               </div>
 
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => setAddModalOpen(false)}
                   className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={addSubmitting}
                   className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
                 >
-                  {isSubmitting ? "Submitting..." : "Submit"}
+                  {addSubmitting ? "Submitting..." : "Submit"}
                 </button>
               </div>
             </form>
@@ -410,24 +416,23 @@ export default function ServiceFollowupsPage() {
         </div>
       )}
 
-      {/* Image Preview Modal */}
-      {previewImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
-          <div className="relative">
-            <button
-              onClick={() => setPreviewImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300"
-            >
-              <X size={24} />
-            </button>
-            <img
-              src={previewImage}
-              alt="Follow-up image"
-              className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
-            />
-          </div>
-        </div>
+      {followUpTarget && (
+        <FollowUpModal
+          fu={followUpTarget}
+          onClose={() => setFollowUpTarget(null)}
+          onSaved={() => fetchFollowups(currentPage, searchQuery)}
+        />
       )}
+
+      {historySerial && (
+        <HistoryModal
+          serialNumber={historySerial}
+          onClose={() => setHistorySerial(null)}
+          onPreviewImage={(img) => setPreviewImage(img)}
+        />
+      )}
+
+      <ImagePreviewModal image={previewImage} onClose={() => setPreviewImage(null)} />
     </div>
   );
 }

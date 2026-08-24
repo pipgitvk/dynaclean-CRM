@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { CheckCircle, AlertTriangle, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast, Toaster } from "react-hot-toast";
+import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
 // ─── AMC Tooltip Component ────────────────────────────────────────────────────
 function AMCTooltip({ amcDetails, children }) {
@@ -414,6 +415,10 @@ export default function WarrantyPage() {
     fetchProducts(currentPage, searchQuery); // refresh list
   }
 
+  const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup(() => {
+    fetchProducts(currentPage, searchQuery);
+  });
+
   const SkeletonRow = () => (
     <tr className="odd:bg-white even:bg-gray-50 animate-pulse">
       {Array.from({ length: 12 }).map((_, i) => (
@@ -540,6 +545,7 @@ export default function WarrantyPage() {
               <div key={i} className="border rounded-lg bg-white p-3 shadow-sm space-y-2 text-xs">
                 <div className="flex justify-between items-start gap-2">
                   <div>
+                    <ProductFollowupIcons product={r} className="mb-1" />
                     <div className="font-semibold text-sm">{r.product_name}</div>
                     <div className="text-[11px] text-gray-600">{r.model} · {r.serial_number}</div>
                   </div>
@@ -594,6 +600,7 @@ export default function WarrantyPage() {
                   displayProducts.map((r, i) => (
                     <tr key={i} className="odd:bg-white even:bg-gray-50 hover:bg-gray-100 transition-colors duration-150">
                       <td className="p-3 border-b border-gray-200">
+                        <ProductFollowupIcons product={r} />
                         <div className="font-semibold">{r.product_name}</div>
                         {r.model && <div className="text-xs text-gray-600">Model: {r.model}</div>}
                       </td>
@@ -698,6 +705,8 @@ export default function WarrantyPage() {
 
         {!loading && products.length > 0 && renderPagination()}
       </div>
+
+      {followupModals}
     </div>
   );
 }

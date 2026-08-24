@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { CheckCircle, AlertTriangle, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast, Toaster } from "react-hot-toast";
+import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
 // ─── AMC Tooltip Component ────────────────────────────────────────────────────
 function AMCTooltip({ amcDetails, children }) {
@@ -408,6 +409,10 @@ export default function WarrantyPage() {
     fetchProducts(currentPage, searchQuery);
   }
 
+  const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup(() => {
+    fetchProducts(currentPage, searchQuery);
+  });
+
   const SkeletonRow = () => (
     <tr className="odd:bg-white even:bg-gray-50 animate-pulse">
       {Array.from({ length: 12 }).map((_, i) => (
@@ -554,6 +559,7 @@ export default function WarrantyPage() {
               <div key={i} className="border rounded-lg bg-white p-3 shadow-sm space-y-2 text-xs">
                 <div className="flex justify-between items-start gap-2">
                   <div className="space-y-0.5 flex-1">
+                    <ProductFollowupIcons product={r} className="mb-1" />
                     <div className="font-semibold text-sm">{r.product_name}</div>
                     {r.model && <div className="text-gray-600">Model: {r.model}</div>}
                     <div className="text-gray-700">
@@ -693,6 +699,7 @@ export default function WarrantyPage() {
                   filteredProducts.map((r, i) => (
                     <tr key={i} className="odd:bg-white even:bg-gray-50 hover:bg-gray-100 transition-colors duration-150 ease-in-out">
                       <td className="p-3 border-b border-gray-200">
+                        <ProductFollowupIcons product={r} />
                         <div className="font-semibold">{r.product_name}</div>
                         {r.model && <div className="text-xs text-gray-600">Model: {r.model}</div>}
                       </td>
@@ -809,6 +816,8 @@ export default function WarrantyPage() {
 
         {!loading && filteredProducts.length > 0 && renderPagination()}
       </div>
+
+      {followupModals}
     </div>
   );
 }
