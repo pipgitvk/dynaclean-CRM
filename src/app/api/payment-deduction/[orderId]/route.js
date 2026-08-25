@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensurePaymentDeductionsTable } from "@/lib/ensurePaymentDeductionsTable";
 
 export async function GET(req, { params }) {
   const { orderId } = await params;
@@ -12,6 +13,7 @@ export async function GET(req, { params }) {
     }
 
     const conn = await getDbConnection();
+    await ensurePaymentDeductionsTable();
 
     const [rows] = await conn.execute(
       `SELECT 
@@ -21,7 +23,10 @@ export async function GET(req, { params }) {
         remarks,
         amount,
         recorded_by,
-        recorded_date
+        recorded_date,
+        claimable,
+        claim_status,
+        claim_received_date
        FROM payment_deductions
        WHERE order_id = ?
        ORDER BY recorded_date DESC`,

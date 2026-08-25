@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import dayjs from "dayjs";
-import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2 } from "lucide-react";
+import { Download, Search, Calendar, DollarSign, ArrowUp, ArrowDown, Trash2, X, PhoneCall, History, Loader2, MinusCircle, List } from "lucide-react";
 
 export default function PaymentPendingReport() {
+  const router = useRouter();
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,18 +21,20 @@ export default function PaymentPendingReport() {
   const [dueDateFrom, setDueDateFrom] = useState("");
   const [dueDateTo, setDueDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all, due, no-due
+  const [completionFilter, setCompletionFilter] = useState("pending"); // pending, completed, all
   const [followupModalOpen, setFollowupModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const canAddDeduction = ["ACCOUNTANT", "PRODUCTION ACCOUNTANT", "ADMIN", "SUPERADMIN"].includes(userRole);
 
   useEffect(() => {
     fetchReport();
-  }, []);
+  }, [completionFilter]);
 
   const fetchReport = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/reports/payment-pending");
+      const res = await fetch(`/api/reports/payment-pending?completion=${completionFilter}`);
       const data = await res.json();
       
       if (data.success) {
@@ -103,7 +108,7 @@ export default function PaymentPendingReport() {
           bVal = dayjs(bVal).unix();
         }
         // Handle numeric sorting
-        else if (['total_amount', 'paid_amount', 'remaining_amount'].includes(sortConfig.key)) {
+        else if (['total_amount', 'paid_amount', 'remaining_amount', 'deduction_amount'].includes(sortConfig.key)) {
           aVal = parseFloat(aVal) || 0;
           bVal = parseFloat(bVal) || 0;
         }
@@ -137,7 +142,7 @@ export default function PaymentPendingReport() {
   };
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
+    const headers = ["Order ID", "Customer Name", "Company", "Contact", "Employee", "Total Amount", "Paid Amount", "Deduction Amount", "Remaining Amount", "Due Date", "Tag", "Next Followup"];
     const csvData = filteredOrders.map(order => [
       order.order_id,
       order.client_name,
@@ -146,6 +151,7 @@ export default function PaymentPendingReport() {
       order.created_by,
       order.total_amount.toFixed(2),
       order.paid_amount.toFixed(2),
+      Number(order.deduction_amount || 0).toFixed(2),
       order.remaining_amount.toFixed(2),
       dayjs(order.due_date).format("DD/MM/YYYY"),
       order.latest_deduction || "",
@@ -274,7 +280,7 @@ export default function PaymentPendingReport() {
           </div>
 
           {/* Right Side: Search and Filters */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-center">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 items-center">
             {/* Search Box */}
             <div className="relative md:col-span-2">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={12} />
@@ -305,6 +311,17 @@ export default function PaymentPendingReport() {
               title="To Date"
             />
 
+            {/* Payment Completion Filter */}
+            <select
+              value={completionFilter}
+              onChange={(e) => setCompletionFilter(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="all">All</option>
+            </select>
+
             {/* Status Filter + Action Buttons */}
             <div className="flex gap-1">
               <select
@@ -318,12 +335,13 @@ export default function PaymentPendingReport() {
               </select>
 
               {/* Clear Button */}
-              {(dueDateFrom || dueDateTo || statusFilter !== "all" || searchQuery) && (
+              {(dueDateFrom || dueDateTo || statusFilter !== "all" || completionFilter !== "pending" || searchQuery) && (
                 <button
                   onClick={() => {
                     setDueDateFrom("");
                     setDueDateTo("");
                     setStatusFilter("all");
+                    setCompletionFilter("pending");
                     setSearchQuery("");
                   }}
                   className="flex items-center justify-center bg-gray-500 hover:bg-gray-600 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
@@ -341,6 +359,16 @@ export default function PaymentPendingReport() {
               >
                 <Download size={12} />
               </button>
+
+              {canAddDeduction && (
+                <Link
+                  href="/admin-dashboard/reports/deductions"
+                  className="flex items-center justify-center bg-orange-600 hover:bg-orange-700 text-white px-1.5 py-1.5 rounded text-xs transition-colors"
+                  title="View Deductions"
+                >
+                  <List size={12} />
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -441,7 +469,12 @@ export default function PaymentPendingReport() {
                         ₹{order.paid_amount.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 border-b text-right font-semibold text-red-600">
-                        ₹{order.remaining_amount.toFixed(2)}
+                        <div>₹{order.remaining_amount.toFixed(2)}</div>
+                        {Number(order.deduction_amount || 0) > 0 && (
+                          <div className="text-[11px] font-medium text-orange-600">
+                            Deducted ₹{Number(order.deduction_amount).toFixed(2)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 border-b text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -494,6 +527,20 @@ export default function PaymentPendingReport() {
                             <History size={14} />
                             History
                           </button>
+                          {canAddDeduction && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                router.push(
+                                  `/admin-dashboard/reports/deductions?order_id=${encodeURIComponent(order.order_id)}`
+                                );
+                              }}
+                              className="inline-flex items-center gap-2 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
+                            >
+                              <MinusCircle size={14} />
+                              Deduction
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

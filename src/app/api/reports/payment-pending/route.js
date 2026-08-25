@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { ensurePaymentPendingFollowupsTable } from "@/lib/ensurePaymentPendingFollowupsTable";
+import { ensurePaymentDeductionsTable } from "@/lib/ensurePaymentDeductionsTable";
 import { PAYMENT_PENDING_ORDER_SQL_WHERE } from "@/lib/paymentPendingFilters";
+import {
+  calculateAdjustedOrderTotal,
+  sumPaymentAmounts,
+} from "@/lib/paymentOrderStatus";
 
-export async function GET() {
+export async function GET(request) {
     try {
         const payload = await getSessionPayload();
         if (!payload) {
@@ -19,8 +24,12 @@ export async function GET() {
             return NextResponse.json({ error: "Access denied" }, { status: 403 });
         }
 
+        const { searchParams } = new URL(request.url);
+        const completionFilter = (searchParams.get("completion") || "pending").toLowerCase();
+
         const pool = await getDbConnection();
         await ensurePaymentPendingFollowupsTable();
+        await ensurePaymentDeductionsTable();
 
         // Build SQL query based on role
         let sql = `
@@ -95,55 +104,8 @@ export async function GET() {
 
         // Calculate remaining amount for each order
         const orders = await Promise.all(rows.map(async (order) => {
-            let totalAmt = parseFloat(order.totalamt || 0);
-
-            // If partially returned, calculate adjusted total
-            if (order.is_returned === 2 && order.quote_number) {
-                try {
-                    // Get returned items for this order
-                    const [returnedItems] = await pool.query(
-                        `SELECT item_code, quantity_returned FROM order_return_items WHERE order_id = ?`,
-                        [order.order_id]
-                    );
-
-                    if (returnedItems.length > 0) {
-                        // Get prices from quotation_items
-                        const itemCodes = returnedItems.map(item => item.item_code);
-                        const placeholders = itemCodes.map(() => '?').join(',');
-
-                        const [quotationItems] = await pool.query(
-                            `SELECT item_code, total_price, quantity FROM quotation_items 
-                             WHERE quote_number = ? AND item_code IN (${placeholders})`,
-                            [order.quote_number, ...itemCodes]
-                        );
-
-                        // Calculate total value of returned items
-                        let returnedValue = 0;
-                        returnedItems.forEach(returnedItem => {
-                            const quotItem = quotationItems.find(q => q.item_code === returnedItem.item_code);
-                            if (quotItem) {
-                                // Calculate price per unit and multiply by returned quantity
-                                const pricePerUnit = parseFloat(quotItem.total_price) / parseInt(quotItem.quantity);
-                                returnedValue += pricePerUnit * returnedItem.quantity_returned;
-                            }
-                        });
-
-                        // Adjust total amount by subtracting returned items value
-                        totalAmt = totalAmt - returnedValue;
-                    }
-                } catch (err) {
-                    console.error(`Error calculating returned value for order ${order.order_id}:`, err);
-                    // Continue with original total if calculation fails
-                }
-            }
-
-            // Parse payment_amount which might be comma-separated values
-            const paymentAmounts = (order.payment_amount || "")
-                .toString()
-                .split(",")
-                .map(s => parseFloat(s.trim()) || 0);
-
-            const paidAmount = paymentAmounts.reduce((sum, amt) => sum + amt, 0);
+            const totalAmt = await calculateAdjustedOrderTotal(pool, order);
+            const paidAmount = sumPaymentAmounts(order.payment_amount);
             const deductionInfo = deductionByOrder.get(order.order_id);
             const deductionAmount = deductionInfo?.total || 0;
             const remaining = totalAmt - paidAmount - deductionAmount;
@@ -164,16 +126,21 @@ export async function GET() {
                 created_at: order.created_at,
                 is_partially_returned: order.is_returned === 2,
                 customer_id: order.customer_id,
-                latest_deduction: deductionInfo?.latest || null
+                latest_deduction: deductionInfo?.latest || null,
+                is_completed: remaining <= 0
             };
         }));
 
-        // Filter out orders with zero or negative remaining amount
-        const pendingOrders = orders.filter(order => order.remaining_amount > 0);
+        let filteredOrders = orders;
+        if (completionFilter === "pending") {
+            filteredOrders = orders.filter((order) => order.remaining_amount > 0);
+        } else if (completionFilter === "completed") {
+            filteredOrders = orders.filter((order) => order.remaining_amount <= 0);
+        }
 
         return NextResponse.json({
             success: true,
-            orders: pendingOrders,
+            orders: filteredOrders,
             userRole: role
         });
 
