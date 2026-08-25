@@ -1,3 +1,5 @@
+import { getRoleDefaultModuleKeys, MODULE_LEAK_CAP_BYPASS_ROLES } from "@/lib/roleDefaultModuleAccess";
+import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 export const MODULE_TREE = [
   {
@@ -21,6 +23,7 @@ export const MODULE_TREE = [
       { key: "dm-fresh-leads", label: "24h Fresh Leads (DM)" },
       { key: "task-manager", label: "Task Manager" },
       { key: "demo-details", label: "Demo Details" },
+      { key: "schedule-visits", label: "Schedule Visits" },
       { key: "attendance-details", label: "Attendance details" },
       { key: "regularization-approvals", label: "Overtime" },
       { key: "fast-card", label: "Fast Card" },
@@ -204,6 +207,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "fast-card", label: "Fast Card" },
       { kind: "leaf", key: "attendance-details", label: "Attendance details" },
       { kind: "leaf", key: "regularization-approvals", label: "Overtime" },
+      { kind: "leaf", key: "schedule-visits", label: "Schedule Visits" },
     ],
   },
   {
@@ -267,6 +271,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "demo-followups", label: "Demo Followups" },
       { kind: "leaf", key: "demo-details", label: "Demo Details" },
+      { kind: "leaf", key: "schedule-visits", label: "Schedule Visits" },
     ],
   },
   {
@@ -571,15 +576,14 @@ export function normalizeModuleAccessKeys(keys) {
 }
 
 /**
- * Parse the raw DB value of module_access.
+ * Parse the raw DB value of module_access (ignores role — use resolveModuleAccess for enforcement).
  *
- * NULL / undefined / empty-string in DB  → not configured yet → return ALL keys (backward compat).
- * "[]" (empty JSON array) in DB          → user explicitly has NO access → return [].
- * "[\"dashboard\",...]" in DB            → return normalized keys.
+ * NULL / undefined / empty-string → ALL keys (legacy callers that expect “unset = full list”).
+ * "[]" → explicitly no access.
  */
 export function parseModuleAccess(raw) {
   if (raw === null || raw === undefined || raw === "") {
-    return [...ALL_MODULE_KEYS]; // never been set → grant all
+    return [...ALL_MODULE_KEYS];
   }
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -590,6 +594,72 @@ export function parseModuleAccess(raw) {
     return [...ALL_MODULE_KEYS];
   } catch {
     return [...ALL_MODULE_KEYS];
+  }
+}
+
+const FULL_GRANT_BYPASS_ROLES = new Set(["SUPERADMIN", "EA", "DIRECTOR"]);
+
+function isFullModuleGrant(keys) {
+  if (!Array.isArray(keys) || keys.length < ALL_MODULE_KEYS.length) return false;
+  const set = new Set(keys);
+  return ALL_MODULE_KEYS.every((k) => set.has(k));
+}
+
+/** Near-full grants saved before module renames — still a legacy leak. */
+function isLegacyLeakGrant(keys) {
+  if (!Array.isArray(keys) || keys.length === 0) return false;
+  if (isFullModuleGrant(keys)) return true;
+  const threshold = Math.max(
+    ALL_MODULE_KEYS.length - 8,
+    Math.floor(ALL_MODULE_KEYS.length * 0.92),
+  );
+  return keys.length >= threshold;
+}
+
+function shouldCollapseLegacyLeak(role) {
+  const roleKey = normalizeRoleKey(role);
+  return roleKey && !FULL_GRANT_BYPASS_ROLES.has(roleKey);
+}
+
+function applyRolePresetLeakCap(allowedKeys, role) {
+  const roleKey = normalizeRoleKey(role);
+  if (MODULE_LEAK_CAP_BYPASS_ROLES.has(roleKey)) return allowedKeys;
+  if (!isLegacyLeakGrant(allowedKeys)) return allowedKeys;
+
+  const preset = getRoleDefaultModuleKeys(role);
+  if (!preset.length) return allowedKeys;
+
+  const cap = new Set(preset);
+  return allowedKeys.filter((k) => cap.has(k));
+}
+
+function resolveUnsetModuleAccess(role) {
+  const defaults = getRoleDefaultModuleKeys(role);
+  return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
+}
+
+/**
+ * Effective module_access for sidebar / route guards.
+ * NULL in DB → role default preset (not full access).
+ * Full ALL-key grant (legacy NULL bug) → role defaults for non-SUPERADMIN roles.
+ */
+export function resolveModuleAccess(raw, role) {
+  if (raw === null || raw === undefined || raw === "") {
+    return resolveUnsetModuleAccess(role);
+  }
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return [];
+      const normalized = normalizeModuleAccessKeys(parsed);
+      if (shouldCollapseLegacyLeak(role) && isLegacyLeakGrant(normalized)) {
+        return resolveUnsetModuleAccess(role);
+      }
+      return applyRolePresetLeakCap(normalized, role);
+    }
+    return resolveUnsetModuleAccess(role);
+  } catch {
+    return resolveUnsetModuleAccess(role);
   }
 }
 
@@ -632,9 +702,19 @@ const HR_DENY_MODULE_KEYS = new Set([
 export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
   if (!allowedKeys) return allowedKeys ?? null;
   const r = String(role ?? "").trim().toUpperCase();
-  const isHr = r === "HR" || r === "HR HEAD" || r === "HR EXECUTIVE" || r === "JUNIOR HR EXECUTIVE" || r === "HR RECRUITER";
-  if (!isHr) return allowedKeys;
-  return allowedKeys.filter((k) => !HR_DENY_MODULE_KEYS.has(k));
+  const isHr =
+    r === "HR" ||
+    r === "HR HEAD" ||
+    r === "HR EXECUTIVE" ||
+    r === "JUNIOR HR EXECUTIVE" ||
+    r === "HR RECRUITER";
+  let next = allowedKeys;
+  if (isHr) {
+    next = next.filter((k) => !HR_DENY_MODULE_KEYS.has(k));
+  }
+  // All roles: cap legacy near-full DB grants to role preset (SUPERADMIN/EA/DIRECTOR/ADMIN exempt)
+  next = applyRolePresetLeakCap(next, role);
+  return next;
 }
 
 /**
@@ -666,4 +746,21 @@ export function isSectionAllowed(sectionKey, allowedKeys) {
   if (allowedKeys.includes(sectionKey)) return true;
   const childKeys = getChildKeys(sectionKey);
   return childKeys.some((k) => allowedKeys.includes(k));
+}
+
+/**
+ * Whether a leaf module key is allowed — direct key, child-of-section, or parent section granted.
+ */
+export function isModuleKeyAllowed(moduleKey, allowedKeys) {
+  if (!allowedKeys) return true;
+  const key = String(moduleKey || "").trim();
+  if (!key) return false;
+  if (allowedKeys.includes(key)) return true;
+  if (isSectionAllowed(key, allowedKeys)) return true;
+  for (const section of MODULE_TREE) {
+    if (allowedKeys.includes(section.key)) {
+      if (getChildKeys(section.key).includes(key)) return true;
+    }
+  }
+  return false;
 }

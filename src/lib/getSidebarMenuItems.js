@@ -2,8 +2,8 @@
 import { getSessionPayload } from "./auth";
 import { normalizeRoleKey } from "@/lib/adminAttendanceRulesAuth";
 import {
-  parseModuleAccess,
-  isSectionAllowed,
+  resolveModuleAccess,
+  isModuleKeyAllowed,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
   SUPERADMIN_ONLY_MODULE_KEYS,
@@ -13,6 +13,7 @@ import { getDbConnection } from "@/lib/db";
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
   const role = String(roleKey || "").toUpperCase();
+  if (role === "DIRECTOR") return "/director-dashboard";
   if (role.includes("SALES")) return "/sales-dashboard";
   if (role.includes("SERVICE") && role.includes("HEAD")) return "/service-head-dashboard";
   if (role.includes("HR")) return "/hr-dashboard";
@@ -88,8 +89,10 @@ function filterByRole(list, roleKey) {
   return (list || [])
     .map((item) => {
       const children = item?.children?.length ? filterByRole(item.children, roleKey) : [];
-      const keepSelf = item?.moduleKey ? true : roleMatches(item?.roles, roleKey);
-      if (children.length > 0) return { ...item, children };
+      const keepSelf = roleMatches(item?.roles, roleKey);
+      if (item?.children?.length) {
+        return children.length > 0 ? { ...item, children } : null;
+      }
       return keepSelf ? item : null;
     })
     .filter(Boolean);
@@ -316,6 +319,13 @@ const allMenuItems = [
           "HR",
         ],
         icon: "PlayCircle",
+      },
+      {
+        path: "/user-dashboard/schedule-visits",
+        name: "Schedule Visits",
+        moduleKey: "schedule-visits",
+        roles: ["ALL"],
+        icon: "MapPin",
       },
     ],
   },
@@ -1033,23 +1043,22 @@ const allMenuItems = [
   },
 ];
 
-async function getUserModuleAccess(username) {
-  if (!username) return null;
+async function getUserModuleAccess(username, roleKey) {
+  if (!username) return [];
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
-    if (!rows.length) return []; // unknown user → show nothing (fail closed)
-    return parseModuleAccess(rows[0].module_access ?? null);
+    if (!rows.length) return [];
+    const role = roleKey || rows[0].userRole;
+    return resolveModuleAccess(rows[0].module_access ?? null, role);
   } catch (err) {
     const msg = String(err?.message || "").toLowerCase();
-    // Backward-compat: if column isn't present yet, allow all.
     if (msg.includes("unknown column") && msg.includes("module_access")) {
-      return null;
+      return resolveModuleAccess(null, roleKey);
     }
-    // Any other DB error: do NOT leak modules.
     return [];
   }
 }
@@ -1066,44 +1075,33 @@ export default async function getSidebarMenuItems() {
   // Hard deny SUPERADMIN-only modules even when module_access is NULL (backward compat).
   items = stripSuperadminOnlyMenuItems(items, roleKey);
 
-  // Step 2: filter by module_access (SUPERADMIN and EA bypass this — see everything)
+  // Step 2: filter by module_access (SUPERADMIN and EA bypass — see everything)
   if (roleKey !== "SUPERADMIN" && roleKey !== "EA") {
-    const allowedModulesRaw = await getUserModuleAccess(username);
-    const allowedModules1 = applySuperadminOnlyModuleRestrictions(
-      allowedModulesRaw,
+    const allowedModulesRaw = await getUserModuleAccess(username, roleKey);
+    const allowedModules = applyRoleDenyModuleRestrictions(
+      applySuperadminOnlyModuleRestrictions(allowedModulesRaw, roleKey) ?? [],
       roleKey,
-    );
-    const allowedModules2 = applyRoleDenyModuleRestrictions(allowedModules1, roleKey);
-    const allowedModules = allowedModules2;
-    // allowedModules === null means column not set yet → show all (backward compat)
-    if (allowedModules !== null) {
-      const filterByModuleAccess = (list) =>
-        (list || [])
-          .map((item) => {
-            const children = item?.children?.length
-              ? filterByModuleAccess(item.children)
-              : [];
-            // When module_access is configured, a leaf link MUST have a moduleKey to be shown.
-            // Otherwise older menu entries would "leak" through and ignore module_access.
-            // My Leads is accessible to anyone who has the my-leads module key in their module_access
-            const allowed = item?.moduleKey
-              ? isSectionAllowed(item.moduleKey, allowedModules)
-              : item?.path
-                ? false
-                : true;
-            // If it originally has children, keep it only if any child remains.
-            // This prevents "empty groups" (e.g. Orders) from showing just because
-            // a broad parent moduleKey like "dashboard" is allowed.
-            if (item?.children?.length) {
-              return children.length > 0 ? { ...item, children } : null;
-            }
-            // Leaf: keep only if allowed.
-            return allowed ? item : null;
-          })
-          .filter(Boolean);
+    ) ?? [];
 
-      items = filterByModuleAccess(items);
-    }
+    const filterByModuleAccess = (list) =>
+      (list || [])
+        .map((item) => {
+          const children = item?.children?.length
+            ? filterByModuleAccess(item.children)
+            : [];
+          const allowed = item?.moduleKey
+            ? isModuleKeyAllowed(item.moduleKey, allowedModules)
+            : item?.path
+              ? false
+              : true;
+          if (item?.children?.length) {
+            return children.length > 0 ? { ...item, children } : null;
+          }
+          return allowed ? item : null;
+        })
+        .filter(Boolean);
+
+    items = filterByModuleAccess(items);
   }
 
   // Transform paths based on role-specific dashboard

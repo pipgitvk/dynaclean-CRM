@@ -8,6 +8,7 @@ import FastCardsWidget from "@/components/FastCardsWidget";
 import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
+import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
 export default function ServiceHeadDashboard({ user, reportingManager, counts }) {
   return (
@@ -61,7 +62,8 @@ export default function ServiceHeadDashboard({ user, reportingManager, counts })
       </div>
 
       {/* Stats Boxes */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <ScheduleVisitCard variant="infobox" href="/service-head-dashboard/schedule-visits" />
         <InfoBox
           title="Completed"
           number={counts.completed}

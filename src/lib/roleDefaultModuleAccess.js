@@ -24,6 +24,100 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "prospects-add",
     "installation-videos",
   ],
+  "SALES HEAD": [
+    "dashboard-home",
+    "task-manager",
+    "fast-card",
+    "view-customers",
+    "add-customer",
+    "my-leads",
+    "daily-report",
+    "lead-reports",
+    "demo-details",
+    "customer-payment-behavior",
+    "quotations",
+    "orders-process",
+    "orders-delay",
+    "schedule-visits",
+    "tl-customers",
+    "product-stock",
+    "expenses",
+    "payment-pending",
+    "employee-crm",
+    "prospects-view",
+    "prospects-add",
+    "sales-target",
+    "installation-videos",
+    "denied-leads",
+  ],
+  ADMIN: [
+    "dashboard-home",
+    "task-manager",
+    "regularization-approvals",
+    "daily-report",
+    "lead-reports",
+    "view-customers",
+    "add-customer",
+    "my-leads",
+    "quotations",
+    "orders-process",
+    "orders-delay",
+    "payment-pending",
+    "expenses",
+    "view-expenses",
+    "employee-list",
+    "employee-crm",
+    "product-stock",
+    "spare-parts",
+    "tl-customers",
+    "attendance-log",
+  ],
+  "BACK OFFICE": [
+    "dashboard-home",
+    "task-manager",
+    "view-customers",
+    "add-customer",
+    "quotations",
+    "orders-process",
+    "orders-delay",
+    "product-stock",
+    "payment-pending",
+    "employee-crm",
+    "daily-report",
+    "installation-videos",
+  ],
+  "WAREHOUSE INCHARGE": [
+    "dashboard-home",
+    "task-manager",
+    "employee-crm",
+    "view-customers",
+    "product-stock",
+    "product-accessories",
+    "spare-parts",
+    "purchase-direct-in",
+    "purchase-request",
+    "purchase-warehouse-in",
+    "purchases",
+    "purchase-ledger",
+    "spare-direct-in",
+    "spare-request",
+    "spare-warehouse-in",
+    "spare-purchases",
+    "production-status",
+    "bom-list",
+  ],
+  WELDER: [
+    "dashboard-home",
+    "task-manager",
+    "regularization-approvals",
+    "employee-crm",
+  ],
+  "WELDER HELPER": [
+    "dashboard-home",
+    "task-manager",
+    "regularization-approvals",
+    "employee-crm",
+  ],
   ACCOUNTANT: [
     "dashboard-home",
     "task-manager",
@@ -152,6 +246,21 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "attendance-log",
   ],
   GEM: [
+    "dashboard-home",
+    "task-manager",
+    "add-customer",
+    "view-customers",
+    "quotations",
+    "orders-process",
+    "payment-pending",
+    "dd-management",
+    "employee-crm",
+    "gem-crm-dashboard",
+    "gem-crm-bids",
+    "gem-crm-reports",
+    "installation-videos",
+  ],
+  "GEM PORTAL": [
     "dashboard-home",
     "task-manager",
     "add-customer",
@@ -375,16 +484,61 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
 export function getRoleDefaultModuleKeys(role) {
   const key = normalizeRoleKey(role);
   if (!key) return [];
+
   const exact = ROLE_DEFAULT_MODULE_KEYS[key];
   if (exact?.length) return [...exact];
-  if (key.includes("SALES") && ROLE_DEFAULT_MODULE_KEYS.SALES) {
-    return [...ROLE_DEFAULT_MODULE_KEYS.SALES];
+
+  // Specific roles before broad substring fallbacks (order matters)
+  if (key.includes("SALES HEAD") || key === "SALES_HEAD") {
+    const preset = ROLE_DEFAULT_MODULE_KEYS["SALES HEAD"];
+    return preset?.length ? [...preset] : [...(ROLE_DEFAULT_MODULE_KEYS.SALES ?? [])];
   }
-  if (key.includes("HR") && ROLE_DEFAULT_MODULE_KEYS.HR) {
-    return [...ROLE_DEFAULT_MODULE_KEYS.HR];
+  if (key.includes("SALES")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS.SALES ?? [])];
   }
-  if (key.includes("SERVICE") && ROLE_DEFAULT_MODULE_KEYS["SERVICE SUPPORT"]) {
-    return [...ROLE_DEFAULT_MODULE_KEYS["SERVICE SUPPORT"]];
+  if (key.includes("SERVICE HEAD")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["SERVICE HEAD"] ?? [])];
+  }
+  if (key.includes("SERVICE SUPPORT")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["SERVICE SUPPORT"] ?? [])];
+  }
+  if (key.includes("SERVICE ENGINEER")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["SERVICE ENGINEER"] ?? [])];
+  }
+  if (key.includes("SERVICE TECHNICIAN")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["SERVICE TECHNICIAN"] ?? [])];
+  }
+  if (key.includes("WAREHOUSE")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["WAREHOUSE INCHARGE"] ?? [])];
+  }
+  if (key.includes("ACCOUNTANT")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS.ACCOUNTANT ?? [])];
+  }
+  if (key.includes("HR")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS.HR ?? [])];
+  }
+  if (key.includes("GEM")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS.GEM ?? [])];
+  }
+  if (key.includes("MARKETER") || key.includes("DIGITAL")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["DIGITAL MARKETER"] ?? [])];
+  }
+  if (key.includes("DESIGN ENGINEER")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["DESIGN ENGINEER"] ?? [])];
+  }
+  if (key.includes("WELDER")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS.WELDER ?? ROLE_DEFAULT_MODULE_KEYS["WELDER HELPER"] ?? [])];
+  }
+  if (key.includes("BACK OFFICE")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["BACK OFFICE"] ?? [])];
   }
   return [];
 }
+
+/** Roles that bypass legacy leak cap (intentionally broad access). */
+export const MODULE_LEAK_CAP_BYPASS_ROLES = new Set([
+  "SUPERADMIN",
+  "EA",
+  "DIRECTOR",
+  "ADMIN",
+]);

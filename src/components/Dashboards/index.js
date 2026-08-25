@@ -9,6 +9,7 @@ import DirectorDashboard from "./DirectorDashboard";
 import AccountantDashboard from "./AccountantDashboard";
 import WelderDashboard from "./WelderDashboard";
 import HrDashboard from "./HrDashboard";
+import ServiceSupportDashboard from "./ServiceSupportDashboard";
 
 export const DASHBOARD_MAP = {
   "WAREHOUSE INCHARGE": WarehouseInchargeDashboard,
@@ -17,6 +18,7 @@ export const DASHBOARD_MAP = {
   "GEM PORTAL": GemPortalDashboard,
   "TEAM LEADER": TeamLeaderDashboard,
   "SERVICE HEAD": ServiceHeadDashboard,
+  "SERVICE SUPPORT": ServiceSupportDashboard,
   "HR": HrDashboard,
   "HR HEAD": HrDashboard,
   "HR EXECUTIVE": HrDashboard,

@@ -13,6 +13,7 @@ export const MODULE_KEY_TO_URL = {
   "item-wise-sales": "/admin-dashboard/reports/item-wise-sales",
   "customer-payment-behavior": "/admin-dashboard/reports/customer-payment-behavior",
   "demo-followups": "/admin-dashboard/demo-registrations",
+  "schedule-visits": "/admin-dashboard/schedule-visits",
   "fast-card": "/admin-dashboard/fast-card",
   "task-manager": "/admin-dashboard/task-manager",
   "attendance-details": "/empcrm/admin-dashboard/attendance",

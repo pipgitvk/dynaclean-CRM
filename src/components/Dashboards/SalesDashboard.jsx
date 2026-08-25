@@ -8,6 +8,7 @@ import TodayReportButton from "@/components/TodayReportButton";
 import TodaysReportingButton from "@/components/TodaysReportingButton";
 import PaymentPendingButton from "@/components/PaymentPendingCircle";
 import SalesAchievedQuickCard from "@/components/targets/SalesAchievedQuickCard";
+import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
 const salesCard =
   "flex min-h-0 flex-col rounded-xl border border-slate-100 bg-white p-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.08),0_2px_4px_-2px_rgba(0,0,0,0.05)] md:p-5";
@@ -20,6 +21,7 @@ export default function SalesDashboard({ user }) {
         <TodaysReportingButton variant="sales" />
         <PaymentPendingButton variant="sales" monthly />
         <TodayReportButton variant="sales" />
+        <ScheduleVisitCard variant="sales" href="/sales-dashboard/schedule-visits" />
         <FastCardButton
           variant="sales"
           monthly

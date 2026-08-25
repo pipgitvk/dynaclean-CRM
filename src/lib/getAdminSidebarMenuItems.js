@@ -152,9 +152,10 @@ import {
   normalizeRoleKey,
 } from "@/lib/adminAttendanceRulesAuth";
 import {
-  parseModuleAccess,
+  resolveModuleAccess,
   isSectionAllowed,
   applySuperadminOnlyModuleRestrictions,
+  applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
 
 const FINAL_PROFILE_APPROVAL_PATH =
@@ -374,6 +375,13 @@ const allMenuItems = [
         name: "Demo Details",
         roles: ["SUPERADMIN"],
         icon: "PlayCircle",
+      },
+      {
+        path: "/admin-dashboard/schedule-visits",
+        name: "Schedule Visits",
+        accessKey: "schedule-visits",
+        roles: ["SUPERADMIN"],
+        icon: "MapPin",
       },
     ],
   },
@@ -975,19 +983,19 @@ async function getSessionUsername() {
  * Fetch module_access for the logged-in user from rep_list.
  * Returns parsed array of module keys, or null if column doesn't exist / user not found.
  */
-async function getUserModuleAccess(username) {
-  if (!username) return null;
+async function getUserModuleAccess(username, roleKey) {
+  if (!username) return [];
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
-    if (!rows.length) return null;
-    return parseModuleAccess(rows[0].module_access ?? null);
+    if (!rows.length) return [];
+    const role = rows[0].userRole ?? roleKey;
+    return resolveModuleAccess(rows[0].module_access ?? null, role);
   } catch {
-    // If column doesn't exist yet, allow all
-    return null;
+    return resolveModuleAccess(null, roleKey);
   }
 }
 
@@ -1017,8 +1025,8 @@ function filterMenuItemDeep(item, allowedModules) {
 }
 
 function filterMenuItemsByModuleAccess(items, allowedModules) {
-  if (!allowedModules) return items;
-  return items.map((item) => filterMenuItemDeep(item, allowedModules)).filter(Boolean);
+  const keys = allowedModules ?? [];
+  return items.map((item) => filterMenuItemDeep(item, keys)).filter(Boolean);
 }
 
 export default async function getSidebarMenuItems() {
@@ -1028,11 +1036,11 @@ export default async function getSidebarMenuItems() {
   // Apply module_access filtering for non-SUPERADMIN users
   if (roleKeyNormalized !== "SUPERADMIN") {
     const username = await getSessionUsername();
-    const allowedModulesRaw = await getUserModuleAccess(username);
-    const allowedModules = applySuperadminOnlyModuleRestrictions(
-      allowedModulesRaw,
+    const allowedModulesRaw = await getUserModuleAccess(username, roleKeyNormalized);
+    const allowedModules = applyRoleDenyModuleRestrictions(
+      applySuperadminOnlyModuleRestrictions(allowedModulesRaw, roleKeyNormalized) ?? [],
       roleKeyNormalized,
-    );
+    ) ?? [];
     items = filterMenuItemsByModuleAccess(items, allowedModules);
   }
 

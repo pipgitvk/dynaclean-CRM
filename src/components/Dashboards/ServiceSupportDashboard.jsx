@@ -7,6 +7,7 @@ import TodayReportButton from "@/components/TodayReportButton";
 import LeaveApprovalButton from "@/components/LeaveApprovalButton";
 import ExpenseApprovalButton from "@/components/ExpenseApprovalButton";
 import UpcomingFollowupsWidget from "@/components/service/UpcomingFollowupsWidget";
+import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
 export default function ServiceSupportDashboard({ user, reportingManager }) {
   return (
@@ -25,10 +26,11 @@ export default function ServiceSupportDashboard({ user, reportingManager }) {
                 <p className="text-gray-500 text-sm">Role: {user.userRole}</p>
               </div>
             </div>
-            <div className="flex flex-row gap-2 justify-start sm:justify-end">
+            <div className="flex flex-row gap-2 justify-start sm:justify-end flex-wrap">
               <TodayReportButton />
               <LeaveApprovalButton />
               <ExpenseApprovalButton />
+              <ScheduleVisitCard variant="sales" href="/user-dashboard/schedule-visits" />
             </div>
             <div className="mt-2">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Fast Cards</p>

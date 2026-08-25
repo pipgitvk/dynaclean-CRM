@@ -5,6 +5,8 @@ import dayjs from "dayjs";
 import FollowUpHistory from "@/components/Leads/FollowUpHistory";
 import CustomerContactsModal from "@/components/Customers/CustomerContactsModal";
 import ViewCustomerQuotationsLink from "@/components/Customers/ViewCustomerQuotationsLink";
+import ScheduleVisitModal from "@/components/scheduleVisit/ScheduleVisitModal";
+import { canShowScheduleVisitOnCustomerProfile } from "@/lib/scheduleVisitScope";
 import Link from "next/link";
 import axios from "axios";
 import { notFound } from "next/navigation";
@@ -17,6 +19,7 @@ export default async function CustomerPage({ params }) {
   const payload = await getSessionPayload();
   const userRole = payload?.role || "";
   const username = payload?.username || "";
+  const showScheduleVisitBtn = canShowScheduleVisitOnCustomerProfile(userRole);
 
   // Explicitly select all columns including service_lead_source
   const [custs] = await conn.execute(
@@ -36,6 +39,11 @@ export default async function CustomerPage({ params }) {
   if (!customer) {
     notFound();
   }
+
+  const customerDisplayName = [customer.first_name, customer.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
   // Fetch followup history
   const [fups] = await conn.execute(
@@ -305,6 +313,16 @@ export default async function CustomerPage({ params }) {
               >
                 View Ledger
               </Link>
+              {showScheduleVisitBtn && (
+                <ScheduleVisitModal
+                  customerId={customerId}
+                  customerName={customerDisplayName}
+                  contact={customer.phone}
+                  address={customer.address}
+                  buttonLabel="Schedule Visit"
+                  prefillVisitAddress={false}
+                />
+              )}
               {orderCount > 0 && (
                 <Link
                   href={`/admin-dashboard/view-customer/${customerId}/orders`}
