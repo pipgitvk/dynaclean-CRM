@@ -2,7 +2,7 @@
 import { getSessionPayload } from "./auth";
 import { normalizeRoleKey } from "@/lib/adminAttendanceRulesAuth";
 import {
-  parseModuleAccess,
+  resolveModuleAccess,
   isSectionAllowed,
   isModuleKeyAllowed,
   applySuperadminOnlyModuleRestrictions,
@@ -90,8 +90,10 @@ function filterByRole(list, roleKey) {
   return (list || [])
     .map((item) => {
       const children = item?.children?.length ? filterByRole(item.children, roleKey) : [];
-      const keepSelf = item?.moduleKey ? true : roleMatches(item?.roles, roleKey);
-      if (children.length > 0) return { ...item, children };
+      const keepSelf = roleMatches(item?.roles, roleKey);
+      if (item?.children?.length) {
+        return children.length > 0 ? { ...item, children } : null;
+      }
       return keepSelf ? item : null;
     })
     .filter(Boolean);
@@ -1042,16 +1044,17 @@ const allMenuItems = [
   },
 ];
 
-async function getUserModuleAccess(username) {
+async function getUserModuleAccess(username, roleKey) {
   if (!username) return null;
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
     if (!rows.length) return []; // unknown user → show nothing (fail closed)
-    return parseModuleAccess(rows[0].module_access ?? null);
+    const role = roleKey || rows[0].userRole;
+    return resolveModuleAccess(rows[0].module_access ?? null, role);
   } catch (err) {
     const msg = String(err?.message || "").toLowerCase();
     // Backward-compat: if column isn't present yet, allow all.
@@ -1077,7 +1080,7 @@ export default async function getSidebarMenuItems() {
 
   // Step 2: filter by module_access (SUPERADMIN and EA bypass this — see everything)
   if (roleKey !== "SUPERADMIN" && roleKey !== "EA") {
-    const allowedModulesRaw = await getUserModuleAccess(username);
+    const allowedModulesRaw = await getUserModuleAccess(username, roleKey);
     const allowedModules1 = applySuperadminOnlyModuleRestrictions(
       allowedModulesRaw,
       roleKey,

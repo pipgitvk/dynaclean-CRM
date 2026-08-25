@@ -152,7 +152,7 @@ import {
   normalizeRoleKey,
 } from "@/lib/adminAttendanceRulesAuth";
 import {
-  parseModuleAccess,
+  resolveModuleAccess,
   isSectionAllowed,
   applySuperadminOnlyModuleRestrictions,
 } from "@/lib/moduleAccess";
@@ -987,11 +987,11 @@ async function getUserModuleAccess(username) {
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
     if (!rows.length) return null;
-    return parseModuleAccess(rows[0].module_access ?? null);
+    return resolveModuleAccess(rows[0].module_access ?? null, rows[0].userRole);
   } catch {
     // If column doesn't exist yet, allow all
     return null;

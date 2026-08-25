@@ -3,6 +3,7 @@ import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import {
   ALL_MODULE_KEYS,
   parseModuleAccess,
+  resolveModuleAccess,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
   isModuleKeyAllowed,
@@ -37,11 +38,11 @@ export async function getEffectiveAllowedModuleKeys(username, role) {
     const pool = await getDbConnection();
     conn = await pool.getConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
       [u],
     );
     if (!rows.length) return [];
-    allowedRaw = parseModuleAccess(rows[0].module_access ?? null);
+    allowedRaw = resolveModuleAccess(rows[0].module_access ?? null, rows[0].userRole ?? role);
   } catch (err) {
     const msg = String(err?.message || "").toLowerCase();
     if (msg.includes("unknown column") && msg.includes("module_access")) {

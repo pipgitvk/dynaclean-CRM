@@ -5,7 +5,7 @@ import { getDbConnection } from "@/lib/db";
 import { getMainSessionPayload } from "@/lib/auth";
 import {
   ALL_MODULE_KEYS,
-  parseModuleAccess,
+  resolveModuleAccess,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
 } from "@/lib/moduleAccess";
@@ -67,7 +67,7 @@ export async function GET(req) {
   // Union of all users' module_access for this role
   const unionSet = new Set();
   for (const row of rows) {
-    const keys = parseModuleAccess(row.module_access ?? null);
+    const keys = resolveModuleAccess(row.module_access ?? null, row.userRole);
     for (const k of keys) unionSet.add(k);
   }
 
@@ -129,7 +129,7 @@ export async function POST(req) {
       continue;
     }
 
-    const existing = parseModuleAccess(row?.module_access ?? null);
+    const existing = resolveModuleAccess(row?.module_access ?? null, row?.userRole);
     let next;
 
     if (operation === "REPLACE") {

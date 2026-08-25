@@ -1,3 +1,4 @@
+import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 
 export const MODULE_TREE = [
   {
@@ -574,15 +575,14 @@ export function normalizeModuleAccessKeys(keys) {
 }
 
 /**
- * Parse the raw DB value of module_access.
+ * Parse the raw DB value of module_access (ignores role — use resolveModuleAccess for enforcement).
  *
- * NULL / undefined / empty-string in DB  → not configured yet → return ALL keys (backward compat).
- * "[]" (empty JSON array) in DB          → user explicitly has NO access → return [].
- * "[\"dashboard\",...]" in DB            → return normalized keys.
+ * NULL / undefined / empty-string → ALL keys (legacy callers that expect “unset = full list”).
+ * "[]" → explicitly no access.
  */
 export function parseModuleAccess(raw) {
   if (raw === null || raw === undefined || raw === "") {
-    return [...ALL_MODULE_KEYS]; // never been set → grant all
+    return [...ALL_MODULE_KEYS];
   }
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -593,6 +593,29 @@ export function parseModuleAccess(raw) {
     return [...ALL_MODULE_KEYS];
   } catch {
     return [...ALL_MODULE_KEYS];
+  }
+}
+
+/**
+ * Effective module_access for sidebar / route guards.
+ * NULL in DB → role default preset (not full access).
+ */
+export function resolveModuleAccess(raw, role) {
+  if (raw === null || raw === undefined || raw === "") {
+    const defaults = getRoleDefaultModuleKeys(role);
+    return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
+  }
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return [];
+      return normalizeModuleAccessKeys(parsed);
+    }
+    const defaults = getRoleDefaultModuleKeys(role);
+    return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
+  } catch {
+    const defaults = getRoleDefaultModuleKeys(role);
+    return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
   }
 }
 
