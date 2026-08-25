@@ -12,6 +12,7 @@ import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
 import {
   appendExactMultiTagFilter,
   appendStatusVisibilityFilter,
+  normalizeSearchParam,
 } from "@/lib/tlCustomersListSql";
 import { ensureTLFollowupsModelColumn } from "@/lib/ensureTLFollowupsModelColumn";
 
@@ -29,8 +30,6 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     employee,
     status,
     stage,
-    tag,
-    model,
     nextFromDate,
     nextToDate,
     lead_campaign,
@@ -39,13 +38,15 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     tlOnly,
     preBookingOnly = "false",
   } = searchParamsResolved;
+  const tag = normalizeSearchParam(searchParamsResolved.tag);
+  const model = normalizeSearchParam(searchParamsResolved.model);
 
   // Default to showing TL-only customers if parameter not specified
   if (tlOnly === undefined || tlOnly === null) {
     tlOnly = "true";
   }
 
-  const currentPage = parseInt(page);
+  const currentPage = Math.max(1, parseInt(page, 10) || 1);
   const pageSize = 50; // Number of records per page
   const offset = (currentPage - 1) * pageSize;
   const showTLOnly = tlOnly === "true";
@@ -59,7 +60,12 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   const statusVisibility = { showTLOnly, isSuperAdmin, statusFilter: status };
 
   const conn = await getDbConnection();
-  await ensureTLFollowupsModelColumn(conn);
+  const hasModelColumn = await ensureTLFollowupsModelColumn(conn);
+  const tlModelSelect = hasModelColumn
+    ? "tlf.model as tl_model"
+    : "NULL AS tl_model";
+  const tlModelSubqueryCol = hasModelColumn ? "model, " : "";
+  const tlModelKpiSubqueryCol = hasModelColumn ? "model, " : "";
 
   // Build query to fetch customers with their latest followup info
   let query = `
@@ -73,7 +79,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       tlf.id as tl_followup_id,
       tlf.estimated_order_date,
       tlf.lead_quality_score,
-      tlf.model as tl_model,
+      ${tlModelSelect},
       ${sqlMultiTag} as multi_tag,
       tlf.notes as tl_notes,
       tlf.next_followup_date as tl_next_followup,
@@ -88,7 +94,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     LEFT JOIN (
-      SELECT customer_id, id, estimated_order_date, lead_quality_score, multi_tag, model, notes, next_followup_date, followed_date, followed_by,
+      SELECT customer_id, id, estimated_order_date, lead_quality_score, multi_tag, ${tlModelSubqueryCol}notes, next_followup_date, followed_date, followed_by,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
@@ -197,7 +203,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   // Filter by model (product)
-  if (model) {
+  if (model && hasModelColumn) {
     query += ` AND tlf.model LIKE ?`;
     params.push(`%${model}%`);
   }
@@ -212,7 +218,17 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     /SELECT[\s\S]*?FROM customers c/,
     "SELECT COUNT(*) as total FROM customers c",
   );
-  const [countResult] = await conn.execute(countQuery, params);
+  let countResult;
+  try {
+    [countResult] = await conn.execute(countQuery, params);
+  } catch (error) {
+    console.error(
+      "Admin TL customers count query failed:",
+      error?.code,
+      error?.message,
+    );
+    throw error;
+  }
   const totalRecords = countResult[0].total;
   const totalPages = Math.ceil(totalRecords / pageSize);
 
@@ -221,10 +237,16 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     query += ` ORDER BY c.date_created DESC`;
   } else {
     query += ` ORDER BY c.date_created DESC LIMIT ? OFFSET ?`;
-    params.push(pageSize, offset);
+    params.push(Number(pageSize), Number(offset));
   }
 
-  const [customers] = await conn.execute(query, params);
+  let customers;
+  try {
+    [customers] = await conn.execute(query, params);
+  } catch (error) {
+    console.error("Admin TL customers query failed:", error?.code, error?.message);
+    throw error;
+  }
 
   // Fetch ALL customers for KPI calculations (just essential fields)
   let kpiQuery = `
@@ -233,7 +255,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       c.status,
       c.stage,
       ${sqlMultiTag} as multi_tag,
-      tlf.model as tl_model,
+      ${tlModelSelect},
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
       tlf.customer_id as tl_customer_id,
@@ -247,7 +269,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       FROM customers_followup
     ) cf ON c.customer_id = cf.customer_id AND cf.rn = 1
     LEFT JOIN (
-      SELECT customer_id, multi_tag, model, next_followup_date, followed_date,
+      SELECT customer_id, multi_tag, ${tlModelKpiSubqueryCol}next_followup_date, followed_date,
       ROW_NUMBER() OVER(PARTITION BY customer_id ORDER BY created_at DESC) as rn
       FROM TL_followups
     ) tlf ON c.customer_id = tlf.customer_id AND tlf.rn = 1
@@ -337,7 +359,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   // Filter by model (product) for KPI
-  if (model) {
+  if (model && hasModelColumn) {
     kpiQuery += ` AND tlf.model LIKE ?`;
     kpiParams.push(`%${model}%`);
   }

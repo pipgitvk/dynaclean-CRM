@@ -2,6 +2,14 @@
  * Server-side filters aligned with TLCustomersTable client rules.
  */
 
+/** Next.js searchParams values may be string | string[] | undefined. */
+export function normalizeSearchParam(value) {
+  if (value == null) return undefined;
+  if (Array.isArray(value)) return value[0] ?? undefined;
+  const trimmed = String(value).trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
 /** Mirrors allowCustomerByStatus() when status dropdown is "All Statuses". */
 export function shouldHideDeniedInvalidLeads({
   showTLOnly,
@@ -35,10 +43,11 @@ export function appendExactMultiTagFilter(
   tag,
   sqlMultiTagExpr,
 ) {
-  if (!tag) return query;
-  if (tag === "N/A" || tag === "Clear") {
+  const normalizedTag = normalizeSearchParam(tag);
+  if (!normalizedTag) return query;
+  if (normalizedTag === "N/A" || normalizedTag === "Clear") {
     return `${query} AND (${sqlMultiTagExpr} IS NULL OR ${sqlMultiTagExpr} = '')`;
   }
-  params.push(tag, tag);
+  params.push(normalizedTag, normalizedTag);
   return `${query} AND (CONCAT(', ', ${sqlMultiTagExpr}, ', ') LIKE CONCAT('%, ', ?, ', %') OR ${sqlMultiTagExpr} = ?)`;
 }
