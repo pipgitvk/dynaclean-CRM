@@ -16,7 +16,6 @@ import {
   buildModuleUiSearchIndex,
 } from "@/lib/moduleAccess";
 import { getModuleUrl } from "@/lib/moduleUrlMapping";
-import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 
 function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
@@ -64,7 +63,7 @@ function ModuleUiBlock({
             <input
               type="checkbox"
               checked={isChecked}
-              onChange={(e) => !disabled && onToggleChild(node.key, e.target.checked)}
+              onChange={() => !disabled && onToggleChild(node.key)}
               disabled={disabled}
               className="w-4 h-4 accent-blue-600 flex-shrink-0"
             />
@@ -163,7 +162,7 @@ function ModuleUiBlock({
                     <input
                       type="checkbox"
                       checked={selected.includes(ch.key)}
-                      onChange={(e) => !disabled && onToggleChild(ch.key, e.target.checked)}
+                      onChange={() => !disabled && onToggleChild(ch.key)}
                       disabled={disabled}
                       className="w-3.5 h-3.5 accent-blue-600 flex-shrink-0"
                     />
@@ -297,7 +296,6 @@ const EmpTable = ({ employees }) => {
   const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkModuleSearch, setBulkModuleSearch] = useState("");
-  const bulkUserEditedRef = useRef(false);
   const router = useRouter();
 
   const persistBulkSelectionForRole = useCallback((role, modules) => {
@@ -309,7 +307,7 @@ const EmpTable = ({ employees }) => {
     }));
   }, []);
 
-  const fetchRoleModulesFromDB = useCallback(async (role, { applyToSelection = false } = {}) => {
+  const fetchRoleModulesFromDB = useCallback(async (role) => {
     const key = String(role || "").trim();
     if (!key) return [];
     setBulkRoleLoading(true);
@@ -322,9 +320,6 @@ const EmpTable = ({ employees }) => {
       const data = await res.json();
       const modules = Array.isArray(data?.moduleKeys) ? data.moduleKeys : [];
       setBulkRoleSelections((prev) => ({ ...(prev || {}), [key]: modules }));
-      if (applyToSelection && !bulkUserEditedRef.current) {
-        setBulkSelectedModules(modules);
-      }
       return modules;
     } catch {
       return [];
@@ -494,7 +489,6 @@ const EmpTable = ({ employees }) => {
   const setRoleAndResetSelection = async (role) => {
     // Persist the in-progress selection for the current role before switching.
     persistBulkSelectionForRole(bulkRole, bulkSelectedModules);
-    bulkUserEditedRef.current = false;
     setBulkRole(role);
     setBulkTouched(false);
     const key = String(role || "").trim();
@@ -502,23 +496,19 @@ const EmpTable = ({ employees }) => {
     if (Array.isArray(cached)) {
       setBulkSelectedModules(cached);
     } else {
-      await fetchRoleModulesFromDB(role, { applyToSelection: true });
+      const fromDB = await fetchRoleModulesFromDB(role);
+      setBulkSelectedModules(fromDB);
     }
   };
 
-  const toggleBulkChild = (key, checked) => {
-    bulkUserEditedRef.current = true;
+  const toggleBulkChild = (key) => {
     setBulkTouched(true);
-    setBulkSelectedModules((prev) => {
-      if (checked) {
-        return prev.includes(key) ? prev : [...prev, key];
-      }
-      return prev.filter((k) => k !== key);
-    });
+    setBulkSelectedModules((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
   };
 
   const toggleBulkGroup = (node) => {
-    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const keys = collectModuleKeysFromUiNode(node);
     if (keys.length === 0) return;
@@ -534,17 +524,380 @@ const EmpTable = ({ employees }) => {
   };
 
   const toggleBulkAll = () => {
-    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const allSelected = ALL_MODULE_KEYS.every((k) => bulkSelectedModules.includes(k));
     setBulkSelectedModules(allSelected ? [] : [...ALL_MODULE_KEYS]);
   };
 
+  const roleDefaultModules = {
+    SALES: [
+      "dashboard-home",
+      "task-manager",
+      "fast-card",
+      "view-customers",
+      "add-customer",
+      "daily-report",
+      "lead-reports",
+      "demo-details",
+      "quotations",
+      "orders-process",
+      "product-stock",
+      "expenses",
+      "employee-crm",
+      "prospects-view",
+      "prospects-add",
+      "installation-videos",
+    ],
+    ACCOUNTANT: [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "view-customers",
+      "add-customer",
+      "daily-report",
+      "demo-details",
+      "quotations",
+      "orders-process",
+      "invoices",
+      "product-stock",
+      "product-accessories",
+      "spare-parts",
+      "purchase-direct-in",
+      "purchase-request",
+      "purchase-warehouse-in",
+      "purchases",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "payment-pending",
+      "manual-payments",
+      "expenses",
+      "view-expenses",
+      "dd-management",
+      "other-income",
+      "bank-management",
+      "client-expenses",
+      "delivery-challan",
+      "statements",
+      "salary-slips",
+      "employee-crm",
+      "company-documents",
+      "assets",
+      "attendance-log",
+    ],
+    "TEAM LEADER": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "view-customers",
+      "add-customer",
+      "my-leads",
+      "daily-report",
+      "customer-payment-behavior",
+      "leads-upload",
+      "denied-leads",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "payment-pending",
+      "employee-crm",
+    ],
+    "DIGITAL MARKETER": [
+      "dashboard-home",
+      "task-manager",
+      "view-customers",
+      "my-leads",
+      "leads-upload",
+      "keywords-management",
+      "backlinks-management",
+      "meta-credentials-add",
+      "daily-report",
+      "blog",
+      "employee-crm",
+    ],
+    HR: [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    "HR HEAD": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    "JUNIOR HR EXECUTIVE": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    "HR EXECUTIVE": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    "HR RECRUITER": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "salary-slips",
+      "employee-list",
+      "employee-crm",
+      "hiring-process",
+      "hr-daily-report",
+      "attendance-log",
+    ],
+    GEM: [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "quotations",
+      "orders-process",
+      "payment-pending",
+      "dd-management",
+      "employee-crm",
+      "gem-crm-dashboard",
+      "gem-crm-bids",
+      "gem-crm-reports",
+      "installation-videos",
+    ],
+    "GRAPHIC DESIGNER": [
+      "dashboard-home",
+      "task-manager",
+      "daily-report",
+      "employee-crm",
+      "installation-videos",
+      "installation-videos-manage",
+      "assets",
+    ],
+    "DESIGN ENGINEER": [
+      "dashboard-home",
+      "task-manager",
+      "spare-parts",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "production-status",
+      "bom-list",
+      "expenses",
+      "employee-crm",
+    ],
+    DEVELOPER: [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
+    "SERVICE ENGINEER": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
+    "SERVICE TECHNICIAN": [
+      "dashboard-home",
+      "task-manager",
+      "regularization-approvals",
+      "employee-crm",
+    ],
+    "SERVICE HEAD": [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+      "return-products",
+    ],
+    "SERVICE SUPPORT": [
+      "dashboard-home",
+      "task-manager",
+      "add-customer",
+      "view-customers",
+      "employee-crm",
+      "quotations",
+      "orders-process",
+      "orders-delay",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "product-stock",
+      "spare-parts",
+      "installation-videos",
+      "return-products",
+    ],
+    "SALES CUM BACKOFFICE": [
+      "dashboard-home",
+      "daily-report",
+      "add-customer",
+      "view-customers",
+      "my-leads",
+      "bulk-reassign",
+      "denied-leads",
+      "task-manager",
+      "fast-card",
+      "quotations",
+      "orders-process",
+      "product-stock",
+      "spare-parts",
+      "payment-pending",
+      "manual-payments",
+      "employee-crm",
+      "prospects-add",
+      "prospects-ne",
+      "installation-videos",
+    ],
+    DIRECTOR: [
+      "dashboard-home",
+      "daily-report",
+      "lead-reports",
+      "quotations-report",
+      "order-report",
+      "demo-followups",
+      "item-wise-sales",
+      "customer-payment-behavior",
+      "lead-distribution",
+      "orders-process",
+      "orders-delay",
+      "estimate-delivery",
+      "bulk-reassign",
+      "my-leads",
+      "dm-fresh-leads",
+      "task-manager",
+      "demo-details",
+      "attendance-details",
+      "regularization-approvals",
+      "fast-card",
+      "tl-customers",
+      "add-customer",
+      "view-customers",
+      "quotations",
+      "invoices",
+      "ads-management",
+      "keywords-management",
+      "backlinks-management",
+      "backlinks-excel-data",
+      "meta-credentials-add",
+      "leads-upload",
+      "denied-leads",
+      "prospects-view",
+      "prospects-add",
+      "prospects-new",
+      "hr-designation-targets",
+      "sales-target",
+      "warranty-console",
+      "registered-products",
+      "service-followups",
+      "warranty-map",
+      "service-records",
+      "upcoming-installations",
+      "service-map",
+      "amc-cmc",
+      "return-products",
+      "product-stock",
+      "product-accessories",
+      "purchase-direct-in",
+      "purchase-request",
+      "purchase-warehouse-in",
+      "purchases",
+      "purchase-ledger",
+      "spare-parts",
+      "spare-direct-in",
+      "spare-request",
+      "spare-warehouse-in",
+      "spare-purchases",
+      "production-status",
+      "bom-list",
+      "employee-list",
+      "employee-crm",
+      "attendance-log",
+      "payment-pending",
+      "manual-payments",
+      "expenses",
+      "view-expenses",
+      "dd-management",
+      "other-income",
+      "import-billing",
+      "ledger",
+      "bank-management",
+      "client-expenses",
+      "delivery-challan",
+      "statements",
+      "salary-slips",
+      "company-documents",
+      "blog",
+      "qa-approval",
+      "qa",
+      "email-templates",
+      "holidays",
+      "installation-videos",
+      "installation-videos-manage",
+      "assets",
+      "import-agents",
+      "import-suppliers",
+      "import-shipments",
+      "import-quote-submissions",
+      "import-award-followups",
+      "gem-crm-dashboard",
+      "gem-crm-bids",
+      "gem-crm-reports",
+      "attendance-rules",
+      "hiring-process",
+      "final-profile-approval",
+      "hr-daily-report",
+    ],
+  };
+
   const applyDefaultModules = () => {
-    bulkUserEditedRef.current = true;
     setBulkTouched(true);
     const trimmedRole = String(bulkRole || "").trim();
-    const defaults = getRoleDefaultModuleKeys(trimmedRole);
+    const defaults = roleDefaultModules[trimmedRole] || [];
     setBulkSelectedModules(defaults);
   };
 
@@ -570,11 +923,13 @@ const EmpTable = ({ employees }) => {
         throw new Error(data?.message || "Failed to apply module access.");
       }
       toast.success(`Applied to ${data.updated ?? 0} users`);
+      // Clear cached state so next open fetches fresh from DB
       const key = String(bulkRole || "").trim();
-      setBulkRoleSelections((prev) => ({
-        ...(prev || {}),
-        [key]: [...bulkSelectedModules],
-      }));
+      setBulkRoleSelections((prev) => {
+        const next = { ...(prev || {}) };
+        delete next[key];
+        return next;
+      });
       setShowGlobalModulesModal(false);
       router.refresh();
     } catch (e) {
@@ -621,17 +976,16 @@ const EmpTable = ({ employees }) => {
         <button
           type="button"
           onClick={async () => {
-            bulkUserEditedRef.current = false;
             setBulkTouched(false);
             const key = String(bulkRole || "").trim();
             const cached = bulkRoleSelections?.[key];
             if (Array.isArray(cached)) {
               setBulkSelectedModules(cached);
-              setShowGlobalModulesModal(true);
             } else {
-              setShowGlobalModulesModal(true);
-              await fetchRoleModulesFromDB(bulkRole, { applyToSelection: true });
+              const fromDB = await fetchRoleModulesFromDB(bulkRole);
+              setBulkSelectedModules(fromDB);
             }
+            setShowGlobalModulesModal(true);
           }}
           className="text-white bg-emerald-600 hover:bg-emerald-700 font-medium whitespace-nowrap rounded-lg text-sm px-5 py-2.5 flex items-center justify-center space-x-2 shadow-md"
         >
@@ -756,7 +1110,7 @@ const EmpTable = ({ employees }) => {
                       key={node.id}
                       node={node}
                       selected={bulkSelectedModules}
-                      disabled={bulkSaving || bulkRoleLoading}
+                      disabled={bulkSaving}
                       onToggleGroup={toggleBulkGroup}
                       onToggleChild={toggleBulkChild}
                     />

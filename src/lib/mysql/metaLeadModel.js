@@ -66,12 +66,6 @@ function parseJsonValue(rawValue, fallback) {
 }
 
 async function createLead(data) {
-  const existing = await getLeadByLeadgenId(data.leadgenId);
-  if (existing) {
-    console.log(`⚠️ Duplicate lead ${data.leadgenId} in createLead — skipping insert`);
-    return null;
-  }
-
   const conn = await getDbConnection();
   try {
     const [result] = await conn.execute(
@@ -92,8 +86,9 @@ async function createLead(data) {
     );
     return { id: result.insertId, ...data };
   } catch (error) {
+    // Handle duplicate key error - return null instead of throwing
     if (error.code === 'ER_DUP_ENTRY' || (error.message && error.message.includes('Duplicate entry'))) {
-      console.log(`⚠️ Duplicate lead ${data.leadgenId} in createLead — race condition`);
+      console.log(`⚠️ Duplicate lead ${data.leadgenId} in createLead`);
       return null;
     }
     throw error;
@@ -103,7 +98,7 @@ async function createLead(data) {
 async function getLeadByLeadgenId(leadgenId) {
   const conn = await getDbConnection();
   const [rows] = await conn.execute(
-    'SELECT * FROM meta_leads WHERE leadgen_id = ? ORDER BY id ASC LIMIT 1',
+    'SELECT * FROM meta_leads WHERE leadgen_id = ?',
     [leadgenId]
   );
   if (rows.length === 0) return null;
@@ -119,49 +114,38 @@ async function getLeadByLeadgenId(leadgenId) {
 
 async function getAllLeads(filters = {}) {
   const conn = await getDbConnection();
-  const useUnique = filters.unique !== false;
-  let query;
+  let query = 'SELECT * FROM meta_leads WHERE 1=1';
   const values = [];
-
-  if (useUnique) {
-    query = `
-      SELECT ml.* FROM meta_leads ml
-      INNER JOIN (
-        SELECT MIN(id) AS min_id
-        FROM meta_leads
-        WHERE leadgen_id IS NOT NULL AND leadgen_id != ''
-        GROUP BY leadgen_id
-      ) unique_leads ON ml.id = unique_leads.min_id
-      WHERE 1=1
-    `;
-  } else {
-    query = 'SELECT * FROM meta_leads WHERE 1=1';
+  
+  // For skipped leads, get unique leads by leadgen_id
+  if (filters.isImported === false && filters.unique) {
+    query = 'SELECT ml.* FROM meta_leads ml INNER JOIN (SELECT MIN(id) as min_id FROM meta_leads WHERE is_imported_to_crm = 0 GROUP BY leadgen_id) unique_leads ON ml.id = unique_leads.min_id';
   }
-
-  const tablePrefix = useUnique ? 'ml.' : '';
-
-  if (filters.assignedTo) {
-    query += ` AND ${tablePrefix}assigned_to = ?`;
-    values.push(filters.assignedTo);
+  
+  if (!filters.unique) {
+    if (filters.assignedTo) {
+      query += ' AND assigned_to = ?';
+      values.push(filters.assignedTo);
+    }
+    if (filters.formId) {
+      query += ' AND form_id = ?';
+      values.push(filters.formId);
+    }
+    if (filters.isImported !== undefined) {
+      query += ' AND is_imported_to_crm = ?';
+      values.push(filters.isImported ? 1 : 0);
+    }
+    if (filters.startDate) {
+      query += ' AND DATE(created_at) >= ?';
+      values.push(filters.startDate);
+    }
+    if (filters.endDate) {
+      query += ' AND DATE(created_at) <= ?';
+      values.push(filters.endDate);
+    }
   }
-  if (filters.formId) {
-    query += ` AND ${tablePrefix}form_id = ?`;
-    values.push(filters.formId);
-  }
-  if (filters.isImported !== undefined) {
-    query += ` AND ${tablePrefix}is_imported_to_crm = ?`;
-    values.push(filters.isImported ? 1 : 0);
-  }
-  if (filters.startDate) {
-    query += ` AND DATE(${tablePrefix}created_at) >= ?`;
-    values.push(filters.startDate);
-  }
-  if (filters.endDate) {
-    query += ` AND DATE(${tablePrefix}created_at) <= ?`;
-    values.push(filters.endDate);
-  }
-
-  query += ` ORDER BY ${tablePrefix}created_at DESC`;
+  
+  query += ' ORDER BY created_at DESC';
   
   if (filters.limit) {
     query += ' LIMIT ?';
@@ -185,64 +169,31 @@ async function getAllLeads(filters = {}) {
 
 async function countLeads(filters = {}) {
   const conn = await getDbConnection();
-  const useUnique = filters.unique !== false;
-  let query;
+  let where = 'WHERE 1=1';
   const values = [];
-
-  if (useUnique) {
-    query = `
-      SELECT COUNT(*) AS count FROM (
-        SELECT MIN(id) AS min_id
-        FROM meta_leads
-        WHERE leadgen_id IS NOT NULL AND leadgen_id != ''
-    `;
-    if (filters.assignedTo) {
-      query += ' AND assigned_to = ?';
-      values.push(filters.assignedTo);
-    }
-    if (filters.formId) {
-      query += ' AND form_id = ?';
-      values.push(filters.formId);
-    }
-    if (filters.isImported !== undefined) {
-      query += ' AND is_imported_to_crm = ?';
-      values.push(filters.isImported ? 1 : 0);
-    }
-    if (filters.startDate) {
-      query += ' AND DATE(created_at) >= ?';
-      values.push(filters.startDate);
-    }
-    if (filters.endDate) {
-      query += ' AND DATE(created_at) <= ?';
-      values.push(filters.endDate);
-    }
-    query += ' GROUP BY leadgen_id) unique_leads';
-  } else {
-    let where = 'WHERE 1=1';
-    if (filters.assignedTo) {
-      where += ' AND assigned_to = ?';
-      values.push(filters.assignedTo);
-    }
-    if (filters.formId) {
-      where += ' AND form_id = ?';
-      values.push(filters.formId);
-    }
-    if (filters.isImported !== undefined) {
-      where += ' AND is_imported_to_crm = ?';
-      values.push(filters.isImported ? 1 : 0);
-    }
-    if (filters.startDate) {
-      where += ' AND DATE(created_at) >= ?';
-      values.push(filters.startDate);
-    }
-    if (filters.endDate) {
-      where += ' AND DATE(created_at) <= ?';
-      values.push(filters.endDate);
-    }
-    query = `SELECT COUNT(*) AS count FROM meta_leads ${where}`;
+  
+  if (filters.assignedTo) {
+    where += ' AND assigned_to = ?';
+    values.push(filters.assignedTo);
   }
-
-  const [rows] = await conn.execute(query, values);
+  if (filters.formId) {
+    where += ' AND form_id = ?';
+    values.push(filters.formId);
+  }
+  if (filters.isImported !== undefined) {
+    where += ' AND is_imported_to_crm = ?';
+    values.push(filters.isImported ? 1 : 0);
+  }
+  if (filters.startDate) {
+    where += ' AND DATE(created_at) >= ?';
+    values.push(filters.startDate);
+  }
+  if (filters.endDate) {
+    where += ' AND DATE(created_at) <= ?';
+    values.push(filters.endDate);
+  }
+  
+  const [rows] = await conn.execute(`SELECT COUNT(*) as count FROM meta_leads ${where}`, values);
   return rows[0].count;
 }
 

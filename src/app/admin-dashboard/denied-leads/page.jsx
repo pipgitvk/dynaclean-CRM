@@ -2,7 +2,7 @@ import { getDbConnection } from "@/lib/db";
 import DeniedLeadsTable from "./DeniedLeadsTable";
 import { getSessionPayload } from "@/lib/auth";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
-import { resolveModuleAccess, applySuperadminOnlyModuleRestrictions, applyRoleDenyModuleRestrictions } from "@/lib/moduleAccess";
+import { parseModuleAccess, applySuperadminOnlyModuleRestrictions, applyRoleDenyModuleRestrictions } from "@/lib/moduleAccess";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -30,13 +30,13 @@ export default async function DeniedLeadsPage({ searchParams }) {
     try {
       connection = await getDbConnection();
       const [rows] = await connection.execute(
-        "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
+        "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
         [username]
       );
 
       let allowedModules = null;
       if (rows.length > 0) {
-        allowedModules = resolveModuleAccess(rows[0].module_access ?? null, rows[0].userRole ?? userRole);
+        allowedModules = parseModuleAccess(rows[0].module_access ?? null);
         allowedModules = applySuperadminOnlyModuleRestrictions(allowedModules, roleKey);
         allowedModules = applyRoleDenyModuleRestrictions(allowedModules, roleKey);
       }

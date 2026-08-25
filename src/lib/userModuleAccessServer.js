@@ -3,10 +3,8 @@ import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 import {
   ALL_MODULE_KEYS,
   parseModuleAccess,
-  resolveModuleAccess,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
-  isModuleKeyAllowed,
 } from "@/lib/moduleAccess";
 
 function uniqueStrings(arr) {
@@ -38,11 +36,11 @@ export async function getEffectiveAllowedModuleKeys(username, role) {
     const pool = await getDbConnection();
     conn = await pool.getConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
       [u],
     );
     if (!rows.length) return [];
-    allowedRaw = resolveModuleAccess(rows[0].module_access ?? null, rows[0].userRole ?? role);
+    allowedRaw = parseModuleAccess(rows[0].module_access ?? null);
   } catch (err) {
     const msg = String(err?.message || "").toLowerCase();
     if (msg.includes("unknown column") && msg.includes("module_access")) {
@@ -73,10 +71,11 @@ export async function userHasModuleKey(username, role, moduleKey) {
 
   const allowed = await getEffectiveAllowedModuleKeys(username, role);
   if (allowed === null) {
+    // Legacy: module_access not configured yet → treat as full access (minus superadmin-only etc.)
     const base = applySuperadminOnlyModuleRestrictions([...ALL_MODULE_KEYS], roleKey) ?? [];
     const base2 = applyRoleDenyModuleRestrictions(base, roleKey) ?? [];
-    return isModuleKeyAllowed(key, uniqueStrings(base2));
+    return uniqueStrings(base2).includes(key);
   }
 
-  return isModuleKeyAllowed(key, allowed);
+  return allowed.includes(key);
 }

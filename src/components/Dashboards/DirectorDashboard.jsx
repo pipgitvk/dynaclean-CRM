@@ -44,7 +44,6 @@ import {
   Area
 } from "recharts";
 import clsx from "clsx";
-import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 
 // Mock sparkline data
 const sparklineData = [
@@ -279,10 +278,6 @@ export default function DirectorDashboard({ user, reportingManager, regTotal = 0
             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <ScheduleVisitCard variant="sales" href="/director-dashboard/schedule-visits" />
       </div>
 
       {/* KPI Cards Grid */}

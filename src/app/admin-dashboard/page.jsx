@@ -195,7 +195,6 @@ import { TextEncoder as NodeTextEncoder } from "util";
 import { getDbConnection } from "@/lib/db";
 import UpcomingTasks from "@/components/task/UpcomingTasksAdmin";
 import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
-import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 import OverduePaymentCard from "@/components/OverduePaymentCard";
 import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanceQuickCard";
 import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText } from "lucide-react";
@@ -395,7 +394,6 @@ export default async function UserDashboardPage() {
 
           {/* Profile Approvals - Dynamic Card Component */}
           <ProfileApprovalsCard />
-          <ScheduleVisitCard href="/admin-dashboard/schedule-visits" />
           <OverduePaymentCard />
           <KeywordPerformanceQuickCard />
  <a href="/admin-dashboard/stats" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-purple-500 min-h-[140px]">

@@ -13,33 +13,12 @@ const ATTENDANCE_RULES_MIDDLEWARE_ROLES = [
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
-/** Schedule visit pages across all dashboard prefixes */
-function isScheduleVisitPath(pathname) {
-  return (
-    pathname.includes("/schedule-visits") ||
-    /\/view-customer\/[^/]+\/schedule-visit(?:\/|$)/.test(pathname)
-  );
-}
-
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
   const impersonationToken = request.cookies.get("impersonation_token")?.value;
   const mainToken = request.cookies.get("token")?.value;
-  const token = impersonationToken || mainToken;    
-
-  // Schedule visit API — require valid session (module access enforced in route handlers)
-  if (pathname.startsWith("/api/schedule-visit")) {
-    if (!token) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    }
-    try {
-      await jwtVerify(token, secret);
-      return NextResponse.next();
-    } catch {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const token = impersonationToken || mainToken;
 
   // Redirect root to login
   if (pathname === "/") {
@@ -97,12 +76,6 @@ export async function middleware(request) {
       const isImpersonated = payload.impersonated;
       const roleKey = normalizeRoleKey(role || "");
       const roleNorm = String(role ?? "").trim().toUpperCase();
-
-      // Schedule visit module pages — allow all authenticated dashboard roles;
-      // sidebar/module_access still controls visibility in the app.
-      if (isScheduleVisitPath(pathname)) {
-        return NextResponse.next();
-      }
 
       // Same roles as getAdminSidebarMenuItems "Attendance rules" — must not block here,
       // otherwise ADMIN/HR see the link but middleware sends them to /user-dashboard.
@@ -174,18 +147,13 @@ export async function middleware(request) {
         const isPaymentPendingReportRoute = pathname.startsWith("/admin-dashboard/reports/payment-pending");
         const isManualPaymentsRoute = pathname.startsWith("/admin-dashboard/manual-payments");
         const isSalesDashboardManualPaymentsRoute = pathname.startsWith("/sales-dashboard/manual-payments");
-        const isScheduleVisitAdminRoute =
-          pathname.startsWith("/admin-dashboard/schedule-visits") ||
-          (pathname.startsWith("/admin-dashboard/view-customer") &&
-            pathname.includes("/schedule-visit"));
         
         // Allow everyone to access allowed admin routes that are module-gated in sidebar.
         const isEveryoneAllowedRoute =
           isAccountingLedgerRoute ||
           isInvoicesBuyerRoute ||
           isPartiesRoute ||
-          isPurchaseProductsRoute ||
-          isScheduleVisitAdminRoute;
+          isPurchaseProductsRoute;
         
         if (
           !(roleNorm === "EA" && isEaAllowed) &&
@@ -276,9 +244,6 @@ export async function middleware(request) {
         if (pathname.startsWith("/user-dashboard/digital-marketer-leads")) {
           return NextResponse.next();
         }
-        if (isScheduleVisitPath(pathname)) {
-          return NextResponse.next();
-        }
         return NextResponse.redirect(new URL("/admin-dashboard", request.url));
       }
 
@@ -304,7 +269,5 @@ export const config = {
     "/hr-dashboard/:path*",
     "/digital-marketing-dashboard/:path*",
     "/accounts-dashboard/:path*",
-    "/api/schedule-visit",
-    "/api/schedule-visit/:path*",
   ],
 };

@@ -1,25 +1,23 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
-import { getSessionPayload } from "@/lib/auth";
-import { getScopedUsername } from "@/lib/dataScope";
-import { buildCustomerOwnershipWhere } from "@/lib/scheduleVisitScope";
+import { jwtVerify } from "jose";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req) {
   try {
-    const payload = await getSessionPayload();
-    if (!payload) {
+    const token = req.cookies.get("token")?.value;
+    if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    await jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
 
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q") || "";
     const limit = parseInt(searchParams.get("limit")) || 10;
-    const scopeOwn = searchParams.get("scope") === "own";
 
     const conn = await getDbConnection();
-    const username = getScopedUsername(payload);
 
     let sql = `
       SELECT 
@@ -38,17 +36,6 @@ export async function GET(req) {
 
     const params = [];
 
-    if (scopeOwn) {
-      const ownership = buildCustomerOwnershipWhere({
-        role: payload.role,
-        username,
-      });
-      if (ownership.whereClause) {
-        sql += ` ${ownership.whereClause}`;
-        params.push(...ownership.params);
-      }
-    }
-
     if (query.trim()) {
       sql += ` AND (
         CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, '')) LIKE ? OR 
@@ -60,17 +47,10 @@ export async function GET(req) {
         customer_id LIKE ?
       )`;
       const searchTerm = `%${query.trim()}%`;
-      params.push(
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm,
-        searchTerm
-      );
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
       sql += ` ORDER BY first_name ASC LIMIT ?`;
     } else {
+      // For empty search, show recent customers
       sql += ` ORDER BY date_created DESC LIMIT ?`;
     }
     params.push(limit);

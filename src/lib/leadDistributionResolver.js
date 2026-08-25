@@ -26,12 +26,11 @@ async function resolveAssigneeFromFormAssignments(formId) {
     const placeholders = usernames.map(() => '?').join(',');
 
     const [leadCounts] = await conn.execute(
-      `SELECT assigned_to, COUNT(DISTINCT leadgen_id) as lead_count
+      `SELECT assigned_to, COUNT(*) as lead_count
        FROM meta_leads
        WHERE assigned_to IN (${placeholders})
        AND form_id = ?
        AND DATE(created_at) = CURDATE()
-       AND leadgen_id IS NOT NULL AND leadgen_id != ''
        GROUP BY assigned_to`,
       [...usernames, formId]
     );

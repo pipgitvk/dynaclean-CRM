@@ -27,8 +27,6 @@ export async function GET(request) {
     const uniqueParam = searchParams.get('unique');
     if (uniqueParam !== null) {
       filters.unique = uniqueParam === 'true';
-    } else {
-      filters.unique = true;
     }
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;

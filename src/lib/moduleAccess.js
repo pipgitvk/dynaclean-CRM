@@ -1,4 +1,3 @@
-import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 
 export const MODULE_TREE = [
   {
@@ -22,7 +21,6 @@ export const MODULE_TREE = [
       { key: "dm-fresh-leads", label: "24h Fresh Leads (DM)" },
       { key: "task-manager", label: "Task Manager" },
       { key: "demo-details", label: "Demo Details" },
-      { key: "schedule-visits", label: "Schedule Visits" },
       { key: "attendance-details", label: "Attendance details" },
       { key: "regularization-approvals", label: "Overtime" },
       { key: "fast-card", label: "Fast Card" },
@@ -206,7 +204,6 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "fast-card", label: "Fast Card" },
       { kind: "leaf", key: "attendance-details", label: "Attendance details" },
       { kind: "leaf", key: "regularization-approvals", label: "Overtime" },
-      { kind: "leaf", key: "schedule-visits", label: "Schedule Visits" },
     ],
   },
   {
@@ -270,7 +267,6 @@ export const SUPERADMIN_MODULE_UI_NODES = [
     children: [
       { kind: "leaf", key: "demo-followups", label: "Demo Followups" },
       { kind: "leaf", key: "demo-details", label: "Demo Details" },
-      { kind: "leaf", key: "schedule-visits", label: "Schedule Visits" },
     ],
   },
   {
@@ -575,14 +571,15 @@ export function normalizeModuleAccessKeys(keys) {
 }
 
 /**
- * Parse the raw DB value of module_access (ignores role — use resolveModuleAccess for enforcement).
+ * Parse the raw DB value of module_access.
  *
- * NULL / undefined / empty-string → ALL keys (legacy callers that expect “unset = full list”).
- * "[]" → explicitly no access.
+ * NULL / undefined / empty-string in DB  → not configured yet → return ALL keys (backward compat).
+ * "[]" (empty JSON array) in DB          → user explicitly has NO access → return [].
+ * "[\"dashboard\",...]" in DB            → return normalized keys.
  */
 export function parseModuleAccess(raw) {
   if (raw === null || raw === undefined || raw === "") {
-    return [...ALL_MODULE_KEYS];
+    return [...ALL_MODULE_KEYS]; // never been set → grant all
   }
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
@@ -593,29 +590,6 @@ export function parseModuleAccess(raw) {
     return [...ALL_MODULE_KEYS];
   } catch {
     return [...ALL_MODULE_KEYS];
-  }
-}
-
-/**
- * Effective module_access for sidebar / route guards.
- * NULL in DB → role default preset (not full access).
- */
-export function resolveModuleAccess(raw, role) {
-  if (raw === null || raw === undefined || raw === "") {
-    const defaults = getRoleDefaultModuleKeys(role);
-    return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
-  }
-  try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (Array.isArray(parsed)) {
-      if (parsed.length === 0) return [];
-      return normalizeModuleAccessKeys(parsed);
-    }
-    const defaults = getRoleDefaultModuleKeys(role);
-    return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
-  } catch {
-    const defaults = getRoleDefaultModuleKeys(role);
-    return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
   }
 }
 
@@ -692,21 +666,4 @@ export function isSectionAllowed(sectionKey, allowedKeys) {
   if (allowedKeys.includes(sectionKey)) return true;
   const childKeys = getChildKeys(sectionKey);
   return childKeys.some((k) => allowedKeys.includes(k));
-}
-
-/**
- * Whether a leaf module key is allowed — direct key, child-of-section, or parent section granted.
- */
-export function isModuleKeyAllowed(moduleKey, allowedKeys) {
-  if (!allowedKeys) return true;
-  const key = String(moduleKey || "").trim();
-  if (!key) return false;
-  if (allowedKeys.includes(key)) return true;
-  if (isSectionAllowed(key, allowedKeys)) return true;
-  for (const section of MODULE_TREE) {
-    if (allowedKeys.includes(section.key)) {
-      if (getChildKeys(section.key).includes(key)) return true;
-    }
-  }
-  return false;
 }

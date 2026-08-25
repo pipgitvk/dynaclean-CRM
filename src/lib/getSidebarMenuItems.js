@@ -2,9 +2,8 @@
 import { getSessionPayload } from "./auth";
 import { normalizeRoleKey } from "@/lib/adminAttendanceRulesAuth";
 import {
-  resolveModuleAccess,
+  parseModuleAccess,
   isSectionAllowed,
-  isModuleKeyAllowed,
   applySuperadminOnlyModuleRestrictions,
   applyRoleDenyModuleRestrictions,
   SUPERADMIN_ONLY_MODULE_KEYS,
@@ -14,7 +13,6 @@ import { getDbConnection } from "@/lib/db";
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
   const role = String(roleKey || "").toUpperCase();
-  if (role === "DIRECTOR") return "/director-dashboard";
   if (role.includes("SALES")) return "/sales-dashboard";
   if (role.includes("SERVICE") && role.includes("HEAD")) return "/service-head-dashboard";
   if (role.includes("HR")) return "/hr-dashboard";
@@ -90,10 +88,8 @@ function filterByRole(list, roleKey) {
   return (list || [])
     .map((item) => {
       const children = item?.children?.length ? filterByRole(item.children, roleKey) : [];
-      const keepSelf = roleMatches(item?.roles, roleKey);
-      if (item?.children?.length) {
-        return children.length > 0 ? { ...item, children } : null;
-      }
+      const keepSelf = item?.moduleKey ? true : roleMatches(item?.roles, roleKey);
+      if (children.length > 0) return { ...item, children };
       return keepSelf ? item : null;
     })
     .filter(Boolean);
@@ -320,13 +316,6 @@ const allMenuItems = [
           "HR",
         ],
         icon: "PlayCircle",
-      },
-      {
-        path: "/user-dashboard/schedule-visits",
-        name: "Schedule Visits",
-        moduleKey: "schedule-visits",
-        roles: ["ALL"],
-        icon: "MapPin",
       },
     ],
   },
@@ -1044,17 +1033,16 @@ const allMenuItems = [
   },
 ];
 
-async function getUserModuleAccess(username, roleKey) {
+async function getUserModuleAccess(username) {
   if (!username) return null;
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
     if (!rows.length) return []; // unknown user → show nothing (fail closed)
-    const role = roleKey || rows[0].userRole;
-    return resolveModuleAccess(rows[0].module_access ?? null, role);
+    return parseModuleAccess(rows[0].module_access ?? null);
   } catch (err) {
     const msg = String(err?.message || "").toLowerCase();
     // Backward-compat: if column isn't present yet, allow all.
@@ -1080,7 +1068,7 @@ export default async function getSidebarMenuItems() {
 
   // Step 2: filter by module_access (SUPERADMIN and EA bypass this — see everything)
   if (roleKey !== "SUPERADMIN" && roleKey !== "EA") {
-    const allowedModulesRaw = await getUserModuleAccess(username, roleKey);
+    const allowedModulesRaw = await getUserModuleAccess(username);
     const allowedModules1 = applySuperadminOnlyModuleRestrictions(
       allowedModulesRaw,
       roleKey,
@@ -1099,7 +1087,7 @@ export default async function getSidebarMenuItems() {
             // Otherwise older menu entries would "leak" through and ignore module_access.
             // My Leads is accessible to anyone who has the my-leads module key in their module_access
             const allowed = item?.moduleKey
-              ? isModuleKeyAllowed(item.moduleKey, allowedModules)
+              ? isSectionAllowed(item.moduleKey, allowedModules)
               : item?.path
                 ? false
                 : true;

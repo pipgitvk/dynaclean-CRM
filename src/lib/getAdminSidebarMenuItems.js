@@ -152,7 +152,7 @@ import {
   normalizeRoleKey,
 } from "@/lib/adminAttendanceRulesAuth";
 import {
-  resolveModuleAccess,
+  parseModuleAccess,
   isSectionAllowed,
   applySuperadminOnlyModuleRestrictions,
 } from "@/lib/moduleAccess";
@@ -374,13 +374,6 @@ const allMenuItems = [
         name: "Demo Details",
         roles: ["SUPERADMIN"],
         icon: "PlayCircle",
-      },
-      {
-        path: "/admin-dashboard/schedule-visits",
-        name: "Schedule Visits",
-        accessKey: "schedule-visits",
-        roles: ["SUPERADMIN"],
-        icon: "MapPin",
       },
     ],
   },
@@ -987,11 +980,11 @@ async function getUserModuleAccess(username) {
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(
-      "SELECT module_access, userRole FROM rep_list WHERE username = ? LIMIT 1",
+      "SELECT module_access FROM rep_list WHERE username = ? LIMIT 1",
       [username],
     );
     if (!rows.length) return null;
-    return resolveModuleAccess(rows[0].module_access ?? null, rows[0].userRole);
+    return parseModuleAccess(rows[0].module_access ?? null);
   } catch {
     // If column doesn't exist yet, allow all
     return null;

@@ -4,7 +4,6 @@ import { createLead, getLeadByLeadgenId, markLeadAsImported } from '@/lib/mysql/
 const { getDbConnection } = require('@/lib/db');
 const { normalizePhone, PHONE_LAST10_WHERE } = require('@/lib/phone-check');
 const { handleDuplicateNotImportedLead } = require('@/lib/services/metaDuplicateLeadHandler');
-const { resolveMetaLeadAssignee } = require('@/lib/metaLeadAssignee');
 
 const GLOBAL_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || 'dynaclean-secret';
 
@@ -130,23 +129,12 @@ export async function POST(request) {
           // Extract product from form data
           const formProduct = fieldData.find(f => f.name === 'product')?.values?.[0] || '';
           const productsInterest = campaignName ? `${formProduct} - ${campaignName}` : formProduct;
-
-          let assignedTo;
-          let employeeName;
-          try {
-            const assignee = await resolveMetaLeadAssignee(formId, credential.employeeName);
-            assignedTo = assignee.assignedTo;
-            employeeName = assignee.employeeName;
-          } catch (assignErr) {
-            console.error(`❌ Failed to resolve assignee for form ${formId}:`, assignErr);
-            continue;
-          }
-
+          
           // Create meta_leads record
           const metaLead = await createLead({
             leadgenId,
-            assignedTo,
-            employeeName,
+            assignedTo: credential.employeeName,
+            employeeName: credential.employeeName,
             formId,
             pageId,
             leadData: {
@@ -159,12 +147,7 @@ export async function POST(request) {
             campaignName,
             productsInterest
           });
-
-          if (!metaLead || !metaLead.id) {
-            console.log(`⚠️ Lead ${leadgenId} already exists after insert attempt, skipping`);
-            continue;
-          }
-
+          
           console.log(`✅ MetaLead created: ${metaLead.id}`);
           
           // Auto-import to CRM
@@ -202,8 +185,8 @@ export async function POST(request) {
                       phoneToStore,
                       parsedLead.address || '',
                       'social_media',
-                      assignedTo,
-                      assignedTo,
+                      credential.employeeName,
+                      credential.employeeName,
                       'Automatic',
                       'New',
                       now,
@@ -228,7 +211,7 @@ export async function POST(request) {
                       parsedLead.first_name,
                       phoneToStore,
                       null,
-                      assignedTo,
+                      credential.employeeName,
                       now,
                       'Facebook',
                       followupNote,
