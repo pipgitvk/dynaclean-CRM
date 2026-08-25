@@ -3,8 +3,10 @@ const { getActiveCredentials, updateCredentialSync } = require('../mysql/metaCre
 const { createLead, getLeadByLeadgenId, markLeadAsImported } = require('../mysql/metaLeadModel');
 const { createSyncLog } = require('../mysql/metaSyncLogModel');
 const { normalizePhone, PHONE_LAST10_WHERE } = require('../phone-check');
-const { resolveAssigneeFromFormAssignments, resolveAssigneeFromLeadDistribution } = require('../leadDistributionResolver');
+const { resolveMetaLeadAssignee } = require('../metaLeadAssignee');
 const { handleDuplicateNotImportedLead } = require('./metaDuplicateLeadHandler');
+
+let syncInProgress = false;
 
 /**
  * Fetch leads from Meta Graph API for a specific form
@@ -126,26 +128,36 @@ async function checkLeadExistsInCRM(phone) {
 async function checkLeadExistsInMetaLeads(leadgenId, phone) {
   try {
     const conn = await getDbConnection();
-    let query = 'SELECT id FROM meta_leads WHERE is_imported_to_crm = 1';
-    const params = [];
 
     if (leadgenId) {
-      query += ' AND leadgen_id = ?';
-      params.push(leadgenId);
+      const [rows] = await conn.execute(
+        'SELECT id FROM meta_leads WHERE leadgen_id = ? AND is_imported_to_crm = 1 LIMIT 1',
+        [leadgenId]
+      );
+      if (rows.length > 0) return true;
     }
 
-    if (phone) {
-      const normalizedPhone = normalizePhone(phone);
-      if (normalizedPhone.length === 10) {
-        query += ` OR JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone_number')) IS NOT NULL AND RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone_number')), ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', ''), ',', ''), 10) = ?`;
-        params.push(normalizedPhone);
-      }
+    const normalizedPhone = normalizePhone(phone);
+    if (normalizedPhone.length === 10) {
+      const [rows] = await conn.execute(
+        `SELECT id FROM meta_leads
+         WHERE is_imported_to_crm = 1
+           AND (
+             JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone')) = ?
+             OR JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone_number')) = ?
+             OR RIGHT(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+               COALESCE(
+                 NULLIF(JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone')), ''),
+                 NULLIF(JSON_UNQUOTE(JSON_EXTRACT(lead_data, '$.phone_number')), '')
+               ), ' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', ''), ',', ''), 10) = ?
+           )
+         LIMIT 1`,
+        [normalizedPhone, normalizedPhone, normalizedPhone]
+      );
+      return rows.length > 0;
     }
 
-    query += ' LIMIT 1';
-
-    const [rows] = await conn.execute(query, params);
-    return rows.length > 0;
+    return false;
   } catch (error) {
     console.error('Error checking lead in meta_leads:', error);
     return false;
@@ -265,30 +277,21 @@ async function syncLeadsForCredential(credential, options = {}) {
         const formProduct = fieldData.find(f => f.name === 'product')?.values?.[0] || '';
         const productsInterest = campaignName ? `${formProduct} - ${campaignName}` : formProduct;
 
-        // Resolve assignee - use employeeName if set, otherwise use form-specific or general lead distribution
-        let assignedTo = credential.employeeName;
-        let employeeName = credential.employeeName;
-
-        if (!assignedTo) {
-          try {
-            // First try form-specific assignments
-            assignedTo = await resolveAssigneeFromFormAssignments(formId);
-
-            if (!assignedTo) {
-              // Fallback to general lead distribution
-              assignedTo = await resolveAssigneeFromLeadDistribution();
-              console.log(`Auto-distributed lead (general distribution) to: ${assignedTo}`);
-            } else {
-              console.log(`Auto-distributed lead (form-specific) to: ${assignedTo} for form: ${formId}`);
-            }
-
-            employeeName = assignedTo;
-          } catch (err) {
-            console.error('Error resolving assignee:', err);
-            errorMessage = 'Failed to resolve assignee';
-            leadsSkipped++;
-            continue;
+        // Resolve assignee via form-specific distribution (or credential fallback)
+        let assignedTo;
+        let employeeName;
+        try {
+          const assignee = await resolveMetaLeadAssignee(formId, credential.employeeName);
+          assignedTo = assignee.assignedTo;
+          employeeName = assignee.employeeName;
+          if (!credential.employeeName) {
+            console.log(`Auto-distributed lead to: ${assignedTo} for form: ${formId}`);
           }
+        } catch (err) {
+          console.error('Error resolving assignee:', err);
+          errorMessage = 'Failed to resolve assignee';
+          leadsSkipped++;
+          continue;
         }
 
         // Create meta_leads record with duplicate error handling
@@ -309,8 +312,8 @@ async function syncLeadsForCredential(credential, options = {}) {
           productsInterest
         });
 
-        // If lead is null, it means duplicate - skip it
-        if (metaLead === null) {
+        // If lead is null or already existed, skip further processing
+        if (!metaLead || !metaLead.id) {
           leadsSkipped++;
           continue;
         }
@@ -431,43 +434,52 @@ async function syncLeadsForCredential(credential, options = {}) {
  * Sync leads for all active credentials
  */
 async function syncAllActiveCredentials(options = {}) {
-  const credentials = await getActiveCredentials();
-  
-  console.log(`🔄 Syncing ${credentials.length} active credentials...`);
-  
-  const results = [];
-  for (const credential of credentials) {
-    console.log(`📋 Syncing credential: ${credential.employeeName} (ID: ${credential.id})`);
-    try {
-      const result = await syncLeadsForCredential(credential, options);
-      results.push(result);
-      console.log(`✅ Completed sync for ${credential.employeeName}: Fetched ${result.leadsFetched}, Imported ${result.leadsImported}`);
-    } catch (error) {
-      console.error(`❌ Error syncing credential ${credential.employeeName}:`, error);
-      // Update credential with error status
-      try {
-        await updateCredentialSync(credential.id, {
-          lastSyncAt: new Date().toISOString(),
-          status: 'error',
-          message: error.message || 'Sync failed',
-          leadsFetched: 0,
-          leadsImported: 0
-        });
-      } catch (updateError) {
-        console.error(`❌ Failed to update error status for ${credential.employeeName}:`, updateError);
-      }
-      results.push({
-        credentialId: credential.id,
-        employeeName: credential.employeeName,
-        leadsFetched: 0,
-        leadsImported: 0,
-        leadsSkipped: 0,
-        error: error.message
-      });
-    }
+  if (syncInProgress) {
+    console.log('⚠️ Meta lead sync already in progress, skipping overlapping run');
+    return [];
   }
-  
-  return results;
+
+  syncInProgress = true;
+  try {
+    const credentials = await getActiveCredentials();
+
+    console.log(`🔄 Syncing ${credentials.length} active credentials...`);
+
+    const results = [];
+    for (const credential of credentials) {
+      console.log(`📋 Syncing credential: ${credential.employeeName} (ID: ${credential.id})`);
+      try {
+        const result = await syncLeadsForCredential(credential, options);
+        results.push(result);
+        console.log(`✅ Completed sync for ${credential.employeeName}: Fetched ${result.leadsFetched}, Imported ${result.leadsImported}`);
+      } catch (error) {
+        console.error(`❌ Error syncing credential ${credential.employeeName}:`, error);
+        try {
+          await updateCredentialSync(credential.id, {
+            lastSyncAt: new Date().toISOString(),
+            status: 'error',
+            message: error.message || 'Sync failed',
+            leadsFetched: 0,
+            leadsImported: 0
+          });
+        } catch (updateError) {
+          console.error(`❌ Failed to update error status for ${credential.employeeName}:`, updateError);
+        }
+        results.push({
+          credentialId: credential.id,
+          employeeName: credential.employeeName,
+          leadsFetched: 0,
+          leadsImported: 0,
+          leadsSkipped: 0,
+          error: error.message
+        });
+      }
+    }
+
+    return results;
+  } finally {
+    syncInProgress = false;
+  }
 }
 
 module.exports = {
