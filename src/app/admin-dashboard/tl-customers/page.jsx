@@ -13,6 +13,7 @@ import {
   appendExactMultiTagFilter,
   appendStatusVisibilityFilter,
 } from "@/lib/tlCustomersListSql";
+import { ensureTLFollowupsModelColumn } from "@/lib/ensureTLFollowupsModelColumn";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   const statusVisibility = { showTLOnly, isSuperAdmin, statusFilter: status };
 
   const conn = await getDbConnection();
+  await ensureTLFollowupsModelColumn(conn);
 
   // Build query to fetch customers with their latest followup info
   let query = `
