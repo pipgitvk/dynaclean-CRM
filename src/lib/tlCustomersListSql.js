@@ -37,6 +37,12 @@ export function appendStatusVisibilityFilter(
  * Exact multi-tag match (", " delimited) — same logic as getTagCounts().
  * @param {string} sqlMultiTagExpr e.g. "tlf.multi_tag" or "cf.multi_tag"
  */
+const TAG_TEXT_COLLATION = "utf8mb4_unicode_ci";
+
+function collateTagExpr(sqlMultiTagExpr) {
+  return `${sqlMultiTagExpr} COLLATE ${TAG_TEXT_COLLATION}`;
+}
+
 export function appendExactMultiTagFilter(
   query,
   params,
@@ -45,9 +51,10 @@ export function appendExactMultiTagFilter(
 ) {
   const normalizedTag = normalizeSearchParam(tag);
   if (!normalizedTag) return query;
+  const tagExpr = collateTagExpr(sqlMultiTagExpr);
   if (normalizedTag === "N/A" || normalizedTag === "Clear") {
-    return `${query} AND (${sqlMultiTagExpr} IS NULL OR ${sqlMultiTagExpr} = '')`;
+    return `${query} AND (${sqlMultiTagExpr} IS NULL OR ${tagExpr} = '')`;
   }
   params.push(normalizedTag, normalizedTag);
-  return `${query} AND (CONCAT(', ', ${sqlMultiTagExpr}, ', ') LIKE CONCAT('%, ', ?, ', %') OR ${sqlMultiTagExpr} = ?)`;
+  return `${query} AND (CONCAT(', ', ${tagExpr}, ', ') LIKE CONCAT('%, ', ?, ', %') OR ${tagExpr} = ?)`;
 }
