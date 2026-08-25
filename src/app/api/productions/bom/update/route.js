@@ -9,17 +9,18 @@ export async function POST(req) {
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { product_code, items } = await req.json();
-    if (!product_code || !Array.isArray(items)) {
+    const code = String(product_code || "").trim();
+    if (!code || !Array.isArray(items)) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
     const db = await getDbConnection();
-    const [exists] = await db.execute(`SELECT id FROM bom WHERE product_code = ?`, [product_code]);
+    const [exists] = await db.execute(`SELECT id FROM bom WHERE TRIM(product_code) = ? LIMIT 1`, [code]);
     if (exists.length === 0) return NextResponse.json({ error: "BOM not found" }, { status: 404 });
 
     const json = JSON.stringify(items);
     await db.execute(
-      `UPDATE bom SET items_json = ?, modified_by = ?, updated_at = NOW() WHERE product_code = ?`,
-      [json, payload.username || null, product_code]
+      `UPDATE bom SET items_json = ?, modified_by = ?, updated_at = NOW() WHERE TRIM(product_code) = ?`,
+      [json, payload.username || null, code]
     );
     return NextResponse.json({ success: true });
   } catch (e) {

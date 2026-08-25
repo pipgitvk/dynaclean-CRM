@@ -1,6 +1,7 @@
 // src/app/api/productions/bom/get/route.js
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { loadBomForProduct, normalizeProductCode, parseItemsJson } from "@/lib/bomUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -8,18 +9,20 @@ export const dynamic = "force-dynamic";
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const product_code = (searchParams.get("product_code") || "").trim();
+    const product_code = normalizeProductCode(searchParams.get("product_code"));
     const idParam = searchParams.get("id");
 
     const db = await getDbConnection();
 
     let row = null;
     if (product_code) {
-      const [rows] = await db.execute(`SELECT id, product_code, items_json, created_by, modified_by FROM bom WHERE product_code = ? LIMIT 1`, [product_code]);
-      row = rows[0] || null;
+      row = await loadBomForProduct(db, product_code);
     } else if (idParam) {
       const id = Number(idParam);
-      const [rows] = await db.execute(`SELECT id, product_code, items_json, created_by, modified_by FROM bom WHERE id = ? LIMIT 1`, [id]);
+      const [rows] = await db.execute(
+        `SELECT id, product_code, items_json, created_by, modified_by FROM bom WHERE id = ? LIMIT 1`,
+        [id]
+      );
       row = rows[0] || null;
     } else {
       return NextResponse.json({ error: "product_code or id is required" }, { status: 400 });
@@ -28,50 +31,52 @@ export async function GET(req) {
     if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     // Product meta
-    const [[product]] = await db.execute(
-      `SELECT item_name, product_image, specification FROM products_list WHERE item_code = ? LIMIT 1`,
-      [row.product_code]
+    const [productRows] = await db.execute(
+      `SELECT item_name, product_image, specification FROM products_list WHERE TRIM(item_code) = ? LIMIT 1`,
+      [normalizeProductCode(row.product_code)]
     );
+    const product = productRows[0] || null;
 
-    // Parse items and enrich with spare details
-    let items = [];
-    try { items = JSON.parse(row.items_json || "[]"); } catch { items = []; }
+    const items = parseItemsJson(row.items_json);
 
-    const spareIds = Array.from(new Set(items.map(it => Number(it.spare_id)).filter(Boolean)));
+    const spareIds = Array.from(new Set(items.map((it) => Number(it.spare_id)).filter(Boolean)));
     let spareMap = new Map();
     if (spareIds.length) {
-      const placeholders = spareIds.map(()=>"?").join(",");
+      const placeholders = spareIds.map(() => "?").join(",");
       const [spares] = await db.execute(
         `SELECT id, item_name, image, specification FROM spare_list WHERE id IN (${placeholders})`,
         spareIds
       );
-      spareMap = new Map(spares.map(s => [Number(s.id), s]));
+      spareMap = new Map(spares.map((s) => [Number(s.id), s]));
     }
 
-    // Availability from stock_summary for all BOM spares
+    // Availability from stock_summary for all BOM spares (non-fatal if table/columns differ)
     let stockMap = new Map();
     if (spareIds.length) {
-      const placeholders2 = spareIds.map(()=>"?").join(",");
-      const [stockRows] = await db.execute(
-        `SELECT spare_id, total_quantity AS total, Delhi AS delhi, South AS south FROM stock_summary WHERE spare_id IN (${placeholders2})`,
-        spareIds
-      );
-      stockMap = new Map(
-        stockRows.map(r => [
-          Number(r.spare_id),
-          {
-            total: Number(r.total || 0),
-            delhi: Number(r.delhi || 0),
-            south: Number(r.south || 0),
-          },
-        ])
-      );
+      try {
+        const placeholders2 = spareIds.map(() => "?").join(",");
+        const [stockRows] = await db.execute(
+          `SELECT spare_id, total_quantity AS total, Delhi AS delhi, South AS south FROM stock_summary WHERE spare_id IN (${placeholders2})`,
+          spareIds
+        );
+        stockMap = new Map(
+          stockRows.map((r) => [
+            Number(r.spare_id),
+            {
+              total: Number(r.total || 0),
+              delhi: Number(r.delhi || 0),
+              south: Number(r.south || 0),
+            },
+          ])
+        );
+      } catch (stockErr) {
+        console.warn("GET /productions/bom/get stock_summary lookup skipped:", stockErr?.message || stockErr);
+      }
     }
 
     const normItems = items.map((it) => {
       const s = spareMap.get(Number(it.spare_id)) || {};
       const st = stockMap.get(Number(it.spare_id)) || {};
-      // Normalize qty/weight keys
       const qty = it.qty_in_product ?? it.qty ?? 0;
       const weight = it.weight_percent ?? it.weight ?? 0;
       return {

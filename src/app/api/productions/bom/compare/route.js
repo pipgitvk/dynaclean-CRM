@@ -1,60 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { loadBomForProduct, parseItemsJson } from "@/lib/bomUtils";
 
 export const dynamic = "force-dynamic";
-
-function parseItemsJson(raw) {
-  if (raw == null || raw === "") return [];
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === "object") {
-    const str = typeof raw.toString === "function" ? raw.toString() : "";
-    if (str && str !== "[object Object]") {
-      try {
-        const parsed = JSON.parse(str);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  }
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
-async function loadBomForProduct(db, productCode) {
-  const code = String(productCode || "").trim();
-  if (!code) return null;
-
-  let [[bomRow]] = await db.query(
-    `SELECT id as bom_id, items_json, created_by, modified_by, status
-       FROM bom
-      WHERE TRIM(product_code) = ? AND status = 'active'
-      LIMIT 1`,
-    [code]
-  );
-
-  if (!bomRow) {
-    [[bomRow]] = await db.query(
-      `SELECT id as bom_id, items_json, created_by, modified_by, status
-         FROM bom
-        WHERE TRIM(product_code) = ?
-        ORDER BY updated_at DESC
-        LIMIT 1`,
-      [code]
-    );
-  }
-
-  return bomRow || null;
-}
 
 // GET /api/productions/bom/compare?production_id=ID
 // Returns current production BOM snapshot items and current active BOM items for that product.
