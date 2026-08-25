@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import OrderTable from "./OrderTable";
 import { getSessionPayload } from "@/lib/auth";
+import { canViewAllOrders } from "@/lib/dataScope";
 
 // Secret for verifying JWT
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -127,7 +128,7 @@ export default async function OrdersPage() {
 
   const params = [];
 
-  if (!["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase())) {
+  if (!canViewAllOrders(userRole)) {
     sql += " WHERE no.created_by = ?";
     params.push(username);
   }

@@ -1,6 +1,7 @@
 import { getDbConnection } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { canViewAllOrders } from "@/lib/dataScope";
 import { parseFormData } from "@/lib/parseForm";
 import fs from "fs/promises"; // Use fs.promises for async file operations
 import path from "path";
@@ -109,7 +110,7 @@ export async function GET(req) {
 
     const params = [];
 
-    if (!["SUPERADMIN", "DIRECTOR"].includes(String(userRole).toUpperCase())) {
+    if (!canViewAllOrders(userRole)) {
       sql += " WHERE no.created_by = ?";
       params.push(username);
     }

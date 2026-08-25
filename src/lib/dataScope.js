@@ -5,6 +5,19 @@ export function isSuperAdminRole(role) {
   return k === "SUPERADMIN" || k === "DIRECTOR";
 }
 
+/** Roles that may view all orders in Order Process (not scoped to created_by). */
+export function canViewAllOrders(role) {
+  const k = normalizeRoleKey(role || "");
+  return (
+    isSuperAdminRole(role) ||
+    k === "SALES CUM BACKOFFICE" ||
+    k === "ADMIN" ||
+    k === "ACCOUNTANT" ||
+    k === "WAREHOUSE INCHARGE" ||
+    k === "TEAM LEADER"
+  );
+}
+
 /** Roles that may search/view all customers (header search, reports, etc.) */
 export function canViewAllCustomers(role) {
   const k = normalizeRoleKey(role || "");

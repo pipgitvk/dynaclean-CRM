@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useUser } from "../../context/UserContext";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 
 export default function ManualLeadModal({ show, onClose }) {
   const [rawText, setRawText] = useState("");
@@ -273,18 +274,18 @@ export default function ManualLeadModal({ show, onClose }) {
               </label>
               <label className="block text-sm sm:text-base">
                 Assign To:
-                <select
-                  value={selectedSource}
-                  onChange={(e) => setSelectedSource(e.target.value)}
-                  className="w-full border p-1 rounded text-sm sm:text-base"
-                >
-                  <option value="">Select source</option>
-                  {Array.isArray(leadSources) && leadSources.map((src) => (
-                    <option key={src} value={src}>
-                      {src}
-                    </option>
-                  ))}
-                </select>
+                <div className="mt-1">
+                  <SearchableSelect
+                    value={selectedSource}
+                    onChange={setSelectedSource}
+                    placeholder="Select source"
+                    searchPlaceholder="Search employee..."
+                    options={leadSources.map((src) => ({
+                      value: src,
+                      label: src,
+                    }))}
+                  />
+                </div>
               </label>
               <div className="text-sm text-gray-600">
                 Assigned By (you): {user?.username || "-"}
