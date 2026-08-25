@@ -1,4 +1,4 @@
-import { getRoleDefaultModuleKeys, MODULE_LEAK_CAP_BYPASS_ROLES, isStrictPresetCapRole } from "@/lib/roleDefaultModuleAccess";
+import { getRoleDefaultModuleKeys } from "@/lib/roleDefaultModuleAccess";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 export const MODULE_TREE = [
@@ -606,18 +606,9 @@ function isFullModuleGrant(keys) {
 }
 
 /** Near-full grants saved before module renames — still a legacy leak. */
-function isLegacyLeakGrant(keys, role) {
+function isLegacyLeakGrant(keys) {
   if (!Array.isArray(keys) || keys.length === 0) return false;
   if (isFullModuleGrant(keys)) return true;
-
-  const preset = getRoleDefaultModuleKeys(role);
-  if (preset.length > 0) {
-    const presetSet = new Set(preset);
-    const outsidePreset = keys.filter((k) => !presetSet.has(k));
-    if (outsidePreset.length > 0 && keys.length > preset.length) return true;
-    if (keys.length > preset.length + 3) return true;
-  }
-
   const threshold = Math.max(
     ALL_MODULE_KEYS.length - 8,
     Math.floor(ALL_MODULE_KEYS.length * 0.92),
@@ -630,59 +621,59 @@ function shouldCollapseLegacyLeak(role) {
   return roleKey && !FULL_GRANT_BYPASS_ROLES.has(roleKey);
 }
 
-function applyRolePresetLeakCap(allowedKeys, role) {
-  const roleKey = normalizeRoleKey(role);
-  if (MODULE_LEAK_CAP_BYPASS_ROLES.has(roleKey)) return allowedKeys;
-  if (!isLegacyLeakGrant(allowedKeys, role)) return allowedKeys;
-
-  const preset = getRoleDefaultModuleKeys(role);
-  if (!preset.length) return allowedKeys;
-
-  const cap = new Set(preset);
-  return allowedKeys.filter((k) => cap.has(k));
-}
-
-/** Hard cap for operational roles — never show modules outside role preset. */
-function applyStrictRolePresetCap(allowedKeys, role) {
-  if (!Array.isArray(allowedKeys) || allowedKeys.length === 0) return allowedKeys;
-  const roleKey = normalizeRoleKey(role);
-  if (!isStrictPresetCapRole(roleKey)) return allowedKeys;
-  if (MODULE_LEAK_CAP_BYPASS_ROLES.has(roleKey)) return allowedKeys;
-
-  const preset = getRoleDefaultModuleKeys(role);
-  if (!preset.length) return allowedKeys;
-
-  const cap = new Set(preset);
-  return allowedKeys.filter((k) => cap.has(k));
-}
-
 function resolveUnsetModuleAccess(role) {
   const defaults = getRoleDefaultModuleKeys(role);
   return defaults.length > 0 ? normalizeModuleAccessKeys(defaults) : [];
 }
 
 /**
+ * Read module_access from DB without role-based rewriting.
+ * null/empty column → null (unset). "[]" → []. Otherwise normalized leaf keys.
+ */
+export function parseStoredModuleAccess(raw) {
+  if (raw === null || raw === undefined || raw === "") return null;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (Array.isArray(parsed)) {
+      if (parsed.length === 0) return [];
+      return normalizeModuleAccessKeys(parsed);
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
+/** For edit UI: unset → role defaults; explicit DB array → exact saved keys. */
+export function getModuleAccessForDisplay(raw, role) {
+  const stored = parseStoredModuleAccess(raw);
+  if (stored === null) return resolveUnsetModuleAccess(role);
+  return stored;
+}
+
+/**
  * Effective module_access for sidebar / route guards.
- * NULL in DB → role default preset (not full access).
- * Full ALL-key grant (legacy NULL bug) → role defaults for non-SUPERADMIN roles.
+ * NULL in DB → role default preset.
+ * Explicit JSON array → exactly those modules (Global Module Access / Quick Edit).
+ * Near-full legacy grant → role defaults for non-SUPERADMIN roles.
  */
 export function resolveModuleAccess(raw, role) {
   if (raw === null || raw === undefined || raw === "") {
-    return applyStrictRolePresetCap(resolveUnsetModuleAccess(role), role);
+    return resolveUnsetModuleAccess(role);
   }
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (Array.isArray(parsed)) {
       if (parsed.length === 0) return [];
       const normalized = normalizeModuleAccessKeys(parsed);
-      if (shouldCollapseLegacyLeak(role) && isLegacyLeakGrant(normalized, role)) {
-        return applyStrictRolePresetCap(resolveUnsetModuleAccess(role), role);
+      if (shouldCollapseLegacyLeak(role) && isLegacyLeakGrant(normalized)) {
+        return resolveUnsetModuleAccess(role);
       }
-      return applyStrictRolePresetCap(applyRolePresetLeakCap(normalized, role), role);
+      return normalized;
     }
-    return applyStrictRolePresetCap(resolveUnsetModuleAccess(role), role);
+    return resolveUnsetModuleAccess(role);
   } catch {
-    return applyStrictRolePresetCap(resolveUnsetModuleAccess(role), role);
+    return resolveUnsetModuleAccess(role);
   }
 }
 
@@ -707,88 +698,10 @@ export function applySuperadminOnlyModuleRestrictions(allowedKeys, role) {
 
 /**
  * Role-specific deny lists (even if module_access contains the key).
- * Use for "this role must never see this module".
+ * Global Module Access / Quick Edit selections are the source of truth — no stripping here.
  */
-const HR_DENY_MODULE_KEYS = new Set([
-  // Reports / Orders should not be shown to HR
-  "lead-reports",
-  "quotations-report",
-  "order-report",
-  "demo-followups",
-  "item-wise-sales",
-  "customer-payment-behavior",
-  "payment-pending",
-  "orders-process",
-  "orders-delay",
-]);
-
-const GEM_DENY_MODULE_KEYS = new Set([
-  "warranty-console",
-  "registered-products",
-  "service-followups",
-  "warranty-map",
-  "service-records",
-  "upcoming-installations",
-  "service-map",
-  "amc-cmc",
-  "return-products",
-  "hiring-process",
-  "import-agents",
-  "import-suppliers",
-  "import-shipments",
-  "import-quote-submissions",
-  "import-award-followups",
-  "attendance-rules",
-  "final-profile-approval",
-]);
-
-const SERVICE_SUPPORT_DENY_MODULE_KEYS = new Set([
-  "gem-crm-dashboard",
-  "gem-crm-bids",
-  "gem-crm-reports",
-  "gem-crm",
-  "hiring-process",
-  "import-agents",
-  "import-suppliers",
-  "import-shipments",
-  "import-quote-submissions",
-  "import-award-followups",
-  "attendance-rules",
-  "final-profile-approval",
-  "prospects-view",
-  "prospects-add",
-  "prospects-new",
-  "leads-upload",
-  "denied-leads",
-  "keywords-management",
-  "backlinks-management",
-  "backlinks-excel-data",
-  "meta-credentials-add",
-]);
-
-export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
-  if (!allowedKeys) return allowedKeys ?? null;
-  const r = String(role ?? "").trim().toUpperCase();
-  const isHr =
-    r === "HR" ||
-    r === "HR HEAD" ||
-    r === "HR EXECUTIVE" ||
-    r === "JUNIOR HR EXECUTIVE" ||
-    r === "HR RECRUITER";
-  let next = allowedKeys;
-  if (isHr) {
-    next = next.filter((k) => !HR_DENY_MODULE_KEYS.has(k));
-  }
-  if (r === "GEM" || r === "GEM PORTAL") {
-    next = next.filter((k) => !GEM_DENY_MODULE_KEYS.has(k));
-  }
-  if (r === "SERVICE SUPPORT") {
-    next = next.filter((k) => !SERVICE_SUPPORT_DENY_MODULE_KEYS.has(k));
-  }
-  // All roles: cap legacy near-full DB grants to role preset (SUPERADMIN/EA/DIRECTOR/ADMIN exempt)
-  next = applyRolePresetLeakCap(next, role);
-  next = applyStrictRolePresetCap(next, role);
-  return next;
+export function applyRoleDenyModuleRestrictions(allowedKeys) {
+  return allowedKeys ?? null;
 }
 
 /**
