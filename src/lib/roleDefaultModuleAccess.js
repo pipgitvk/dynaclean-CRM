@@ -542,3 +542,22 @@ export const MODULE_LEAK_CAP_BYPASS_ROLES = new Set([
   "DIRECTOR",
   "ADMIN",
 ]);
+
+/**
+ * Operational roles: sidebar must never exceed the role preset, even when DB
+ * module_access was bulk-saved with extra / parent section keys.
+ */
+export const STRICT_PRESET_CAP_ROLES = new Set([
+  "SERVICE SUPPORT",
+  "SERVICE ENGINEER",
+  "SERVICE TECHNICIAN",
+  "GEM",
+  "GEM PORTAL",
+  "WELDER",
+  "WELDER HELPER",
+  "DEVELOPER",
+]);
+
+export function isStrictPresetCapRole(role) {
+  return STRICT_PRESET_CAP_ROLES.has(normalizeRoleKey(role));
+}

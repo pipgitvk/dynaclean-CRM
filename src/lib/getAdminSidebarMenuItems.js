@@ -984,7 +984,7 @@ async function getSessionUsername() {
  * Returns parsed array of module keys, or null if column doesn't exist / user not found.
  */
 async function getUserModuleAccess(username, roleKey) {
-  if (!username) return [];
+  if (!username) return resolveModuleAccess(null, roleKey);
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(

@@ -1044,7 +1044,7 @@ const allMenuItems = [
 ];
 
 async function getUserModuleAccess(username, roleKey) {
-  if (!username) return [];
+  if (!username) return resolveModuleAccess(null, roleKey);
   try {
     const conn = await getDbConnection();
     const [rows] = await conn.execute(

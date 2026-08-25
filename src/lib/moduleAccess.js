@@ -1,4 +1,4 @@
-import { getRoleDefaultModuleKeys, MODULE_LEAK_CAP_BYPASS_ROLES } from "@/lib/roleDefaultModuleAccess";
+import { getRoleDefaultModuleKeys, MODULE_LEAK_CAP_BYPASS_ROLES, isStrictPresetCapRole } from "@/lib/roleDefaultModuleAccess";
 import { normalizeRoleKey } from "@/lib/roleKeyUtils";
 
 export const MODULE_TREE = [
@@ -606,9 +606,18 @@ function isFullModuleGrant(keys) {
 }
 
 /** Near-full grants saved before module renames — still a legacy leak. */
-function isLegacyLeakGrant(keys) {
+function isLegacyLeakGrant(keys, role) {
   if (!Array.isArray(keys) || keys.length === 0) return false;
   if (isFullModuleGrant(keys)) return true;
+
+  const preset = getRoleDefaultModuleKeys(role);
+  if (preset.length > 0) {
+    const presetSet = new Set(preset);
+    const outsidePreset = keys.filter((k) => !presetSet.has(k));
+    if (outsidePreset.length > 0 && keys.length > preset.length) return true;
+    if (keys.length > preset.length + 3) return true;
+  }
+
   const threshold = Math.max(
     ALL_MODULE_KEYS.length - 8,
     Math.floor(ALL_MODULE_KEYS.length * 0.92),
@@ -624,7 +633,21 @@ function shouldCollapseLegacyLeak(role) {
 function applyRolePresetLeakCap(allowedKeys, role) {
   const roleKey = normalizeRoleKey(role);
   if (MODULE_LEAK_CAP_BYPASS_ROLES.has(roleKey)) return allowedKeys;
-  if (!isLegacyLeakGrant(allowedKeys)) return allowedKeys;
+  if (!isLegacyLeakGrant(allowedKeys, role)) return allowedKeys;
+
+  const preset = getRoleDefaultModuleKeys(role);
+  if (!preset.length) return allowedKeys;
+
+  const cap = new Set(preset);
+  return allowedKeys.filter((k) => cap.has(k));
+}
+
+/** Hard cap for operational roles — never show modules outside role preset. */
+function applyStrictRolePresetCap(allowedKeys, role) {
+  if (!Array.isArray(allowedKeys) || allowedKeys.length === 0) return allowedKeys;
+  const roleKey = normalizeRoleKey(role);
+  if (!isStrictPresetCapRole(roleKey)) return allowedKeys;
+  if (MODULE_LEAK_CAP_BYPASS_ROLES.has(roleKey)) return allowedKeys;
 
   const preset = getRoleDefaultModuleKeys(role);
   if (!preset.length) return allowedKeys;
@@ -645,21 +668,21 @@ function resolveUnsetModuleAccess(role) {
  */
 export function resolveModuleAccess(raw, role) {
   if (raw === null || raw === undefined || raw === "") {
-    return resolveUnsetModuleAccess(role);
+    return applyStrictRolePresetCap(resolveUnsetModuleAccess(role), role);
   }
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (Array.isArray(parsed)) {
       if (parsed.length === 0) return [];
       const normalized = normalizeModuleAccessKeys(parsed);
-      if (shouldCollapseLegacyLeak(role) && isLegacyLeakGrant(normalized)) {
-        return resolveUnsetModuleAccess(role);
+      if (shouldCollapseLegacyLeak(role) && isLegacyLeakGrant(normalized, role)) {
+        return applyStrictRolePresetCap(resolveUnsetModuleAccess(role), role);
       }
-      return applyRolePresetLeakCap(normalized, role);
+      return applyStrictRolePresetCap(applyRolePresetLeakCap(normalized, role), role);
     }
-    return resolveUnsetModuleAccess(role);
+    return applyStrictRolePresetCap(resolveUnsetModuleAccess(role), role);
   } catch {
-    return resolveUnsetModuleAccess(role);
+    return applyStrictRolePresetCap(resolveUnsetModuleAccess(role), role);
   }
 }
 
@@ -699,6 +722,50 @@ const HR_DENY_MODULE_KEYS = new Set([
   "orders-delay",
 ]);
 
+const GEM_DENY_MODULE_KEYS = new Set([
+  "warranty-console",
+  "registered-products",
+  "service-followups",
+  "warranty-map",
+  "service-records",
+  "upcoming-installations",
+  "service-map",
+  "amc-cmc",
+  "return-products",
+  "hiring-process",
+  "import-agents",
+  "import-suppliers",
+  "import-shipments",
+  "import-quote-submissions",
+  "import-award-followups",
+  "attendance-rules",
+  "final-profile-approval",
+]);
+
+const SERVICE_SUPPORT_DENY_MODULE_KEYS = new Set([
+  "gem-crm-dashboard",
+  "gem-crm-bids",
+  "gem-crm-reports",
+  "gem-crm",
+  "hiring-process",
+  "import-agents",
+  "import-suppliers",
+  "import-shipments",
+  "import-quote-submissions",
+  "import-award-followups",
+  "attendance-rules",
+  "final-profile-approval",
+  "prospects-view",
+  "prospects-add",
+  "prospects-new",
+  "leads-upload",
+  "denied-leads",
+  "keywords-management",
+  "backlinks-management",
+  "backlinks-excel-data",
+  "meta-credentials-add",
+]);
+
 export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
   if (!allowedKeys) return allowedKeys ?? null;
   const r = String(role ?? "").trim().toUpperCase();
@@ -712,8 +779,15 @@ export function applyRoleDenyModuleRestrictions(allowedKeys, role) {
   if (isHr) {
     next = next.filter((k) => !HR_DENY_MODULE_KEYS.has(k));
   }
+  if (r === "GEM" || r === "GEM PORTAL") {
+    next = next.filter((k) => !GEM_DENY_MODULE_KEYS.has(k));
+  }
+  if (r === "SERVICE SUPPORT") {
+    next = next.filter((k) => !SERVICE_SUPPORT_DENY_MODULE_KEYS.has(k));
+  }
   // All roles: cap legacy near-full DB grants to role preset (SUPERADMIN/EA/DIRECTOR/ADMIN exempt)
   next = applyRolePresetLeakCap(next, role);
+  next = applyStrictRolePresetCap(next, role);
   return next;
 }
 
