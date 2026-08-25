@@ -296,14 +296,24 @@ export async function GET(req) {
           WHEN EXISTS (
             SELECT 1 FROM spare_list sl
             WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+               OR LOWER(TRIM(sl.spare_number)) = LOWER(TRIM(psr.product_code))
           ) THEN 'Spare'
           ELSE NULL
         END AS item_category,
         CASE
           WHEN TRIM(COALESCE(psr.product_code, '')) = '' THEN NULL
           WHEN EXISTS (
+            SELECT 1 FROM products_list pl
+            WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(psr.product_code))
+          ) THEN (
+            SELECT pl.category FROM products_list pl
+            WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(psr.product_code))
+            LIMIT 1
+          )
+          WHEN EXISTS (
             SELECT 1 FROM spare_list sl
             WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+               OR LOWER(TRIM(sl.spare_number)) = LOWER(TRIM(psr.product_code))
           )
           AND NOT EXISTS (
             SELECT 1 FROM products_list pl
@@ -311,6 +321,7 @@ export async function GET(req) {
           ) THEN (
             SELECT sl.type FROM spare_list sl
             WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+               OR LOWER(TRIM(sl.spare_number)) = LOWER(TRIM(psr.product_code))
             LIMIT 1
           )
           ELSE NULL
@@ -347,7 +358,7 @@ export async function GET(req) {
       return {
         ...rest,
         category,
-        sub_category: category === "Spare" ? item_sub_category || null : null,
+        sub_category: item_sub_category || null,
       };
     });
 

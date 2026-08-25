@@ -24,7 +24,7 @@ const resolvePurchaseCategory = (purchase) => {
       : null;
   return {
     category,
-    sub_category: category === "Spare" ? purchase?.sub_category || null : null,
+    sub_category: purchase?.sub_category || null,
   };
 };
 
@@ -1177,7 +1177,7 @@ export default function PurchasesPage() {
       worksheet.addRow({
         ...row,
         category: row.category === "Product" || row.category === "Spare" ? row.category : "",
-        sub_category: row.category === "Spare" ? (row.sub_category || "") : "",
+        sub_category: row.sub_category || "",
         status_label: row.status_label || row.status,
         created_at: new Date(row.created_at).toLocaleString(),
         invoice_date: formatDisplayDate(row.invoice_date),
@@ -1522,7 +1522,7 @@ export default function PurchasesPage() {
                         )}
                       </td>
                       <td className="p-3">
-                        {category === 'Spare' && sub_category ? (
+                        {sub_category ? (
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700 border border-violet-200">
                             {sub_category}
                           </span>
@@ -1685,8 +1685,8 @@ export default function PurchasesPage() {
                   return category || "—";
                 })()],
                 ["Sub Category", (() => {
-                  const { category, sub_category } = resolvePurchaseCategory(detailPurchase);
-                  return category === "Spare" && sub_category ? sub_category : "—";
+                  const { sub_category } = resolvePurchaseCategory(detailPurchase);
+                  return sub_category || "—";
                 })()],
                 ["Product Name", detailPurchase.product_name],
                 ["Customer ID", detailPurchase.customer_id],
