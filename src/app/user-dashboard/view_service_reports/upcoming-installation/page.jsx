@@ -1,11 +1,18 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Eye } from "lucide-react";
 
 export default function UpcomingInstallationsPage() {
+  const searchParams = useSearchParams();
+  const registrationFilter = searchParams.get("registration");
+  const showUnregisteredOnly = registrationFilter === "unregistered";
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("products"); // Default to "products"
+  const [typeFilter, setTypeFilter] = useState(
+    () => searchParams.get("type") || "products"
+  );
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -42,7 +49,14 @@ export default function UpcomingInstallationsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/installation/upcoming?type=${typeFilter}`);
+      const params = new URLSearchParams({
+        type: showUnregisteredOnly ? "products" : typeFilter,
+      });
+      if (showUnregisteredOnly) {
+        params.set("registration", "unregistered");
+      }
+
+      const res = await fetch(`/api/installation/upcoming?${params.toString()}`);
       const data = await res.json();
 
       setRecords(data.installations || []);
@@ -55,7 +69,7 @@ export default function UpcomingInstallationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter]);
+  }, [typeFilter, showUnregisteredOnly]);
 
   useEffect(() => {
     fetchData();
@@ -105,7 +119,16 @@ export default function UpcomingInstallationsPage() {
     <div className="w-full max-w-full p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-3xl font-bold">Upcoming Installations</h2>
+        <div>
+          <h2 className="text-3xl font-bold">
+            {showUnregisteredOnly ? "Pending Product Registration" : "Upcoming Installations"}
+          </h2>
+          {showUnregisteredOnly && (
+            <p className="text-sm text-amber-600 mt-1">
+              Showing only unregistered products
+            </p>
+          )}
+        </div>
         <p className="text-sm text-gray-600">Total: {total} records</p>
       </div>
 
@@ -120,38 +143,40 @@ export default function UpcomingInstallationsPage() {
         />
 
         {/* Type Filter */}
-        <div className="flex gap-3">
-          <button
-            onClick={() => setTypeFilter("all")}
-            className={`px-4 py-2 rounded font-medium transition ${
-              typeFilter === "all"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setTypeFilter("products")}
-            className={`px-4 py-2 rounded font-medium transition ${
-              typeFilter === "products"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            }`}
-          >
-            Products
-          </button>
-          <button
-            onClick={() => setTypeFilter("spares")}
-            className={`px-4 py-2 rounded font-medium transition ${
-              typeFilter === "spares"
-                ? "bg-blue-600 text-white"
-                : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-            }`}
-          >
-            Spares
-          </button>
-        </div>
+        {!showUnregisteredOnly && (
+          <div className="flex gap-3">
+            <button
+              onClick={() => setTypeFilter("all")}
+              className={`px-4 py-2 rounded font-medium transition ${
+                typeFilter === "all"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setTypeFilter("products")}
+              className={`px-4 py-2 rounded font-medium transition ${
+                typeFilter === "products"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+              }`}
+            >
+              Products
+            </button>
+            <button
+              onClick={() => setTypeFilter("spares")}
+              className={`px-4 py-2 rounded font-medium transition ${
+                typeFilter === "spares"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+              }`}
+            >
+              Spares
+            </button>
+          </div>
+        )}
 
         <div className="flex gap-6">
           <div className="flex items-center">

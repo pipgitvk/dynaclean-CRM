@@ -1,6 +1,7 @@
 // /app/api/installations/upcoming/route.js
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { UNREGISTERED_PRODUCT_ORDER_SQL, IS_PRODUCT_DISPATCH_ITEM_SQL } from "@/lib/pendingProductRegistrationCount";
 
 /**
  * API route for upcoming installations.
@@ -8,21 +9,22 @@ import { getDbConnection } from "@/lib/db";
  *  - quotations (to get model(s) and item_name) via quote_number
  *
  * Highlights installations within 10 days and past expected delivery dates.
- * Query parameter: ?type=products|spares|all
+ * Query parameters:
+ *   ?type=products|spares|all
+ *   ?registration=unregistered  (orders with at least one unregistered product)
  */
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type") || "products"; // Default to products
+    const registration = searchParams.get("registration");
+    const type =
+      registration === "unregistered"
+        ? "products"
+        : searchParams.get("type") || "products";
 
     let typeFilter = "";
     if (type === "products") {
-      typeFilter = `
-        AND EXISTS (
-          SELECT 1 FROM products_list pl 
-          WHERE pl.item_code = d.item_code
-        )
-      `;
+      typeFilter = `AND ${IS_PRODUCT_DISPATCH_ITEM_SQL("d")}`;
     } else if (type === "spares") {
       typeFilter = `
         AND EXISTS (
@@ -32,6 +34,9 @@ export async function GET(req) {
       `;
     }
     // If type === "all", no filter needed
+
+    const registrationFilter =
+      registration === "unregistered" ? `AND ${UNREGISTERED_PRODUCT_ORDER_SQL}` : "";
 
     const query = `
       SELECT
@@ -73,6 +78,7 @@ export async function GET(req) {
        AND no.delivery_date IS NOT NULL
        AND no.dispatch_status = 1
       ${typeFilter}
+      ${registrationFilter}
       GROUP BY no.id
       ORDER BY days_until_installation ASC;
     `;
