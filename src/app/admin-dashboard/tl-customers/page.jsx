@@ -9,6 +9,10 @@ import {
   mysqlUpperBoundIstDayEnd,
 } from "@/lib/timezone";
 import { notesLanguageExistsSql } from "@/constants/notesLanguageOptions";
+import {
+  appendExactMultiTagFilter,
+  appendStatusVisibilityFilter,
+} from "@/lib/tlCustomersListSql";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +50,12 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   const showTLOnly = tlOnly === "true";
   const showPreBookingOnly = preBookingOnly === "true";
   const sqlNextForDateFilter = SQL_EFFECTIVE_NEXT_FOLLOWUP;
+  // TL toggle ON → TL_followups tags; OFF → latest customers_followup tags only
+  const sqlMultiTag = showTLOnly ? "tlf.multi_tag" : "cf.multi_tag";
+  const isSuperAdmin =
+    String(payload.role ?? payload.userRole ?? "").trim().toUpperCase() ===
+    "SUPERADMIN";
+  const statusVisibility = { showTLOnly, isSuperAdmin, statusFilter: status };
 
   const conn = await getDbConnection();
 
@@ -62,7 +72,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       tlf.estimated_order_date,
       tlf.lead_quality_score,
       tlf.model as tl_model,
-      COALESCE(tlf.multi_tag, cf.multi_tag) as multi_tag,
+      ${sqlMultiTag} as multi_tag,
       tlf.notes as tl_notes,
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
@@ -121,6 +131,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   if (status) {
     query += ` AND c.status = ?`;
     params.push(status);
+  } else {
+    query = appendStatusVisibilityFilter(query, statusVisibility);
   }
 
   // Filter by stage
@@ -129,15 +141,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     params.push(stage);
   }
 
-  // Filter by tag
-  if (tag) {
-    if (tag === "N/A") {
-      query += ` AND (tlf.multi_tag IS NULL OR tlf.multi_tag = '') AND (cf.multi_tag IS NULL OR cf.multi_tag = '')`;
-    } else {
-      query += ` AND (tlf.multi_tag LIKE ? OR cf.multi_tag LIKE ?)`;
-      params.push(`%${tag}%`, `%${tag}%`);
-    }
-  }
+  // Filter by tag (source follows TL toggle — exact match like dropdown counts)
+  query = appendExactMultiTagFilter(query, params, tag, sqlMultiTag);
 
   // When ON: show only customers that have TL_followups rows (TL ne follow-up dala ho)
   if (showTLOnly) {
@@ -225,7 +230,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
       c.customer_id,
       c.status,
       c.stage,
-      COALESCE(tlf.multi_tag, cf.multi_tag) as multi_tag,
+      ${sqlMultiTag} as multi_tag,
       tlf.model as tl_model,
       tlf.next_followup_date as tl_next_followup,
       tlf.followed_date as tl_followed_date,
@@ -272,6 +277,8 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   if (status) {
     kpiQuery += ` AND c.status = ?`;
     kpiParams.push(status);
+  } else {
+    kpiQuery = appendStatusVisibilityFilter(kpiQuery, statusVisibility);
   }
 
   if (stage) {
@@ -279,14 +286,7 @@ export default async function AdminTLCustomersPage({ searchParams }) {
     kpiParams.push(stage);
   }
 
-  if (tag) {
-    if (tag === "N/A") {
-      kpiQuery += ` AND (tlf.multi_tag IS NULL OR tlf.multi_tag = '') AND (cf.multi_tag IS NULL OR cf.multi_tag = '')`;
-    } else {
-      kpiQuery += ` AND (tlf.multi_tag LIKE ? OR cf.multi_tag LIKE ?)`;
-      kpiParams.push(`%${tag}%`, `%${tag}%`);
-    }
-  }
+  kpiQuery = appendExactMultiTagFilter(kpiQuery, kpiParams, tag, sqlMultiTag);
 
   if (showTLOnly) {
     kpiQuery += ` AND tlf.customer_id IS NOT NULL`;
@@ -346,10 +346,6 @@ export default async function AdminTLCustomersPage({ searchParams }) {
   }
 
   const [allCustomersForKPI] = await conn.execute(kpiQuery, kpiParams);
-
-  const isSuperAdmin = String(payload.role ?? payload.userRole ?? "")
-    .trim()
-    .toUpperCase() === "SUPERADMIN";
 
   // Fetch employees for only sales role
   const [employees] = await conn.execute(
