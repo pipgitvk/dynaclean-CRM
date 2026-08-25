@@ -119,7 +119,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     params.append("limit", PAGE_SIZE);
     params.append("sort", sortBy);
     params.append("order", sortOrder);
-    params.append("includeDetails", "0");
+    params.append("includeDetails", "1");
     params.append("includeCount", "0");
 
     if (fromDate) params.append("fromDate", fromDate);

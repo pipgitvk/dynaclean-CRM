@@ -1,6 +1,6 @@
 /**
- * Parse statements.linked_purchase_ids (JSON array or comma string) into normalized PP/PS tokens.
- * Mirrors PATCH logic on /api/statements/[id].
+ * Parse statements.linked_purchase_ids (JSON array or comma string) into normalized tokens.
+ * Supports invoice (IP), purchase (PP/PS/SP) prefixes.
  */
 export function parseLinkedPurchaseTokens(rawVal) {
   if (rawVal == null || String(rawVal).trim() === "") return [];
@@ -19,13 +19,29 @@ export function parseLinkedPurchaseTokens(rawVal) {
     if (v == null) continue;
     const s = String(v).trim().toUpperCase();
     if (!s) continue;
-    if (/^(PP|PS|SP)\d+$/.test(s)) {
+    if (/^(IP|PP|PS|SP)\d+$/.test(s)) {
       out.push(s.startsWith("SP") ? `PS${s.slice(2)}` : s);
     } else if (/^\d+$/.test(s)) {
       out.push(`PP${s}`);
     }
   }
   return out;
+}
+
+/** Parse invoices.linked_trans_ids JSON or comma string → array of trans_id strings */
+export function parseLinkedTransIds(rawVal) {
+  if (rawVal == null || String(rawVal).trim() === "") return [];
+  if (Array.isArray(rawVal)) return rawVal.filter(Boolean).map(String);
+  try {
+    const parsed = JSON.parse(String(rawVal));
+    if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+  } catch {
+    // fall through to comma split
+  }
+  return String(rawVal)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /**

@@ -67,7 +67,7 @@ export default function InvoiceTable({ onSummaryUpdate }) {
     if (search) params.append("search", search);
     if (invoiceTypeFilter) params.append("invoiceType", invoiceTypeFilter);
     if (statusFilter) params.append("status", statusFilter);
-    params.append("includeDetails", "0");
+    params.append("includeDetails", "1");
     params.append("includeCount", "0");
 
     try {

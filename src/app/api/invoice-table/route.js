@@ -438,7 +438,13 @@ function getRelatedInvoicesForRow(invoice, relatedById) {
 }
 
 function statementMatchesInvoice(stmt, inv) {
-  if (inv.number && stmt.invoice_number === inv.number) return true;
+  if (inv.number && stmt.invoice_number) {
+    const stmtNumbers = String(stmt.invoice_number)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (stmtNumbers.includes(inv.number)) return true;
+  }
   const tokens = parseLinkedPurchaseIds(stmt.linked_purchase_ids);
   return tokens.includes(`IP${inv.id}`);
 }
@@ -527,11 +533,14 @@ async function enrichInvoicesWithDetails(conn, rows) {
         }
       }
     }
-    if (stmt.invoice_number && invoiceNumberToIdMap[stmt.invoice_number]) {
-      const invId = invoiceNumberToIdMap[stmt.invoice_number];
-      if (!seenIds.has(invId)) {
-        linkedIds.push(invId);
-        seenIds.add(invId);
+    const stmtInvoiceNumbers = String(stmt.invoice_number || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const num of stmtInvoiceNumbers) {
+      if (invoiceNumberToIdMap[num] && !seenIds.has(invoiceNumberToIdMap[num])) {
+        linkedIds.push(invoiceNumberToIdMap[num]);
+        seenIds.add(invoiceNumberToIdMap[num]);
       }
     }
     transToInvoiceIdsMap[stmt.trans_id] = linkedIds;
