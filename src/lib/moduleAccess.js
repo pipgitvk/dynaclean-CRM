@@ -540,6 +540,18 @@ export const ALL_MODULE_KEYS = MODULE_TREE.flatMap((parent) => [
 /** Just the top-level (section) keys */
 export const TOP_LEVEL_KEYS = MODULE_TREE.map((m) => m.key);
 
+const TOP_LEVEL_KEY_SET = new Set(TOP_LEVEL_KEYS);
+
+/** Parent section keys (e.g. "dashboard") must not unlock every child in the sidebar. */
+export function stripParentSectionKeys(keys) {
+  if (!Array.isArray(keys)) return [];
+  return keys.filter((k) => !TOP_LEVEL_KEY_SET.has(k));
+}
+
+function containsParentSectionKeys(keys) {
+  return Array.isArray(keys) && keys.some((k) => TOP_LEVEL_KEY_SET.has(k));
+}
+
 /** Child keys that belong to a given parent section key */
 export function getChildKeys(parentKey) {
   if (parentKey === "others") {
@@ -608,12 +620,25 @@ function isFullModuleGrant(keys) {
 /** Near-full grants saved before module renames — still a legacy leak. */
 function isLegacyLeakGrant(keys) {
   if (!Array.isArray(keys) || keys.length === 0) return false;
+  if (containsParentSectionKeys(keys)) return true;
   if (isFullModuleGrant(keys)) return true;
   const threshold = Math.max(
+    40,
     ALL_MODULE_KEYS.length - 8,
     Math.floor(ALL_MODULE_KEYS.length * 0.92),
   );
   return keys.length >= threshold;
+}
+
+function finalizeResolvedModuleAccess(normalized, role) {
+  const leafKeys = stripParentSectionKeys(normalized);
+  if (shouldCollapseLegacyLeak(role) && isLegacyLeakGrant(normalized)) {
+    if (leafKeys.length > 0 && leafKeys.length <= 24 && !isFullModuleGrant(leafKeys)) {
+      return leafKeys;
+    }
+    return resolveUnsetModuleAccess(role);
+  }
+  return leafKeys;
 }
 
 function shouldCollapseLegacyLeak(role) {
@@ -648,7 +673,7 @@ export function parseStoredModuleAccess(raw) {
 export function getModuleAccessForDisplay(raw, role) {
   const stored = parseStoredModuleAccess(raw);
   if (stored === null) return resolveUnsetModuleAccess(role);
-  return stored;
+  return stripParentSectionKeys(stored);
 }
 
 /**
@@ -666,10 +691,7 @@ export function resolveModuleAccess(raw, role) {
     if (Array.isArray(parsed)) {
       if (parsed.length === 0) return [];
       const normalized = normalizeModuleAccessKeys(parsed);
-      if (shouldCollapseLegacyLeak(role) && isLegacyLeakGrant(normalized)) {
-        return resolveUnsetModuleAccess(role);
-      }
-      return normalized;
+      return finalizeResolvedModuleAccess(normalized, role);
     }
     return resolveUnsetModuleAccess(role);
   } catch {
@@ -736,18 +758,12 @@ export function isSectionAllowed(sectionKey, allowedKeys) {
 }
 
 /**
- * Whether a leaf module key is allowed — direct key, child-of-section, or parent section granted.
+ * Whether a leaf module key is allowed — exact key match only.
+ * (Parent section keys do not auto-unlock all children.)
  */
 export function isModuleKeyAllowed(moduleKey, allowedKeys) {
   if (!allowedKeys) return true;
   const key = String(moduleKey || "").trim();
   if (!key) return false;
-  if (allowedKeys.includes(key)) return true;
-  if (isSectionAllowed(key, allowedKeys)) return true;
-  for (const section of MODULE_TREE) {
-    if (allowedKeys.includes(section.key)) {
-      if (getChildKeys(section.key).includes(key)) return true;
-    }
-  }
-  return false;
+  return allowedKeys.includes(key);
 }

@@ -7,6 +7,7 @@ import {
   ALL_MODULE_KEYS,
   getModuleAccessForDisplay,
   parseStoredModuleAccess,
+  stripParentSectionKeys,
   applySuperadminOnlyModuleRestrictions,
 } from "@/lib/moduleAccess";
 
@@ -150,7 +151,7 @@ export async function POST(req) {
     }
 
     next = applySuperadminOnlyModuleRestrictions(next, userRole) ?? [];
-    next = uniqueStrings(next);
+    next = stripParentSectionKeys(uniqueStrings(next));
 
     await db.query(
       `UPDATE rep_list SET module_access = ? WHERE username = ?`,

@@ -9,6 +9,7 @@ import { getMainSessionPayload } from "@/lib/auth";
 import {
   getModuleAccessForDisplay,
   ALL_MODULE_KEYS,
+  stripParentSectionKeys,
   applySuperadminOnlyModuleRestrictions,
 } from "@/lib/moduleAccess";
 // Login username rename disabled — keep import commented if re-enabled:
@@ -161,8 +162,10 @@ export async function PUT(request, { params }) {
       try {
         const parsed = JSON.parse(moduleAccessRaw);
         if (Array.isArray(parsed)) {
-          const effective = applySuperadminOnlyModuleRestrictions(parsed, userRole);
-          moduleAccessToSet = JSON.stringify(effective ?? []);
+          const effective = stripParentSectionKeys(
+            applySuperadminOnlyModuleRestrictions(parsed, userRole) ?? [],
+          );
+          moduleAccessToSet = JSON.stringify(effective);
         }
       } catch {
         // ignore malformed input
