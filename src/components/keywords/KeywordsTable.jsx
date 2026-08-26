@@ -204,6 +204,9 @@ const KeywordsTable = () => {
                 Page
               </th>
               <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                Latest Follow-up Date
+              </th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">
                 Updated Date
               </th>
               <th className="px-6 py-3 text-left font-semibold text-gray-700">
@@ -217,7 +220,7 @@ const KeywordsTable = () => {
           <tbody>
             {filteredKeywords.length === 0 ? (
               <tr>
-                <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                   No keywords found. Add one to get started!
                 </td>
               </tr>
@@ -246,6 +249,9 @@ const KeywordsTable = () => {
                   </td>
                   <td className="px-6 py-3 text-gray-700">
                     {keyword.latest_followup_page || keyword.page || "-"}
+                  </td>
+                  <td className="px-6 py-3 text-gray-700">
+                    {formatDate(keyword.latest_followup_date)}
                   </td>
                   <td className="px-6 py-3 text-gray-700">
                     {formatDate(keyword.updated_at)}
@@ -322,6 +328,7 @@ const KeywordsTable = () => {
                 </div>
               </div>
               <div className="text-sm text-gray-600">
+                <p>Latest Follow-up: {formatDate(keyword.latest_followup_date)}</p>
                 <p>Updated: {formatDate(keyword.updated_at)}</p>
                 <p>Assigned To: {keyword.assigned_to || "-"}</p>
               </div>

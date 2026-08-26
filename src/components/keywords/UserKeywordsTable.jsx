@@ -145,6 +145,9 @@ const UserKeywordsTable = () => {
                 Page
               </th>
               <th className="px-6 py-3 text-left font-semibold text-gray-700">
+                Latest Follow-up Date
+              </th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">
                 Updated Date
               </th>
               <th className="px-6 py-3 text-center font-semibold text-gray-700">
@@ -155,7 +158,7 @@ const UserKeywordsTable = () => {
           <tbody>
             {filteredKeywords.length === 0 ? (
               <tr>
-                <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
                   No keywords assigned to you yet.
                 </td>
               </tr>
@@ -172,6 +175,9 @@ const UserKeywordsTable = () => {
                   </td>
                   <td className="px-6 py-3 text-gray-700">
                     {keyword.latest_followup_page || keyword.page || "-"}
+                  </td>
+                  <td className="px-6 py-3 text-gray-700">
+                    {formatDate(keyword.latest_followup_date)}
                   </td>
                   <td className="px-6 py-3 text-gray-700">
                     {formatDate(keyword.updated_at)}
@@ -232,6 +238,7 @@ const UserKeywordsTable = () => {
                 </div>
               </div>
               <div className="text-sm text-gray-600">
+                <p>Latest Follow-up: {formatDate(keyword.latest_followup_date)}</p>
                 <p>Updated: {formatDate(keyword.updated_at)}</p>
               </div>
               <div className="flex gap-2 mt-4">

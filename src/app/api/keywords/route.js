@@ -18,7 +18,7 @@ export async function GET() {
          ORDER BY followup_date DESC, created_at DESC
          LIMIT 1
        )
-       ORDER BY k.updated_at DESC`
+       ORDER BY lf.followup_date IS NULL, lf.followup_date DESC, k.updated_at DESC`
     );
 
     // Ensure numeric fields are proper numbers, not strings
