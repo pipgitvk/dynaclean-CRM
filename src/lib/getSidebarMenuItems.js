@@ -36,6 +36,10 @@ function transformMenuItemPaths(item, roleKey) {
     return { ...item, path: "/admin-dashboard/reports/payment-pending" };
   }
 
+  if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "denied-leads") {
+    return { ...item, path: "/sales-dashboard/denied-leads" };
+  }
+
   // Don't transform admin-dashboard, accounts-dashboard or empcrm paths
   if (item.path?.startsWith("/admin-dashboard") || item.path?.startsWith("/accounts-dashboard") || item.path?.startsWith("/empcrm")) {
     return item;

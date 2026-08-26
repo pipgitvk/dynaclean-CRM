@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function DeniedLeadsPage({ searchParams }) {
   const access = await checkDeniedLeadsAccess();
   if (!access.allowed) {
-    redirect("/admin-dashboard");
+    redirect("/sales-dashboard");
   }
 
   const searchParamsResolved = await searchParams;
@@ -49,8 +49,8 @@ export default async function DeniedLeadsPage({ searchParams }) {
             totalRecords={totalRecords}
             pageSize={pageSize}
             employees={employees}
-            basePath="/admin-dashboard/denied-leads"
-            viewCustomerBase="/admin-dashboard/view-customer"
+            basePath="/sales-dashboard/denied-leads"
+            viewCustomerBase="/user-dashboard/view-customer"
           />
         )}
       </div>

@@ -4,15 +4,16 @@ import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Eye, Search, RefreshCw, Loader2 } from "lucide-react";
 
-export default function DeniedLeadsTable({ 
-  data, 
+export default function DeniedLeadsTable({
+  data,
   searchParams = {},
   currentPage = 1,
   totalPages = 1,
   totalRecords = 0,
   pageSize = 50,
-  userRole,
   employees = [],
+  basePath = "/admin-dashboard/denied-leads",
+  viewCustomerBase = "/admin-dashboard/view-customer",
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -25,17 +26,22 @@ export default function DeniedLeadsTable({
     followed_by: searchParams?.followed_by || "",
   });
 
+  const buildParams = (page) => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (filters.from) params.set("from", filters.from);
+    if (filters.to) params.set("to", filters.to);
+    if (filters.denied_from) params.set("denied_from", filters.denied_from);
+    if (filters.denied_to) params.set("denied_to", filters.denied_to);
+    if (filters.followed_by) params.set("followed_by", filters.followed_by);
+    if (page) params.set("page", page.toString());
+    return params;
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     startTransition(() => {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (filters.from) params.set("from", filters.from);
-      if (filters.to) params.set("to", filters.to);
-      if (filters.denied_from) params.set("denied_from", filters.denied_from);
-      if (filters.denied_to) params.set("denied_to", filters.denied_to);
-      if (filters.followed_by) params.set("followed_by", filters.followed_by);
-      router.push(`/admin-dashboard/denied-leads?${params.toString()}`);
+      router.push(`${basePath}?${buildParams().toString()}`);
     });
   };
 
@@ -49,21 +55,13 @@ export default function DeniedLeadsTable({
         denied_to: "",
         followed_by: "",
       });
-      router.push("/admin-dashboard/denied-leads");
+      router.push(basePath);
     });
   };
 
   const handlePageChange = (newPage) => {
     startTransition(() => {
-      const params = new URLSearchParams();
-      if (search) params.set("search", search);
-      if (filters.from) params.set("from", filters.from);
-      if (filters.to) params.set("to", filters.to);
-      if (filters.denied_from) params.set("denied_from", filters.denied_from);
-      if (filters.denied_to) params.set("denied_to", filters.denied_to);
-      if (filters.followed_by) params.set("followed_by", filters.followed_by);
-      params.set("page", newPage.toString());
-      router.push(`/admin-dashboard/denied-leads?${params.toString()}`);
+      router.push(`${basePath}?${buildParams(newPage).toString()}`);
     });
   };
 
@@ -79,7 +77,7 @@ export default function DeniedLeadsTable({
             className="border border-gray-300 p-2.5 sm:p-2 rounded-lg flex-1 min-w-0 text-sm"
           />
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <select
             value={filters.followed_by}
@@ -122,7 +120,7 @@ export default function DeniedLeadsTable({
             onChange={(e) => setFilters({ ...filters, to: e.target.value })}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm min-w-[120px] sm:min-w-0"
           />
-          
+
           <button
             type="submit"
             disabled={isPending}
@@ -131,7 +129,7 @@ export default function DeniedLeadsTable({
             {isPending ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
             {isPending ? "Searching..." : "Search"}
           </button>
-          
+
           <button
             type="button"
             onClick={resetFilters}
@@ -143,7 +141,7 @@ export default function DeniedLeadsTable({
           </button>
         </div>
       </form>
-      
+
       <div className="text-sm text-gray-600 font-medium px-2 sm:px-4">
         Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalRecords)} of {totalRecords} denied leads
       </div>
@@ -171,7 +169,7 @@ export default function DeniedLeadsTable({
               </div>
               <button
                 title="View Customer"
-                onClick={() => router.push(`/admin-dashboard/view-customer/${row.customer_id}`)}
+                onClick={() => router.push(`${viewCustomerBase}/${row.customer_id}`)}
                 className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
               >
                 <Eye className="w-5 h-5 text-gray-600" />
@@ -192,66 +190,64 @@ export default function DeniedLeadsTable({
       <div className="hidden md:block overflow-x-auto">
         <div className="min-w-[900px] max-h-[500px] sm:max-h-[600px] overflow-y-auto rounded-lg border border-gray-200">
           <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-100 sticky top-0 z-10">
-                <tr>
-                  <th className="px-4 py-2 text-left">Customer</th>
-                  <th className="px-4 py-2 text-left">Contact</th>
-                  <th className="px-4 py-2 text-left">Followed By</th>
-                  <th className="px-4 py-2 text-left">Denied Date</th>
-                  <th className="px-4 py-2 text-left">Followed Date</th>
-                  <th className="px-4 py-2 text-left">Next Follow-up</th>
-                  <th className="px-4 py-2 text-left">Customer Status</th>
-                  <th className="px-4 py-2 text-left">Remarks</th>
-                  <th className="px-4 py-2 text-left">Action</th>
-                </tr>
-              </thead>
+            <thead className="bg-gray-100 sticky top-0 z-10">
+              <tr>
+                <th className="px-4 py-2 text-left">Customer</th>
+                <th className="px-4 py-2 text-left">Contact</th>
+                <th className="px-4 py-2 text-left">Followed By</th>
+                <th className="px-4 py-2 text-left">Denied Date</th>
+                <th className="px-4 py-2 text-left">Followed Date</th>
+                <th className="px-4 py-2 text-left">Next Follow-up</th>
+                <th className="px-4 py-2 text-left">Customer Status</th>
+                <th className="px-4 py-2 text-left">Remarks</th>
+                <th className="px-4 py-2 text-left">Action</th>
+              </tr>
+            </thead>
 
-              <tbody className="bg-white divide-y divide-gray-200">
-                {data.map((row, i) => (
-                  <tr key={i}>
-                    <td className="px-4 py-2">
-                      <div className="font-medium">{row.name}</div>
-                      <div className="text-xs text-gray-500">ID: {row.customer_id}</div>
-                    </td>
-                    <td className="px-4 py-2">{row.contact}</td>
-                    <td className="px-4 py-2">{row.followed_by}</td>
-                    <td className="px-4 py-2 font-medium text-red-700">
-                      {row.denied_date ? format(new Date(row.denied_date), "dd MMM yyyy HH:mm") : "—"}
-                    </td>
-                    <td className="px-4 py-2">
-                      {row.followed_date ? format(new Date(row.followed_date), "dd MMM yyyy HH:mm") : "—"}
-                    </td>
-                    <td className="px-4 py-2">
-                      {row.next_followup_date ? format(new Date(row.next_followup_date), "dd MMM yyyy") : "—"}
-                    </td>
-                    <td className="px-4 py-2">{row.customer_status}</td>
-                    <td className="px-4 py-2 max-w-xs truncate">{row.notes}</td>
-                    <td className="px-4 py-2 flex items-center gap-2">
-                      <button
-                        title="View Customer"
-                        onClick={() =>
-                          router.push(
-                            `/admin-dashboard/view-customer/${row.customer_id}`
-                          )
-                        }
-                      >
-                        <Eye className="w-5 h-5 hover:text-blue-600" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {data.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={9}
-                      className="px-4 py-4 text-center text-gray-400"
+            <tbody className="bg-white divide-y divide-gray-200">
+              {data.map((row, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-2">
+                    <div className="font-medium">{row.name}</div>
+                    <div className="text-xs text-gray-500">ID: {row.customer_id}</div>
+                  </td>
+                  <td className="px-4 py-2">{row.contact}</td>
+                  <td className="px-4 py-2">{row.followed_by}</td>
+                  <td className="px-4 py-2 font-medium text-red-700">
+                    {row.denied_date ? format(new Date(row.denied_date), "dd MMM yyyy HH:mm") : "—"}
+                  </td>
+                  <td className="px-4 py-2">
+                    {row.followed_date ? format(new Date(row.followed_date), "dd MMM yyyy HH:mm") : "—"}
+                  </td>
+                  <td className="px-4 py-2">
+                    {row.next_followup_date ? format(new Date(row.next_followup_date), "dd MMM yyyy") : "—"}
+                  </td>
+                  <td className="px-4 py-2">{row.customer_status}</td>
+                  <td className="px-4 py-2 max-w-xs truncate">{row.notes}</td>
+                  <td className="px-4 py-2 flex items-center gap-2">
+                    <button
+                      title="View Customer"
+                      onClick={() =>
+                        router.push(`${viewCustomerBase}/${row.customer_id}`)
+                      }
                     >
-                      No results found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      <Eye className="w-5 h-5 hover:text-blue-600" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {data.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={9}
+                    className="px-4 py-4 text-center text-gray-400"
+                  >
+                    No results found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -264,7 +260,7 @@ export default function DeniedLeadsTable({
           >
             Previous
           </button>
-          
+
           <div className="flex items-center gap-1 flex-wrap justify-center">
             {currentPage > 3 && (
               <>
@@ -278,11 +274,11 @@ export default function DeniedLeadsTable({
                 {currentPage > 4 && <span className="px-2 text-gray-500">...</span>}
               </>
             )}
-            
+
             {Array.from({ length: totalPages }, (_, i) => i + 1)
               .filter(page => {
-                return page === currentPage || 
-                       page === currentPage - 1 || 
+                return page === currentPage ||
+                       page === currentPage - 1 ||
                        page === currentPage + 1 ||
                        page === currentPage - 2 ||
                        page === currentPage + 2;
@@ -301,7 +297,7 @@ export default function DeniedLeadsTable({
                   {page}
                 </button>
               ))}
-            
+
             {currentPage < totalPages - 2 && (
               <>
                 {currentPage < totalPages - 3 && <span className="px-2 text-gray-500">...</span>}
@@ -315,7 +311,7 @@ export default function DeniedLeadsTable({
               </>
             )}
           </div>
-          
+
           <button
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages || isPending}
