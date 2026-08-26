@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import dayjs from "dayjs";
+import { isSalesRole } from "@/lib/isSalesRole";
 
 import DeleteButton from "@/components/accounts/DeleteButton";
 
@@ -519,16 +520,18 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
 
   const popRef = useRef(null);
   const role = (userRole || "").toString().trim().toLowerCase();
-  const canViewSales = [
-    "back office",
-    "accountant",
-    "admin",
-    "sales",
-    "warehouse incharge",
-    "gem portal",
-    "team leader",
-    "service head",
-  ].includes(role);
+  const canViewSales =
+    isSalesRole(userRole) ||
+    [
+      "back office",
+      "accountant",
+      "admin",
+      "warehouse incharge",
+      "gem portal",
+      "team leader",
+      "service head",
+    ].includes(role) ||
+    role.includes("gem");
   const isAdmin = role === "admin";
   const isTeamLeader = role === "team leader";
   const isWarehouse = role === "warehouse incharge";
@@ -581,7 +584,7 @@ function ActionButtons({ r, userRole, isOpen, toggleMenu }) {
           <div className="py-1 text-sm">
             {canViewSales && (
               <Link
-                href={`/user-dashboard/order/${r.order_id}`}
+                href={`/sales-dashboard/order/${r.order_id}`}
                 className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                 title="View Sales"
                 onClick={(e) => e.stopPropagation()}

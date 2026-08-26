@@ -300,7 +300,7 @@ export default function OrderDetailsClient({
       {/* Back Link */}
       <div className="text-center mt-6">
         <a
-          href="/user-dashboard/order"
+          href="/sales-dashboard/order"
           className="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
         >
           ← Back to Order List
