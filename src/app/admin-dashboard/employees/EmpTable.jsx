@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Link from "next/link";
-import { LogIn, Key, Edit, Shield, UserPlus, X, ExternalLink } from "lucide-react";
+import { LogIn, Key, Edit, Shield, UserPlus, X, ExternalLink, Clock } from "lucide-react";
 import { getRoleDashboardPath } from "@/lib/getRoleDashboardPath";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import toast from "react-hot-toast";
@@ -193,6 +193,8 @@ const EmployeeCard = ({
   employee,
   handleImpersonateLogin,
   handleOpenReportingManagerModal,
+  handleToggleLoginTimeRestriction,
+  togglingTimeRestriction,
   maskEmail,
   maskNumber,
   maskStatus,
@@ -275,6 +277,24 @@ const EmployeeCard = ({
         <span>Manager</span>
       </button>
 
+      <button
+        onClick={() => handleToggleLoginTimeRestriction(employee)}
+        disabled={togglingTimeRestriction === employee.username}
+        className={`font-medium flex items-center space-x-1 text-sm disabled:opacity-50 ${
+          employee.login_time_restriction_enabled === 1
+            ? "text-green-600 hover:text-green-800"
+            : "text-red-600 hover:text-red-800"
+        }`}
+        title={
+          employee.login_time_restriction_enabled === 1
+            ? "Login time restriction ON (09:00–19:00 IST) — click to disable"
+            : "Login time restriction OFF — click to enable (09:00–19:00 IST)"
+        }
+      >
+        <Clock size={16} />
+        <span>Time</span>
+      </button>
+
     </div>
   </div>
 );
@@ -297,6 +317,8 @@ const EmpTable = ({ employees }) => {
   const [bulkTouched, setBulkTouched] = useState(false);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkModuleSearch, setBulkModuleSearch] = useState("");
+  const [togglingTimeRestriction, setTogglingTimeRestriction] = useState("");
+  const [timeRestrictionMap, setTimeRestrictionMap] = useState({});
   const bulkUserEditedRef = useRef(false);
   const router = useRouter();
 
@@ -340,6 +362,54 @@ const EmpTable = ({ employees }) => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const map = {};
+    employees.forEach((emp) => {
+      map[emp.username] = emp.login_time_restriction_enabled === 0 ? 0 : 1;
+    });
+    setTimeRestrictionMap(map);
+  }, [employees]);
+
+  const handleToggleLoginTimeRestriction = async (employee) => {
+    const username = employee?.username;
+    if (!username) return;
+
+    const current = timeRestrictionMap[username] === 1 ? 1 : 0;
+    const next = current === 1 ? 0 : 1;
+
+    setTogglingTimeRestriction(username);
+    try {
+      const res = await fetch("/api/employees/set-login-time-restriction", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          login_time_restriction_enabled: next,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update login time restriction.");
+      }
+      setTimeRestrictionMap((prev) => ({ ...prev, [username]: next }));
+      toast.success(
+        next === 1
+          ? `${username}: login restricted to 09:00–19:00 IST`
+          : `${username}: login time restriction removed`,
+      );
+    } catch (err) {
+      toast.error(err.message || "Failed to update login time restriction.");
+    } finally {
+      setTogglingTimeRestriction("");
+    }
+  };
+
+  const getEmployeeWithTimeRestriction = (employee) => ({
+    ...employee,
+    login_time_restriction_enabled:
+      timeRestrictionMap[employee.username] === 0 ? 0 : 1,
+  });
 
   const handleOpenReportingManagerModal = (employee) => {
     setSelectedEmployee(employee?.username || "");
@@ -884,9 +954,11 @@ const EmpTable = ({ employees }) => {
             filteredEmployees.map((employee) => (
               <EmployeeCard
                 key={employee.empId}
-                employee={employee}
+                employee={getEmployeeWithTimeRestriction(employee)}
                 handleImpersonateLogin={handleImpersonateLogin}
                 handleOpenReportingManagerModal={handleOpenReportingManagerModal}
+                handleToggleLoginTimeRestriction={handleToggleLoginTimeRestriction}
+                togglingTimeRestriction={togglingTimeRestriction}
                 maskEmail={maskEmail}
                 maskNumber={maskNumber}
                 maskStatus={maskStatus}
@@ -932,7 +1004,9 @@ const EmpTable = ({ employees }) => {
 
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredEmployees.length ? (
-                filteredEmployees.map((employee) => (
+                filteredEmployees.map((employee) => {
+                  const emp = getEmployeeWithTimeRestriction(employee);
+                  return (
                   <tr key={employee.empId} className="hover:bg-gray-50">
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">{employee.username}</td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 text-sm">{maskEmail(employee.email)}</td>
@@ -983,10 +1057,28 @@ const EmpTable = ({ employees }) => {
                         >
                           <UserPlus size={20} />
                         </button>
+
+                        <button
+                          onClick={() => handleToggleLoginTimeRestriction(employee)}
+                          disabled={togglingTimeRestriction === employee.username}
+                          className={`disabled:opacity-50 ${
+                            emp.login_time_restriction_enabled === 1
+                              ? "text-green-600 hover:text-green-800"
+                              : "text-red-600 hover:text-red-800"
+                          }`}
+                          title={
+                            emp.login_time_restriction_enabled === 1
+                              ? "Login time restriction ON (09:00–19:00 IST) — click to disable"
+                              : "Login time restriction OFF — click to enable (09:00–19:00 IST)"
+                          }
+                        >
+                          <Clock size={20} />
+                        </button>
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="8" className="text-center py-4 text-gray-500">

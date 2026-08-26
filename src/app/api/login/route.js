@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { getDbConnection } from "@/lib/db";
 import { getCurrentISTTime } from "@/lib/timezone";
+import { ensureLoginTimeRestrictionColumn } from "@/lib/ensureLoginTimeRestrictionColumn";
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret";
@@ -77,26 +78,7 @@ export async function POST(request) {
       return res;
     }
 
-    // --- 1. Time-based Restriction (9:00 AM - 7:00 PM IST) ---
-    const { hour, minute } = getCurrentISTTime();
-    const currentTimeMinutes = hour * 60 + minute;
-    const startRange = 9 * 60; // 9:00 AM
-    const endRange = 19 * 60; // 7:00 PM
-
-    if (username !== "admin" && username !== "VK") {
-      if (currentTimeMinutes < startRange || currentTimeMinutes > endRange) {
-        await recordActivity(
-          username,
-          "UNKNOWN",
-          "FAILED",
-          `Login attempted outside allowed hours (09:00 - 19:00 IST). Current IST time: ${hour}:${minute}`,
-        );
-        return NextResponse.json(
-          { error: "Login allowed only between 09:00 and 19:00 IST" },
-          { status: 403 },
-        );
-      }
-    }
+    await ensureLoginTimeRestrictionColumn();
 
     // Step 1: Try emplist
     const [empRows] = await conn.execute(
@@ -131,10 +113,30 @@ export async function POST(request) {
       await recordActivity(username, "UNKNOWN", "FAILED", "User not found");
       return NextResponse.json({ error: "User not found" }, { status: 401 });
     }
-   
-    
 
     const userRole = user.userRole || user.role || "UNKNOWN";
+
+    // Time-based restriction (09:00–19:00 IST) when enabled per employee
+    const isTimeRestrictionEnabled = user.login_time_restriction_enabled !== 0;
+    if (isTimeRestrictionEnabled) {
+      const { hour, minute } = getCurrentISTTime();
+      const currentTimeMinutes = hour * 60 + minute;
+      const startRange = 9 * 60;
+      const endRange = 19 * 60;
+
+      if (currentTimeMinutes < startRange || currentTimeMinutes > endRange) {
+        await recordActivity(
+          username,
+          userRole,
+          "FAILED",
+          `Login attempted outside allowed hours (09:00 - 19:00 IST). Current IST time: ${hour}:${minute}`,
+        );
+        return NextResponse.json(
+          { error: "Login allowed only between 09:00 and 19:00 IST" },
+          { status: 403 },
+        );
+      }
+    }
     const dbPassword = user.password || "";
     const inputPassword = password.trim();
 
