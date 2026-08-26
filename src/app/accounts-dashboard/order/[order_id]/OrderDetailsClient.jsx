@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import dayjs from "dayjs";
+import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
 const stages = [
   "Sales",
@@ -373,15 +374,7 @@ function FileSection({ label, file }) {
 }
 
 function DocCell({ label, file, optional, required }) {
-  let displayUrl = file;
-  if (file && file.startsWith('/uploads/')) {
-    const parts = file.split('/');
-    if (parts.length >= 3) {
-      const folder = parts[2];
-      const filename = parts.slice(3).join('/');
-      displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
-    }
-  }
+  const displayUrl = resolveStoredFileUrl(file);
   return (
     <div>
       <p className="font-medium">{label}</p>

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import dayjs from "dayjs";
+import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
 const stages = [
   "Sales",
@@ -379,15 +380,7 @@ function DocCell({ label, file, optional, required }) {
 
   // If there's only one file, show simple view
   if (fileUrls.length === 1) {
-    let displayUrl = fileUrls[0];
-    if (displayUrl.startsWith('/uploads/')) {
-      const parts = displayUrl.split('/');
-      if (parts.length >= 3) {
-        const folder = parts[2];
-        const filename = parts.slice(3).join('/');
-        displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
-      }
-    }
+    const displayUrl = resolveStoredFileUrl(fileUrls[0]);
     return (
       <div>
         <p className="font-medium">{label}</p>
@@ -418,16 +411,8 @@ function DocCell({ label, file, optional, required }) {
         </summary>
         <div className="mt-2 space-y-2 bg-gray-50 p-2 rounded border border-gray-200">
           {fileUrls.map((fileUrl, idx) => {
-            let displayUrl = fileUrl;
-            if (displayUrl.startsWith('/uploads/')) {
-              const parts = displayUrl.split('/');
-              if (parts.length >= 3) {
-                const folder = parts[2];
-                const filename = parts.slice(3).join('/');
-                displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
-              }
-            }
-            
+            const displayUrl = resolveStoredFileUrl(fileUrl);
+
             // Extract filename from URL
             const filename = fileUrl.split('/').pop() || `File ${idx + 1}`;
             

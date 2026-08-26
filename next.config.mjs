@@ -43,6 +43,11 @@ const nextConfig = {
         source: "/company_documents/:path*",
         destination: "/api/serve/:path*",
       },
+      // Order invoice / e-way bill uploads (public/Order/accounts/)
+      {
+        source: "/Order/:path*",
+        destination: "/api/serve/Order/:path*",
+      },
     ];
   },
 };

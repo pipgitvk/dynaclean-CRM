@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { resolveStoredFileUrl } from "@/lib/resolveStoredFileUrl";
 
 export default function ViewOrderDetails({ data }) {
   const {
@@ -196,19 +197,7 @@ export default function ViewOrderDetails({ data }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {files.map(({ label, key }) => {
           const fileUrl = orderDetails[key];
-          let displayUrl = fileUrl;
-          
-          // Convert direct upload paths to API routes for proper file serving
-          if (fileUrl && fileUrl.startsWith('/uploads/')) {
-            const parts = fileUrl.split('/');
-            if (parts.length >= 3) {
-              // Extract folder and filename from /uploads/folder/filename
-              const folder = parts[2];
-              const filename = parts.slice(3).join('/');
-              displayUrl = `/api/files/${folder}/${encodeURIComponent(filename)}`;
-            }
-          }
-          
+          const displayUrl = resolveStoredFileUrl(fileUrl);
           return (
             <div key={key} className="p-4 border rounded-lg">
               <h4 className="text-sm font-semibold mb-2">{label}</h4>
