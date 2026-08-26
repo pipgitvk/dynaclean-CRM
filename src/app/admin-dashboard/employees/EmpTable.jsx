@@ -22,6 +22,12 @@ function uniqueStrings(arr) {
   return [...new Set((arr || []).map((v) => String(v || "").trim()).filter(Boolean))];
 }
 
+function isSuperAdminEmployee(employee) {
+  const role = String(employee?.userRole || "").trim().toUpperCase();
+  const username = String(employee?.username || "").trim().toLowerCase();
+  return role === "SUPERADMIN" || username === "admin";
+}
+
 /** Global Module Access: mirrors super-admin sidebar (single row vs nested groups). */
 function ModuleUiBlock({
   node,
@@ -277,6 +283,7 @@ const EmployeeCard = ({
         <span>Manager</span>
       </button>
 
+      {!isSuperAdminEmployee(employee) && (
       <button
         onClick={() => handleToggleLoginTimeRestriction(employee)}
         disabled={togglingTimeRestriction === employee.username}
@@ -294,6 +301,7 @@ const EmployeeCard = ({
         <Clock size={16} />
         <span>Time</span>
       </button>
+      )}
 
     </div>
   </div>
@@ -1058,6 +1066,7 @@ const EmpTable = ({ employees }) => {
                           <UserPlus size={20} />
                         </button>
 
+                        {!isSuperAdminEmployee(employee) && (
                         <button
                           onClick={() => handleToggleLoginTimeRestriction(employee)}
                           disabled={togglingTimeRestriction === employee.username}
@@ -1074,6 +1083,7 @@ const EmpTable = ({ employees }) => {
                         >
                           <Clock size={20} />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>

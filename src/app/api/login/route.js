@@ -115,9 +115,13 @@ export async function POST(request) {
     }
 
     const userRole = user.userRole || user.role || "UNKNOWN";
+    const isSuperAdmin =
+      String(userRole).trim().toUpperCase() === "SUPERADMIN" ||
+      String(username).trim().toLowerCase() === "admin";
 
-    // Time-based restriction (09:00–19:00 IST) when enabled per employee
-    const isTimeRestrictionEnabled = user.login_time_restriction_enabled !== 0;
+    // Time-based restriction when enabled per employee (not for SUPERADMIN)
+    const isTimeRestrictionEnabled =
+      !isSuperAdmin && user.login_time_restriction_enabled !== 0;
     if (isTimeRestrictionEnabled) {
       const { hour, minute } = getCurrentISTTime();
       const currentTimeMinutes = hour * 60 + minute;
