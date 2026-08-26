@@ -21,6 +21,7 @@ export default function OrderDetailsClient({
   orderId,
   gstin,
   quoteCustomerId,
+  orderListPath = "/user-dashboard/order",
 }) {
   const formatDate = (value) => {
     if (!value) return "";
@@ -300,7 +301,7 @@ export default function OrderDetailsClient({
       {/* Back Link */}
       <div className="text-center mt-6">
         <a
-          href="/user-dashboard/order"
+          href={orderListPath}
           className="inline-block bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
         >
           ← Back to Order List

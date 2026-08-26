@@ -124,7 +124,7 @@ export default function OrderDetailsClient({
           value={orderDetails.delivery_location}
         />
         <Input label="PO Number / Gem Order Number" value={orderDetails.po_number} />
-        <Input label="Total Amount" value={`₹${(orderDetails.totalamt || totalAmount || 0).toFixed(2)}`} />
+        <Input label="Total Amount" value={`₹${Number(orderDetails.totalamt || totalAmount || 0).toFixed(2)}`} />
         <Input label="Total Paid Amount" value={`₹${totalPaid.toFixed(2)}`} />
         <Input label="Payment Date" value={formatDate(orderDetails.payment_date)} />
         <Input label="Transaction ID" value={orderDetails.transaction_id} />
