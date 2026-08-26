@@ -5,13 +5,39 @@ import { EXCLUDE_PROFORMA_INVOICE_SQL_I } from "@/lib/ledgerInvoiceFilters";
 
 export const dynamic = "force-dynamic";
 
-function keyFor(name, customerId) {
-  const n = String(name || "").trim().toLowerCase();
-  const c =
-    customerId != null && String(customerId).trim() !== ""
-      ? "c_" + String(customerId).trim()
-      : "n_" + n;
-  return n + "|" + c;
+function keyFor(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+function mergePartyExtras(existing, extras = {}, customerId) {
+  const merged = { ...existing };
+
+  if (extras._psrTotal) {
+    merged._psrTotal = Number(merged._psrTotal || 0) + Number(extras._psrTotal);
+  }
+  if (extras._psrCount) {
+    merged._psrCount = Number(merged._psrCount || 0) + Number(extras._psrCount);
+  }
+  if (extras._spareTotal) {
+    merged._spareTotal = Number(merged._spareTotal || 0) + Number(extras._spareTotal);
+  }
+
+  for (const [field, value] of Object.entries(extras)) {
+    if (field.startsWith("_")) continue;
+    if (value != null && value !== "" && value !== 0 && !merged[field]) {
+      merged[field] = value;
+    }
+  }
+
+  if (
+    (merged.customer_id == null || String(merged.customer_id).trim() === "") &&
+    customerId != null &&
+    String(customerId).trim() !== ""
+  ) {
+    merged.customer_id = customerId;
+  }
+
+  return merged;
 }
 
 function buildCustomerNameLookup(custRows) {
@@ -54,19 +80,11 @@ export async function GET(req) {
     const addRow = (rawName, customerId, extras = {}) => {
       const name = String(rawName || "").trim();
       if (!name) return;
-      const k = keyFor(name, customerId);
+      const k = keyFor(name);
       if (!rows.has(k)) {
         rows.set(k, { name, customer_id: customerId || undefined, ...extras });
       } else {
-        const existing = rows.get(k);
-        rows.set(k, {
-          ...existing,
-          ...Object.fromEntries(
-            Object.entries(extras).filter(
-              ([, v]) => v != null && v !== "" && v !== 0,
-            ),
-          ),
-        });
+        rows.set(k, mergePartyExtras(rows.get(k), extras, customerId));
       }
     };
 
@@ -269,17 +287,12 @@ export async function GET(req) {
 
     for (const r of spareRows) {
       const nm = r.client_company_name || r.client_name;
-      const k = keyFor(nm, r.customer_id);
       addRow(nm, r.customer_id, {
         phone: r.client_number,
         gstin: r.client_gstin,
         billing_address: r.customer_address,
+        _spareTotal: Number(r.total_purchase || 0),
       });
-      const existing = rows.get(k);
-      if (existing) {
-        existing._spareTotal =
-          Number(existing._spareTotal || 0) + Number(r.total_purchase || 0);
-      }
     }
 
     for (const r of leRows) {
@@ -287,7 +300,7 @@ export async function GET(req) {
       const nmLow = nm.toLowerCase();
       manualDrByName.set(nmLow, Number(r.dr) || 0);
       manualCrByName.set(nmLow, Number(r.cr) || 0);
-      const hasAny = Array.from(rows.keys()).some((k) => k.startsWith(nmLow + "|"));
+      const hasAny = rows.has(nmLow);
       if (!hasAny) addRow(nm, null, {});
     }
 
@@ -418,11 +431,7 @@ export async function GET(req) {
       const an = Math.abs(a.balance || 0);
       const bn = Math.abs(b.balance || 0);
       if (bn !== an) return bn - an;
-      const nc = a.name.localeCompare(b.name);
-      if (nc !== 0) return nc;
-      const ac = a.customer_id ? String(a.customer_id) : "";
-      const bc = b.customer_id ? String(b.customer_id) : "";
-      return ac.localeCompare(bc);
+      return a.name.localeCompare(b.name);
     });
 
     console.timeEnd("[parties-list] total");
