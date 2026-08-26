@@ -665,35 +665,36 @@ const allMenuItems = [
   {
     name: "Main Expenses",
     moduleKey: "tally-payments",
-    roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+    /* Visibility driven by module_access; keep role list open so granted keys are not stripped first. */
+    roles: ["ALL"],
     icon: "Receipt",
     children: [
       {
         path: "/admin-dashboard/client-expenses/cards",
         name: "Main Expenses",
         moduleKey: "client-expenses",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        roles: ["ALL"],
         icon: "FileText",
       },
       {
         path: "/admin-dashboard/delivery-challan",
         name: "Delivery Challan",
         moduleKey: "delivery-challan",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        roles: ["ALL"],
         icon: "Package",
       },
       {
         path: "/admin-dashboard/statements",
         name: "Statement",
         moduleKey: "statements",
-        roles: ["SUPERADMIN", "ACCOUNTANT", "PRODUCTION ACCOUNTANT"],
+        roles: ["ALL"],
         icon: "Receipt",
       },
       {
         path: "/admin-dashboard/bank-masters",
         name: "Bank Management",
         moduleKey: "bank-management",
-        roles: ["ACCOUNTANT", "DIRECTOR", "ADMIN", "SUPERADMIN"],
+        roles: ["ALL"],
         icon: "Landmark",
       },
     ],
