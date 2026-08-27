@@ -2,9 +2,27 @@
 
 import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Filter, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Filter, X, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 import dayjs from "dayjs";
+import PreBookingRemarkModal from "@/components/PreBookingRemarkModal";
+
+function getStatusStyles(status) {
+  switch (status) {
+    case "pending":
+      return "bg-yellow-100 border-yellow-400 text-yellow-800";
+    case "partial":
+      return "bg-orange-100 border-orange-400 text-orange-800";
+    case "received":
+      return "bg-green-100 border-green-400 text-green-800";
+    case "cancelled":
+      return "bg-red-100 border-red-400 text-red-800";
+    case "postponed":
+      return "bg-purple-100 border-purple-400 text-purple-800";
+    default:
+      return "bg-gray-100 border-gray-400 text-gray-800";
+  }
+}
 
 export default function PreBookingListClient({
   preBookings,
@@ -30,6 +48,7 @@ export default function PreBookingListClient({
   const [expectedDateTo, setExpectedDateTo] = useState(initialExpectedDateTo);
   const [showFilters, setShowFilters] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
+  const [remarkModal, setRemarkModal] = useState({ isOpen: false, booking: null });
 
   const totalPages = Math.ceil(total / pageSize);
 
@@ -95,16 +114,16 @@ export default function PreBookingListClient({
   const hasActiveFilters = search || modelFilter || leadSourceFilter || statusFilter || expectedDateFrom || expectedDateTo;
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-800 mb-2">Pre-Bookings</h1>
+    <div className="w-full">
+      <div className="mb-4">
+        <h1 className="text-3xl font-bold text-gray-800 mb-1">Pre-Bookings</h1>
         <p className="text-gray-600">
           Total: <span className="font-semibold text-blue-600">{total}</span> pre-bookings
         </p>
       </div>
 
       {/* Search and Filter Section */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="bg-white rounded-lg shadow-md p-4 mb-4">
         <div className="flex gap-4 mb-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-3 text-gray-400" size={20} />
@@ -180,6 +199,8 @@ export default function PreBookingListClient({
                 <option value="pending">Pending</option>
                 <option value="partial">Partial</option>
                 <option value="received">Received</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="postponed">Postponed</option>
               </select>
             </div>
 
@@ -223,7 +244,7 @@ export default function PreBookingListClient({
       </div>
 
       {/* Table Section */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="bg-white rounded-lg shadow-md overflow-hidden w-full">
         {preBookings.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <p className="text-lg">No pre-bookings found</p>
@@ -231,38 +252,41 @@ export default function PreBookingListClient({
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-auto min-w-full">
                 <thead>
                   <tr className="bg-gray-100 border-b border-gray-200">
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Customer ID
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Customer Name
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Lead Source
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Product Name
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Item Code
                     </th>
-                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-center text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Qty
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Expected Date
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Order ID
                     </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
                       Received Date
+                    </th>
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 whitespace-nowrap">
+                      Remark
                     </th>
                   </tr>
                 </thead>
@@ -272,48 +296,42 @@ export default function PreBookingListClient({
                       key={booking.id}
                       className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      <td className="px-3 py-3 text-sm font-medium text-gray-900">
                         {booking.customer_id}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-gray-700">
                         <div className="font-medium">
                           {booking.first_name} {booking.last_name}
                         </div>
                         <div className="text-xs text-gray-500">{booking.company}</div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-gray-700">
                         <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
                           {booking.lead_source || "N/A"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-gray-700">
                         {booking.product_name}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-gray-700">
                         <code className="bg-gray-100 px-2 py-1 rounded text-xs">
                           {booking.item_code || "N/A"}
                         </code>
                       </td>
-                      <td className="px-6 py-4 text-sm text-center font-semibold text-gray-900">
+                      <td className="px-3 py-3 text-sm text-center font-semibold text-gray-900">
                         {booking.quantity}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-gray-700">
                         {booking.expected_date
                           ? dayjs(booking.expected_date).format("DD MMM YYYY")
                           : "N/A"}
                       </td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className={`inline-block px-3 py-1 rounded text-sm font-medium border-2 ${
-                          (booking.status || 'pending') === 'pending'
-                            ? 'bg-yellow-100 border-yellow-400 text-yellow-800'
-                            : (booking.status || 'pending') === 'partial'
-                            ? 'bg-orange-100 border-orange-400 text-orange-800'
-                            : 'bg-green-100 border-green-400 text-green-800'
-                        }`}>
-                          {(booking.status || 'pending').charAt(0).toUpperCase() + (booking.status || 'pending').slice(1)}
+                      <td className="px-3 py-3 text-sm">
+                        <span className={`inline-block px-3 py-1 rounded text-sm font-medium border-2 ${getStatusStyles(booking.status || "pending")}`}>
+                          {(booking.status || "pending").charAt(0).toUpperCase() + (booking.status || "pending").slice(1)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-gray-700">
                         {booking.order_id ? (
                           <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
                             {booking.order_id}
@@ -322,10 +340,60 @@ export default function PreBookingListClient({
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-gray-700">
                         {booking.received_date
                           ? dayjs(booking.received_date).format("DD MMM YYYY")
                           : "-"}
+                      </td>
+                      <td className="px-3 py-3 text-sm">
+                        {booking.remark_type ? (
+                          <div className="space-y-1">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                                booking.remark_type === "cancelled"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-purple-100 text-purple-800"
+                              }`}
+                            >
+                              {booking.remark_type === "cancelled"
+                                ? "Order Cancelled"
+                                : "Order Postponed"}
+                            </span>
+                            <p
+                              className="text-xs text-gray-600 break-words"
+                              title={booking.remark_reason}
+                            >
+                              {booking.remark_reason}
+                            </p>
+                            {booking.remark_type === "postponed" && booking.postponed_date && (
+                              <p className="text-xs text-gray-500">
+                                New date: {dayjs(booking.postponed_date).format("DD MMM YYYY")}
+                              </p>
+                            )}
+                            <button
+                              onClick={() =>
+                                setRemarkModal({ isOpen: true, booking })
+                              }
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() =>
+                              setRemarkModal({ isOpen: true, booking })
+                            }
+                            disabled={
+                              booking.status === "received" ||
+                              booking.status === "partial"
+                            }
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <MessageSquare size={14} />
+                            Add Remark
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -335,7 +403,7 @@ export default function PreBookingListClient({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-200">
+              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-200">
                 <div className="text-sm text-gray-600">
                   Page <span className="font-semibold">{currentPage}</span> of{" "}
                   <span className="font-semibold">{totalPages}</span> (
@@ -364,6 +432,13 @@ export default function PreBookingListClient({
           </>
         )}
       </div>
+
+      <PreBookingRemarkModal
+        isOpen={remarkModal.isOpen}
+        booking={remarkModal.booking}
+        onClose={() => setRemarkModal({ isOpen: false, booking: null })}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }

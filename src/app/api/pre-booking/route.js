@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
+import { ensurePreBookingRemarkColumns } from "@/lib/ensurePreBookingRemarkColumns";
 
 // POST - Create a new pre-booking
 export async function POST(request) {
@@ -133,6 +134,86 @@ export async function DELETE(request) {
     return NextResponse.json(
       { error: "Failed to delete pre-booking" },
       { status: 500 }
+    );
+  }
+}
+
+// PATCH - Add remark (order cancelled / order postponed)
+export async function PATCH(request) {
+  try {
+    const payload = await getSessionPayload();
+    if (!payload) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { id, remark_type, remark_reason, postponed_date } = body;
+
+    if (!id || !remark_type) {
+      return NextResponse.json(
+        { error: "id and remark_type are required" },
+        { status: 400 },
+      );
+    }
+
+    if (!["cancelled", "postponed"].includes(remark_type)) {
+      return NextResponse.json(
+        { error: "Invalid remark_type. Must be 'cancelled' or 'postponed'" },
+        { status: 400 },
+      );
+    }
+
+    if (!remark_reason?.trim()) {
+      return NextResponse.json(
+        { error: "remark_reason is required" },
+        { status: 400 },
+      );
+    }
+
+    if (remark_type === "postponed" && !postponed_date) {
+      return NextResponse.json(
+        { error: "postponed_date is required for postponed orders" },
+        { status: 400 },
+      );
+    }
+
+    const connection = await getDbConnection();
+    await ensurePreBookingRemarkColumns(connection);
+
+    if (remark_type === "cancelled") {
+      await connection.execute(
+        `UPDATE pre_booking
+         SET status = 'cancelled',
+             remark_type = 'cancelled',
+             remark_reason = ?,
+             postponed_date = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [remark_reason.trim(), id],
+      );
+    } else {
+      await connection.execute(
+        `UPDATE pre_booking
+         SET status = 'postponed',
+             remark_type = 'postponed',
+             remark_reason = ?,
+             postponed_date = ?,
+             expected_date = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [remark_reason.trim(), postponed_date, postponed_date, id],
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Remark saved successfully",
+    });
+  } catch (error) {
+    console.error("Error saving pre-booking remark:", error);
+    return NextResponse.json(
+      { error: "Failed to save remark" },
+      { status: 500 },
     );
   }
 }
