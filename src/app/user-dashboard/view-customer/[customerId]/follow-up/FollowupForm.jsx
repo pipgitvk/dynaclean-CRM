@@ -407,28 +407,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
     }));
   }, []);
 
-  // Filter stages based on customer's current stage from database
-  const getAvailableStages = (currentStage) => {
-    // Use formData.stage as fallback if customerCurrentStage hasn't updated yet
-    const effectiveStage = currentStage || formData.stage || "New";
-
-    const stageOrder = stageOptions;
-    const currentIndex = stageOrder.indexOf(effectiveStage);
-
-    // For final stages, only allow staying in the same stage
-    if (effectiveStage === "Won (Order Received)" || effectiveStage === "Lost" || effectiveStage === "Disqualified / Invalid Lead") {
-      return [effectiveStage];
-    }
-
-    // If stage not found in list, return all options
-    if (currentIndex === -1) return stageOptions;
-
-    // Show current stage and all stages after it (progressive flow)
-    return stageOrder.slice(currentIndex);
-  };
-
-  // Recompute whenever customerCurrentStage OR formData.stage changes
-  const availableStages = getAvailableStages(customerCurrentStage);
+  const availableStages = stageOptions;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
