@@ -2,6 +2,14 @@ const FILE_SERVE_PREFIX = "/api/serve/";
 
 const isExternalUrl = (url) => /^https?:\/\//i.test(url);
 
+function encodePathSegment(segment) {
+  try {
+    return encodeURIComponent(decodeURIComponent(segment));
+  } catch {
+    return encodeURIComponent(segment);
+  }
+}
+
 /**
  * Turn stored file paths (/Order/accounts/..., /uploads/..., etc.) into URLs
  * served via /api/serve so production can read from disk reliably.
@@ -14,15 +22,10 @@ export function resolveStoredFileUrl(raw) {
     return value;
   }
 
+  // Only split a real query string. Filenames may contain "#" (e.g. "PO # 123.pdf")
+  // and must not be treated as URL fragments.
   let pathPart = value;
-  let hash = "";
   let query = "";
-
-  const hashIndex = pathPart.indexOf("#");
-  if (hashIndex !== -1) {
-    hash = pathPart.slice(hashIndex);
-    pathPart = pathPart.slice(0, hashIndex);
-  }
 
   const queryIndex = pathPart.indexOf("?");
   if (queryIndex !== -1) {
@@ -41,10 +44,10 @@ export function resolveStoredFileUrl(raw) {
   const encodedPath = normalized
     .split("/")
     .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
+    .map(encodePathSegment)
     .join("/");
 
   const querySuffix = query ? `?${query}` : "";
 
-  return `${FILE_SERVE_PREFIX}${encodedPath}${querySuffix}${hash}`;
+  return `${FILE_SERVE_PREFIX}${encodedPath}${querySuffix}`;
 }

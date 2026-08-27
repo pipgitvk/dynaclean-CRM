@@ -2,6 +2,50 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 
+async function findExistingPath(candidates) {
+  for (const candidate of candidates) {
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/** Recover files when "#" in the filename was stripped by the browser as a URL fragment. */
+async function findPathByTruncatedBasename(decodedPath, baseCandidates) {
+  const basename = path.basename(decodedPath);
+  if (!basename || path.extname(basename)) return null;
+
+  const parentDirs = new Set(
+    baseCandidates.map((candidate) => path.dirname(candidate)),
+  );
+
+  for (const parentDir of parentDirs) {
+    try {
+      const entries = await fs.readdir(parentDir);
+      const match = entries.find(
+        (name) => name.startsWith(basename) && path.extname(name),
+      );
+      if (match) {
+        const resolved = path.join(parentDir, match);
+        try {
+          await fs.access(resolved);
+          return resolved;
+        } catch {
+          continue;
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 export async function GET(req, { params }) {
   try {
     const { path: filePath } = await params;
@@ -26,31 +70,23 @@ export async function GET(req, { params }) {
       path.join(process.cwd(), "public", decodedPath),
     ];
 
-    let targetPath = null;
-    let fileExists = false;
+    let targetPath = await findExistingPath(possiblePaths);
 
-    // Check each possible path
-    for (const possiblePath of possiblePaths) {
-      try {
-        await fs.access(possiblePath);
-        targetPath = possiblePath;
-        fileExists = true;
-        break;
-      } catch {
-        // File doesn't exist at this path, continue checking
-        continue;
-      }
+    if (!targetPath) {
+      targetPath = await findPathByTruncatedBasename(decodedPath, possiblePaths);
     }
 
-    if (!fileExists) {
+    if (!targetPath) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
+
+    const resolvedBasename = path.basename(targetPath);
 
     // Read the file
     const fileBuffer = await fs.readFile(targetPath);
     
     // Get file extension to determine content type
-    const ext = path.extname(decodedPath).toLowerCase();
+    const ext = path.extname(resolvedBasename).toLowerCase();
     let contentType = "application/octet-stream";
     
     switch (ext) {
@@ -124,7 +160,7 @@ export async function GET(req, { params }) {
     return new Response(fileBuffer, {
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `inline; filename="${path.basename(decodedPath)}"`,
+        "Content-Disposition": `inline; filename="${resolvedBasename}"`,
         "Cache-Control": "public, max-age=31536000", // Cache for 1 year
       },
     });
