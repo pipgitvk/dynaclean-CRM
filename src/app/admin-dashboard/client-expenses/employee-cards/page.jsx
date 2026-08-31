@@ -25,12 +25,11 @@ export default async function EmployeeCardsPage() {
   let error = null;
   try {
     const conn = await getDbConnection();
-    // Fetch only employees who are active in rep_list AND have expenses
+    // Fetch employees (both active and inactive) who have expenses
     const [result] = await conn.execute(
       `SELECT DISTINCT r.username 
        FROM rep_list r
        INNER JOIN expenses e ON r.username = e.username
-       WHERE r.status = 1 
        ORDER BY r.username ASC`
     );
     
