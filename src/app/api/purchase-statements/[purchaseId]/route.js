@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
+import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
 
 export async function GET(req, { params }) {
   try {
@@ -29,31 +30,47 @@ export async function GET(req, { params }) {
     }
     
     const purchase = purchases[0];
-    let linkedStatementIds = [];
-    
-    // Parse linked statement trans_ids
-    if (purchase.linked_statement_ids) {
-      try {
-        linkedStatementIds = JSON.parse(purchase.linked_statement_ids);
-      } catch (e) {
-        console.warn(`Invalid JSON in linked_statement_ids for purchase ${purchaseId}`);
-        linkedStatementIds = [];
+    const linkedTokens = parseLinkedStatementIds(purchase.linked_statement_ids);
+    const transIdTokens = [];
+    const numericIdTokens = [];
+
+    for (const token of linkedTokens) {
+      const value = String(token).trim();
+      if (!value) continue;
+      if (/^\d+$/.test(value)) {
+        numericIdTokens.push(Number(value));
       }
+      transIdTokens.push(value);
     }
-    
+
     let statements = [];
-    
-    // Get statement details if there are linked trans_ids
-    if (linkedStatementIds.length > 0) {
-      const placeholders = linkedStatementIds.map(() => '?').join(',');
+
+    if (transIdTokens.length > 0 || numericIdTokens.length > 0) {
+      const conditions = [];
+      const params = [];
+
+      if (transIdTokens.length > 0) {
+        conditions.push(`trans_id IN (${transIdTokens.map(() => "?").join(", ")})`);
+        params.push(...transIdTokens);
+      }
+      if (numericIdTokens.length > 0) {
+        conditions.push(`id IN (${numericIdTokens.map(() => "?").join(", ")})`);
+        params.push(...numericIdTokens);
+      }
+
       const [stmtRows] = await conn.execute(
         `SELECT id, trans_id, date, description, amount, type, invoice_status
-         FROM statements 
-         WHERE trans_id IN (${placeholders})
+         FROM statements
+         WHERE ${conditions.join(" OR ")}
          ORDER BY date DESC, id DESC`,
-        linkedStatementIds
+        params
       );
-      statements = stmtRows;
+      const seen = new Set();
+      statements = stmtRows.filter((row) => {
+        if (seen.has(row.id)) return false;
+        seen.add(row.id);
+        return true;
+      });
     }
     
     // Calculate totals

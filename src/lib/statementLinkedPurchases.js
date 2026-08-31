@@ -28,6 +28,24 @@ export function parseLinkedPurchaseTokens(rawVal) {
   return out;
 }
 
+/** Parse product_stock_request.linked_statement_ids JSON or comma string */
+export function parseLinkedStatementIds(rawVal) {
+  if (rawVal == null || String(rawVal).trim() === "") return [];
+  if (Array.isArray(rawVal)) return rawVal.filter((v) => v != null && String(v).trim() !== "");
+  try {
+    const parsed = JSON.parse(String(rawVal));
+    if (Array.isArray(parsed)) {
+      return parsed.filter((v) => v != null && String(v).trim() !== "");
+    }
+  } catch {
+    // fall through to comma split
+  }
+  return String(rawVal)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /** Parse invoices.linked_trans_ids JSON or comma string → array of trans_id strings */
 export function parseLinkedTransIds(rawVal) {
   if (rawVal == null || String(rawVal).trim() === "") return [];

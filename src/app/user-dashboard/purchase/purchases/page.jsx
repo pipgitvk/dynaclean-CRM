@@ -9,6 +9,7 @@ import ExcelJS from "exceljs";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useUser } from "@/context/UserContext";
+import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
 
 const formatDisplayDate = (value) => {
   if (!value) return "—";
@@ -479,6 +480,118 @@ function EditCustomerModal({ open, onClose, record, onSaved }) {
   );
 }
 
+const parseLinkedPurchaseIds = (raw) => {
+  if (raw == null || String(raw).trim() === "") return [];
+  let arr = null;
+  try {
+    const parsed = JSON.parse(String(raw));
+    if (Array.isArray(parsed)) arr = parsed;
+  } catch {
+    arr = String(raw).split(",");
+  }
+  const ids = [];
+  for (const v of arr) {
+    if (v == null) continue;
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) {
+      ids.push(Math.trunc(v));
+      continue;
+    }
+    const s = String(v).trim().toUpperCase();
+    if (!s) continue;
+    if (/^PP\d+$/.test(s)) {
+      const n = Number(s.slice(2));
+      if (Number.isFinite(n) && n > 0) ids.push(n);
+      continue;
+    }
+    if (/^\d+$/.test(s)) {
+      const n = Number(s);
+      if (Number.isFinite(n) && n > 0) ids.push(n);
+      continue;
+    }
+  }
+  return ids;
+};
+
+function buildPaymentLinkMaps(statements, purchases) {
+  const next = new Set();
+  const transMap = {};
+  const stmtMap = {};
+
+  const addLink = (pid, stmt) => {
+    if (!Number.isFinite(pid) || pid <= 0) return;
+    next.add(pid);
+    if (!transMap[pid]) transMap[pid] = [];
+    if (stmt?.trans_id && !transMap[pid].includes(stmt.trans_id)) {
+      transMap[pid].push(stmt.trans_id);
+    }
+    if (!stmtMap[pid]) stmtMap[pid] = [];
+    if (stmt?.id != null && !stmtMap[pid].includes(Number(stmt.id))) {
+      stmtMap[pid].push(Number(stmt.id));
+    }
+  };
+
+  const addTransToken = (pid, token) => {
+    if (!Number.isFinite(pid) || pid <= 0 || token == null) return;
+    const value = String(token).trim();
+    if (!value) return;
+    next.add(pid);
+    if (!transMap[pid]) transMap[pid] = [];
+    if (!transMap[pid].includes(value)) {
+      transMap[pid].push(value);
+    }
+  };
+
+  for (const s of statements) {
+    const ids = parseLinkedPurchaseIds(s?.linked_purchase_ids);
+    for (const id of ids) {
+      addLink(id, s);
+    }
+  }
+
+  const byTransId = new Map();
+  const byId = new Map();
+  for (const s of statements) {
+    if (s?.trans_id != null) byTransId.set(String(s.trans_id), s);
+    if (s?.id != null) byId.set(Number(s.id), s);
+  }
+
+  for (const p of purchases) {
+    const pid = Number(p?.id);
+    const tokens = parseLinkedStatementIds(p?.linked_statement_ids);
+    for (const token of tokens) {
+      const value = String(token).trim();
+      if (!value) continue;
+
+      const matchedByTransId = byTransId.get(value);
+      if (matchedByTransId) {
+        addLink(pid, matchedByTransId);
+        continue;
+      }
+
+      if (/^\d+$/.test(value)) {
+        const matchedById = byId.get(Number(value));
+        if (matchedById) {
+          addLink(pid, matchedById);
+          continue;
+        }
+      }
+
+      addTransToken(pid, value);
+    }
+  }
+
+  const transDisplayMap = {};
+  for (const pid in transMap) {
+    transDisplayMap[pid] = transMap[pid].join(", ");
+  }
+
+  return {
+    linkedPurchaseIds: next,
+    transDisplayMap,
+    stmtMap,
+  };
+}
+
 function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementIds, userRole }) {
   const [loading, setLoading] = useState(false);
   const [statements, setStatements] = useState([]);
@@ -534,6 +647,17 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
     return keys;
   };
 
+  const hasPurchaseId = (stmt) => {
+    const pid = Number(purchase?.id);
+    if (!Number.isFinite(pid) || pid <= 0) return false;
+    return getLinkedKeys(stmt).includes(`PP${pid}`);
+  };
+
+  const isStatementLinkedToPurchase = (stmt) => {
+    if (hasPurchaseId(stmt)) return true;
+    return Array.isArray(currentStatementIds) && currentStatementIds.includes(Number(stmt?.id));
+  };
+
   const { currentTotal, myKey } = useMemo(() => {
     const pid = Number(purchase?.id);
     const key = Number.isFinite(pid) && pid > 0 ? `PP${pid}` : "";
@@ -541,16 +665,13 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
       if (getLinkedKeys(s).includes(key)) {
         return acc + Number(s.amount || 0);
       }
+      if (Array.isArray(currentStatementIds) && currentStatementIds.includes(Number(s?.id))) {
+        return acc + Number(s.amount || 0);
+      }
       return acc;
     }, 0);
     return { currentTotal: total, myKey: key };
-  }, [statements, purchase?.id]);
-
-  const hasPurchaseId = (stmt) => {
-    const pid = Number(purchase?.id);
-    if (!Number.isFinite(pid) || pid <= 0) return false;
-    return getLinkedKeys(stmt).includes(`PP${pid}`);
-  };
+  }, [statements, purchase?.id, currentStatementIds]);
 
   const eligibleStatements = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -574,7 +695,7 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
 
     // Filter to show only selected (linked to current purchase) if checkbox is checked
     if (showOnlySelected) {
-      rows = rows.filter((s) => hasPurchaseId(s));
+      rows = rows.filter((s) => isStatementLinkedToPurchase(s));
     }
 
     if (q) {
@@ -732,7 +853,7 @@ function LinkPaymentModal({ open, onClose, purchase, onLinked, currentStatementI
                 </tr>
               ) : (
                 eligibleStatements.map((s) => {
-                  const alreadyLinkedToThis = hasPurchaseId(s);
+                  const alreadyLinkedToThis = isStatementLinkedToPurchase(s);
                   const linkedKeys = getLinkedKeys(s);
                   const myKey = purchase?.id != null ? `PP${Number(purchase.id)}` : "";
                   const linkedToOther = linkedKeys.length > 0 && !linkedKeys.includes(myKey);
@@ -812,8 +933,7 @@ export default function PurchasesPage() {
   const [editCustomerRecord, setEditCustomerRecord] = useState(null);
 
   useEffect(() => {
-    loadPurchases();
-    loadLinkedPurchaseIds();
+    loadPurchaseData();
   }, []);
 
   const loadPurchases = async () => {
@@ -822,12 +942,12 @@ export default function PurchasesPage() {
       const res = await fetch("/api/stock-request");
       if (res.ok) {
         const data = await res.json();
-        setPurchases(
-          (Array.isArray(data) ? data : []).map((row) => {
-            const { category, sub_category } = resolvePurchaseCategory(row);
-            return { ...row, category, sub_category };
-          })
-        );
+        const rows = (Array.isArray(data) ? data : []).map((row) => {
+          const { category, sub_category } = resolvePurchaseCategory(row);
+          return { ...row, category, sub_category };
+        });
+        setPurchases(rows);
+        return rows;
       }
     } catch (error) {
       console.error("Error loading purchases:", error);
@@ -835,78 +955,25 @@ export default function PurchasesPage() {
     } finally {
       setLoading(false);
     }
+    return [];
   };
 
-  const parseLinkedPurchaseIds = (raw) => {
-    if (raw == null || String(raw).trim() === "") return [];
-    let arr = null;
-    try {
-      const parsed = JSON.parse(String(raw));
-      if (Array.isArray(parsed)) arr = parsed;
-    } catch {
-      arr = String(raw).split(",");
-    }
-    const ids = [];
-    for (const v of arr) {
-      if (v == null) continue;
-      if (typeof v === "number" && Number.isFinite(v) && v > 0) {
-        ids.push(Math.trunc(v));
-        continue;
-      }
-      const s = String(v).trim().toUpperCase();
-      if (!s) continue;
-      if (/^PP\d+$/.test(s)) {
-        const n = Number(s.slice(2));
-        if (Number.isFinite(n) && n > 0) ids.push(n);
-        continue;
-      }
-      if (/^\d+$/.test(s)) {
-        const n = Number(s);
-        if (Number.isFinite(n) && n > 0) ids.push(n);
-        continue;
-      }
-    }
-    return ids;
-  };
-
-  const loadLinkedPurchaseIds = async () => {
+  const loadLinkedPurchaseIds = async (purchaseRows = purchases) => {
     try {
       const res = await fetch("/api/statements", { credentials: "include" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return;
       const rows = Array.isArray(data?.statements) ? data.statements : [];
-      const next = new Set();
-      const transMap = {};
-      const stmtMap = {};
-      for (const s of rows) {
-        const ids = parseLinkedPurchaseIds(s?.linked_purchase_ids);
-        for (const id of ids) {
-          next.add(id);
-          const pid = Number(id);
-          if (Number.isFinite(pid) && pid > 0) {
-            // Aggregate trans IDs
-            if (!transMap[pid]) transMap[pid] = [];
-            if (s.trans_id && !transMap[pid].includes(s.trans_id)) {
-              transMap[pid].push(s.trans_id);
-            }
-            // Aggregate statement IDs
-            if (!stmtMap[pid]) stmtMap[pid] = [];
-            if (s.id && !stmtMap[pid].includes(Number(s.id))) {
-              stmtMap[pid].push(Number(s.id));
-            }
-          }
-        }
-      }
-      // Convert arrays to comma-separated strings for display
-      const transDisplayMap = {};
-      for (const pid in transMap) {
-        transDisplayMap[pid] = transMap[pid].join(", ");
-      }
-
-      setLinkedPurchaseIds(next);
-      setPaymentTransByPurchaseId(transDisplayMap);
-      setPaymentStatementByPurchaseId(stmtMap);
+      const maps = buildPaymentLinkMaps(rows, purchaseRows);
+      setLinkedPurchaseIds(maps.linkedPurchaseIds);
+      setPaymentTransByPurchaseId(maps.transDisplayMap);
+      setPaymentStatementByPurchaseId(maps.stmtMap);
     } catch {}
+  };
+
+  const loadPurchaseData = async () => {
+    const rows = await loadPurchases();
+    await loadLinkedPurchaseIds(rows);
   };
 
   const markPurchaseLinked = (purchaseId, statementId, transId, action = "link") => {
@@ -1770,14 +1837,14 @@ export default function PurchasesPage() {
       )}
 
       {/* Edit Transport Modal */}
-      <EditTransportModal open={editOpen} onClose={() => setEditOpen(false)} record={editRecord} onSaved={loadPurchases} />
+      <EditTransportModal open={editOpen} onClose={() => setEditOpen(false)} record={editRecord} onSaved={loadPurchaseData} />
 
       {/* Edit Customer Modal */}
       <EditCustomerModal 
         open={editCustomerOpen} 
         onClose={() => { setEditCustomerOpen(false); setEditCustomerRecord(null); }} 
         record={editCustomerRecord} 
-        onSaved={loadPurchases} 
+        onSaved={loadPurchaseData} 
       />
 
       {/* Link Payment Modal */}
@@ -1797,7 +1864,7 @@ export default function PurchasesPage() {
         selectedPurchaseIds={selectedPurchaseIds}
         selectedNetAmount={selectedTotals.selectedNetAmount}
         purchases={purchases}
-        onLinkSuccess={() => { setSelectedPurchaseIds(new Set()); loadLinkedPurchaseIds(); }}
+        onLinkSuccess={() => { setSelectedPurchaseIds(new Set()); loadPurchaseData(); }}
       />
 
       {/* Preview Modal */}

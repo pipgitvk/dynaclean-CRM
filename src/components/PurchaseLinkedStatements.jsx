@@ -176,7 +176,7 @@ export default function PurchaseLinkedStatements({ purchaseId, onClose }) {
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
           >
             Close
-          </div>
+          </button>
         </div>
       </div>
     </div>
