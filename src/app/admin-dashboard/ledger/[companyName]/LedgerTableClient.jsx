@@ -422,8 +422,8 @@ export default function LedgerTableClient({ rows: initialRows, companyName, cust
                   <td className="px-4 py-3 whitespace-nowrap text-gray-700">
                     {dayjs(row.entry_date).format("DD MMM YYYY")}
                   </td>
-                  <td className="px-4 py-3 text-gray-800 max-w-xs">{row.particulars}</td>
-                  <td className="px-4 py-3"><VchBadge type={row.vch_type} /></td>
+                  <td className="px-4 py-3 text-gray-800 max-w-xs break-all">{row.particulars}</td>
+                  <td className="px-4 py-3 whitespace-nowrap"><VchBadge type={row.vch_type} /></td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{row.vch_no || "—"}</td>
                   <td className="px-4 py-3 text-right font-mono text-red-600 whitespace-nowrap">
                     {Number(row.debit) > 0 ? `₹${fmt(row.debit)}` : "—"}
