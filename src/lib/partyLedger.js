@@ -363,9 +363,19 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   const purchaseTokenSet = new Set();
   const tokenToSource = {};
   for (const purch of purchaseRows) {
-    const token =
-      purch.purchase_source === "spare" ? `PS${purch.id}` : `PP${purch.id}`;
+    // Spares stored in product_stock_request use PP{id} tokens (same as products).
+    // Only true spare_stock_request rows (purchase_source === "spare" AND from spare_stock_request)
+    // would use PS{id}, but those are fetched separately and have their own id space.
+    // Since all purchases here come from product_stock_request (or spare_stock_request aliased),
+    // we always use PP{id} so it matches what's stored in statements.linked_purchase_ids.
+    const token = `PP${purch.id}`;
     purchaseTokenSet.add(token);
+    // Also add PS token as fallback for any legacy spare_stock_request links
+    if (purch.purchase_source === "spare") {
+      const psToken = `PS${purch.id}`;
+      purchaseTokenSet.add(psToken);
+      tokenToSource[psToken] = "spare";
+    }
     tokenToSource[token] = purch.purchase_source;
   }
 
@@ -553,7 +563,7 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     seenPaymentStmtIds.add(stmt.id);
     const stmtDate = stmt.date ? String(stmt.date).slice(0, 10) : null;
     if (!stmtDate) continue;
-    const isSparePayment = matchingTokens.every(
+    const isSparePayment = matchingTokens.some(
       (t) => t.startsWith("PS") || tokenToSource[t] === "spare"
     );
     derivedLedger.push({
