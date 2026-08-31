@@ -3,6 +3,7 @@ export const TL_POSTPONDING_DECLINED_TAG = "Postponding/Declined";
 
 export const BASE_TL_TAG_OPTIONS = [
   "Demo",
+  "Physical-Demo",
   "Prime",
   "Repeat order",
   "Mail",
@@ -27,6 +28,7 @@ export function getTlTagOptions() {
 /** Tag filter order on TL customers list (`TLCustomersTable`) */
 export const TL_CUSTOMERS_TABLE_BASE_TAGS = [
   "Demo",
+  "Physical-Demo",
   "Payment Collection",
   "Truck FollowUp",
   "Strong FollowUp",
@@ -76,6 +78,9 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
 
   if (norm.includes("payment") && norm.includes("collection")) {
     return `${base} bg-purple-600 text-white`;
+  }
+  if (norm.includes("physical") && norm.includes("demo")) {
+    return `${base} bg-indigo-600 text-white border border-indigo-700/90 font-semibold`;
   }
   if (norm.includes("service") && norm.includes("issue")) {
     return `${base} bg-pink-500 text-white`;
