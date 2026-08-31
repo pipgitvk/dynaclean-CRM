@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbConnection } from "@/lib/db";
 import { getSessionPayload } from "@/lib/auth";
 import { EXCLUDE_PROFORMA_INVOICE_SQL } from "@/lib/ledgerInvoiceFilters";
+import { parseLinkedStatementIds } from "@/lib/statementLinkedPurchases";
 
 function parseTransIds(raw) {
   if (!raw) return [];
@@ -302,6 +303,7 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       invoice_number,
       net_amount,
       client_name,
+      linked_statement_ids,
       CASE
         WHEN EXISTS (
           SELECT 1 FROM spare_list sl
@@ -386,10 +388,19 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
     }
   }
 
+  // Also collect trans_ids stored directly on purchases (product_stock_request.linked_statement_ids)
+  const transIdsFromPurchases = new Set();
+  for (const purch of purchaseRows) {
+    const tokens = parseLinkedStatementIds(purch.linked_statement_ids);
+    for (const t of tokens) {
+      if (t) transIdsFromPurchases.add(String(t).trim());
+    }
+  }
+
   const relevantStatements = await fetchRelevantStatements(conn, {
     invoiceIds: [...buyerInvoiceIds],
     invoiceNumbers: [...buyerInvoiceNumbers],
-    transIds: [...transIdsFromInvoices],
+    transIds: [...transIdsFromInvoices, ...transIdsFromPurchases],
     purchaseTokens: [...purchaseTokenSet],
   });
 
@@ -558,21 +569,18 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
       (t) =>
         (t.startsWith("PP") || t.startsWith("PS")) && purchaseTokenSet.has(t)
     );
-    if (matchingTokens.length === 0 || seenPaymentStmtIds.has(stmt.id))
+    // Also match if this statement's trans_id was found via purchase's linked_statement_ids
+    const foundViaPurchase = transIdsFromPurchases.has(stmt.trans_id);
+    if ((matchingTokens.length === 0 && !foundViaPurchase) || seenPaymentStmtIds.has(stmt.id))
       continue;
     seenPaymentStmtIds.add(stmt.id);
     const stmtDate = stmt.date ? String(stmt.date).slice(0, 10) : null;
     if (!stmtDate) continue;
-    const isSparePayment = matchingTokens.some(
-      (t) => t.startsWith("PS") || tokenToSource[t] === "spare"
-    );
     derivedLedger.push({
       id: `pmt-${stmt.id}`,
       entry_date: stmtDate,
-      particulars: stmt.description
-        ? stmt.description
-        : `${isSparePayment ? "Spare" : "Payment"} – ${stmt.trans_id}`,
-      vch_type: isSparePayment ? "Spare" : "Payment",
+      particulars: stmt.description || `Payment – ${stmt.trans_id}`,
+      vch_type: "Payment",
       vch_no: String(stmt.trans_id),
       debit: Math.abs(Number(stmt.amount) || 0),
       credit: 0,
