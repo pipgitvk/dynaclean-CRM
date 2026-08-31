@@ -134,7 +134,9 @@ export async function GET(req) {
     if (expenseId) {
       [rows] = await conn.execute(
         `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.failed_transaction_id, s.cancelled_transaction_id, s.created_at,
-                GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
+                GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids,
+                s.description as particulars,
+                s.description as remark
          FROM statements s
          LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
          WHERE s.client_expense_id = ?
@@ -144,7 +146,9 @@ export async function GET(req) {
       );
     } else if (status === "unsettled") {
       let query = `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.failed_transaction_id, s.cancelled_transaction_id, s.created_at,
-         GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
+         GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids,
+         s.description as particulars,
+         s.description as remark
          FROM statements s
          LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
          WHERE (s.invoice_status IS NULL OR s.invoice_status = 'Unsettled' OR s.invoice_status = '')
@@ -163,7 +167,9 @@ export async function GET(req) {
     } else {
       [rows] = await conn.execute(
         `SELECT s.id, s.trans_id, s.date, s.txn_dated_deb, s.txn_posted_date, s.cheq_no, s.description, s.type, s.amount, s.closing_balance, s.client_expense_id, s.invoice_number, s.invoice_status, s.linked_purchase_ids, s.dd_id, s.linked_module_type, s.linked_module_id, s.failed_transaction_id, s.cancelled_transaction_id, s.created_at,
-         GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids
+         GROUP_CONCAT(DISTINCT sal.asset_id SEPARATOR ',') AS linked_asset_ids,
+         s.description as particulars,
+         s.description as remark
          FROM statements s
          LEFT JOIN statement_asset_links sal ON sal.statement_id = s.id
          GROUP BY s.id

@@ -89,8 +89,7 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
     const query = search.toLowerCase();
     return (
       String(s.trans_id || "").toLowerCase().includes(query) ||
-      String(s.remark || "").toLowerCase().includes(query) ||
-      String(s.particulars || "").toLowerCase().includes(query) ||
+      String(s.description || "").toLowerCase().includes(query) ||
       String(s.amount || "").includes(query)
     );
   });
@@ -256,8 +255,7 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
                     <th className="px-4 py-3 font-semibold text-gray-700">ID</th>
                     <th className="px-4 py-3 font-semibold text-gray-700">Trans ID</th>
                     <th className="px-4 py-3 font-semibold text-gray-700">Date</th>
-                    <th className="px-4 py-3 font-semibold text-gray-700">Particulars</th>
-                    <th className="px-4 py-3 font-semibold text-gray-700">Remark</th>
+                    <th className="px-4 py-3 font-semibold text-gray-700">Description</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-right">Amount</th>
                     <th className="px-4 py-3 font-semibold text-gray-700 text-center">Action</th>
                   </tr>
@@ -285,11 +283,8 @@ export default function LinkStatementModal({ isOpen, onClose, asset, onLinked })
                             ? new Date(stmt.date).toLocaleDateString("en-IN")
                             : "—"}
                         </td>
-                        <td className="px-4 py-3 text-gray-700 max-w-xs truncate">
-                          {stmt.particulars || "—"}
-                        </td>
-                        <td className="px-4 py-3 text-gray-700 text-sm max-w-xs truncate">
-                          {stmt.remark || "—"}
+                        <td className="px-4 py-3 text-gray-700 max-w-sm truncate">
+                          {stmt.description || "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-red-600">
                           ₹{Number(stmt.amount || 0).toLocaleString("en-IN")}
