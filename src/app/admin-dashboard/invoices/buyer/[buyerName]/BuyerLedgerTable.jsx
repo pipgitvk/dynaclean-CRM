@@ -667,11 +667,11 @@ left("Closing Balance", col.particulars, y, 9, true);
                     {dayjs(row.entry_date).format("DD MMM YYYY")}
                   </td>
 
-                  <td className="px-4 py-3 text-gray-800 max-w-xs">
+                  <td className="px-4 py-3 text-gray-800 max-w-xs break-all">
                     {row.particulars}
                   </td>
 
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 whitespace-nowrap">
                     <VchBadge type={row.vch_type} />
                   </td>
 

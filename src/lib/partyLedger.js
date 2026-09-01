@@ -318,10 +318,15 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   `;
 
   const purchaseById = new Map();
-  const addPurchases = (rows) => {
+  // Track which purchase ids came from customer_id match (buyer side)
+  const buyerPurchaseIds = new Set();
+  const addPurchases = (rows, isBuyer = false) => {
     for (const row of rows) {
       const key = `${row.purchase_source}-${row.id}`;
-      if (!purchaseById.has(key)) purchaseById.set(key, row);
+      if (!purchaseById.has(key)) {
+        purchaseById.set(key, row);
+        if (isBuyer) buyerPurchaseIds.add(key);
+      }
     }
   };
 
@@ -333,7 +338,7 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
        ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
       [customerIdForCompany],
     );
-    addPurchases(pRows);
+    addPurchases(pRows, true);
     try {
       const [spareRows] = await conn.execute(
         `SELECT
@@ -342,13 +347,14 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
            NULL AS invoice_number,
            net_amount,
            client_name,
+           NULL AS linked_statement_ids,
            'spare' AS purchase_source
          FROM spare_stock_request
          WHERE customer_id = ?
          ORDER BY created_at DESC, id DESC`,
         [customerIdForCompany],
       );
-      addPurchases(spareRows);
+      addPurchases(spareRows, true);
     } catch (_) {}
   }
 
@@ -359,7 +365,9 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
      ORDER BY COALESCE(invoice_date, DATE(created_at)) DESC, id DESC`,
     [decodedCompany],
   );
-  addPurchases(supplierPurchases);
+  // Supplier purchases: NOT marked as buyer — don't use their linked_statement_ids
+  // to avoid pulling in payments that belong to other parties
+  addPurchases(supplierPurchases, false);
 
   const purchaseRows = Array.from(purchaseById.values());
   const purchaseTokenSet = new Set();
@@ -389,8 +397,11 @@ export async function buildLedgerForParty(decodedCompany, customerIdFilter = nul
   }
 
   // Also collect trans_ids stored directly on purchases (product_stock_request.linked_statement_ids)
+  // Only from buyer-side purchases (customer_id match) to avoid picking up
+  // payments that belong to other parties via supplier-side purchases
   const transIdsFromPurchases = new Set();
-  for (const purch of purchaseRows) {
+  for (const [key, purch] of purchaseById.entries()) {
+    if (!buyerPurchaseIds.has(key)) continue; // skip supplier-side purchases
     const tokens = parseLinkedStatementIds(purch.linked_statement_ids);
     for (const t of tokens) {
       if (t) transIdsFromPurchases.add(String(t).trim());
