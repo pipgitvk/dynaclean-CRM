@@ -10,6 +10,8 @@ export default function ManualLeadModal({ show, onClose }) {
   const [selectedSource, setSelectedSource] = useState("");
   const [leadCampaign, setLeadCampaign] = useState("");
   const [followupNotes, setFollowupNotes] = useState("");
+  const [salesReps, setSalesReps] = useState([]);
+  const [assignActiveTo, setAssignActiveTo] = useState("");
   const { user } = useUser();
 
   useEffect(() => {
@@ -17,7 +19,6 @@ export default function ManualLeadModal({ show, onClose }) {
       fetch("/api/lead-sources")
         .then((res) => res.json())
         .then((data) => {
-          // Handle the API response structure correctly
           if (data.success && data.employees) {
             setLeadSources(data.employees.map(emp => emp.username));
           } else {
@@ -27,6 +28,21 @@ export default function ManualLeadModal({ show, onClose }) {
         .catch((error) => {
           console.error("Error fetching lead sources:", error);
           setLeadSources([]);
+        });
+
+      // Fetch sales reps from rep_list
+      fetch("/api/tl-assign-lead")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.employees) {
+            setSalesReps(data.employees.map(emp => emp.username));
+          } else {
+            setSalesReps([]);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching sales reps:", error);
+          setSalesReps([]);
         });
     }
   }, [show]);
@@ -108,6 +124,7 @@ export default function ManualLeadModal({ show, onClose }) {
     setSelectedSource("");
     setLeadCampaign("");
     setFollowupNotes("");
+    setAssignActiveTo("");
   };
 
   const submitLead = async () => {
@@ -125,7 +142,7 @@ export default function ManualLeadModal({ show, onClose }) {
       followup_notes: followupNotes,
       communication_history: "",
       products_interest: analyzed.product,
-      sales_representative: selectedSource,
+      sales_representative: assignActiveTo || selectedSource,
       assigned_to: user?.username || "",
       tags: "",
       notes: followupNotes,
@@ -286,6 +303,21 @@ export default function ManualLeadModal({ show, onClose }) {
                     }))}
                   />
                 </div>
+              </label>
+              <label className="block text-sm sm:text-base">
+                Assign Active To:
+                <select
+                  value={assignActiveTo}
+                  onChange={(e) => setAssignActiveTo(e.target.value)}
+                  className="w-full border p-1 rounded text-sm sm:text-base mt-1"
+                >
+                  <option value="">Select sales rep</option>
+                  {salesReps.map((rep) => (
+                    <option key={rep} value={rep}>
+                      {rep}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="text-sm text-gray-600">
                 Assigned By (you): {user?.username || "-"}
