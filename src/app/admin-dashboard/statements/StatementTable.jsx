@@ -874,7 +874,7 @@ export default function StatementTable({ rows }) {
             <Trash2 size={16} />
             {deletingAll ? "Deleting..." : "Delete All"}
           </button>
-          <button
+          {/* <button
             type="button"
             onClick={handleFixInvoiceStatus}
             disabled={fixingStatus}
@@ -882,7 +882,7 @@ export default function StatementTable({ rows }) {
             title="Fix invoice_status for already-linked statements that still show Unsettled"
           >
             {fixingStatus ? "Fixing..." : "Fix Settled Status"}
-          </button>
+          </button> */}
         </div>
       </div>
 
