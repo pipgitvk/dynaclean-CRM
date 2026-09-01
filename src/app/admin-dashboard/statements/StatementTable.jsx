@@ -46,6 +46,7 @@ export default function StatementTable({ rows }) {
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [fixingStatus, setFixingStatus] = useState(false);
   const [skippedRows, setSkippedRows] = useState([]);
   const [showSkippedModal, setShowSkippedModal] = useState(false);
   const [selectedSkipped, setSelectedSkipped] = useState(new Set());
@@ -129,6 +130,12 @@ export default function StatementTable({ rows }) {
       }
       const s = String(v).trim().toUpperCase();
       if (!s) continue;
+      if (/^IP\d+$/.test(s)) {
+        // Invoice-linked token — treat as settled
+        const id = Number(s.slice(2));
+        if (Number.isFinite(id) && id > 0) out.push({ prefix: "IP", id });
+        continue;
+      }
       if (/^(PP|PS|SP)\d+$/.test(s)) {
         const prefix = s.startsWith("SP") ? "PS" : s.slice(0, 2);
         const id = Number(s.slice(2));
@@ -151,7 +158,8 @@ export default function StatementTable({ rows }) {
     if (row?.client_expense_id) return true;
     if (row?.dd_id) return true;
     if (row?.linked_module_id && row?.linked_module_type === 'Assets') return true;
-    if (linked.length > 0) return true;
+    if (linked.length > 0) return true; // includes IP-prefixed invoice tokens
+    if (row?.invoice_number != null && String(row.invoice_number).trim() !== "") return true;
     if (row?.failed_transaction_id != null && String(row.failed_transaction_id).trim() !== "") return true;
     if (row?.cancelled_transaction_id != null && String(row.cancelled_transaction_id).trim() !== "") return true;
     return false;
@@ -162,11 +170,12 @@ export default function StatementTable({ rows }) {
     const inv = row?.invoice_status != null ? String(row.invoice_status).trim() : "";
     if (row?.failed_transaction_id != null && String(row.failed_transaction_id).trim() !== "") return "Failed";
     if (row?.cancelled_transaction_id != null && String(row.cancelled_transaction_id).trim() !== "") return "Cancelled";
-    if (linked.length > 0) return "Settled";
+    if (linked.length > 0) return "Settled"; // includes IP-prefixed invoice tokens
     if (row?.client_expense_id) return "Settled";
     if (row?.dd_id) return "Settled";
     if (row?.linked_module_id && row?.linked_module_type === 'Assets') return "Settled";
     if (inv) return inv;
+    if (row?.invoice_number != null && String(row.invoice_number).trim() !== "") return "Settled";
     return "Unsettled";
   };
 
@@ -699,6 +708,22 @@ export default function StatementTable({ rows }) {
     }
   };
 
+  const handleFixInvoiceStatus = async () => {
+    if (!window.confirm("Yeh action DB mein saari linked statements ka invoice_status 'Settled' kar dega. Continue?")) return;
+    setFixingStatus(true);
+    try {
+      const res = await fetch("/api/statements/fix-invoice-status", { method: "POST", credentials: "include" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Fix failed");
+      toast.success(data.message || "Fix complete");
+      router.refresh();
+    } catch (err) {
+      toast.error(err.message || "Fix failed");
+    } finally {
+      setFixingStatus(false);
+    }
+  };
+
   useEffect(() => {
     if (!modalId) {
       setExpense(null);
@@ -848,6 +873,15 @@ export default function StatementTable({ rows }) {
           >
             <Trash2 size={16} />
             {deletingAll ? "Deleting..." : "Delete All"}
+          </button>
+          <button
+            type="button"
+            onClick={handleFixInvoiceStatus}
+            disabled={fixingStatus}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Fix invoice_status for already-linked statements that still show Unsettled"
+          >
+            {fixingStatus ? "Fixing..." : "Fix Settled Status"}
           </button>
         </div>
       </div>
