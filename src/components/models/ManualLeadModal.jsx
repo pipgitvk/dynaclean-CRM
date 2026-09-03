@@ -329,10 +329,10 @@ export default function ManualLeadModal({ show, onClose }) {
               </button>
               <button
                 onClick={submitLead}
-                disabled={!selectedSource || !leadCampaign}
+                disabled={!leadCampaign}
                 className="bg-blue-600 text-white px-4 py-2 rounded shadow text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
               >
-                Send to {selectedSource || "..."}
+                Send to {selectedSource || assignActiveTo || "lead"}
               </button>
             </div>
           </>
