@@ -82,7 +82,56 @@ export async function PATCH(request) {
           { status: 409 }
         );
       }
-      
+
+      // If it was approved, undo the attendance_logs change by restoring original times
+      if (reqRow.status === "approved") {
+        const [logRows] = await conn.execute(
+          `SELECT * FROM attendance_logs WHERE username = ? AND date = ? LIMIT 1`,
+          [reqRow.username, reqRow.log_date]
+        );
+
+        if (logRows.length > 0) {
+          // If the original row had no checkin/checkout (i.e. this request created the row from an absent day),
+          // delete the inserted row entirely
+          const hadOriginalData =
+            reqRow.original_checkin_time != null ||
+            reqRow.original_checkout_time != null;
+
+          if (!hadOriginalData) {
+            await conn.execute(
+              `DELETE FROM attendance_logs WHERE username = ? AND date = ?`,
+              [reqRow.username, reqRow.log_date]
+            );
+          } else {
+            // Restore original times
+            await conn.execute(
+              `UPDATE attendance_logs SET
+                checkin_time = ?,
+                checkout_time = ?,
+                break_morning_start = ?,
+                break_morning_end = ?,
+                break_lunch_start = ?,
+                break_lunch_end = ?,
+                break_evening_start = ?,
+                break_evening_end = ?
+               WHERE username = ? AND date = ?`,
+              [
+                reqRow.original_checkin_time ?? null,
+                reqRow.original_checkout_time ?? null,
+                reqRow.original_break_morning_start ?? null,
+                reqRow.original_break_morning_end ?? null,
+                reqRow.original_break_lunch_start ?? null,
+                reqRow.original_break_lunch_end ?? null,
+                reqRow.original_break_evening_start ?? null,
+                reqRow.original_break_evening_end ?? null,
+                reqRow.username,
+                reqRow.log_date,
+              ]
+            );
+          }
+        }
+      }
+
       await conn.execute(
         `UPDATE attendance_regularization_requests SET
           status = 'pending',
@@ -92,8 +141,8 @@ export async function PATCH(request) {
          WHERE id = ?`,
         [id]
       );
-      
-      return NextResponse.json({ success: true, message: "Request reverted to pending." });
+
+      return NextResponse.json({ success: true, message: "Request reverted to pending and attendance log restored." });
     }
     
     if (reqRow.status !== "pending") {

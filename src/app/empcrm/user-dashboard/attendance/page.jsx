@@ -33,6 +33,14 @@ const AttendancePage = () => {
   const [selectedRemarks, setSelectedRemarks] = useState("");
   const [reportingManager, setReportingManager] = useState(null);
 
+  // Edit pending regularization request
+  const [editRegModal, setEditRegModal] = useState(false);
+  const [editRegRequest, setEditRegRequest] = useState(null); // the pending request row
+  const [editCheckin, setEditCheckin] = useState("");
+  const [editCheckout, setEditCheckout] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   const fetchAttendance = async () => {
     setLoading(true);
     try {
@@ -159,6 +167,64 @@ const AttendancePage = () => {
   const showRemarks = (remarks) => {
     setSelectedRemarks(remarks);
     setShowRemarksModal(true);
+  };
+
+  const showApprovalRemarks = (remarks) => {
+    setSelectedRemarks(remarks);
+    setShowRemarksModal(true);
+  };
+
+  const openEditRegModal = (pendingReq) => {
+    setEditRegRequest(pendingReq);
+    // pre-fill with the current proposed times
+    setEditCheckin(
+      pendingReq.proposed_checkin_time
+        ? String(pendingReq.proposed_checkin_time).trim().replace(" ", "T").slice(0, 16)
+        : ""
+    );
+    setEditCheckout(
+      pendingReq.proposed_checkout_time
+        ? String(pendingReq.proposed_checkout_time).trim().replace(" ", "T").slice(0, 16)
+        : ""
+    );
+    setEditReason(pendingReq.reason || "");
+    setEditRegModal(true);
+  };
+
+  const submitEditReg = async (e) => {
+    e.preventDefault();
+    if (!editReason.trim()) {
+      toast.error("Reason is required.");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const toMysql = (v) => {
+        if (!v) return null;
+        const t = String(v).trim();
+        return t.includes("T") ? `${t.replace("T", " ")}:00` : `${t}:00`;
+      };
+      const res = await fetch("/api/attendance/regularization", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editRegRequest.id,
+          checkin_time: toMysql(editCheckin),
+          checkout_time: toMysql(editCheckout),
+          reason: editReason.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Update failed.");
+      toast.success(data.message || "Request updated.");
+      setEditRegModal(false);
+      setEditRegRequest(null);
+      refreshRegularization();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const fetchReportingManager = async () => {
@@ -643,9 +709,16 @@ const AttendancePage = () => {
                     {log.type === "absent" && (
                       <div className="mt-3">
                         {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                          <span className="text-amber-700 font-medium text-sm">
-                            Pending approval
-                          </span>
+                          <div className="flex items-center gap-2 justify-center">
+                            <span className="text-amber-700 font-medium text-sm">Pending approval</span>
+                            <button
+                              type="button"
+                              onClick={() => openEditRegModal(pendingRegByDate.get(logDateKeyForReg(log)))}
+                              className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                            >
+                              Edit
+                            </button>
+                          </div>
                         ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
                           <div className="flex items-center gap-2">
                             <span className="text-red-600 font-medium text-sm">
@@ -813,7 +886,16 @@ const AttendancePage = () => {
                         {filterStatus === "regularize" && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <span className="text-amber-700 font-medium">Pending</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-amber-700 font-medium">Pending</span>
+                                <button
+                                  type="button"
+                                  onClick={() => openEditRegModal(pendingRegByDate.get(logDateKeyForReg(log)))}
+                                  className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                             ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
                               <div className="flex items-center gap-2">
                                 <span className="text-red-600 font-medium text-sm">Rejected</span>
@@ -884,9 +966,16 @@ const AttendancePage = () => {
                         {log.type === "absent" && (
                           <div className="mt-3 flex justify-center">
                             {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <span className="text-amber-700 font-medium text-sm">
-                                Pending approval
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-amber-700 font-medium text-sm">Pending approval</span>
+                                <button
+                                  type="button"
+                                  onClick={() => openEditRegModal(pendingRegByDate.get(logDateKeyForReg(log)))}
+                                  className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                             ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
                               <div className="flex items-center gap-2">
                                 <span className="text-red-600 font-medium text-sm">
@@ -933,7 +1022,16 @@ const AttendancePage = () => {
                         {filterStatus === "regularize" && (
                           <div className="mt-3 flex justify-center">
                             {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <span className="text-amber-700 font-medium text-sm">Pending</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-amber-700 font-medium text-sm">Pending</span>
+                                <button
+                                  type="button"
+                                  onClick={() => openEditRegModal(pendingRegByDate.get(logDateKeyForReg(log)))}
+                                  className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                             ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
                               <div className="flex items-center gap-2">
                                 <span className="text-red-600 font-medium text-sm">Rejected</span>
@@ -1029,6 +1127,81 @@ const AttendancePage = () => {
                 ))}
               </ul>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Pending Regularization Modal */}
+      {editRegModal && editRegRequest && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Edit pending request</h2>
+              <button
+                type="button"
+                onClick={() => { setEditRegModal(false); setEditRegRequest(null); }}
+                className="text-gray-500 hover:text-gray-800 text-xl leading-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={submitEditReg} className="p-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Date:{" "}
+                <span className="font-medium text-gray-900">
+                  {new Date(editRegRequest.log_date).toLocaleDateString()}
+                </span>
+                . Update the proposed check-in / check-out times and reason. The request stays pending with your manager.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Check-in</label>
+                <input
+                  type="datetime-local"
+                  value={editCheckin}
+                  onChange={(e) => setEditCheckin(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Check-out</label>
+                <input
+                  type="datetime-local"
+                  value={editCheckout}
+                  onChange={(e) => setEditCheckout(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Reason <span className="text-red-600">*</span>
+                </label>
+                <textarea
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  rows={3}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="Reason for regularization"
+                />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setEditRegModal(false); setEditRegRequest(null); }}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {editSaving ? "Saving…" : "Update request"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

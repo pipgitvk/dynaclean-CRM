@@ -529,3 +529,76 @@ export async function PATCH(request) {
     );
   }
 }
+
+/**
+ * PUT — Employee updates the proposed check-in/check-out of their OWN pending request.
+ * Only allowed while status = 'pending'. Reason can also be updated.
+ * Body: { id, checkin_time, checkout_time, reason }
+ */
+export async function PUT(request) {
+  try {
+    const session = await getSessionPayload();
+    if (!session?.username) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { id, checkin_time, checkout_time, reason } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "id is required" }, { status: 400 });
+    }
+
+    const conn = await getDbConnection();
+
+    // Fetch the existing request
+    const [rows] = await conn.execute(
+      `SELECT * FROM attendance_regularization_requests WHERE id = ? LIMIT 1`,
+      [id]
+    );
+    if (rows.length === 0) {
+      return NextResponse.json({ success: false, error: "Request not found." }, { status: 404 });
+    }
+
+    const req = rows[0];
+
+    // Only the owner can edit their own request
+    if (req.username !== session.username) {
+      return NextResponse.json({ success: false, error: "Forbidden." }, { status: 403 });
+    }
+
+    // Only editable while pending
+    if (req.status !== "pending") {
+      return NextResponse.json(
+        { success: false, error: "This request is no longer pending and cannot be edited." },
+        { status: 409 }
+      );
+    }
+
+    const newCheckin = normalizeMysqlDatetime(checkin_time != null ? String(checkin_time) : null);
+    const newCheckout = normalizeMysqlDatetime(checkout_time != null ? String(checkout_time) : null);
+    const newReason = reason ? String(reason).trim() : req.reason;
+
+    if (!newReason) {
+      return NextResponse.json({ success: false, error: "Reason is required." }, { status: 400 });
+    }
+
+    await conn.execute(
+      `UPDATE attendance_regularization_requests
+       SET proposed_checkin_time = ?,
+           proposed_checkout_time = ?,
+           reason = ?,
+           updated_at = NOW()
+       WHERE id = ?`,
+      [newCheckin, newCheckout, newReason, id]
+    );
+
+    return NextResponse.json({ success: true, message: "Request updated successfully." });
+  } catch (error) {
+    console.error("attendance regularization PUT:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Server error" },
+      { status: 500 }
+    );
+  }
+}
