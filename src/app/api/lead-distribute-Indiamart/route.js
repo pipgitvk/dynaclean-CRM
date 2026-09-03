@@ -57,7 +57,7 @@ export async function POST(req) {
         fields.followup_notes || "",
         fields.communication_history || "",
         fields.products_interest,
-        createdby,
+        fields.sales_representative || createdby,
         fields.assigned_to,
         fields.tags,
         fields.notes,
