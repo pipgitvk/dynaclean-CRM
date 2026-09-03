@@ -66,12 +66,12 @@ export default function PersonalInfoSection({
 
       setFiles(prev => ({ ...prev, doc_employment_confirmation_letter: file }));
       
-      // Clear the old file URL so new one is used
+      // Save the Cloudinary URL so it can be used in the email link
       setFormData(prev => ({
         ...prev,
         fileUrls: {
           ...prev.fileUrls,
-          doc_employment_confirmation_letter: null,
+          doc_employment_confirmation_letter: result.url,
         }
       }));
       

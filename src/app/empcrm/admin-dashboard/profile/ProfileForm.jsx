@@ -790,13 +790,13 @@ export default function ProfileForm({
   const sendConfirmationEmail = async () => {
     setSendingEmail(true);
     try {
-      // Get confirmation letter path and build full URL
+      // Get confirmation letter URL - prefer the saved Cloudinary URL from fileUrls
       let confirmationLetterLink = null;
-      const letterPath = formData.fileUrls?.doc_employment_confirmation_letter || 
-                        (files.doc_employment_confirmation_letter ? null : null);
+      const letterPath = formData.fileUrls?.doc_employment_confirmation_letter || null;
       
       if (letterPath) {
-        // If it's a file path, construct the full URL
+        // Cloudinary URLs are absolute (https://res.cloudinary.com/...)
+        // Local paths start with '/' and need origin prepended
         if (letterPath.startsWith('/')) {
           confirmationLetterLink = `${typeof window !== 'undefined' ? window.location.origin : ''}${letterPath}`;
         } else {
