@@ -19,6 +19,8 @@ export const BASE_TL_TAG_OPTIONS = [
   "Delhi-Visiting",
   "Tamilnadu-Visiting",
   "Municipal",
+  "Dealer/Reseller",
+  "Contractor",
 ];
 
 export function getTlTagOptions() {
@@ -44,6 +46,8 @@ export const TL_CUSTOMERS_TABLE_BASE_TAGS = [
   "Delhi-Visiting",
   "Tamilnadu-Visiting",
   "Municipal",
+  "Dealer/Reseller",
+  "Contractor",
 ];
 
 export function getTlCustomersTableTagOptions() {
@@ -120,6 +124,12 @@ export function getTlMultiTagChipClass(rawTag, variant = "table") {
   }
   if (norm === "municipal") {
     return `${base} bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold shadow-lg`;
+  }
+  if (norm === "dealer/reseller") {
+    return `${base} bg-violet-100 text-violet-800 border border-violet-300`;
+  }
+  if (norm === "contractor") {
+    return `${base} bg-amber-100 text-amber-800 border border-amber-300`;
   }
 
   return `${base} bg-slate-500 text-white`;
