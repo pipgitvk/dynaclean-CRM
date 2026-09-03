@@ -792,15 +792,26 @@ export default function ProfileForm({
     try {
       // Get confirmation letter URL - prefer the saved Cloudinary URL from fileUrls
       let confirmationLetterLink = null;
+      let confirmationLetterDownloadLink = null;
       const letterPath = formData.fileUrls?.doc_employment_confirmation_letter || null;
       
       if (letterPath) {
-        // Cloudinary URLs are absolute (https://res.cloudinary.com/...)
-        // Local paths start with '/' and need origin prepended
         if (letterPath.startsWith('/')) {
-          confirmationLetterLink = `${typeof window !== 'undefined' ? window.location.origin : ''}${letterPath}`;
+          // Local path — prepend origin for both view and download
+          const origin = typeof window !== 'undefined' ? window.location.origin : '';
+          confirmationLetterLink = `${origin}${letterPath}`;
+          confirmationLetterDownloadLink = `${origin}${letterPath}`;
+        } else if (letterPath.includes('res.cloudinary.com')) {
+          // Cloudinary URL — use fl_attachment for forced download
+          confirmationLetterLink = letterPath;
+          // Insert fl_attachment after /upload/ to force download on Cloudinary side
+          confirmationLetterDownloadLink = letterPath.replace(
+            '/upload/',
+            '/upload/fl_attachment:Employment_Confirmation_Letter/'
+          );
         } else {
           confirmationLetterLink = letterPath;
+          confirmationLetterDownloadLink = letterPath;
         }
       }
       
@@ -813,7 +824,8 @@ export default function ProfileForm({
           professional_email: formData.professional_email,
           full_name: formData.full_name,
           confirmationLetterPath: letterPath, // For attachment
-          confirmation_letter_link: confirmationLetterLink, // For email template link
+          confirmation_letter_link: confirmationLetterLink, // For email View button
+          confirmation_letter_download_link: confirmationLetterDownloadLink, // For email Download button
         }),
       });
 
