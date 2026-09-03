@@ -582,21 +582,21 @@ const allMenuItems = [
   {
     name: "Production",
     moduleKey: "products",
-    roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT"],
+    roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT", "PRODUCTION ENGINEER", "MACHINE OPERATOR"],
     icon: "PackageCheck",
     children: [
       {
         path: "/user-dashboard/productions/status",
         name: "Production Status",
         moduleKey: "production-status",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT"],
+        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT", "PRODUCTION ENGINEER", "MACHINE OPERATOR"],
         icon: "ListOrdered",
       },
       {
         path: "/user-dashboard/productions/bom-list",
         name: "BOM List",
         moduleKey: "bom-list",
-        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT"],
+        roles: ["ADMIN", "ACCOUNTANT", "WAREHOUSE INCHARGE", "DESIGN ENGINEER", "SERVICE SUPPORT", "PRODUCTION ENGINEER", "MACHINE OPERATOR"],
         icon: "ClipboardList",
       },
     ],

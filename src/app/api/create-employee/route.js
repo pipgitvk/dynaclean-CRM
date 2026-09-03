@@ -29,6 +29,8 @@ const ALLOWED_USER_ROLES = new Set([
   "WELDER HELPER",
   "WAREHOUSE INCHARGE",
   "EA",
+  "MACHINE OPERATOR",
+  "PRODUCTION ENGINEER",
 ]);
 
 export async function POST(request) {

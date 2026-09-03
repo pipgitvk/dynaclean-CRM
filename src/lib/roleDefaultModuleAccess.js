@@ -297,6 +297,16 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "expenses",
     "employee-crm",
   ],
+  "PRODUCTION ENGINEER": [
+    "dashboard-home",
+    "task-manager",
+    "employee-crm",
+  ],
+  "MACHINE OPERATOR": [
+    "dashboard-home",
+    "task-manager",
+    "employee-crm",
+  ],
   DEVELOPER: [
     "dashboard-home",
     "task-manager",
@@ -525,6 +535,12 @@ export function getRoleDefaultModuleKeys(role) {
   }
   if (key.includes("DESIGN ENGINEER")) {
     return [...(ROLE_DEFAULT_MODULE_KEYS["DESIGN ENGINEER"] ?? [])];
+  }
+  if (key.includes("PRODUCTION ENGINEER")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["PRODUCTION ENGINEER"] ?? [])];
+  }
+  if (key.includes("MACHINE OPERATOR")) {
+    return [...(ROLE_DEFAULT_MODULE_KEYS["MACHINE OPERATOR"] ?? [])];
   }
   if (key.includes("WELDER")) {
     return [...(ROLE_DEFAULT_MODULE_KEYS.WELDER ?? ROLE_DEFAULT_MODULE_KEYS["WELDER HELPER"] ?? [])];
