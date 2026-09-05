@@ -287,6 +287,13 @@ export async function GET(req) {
     let query = `
       SELECT 
         psr.*,
+        COALESCE(
+          (SELECT pl.product_image FROM products_list pl
+           WHERE LOWER(TRIM(pl.item_code)) = LOWER(TRIM(psr.product_code)) LIMIT 1),
+          (SELECT sl.image FROM spare_list sl
+           WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+              OR LOWER(TRIM(sl.spare_number)) = LOWER(TRIM(psr.product_code)) LIMIT 1)
+        ) AS catalog_image,
         CASE 
           WHEN TRIM(COALESCE(psr.product_code, '')) = '' THEN NULL
           WHEN EXISTS (
@@ -359,6 +366,7 @@ export async function GET(req) {
         ...rest,
         category,
         sub_category: item_sub_category || null,
+        catalog_image: row.catalog_image || null,
       };
     });
 

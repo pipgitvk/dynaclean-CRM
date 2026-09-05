@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { Search, Download, Eye, Plus, Edit2 } from "lucide-react";
 import MultiPurchaseLinkModal from "./MultiPurchaseLinkModal";
@@ -906,6 +906,8 @@ export default function PurchasesPage() {
   const userRole = user?.userRole;
   
   const [purchases, setPurchases] = useState([]);
+  const [hoveredImg, setHoveredImg] = useState(null); // { src, x, y }
+  const hoverTimerRef = useRef(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -1307,6 +1309,23 @@ export default function PurchasesPage() {
 
   return (
     <div className="max-w-full mx-auto p-6">
+      {/* Fixed hover image portal — desktop only */}
+      {hoveredImg && (
+        <div
+          className="pointer-events-none fixed z-[9999]"
+          style={{
+            left: hoveredImg.x,
+            top: hoveredImg.y - 8,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <img
+            src={hoveredImg.src}
+            alt="preview"
+            className="w-52 h-52 object-contain rounded-xl border-2 border-gray-300 shadow-2xl bg-white p-1"
+          />
+        </div>
+      )}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">All Purchase Requests</h1>
         <p className="text-gray-600 mt-1">View and manage all stock purchase requests</p>
@@ -1531,6 +1550,7 @@ export default function PurchasesPage() {
                   </th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('id')}>ID {sortColumn === 'id' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_code')}>Product Code {sortColumn === 'product_code' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 border-b font-semibold">Image</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('category')}>Category {sortColumn === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('sub_category')}>Sub Category {sortColumn === 'sub_category' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('product_name')}>Product Name {sortColumn === 'product_name' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
@@ -1547,7 +1567,6 @@ export default function PurchasesPage() {
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('status')}>Status {sortColumn === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('created_by')}>Created By {sortColumn === 'created_by' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 border-b font-semibold cursor-pointer hover:bg-gray-200" onClick={() => handleSort('created_at')}>Created At {sortColumn === 'created_at' && (sortDirection === 'asc' ? '↑' : '↓')}</th>
-                  <th className="p-3 border-b font-semibold">Image</th>
                   <th className="p-3 border-b font-semibold">Payment Trans ID</th>
                   <th className="p-3 border-b font-semibold">Action</th>
                 </tr>
@@ -1575,6 +1594,42 @@ export default function PurchasesPage() {
                         </div>
                       </td>
                       <td className="p-3 font-medium">{purchase.product_code}</td>
+                      <td className="p-3 text-center">
+                        {(() => {
+                          const imgSrc = purchase.catalog_image
+                            ? resolvePurchaseFileUrl(purchase.catalog_image)
+                            : purchase.product_image
+                            ? resolvePurchaseFileUrl(purchase.product_image)
+                            : null;
+                          if (!imgSrc) return <span className="text-gray-400">—</span>;
+                          return (
+                            <div className="relative inline-block group">
+                              <button
+                                onClick={() =>
+                                  setPreviewImage({
+                                    url: imgSrc,
+                                    type: getFileType(imgSrc),
+                                  })
+                                }
+                                onMouseEnter={(e) => {
+                                  if (window.innerWidth < 768) return;
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setHoveredImg({ src: imgSrc, x: rect.left + rect.width / 2, y: rect.top });
+                                }}
+                                onMouseLeave={() => setHoveredImg(null)}
+                                title="Click to view full"
+                              >
+                                <img
+                                  src={imgSrc}
+                                  alt="Product"
+                                  className="w-12 h-12 object-cover rounded border"
+                                  onError={(e) => { e.currentTarget.parentElement.parentElement.style.display = "none"; }}
+                                />
+                              </button>
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="p-3">
                         {category === 'Product' ? (
                           <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
@@ -1635,26 +1690,6 @@ export default function PurchasesPage() {
                       <td className="p-3">{getStatusBadge(purchase.status)}</td>
                       <td className="p-3">{purchase.created_by}</td>
                       <td className="p-3">{new Date(purchase.created_at).toLocaleDateString('en-IN', { timeZone: 'UTC' })}</td>
-                      <td className="p-3 text-center">
-                        {purchase.product_image ? (
-                          <button
-                            onClick={() =>
-                              {
-                                const fileUrl = resolvePurchaseFileUrl(purchase.product_image);
-                                setPreviewImage({
-                                  url: fileUrl,
-                                  type: getFileType(fileUrl || purchase.product_image),
-                                });
-                              }
-                            }
-                            className="text-gray-600 hover:text-blue-700"
-                          >
-                            <Eye className="w-5 h-5 inline" />
-                          </button>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
                       <td className="p-3 font-mono text-xs">
                         {paymentTransByPurchaseId?.[Number(purchase.id)] ? paymentTransByPurchaseId[Number(purchase.id)] : "—"}
                       </td>
