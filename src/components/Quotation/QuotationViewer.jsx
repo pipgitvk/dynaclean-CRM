@@ -533,14 +533,13 @@ export default function QuotationViewer({
               ))}
             </tbody>
             <tfoot className="bg-gray-100 font-semibold">
-              <tr className="text-center">
-                <td colSpan={6} className="p-2 text-left sm:text-center">
-                  Total
-                </td>
-                <td className="p-2">{totalQty}</td>
-                <td colSpan={5} className="p-2 text-right sm:text-center">
-                  ₹{displayGrandTotal}
-                </td>
+              <tr className="text-center border-t-2 border-gray-400">
+                <td colSpan={8} className="p-2 text-left"></td>
+                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.price_per_unit || 0), 0)).toFixed(2)}</td>
+                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.total_taxable_amt || 0), 0)).toFixed(2)}</td>
+                <td className="p-2">{(items.reduce((sum, it) => sum + Number(it.gst || 0), 0) / Math.max(items.length, 1)).toFixed(2)}%</td>
+                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.igsttamt || 0), 0)).toFixed(2)}</td>
+                <td className="p-2">₹{Number(items.reduce((sum, it) => sum + Number(it.total_price || 0), 0)).toFixed(2)}</td>
               </tr>
             </tfoot>
           </table>
