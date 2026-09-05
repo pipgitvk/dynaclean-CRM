@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
-import { Search, Download, Eye, Plus, Upload, Trash2, Edit2, ChevronDown, FileSpreadsheet, Printer, Link2, MoreVertical, ExternalLink } from "lucide-react";
+import { Search, Eye, Plus, Upload, Trash2, Edit2, ChevronDown, FileSpreadsheet, Printer, Link2, MoreVertical, Mail, Save, X } from "lucide-react";
 import { toast } from "react-hot-toast";
-import dayjs from "dayjs";
+import { numberToWords } from "@/utils/NumbertoWord";
 
 const fmt = (n) =>
   Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -859,11 +859,14 @@ export default function PurchaseProductsPage() {
                             <Link2 size={16} />
                           </button>
                           <button
-                            onClick={() => toast.info("Share coming soon")}
+                            onClick={() => {
+                              setSelectedPurchase(purchase);
+                              setShowPreviewModal(true);
+                            }}
                             className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition"
-                            title="Share / View"
+                            title="View Details"
                           >
-                            <ExternalLink size={16} />
+                            <Eye size={16} />
                           </button>
                         </div>
                       </td>
@@ -1411,91 +1414,371 @@ function EditPurchaseModal({ open, onClose, purchase, onSaved }) {
   );
 }
 
-// Preview Modal Component
+// Preview Modal Component - Bill Format
 function PreviewModal({ purchase, onClose }) {
+  const [allProducts, setAllProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchFullInvoice() {
+      try {
+        setLoading(true);
+        if (purchase?.invoice_no) {
+          const res = await fetch(`/api/purchase-products/by-invoice/${encodeURIComponent(purchase.invoice_no)}`, { credentials: "include" });
+          const result = await res.json();
+          if (result.success && Array.isArray(result.data)) {
+            setAllProducts(result.data);
+          } else {
+            setAllProducts([purchase]);
+          }
+        } else {
+          setAllProducts([purchase]);
+        }
+      } catch (e) {
+        console.error("Fetch error:", e);
+        setAllProducts([purchase]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchFullInvoice();
+  }, [purchase]);
+
+  const vendorInfo = allProducts[0] || purchase;
+
+  const totals = useMemo(() => {
+    let totalQty = 0;
+    let subTotal = 0;
+    let totalGST = 0;
+    const hsnMap = {};
+
+    allProducts.forEach((item) => {
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unit_price) || 0;
+      const gst = Number(item.gst_amount) || 0;
+      const amount = Number(item.amount) || 0;
+
+      totalQty += qty;
+      subTotal += amount - gst;
+      totalGST += gst;
+
+      const hsn = item.product_code || "NA";
+      if (!hsnMap[hsn]) {
+        hsnMap[hsn] = { taxable: 0, cgstRate: 0, sgstRate: 0, cgstAmt: 0, sgstAmt: 0, totalTax: 0 };
+      }
+      const taxableUnit = qty && price ? qty * price : amount - gst;
+      hsnMap[hsn].taxable += taxableUnit;
+      const halfGst = gst / 2;
+      hsnMap[hsn].cgstAmt += halfGst;
+      hsnMap[hsn].sgstAmt += halfGst;
+      hsnMap[hsn].totalTax += gst;
+      if (taxableUnit > 0 && gst > 0) {
+        const rate = ((gst / 2 / taxableUnit) * 100) || 0;
+        hsnMap[hsn].cgstRate = rate;
+        hsnMap[hsn].sgstRate = rate;
+      }
+    });
+
+    // Corrected subTotal calculation: use (qty * unit_price) or (amount - gst) whichever is reasonable
+    let correctedSubTotal = 0;
+    allProducts.forEach((item) => {
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unit_price) || 0;
+      const amount = Number(item.amount) || 0;
+      const gst = Number(item.gst_amount) || 0;
+      const lineAmount = qty && price ? (qty * price) : Math.max(0, amount - gst);
+      correctedSubTotal += lineAmount;
+    });
+
+    const grandTotal = correctedSubTotal + totalGST;
+
+    let totalPaid = 0;
+    if (vendorInfo?.payment_entries) {
+      try {
+        const entries = JSON.parse(vendorInfo.payment_entries);
+        if (Array.isArray(entries)) {
+          totalPaid = entries.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+        }
+      } catch {}
+    }
+    const balance = Math.max(0, grandTotal - totalPaid);
+
+    return {
+      totalQty,
+      subTotal: correctedSubTotal,
+      totalGST,
+      grandTotal,
+      totalPaid,
+      balance,
+      hsnSummary: Object.entries(hsnMap).map(([hsn, v]) => ({ hsn, ...v })),
+    };
+  }, [allProducts, vendorInfo]);
+
+  const amountInWords = useMemo(() => {
+    try {
+      const w = numberToWords(totals.grandTotal);
+      return w ? `${w.charAt(0).toUpperCase()}${w.slice(1)} Rupees only` : "";
+    } catch {
+      return "";
+    }
+  }, [totals.grandTotal]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleOpenPdf = () => {
+    if (vendorInfo?.invoice_upload) {
+      window.open(vendorInfo.invoice_upload, "_blank");
+    } else {
+      toast.error("No PDF available");
+    }
+  };
+
+  const handleSavePdf = () => {
+    toast.info("Save PDF feature coming soon");
+  };
+
+  const handleEmailPdf = () => {
+    toast.info("Email PDF feature coming soon");
+  };
+
+  const hasDocuments = ["eway_bill", "product_image", "invoice_upload", "payment_proof_upload", "quotation_upload"].some(k => purchase[k] || vendorInfo[k]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold">Purchase Preview</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-gray-900/60 pt-8" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-[1100px] max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Preview Header */}
+        <div className="flex items-center justify-between px-6 py-3 border-b">
+          <h3 className="text-xl font-bold text-gray-800">Preview</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 transition">
+            <X size={22} />
+          </button>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-50 p-3 rounded">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Invoice Number</label>
-              <div className="text-lg font-semibold text-gray-800">{purchase.invoice_no || "—"}</div>
-            </div>
-            <div className="bg-gray-50 p-3 rounded">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Purchase Date</label>
-              <div className="text-lg font-semibold text-gray-800">{formatDate(purchase.purchase_date)}</div>
-            </div>
-            <div className="bg-gray-50 p-3 rounded">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Vendor Name</label>
-              <div className="text-lg font-semibold text-gray-800">{purchase.vendor_name || "—"}</div>
-            </div>
-            <div className="bg-gray-50 p-3 rounded">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
-              <div className={`inline-block px-2 py-1 rounded-full text-sm font-medium ${
-                purchase.status === "Paid" ? "bg-green-100 text-green-800" :
-                purchase.status === "Partially Paid" ? "bg-yellow-100 text-yellow-800" :
-                "bg-red-100 text-red-800"
-              }`}>
-                {purchase.status}
+        {/* Scrollable Bill Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {/* Bill Title */}
+          <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Bill</h2>
+
+          <div className="border border-gray-400 rounded">
+            {/* Company Header */}
+            <div className="flex items-center p-4 border-b border-gray-300">
+              <div className="flex items-center gap-4 flex-1">
+                <div className="flex-shrink-0">
+                  <img src="/logo.png" alt="Dynaclean Logo" className="h-20 w-auto object-contain" />
+                </div>
+                <div className="flex flex-col gap-0.5 ml-3">
+                  <div className="text-2xl font-bold text-gray-800">
+                    {vendorInfo?.client_company_name || vendorInfo?.client_name || vendorInfo?.self_name || "—"}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1 text-right text-sm text-gray-700">
+                <div>
+                  <span className="font-medium text-gray-600">Phone: </span>
+                  <span className="font-semibold text-gray-800">{vendorInfo?.client_number || "7458874554"}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-600">Email: </span>
+                  <span className="font-semibold text-gray-800">{vendorInfo?.client_email || "piptrade11@gmail.com"}</span>
+                </div>
               </div>
             </div>
-            <div className="bg-gray-50 p-3 rounded">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Product</label>
-              <div className="text-lg font-semibold text-gray-800">{purchase.product_name || "—"}</div>
+
+            {/* Bill From / Bill Details */}
+            <table className="w-full text-sm">
+              <tbody>
+                <tr className="bg-gray-100 border-b border-gray-300">
+                  <td className="w-1/2 p-2.5 border-r border-gray-300 font-bold text-gray-700">Bill From:</td>
+                  <td className="w-1/2 p-2.5 font-bold text-gray-700">Bill Details:</td>
+                </tr>
+                <tr className="border-b border-gray-300 align-top">
+                  <td className="w-1/2 p-2.5 border-r border-gray-300 text-gray-800">
+                    <div className="font-semibold text-base">{vendorInfo?.vendor_name || "—"}</div>
+                    <div className="text-gray-600 mt-1">{vendorInfo?.delivery_location || vendorInfo?.customer_address || "na"}</div>
+                    <div className="text-gray-600 mt-1">
+                      {vendorInfo?.self_name ? (
+                        <><span className="font-medium">Contact No: </span><span className="font-semibold">{vendorInfo.self_name}</span></>
+                      ) : (
+                        <><span className="font-medium">Contact No: </span><span className="font-semibold">{vendorInfo?.client_number || "—"}</span></>
+                      )}
+                    </div>
+                  </td>
+                  <td className="w-1/2 p-2.5 text-gray-800 align-top">
+                    <div className="flex gap-2">
+                      <span className="font-medium text-gray-700 min-w-[52px]">Date:</span>
+                      <span className="font-semibold">{formatDateDisplay(vendorInfo?.purchase_date) || formatDate(vendorInfo?.purchase_date) || "—"}</span>
+                    </div>
+                    {vendorInfo?.invoice_no && (
+                      <div className="flex gap-2 mt-1.5">
+                        <span className="font-medium text-gray-700 min-w-[52px]">Invoice:</span>
+                        <span className="font-semibold">{vendorInfo.invoice_no}</span>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Items Table */}
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-300">
+                  <th className="p-2 border-r border-gray-300 text-left font-bold text-gray-700 w-10">#</th>
+                  <th className="p-2 border-r border-gray-300 text-left font-bold text-gray-700">Item name</th>
+                  <th className="p-2 border-r border-gray-300 text-left font-bold text-gray-700">HSN/ SAC</th>
+                  <th className="p-2 border-r border-gray-300 text-right font-bold text-gray-700 w-20">Quantity</th>
+                  <th className="p-2 border-r border-gray-300 text-center font-bold text-gray-700 w-16">Unit</th>
+                  <th className="p-2 border-r border-gray-300 text-right font-bold text-gray-700 w-28">Price/ Unit(₹)</th>
+                  <th className="p-2 border-r border-gray-300 text-right font-bold text-gray-700 w-28">GST(₹)</th>
+                  <th className="p-2 text-right font-bold text-gray-700 w-28">Amount(₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-gray-500">Loading...</td>
+                  </tr>
+                ) : allProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-gray-500">No items</td>
+                  </tr>
+                ) : (
+                  allProducts.map((item, idx) => {
+                    const qty = Number(item.quantity) || 0;
+                    const price = Number(item.unit_price) || 0;
+                    const gst = Number(item.gst_amount) || 0;
+                    const amount = Number(item.amount) || 0;
+                    const lineTotal = qty && price ? (qty * price) + gst : amount;
+                    return (
+                      <tr key={item.id || idx} className="border-b border-gray-200 hover:bg-gray-50/50">
+                        <td className="p-2 border-r border-gray-200 text-gray-800">{idx + 1}</td>
+                        <td className="p-2 border-r border-gray-200 text-gray-800 font-medium">{item.product_name || "—"}</td>
+                        <td className="p-2 border-r border-gray-200 text-gray-600">{item.product_code || "—"}</td>
+                        <td className="p-2 border-r border-gray-200 text-right text-gray-800">{qty || 1}</td>
+                        <td className="p-2 border-r border-gray-200 text-center text-gray-600">Nos</td>
+                        <td className="p-2 border-r border-gray-200 text-right text-gray-800">₹ {fmt(price || (amount - gst) / (qty || 1))}</td>
+                        <td className="p-2 border-r border-gray-200 text-right text-gray-800">
+                          {gst > 0 ? (
+                            <>
+                              ₹ {fmt(gst)}
+                              <span className="text-gray-500 text-xs ml-1">
+                                ({totals.subTotal > 0 && gst > 0 ? ((gst / ((qty * price) || (amount - gst))) * 100).toFixed(0) : 18}%)
+                              </span>
+                            </>
+                          ) : "₹ 0.00"}
+                        </td>
+                        <td className="p-2 text-right text-gray-800 font-semibold">₹ {fmt(lineTotal)}</td>
+                      </tr>
+                    );
+                  })
+                )}
+                {/* Total Row */}
+                <tr className="bg-gray-50 border-t-2 border-gray-300 font-semibold">
+                  <td className="p-2 border-r border-gray-300"></td>
+                  <td className="p-2 border-r border-gray-300 font-bold text-gray-700">Total</td>
+                  <td className="p-2 border-r border-gray-300"></td>
+                  <td className="p-2 border-r border-gray-300 text-right">{totals.totalQty || allProducts.length}</td>
+                  <td className="p-2 border-r border-gray-300"></td>
+                  <td className="p-2 border-r border-gray-300"></td>
+                  <td className="p-2 border-r border-gray-300 text-right">₹ {fmt(totals.totalGST)}</td>
+                  <td className="p-2 text-right">₹ {fmt(totals.grandTotal)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Tax Summary + Right Summary */}
+            <div className="flex border-t border-gray-300">
+              {/* Tax Summary */}
+              <div className="flex-1 border-r border-gray-300 p-3">
+                <div className="font-bold text-gray-700 mb-2 text-sm">Tax Summary:</div>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 border border-gray-300">
+                      <th rowSpan={2} className="p-2 border-r border-gray-300 text-left font-bold text-gray-700 align-middle w-24">HSN/ SAC</th>
+                      <th rowSpan={2} className="p-2 border-r border-gray-300 text-right font-bold text-gray-700 align-middle">Taxable amount (₹)</th>
+                      <th colSpan={2} className="p-1.5 border-r border-gray-300 text-center font-bold text-gray-700 bg-gray-100">CGST</th>
+                      <th colSpan={2} className="p-1.5 border-r border-gray-300 text-center font-bold text-gray-700 bg-gray-100">SGST</th>
+                      <th rowSpan={2} className="p-2 text-right font-bold text-gray-700 align-middle">Total Tax (₹)</th>
+                    </tr>
+                    <tr className="bg-gray-50 border border-gray-300 border-t-0">
+                      <th className="p-1 border-r border-gray-300 text-center font-bold text-gray-600 w-16">Rate (%)</th>
+                      <th className="p-1 border-r border-gray-300 text-right font-bold text-gray-600 w-20">Amt (₹)</th>
+                      <th className="p-1 border-r border-gray-300 text-center font-bold text-gray-600 w-16">Rate (%)</th>
+                      <th className="p-1 border-r border-gray-300 text-right font-bold text-gray-600 w-20">Amt (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {totals.hsnSummary.length === 0 ? (
+                      <tr className="border border-gray-300 border-t-0">
+                        <td colSpan={7} className="p-4 text-center text-gray-500">No tax data</td>
+                      </tr>
+                    ) : (
+                      totals.hsnSummary.map((row, idx) => (
+                        <tr key={idx} className="border border-gray-300 border-t-0">
+                          <td className="p-2 border-r border-gray-200 text-gray-700">{row.hsn}</td>
+                          <td className="p-2 border-r border-gray-200 text-right text-gray-800">{fmt(row.taxable)}</td>
+                          <td className="p-2 border-r border-gray-200 text-center text-gray-700">{row.cgstRate ? row.cgstRate.toFixed(0) : 9}</td>
+                          <td className="p-2 border-r border-gray-200 text-right text-gray-800">{fmt(row.cgstAmt || totals.totalGST / 2 / totals.hsnSummary.length)}</td>
+                          <td className="p-2 border-r border-gray-200 text-center text-gray-700">{row.sgstRate ? row.sgstRate.toFixed(0) : 9}</td>
+                          <td className="p-2 border-r border-gray-200 text-right text-gray-800">{fmt(row.sgstAmt || totals.totalGST / 2 / totals.hsnSummary.length)}</td>
+                          <td className="p-2 text-right text-gray-800 font-medium">{fmt(row.totalTax)}</td>
+                        </tr>
+                      ))
+                    )}
+                    {/* TOTAL row */}
+                    <tr className="bg-gray-50 border border-gray-300 border-t-0 font-bold">
+                      <td className="p-2 border-r border-gray-200 text-gray-700">TOTAL</td>
+                      <td className="p-2 border-r border-gray-200 text-right text-gray-800">{fmt(totals.subTotal)}</td>
+                      <td className="p-2 border-r border-gray-200"></td>
+                      <td className="p-2 border-r border-gray-200 text-right text-gray-800">{fmt(totals.totalGST / 2)}</td>
+                      <td className="p-2 border-r border-gray-200"></td>
+                      <td className="p-2 border-r border-gray-200 text-right text-gray-800">{fmt(totals.totalGST / 2)}</td>
+                      <td className="p-2 text-right text-gray-800">{fmt(totals.totalGST)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Right Summary */}
+              <div className="w-80 p-3 flex flex-col">
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b border-gray-200">
+                      <td className="p-2 font-medium text-gray-700">Sub Total</td>
+                      <td className="p-2 text-right font-medium">:</td>
+                      <td className="p-2 text-right font-semibold text-gray-800">₹ {fmt(totals.subTotal)}</td>
+                    </tr>
+                    <tr className="border-b border-gray-200">
+                      <td className="p-2 font-bold text-gray-800">Total</td>
+                      <td className="p-2 text-right font-bold">:</td>
+                      <td className="p-2 text-right font-bold text-gray-900">₹ {fmt(totals.grandTotal)}</td>
+                    </tr>
+                    <tr className="bg-gray-50 border-b border-gray-200 align-top">
+                      <td colSpan={2} className="p-2 font-semibold text-gray-700 align-middle">Bill Amount in Words:</td>
+                      <td className="p-2 text-gray-800 text-xs leading-snug pl-2">{amountInWords || "—"}</td>
+                    </tr>
+                    <tr className="border-b border-gray-200">
+                      <td className="p-2 font-medium text-gray-700">Paid</td>
+                      <td className="p-2 text-right font-medium">:</td>
+                      <td className="p-2 text-right font-semibold text-green-700">₹ {fmt(totals.totalPaid)}</td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 font-medium text-gray-700">Balance</td>
+                      <td className="p-2 text-right font-medium">:</td>
+                      <td className="p-2 text-right font-bold text-red-700">₹ {fmt(totals.balance)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="bg-gray-50 p-3 rounded">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Amount</label>
-              <div className="text-lg font-semibold text-gray-800">₹ {fmt(purchase.amount || 0)}</div>
-            </div>
-            {purchase.quantity && (
-              <div className="bg-gray-50 p-3 rounded">
-                <label className="block text-sm font-medium text-gray-600 mb-1">Quantity</label>
-                <div className="text-lg font-semibold text-gray-800">{purchase.quantity}</div>
-              </div>
-            )}
-            {purchase.unit_price && (
-              <div className="bg-gray-50 p-3 rounded">
-                <label className="block text-sm font-medium text-gray-600 mb-1">Unit Price</label>
-                <div className="text-lg font-semibold text-gray-800">₹ {fmt(purchase.unit_price)}</div>
-              </div>
-            )}
-            {purchase.gst_amount && (
-              <div className="bg-gray-50 p-3 rounded">
-                <label className="block text-sm font-medium text-gray-600 mb-1">GST Amount</label>
-                <div className="text-lg font-semibold text-gray-800">₹ {fmt(purchase.gst_amount)}</div>
-              </div>
-            )}
-            {purchase.reference_no && (
-              <div className="bg-gray-50 p-3 rounded">
-                <label className="block text-sm font-medium text-gray-600 mb-1">Reference No.</label>
-                <div className="text-lg font-semibold text-gray-800">{purchase.reference_no}</div>
-              </div>
-            )}
           </div>
 
-          {purchase.notes && (
-            <div className="bg-gray-50 p-3 rounded">
-              <label className="block text-sm font-medium text-gray-600 mb-1">Notes</label>
-              <div className="text-gray-800">{purchase.notes}</div>
-            </div>
-          )}
-
-          {/* Document Uploads */}
-          {[
-            { key: "eway_bill",            label: "E-Way Bill" },
-            { key: "product_image",        label: "Product Image" },
-            { key: "invoice_upload",       label: "Invoice" },
-            { key: "payment_proof_upload", label: "Payment Proof" },
-            { key: "quotation_upload",     label: "Quotation" },
-          ].some(({ key }) => purchase[key]) && (
-            <div className="bg-blue-50 p-3 rounded border border-blue-200">
-              <label className="block text-sm font-medium text-blue-600 mb-2">Uploaded Documents</label>
+          {/* Uploaded Documents */}
+          {hasDocuments && (
+            <div className="mt-4 bg-blue-50 p-3 rounded border border-blue-200">
+              <div className="font-semibold text-blue-700 text-sm mb-2">Uploaded Documents</div>
               <div className="flex flex-wrap gap-2">
                 {[
                   { key: "eway_bill",            label: "E-Way Bill" },
@@ -1503,39 +1786,55 @@ function PreviewModal({ purchase, onClose }) {
                   { key: "invoice_upload",       label: "Invoice" },
                   { key: "payment_proof_upload", label: "Payment Proof" },
                   { key: "quotation_upload",     label: "Quotation" },
-                ].map(({ key, label }) =>
-                  purchase[key] ? (
+                ].map(({ key, label }) => {
+                  const url = purchase[key] || vendorInfo[key];
+                  return url ? (
                     <button
                       key={key}
-                      onClick={() => window.open(purchase[key], "_blank")}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                      onClick={() => window.open(url, "_blank")}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm transition"
                     >
                       <FileSpreadsheet size={13} />
                       {label}
                     </button>
-                  ) : null
-                )}
+                  ) : null;
+                })}
               </div>
             </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t mt-6">
+        {/* Action Buttons Footer */}
+        <div className="px-6 py-4 border-t bg-gray-50/50 flex items-center justify-end gap-3 rounded-b-lg">
           <button
-            onClick={onClose}
-            className="px-4 py-2 border rounded hover:bg-gray-50"
+            onClick={handleOpenPdf}
+            className="px-5 py-2 border-2 border-red-500 text-red-600 rounded-full hover:bg-red-50 transition font-medium flex items-center gap-2 text-sm"
           >
-            Close
+            <FileSpreadsheet size={16} /> Open PDF
           </button>
           <button
-            onClick={() => {
-              // Navigate to edit page with invoice number to load all products
-              const editUrl = `/admin-dashboard/purchase-products/add?edit=true&invoice=${encodeURIComponent(purchase.invoice_no)}`;
-              window.location.href = editUrl;
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            onClick={handlePrint}
+            className="px-5 py-2 border-2 border-red-500 text-red-600 rounded-full hover:bg-red-50 transition font-medium flex items-center gap-2 text-sm"
           >
-            Edit Purchase
+            <Printer size={16} /> Print
+          </button>
+          <button
+            onClick={handleSavePdf}
+            className="px-5 py-2 border-2 border-red-500 text-red-600 rounded-full hover:bg-red-50 transition font-medium flex items-center gap-2 text-sm"
+          >
+            <Save size={16} /> Save PDF
+          </button>
+          <button
+            onClick={handleEmailPdf}
+            className="px-5 py-2 border-2 border-red-500 text-red-600 rounded-full hover:bg-red-50 transition font-medium flex items-center gap-2 text-sm"
+          >
+            <Mail size={16} /> Email PDF
+          </button>
+          <button
+            onClick={onClose}
+            className="px-5 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition font-medium shadow-sm text-sm"
+          >
+            Close
           </button>
         </div>
       </div>
