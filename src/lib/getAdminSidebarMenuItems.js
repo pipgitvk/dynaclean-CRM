@@ -222,6 +222,12 @@ const allMenuItems = [
         icon: "FileText",
       },
       {
+        path: "/admin-dashboard/service-support-report",
+        name: "Service Support Report",
+        roles: ["SUPERADMIN", "DIRECTOR", "SERVICE HEAD", "EA"],
+        icon: "Headset",
+      },
+      {
         path: "/admin-dashboard/lead-reports",
         name: "Lead Reports",
         roles: ["SUPERADMIN"],

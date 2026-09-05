@@ -188,11 +188,16 @@ export async function middleware(request) {
           isPurchaseProductsRoute ||
           isScheduleVisitAdminRoute;
         
+        const isServiceSupportReport = pathname.startsWith("/admin-dashboard/service-support-report");
+        const isServiceHead = roleNorm === "SERVICE HEAD";
+
         if (
           !(roleNorm === "EA" && isEaAllowed) &&
           !(isTeamLeader && (isDeniedLeadsRoute || isViewCustomerRoute)) &&
           !(isSales && (isDeniedLeadsRoute || isViewCustomerRoute || isBulkReassignRoute)) &&
           !(isSalesCumBackoffice && (isBulkReassignRoute || isPaymentPendingReportRoute || isManualPaymentsRoute || isSalesDashboardManualPaymentsRoute)) &&
+          !(isServiceHead && isServiceSupportReport) &&
+          !(roleNorm === "EA" && isServiceSupportReport) &&
           !isEveryoneAllowedRoute
         ) {
           const dest = new URL("/user-dashboard", request.url);
