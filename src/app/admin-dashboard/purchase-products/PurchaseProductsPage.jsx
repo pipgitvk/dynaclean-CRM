@@ -870,16 +870,23 @@ export default function PurchaseProductsPage() {
                           >
                             <Eye size={16} />
                           </button>
+                          <Link
+                            href={`/admin-dashboard/purchase-products/add?edit=true&invoice=${purchase.invoice_no}`}
+                            className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition inline-block"
+                            title="Edit"
+                          >
+                            <Edit2 size={16} />
+                          </Link>
                         </div>
                       </td>
-                      <td className="px-3 py-3 relative">
+                      {/* <td className="px-3 py-3 relative">
                         <button
                           onClick={(e) => handleMenuClick(e, purchase.id)}
                           className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition block mx-auto"
                         >
                           <MoreVertical size={18} />
                         </button>
-                      </td>
+                      </td> */}
                     </tr>
                   );
                 })
