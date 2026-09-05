@@ -139,31 +139,6 @@ export default function QuotationViewer({
       }),
     );
 
-    // Fix modern color function errors (oklch, lab, lch, etc.) for html2canvas compatibility
-    el.querySelectorAll("*").forEach((e) => {
-      const style = window.getComputedStyle(e);
-      const color = style.color || "";
-      const bg = style.backgroundColor || "";
-
-      if (
-        color.includes("oklch") ||
-        color.includes("oklab") ||
-        color.includes("lab(") ||
-        color.includes("lch(")
-      ) {
-        e.style.color = "#000";
-      }
-
-      if (
-        bg.includes("oklch") ||
-        bg.includes("oklab") ||
-        bg.includes("lab(") ||
-        bg.includes("lch(")
-      ) {
-        e.style.backgroundColor = "#fff";
-      }
-    });
-
     // Generate PDF
     try {
       const canvas = await html2canvas(el, {
@@ -173,6 +148,38 @@ export default function QuotationViewer({
         scrollY: 0,
         windowWidth: el.scrollWidth,
         windowHeight: el.scrollHeight,
+        // Fix modern color functions (oklch, oklab, lab, lch, color-mix, etc.)
+        // that html2canvas cannot parse. We do this inside onclone so the fix
+        // is applied to the *copy* html2canvas renders from — not the live DOM.
+        onclone: (_doc, clonedEl) => {
+          const MODERN_COLOR_RE = /\b(oklch|oklab|lab|lch|color-mix|color)\s*\(/i;
+          const PROPS = [
+            "color",
+            "backgroundColor",
+            "borderColor",
+            "borderTopColor",
+            "borderRightColor",
+            "borderBottomColor",
+            "borderLeftColor",
+            "outlineColor",
+            "textDecorationColor",
+            "caretColor",
+            "fill",
+            "stroke",
+          ];
+
+          clonedEl.querySelectorAll("*").forEach((node) => {
+            const computed = window.getComputedStyle(node);
+            PROPS.forEach((prop) => {
+              const val = computed[prop] || "";
+              if (MODERN_COLOR_RE.test(val)) {
+                // Choose a sensible fallback: white for backgrounds, black for everything else
+                node.style[prop] =
+                  prop === "backgroundColor" ? "#ffffff" : "#000000";
+              }
+            });
+          });
+        },
       });
 
       const imgData = canvas.toDataURL("image/jpeg", 0.7);
