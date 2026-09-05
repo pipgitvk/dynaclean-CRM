@@ -59,11 +59,16 @@ export default function QuotationViewer({
     return map[header.payment_term_days] || header.payment_term_days || "";
   }, [header.payment_term_days]);
 
+  const [isDownloading, setIsDownloading] = useState(false);
   const [isInvoice, setIsInvoice] = useState(false);
 
   const downloadPDF = async () => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) {
+      alert("Content not ready. Please try again.");
+      return;
+    }
+    setIsDownloading(true);
 
     // Temporarily force the large screen view for the PDF generation
     const lgViewElements = el.querySelectorAll(".lg-view");
@@ -195,9 +200,18 @@ export default function QuotationViewer({
         heightLeft -= pdfHeight;
       }
 
-      pdf.save("quotation.pdf");
+      // Build filename: QUOTE-DYNACLEAN-{ClientName}.pdf
+      const clientName = (header?.company || customerFirstName || "Client")
+        .trim()
+        .replace(/[^a-zA-Z0-9\s]/g, "")   // remove special chars
+        .replace(/\s+/g, "_")               // spaces → underscores
+        .toUpperCase();
+      const pdfFileName = `QUOTE-DYNACLEAN-${clientName}.pdf`;
+
+      pdf.save(pdfFileName);
     } catch (error) {
       console.error("Error during PDF generation:", error);
+      alert("PDF generation failed: " + (error?.message || "Unknown error"));
     } finally {
       // Restore masked PII
       originalTexts.forEach(({ node, original }) => {
@@ -219,6 +233,7 @@ export default function QuotationViewer({
       // Revert width so on-screen layout goes back to normal
       el.style.width = originalWidth;
       el.style.maxWidth = originalMaxWidth;
+      setIsDownloading(false);
     }
   };
 
@@ -666,9 +681,10 @@ export default function QuotationViewer({
         <div className="text-right">
           <button
             onClick={downloadPDF}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+            disabled={isDownloading}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Download PDF
+            {isDownloading ? "Generating PDF..." : "Download PDF"}
           </button>
         </div>
         {/* <div className="text-right">
