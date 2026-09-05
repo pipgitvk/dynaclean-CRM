@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Search, Eye, Plus, Upload, Trash2, Edit2, ChevronDown, FileSpreadsheet, Printer, Link2, MoreVertical, Mail, Save, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { numberToWords } from "@/utils/NumbertoWord";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const fmt = (n) =>
   Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1523,20 +1525,345 @@ function PreviewModal({ purchase, onClose }) {
     }
   }, [totals.grandTotal]);
 
+  const cloneBillToNewWindow = ({ autoPrint = false }) => {
+    const invoiceNo = vendorInfo?.invoice_no || "Purchase Bill";
+    const w = window.open("", "_blank", "width=1100,height=900");
+    if (!w) {
+      toast.error("Pop-up blocked. Please allow pop-ups for this site.");
+      return null;
+    }
+    w.document.write(`<html><head><title>Purchase Bill - ${invoiceNo}</title>`);
+    w.document.write(`<base href="${window.location.origin}" />`);
+    w.document.write(`
+      <style>
+        * { box-sizing: border-box; }
+        body {
+          margin: 0;
+          padding: 20px;
+          background: #f9fafb;
+          font-family: Arial, Helvetica, sans-serif;
+          color: #1f2937;
+          font-size: 13px;
+          line-height: 1.45;
+        }
+        @media print {
+          body { margin: 0; padding: 10px; background: #fff; }
+        }
+      </style>
+    `);
+    w.document.write("</head><body>");
+    w.document.write(buildBillPreviewHTML());
+    w.document.write("</body></html>");
+    w.document.close();
+    w.focus();
+    if (autoPrint) {
+      w.onload = () => {
+        setTimeout(() => {
+          w.print();
+        }, 400);
+      };
+    }
+    return w;
+  };
+
   const handlePrint = () => {
-    window.print();
+    cloneBillToNewWindow({ autoPrint: true });
   };
 
   const handleOpenPdf = () => {
-    if (vendorInfo?.invoice_upload) {
-      window.open(vendorInfo.invoice_upload, "_blank");
-    } else {
-      toast.error("No PDF available");
-    }
+    cloneBillToNewWindow({ autoPrint: false });
   };
 
-  const handleSavePdf = () => {
-    toast.info("Save PDF feature coming soon");
+  const buildBillPreviewHTML = () => {
+    const company = vendorInfo?.client_company_name || vendorInfo?.client_name || vendorInfo?.self_name || "DYNACLEAN INDUSTRIES";
+    const phone = vendorInfo?.client_number || "7458874554";
+    const email = vendorInfo?.client_email || "piptrade11@gmail.com";
+    const vendor = vendorInfo?.vendor_name || "—";
+    const address = vendorInfo?.delivery_location || vendorInfo?.customer_address || "na";
+    const contact = vendorInfo?.self_name ? vendorInfo.self_name : (vendorInfo?.client_number || "—");
+    const dateStr = formatDateDisplay(vendorInfo?.purchase_date) || formatDate(vendorInfo?.purchase_date) || "—";
+    const invoice = vendorInfo?.invoice_no || "—";
+    const amtInWords = amountInWords || "—";
+    const qty = totals.totalQty || allProducts.length || 1;
+
+    const rows = (allProducts.length > 0 ? allProducts : [purchase]).map((item, idx) => {
+      const q = Number(item.quantity) || 1;
+      const price = Number(item.unit_price) || 0;
+      const gst = Number(item.gst_amount) || 0;
+      const amt = Number(item.amount) || 0;
+      const lineTotal = q && price ? (q * price) + gst : amt;
+      const unitP = price || (Math.max(0, amt - gst) / Math.max(1, q));
+      const gstPct = (q && price && gst) ? ((gst / (q * price)) * 100).toFixed(0) : "18";
+      return `
+        <tr>
+          <td style="padding:6px 8px;border-bottom:1px solid #d1d5db;border-right:1px solid #d1d5db;text-align:left;vertical-align:middle">${idx + 1}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #d1d5db;border-right:1px solid #d1d5db;text-align:left;vertical-align:middle;font-weight:500">${item.product_name || "—"}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #d1d5db;border-right:1px solid #d1d5db;text-align:left;vertical-align:middle">${item.product_code || "—"}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #d1d5db;border-right:1px solid #d1d5db;text-align:right;vertical-align:middle">${q}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #d1d5db;border-right:1px solid #d1d5db;text-align:center;vertical-align:middle">Nos</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #d1d5db;border-right:1px solid #d1d5db;text-align:right;vertical-align:middle">₹ ${fmt(unitP)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #d1d5db;border-right:1px solid #d1d5db;text-align:right;vertical-align:middle;white-space:nowrap">${gst > 0 ? `₹ ${fmt(gst)} <span style="color:#6b7280;font-size:10px;margin-left:2px">(${gstPct}%)</span>` : "₹ 0.00"}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #d1d5db;text-align:right;vertical-align:middle;font-weight:700">₹ ${fmt(lineTotal)}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const totalRow = `
+      <tr style="background:#f3f4f6;font-weight:700">
+        <td style="padding:8px;border-top:2px solid #9ca3af;border-right:1px solid #d1d5db"></td>
+        <td style="padding:8px;border-top:2px solid #9ca3af;border-right:1px solid #d1d5db;font-weight:700;color:#1f2937">Total</td>
+        <td style="padding:8px;border-top:2px solid #9ca3af;border-right:1px solid #d1d5db"></td>
+        <td style="padding:8px;border-top:2px solid #9ca3af;border-right:1px solid #d1d5db;text-align:right">${qty}</td>
+        <td style="padding:8px;border-top:2px solid #9ca3af;border-right:1px solid #d1d5db"></td>
+        <td style="padding:8px;border-top:2px solid #9ca3af;border-right:1px solid #d1d5db"></td>
+        <td style="padding:8px;border-top:2px solid #9ca3af;border-right:1px solid #d1d5db;text-align:right">₹ ${fmt(totals.totalGST)}</td>
+        <td style="padding:8px;border-top:2px solid #9ca3af;text-align:right">₹ ${fmt(totals.grandTotal)}</td>
+      </tr>
+    `;
+
+    const hsnRows = totals.hsnSummary.length > 0
+      ? totals.hsnSummary.map((r) => {
+          const cgstR = r.cgstRate ? r.cgstRate.toFixed(0) : "9";
+          const sgstR = r.sgstRate ? r.sgstRate.toFixed(0) : "9";
+          const equalLen = Math.max(1, totals.hsnSummary.length);
+          const cgstA = (r.cgstAmt != null && isFinite(r.cgstAmt)) ? fmt(r.cgstAmt) : fmt(totals.totalGST / 2 / equalLen);
+          const sgstA = (r.sgstAmt != null && isFinite(r.sgstAmt)) ? fmt(r.sgstAmt) : fmt(totals.totalGST / 2 / equalLen);
+          return `
+            <tr>
+              <td style="padding:5px 6px;border:1px solid #d1d5db;border-top:0;border-left:0;text-align:left;vertical-align:middle;font-size:11px;width:72px;table-layout:fixed;word-break:break-word">${r.hsn}</td>
+              <td style="padding:5px 6px;border-top:0;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db;text-align:right;vertical-align:middle;font-size:11px">${fmt(r.taxable)}</td>
+              <td style="padding:4px 6px;border-top:0;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db;text-align:center;vertical-align:middle;font-size:11px;width:42px;table-layout:fixed">${cgstR}</td>
+              <td style="padding:4px 6px;border-top:0;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db;text-align:right;vertical-align:middle;font-size:11px;width:60px;table-layout:fixed">${cgstA}</td>
+              <td style="padding:4px 6px;border-top:0;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db;text-align:center;vertical-align:middle;font-size:11px;width:42px;table-layout:fixed">${sgstR}</td>
+              <td style="padding:4px 6px;border-top:0;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db;text-align:right;vertical-align:middle;font-size:11px;width:60px;table-layout:fixed">${sgstA}</td>
+              <td style="padding:5px 6px;border-top:0;border-bottom:1px solid #d1d5db;text-align:right;vertical-align:middle;font-weight:600;font-size:11px">${fmt(r.totalTax)}</td>
+            </tr>`;
+        }).join("")
+      : `<tr><td colspan="7" style="padding:16px;border:1px solid #d1d5db;border-top:0;text-align:center;color:#6b7280;font-size:11px">No tax data</td></tr>`;
+
+    const hsnTotalRow = `
+      <tr style="background:#f3f4f6;font-weight:700">
+        <td style="padding:5px 6px;border:1px solid #9ca3af;border-left:0;border-right:1px solid #d1d5db;font-weight:700;color:#1f2937;font-size:11px;width:72px;table-layout:fixed">TOTAL</td>
+        <td style="padding:5px 6px;border-top:1px solid #9ca3af;border-right:1px solid #d1d5db;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;font-size:11px">${fmt(totals.subTotal)}</td>
+        <td style="padding:4px 6px;border-top:1px solid #9ca3af;border-right:1px solid #d1d5db;border-bottom:1px solid #9ca3af;font-size:11px;width:42px;table-layout:fixed"></td>
+        <td style="padding:4px 6px;border-top:1px solid #9ca3af;border-right:1px solid #d1d5db;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;font-size:11px;width:60px;table-layout:fixed">${fmt(totals.totalGST / 2)}</td>
+        <td style="padding:4px 6px;border-top:1px solid #9ca3af;border-right:1px solid #d1d5db;border-bottom:1px solid #9ca3af;font-size:11px;width:42px;table-layout:fixed"></td>
+        <td style="padding:4px 6px;border-top:1px solid #9ca3af;border-right:1px solid #d1d5db;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;font-size:11px;width:60px;table-layout:fixed">${fmt(totals.totalGST / 2)}</td>
+        <td style="padding:5px 6px;border-top:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;font-size:11px">${fmt(totals.totalGST)}</td>
+      </tr>
+    `;
+
+    return `
+      <div style="padding:14px 10px;background:#ffffff;color:#1f2937;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.45;width:760px;margin:0 auto;max-width:100%;-webkit-font-smoothing:antialiased;text-rendering:geometricPrecision">
+        <h2 style="font-size:22px;font-weight:700;color:#1f2937;text-align:center;margin:2px 0 16px 0;padding:0">Bill</h2>
+        <div style="border:1px solid #6b7280;border-radius:6px;overflow:hidden;background:#ffffff">
+
+          <div style="display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid #9ca3af;background:#ffffff">
+            <div style="display:flex;align-items:center;gap:16px;flex:1;min-width:0">
+              <div style="flex-shrink:0">
+                <img src="${window.location.origin}/logo.png" alt="Logo" style="height:60px;width:auto;display:block;max-width:120px" onerror="this.style.display='none'"/>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:2px;margin-left:4px;min-width:0">
+                <div style="font-size:20px;font-weight:700;color:#111827;letter-spacing:-0.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${company}</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;text-align:right;font-size:12px;color:#374151;flex-shrink:0;margin-left:10px">
+              <div><span style="font-weight:600;color:#4b5563">Phone: </span><span style="font-weight:700;color:#111827;white-space:nowrap">${phone}</span></div>
+              <div><span style="font-weight:600;color:#4b5563">Email: </span><span style="font-weight:700;color:#111827;white-space:nowrap">${email}</span></div>
+            </div>
+          </div>
+
+          <table style="width:100%;font-size:13px;border-collapse:collapse;table-layout:fixed">
+            <tbody>
+              <tr style="background:#f1f5f9">
+                <td style="width:50%;padding:10px 12px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;font-weight:700;color:#374151">Bill From:</td>
+                <td style="width:50%;padding:10px 12px;border-bottom:1px solid #9ca3af;font-weight:700;color:#374151">Bill Details:</td>
+              </tr>
+              <tr style="vertical-align:top">
+                <td style="width:50%;padding:10px 12px;border-right:1px solid #d1d5db;color:#111827;background:#ffffff">
+                  <div style="font-weight:700;font-size:14px;color:#111827;margin-bottom:2px">${vendor}</div>
+                  <div style="color:#4b5563;font-size:12px;margin-top:3px">${address}</div>
+                  <div style="color:#4b5563;font-size:12px;margin-top:5px"><span style="font-weight:600">Contact No: </span><span style="font-weight:700;color:#111827">${contact}</span></div>
+                </td>
+                <td style="width:50%;padding:10px 12px;color:#111827;vertical-align:top;background:#ffffff">
+                  <div style="display:flex;gap:8px;align-items:baseline"><span style="font-weight:600;color:#374151;flex:0 0 58px;white-space:nowrap">Date:</span><span style="font-weight:700;color:#111827;white-space:nowrap">${dateStr}</span></div>
+                  ${invoice !== "—" ? `<div style="display:flex;gap:8px;align-items:baseline;margin-top:6px"><span style="font-weight:600;color:#374151;flex:0 0 58px;white-space:nowrap">Invoice:</span><span style="font-weight:700;color:#111827;white-space:nowrap">${invoice}</span></div>` : ""}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <table style="width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed">
+            <thead>
+              <tr style="background:#f8fafc">
+                <th style="width:34px;padding:8px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:left;font-weight:700;color:#111827;table-layout:fixed;line-height:1.3;overflow:visible">#</th>
+                <th style="padding:8px 8px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:left;font-weight:700;color:#111827;table-layout:fixed;line-height:1.3;overflow:visible">Item name</th>
+                <th style="width:76px;padding:8px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:left;font-weight:700;color:#111827;table-layout:fixed;line-height:1.3;overflow:visible;white-space:nowrap">HSN/SAC</th>
+                <th style="width:54px;padding:8px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;color:#111827;table-layout:fixed;line-height:1.3;overflow:visible;white-space:nowrap">Qty</th>
+                <th style="width:48px;padding:8px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:center;font-weight:700;color:#111827;table-layout:fixed;line-height:1.3;overflow:visible;white-space:nowrap">Unit</th>
+                <th style="width:82px;padding:8px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;color:#111827;table-layout:fixed;line-height:1.3;overflow:visible;white-space:nowrap">Price/Unit</th>
+                <th style="width:78px;padding:8px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;color:#111827;table-layout:fixed;line-height:1.3;overflow:visible;white-space:nowrap">GST</th>
+                <th style="width:84px;padding:8px 6px;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;color:#111827;table-layout:fixed;line-height:1.3;overflow:visible;white-space:nowrap">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+              ${totalRow}
+            </tbody>
+          </table>
+
+          <div style="display:flex;border-top:1px solid #9ca3af;align-items:stretch">
+            <div style="flex:1 1 auto;border-right:1px solid #9ca3af;padding:10px 12px;min-width:0;background:#ffffff">
+              <div style="font-weight:700;color:#374151;margin-bottom:6px;font-size:12px">Tax Summary:</div>
+              <table style="width:100%;font-size:11px;border-collapse:collapse;table-layout:fixed">
+                <colgroup>
+                  <col style="width:72px">
+                  <col>
+                  <col style="width:42px">
+                  <col style="width:60px">
+                  <col style="width:42px">
+                  <col style="width:60px">
+                  <col>
+                </colgroup>
+                <thead>
+                  <tr style="background:#eef2ff">
+                    <th style="padding:5px 6px;border:1px solid #9ca3af;text-align:left;font-weight:700;color:#111827;font-size:11px;display:table-cell;min-height:24px;white-space:nowrap">HSN/SAC</th>
+                    <th style="padding:5px 6px;border-top:1px solid #9ca3af;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;color:#111827;font-size:11px;display:table-cell;min-height:24px;white-space:nowrap">Taxable (₹)</th>
+                    <th colspan="2" style="padding:5px 6px;border-top:1px solid #9ca3af;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:center;font-weight:700;color:#111827;background:#c7d2fe;font-size:11px;display:table-cell;min-height:24px;white-space:nowrap">CGST</th>
+                    <th colspan="2" style="padding:5px 6px;border-top:1px solid #9ca3af;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:center;font-weight:700;color:#111827;background:#c7d2fe;font-size:11px;display:table-cell;min-height:24px;white-space:nowrap">SGST</th>
+                    <th style="padding:5px 6px;border-top:1px solid #9ca3af;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;color:#111827;font-size:11px;display:table-cell;min-height:24px;white-space:nowrap">Total Tax</th>
+                  </tr>
+                  <tr style="background:#f8fafc">
+                    <th style="padding:3px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;border-left:1px solid #9ca3af;font-size:10px;color:#374151;display:table-cell;min-height:18px"></th>
+                    <th style="padding:3px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;font-size:10px;color:#374151;display:table-cell;min-height:18px"></th>
+                    <th style="padding:3px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:center;font-weight:700;color:#374151;font-size:10px;display:table-cell;min-height:18px">Rate</th>
+                    <th style="padding:3px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;color:#374151;font-size:10px;display:table-cell;min-height:18px">Amt</th>
+                    <th style="padding:3px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:center;font-weight:700;color:#374151;font-size:10px;display:table-cell;min-height:18px">Rate</th>
+                    <th style="padding:3px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;text-align:right;font-weight:700;color:#374151;font-size:10px;display:table-cell;min-height:18px">Amt</th>
+                    <th style="padding:3px 6px;border-right:1px solid #9ca3af;border-bottom:1px solid #9ca3af;font-size:10px;color:#374151;display:table-cell;min-height:18px"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${hsnRows}
+                  ${hsnTotalRow}
+                </tbody>
+              </table>
+            </div>
+
+            <div style="width:290px;flex-shrink:0;padding:10px 12px;background:#ffffff;display:flex;flex-direction:column">
+              <table style="width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed">
+                <colgroup>
+                  <col style="width:40%">
+                  <col style="width:8%">
+                  <col>
+                </colgroup>
+                <tbody>
+                  <tr>
+                    <td style="padding:6px 6px;border-bottom:1px solid #d1d5db;font-weight:600;color:#374151;vertical-align:middle">Sub Total</td>
+                    <td style="padding:6px 2px;border-bottom:1px solid #d1d5db;text-align:right;font-weight:600;vertical-align:middle">:</td>
+                    <td style="padding:6px 6px;border-bottom:1px solid #d1d5db;text-align:right;font-weight:700;color:#111827;vertical-align:middle;white-space:nowrap">₹ ${fmt(totals.subTotal)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 6px;border-bottom:1px solid #d1d5db;font-weight:700;color:#111827;vertical-align:middle">Total</td>
+                    <td style="padding:6px 2px;border-bottom:1px solid #d1d5db;text-align:right;font-weight:700;vertical-align:middle">:</td>
+                    <td style="padding:6px 6px;border-bottom:1px solid #d1d5db;text-align:right;font-weight:800;color:#111111;vertical-align:middle;white-space:nowrap">₹ ${fmt(totals.grandTotal)}</td>
+                  </tr>
+                  <tr style="background:#f8fafc">
+                    <td colspan="2" style="padding:7px 6px;border-bottom:1px solid #d1d5db;font-weight:700;color:#374151;vertical-align:top;font-size:12px">Bill in Words:</td>
+                    <td style="padding:7px 6px;border-bottom:1px solid #d1d5db;color:#1f2937;font-size:11px;line-height:1.45;vertical-align:top;word-break:break-word">${amtInWords}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 6px;border-bottom:1px solid #d1d5db;font-weight:600;color:#374151;vertical-align:middle">Paid</td>
+                    <td style="padding:6px 2px;border-bottom:1px solid #d1d5db;text-align:right;font-weight:600;vertical-align:middle">:</td>
+                    <td style="padding:6px 6px;border-bottom:1px solid #d1d5db;text-align:right;font-weight:700;color:#047857;vertical-align:middle;white-space:nowrap">₹ ${fmt(totals.totalPaid)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:6px 6px;font-weight:600;color:#374151;vertical-align:middle">Balance</td>
+                    <td style="padding:6px 2px;text-align:right;font-weight:600;vertical-align:middle">:</td>
+                    <td style="padding:6px 6px;text-align:right;font-weight:800;color:#b91c1c;vertical-align:middle;white-space:nowrap">₹ ${fmt(totals.balance)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  const handleSavePdf = async () => {
+    try {
+      toast.loading("Generating PDF...", { id: "pdf-gen" });
+      const tempContainer = document.createElement("div");
+      tempContainer.style.position = "fixed";
+      tempContainer.style.left = "-10000px";
+      tempContainer.style.top = "0";
+      tempContainer.style.width = "794px";
+      tempContainer.style.background = "#ffffff";
+      tempContainer.style.zIndex = "-1";
+      tempContainer.innerHTML = buildBillPreviewHTML();
+      document.body.appendChild(tempContainer);
+      void tempContainer.offsetHeight;
+
+      const capW = Math.ceil(Math.max(tempContainer.scrollWidth, tempContainer.offsetWidth, 794));
+      const capH = Math.ceil(Math.max(tempContainer.scrollHeight, 1)) + 40;
+
+      const canvas = await html2canvas(tempContainer, {
+        scale: 2,
+        width: capW,
+        height: capH,
+        windowWidth: capW,
+        windowHeight: capH,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (clonedDoc) => {
+          const b = clonedDoc.body;
+          if (b) {
+            b.style.setProperty("-webkit-font-smoothing", "antialiased");
+            b.style.setProperty("text-rendering", "geometricPrecision");
+          }
+        },
+      });
+
+      document.body.removeChild(tempContainer);
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const pdf = new jsPDF({
+        orientation: "p",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+        precision: 16,
+      });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 8;
+      const imgWidth = pageWidth - 2 * margin;
+      const imgHeightMM = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeightMM;
+      let position = margin;
+      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeightMM);
+      heightLeft -= pageHeight - 2 * margin;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeightMM + margin;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeightMM);
+        heightLeft -= pageHeight - 2 * margin;
+      }
+      const invoiceNo = vendorInfo?.invoice_no || "Purchase-Bill";
+      const sanitizedInvoice = String(invoiceNo).replace(/[^a-zA-Z0-9_-]/g, "_");
+      pdf.save(`Purchase_Bill_${sanitizedInvoice}.pdf`);
+      toast.dismiss("pdf-gen");
+      toast.success("PDF downloaded successfully");
+    } catch (err) {
+      console.error("Save PDF error:", err);
+      toast.dismiss("pdf-gen");
+      toast.error("Failed to generate PDF");
+    }
   };
 
   const handleEmailPdf = () => {
@@ -1557,7 +1884,7 @@ function PreviewModal({ purchase, onClose }) {
         </div>
 
         {/* Scrollable Bill Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div id="purchase-bill-content" className="flex-1 overflow-y-auto px-6 py-5">
           {/* Bill Title */}
           <h2 className="text-2xl font-bold text-gray-800 text-center mb-4">Bill</h2>
 
@@ -1777,7 +2104,7 @@ function PreviewModal({ purchase, onClose }) {
 
           {/* Uploaded Documents */}
           {hasDocuments && (
-            <div className="mt-4 bg-blue-50 p-3 rounded border border-blue-200">
+            <div id="purchase-docs-section" className="mt-4 bg-blue-50 p-3 rounded border border-blue-200">
               <div className="font-semibold text-blue-700 text-sm mb-2">Uploaded Documents</div>
               <div className="flex flex-wrap gap-2">
                 {[
