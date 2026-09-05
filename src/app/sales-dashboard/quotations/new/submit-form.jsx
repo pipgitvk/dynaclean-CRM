@@ -506,7 +506,7 @@ Thanks for doing business with us!`,
       const data = await res.json();
       if (data.success) {
         toast.success("✅ Quotation added successfully");
-        router.push("/user-dashboard/quotations");
+        router.push(`/user-dashboard/quotations?customer_id=${form.customer_id || ""}`);
       } else {
         alert("Error: " + data.error);
       }

@@ -523,7 +523,7 @@ export default function QuotationForm() {
       const data = await res.json();
       if (data.success) {
         toast.success("✅ Quotation added successfully");
-        router.push("/admin-dashboard/quotations");
+        router.push(`/admin-dashboard/quotations?customer_id=${form.customer_id || ""}`);
       } else {
         alert("Error: " + data.error);
       }
