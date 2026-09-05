@@ -305,11 +305,12 @@ export default function ManualLeadModal({ show, onClose }) {
                 </div>
               </label>
               <label className="block text-sm sm:text-base">
-                Assign Active To:
+                Assign Active To: <span className="text-red-600">*</span>
                 <select
                   value={assignActiveTo}
                   onChange={(e) => setAssignActiveTo(e.target.value)}
                   className="w-full border p-1 rounded text-sm sm:text-base mt-1"
+                  required
                 >
                   <option value="">Select sales rep</option>
                   {salesReps.map((rep) => (
@@ -329,7 +330,7 @@ export default function ManualLeadModal({ show, onClose }) {
               </button>
               <button
                 onClick={submitLead}
-                disabled={!leadCampaign}
+                disabled={!leadCampaign || !assignActiveTo}
                 className="bg-blue-600 text-white px-4 py-2 rounded shadow text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
               >
                 Send to {selectedSource || assignActiveTo || "lead"}
