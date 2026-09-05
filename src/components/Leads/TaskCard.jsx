@@ -81,60 +81,75 @@ const TaskCard = ({
     );
   }
 
+  // Default variant — matches the screenshot UI exactly
   return (
     <div
-      className="flex min-w-[250px] max-w-[300px] flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 text-white shadow-md transition duration-300 hover:shadow-lg"
+      className="flex w-[260px] shrink-0 flex-col justify-between rounded-xl p-4 text-white shadow-md transition duration-200 hover:shadow-lg hover:brightness-95"
       style={{ backgroundColor: bgColor }}
     >
+      {/* Name */}
       <div>
-        <h3 className="text-s mb-1 line-clamp-1 text-white">{name}</h3>
+        <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-white line-clamp-1">
+          {name}
+        </h3>
 
-        <div className="text-white-600 mb-1 flex items-center gap-2 text-xs">
-          <Phone size={14} className="text-gray-200" />
-          <span>{contact}</span>
+        {/* Phone */}
+        <div className="mb-1 flex items-center gap-2 text-xs text-white/90">
+          <Phone size={13} className="shrink-0 text-white/70" />
+          <span className="truncate">{contact || "—"}</span>
         </div>
 
-        <div className="mb-3 text-xs font-medium text-white">
-          📍 {company || "Company not added"}
+        {/* Company */}
+        <div className="mb-3 flex items-center gap-2 text-xs text-white/90">
+          <MapPin size={13} className="shrink-0 text-white/70" />
+          <span className="truncate">{company || "Company not added"}</span>
         </div>
 
-        <p className="mb-4 line-clamp-3 text-sm text-white">
-          {notes || "No notes"}
-        </p>
+        {/* Notes */}
+        {notes && (
+          <p className="mb-2 line-clamp-2 text-xs leading-relaxed text-white/90">
+            {notes}
+          </p>
+        )}
 
-        <p className="mb-4 line-clamp-3 text-sm text-white">
-          {products_interest || "products not showing"}
-        </p>
+        {/* Product interest */}
+        {products_interest && (
+          <p className="mb-3 text-xs font-semibold text-white line-clamp-2">
+            {products_interest}
+          </p>
+        )}
 
-        <div className="space-y-2 text-xs font-medium text-white">
+        {/* Date + status dots */}
+        <div className="mt-2 space-y-1.5 text-xs text-white/90">
           <div className="flex items-center gap-2">
-            <CalendarDays size={14} className="text-gray-200" />
-            <span>Scheduled: {dueDate}</span>
+            <CalendarDays size={13} className="shrink-0 text-white/70" />
+            <span>{dueDate}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-yellow-500" />
-            <span>Status: {status}</span>
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-yellow-300" />
+            <span className="truncate">{status || "—"}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-blue-500" />
-            <span>Stage: {stage || "-"}</span>
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-200" />
+            <span className="truncate">{stage || "—"}</span>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-2">
-        <a
+      {/* View / Follow links */}
+      <div className="mt-4 flex items-center gap-4 border-t border-white/25 pt-3">
+        <Link
           href={`${detailsBasePath}/view-customer/${customerId}`}
-          className="text-s flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 font-semibold text-gray-600 transition"
+          className="text-xs font-semibold text-white transition hover:text-white/70"
         >
           View
-        </a>
-        <a
+        </Link>
+        <Link
           href={`${detailsBasePath}/view-customer/${customerId}/follow-up?source=upcoming`}
-          className="text-s flex items-center justify-center gap-1 rounded-lg px-3 py-1.5 font-semibold text-gray-600 transition"
+          className="text-xs font-semibold text-white transition hover:text-white/70"
         >
           Follow
-        </a>
+        </Link>
       </div>
     </div>
   );

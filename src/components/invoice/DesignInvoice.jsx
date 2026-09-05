@@ -2057,21 +2057,30 @@ const NewInvoice = ({ invoice }) => {
       "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);color:white;padding:20px;border-radius:8px;z-index:9999;font-family:Arial,sans-serif;";
     document.body.appendChild(loadingDiv);
 
-    let styleTag;
+    // Off-screen container: renders at full invoice width outside viewport so
+    // html2canvas captures the ENTIRE invoice height, not just what's visible.
+    const offscreenWrapper = document.createElement("div");
+    offscreenWrapper.style.cssText =
+      "position:fixed;left:-9999px;top:0;width:794px;background:#fff;z-index:-1;";
+    document.body.appendChild(offscreenWrapper);
+
+    let clonedEl = null;
 
     try {
-      const originalWidth = el.style.width;
-      const originalMaxWidth = el.style.maxWidth;
-      const originalPadding = el.style.padding;
-      const originalBorder = el.style.border;
+      // Deep-clone the invoice element into the off-screen wrapper
+      clonedEl = el.cloneNode(true);
+      clonedEl.style.width = "794px";
+      clonedEl.style.maxWidth = "794px";
+      clonedEl.style.padding = "25px";
+      clonedEl.style.border = "none";
+      clonedEl.style.overflow = "visible";
+      offscreenWrapper.appendChild(clonedEl);
 
-      el.style.width = "794px";
-      el.style.maxWidth = "794px";
-      el.style.padding = "25px";
-      el.style.border = "none";
+      // Let the browser reflow the cloned element at 794px width
+      await new Promise((r) => setTimeout(r, 300));
 
-      // Convert images to base64
-      const images = el.querySelectorAll("img");
+      // Convert images to base64 in the cloned element
+      const images = clonedEl.querySelectorAll("img");
       await Promise.all(
         Array.from(images).map(async (img) => {
           if (!img.src || img.src.startsWith("data:")) return;
@@ -2098,73 +2107,27 @@ const NewInvoice = ({ invoice }) => {
 
       await new Promise((r) => setTimeout(r, 200));
 
-      // CRITICAL FIX: Override ALL color functions
-      styleTag = document.createElement("style");
-      styleTag.setAttribute("data-pdf-override", "true");
-      styleTag.innerHTML = `
-      [data-pdf-capture-root],
-      [data-pdf-capture-root] * {
-        color: rgb(0, 0, 0) !important;
-        -webkit-text-fill-color: rgb(0, 0, 0) !important;
-        background-color: rgb(255, 255, 255) !important;
-        border-color: rgb(0, 0, 0) !important;
-        outline-color: rgb(0, 0, 0) !important;
-        box-shadow: none !important;
-        text-shadow: none !important;
-        text-decoration: none !important;
-        -webkit-font-smoothing: antialiased !important;
-        font-smooth: always !important;
-        letter-spacing: normal !important;
-      }
+      // Apply color overrides directly to the off-screen cloned element
+      clonedEl.querySelectorAll("*").forEach((elem) => {
+        elem.style.color = "rgb(0, 0, 0)";
+        elem.style.webkitTextFillColor = "rgb(0, 0, 0)";
+        elem.style.backgroundColor = "rgb(255, 255, 255)";
+        elem.style.borderColor = "rgb(0, 0, 0)";
+        // Release any overflow constraints that could clip rows
+        const tag = elem.tagName?.toLowerCase();
+        if (tag !== "img") {
+          elem.style.overflow = "visible";
+          elem.style.overflowY = "visible";
+        }
+      });
 
-      [data-pdf-capture-root] *::before,
-      [data-pdf-capture-root] *::after {
-        color: rgb(0, 0, 0) !important;
-        background-color: rgb(255, 255, 255) !important;
-        border-color: rgb(0, 0, 0) !important;
-      }
-
-      [data-pdf-capture-root] table {
-        border-collapse: collapse !important;
-      }
-
-      [data-pdf-capture-root] td,
-      [data-pdf-capture-root] th {
-        page-break-inside: avoid !important;
-        overflow: visible !important;
-        vertical-align: top !important;
-      }
-
-      /* Force bank detail lines to render EXACTLY like other invoice text */
-      [data-pdf-capture-root] [data-pdf-bank-line] {
-        color: rgb(0, 0, 0) !important;
-        -webkit-text-fill-color: rgb(0, 0, 0) !important;
-        background-color: rgb(255, 255, 255) !important;
-        font-family: Arial, Helvetica, sans-serif !important;
-        font-weight: 400 !important;
-        font-size: 9px !important;
-        line-height: 1.35 !important;
-        text-decoration: none !important;
-        text-shadow: none !important;
-        -webkit-tap-highlight-color: transparent !important;
-        -webkit-user-select: text !important;
-        user-select: text !important;
-        pointer-events: none !important;
-        padding: 0 !important;
-        margin: 0 0 2px 0 !important;
-      }
-    `;
-      document.head.appendChild(styleTag);
-
-      await new Promise((r) => setTimeout(r, 100));
-
-      // Collect positions for ALL 4 bank detail lines (html2canvas renders them corrupted → we redraw with jsPDF)
+      // Collect positions for ALL 4 bank detail lines using the cloned element
       const bankLineSelectors = ["holder", "name", "acno", "ifsc"];
       const bankLineBoxes = {};
-      const rootRectForBank = el.getBoundingClientRect();
+      const rootRectForBank = clonedEl.getBoundingClientRect();
       if (rootRectForBank.width > 0 && rootRectForBank.height > 0) {
         for (const key of bankLineSelectors) {
-          const lineEl = el.querySelector(`[data-pdf-bank-line="${key}"]`);
+          const lineEl = clonedEl.querySelector(`[data-pdf-bank-line="${key}"]`);
           if (lineEl) {
             const r = lineEl.getBoundingClientRect();
             bankLineBoxes[key] = {
@@ -2177,7 +2140,20 @@ const NewInvoice = ({ invoice }) => {
         }
       }
 
-      const canvas = await html2canvas(el, {
+      // Hide bank detail lines from html2canvas (will be redrawn by jsPDF)
+      clonedEl.querySelectorAll("[data-pdf-bank-line]").forEach((elem) => {
+        elem.style.opacity = "0";
+        elem.style.visibility = "hidden";
+        elem.style.color = "rgb(255,255,255)";
+        elem.style.backgroundColor = "rgb(255,255,255)";
+        elem.style.textIndent = "-9999px";
+      });
+
+      // Measure the FULL height of the off-screen cloned element after reflow
+      const captureWidth = clonedEl.scrollWidth || 794;
+      const captureHeight = clonedEl.scrollHeight || clonedEl.offsetHeight;
+
+      const canvas = await html2canvas(clonedEl, {
         scale: 3,
         useCORS: true,
         allowTaint: false,
@@ -2185,36 +2161,12 @@ const NewInvoice = ({ invoice }) => {
         backgroundColor: "#ffffff",
         logging: false,
         imageTimeout: 15000,
-        onclone: (clonedDoc) => {
-          const root = clonedDoc.querySelector(
-            '[data-pdf-capture-root="true"]',
-          );
-          if (root) {
-            root.style.width = "794px";
-            root.style.maxWidth = "794px";
-            root.style.boxSizing = "border-box";
-            root.style.overflow = "visible";
-            const h = Math.max(root.scrollHeight, root.offsetHeight);
-            root.style.minHeight = `${Math.ceil(h + 4)}px`;
-
-            root.querySelectorAll("*").forEach((elem) => {
-              elem.style.color = "rgb(0, 0, 0)";
-              elem.style.backgroundColor = "rgb(255, 255, 255)";
-              elem.style.borderColor = "rgb(0, 0, 0)";
-            });
-
-            // COMPLETELY HIDE bank detail lines from html2canvas capture.
-            // We will re-draw them cleanly with jsPDF AFTER the image is placed.
-            // Keeping the layout box intact (empty pixels) so rest of invoice alignment is preserved.
-            root.querySelectorAll("[data-pdf-bank-line]").forEach((elem) => {
-              elem.style.setProperty("opacity", "0", "important");
-              elem.style.setProperty("visibility", "hidden", "important");
-              elem.style.setProperty("color", "rgb(255,255,255)", "important");
-              elem.style.setProperty("backgroundColor", "rgb(255,255,255)", "important");
-              elem.style.setProperty("textIndent", "-9999px", "important");
-            });
-          }
-        },
+        width: captureWidth,
+        height: captureHeight,
+        windowWidth: captureWidth,
+        windowHeight: captureHeight,
+        x: 0,
+        y: 0,
       });
 
       const imgData = canvas.toDataURL("image/png", 1.0);
@@ -2305,16 +2257,12 @@ const NewInvoice = ({ invoice }) => {
         : `Invoice-${data.invoice.number.replace(/[/\\]/g, "_")}.pdf`;
       pdf.save(pdfFileName);
 
-      el.style.width = originalWidth;
-      el.style.maxWidth = originalMaxWidth;
-      el.style.padding = originalPadding;
-      el.style.border = originalBorder;
     } catch (err) {
       console.error("PDF generation failed:", err);
       alert("Failed to generate PDF. Check console for details.");
     } finally {
-      if (styleTag && styleTag.parentNode) {
-        document.head.removeChild(styleTag);
+      if (offscreenWrapper && offscreenWrapper.parentNode) {
+        document.body.removeChild(offscreenWrapper);
       }
       if (loadingDiv && loadingDiv.parentNode) {
         document.body.removeChild(loadingDiv);
