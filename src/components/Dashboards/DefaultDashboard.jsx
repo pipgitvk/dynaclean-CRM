@@ -22,6 +22,7 @@ export default function DefaultDashboard({ user, reportingManager, counts }) {
   const isDigitalRole =
     roleNorm.includes("DIGITAL") || roleNorm.includes("MARKETER");
   const isEaRole = String(user?.userRole || "").trim() === "EA";
+  const isDesignEngineer = roleNorm === "DESIGN ENGINEER";
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -59,18 +60,20 @@ export default function DefaultDashboard({ user, reportingManager, counts }) {
         </div>
       ) : (
         <>
-          {/* Enquiry left, Tasks right */}
+          {/* Enquiry + Tasks grid - Enquiry hidden for Design Engineer */}
           <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-12">
-            <div className={`${salesCard} min-h-[380px] xl:col-span-8`}>
-              <UpcomingLeads
-                leadSource={user.username}
-                userRole={user.userRole}
-                compact
-                variant="sales"
-                dashboardPrefix="/user-dashboard"
-              />
-            </div>
-            <div className={`${salesCard} min-h-[280px] xl:col-span-4`}>
+            {!isDesignEngineer && (
+              <div className={`${salesCard} min-h-[380px] xl:col-span-8`}>
+                <UpcomingLeads
+                  leadSource={user.username}
+                  userRole={user.userRole}
+                  compact
+                  variant="sales"
+                  dashboardPrefix="/user-dashboard"
+                />
+              </div>
+            )}
+            <div className={`${salesCard} min-h-[280px] ${isDesignEngineer ? "xl:col-span-12" : "xl:col-span-4"}`}>
               <UpcomingTasks
                 leadSource={user.username}
                 compact
@@ -80,8 +83,8 @@ export default function DefaultDashboard({ user, reportingManager, counts }) {
             </div>
           </div>
 
-          {/* Upcoming Follow-ups - Hidden for EA role */}
-          {!isEaRole && (
+          {/* Upcoming Follow-ups - Hidden for EA role and Design Engineer */}
+          {!isEaRole && !isDesignEngineer && (
             <UpcomingFollowupsWidget
               username={user.username}
               userRole={user.userRole}
