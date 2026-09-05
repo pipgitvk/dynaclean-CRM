@@ -23,6 +23,8 @@ export default function QuotationForm() {
   const [customerIdInput, setCustomerIdInput] = useState("");
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(false);
   const [customerError, setCustomerError] = useState("");
+  const [modalSuggestions, setModalSuggestions] = useState([]);
+  const [showModalSuggestions, setShowModalSuggestions] = useState(false);
   const [originalCustomerData, setOriginalCustomerData] = useState(null);
   const [editableFields, setEditableFields] = useState({
     company: true,
@@ -538,7 +540,7 @@ export default function QuotationForm() {
       {/* Customer ID Modal */}
       {showCustomerModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 overflow-visible">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               Enter Customer ID
             </h2>
@@ -552,12 +554,33 @@ export default function QuotationForm() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Customer ID *
                 </label>
+                <div className="relative">
                 <input
                   type="text"
                   value={customerIdInput}
-                  onChange={(e) => {
-                    setCustomerIdInput(e.target.value);
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setCustomerIdInput(val);
                     setCustomerError("");
+
+                    if (val.trim().length === 0) {
+                      setModalSuggestions([]);
+                      setShowModalSuggestions(false);
+                      return;
+                    }
+
+                    try {
+                      const res = await fetch("/api/customer-suggestions", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ query: val }),
+                      });
+                      const data = await res.json();
+                      setModalSuggestions(Array.isArray(data) ? data : []);
+                      setShowModalSuggestions(true);
+                    } catch (err) {
+                      console.error("Suggestion fetch error", err);
+                    }
                   }}
                   onKeyPress={(e) => {
                     if (e.key === "Enter") {
@@ -565,13 +588,36 @@ export default function QuotationForm() {
                       handleFetchCustomer();
                     }
                   }}
-                  placeholder="Enter customer ID"
+                  placeholder="Enter customer ID or name"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={isLoadingCustomer}
+                  autoComplete="off"
                 />
+                {showModalSuggestions && modalSuggestions.length > 0 && (
+                  <ul className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto w-full text-sm">
+                    {modalSuggestions.map((s, i) => (
+                      <li
+                        key={i}
+                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b last:border-0"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setCustomerIdInput(String(s.customer_id));
+                          setShowModalSuggestions(false);
+                          setModalSuggestions([]);
+                          fetchCustomerById(String(s.customer_id));
+                        }}
+                      >
+                        <span className="font-semibold text-blue-700">#{s.customer_id}</span>
+                        {s.company ? ` — ${s.company}` : ""}
+                        {s.location ? <span className="text-gray-400 text-xs ml-1">({s.location})</span> : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {customerError && (
                   <p className="text-sm text-red-600 mt-2">{customerError}</p>
                 )}
+                </div>
               </div>
 
               <div className="flex gap-3">
