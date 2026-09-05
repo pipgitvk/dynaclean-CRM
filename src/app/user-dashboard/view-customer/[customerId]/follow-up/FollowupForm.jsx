@@ -21,7 +21,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
     communication_mode: "",
     status: "",
     multi_tag: [],
-    stage: "New"
+    stage: "New",
+    purpose: "",
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -492,6 +493,7 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         delete payload.stage;
         delete payload.multi_tag;
         delete payload.gem_next_followup;
+        // purpose is kept in payload for SERVICE SUPPORT
       }
 
       // GEM को next_followup_date की जरूरत नहीं, सिर्फ gem_next_followup भेजेंगे
@@ -636,6 +638,27 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         </select>
       </div>
 
+      {/* Calling Purpose - Only for SERVICE SUPPORT */}
+      {isServiceSupport && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Calling Purpose <span className="text-red-500">*</span>
+          </label>
+          <select
+            name="purpose"
+            value={formData.purpose}
+            onChange={handleChange}
+            className="w-full px-4 py-2 border rounded-lg"
+            required
+          >
+            <option value="" disabled>Select Purpose</option>
+            <option value="Service">Service</option>
+            <option value="CAMC">CAMC</option>
+            <option value="Installation">Installation</option>
+          </select>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-medium text-gray-700">
           Status
@@ -767,14 +790,14 @@ export default function FollowupForm({ customerId, userRole = "" }) {
             value={formData.service_next_followup}
             onChange={handleChange}
             min={nextFollowupDateLimits.min}
-            max={nextFollowupDateLimits.max}
+            max={formatISTDateTime(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000))}
             disabled={isLoadingCustomer}
             className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
           />
           <p className="mt-1 text-xs text-blue-600">
             {isLoadingCustomer
               ? "Loading lead information..."
-              : "Schedule your next service follow-up (maximum 15 days from now)."}
+              : "Schedule your next service follow-up (maximum 2 months from now)."}
           </p>
         </div>
       )}

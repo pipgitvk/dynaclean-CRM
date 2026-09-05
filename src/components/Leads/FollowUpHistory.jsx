@@ -274,8 +274,8 @@ export default function FollowUpHistory({
   cust_analysis_external,
   userRole = "",
 }) {
-  const uploads = cust_analysis_external?.uploads || [];
   const isServiceSupport = userRole === "SERVICE SUPPORT";
+  const uploads = isServiceSupport ? [] : (cust_analysis_external?.uploads || []);
 const mergedMap = {};
 
 // 1️⃣ Add followups (support multiple per date safely)

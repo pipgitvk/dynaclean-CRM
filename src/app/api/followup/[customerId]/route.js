@@ -176,11 +176,12 @@ export async function POST(req, { params }) {
   }
 
   const notesLanguage = (data.notes_language || "en").slice(0, 10);
+  const purpose = data.purpose ? data.purpose.slice(0, 100) : null;
 
   await conn.execute(
     `INSERT INTO customers_followup 
-    (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag, purpose)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       customerId,
       name,
@@ -195,6 +196,7 @@ export async function POST(req, { params }) {
       notesLanguage,
       followedBy,
       data.multi_tag || null,
+      purpose,
     ],
   );
 
@@ -204,22 +206,23 @@ export async function POST(req, { params }) {
     const secondRowNotes = `(${followedBy}) marked (${name}-${contact}) as Denied dated (${currentDateTime}), ${data.notes}`;
     await conn.execute(
       `INSERT INTO customers_followup 
-      (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (customer_id, name, contact, email, next_followup_date, service_next_followup, gem_next_followup, followed_date, comm_mode, notes, notes_language, followed_by, multi_tag, purpose)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customerId,
         name,
         contact,
         email,
-        nextFollowupDateUTC, // 4 days later date
-        null, // no service_next_followup for Denied status
-        null, // no gem_next_followup for Denied status
+        nextFollowupDateUTC,
+        null,
+        null,
         followedDateUTC,
         data.communication_mode,
         secondRowNotes,
         notesLanguage,
         followedBy,
         data.multi_tag || null,
+        purpose,
       ],
     );
   }

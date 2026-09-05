@@ -444,7 +444,7 @@ const allMenuItems = [
         },
         {
           path: "/admin-dashboard/service-followups",
-          name: "Service Follow-ups",
+          name: "Machine Follow-ups",
           accessKey: "service-followups",
           roles: ["SUPERADMIN", "SERVICE SUPPORT"],
           icon: "Calendar",

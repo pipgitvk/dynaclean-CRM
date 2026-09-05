@@ -47,12 +47,19 @@ export default async function CustomerPage({ params }) {
     .trim();
 
   // Fetch followup history
+  // SERVICE SUPPORT: only their own followups; everyone else: all followups
+  const isServiceSupport = userRole === "SERVICE SUPPORT";
   const [fups] = await conn.execute(
-    `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
-     FROM customers_followup
-     WHERE customer_id = ?
-     ORDER BY time_stamp DESC`,
-    [customerId],
+    isServiceSupport
+      ? `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
+         FROM customers_followup
+         WHERE customer_id = ? AND followed_by = ? AND followed_by IS NOT NULL AND followed_by != ''
+         ORDER BY time_stamp DESC`
+      : `SELECT next_followup_date, service_next_followup, followed_date, followed_by, notes, comm_mode, time_stamp 
+         FROM customers_followup
+         WHERE customer_id = ?
+         ORDER BY time_stamp DESC`,
+    isServiceSupport ? [customerId, username] : [customerId],
   );
 
   // Fetch orders count for this customer
@@ -322,13 +329,15 @@ export default async function CustomerPage({ params }) {
               Special Price
             </Link>
 
-            {/* View Ledger - visible to all */}
-            <Link
-              href={`/admin-dashboard/accounting/ledger?customerId=${customerId}`}
-              className="btn text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
-            >
-              View Ledger
-            </Link>
+            {/* View Ledger - hidden for SERVICE SUPPORT */}
+            {userRole !== "SERVICE SUPPORT" && (
+              <Link
+                href={`/admin-dashboard/accounting/ledger?customerId=${customerId}`}
+                className="btn text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                View Ledger
+              </Link>
+            )}
 
             {showScheduleVisitBtn && (
               <ScheduleVisitModal

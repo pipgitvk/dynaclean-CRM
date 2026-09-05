@@ -11,7 +11,7 @@ export default async function UpcomingFollowupsWidget({
 }) {
   const connection = await getDbConnection();
   const role = (userRole || "").toUpperCase();
-  const canViewAll = role === "SERVICE HEAD" || role === "SUPERADMIN" || role === "DIRECTOR" || role === "SERVICE SUPPORT";
+  const canViewAll = role === "SERVICE HEAD" || role === "SUPERADMIN" || role === "DIRECTOR";
 
   let rows = [];
 

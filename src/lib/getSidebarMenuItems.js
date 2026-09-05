@@ -399,7 +399,7 @@ const allMenuItems = [
       },
       {
         path: "/user-dashboard/service-followups",
-        name: "Service Follow-ups",
+        name: "Machine Follow-ups",
         moduleKey: "service-followups",
         roles: ["ALL"],
         icon: "Calendar",

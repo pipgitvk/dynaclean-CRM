@@ -81,7 +81,7 @@ function FollowUpModal({ fu, onClose, onSaved }) {
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* header */}
         <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="text-xl font-bold text-gray-800">Service Follow-up</h3>
+          <h3 className="text-xl font-bold text-gray-800">Machine Follow-up</h3>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200"><X size={22} /></button>
         </div>
         {/* info strip */}
@@ -332,7 +332,7 @@ export default function ServiceFollowupsPage() {
     <div className="w-full max-w-full p-6 overflow-hidden">
       {/* page header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-3xl font-bold">Service Follow-ups</h2>
+        <h2 className="text-3xl font-bold">Machine Follow-ups</h2>
         <button onClick={() => setAddModalOpen(true)}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
           <Plus size={18} /> Add Follow-up
@@ -413,7 +413,7 @@ export default function ServiceFollowupsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-xl font-bold text-gray-800">Add Service Follow-up</h3>
+              <h3 className="text-xl font-bold text-gray-800">Add Machine Follow-up</h3>
               <button onClick={() => setAddModalOpen(false)} className="p-1 rounded-full hover:bg-gray-200"><X size={22} /></button>
             </div>
             <form onSubmit={handleAddSubmit} className="p-6 space-y-4">

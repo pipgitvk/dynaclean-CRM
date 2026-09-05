@@ -29,10 +29,21 @@ async function getQuotations(username, role, { search, date_from, date_to, custo
   let values = [];
 
   // ---------------------------------------------------------
+  // ⭐ SERVICE SUPPORT → ALWAYS ONLY OWN QUOTATIONS (with optional customer_id filter)
+  // ---------------------------------------------------------
+  if (role === "SERVICE SUPPORT") {
+    conditions.push(`qr.emp_name = ?`);
+    values.push(username);
+    if (customer_id) {
+      conditions.push(`qr.customer_id = ?`);
+      values.push(customer_id);
+    }
+  }
+  // ---------------------------------------------------------
   // ⭐ IF customer_id IS PROVIDED → SHOW ALL QUOTATIONS FOR THAT CUSTOMER
   // (Regardless of user role)
   // ---------------------------------------------------------
-  if (customer_id) {
+  else if (customer_id) {
     conditions.push(`qr.customer_id = ?`);
     values.push(customer_id);
   }

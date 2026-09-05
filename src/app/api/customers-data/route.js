@@ -80,8 +80,17 @@ export async function GET(req) {
     if (!canViewAllCustomers(role)) {
       const normalizedRole = normalizeRoleKey(role);
 
-      if (globalSearch && (normalizedRole === "SERVICE SUPPORT" || normalizedRole === "GEM")) {
-        // Skip ownership scoping for SERVICE SUPPORT / GEM when using global header search
+      if (globalSearch && normalizedRole === "GEM") {
+        // Skip ownership scoping for GEM when using global header search
+      } else if (globalSearch && normalizedRole === "SERVICE SUPPORT") {
+        // SERVICE SUPPORT global header search: only customers with at least one fully processed order
+        // (account_status = 1 AND dispatch_status = 1)
+        // Use subquery with no outer-table reference so it works in both countSql (no alias) and dataSql (alias c)
+        whereClause += ` AND customer_id IN (
+          SELECT DISTINCT customer_id FROM neworder
+          WHERE account_status = 1
+            AND dispatch_status = 1
+        )`;
       } else if (normalizedRole === "SERVICE SUPPORT") {
         // SERVICE SUPPORT sees only customers assigned to them via service_lead_source
         if (username) {

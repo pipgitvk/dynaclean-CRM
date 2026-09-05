@@ -324,7 +324,7 @@ export default function UpcomingFollowupsClient({
             }
           >
             <ClipboardList className="text-indigo-500" size={isSales ? 18 : 26} />
-            Upcoming Follow-ups ({rows.length})
+            Upcoming Machine Follow-ups ({rows.length})
           </h2>
           <Link href={`${dashboardPrefix}/service-followups`}>
             <button
