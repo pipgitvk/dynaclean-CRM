@@ -2119,7 +2119,19 @@ const NewInvoice = ({ invoice }) => {
           elem.style.overflow = "visible";
           elem.style.overflowY = "visible";
         }
+        // Force all elements to be visible (no display:none, visibility:hidden)
+        if (elem.style.display === "none") elem.style.display = "block";
+        if (elem.style.visibility === "hidden") elem.style.visibility = "visible";
       });
+
+      // Force layout recalculation
+      await new Promise((r) => setTimeout(r, 100));
+      const finalHeight = Math.max(
+        clonedEl.scrollHeight,
+        clonedEl.offsetHeight,
+        clonedEl.getBoundingClientRect().height
+      );
+      clonedEl.style.minHeight = `${finalHeight}px`;
 
       // Collect positions for ALL 4 bank detail lines using the cloned element
       const bankLineSelectors = ["holder", "name", "acno", "ifsc"];
@@ -2716,9 +2728,12 @@ const NewInvoice = ({ invoice }) => {
                   textAlign: "left",
                 }}
               >
-                <b>Buyer's Order No. : <span style={{
-                  fontWeight: "normal",
-                }}>{data.invoice.buyersOrderNo}</span></b>
+                <div style={{ fontWeight: "bold", lineHeight: "1.3" }}>
+                  Buyer's Order No. :
+                </div>
+                <div style={{ fontWeight: "normal", marginTop: "4px", lineHeight: "1.3" }}>
+                  {data.invoice.buyersOrderNo || "-"}
+                </div>
               </td>
               <td
                 style={{
