@@ -2152,12 +2152,6 @@ function PreviewModal({ purchase, onClose }) {
             <Save size={16} /> Save PDF
           </button>
           <button
-            onClick={handleEmailPdf}
-            className="px-5 py-2 border-2 border-red-500 text-red-600 rounded-full hover:bg-red-50 transition font-medium flex items-center gap-2 text-sm"
-          >
-            <Mail size={16} /> Email PDF
-          </button>
-          <button
             onClick={onClose}
             className="px-5 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition font-medium shadow-sm text-sm"
           >
