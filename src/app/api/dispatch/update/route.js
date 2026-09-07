@@ -28,7 +28,8 @@ export async function POST(req) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = tokenPayload.role;
     const username = tokenPayload.username;
-    if (role !== "warehouse incharge" && role !== "WAREHOUSE INCHARGE") {
+    const roleUpperUpdate = String(role).toUpperCase();
+    if (!["WAREHOUSE INCHARGE", "ADMIN"].includes(roleUpperUpdate)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

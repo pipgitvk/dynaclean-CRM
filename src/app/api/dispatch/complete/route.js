@@ -7,7 +7,8 @@ export async function POST(req) {
     const payload = await getSessionPayload();
     if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const role = payload.role;
-    if (role !== "warehouse incharge" && role !== "WAREHOUSE INCHARGE") {
+    const roleUpperComplete = String(role).toUpperCase();
+    if (!["WAREHOUSE INCHARGE", "ADMIN"].includes(roleUpperComplete)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
