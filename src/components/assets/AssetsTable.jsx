@@ -25,6 +25,7 @@ export default function AssetsTable() {
   const [showLinkStatementModal, setShowLinkStatementModal] = useState(false);
   const [selectedAssetIds, setSelectedAssetIds] = useState(new Set());
   const [showBulkLinkModal, setShowBulkLinkModal] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState(null);
 
   const handleSort = (key) => {
     setSortConfig((prev) => {
@@ -280,6 +281,7 @@ export default function AssetsTable() {
               />
             </th>
             <th className="py-3 px-6 text-left cursor-pointer w-24" onClick={() => handleSort('asset_id')}>Asset ID {sortConfig.key==='asset_id' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
+            <th className="py-3 px-6 text-center w-24">Image</th>
             <th className="py-3 px-6 text-left cursor-pointer w-28" onClick={() => handleSort('asset_category')}>Category {sortConfig.key==='asset_category' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
             <th className="py-3 px-6 text-left cursor-pointer w-40" onClick={() => handleSort('asset_name')}>Asset Name {sortConfig.key==='asset_name' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
             <th className="py-3 px-6 text-left cursor-pointer w-32" onClick={() => handleSort('sim_no_1')}>SIM Number {sortConfig.key==='sim_no_1' && (<span>{sortConfig.direction==='asc'?' ▲':' ▼'}</span>)}</th>
@@ -310,6 +312,21 @@ export default function AssetsTable() {
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {asset.asset_id}
+                  </td>
+                  <td className="py-3 px-6 text-center">
+                    {asset.asset_photos_paths && JSON.parse(asset.asset_photos_paths).length > 0 ? (
+                      <div className="flex justify-center">
+                        <img
+                          src={JSON.parse(asset.asset_photos_paths)[0]}
+                          alt={asset.asset_name}
+                          className="h-12 w-12 object-cover rounded cursor-pointer transition-all duration-300 hover:scale-110"
+                          onMouseEnter={() => setZoomedImage(JSON.parse(asset.asset_photos_paths)[0])}
+                          onMouseLeave={() => setZoomedImage(null)}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-sm">No Image</span>
+                    )}
                   </td>
                   <td className="py-3 px-6 whitespace-nowrap">
                     {asset.asset_category || asset.type || '-'}
@@ -372,6 +389,24 @@ export default function AssetsTable() {
                       )
                     ) : (
                       "--"
+                    )}
+                  </td>
+                  <td className="py-3 px-6 text-center">
+                    {asset.asset_photos_paths && JSON.parse(asset.asset_photos_paths).length > 0 ? (
+                      <div className="flex justify-center">
+                        <img
+                          src={JSON.parse(asset.asset_photos_paths)[0]}
+                          alt={asset.asset_name}
+                          className="h-12 w-12 object-cover rounded cursor-pointer transition-all duration-300 hover:scale-150 hover:shadow-lg hover:z-50"
+                          onMouseEnter={() => setZoomedImage(JSON.parse(asset.asset_photos_paths)[0])}
+                          onMouseLeave={() => setZoomedImage(null)}
+                          style={{
+                            position: zoomedImage === JSON.parse(asset.asset_photos_paths)[0] ? 'relative' : 'relative'
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-sm">No Image</span>
                     )}
                   </td>
                   <td className="py-3 px-6 text-center whitespace-nowrap">
@@ -541,6 +576,23 @@ export default function AssetsTable() {
       <Modal isOpen={isModalOpen} onClose={closeModal}>
         {renderModalContent()}
       </Modal>
+      
+      {/* Image Zoom Overlay */}
+      {zoomedImage && (
+        <div 
+          className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+          onMouseLeave={() => setZoomedImage(null)}
+        >
+          <div className="pointer-events-auto rounded-lg shadow-2xl p-4">
+            <img
+              src={zoomedImage}
+              alt="Zoomed Asset"
+              className="max-w-md max-h-96 rounded-md object-contain"
+            />
+          </div>
+        </div>
+      )}
+      
       <LinkStatementModal 
         isOpen={showLinkStatementModal} 
         onClose={() => setShowLinkStatementModal(false)}
