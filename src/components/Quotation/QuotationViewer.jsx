@@ -182,7 +182,7 @@ export default function QuotationViewer({
         },
       });
 
-      const imgData = canvas.toDataURL("image/jpeg", 0.7);
+      const imgData = canvas.toDataURL("image/jpeg", 0.85);
 
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -190,21 +190,23 @@ export default function QuotationViewer({
 
       // Image dimensions in jsPDF units
       const imgProps = pdf.getImageProperties(imgData);
-      const imgWidth = pdfWidth;
-      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+      const naturalImgHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      // Calculate total number of pages
-      let heightLeft = imgHeight;
-      let position = 0;
+      // If content fits within one page, render as-is.
+      // Otherwise scale it down to fit exactly one A4 page.
+      const fitsOnOnePage = naturalImgHeight <= pdfHeight;
 
-      pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pdfHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight; // shift canvas for next page
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
+      if (fitsOnOnePage) {
+        // Normal single-page render
+        pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, naturalImgHeight);
+      } else {
+        // Scale down uniformly so everything fits on one page
+        const scaleFactor = pdfHeight / naturalImgHeight;
+        const scaledWidth = pdfWidth * scaleFactor;
+        const scaledHeight = pdfHeight;
+        // Centre horizontally on the page
+        const xOffset = (pdfWidth - scaledWidth) / 2;
+        pdf.addImage(imgData, "JPEG", xOffset, 0, scaledWidth, scaledHeight);
       }
 
       // Build filename: QUOTE-DYNACLEAN-{ClientName}.pdf
