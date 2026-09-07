@@ -89,6 +89,14 @@ export default async function CustomerPage({ params }) {
     }
   }
 
+  // Fetch machine follow-up history for SUPERADMIN and SALES roles only
+  const roleUpper = String(userRole).toUpperCase().trim();
+  const canSeeMachineFollowup =
+    roleUpper === "SUPERADMIN" ||
+    roleUpper === "SALES" ||
+    roleUpper === "SALES HEAD" ||
+    roleUpper === "SALES CUM BACKOFFICE";
+
   // await conn.end();
 
   return (
@@ -329,6 +337,14 @@ export default async function CustomerPage({ params }) {
                   className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-teal-600 hover:bg-teal-700 py-2 px-4 rounded-md text-center transition duration-300"
                 >
                   Orders ({orderCount})
+                </Link>
+              )}
+              {canSeeMachineFollowup && (
+                <Link
+                  href={`/admin-dashboard/view-customer/${customerId}/machine-followup`}
+                  className="btn w-full md:w-auto md:flex-shrink-0 whitespace-nowrap text-white bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded-md text-center transition duration-300"
+                >
+                  Machine Follow-up
                 </Link>
               )}
             </div>

@@ -97,6 +97,12 @@ export default async function CustomerPage({ params }) {
     }
   }
 
+  const roleUpper = String(userRole).toUpperCase().trim();
+  const canSeeMachineFollowup =
+    roleUpper === "SALES" ||
+    roleUpper === "SALES HEAD" ||
+    roleUpper === "SALES CUM BACKOFFICE";
+
   // await conn.end();
 
   return (
@@ -357,6 +363,14 @@ export default async function CustomerPage({ params }) {
                 className="btn text-white bg-teal-600 hover:bg-teal-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
               >
                 Orders ({orderCount})
+              </Link>
+            )}
+            {canSeeMachineFollowup && (
+              <Link
+                href={`/user-dashboard/view-customer/${customerId}/machine-followup`}
+                className="btn text-white bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded-md w-full md:w-auto text-center transition duration-300"
+              >
+                Machine Follow-up
               </Link>
             )}
           </div>
