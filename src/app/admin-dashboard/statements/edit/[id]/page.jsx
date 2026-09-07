@@ -305,7 +305,16 @@ export default function EditStatementPage() {
         <label className="block text-sm font-semibold mb-2">Statement Type *</label>
         <select
           value={statementType}
-          onChange={(e) => setStatementType(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === "invoices") {
+              router.push("/admin-dashboard/statements/invoices");
+            } else if (value === "purchase_billings") {
+              router.push("/admin-dashboard/statements/purchase-billings");
+            } else {
+              setStatementType(value);
+            }
+          }}
           disabled={isTypeLocked}
           className="w-full sm:w-1/2 border p-2 rounded disabled:bg-gray-200 disabled:cursor-not-allowed"
           required
@@ -314,6 +323,8 @@ export default function EditStatementPage() {
           <option value="expense">Expense</option>
           <option value="failed_transaction">Failed Transaction</option>
           <option value="cancelled_transaction">Cancelled Transaction</option>
+          <option value="invoices">Invoices</option>
+          <option value="purchase_billings">Purchase Billings</option>
         </select>
         {isTypeLocked && (
           <p className="text-xs text-red-600 mt-2">
