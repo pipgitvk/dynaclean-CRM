@@ -36,7 +36,6 @@ function createMysqlPool() {
     host: DB_HOST,
     user: DB_USER,
     database: DB_NAME,
-    passwordLength: DB_PASSWORD.length,
   });
 
   const pool = mysql.createPool({
@@ -46,45 +45,35 @@ function createMysqlPool() {
     database: DB_NAME,
 
     waitForConnections: true,
-    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
+    // Keep the pool small — Hostinger limits 500 connections/hour.
+    // connectionLimit=5 means at most 5 physical connections are open at once,
+    // and they are reused across all requests, not opened fresh per request.
+    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 5),
     queueLimit: 0,
 
     connectTimeout: 10000,
-    
-    /**
-     * CRITICAL: Idle timeout prevents connection leaks
-     * Closes idle connections after 30 seconds to free up resources
-     * This prevents ER_USER_LIMIT_REACHED errors
-     */
-    idleTimeout: 30000,
 
-    /**
-     * Important:
-     * DATE/DATETIME/TIMESTAMP strings me return honge.
-     * Isse frontend me UTC/IST double conversion issue nahi aayega.
-     */
+    // idleTimeout is intentionally removed.
+    // It was closing idle connections after 30 s, then mysql2 had to re-open
+    // them on the next request — each re-open counted against the hourly quota.
+    // enableKeepAlive below keeps the connections alive so they never need
+    // to be re-established.
+
+    // DATE/DATETIME/TIMESTAMP are returned as strings to avoid
+    // UTC/IST double-conversion on the frontend.
     dateStrings: true,
 
-    /**
-     * Keep connection stable on hosting providers.
-     */
+    // Keep long-lived connections stable on Hostinger's remote MySQL.
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0,
+    keepAliveInitialDelay: 30000,
 
-    /**
-     * Agar Hostinger MySQL SSL require karta ho to .env me DB_SSL=true set kar dena.
-     */
     ssl:
       process.env.DB_SSL === "true"
-        ? {
-            rejectUnauthorized: false,
-          }
+        ? { rejectUnauthorized: false }
         : undefined,
   });
 
-  console.log("✅ [DB] MySQL pool created");
-  console.log("✅ [DB] Host:", DB_HOST);
-  console.log("✅ [DB] Database:", DB_NAME);
+  console.log(`✅ [DB] MySQL pool created — host: ${DB_HOST}, db: ${DB_NAME}`);
 
   return pool;
 }
@@ -132,6 +121,15 @@ async function recreatePool() {
 function shouldRecreatePool(error) {
   const message = error?.message || "";
   const code = error?.code || "";
+  // Do NOT recreate the pool for quota/limit errors — opening a new pool
+  // immediately consumes another connection and makes the hourly limit worse.
+  if (
+    code === "ER_USER_LIMIT_REACHED" ||
+    code === "ER_TOO_MANY_USER_CONNECTIONS" ||
+    code === "ER_CON_COUNT_ERROR"
+  ) {
+    return false;
+  }
   return (
     message.includes("Pool is closed") ||
     code === "POOL_CLOSED" ||

@@ -47,13 +47,9 @@ async function generateRecurringTasks() {
     conn = await pool.getConnection();
 
     const [[dbNow]] = await conn.execute(`SELECT NOW() as current_db_time`);
-    console.log(`⏰ Current database time (NOW()): ${dbNow.current_db_time}`);
+    console.log(`⏰ [RecurringCron] DB time: ${dbNow.current_db_time}`);
 
-    // First, get all recurring tasks for debugging!
-    const [allRecurringTasks] = await conn.execute(`SELECT * FROM recurring_tasks`);
-    console.log(`📊 All recurring tasks in DB (${allRecurringTasks.length}):`, allRecurringTasks);
-
-    // First, get all active recurring tasks that are due (without the last_generated_at condition)
+    // Get all active recurring tasks that are due
     const [recurringTasks] = await conn.execute(
       `SELECT * FROM recurring_tasks 
        WHERE status = 'active' 

@@ -148,7 +148,7 @@ export default function Navbar({ onToggleSidebar, showSalesMeta = false }) {
     }
   };
   
-  // Fetch notifications on component mount and poll every 30 seconds
+  // Fetch notifications on component mount and poll every 15 seconds
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 15000);
