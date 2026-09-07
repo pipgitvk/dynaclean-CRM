@@ -53,14 +53,7 @@ function createMysqlPool() {
 
     connectTimeout: 10000,
 
-    // idleTimeout is intentionally removed.
-    // It was closing idle connections after 30 s, then mysql2 had to re-open
-    // them on the next request — each re-open counted against the hourly quota.
-    // enableKeepAlive below keeps the connections alive so they never need
-    // to be re-established.
-
-    // DATE/DATETIME/TIMESTAMP are returned as strings to avoid
-    // UTC/IST double-conversion on the frontend.
+   
     dateStrings: true,
 
     // Keep long-lived connections stable on Hostinger's remote MySQL.
