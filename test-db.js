@@ -7,6 +7,7 @@ const mysql = require("mysql2/promise");
       user: "u983728112_crm",
       password: "dH76ZhzY&",
       database: "u983728112_crm",
+       passwordLength: DB_PASSWORD.length,
     });
 
     console.log("✅ Connected from Node!");
