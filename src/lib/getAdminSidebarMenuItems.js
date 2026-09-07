@@ -1066,3 +1066,12 @@ export async function getShowBackToUserCrm() {
   const roleKeyNormalized = await getAdminRoleKeyNormalized();
   return roleKeyNormalized !== "SUPERADMIN";
 }
+
+/** Returns accounts-dashboard path for ACCOUNTANT role, null otherwise. */
+export async function getAccountantBackPath() {
+  const roleKeyNormalized = await getAdminRoleKeyNormalized();
+  if (String(roleKeyNormalized).toUpperCase().includes("ACCOUNTANT")) {
+    return "/accounts-dashboard";
+  }
+  return null;
+}
