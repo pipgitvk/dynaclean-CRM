@@ -57,7 +57,7 @@ export async function POST(request) {
       AND (esd.effective_from <= ? AND (esd.effective_to IS NULL OR esd.effective_to >= ?))
     `, [username, salary_month + '-31', salary_month + '-01']);
 
-    const workingDays = 30;
+    const workingDays = Math.max(1, Number(working_days) || 30);
     const presentDays = Number(present_days) || 0;
     const overtimeHours = Number(overtime_hours) || 0;
 
@@ -142,6 +142,18 @@ export async function POST(request) {
       const isESI = code === 'ESI' || name === 'ESI' || name.includes('ESI');
       const isIT = code === 'IT' || name === 'IT' || name.includes('Income Tax');
       const isPT = code === 'PT' || name === 'PT' || name.includes('Professional Tax');
+      const isUnpaidLeave = code === 'UNPAID_LEAVE' || (typeof name === 'string' && name.toLowerCase().includes('unpaid leave'));
+
+      if (isUnpaidLeave) {
+        deductionDetails.push({
+          deduction_type_id: deduction.deduction_type_id,
+          deduction_name: deduction.deduction_name,
+          deduction_code: deduction.deduction_code,
+          amount: 0,
+          reason: deduction.reason,
+        });
+        continue;
+      }
 
       if (isPF) {
         deductionDetails.push({
@@ -191,7 +203,7 @@ export async function POST(request) {
             amount = 0;
           }
         } else if (isPT) {
-          amount = Number(deduction.amount) > 0 ? Number(deduction.amount) : 200;
+          amount = 200;
         } else {
           amount = Number(deduction.amount) || 0;
         }
