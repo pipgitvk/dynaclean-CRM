@@ -231,6 +231,32 @@ export default function AdminLeaveManagement() {
     }
   };
 
+  const handleRevertAcknowledgement = async (leaveId) => {
+    try {
+      setActionLoading(true);
+      const response = await fetch("/api/empcrm/leaves", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leaveId, revert_acknowledgement: true })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert("Acknowledgement reverted successfully");
+        fetchLeaves();
+        setShowApprovalModal(false);
+      } else {
+        alert(data.error || "Failed to revert acknowledgement");
+      }
+    } catch (error) {
+      console.error("Error reverting acknowledgement:", error);
+      alert("Error reverting acknowledgement");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleReject = async (leaveId) => {
     if (!rejectionReason.trim()) {
       alert("Please provide a rejection reason");
@@ -314,28 +340,22 @@ export default function AdminLeaveManagement() {
       rejected: <XCircle className="w-3 h-3" />
     };
 
-    const statusBadge = (
+    if (acknowledgedAt) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+          <BadgeCheck className="w-3 h-3" />
+          Acknowledged
+        </span>
+      );
+    }
+
+    return (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${styles[status]}`}>
         {icons[status]}
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
-
-    if (!acknowledgedAt) {
-      return statusBadge;
-    }
-
-    return (
-      <div className="flex flex-col gap-1 items-start">
-        {statusBadge}
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
-          <BadgeCheck className="w-3 h-3" />
-          Acknowledged
-        </span>
-      </div>
-    );
   };
-
   const getLeaveTypeColor = (type) => {
     const colors = {
       sick: "bg-blue-100 text-blue-800",
@@ -546,11 +566,19 @@ export default function AdminLeaveManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      {getStatusBadge(leave.status, leave.acknowledged_at)}
+                      <div className="flex flex-col gap-2">
+                        {getStatusBadge(leave.status, leave.acknowledged_at)}
+                        {leave.acknowledged_at && leave.acknowledgement_remark && (
+                          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-2 mt-1">
+                            <p className="text-xs font-medium text-indigo-700 mb-1">Remark:</p>
+                            <p className="text-xs text-indigo-600">{leave.acknowledgement_remark}</p>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
-                        {isSuperAdmin && leave.status === "pending" && (
+                        {isSuperAdmin && leave.status === "pending" && !leave.acknowledged_at && (
                           <>
                             <button
                               onClick={() => {
@@ -571,6 +599,17 @@ export default function AdminLeaveManagement() {
                               Reject
                             </button>
                           </>
+                        )}
+                        {leave.status === "pending" && leave.acknowledged_at && (
+                          <button
+                            onClick={() => {
+                              setSelectedLeave(leave);
+                              handleRevertAcknowledgement(leave.id);
+                            }}
+                            className="px-3 py-1 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium"
+                          >
+                            Revert
+                          </button>
                         )}
                         {leave.status === "pending" && !leave.acknowledged_at && (
                           <button
@@ -818,10 +857,18 @@ export default function AdminLeaveManagement() {
               )}
 
               {selectedLeave.acknowledged_by && (
-                <div className="text-sm text-indigo-600 flex items-center gap-1 mt-1">
-                  <BadgeCheck className="w-4 h-4" />
-                  Acknowledged by <span className="font-medium">{selectedLeave.acknowledged_by}</span> on{" "}
-                  {formatDate(selectedLeave.acknowledged_at)}
+                <div>
+                  <div className="text-sm text-indigo-600 flex items-center gap-1 mt-1">
+                    <BadgeCheck className="w-4 h-4" />
+                    Acknowledged by <span className="font-medium">{selectedLeave.acknowledged_by}</span> on{" "}
+                    {formatDate(selectedLeave.acknowledged_at)}
+                  </div>
+                  {selectedLeave.acknowledgement_remark && (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mt-2">
+                      <p className="text-sm font-medium text-indigo-700 mb-1">Remark:</p>
+                      <p className="text-sm text-indigo-600">{selectedLeave.acknowledgement_remark}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -829,7 +876,7 @@ export default function AdminLeaveManagement() {
 
             <div className="p-6 border-t border-gray-200">
               {/* SUPERADMIN Approve/Reject Actions */}
-              {isSuperAdmin && selectedLeave.status === "pending" && (
+              {isSuperAdmin && selectedLeave.status === "pending" && !selectedLeave.acknowledged_at && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Rejection Reason (if rejecting)
@@ -846,7 +893,7 @@ export default function AdminLeaveManagement() {
 
               <div className="flex justify-between items-center">
                 <div className="flex gap-2">
-                  {isSuperAdmin && selectedLeave.status === "pending" && (
+                  {isSuperAdmin && selectedLeave.status === "pending" && !selectedLeave.acknowledged_at && (
                     <>
                       <button
                         onClick={() => handleApprove(selectedLeave.id)}
@@ -863,6 +910,15 @@ export default function AdminLeaveManagement() {
                         {actionLoading ? "Processing..." : "Reject"}
                       </button>
                     </>
+                  )}
+                  {selectedLeave.status === "pending" && selectedLeave.acknowledged_at && (
+                    <button
+                      onClick={() => handleRevertAcknowledgement(selectedLeave.id)}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                    >
+                      {actionLoading ? "Processing..." : "Revert"}
+                    </button>
                   )}
                   {selectedLeave.status === "pending" && !selectedLeave.acknowledged_at && (
                     <button

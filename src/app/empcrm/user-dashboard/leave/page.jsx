@@ -529,7 +529,7 @@ export default function UserLeaveManagement() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {leave.status === "pending" && (
+                      {leave.status === "pending" && !leave.acknowledged_at && (
                         <button
                           onClick={() => handleDelete(leave.id)}
                           className="px-3 py-1 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium flex items-center gap-1"

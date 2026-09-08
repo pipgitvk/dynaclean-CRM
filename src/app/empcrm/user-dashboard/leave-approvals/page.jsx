@@ -165,6 +165,17 @@ export default function LeaveApprovalsPage() {
       approved: <CheckCircle className="w-3 h-3" />,
       rejected: <XCircle className="w-3 h-3" />,
     };
+
+    // If acknowledged, show only Acknowledged badge
+    if (acknowledgedAt) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+          <BadgeCheck className="w-3 h-3" />
+          Acknowledged
+        </span>
+      );
+    }
+
     const statusBadge = (
       <span
         className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${styles[status] || "bg-gray-100"}`}
@@ -173,18 +184,7 @@ export default function LeaveApprovalsPage() {
         {status?.charAt(0)?.toUpperCase() + status?.slice(1)}
       </span>
     );
-    if (!acknowledgedAt) {
-      return statusBadge;
-    }
-    return (
-      <div className="flex flex-col gap-1 items-start">
-        {statusBadge}
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
-          <BadgeCheck className="w-3 h-3" />
-          Acknowledged
-        </span>
-      </div>
-    );
+    return statusBadge;
   };
 
   const getLeaveTypeColor = (type) => {
@@ -379,20 +379,22 @@ export default function LeaveApprovalsPage() {
                             Acknowledge
                           </button>
                         )}
-                        <button
-                          onClick={() => {
-                            setSelectedLeave(leave);
-                            setShowApprovalModal(true);
-                            setRejectionReason("");
-                          }}
-                          className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                            leave.status === "pending"
-                              ? "bg-blue-600 text-white hover:bg-blue-700"
-                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                          }`}
-                        >
-                          {leave.status === "pending" ? "Review" : "View"}
-                        </button>
+                        {!leave.acknowledged_at && (
+                          <button
+                            onClick={() => {
+                              setSelectedLeave(leave);
+                              setShowApprovalModal(true);
+                              setRejectionReason("");
+                            }}
+                            className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                              leave.status === "pending"
+                                ? "bg-blue-600 text-white hover:bg-blue-700"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
+                          >
+                            {leave.status === "pending" ? "Review" : "View"}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

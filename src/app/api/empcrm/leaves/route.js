@@ -456,16 +456,16 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { leaveId, status, rejection_reason, acknowledgement_remark } = body;
+    const { leaveId, status, rejection_reason, acknowledgement_remark, revert_acknowledgement } = body;
 
-    if (!leaveId || !status) {
+    if (!leaveId || (!status && !revert_acknowledgement)) {
       return NextResponse.json(
         { success: false, error: "Leave ID and status are required" },
         { status: 400 }
       );
     }
 
-    if (!["approved", "rejected", "acknowledge"].includes(status)) {
+    if (status && !["approved", "rejected", "acknowledge"].includes(status)) {
       return NextResponse.json(
         { success: false, error: "Invalid status. Must be 'approved', 'rejected', or 'acknowledge'" },
         { status: 400 }
@@ -514,6 +514,23 @@ export async function PATCH(request) {
           { status: 400 }
         );
       }
+    }
+
+    // Revert acknowledgement: clear acknowledgement fields
+    if (revert_acknowledgement) {
+      await conn.execute(
+        `UPDATE employee_leaves
+         SET acknowledged_at = NULL, acknowledged_by = NULL, acknowledgement_remark = NULL
+         WHERE id = ?`,
+        [leaveId]
+      );
+      if (conn.release) conn.release();
+
+      return NextResponse.json({
+        success: true,
+        message: "Acknowledgement reverted successfully",
+        reverted: true,
+      });
     }
 
     // Reporting manager can only approve their reportees' leaves, but SUPERADMIN can approve any
