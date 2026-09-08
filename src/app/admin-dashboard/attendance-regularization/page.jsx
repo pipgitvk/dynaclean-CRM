@@ -53,13 +53,10 @@ function StatusBadge({ status, acknowledgedAt }) {
   );
   if (!acknowledgedAt) return statusEl;
   return (
-    <div className="flex flex-col gap-1 items-start">
-      {statusEl}
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
-        <BadgeCheck className="w-3 h-3" />
-        Acknowledged
-      </span>
-    </div>
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+      <BadgeCheck className="w-3 h-3" />
+      Acknowledged
+    </span>
   );
 }
 
@@ -67,6 +64,9 @@ export default function AdminAttendanceRegularizationPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
+  const [showAcknowledgeModal, setShowAcknowledgeModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [acknowledgementRemark, setAcknowledgementRemark] = useState("");
 
   // Filter states
   const [statusFilter, setStatusFilter] = useState("all");
@@ -94,7 +94,7 @@ export default function AdminAttendanceRegularizationPage() {
   }, []);
 
   const handleAction = useCallback(
-    async (id, action) => {
+    async (id, action, remark = null) => {
       const labels = {
         approve: "Approve",
         reject: "Reject",
@@ -103,18 +103,21 @@ export default function AdminAttendanceRegularizationPage() {
       };
       const label = labels[action] || "Action";
       
-      if (!confirm(`${label} request #${id}?`)) return;
+      if (action !== "acknowledge" && !confirm(`${label} request #${id}?`)) return;
       
       setActionLoading(`${id}-${action}`);
       try {
         const res = await fetch("/api/admin/attendance-regularization", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, action }),
+          body: JSON.stringify({ id, action, acknowledgement_remark: remark }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.message || "Action failed");
         toast.success(data.message || `${label}ed successfully`);
+        setShowAcknowledgeModal(false);
+        setSelectedRequest(null);
+        setAcknowledgementRemark("");
         await load();
       } catch (e) {
         toast.error(e.message);
@@ -310,6 +313,12 @@ export default function AdminAttendanceRegularizationPage() {
                             </span>
                           </div>
                         )}
+                        {req.acknowledgement_remark && (
+                          <div className="mt-1 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700">
+                            <span className="font-medium text-indigo-800">Remark: </span>
+                            {req.acknowledgement_remark}
+                          </div>
+                        )}
                         <div className="text-gray-400 mt-1 pt-1 border-t border-gray-50">
                           {req.created_at
                             ? new Date(req.created_at).toLocaleString()
@@ -332,7 +341,18 @@ export default function AdminAttendanceRegularizationPage() {
                       )}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
-                      {req.status === "pending" ? (
+                      {req.acknowledged_at ? (
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => handleAction(req.id, "revert")}
+                            disabled={actionLoading !== null}
+                            className="px-2 py-1 text-xs font-medium rounded bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Revert to pending - clears acknowledgement"
+                          >
+                            {actionLoading === `${req.id}-revert` ? "…" : "Revert"}
+                          </button>
+                        </div>
+                      ) : req.status === "pending" ? (
                         <div className="flex gap-2 flex-wrap">
                           <button
                             onClick={() => handleAction(req.id, "approve")}
@@ -348,15 +368,17 @@ export default function AdminAttendanceRegularizationPage() {
                           >
                             {actionLoading === `${req.id}-reject` ? "…" : "Reject"}
                           </button>
-                          {!req.acknowledged_at && (
-                            <button
-                              onClick={() => handleAction(req.id, "acknowledge")}
-                              disabled={actionLoading !== null}
-                              className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {actionLoading === `${req.id}-acknowledge` ? "…" : "Acknowledge"}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedRequest(req);
+                              setShowAcknowledgeModal(true);
+                              setAcknowledgementRemark("");
+                            }}
+                            disabled={actionLoading !== null}
+                            className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {actionLoading === `${req.id}-acknowledge` ? "…" : "Acknowledge"}
+                          </button>
                         </div>
                       ) : req.status === "approved" || req.status === "rejected" ? (
                         <div className="flex gap-2 flex-wrap">
@@ -368,15 +390,17 @@ export default function AdminAttendanceRegularizationPage() {
                           >
                             {actionLoading === `${req.id}-revert` ? "…" : "Revert"}
                           </button>
-                          {!req.acknowledged_at && (
-                            <button
-                              onClick={() => handleAction(req.id, "acknowledge")}
-                              disabled={actionLoading !== null}
-                              className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {actionLoading === `${req.id}-acknowledge` ? "…" : "Acknowledge"}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              setSelectedRequest(req);
+                              setShowAcknowledgeModal(true);
+                              setAcknowledgementRemark("");
+                            }}
+                            disabled={actionLoading !== null}
+                            className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {actionLoading === `${req.id}-acknowledge` ? "…" : "Acknowledge"}
+                          </button>
                         </div>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
@@ -386,6 +410,73 @@ export default function AdminAttendanceRegularizationPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Acknowledgement Remark Modal */}
+      {showAcknowledgeModal && selectedRequest && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200 flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                <BadgeCheck className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Acknowledge Request</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {selectedRequest.username} - {formatLogDate(selectedRequest.log_date)}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Employee Details
+                </label>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs space-y-1">
+                  <div><strong>In:</strong> {displayIn(selectedRequest) ? formatDt(displayIn(selectedRequest)) : "—"}</div>
+                  <div><strong>Out:</strong> {displayOut(selectedRequest) ? formatDt(displayOut(selectedRequest)) : "—"}</div>
+                  <div><strong>Reason:</strong> {selectedRequest.reason || "—"}</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Remark <span className="text-gray-500">(Optional)</span>
+                </label>
+                <textarea
+                  value={acknowledgementRemark}
+                  onChange={(e) => setAcknowledgementRemark(e.target.value)}
+                  placeholder="Enter your remark or comment about this attendance request..."
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-2">This remark will be visible to the employee.</p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAcknowledgeModal(false);
+                  setAcknowledgementRemark("");
+                  setSelectedRequest(null);
+                }}
+                disabled={actionLoading !== null}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAction(selectedRequest.id, "acknowledge", acknowledgementRemark)}
+                disabled={actionLoading !== null}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {actionLoading === `${selectedRequest.id}-acknowledge` ? "Processing..." : "Acknowledge"}
+              </button>
+            </div>
           </div>
         </div>
       )}

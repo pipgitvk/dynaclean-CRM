@@ -35,20 +35,18 @@ function statusBadgeClass(status) {
 function RegStatusBadge({ status, acknowledgedAt }) {
   const cls = statusBadgeClass(status);
   const display = status ? String(status).charAt(0).toUpperCase() + String(status).slice(1) : "—";
-  const statusEl = (
-    <span className={`inline-block px-2 py-1 rounded text-xs font-medium uppercase tracking-wide ${cls}`}>
-      {display}
-    </span>
-  );
-  if (!acknowledgedAt) return statusEl;
-  return (
-    <div className="flex flex-col gap-1 items-end">
-      {statusEl}
+  if (acknowledgedAt) {
+    return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
         <BadgeCheck className="w-3 h-3" />
         Acknowledged
       </span>
-    </div>
+    );
+  }
+  return (
+    <span className={`inline-block px-2 py-1 rounded text-xs font-medium uppercase tracking-wide ${cls}`}>
+      {display}
+    </span>
   );
 }
 
@@ -57,6 +55,9 @@ export default function AttendanceRegularizationApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [actingId, setActingId] = useState(null);
   const [commentById, setCommentById] = useState({});
+  const [showAcknowledgeModal, setShowAcknowledgeModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [acknowledgementRemark, setAcknowledgementRemark] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -118,20 +119,22 @@ export default function AttendanceRegularizationApprovalsPage() {
     }
   };
 
-  const acknowledge = async (id) => {
-    if (!confirm(`Acknowledge request #${id}?`)) return;
+  const acknowledge = async (id, remark = null) => {
     setActingId(id);
     try {
       const res = await fetch("/api/attendance/regularization", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "acknowledge" }),
+        body: JSON.stringify({ id, action: "acknowledge", acknowledgement_remark: remark }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || data.message || "Action failed");
       }
       toast.success(data.message || "Acknowledged.");
+      setShowAcknowledgeModal(false);
+      setSelectedRequest(null);
+      setAcknowledgementRemark("");
       load();
     } catch (e) {
       toast.error(e.message);
@@ -277,59 +280,72 @@ export default function AttendanceRegularizationApprovalsPage() {
                                 {new Date(req.acknowledged_at).toLocaleString()}
                               </div>
                             )}
+                            {req.acknowledgement_remark && (
+                              <div className="mt-1 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700">
+                                <span className="font-medium text-indigo-800">Remark: </span>
+                                {req.acknowledgement_remark}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className="text-gray-400 text-xs">Not yet</span>
                         )}
                       </td>
                       <td className="px-4 py-3 max-w-[320px]">
-                        <textarea
-                          value={commentById[req.id] || ""}
-                          onChange={(e) =>
-                            setCommentById((prev) => ({
-                              ...prev,
-                              [req.id]: e.target.value,
-                            }))
-                          }
-                          rows={2}
-                          className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Enter remarks (mandatory)"
-                          required
-                        />
+                        {!req.acknowledged_at && (
+                          <textarea
+                            value={commentById[req.id] || ""}
+                            onChange={(e) =>
+                              setCommentById((prev) => ({
+                                ...prev,
+                                [req.id]: e.target.value,
+                              }))
+                            }
+                            rows={2}
+                            className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-xs focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter remarks (mandatory)"
+                            required
+                          />
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex flex-col gap-1.5 items-end">
-                          <button
-                            type="button"
-                            disabled={actingId === req.id}
-                            onClick={() => review(req.id, "approve")}
-                            className="w-full px-3 py-1.5 rounded-md text-xs font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                          >
-                            {actingId === req.id ? "Working…" : "Approve"}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={actingId === req.id}
-                            onClick={() => review(req.id, "reject")}
-                            className="w-full px-3 py-1.5 rounded-md text-xs font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
-                          >
-                            {actingId === req.id ? "Working…" : "Reject"}
-                          </button>
-                          {!req.acknowledged_at && (
-                            <button
-                              type="button"
-                              disabled={actingId === req.id}
-                              onClick={() => acknowledge(req.id)}
-                              className="w-full px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-                            >
-                              {actingId === req.id ? "Working…" : "Acknowledge"}
-                            </button>
-                          )}
-                          {req.acknowledged_at && (
-                            <span className="w-full text-center text-green-600 text-[11px] font-medium inline-flex items-center justify-center gap-1">
+                          {req.acknowledged_at ? (
+                            <span className="w-full text-center text-indigo-600 text-[11px] font-medium inline-flex items-center justify-center gap-1">
                               <BadgeCheck className="w-3 h-3" />
                               Acknowledged
                             </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={actingId === req.id}
+                                onClick={() => review(req.id, "approve")}
+                                className="w-full px-3 py-1.5 rounded-md text-xs font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                              >
+                                {actingId === req.id ? "Working…" : "Approve"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actingId === req.id}
+                                onClick={() => review(req.id, "reject")}
+                                className="w-full px-3 py-1.5 rounded-md text-xs font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
+                              >
+                                {actingId === req.id ? "Working…" : "Reject"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={actingId === req.id}
+                                onClick={() => {
+                                  setSelectedRequest(req);
+                                  setShowAcknowledgeModal(true);
+                                  setAcknowledgementRemark("");
+                                }}
+                                className="w-full px-3 py-1.5 rounded-md text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                              >
+                                {actingId === req.id ? "Working…" : "Acknowledge"}
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -400,57 +416,78 @@ export default function AttendanceRegularizationApprovalsPage() {
                   )}
 
                   {req.acknowledged_by && (
-                    <div className="mb-3 flex items-center gap-1.5 text-[12px] text-indigo-700">
-                      <BadgeCheck className="w-3.5 h-3.5" />
-                      <span>
-                        Acknowledged by {req.acknowledged_by}
-                        {req.acknowledged_at ? ` on ${new Date(req.acknowledged_at).toLocaleString()}` : ""}
-                      </span>
+                    <div className="mb-3 flex flex-col gap-1">
+                      <div className="flex items-center gap-1.5 text-[12px] text-indigo-700">
+                        <BadgeCheck className="w-3.5 h-3.5" />
+                        <span>
+                          Acknowledged by {req.acknowledged_by}
+                          {req.acknowledged_at ? ` on ${new Date(req.acknowledged_at).toLocaleString()}` : ""}
+                        </span>
+                      </div>
+                      {req.acknowledgement_remark && (
+                        <div className="mt-1 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700">
+                          <span className="font-medium text-indigo-800">Remark: </span>
+                          {req.acknowledgement_remark}
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  <div className="mb-3">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Remarks *
-                    </label>
-                    <textarea
-                      value={commentById[req.id] || ""}
-                      onChange={(e) =>
-                        setCommentById((prev) => ({ ...prev, [req.id]: e.target.value }))
-                      }
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      placeholder="Enter remarks (mandatory)"
-                      required
-                    />
-                  </div>
+                  {!req.acknowledged_at && (
+                    <div className="mb-3">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Remarks *
+                      </label>
+                      <textarea
+                        value={commentById[req.id] || ""}
+                        onChange={(e) =>
+                          setCommentById((prev) => ({ ...prev, [req.id]: e.target.value }))
+                        }
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        placeholder="Enter remarks (mandatory)"
+                        required
+                      />
+                    </div>
+                  )}
 
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={actingId === req.id}
-                      onClick={() => review(req.id, "approve")}
-                      className="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-                    >
-                      {actingId === req.id ? "Working…" : "Approve & update log"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={actingId === req.id}
-                      onClick={() => review(req.id, "reject")}
-                      className="px-4 py-2 rounded-md text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
-                    >
-                      Reject
-                    </button>
-                    {!req.acknowledged_at && (
-                      <button
-                        type="button"
-                        disabled={actingId === req.id}
-                        onClick={() => acknowledge(req.id)}
-                        className="px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-                      >
-                        {actingId === req.id ? "Working…" : "Acknowledge"}
-                      </button>
+                    {req.acknowledged_at ? (
+                      <span className="text-indigo-600 text-[12px] font-medium inline-flex items-center gap-1">
+                        <BadgeCheck className="w-3.5 h-3.5" />
+                        Acknowledged
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          disabled={actingId === req.id}
+                          onClick={() => review(req.id, "approve")}
+                          className="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                        >
+                          {actingId === req.id ? "Working…" : "Approve & update log"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actingId === req.id}
+                          onClick={() => review(req.id, "reject")}
+                          className="px-4 py-2 rounded-md text-sm font-medium bg-gray-200 text-gray-800 hover:bg-gray-300 disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          type="button"
+                          disabled={actingId === req.id}
+                          onClick={() => {
+                            setSelectedRequest(req);
+                            setShowAcknowledgeModal(true);
+                            setAcknowledgementRemark("");
+                          }}
+                          className="px-4 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {actingId === req.id ? "Working…" : "Acknowledge"}
+                        </button>
+                      </>
                     )}
                   </div>
                 </li>
@@ -458,6 +495,62 @@ export default function AttendanceRegularizationApprovalsPage() {
             })}
           </ul>
         </>
+      )}
+
+      {/* Acknowledgement Remark Modal */}
+      {showAcknowledgeModal && selectedRequest && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200 flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                <BadgeCheck className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Acknowledge Request</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {selectedRequest.username} - {formatLogDate(selectedRequest.log_date)}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Remark <span className="text-gray-500">(Optional)</span>
+                </label>
+                <textarea
+                  value={acknowledgementRemark}
+                  onChange={(e) => setAcknowledgementRemark(e.target.value)}
+                  placeholder="Enter your remark or comment about this attendance request..."
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-2">This remark will be visible to the employee.</p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAcknowledgeModal(false);
+                  setAcknowledgementRemark("");
+                  setSelectedRequest(null);
+                }}
+                disabled={actingId !== null}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => acknowledge(selectedRequest.id, acknowledgementRemark)}
+                disabled={actingId !== null}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {actingId === selectedRequest.id ? "Processing..." : "Acknowledge"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

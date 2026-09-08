@@ -772,18 +772,26 @@ const AttendancePage = () => {
                           if (pendingReq) {
                             return (
                               <div className="flex flex-col items-center gap-2">
-                                <RegStatusBadge status="pending" acknowledgedAt={pendingReq.acknowledged_at} />
-                                <button
-                                  type="button"
-                                  onClick={() => openEditRegModal(pendingReq)}
-                                  className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
-                                >
-                                  Edit
-                                </button>
-                                {pendingReq.acknowledged_by && (
-                                  <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                {!pendingReq.acknowledged_at && <RegStatusBadge status="pending" acknowledgedAt={pendingReq.acknowledged_at} />}
+                                {!pendingReq.acknowledged_at && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditRegModal(pendingReq)}
+                                    className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                  >
+                                    Edit
+                                  </button>
+                                )}
+                                {pendingReq.acknowledged_at && (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
                                     <BadgeCheck className="w-3 h-3" />
-                                    <span>Acknowledged by {pendingReq.acknowledged_by}</span>
+                                    Acknowledged
+                                  </span>
+                                )}
+                                {pendingReq.acknowledgement_remark && (
+                                  <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                    <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                    <p className="text-indigo-600">{pendingReq.acknowledgement_remark}</p>
                                   </div>
                                 )}
                               </div>
@@ -811,6 +819,12 @@ const AttendancePage = () => {
                                     <span>Acknowledged by {rejectedReq.acknowledged_by}</span>
                                   </div>
                                 )}
+                                {rejectedReq.acknowledgement_remark && (
+                                  <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                    <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                    <p className="text-indigo-600">{rejectedReq.acknowledgement_remark}</p>
+                                  </div>
+                                )}
                               </div>
                             );
                           }
@@ -834,6 +848,12 @@ const AttendancePage = () => {
                                   <div className="flex items-center gap-1 text-[11px] text-indigo-700">
                                     <BadgeCheck className="w-3 h-3" />
                                     <span>Acknowledged by {approvedReq.acknowledged_by}</span>
+                                  </div>
+                                )}
+                                {approvedReq.acknowledgement_remark && (
+                                  <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                    <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                    <p className="text-indigo-600">{approvedReq.acknowledgement_remark}</p>
                                   </div>
                                 )}
                               </div>
@@ -989,19 +1009,27 @@ const AttendancePage = () => {
                                 return (
                                   <div className="flex flex-col items-start gap-1.5">
                                     <div className="flex items-center gap-2">
-                                      <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />
-                                      <button
-                                        type="button"
-                                        onClick={() => openEditRegModal(pReq)}
-                                        className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
-                                      >
-                                        Edit
-                                      </button>
+                                      {!pReq.acknowledged_at && <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />}
+                                      {!pReq.acknowledged_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditRegModal(pReq)}
+                                          className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                        >
+                                          Edit
+                                        </button>
+                                      )}
                                     </div>
-                                    {pReq.acknowledged_by && (
-                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                    {pReq.acknowledged_at && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
                                         <BadgeCheck className="w-3 h-3" />
-                                        <span>Acknowledged by {pReq.acknowledged_by}</span>
+                                        Acknowledged
+                                      </span>
+                                    )}
+                                    {pReq.acknowledgement_remark && (
+                                      <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                        <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                        <p className="text-indigo-600">{pReq.acknowledgement_remark}</p>
                                       </div>
                                     )}
                                   </div>
@@ -1111,19 +1139,27 @@ const AttendancePage = () => {
                                 return (
                                   <div className="flex flex-col items-center gap-2">
                                     <div className="flex items-center gap-2">
-                                      <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />
-                                      <button
-                                        type="button"
-                                        onClick={() => openEditRegModal(pReq)}
-                                        className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
-                                      >
-                                        Edit
-                                      </button>
+                                      {!pReq.acknowledged_at && <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />}
+                                      {!pReq.acknowledged_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditRegModal(pReq)}
+                                          className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                        >
+                                          Edit
+                                        </button>
+                                      )}
                                     </div>
-                                    {pReq.acknowledged_by && (
-                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                    {pReq.acknowledged_at && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
                                         <BadgeCheck className="w-3 h-3" />
-                                        <span>Acknowledged by {pReq.acknowledged_by}</span>
+                                        Acknowledged
+                                      </span>
+                                    )}
+                                    {pReq.acknowledgement_remark && (
+                                      <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                        <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                        <p className="text-indigo-600">{pReq.acknowledgement_remark}</p>
                                       </div>
                                     )}
                                   </div>
@@ -1202,19 +1238,27 @@ const AttendancePage = () => {
                                 return (
                                   <div className="flex flex-col items-center gap-2">
                                     <div className="flex items-center gap-2">
-                                      <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />
-                                      <button
-                                        type="button"
-                                        onClick={() => openEditRegModal(pReq)}
-                                        className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
-                                      >
-                                        Edit
-                                      </button>
+                                      {!pReq.acknowledged_at && <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />}
+                                      {!pReq.acknowledged_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => openEditRegModal(pReq)}
+                                          className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                        >
+                                          Edit
+                                        </button>
+                                      )}
                                     </div>
-                                    {pReq.acknowledged_by && (
-                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                    {pReq.acknowledged_at && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
                                         <BadgeCheck className="w-3 h-3" />
-                                        <span>Acknowledged by {pReq.acknowledged_by}</span>
+                                        Acknowledged
+                                      </span>
+                                    )}
+                                    {pReq.acknowledgement_remark && (
+                                      <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                                        <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                                        <p className="text-indigo-600">{pReq.acknowledgement_remark}</p>
                                       </div>
                                     )}
                                   </div>

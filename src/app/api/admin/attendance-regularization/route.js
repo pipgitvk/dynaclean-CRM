@@ -65,7 +65,7 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { id, action, reviewer_comment } = body;
+    const { id, action, reviewer_comment, acknowledgement_remark } = body;
 
     if (!id || !["approve", "reject", "revert", "acknowledge"].includes(action)) {
       return NextResponse.json(
@@ -80,6 +80,14 @@ export async function PATCH(request) {
         `ALTER TABLE attendance_regularization_requests
          ADD COLUMN acknowledged_at DATETIME NULL,
          ADD COLUMN acknowledged_by VARCHAR(255) NULL`
+      );
+    } catch (e) {
+      if (!String(e.message).includes("Duplicate column name")) throw e;
+    }
+    try {
+      await conn.execute(
+        `ALTER TABLE attendance_regularization_requests
+         ADD COLUMN acknowledgement_remark longtext DEFAULT NULL`
       );
     } catch (e) {
       if (!String(e.message).includes("Duplicate column name")) throw e;
@@ -106,18 +114,20 @@ export async function PATCH(request) {
       await conn.execute(
         `UPDATE attendance_regularization_requests SET
           acknowledged_at = NOW(),
-          acknowledged_by = ?
+          acknowledged_by = ?,
+          acknowledgement_remark = ?
          WHERE id = ?`,
-        [payload.username, id]
+        [payload.username, acknowledgement_remark || null, id]
       );
       return NextResponse.json({ success: true, message: "Request acknowledged." });
     }
     
     // Handle revert action
     if (action === "revert") {
-      if (!["approved", "rejected"].includes(reqRow.status)) {
+      // Allow reverting acknowledged requests OR approved/rejected requests
+      if (!["approved", "rejected"].includes(reqRow.status) && !reqRow.acknowledged_at) {
         return NextResponse.json(
-          { success: false, message: "Only approved or rejected requests can be reverted." },
+          { success: false, message: "Only approved, rejected, or acknowledged requests can be reverted." },
           { status: 409 }
         );
       }
@@ -130,8 +140,6 @@ export async function PATCH(request) {
         );
 
         if (logRows.length > 0) {
-          // If the original row had no checkin/checkout (i.e. this request created the row from an absent day),
-          // delete the inserted row entirely
           const hadOriginalData =
             reqRow.original_checkin_time != null ||
             reqRow.original_checkout_time != null;
@@ -142,7 +150,6 @@ export async function PATCH(request) {
               [reqRow.username, reqRow.log_date]
             );
           } else {
-            // Restore original times
             await conn.execute(
               `UPDATE attendance_logs SET
                 checkin_time = ?,
@@ -171,17 +178,21 @@ export async function PATCH(request) {
         }
       }
 
+      // Reset everything back to pending - clear acknowledgement and review fields
       await conn.execute(
         `UPDATE attendance_regularization_requests SET
           status = 'pending',
           reviewed_by = NULL,
           reviewed_at = NULL,
-          reviewer_comment = NULL
+          reviewer_comment = NULL,
+          acknowledged_at = NULL,
+          acknowledged_by = NULL,
+          acknowledgement_remark = NULL
          WHERE id = ?`,
         [id]
       );
 
-      return NextResponse.json({ success: true, message: "Request reverted to pending and attendance log restored." });
+      return NextResponse.json({ success: true, message: "Request reverted to pending." });
     }
     
     if (reqRow.status !== "pending") {
