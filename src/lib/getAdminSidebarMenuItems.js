@@ -761,13 +761,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "FileText",
       },
-      // {
-      //   path: "/user-dashboard/hr-today-report",
-      //   name: "HR Daily Report",
-      //   accessKey: "hr-daily-report",
-      //   roles: ["SUPERADMIN"],
-      //   icon: "FileText",
-      // },
+      {
+        path: "/admin-dashboard/hr-operations",
+        name: "Add Paid Leaves",
+        accessKey: "add-paid-leaves",
+        roles: ["SUPERADMIN"],
+        icon: "Calendar",
+      },
     ],
   },
   {

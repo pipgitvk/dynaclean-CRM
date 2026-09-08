@@ -780,6 +780,13 @@ const allMenuItems = [
         roles: ["SUPERADMIN"],
         icon: "FileText",
       },
+      {
+        path: "/empcrm/user-dashboard/add-paid-leave",
+        name: "Add Paid Leave Request",
+        moduleKey: "add-paid-leaves",
+        roles: ["ALL"],
+        icon: "Calendar",
+      },
     ],
   },
   {

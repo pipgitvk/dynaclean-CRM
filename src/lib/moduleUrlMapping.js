@@ -103,6 +103,7 @@ export const MODULE_KEY_TO_URL = {
   "hr-daily-report": "/empcrm/admin-dashboard/salary",
   "attendance-rules": "/admin-dashboard/attendance-rules",
   "all-hr-report": "/admin-dashboard/all-hr-report",
+  "add-paid-leaves": "/admin-dashboard/hr-operations",
 
   // Digital Marketing
   "keywords-management": "/admin-dashboard/keywords",

@@ -523,6 +523,9 @@ export default function AdminLeaveManagement() {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created By
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -575,6 +578,15 @@ export default function AdminLeaveManagement() {
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {leave.created_by ? (
+                        <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                          {leave.created_by}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">

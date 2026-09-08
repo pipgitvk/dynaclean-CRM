@@ -467,6 +467,7 @@ export default function UserLeaveManagement() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created By</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
@@ -504,6 +505,15 @@ export default function UserLeaveManagement() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
                       {leave.reason}
+                    </td>
+                    <td className="px-6 py-4">
+                      {leave.created_by ? (
+                        <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                          {leave.created_by}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {leave.status !== "pending" && getStatusBadge(leave.status, leave.acknowledged_at)}

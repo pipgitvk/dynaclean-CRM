@@ -384,6 +384,11 @@ export default function PaidLeaveLedger() {
                           <td className="px-6 py-4 text-sm text-gray-600">
                             <div>
                               <div>{entry.description}</div>
+                              {entry.created_by && (
+                                <div className="text-xs mt-1 px-2 py-1 bg-indigo-50 border border-indigo-200 rounded text-indigo-700 inline-block">
+                                  Added by: <span className="font-medium">{entry.created_by}</span>
+                                </div>
+                              )}
                               {entry.reason && (
                                 <div className="text-xs text-gray-500 mt-1">Reason: {entry.reason.substring(0, 100)}</div>
                               )}

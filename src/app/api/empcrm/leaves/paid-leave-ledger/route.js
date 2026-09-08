@@ -74,7 +74,8 @@ export async function GET(request) {
         el.total_days,
         el.status,
         el.reason,
-        el.created_at
+        el.created_at,
+        el.created_by
       FROM employee_leaves el
       WHERE el.username = ? AND el.leave_type = 'paid' AND el.status = 'approved'
       AND el.from_date >= ?
@@ -137,16 +138,21 @@ export async function GET(request) {
 
     // Add debit (used) entries for paid leaves
     leavesUsed.forEach(leave => {
+      const description = leave.created_by 
+        ? `Paid Leave added by ${leave.created_by}`
+        : `Paid Leave taken`;
+      
       ledgerEntries.push({
         type: "debit",
         date: leave.from_date,
         days: leave.total_days,
-        description: `Paid Leave taken`,
+        description,
         leaveId: leave.id,
         entryType: "usage",
         reason: leave.reason,
         leave_type: "paid",
-        status: leave.status
+        status: leave.status,
+        created_by: leave.created_by
       });
     });
 
