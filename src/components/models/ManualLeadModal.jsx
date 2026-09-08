@@ -136,7 +136,7 @@ export default function ManualLeadModal({ show, onClose }) {
       phone: analyzed.phone,
       address: analyzed.address,
       company: analyzed.company,
-      lead_source: selectedSource,
+      lead_source: selectedSource || assignActiveTo,
       lead_campaign: leadCampaign,
       status: "New",
       followup_notes: followupNotes,
