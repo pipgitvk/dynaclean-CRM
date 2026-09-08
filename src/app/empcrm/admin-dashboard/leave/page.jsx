@@ -10,7 +10,9 @@ import {
   Search,
   ChevronDown,
   User,
-  AlertCircle
+  AlertCircle,
+  Sun,
+  BadgeCheck
 } from "lucide-react";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import Link from "next/link";
@@ -200,6 +202,32 @@ export default function AdminLeaveManagement() {
     }
   };
 
+  const handleAcknowledge = async (leaveId) => {
+    try {
+      setActionLoading(true);
+      const response = await fetch("/api/empcrm/leaves", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leaveId, status: "acknowledge" })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        alert("Leave acknowledged successfully");
+        fetchLeaves();
+        setShowApprovalModal(false);
+      } else {
+        alert(data.error || "Failed to acknowledge leave");
+      }
+    } catch (error) {
+      console.error("Error acknowledging leave:", error);
+      alert("Error acknowledging leave");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleReject = async (leaveId) => {
     if (!rejectionReason.trim()) {
       alert("Please provide a rejection reason");
@@ -270,7 +298,7 @@ export default function AdminLeaveManagement() {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, acknowledgedAt) => {
     const styles = {
       pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
       approved: "bg-green-100 text-green-800 border-green-300",
@@ -283,11 +311,25 @@ export default function AdminLeaveManagement() {
       rejected: <XCircle className="w-3 h-3" />
     };
 
-    return (
+    const statusBadge = (
       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${styles[status]}`}>
         {icons[status]}
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
+    );
+
+    if (!acknowledgedAt) {
+      return statusBadge;
+    }
+
+    return (
+      <div className="flex flex-col gap-1 items-start">
+        {statusBadge}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+          <BadgeCheck className="w-3 h-3" />
+          Acknowledged
+        </span>
+      </div>
     );
   };
 
@@ -296,7 +338,8 @@ export default function AdminLeaveManagement() {
       sick: "bg-blue-100 text-blue-800",
       paid: "bg-purple-100 text-purple-800",
       casual: "bg-green-100 text-green-800",
-      unpaid: "bg-gray-100 text-gray-800"
+      unpaid: "bg-gray-100 text-gray-800",
+      "half-day": "bg-orange-100 text-orange-700"
     };
     return colors[type] || "bg-gray-100 text-gray-800";
   };
@@ -476,19 +519,31 @@ export default function AdminLeaveManagement() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeColor(leave.leave_type)}`}>
-                        {leave.leave_type.charAt(0).toUpperCase() + leave.leave_type.slice(1)}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${leave.is_half_day ? "bg-orange-100 text-orange-700" : getLeaveTypeColor(leave.leave_type)}`}>
+                          {leave.is_half_day ? "Half-Day" : leave.leave_type.charAt(0).toUpperCase() + leave.leave_type.slice(1)}
+                        </span>
+                        {leave.is_half_day ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                            <Sun className="w-3 h-3" />
+                            {leave.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <div>{formatDate(leave.from_date)}</div>
-                      <div className="text-gray-500">to {formatDate(leave.to_date)}</div>
+                      {!leave.is_half_day && (
+                        <div className="text-gray-500">to {formatDate(leave.to_date)}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-lg font-semibold text-gray-900">{leave.total_days}</span>
+                      <span className="text-lg font-semibold text-gray-900">
+                        {leave.is_half_day ? "½" : leave.total_days}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
-                      {getStatusBadge(leave.status)}
+                      {getStatusBadge(leave.status, leave.acknowledged_at)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
@@ -513,6 +568,14 @@ export default function AdminLeaveManagement() {
                               Reject
                             </button>
                           </>
+                        )}
+                        {leave.status === "pending" && !leave.acknowledged_at && (
+                          <button
+                            onClick={() => handleAcknowledge(leave.id)}
+                            className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+                          >
+                            Acknowledge
+                          </button>
                         )}
                         <button
                           onClick={() => {
@@ -626,12 +689,26 @@ export default function AdminLeaveManagement() {
                     .sort((a,b)=> new Date(b.from_date) - new Date(a.from_date))
                     .map(l => (
                     <tr key={l.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-3 text-sm text-gray-900">{formatDate(l.from_date)} - {formatDate(l.to_date)}</td>
-                      <td className="px-6 py-3 text-sm">
-                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeColor(l.leave_type)}`}>{l.leave_type}</span>
+                      <td className="px-6 py-3 text-sm text-gray-900">
+                        {l.is_half_day
+                          ? formatDate(l.from_date)
+                          : `${formatDate(l.from_date)} - ${formatDate(l.to_date)}`}
                       </td>
-                      <td className="px-6 py-3 text-sm text-gray-900">{l.total_days}</td>
-                      <td className="px-6 py-3">{getStatusBadge(l.status)}</td>
+                      <td className="px-6 py-3 text-sm">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeColor(l.leave_type)}`}>{l.leave_type}</span>
+                          {l.is_half_day && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                              <Sun className="w-3 h-3" />
+                              {l.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-gray-900">
+                        {l.is_half_day ? "½" : l.total_days}
+                      </td>
+                      <td className="px-6 py-3">{getStatusBadge(l.status, l.acknowledged_at)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -669,27 +746,39 @@ export default function AdminLeaveManagement() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-600">Leave Type</label>
-                  <p>
-                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeColor(selectedLeave.leave_type)}`}>
-                      {selectedLeave.leave_type.charAt(0).toUpperCase() + selectedLeave.leave_type.slice(1)}
+                  <div className="flex flex-col gap-1 mt-1">
+                    <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${selectedLeave.is_half_day ? "bg-orange-100 text-orange-700" : getLeaveTypeColor(selectedLeave.leave_type)}`}>
+                      {selectedLeave.is_half_day ? "Half-Day" : selectedLeave.leave_type.charAt(0).toUpperCase() + selectedLeave.leave_type.slice(1)}
                     </span>
-                  </p>
+                    {selectedLeave.is_half_day && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                        <Sun className="w-3 h-3" />
+                        Half-Day · {selectedLeave.half_day_type === "1st_half" ? "1st Half (Morning)" : "2nd Half (Afternoon)"}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-600">Total Days</label>
-                  <p className="text-gray-900 font-medium">{selectedLeave.total_days} days</p>
+                  <p className="text-gray-900 font-medium">
+                    {selectedLeave.is_half_day ? "0.5 (Half-Day)" : `${selectedLeave.total_days} days`}
+                  </p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-600">From Date</label>
+                  <label className="text-sm font-medium text-gray-600">
+                    {selectedLeave.is_half_day ? "Date" : "From Date"}
+                  </label>
                   <p className="text-gray-900">{formatDate(selectedLeave.from_date)}</p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">To Date</label>
-                  <p className="text-gray-900">{formatDate(selectedLeave.to_date)}</p>
-                </div>
+                {!selectedLeave.is_half_day && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">To Date</label>
+                    <p className="text-gray-900">{formatDate(selectedLeave.to_date)}</p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -699,7 +788,7 @@ export default function AdminLeaveManagement() {
 
               <div>
                 <label className="text-sm font-medium text-gray-600">Status</label>
-                <div className="mt-1">{getStatusBadge(selectedLeave.status)}</div>
+                <div className="mt-1">{getStatusBadge(selectedLeave.status, selectedLeave.acknowledged_at)}</div>
               </div>
 
               {selectedLeave.status === "rejected" && selectedLeave.rejection_reason && (
@@ -718,6 +807,14 @@ export default function AdminLeaveManagement() {
                 <div className="text-sm text-gray-600">
                   Reviewed by <span className="font-medium">{selectedLeave.reviewed_by}</span> on{" "}
                   {formatDate(selectedLeave.reviewed_at)}
+                </div>
+              )}
+
+              {selectedLeave.acknowledged_by && (
+                <div className="text-sm text-indigo-600 flex items-center gap-1 mt-1">
+                  <BadgeCheck className="w-4 h-4" />
+                  Acknowledged by <span className="font-medium">{selectedLeave.acknowledged_by}</span> on{" "}
+                  {formatDate(selectedLeave.acknowledged_at)}
                 </div>
               )}
 
@@ -759,6 +856,15 @@ export default function AdminLeaveManagement() {
                         {actionLoading ? "Processing..." : "Reject"}
                       </button>
                     </>
+                  )}
+                  {selectedLeave.status === "pending" && !selectedLeave.acknowledged_at && (
+                    <button
+                      onClick={() => handleAcknowledge(selectedLeave.id)}
+                      disabled={actionLoading}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {actionLoading ? "Processing..." : "Acknowledge"}
+                    </button>
                   )}
                   {canAddReportingManager && (
                     <button

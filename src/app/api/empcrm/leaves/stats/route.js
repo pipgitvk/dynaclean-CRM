@@ -18,6 +18,21 @@ export async function GET(request) {
     
     const conn = await getDbConnection();
     
+    // Auto-migration: Ensure 'half-day' value exists in leave_type ENUM
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
+    } catch (e) { /* ignore - already applied */ }
+    try {
+      await conn.execute(`UPDATE employee_leaves SET leave_type = 'half-day' WHERE is_half_day = 1 AND leave_type != 'half-day'`);
+    } catch (e) { /* ignore */ }
+    // Auto-migration: Add acknowledgment columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_at timestamp NULL DEFAULT NULL COMMENT 'Acknowledgment timestamp (SuperAdmin/ReportingManager)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
+    } catch (e) { /* ignore */ }
+    
     // Check if user is admin/HR
     const isAdmin = ["SUPERADMIN", "HR HEAD", "HR"].includes(session.role);
     
@@ -152,12 +167,23 @@ export async function GET(request) {
       rejected: unpaidStats ? unpaidStats.rejected : 0
     };
 
+    // Count half-day leaves
+    const halfDayStats = stats.find(s => s.leave_type === 'half-day');
+    const halfDayLeaves = {
+      type: 'half-day',
+      enabled: true,
+      taken: halfDayStats ? halfDayStats.taken : 0,
+      pending: halfDayStats ? halfDayStats.pending : 0,
+      rejected: halfDayStats ? halfDayStats.rejected : 0
+    };
+
     return NextResponse.json({
       success: true,
       employment_status: profile.employment_status,
       accrual_start_date: leavePolicy.accrual_start_date || null,
       leaveSummary,
       unpaidLeaves,
+      halfDayLeaves,
       totalApprovedDays: stats.reduce((sum, s) => sum + (s.taken || 0), 0),
       totalPendingDays: stats.reduce((sum, s) => sum + (s.pending || 0), 0)
     });

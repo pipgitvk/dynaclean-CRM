@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
+import { Sun } from "lucide-react";
 import {
   DEFAULT_ATTENDANCE_RULES,
   getCheckinStatus as checkinStatusFromRules,
@@ -310,18 +311,37 @@ const AttendancePage = () => {
     }
   });
 
+  // Create a separate map of APPROVED half-day leaves for attendance page display
+  // Key: "yyyy-mm-dd" | Value: { is_half_day, half_day_type, leave_type, reason }
+  const halfDayLeaveMap = new Map();
+  leaves
+    .filter(leave => leave.is_half_day == 1 || leave.leave_type === 'half-day')
+    .forEach((leave) => {
+      const fromDate = new Date(leave.from_date);
+      const toDate = new Date(leave.to_date);
+      for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
+        halfDayLeaveMap.set(d.toLocaleDateString("en-CA"), {
+          is_half_day: leave.is_half_day,
+          half_day_type: leave.half_day_type,
+          leave_type: leave.leave_type,
+          reason: leave.reason,
+        });
+      }
+    });
+
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     const dateString = d.toLocaleDateString("en-CA");
     const existingLog = dateMap.get(dateString);
     const isWeekend = d.getDay() === 0; // Sunday
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveMap.has(dateString);
+    const approvedHalfDay = halfDayLeaveMap.get(dateString) || null;
 
     const hasRealPunch =
       existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
 
     if (hasRealPunch) {
-      allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend });
+      allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
     } else {
       const base = existingLog ? { ...existingLog } : {};
       if (isWeekend) {
@@ -607,11 +627,19 @@ const AttendancePage = () => {
                   <span className="text-sm font-semibold text-gray-900">
                     Date:
                   </span>
-                  <span className="text-sm text-gray-700 flex items-center gap-1.5">
-                    {new Date(log.date).toLocaleDateString()}
-                    {log.workedSunday && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
-                        Working Sunday
+                  <span className="text-sm text-gray-700 flex flex-col items-end gap-1.5">
+                    <span className="flex items-center gap-1.5">
+                      {new Date(log.date).toLocaleDateString()}
+                      {log.workedSunday && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                          Working Sunday
+                        </span>
+                      )}
+                    </span>
+                    {log.approvedHalfDay && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                        <Sun className="w-3 h-3" />
+                        Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
                       </span>
                     )}
                   </span>
@@ -815,6 +843,12 @@ const AttendancePage = () => {
                       {log.workedSunday && (
                         <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 border border-purple-200">
                           Working Sunday
+                        </span>
+                      )}
+                      {log.approvedHalfDay && (
+                        <span className="ml-2 mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                          <Sun className="w-3 h-3" />
+                          Half-Day · {log.approvedHalfDay.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
                         </span>
                       )}
                     </td>

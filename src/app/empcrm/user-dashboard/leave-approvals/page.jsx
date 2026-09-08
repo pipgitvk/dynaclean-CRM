@@ -10,6 +10,8 @@ import {
   Search,
   User,
   ArrowLeft,
+  Sun,
+  BadgeCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -126,7 +128,30 @@ export default function LeaveApprovalsPage() {
     }
   };
 
-  const getStatusBadge = (status) => {
+  const handleAcknowledge = async (leaveId) => {
+    try {
+      setActionLoading(true);
+      const res = await fetch("/api/empcrm/leaves", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leaveId, status: "acknowledge" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowApprovalModal(false);
+        setSelectedLeave(null);
+        fetchLeaves();
+      } else {
+        alert(data.error || "Failed to acknowledge");
+      }
+    } catch (e) {
+      alert("Error acknowledging leave");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status, acknowledgedAt) => {
     const styles = {
       pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
       approved: "bg-green-100 text-green-800 border-green-300",
@@ -137,13 +162,25 @@ export default function LeaveApprovalsPage() {
       approved: <CheckCircle className="w-3 h-3" />,
       rejected: <XCircle className="w-3 h-3" />,
     };
-    return (
+    const statusBadge = (
       <span
         className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${styles[status] || "bg-gray-100"}`}
       >
         {icons[status]}
         {status?.charAt(0)?.toUpperCase() + status?.slice(1)}
       </span>
+    );
+    if (!acknowledgedAt) {
+      return statusBadge;
+    }
+    return (
+      <div className="flex flex-col gap-1 items-start">
+        {statusBadge}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+          <BadgeCheck className="w-3 h-3" />
+          Acknowledged
+        </span>
+      </div>
     );
   };
 
@@ -153,6 +190,7 @@ export default function LeaveApprovalsPage() {
       paid: "bg-purple-100 text-purple-800",
       casual: "bg-green-100 text-green-800",
       unpaid: "bg-gray-100 text-gray-800",
+      "half-day": "bg-orange-100 text-orange-700",
     };
     return colors[type] || "bg-gray-100 text-gray-800";
   };
@@ -297,40 +335,58 @@ export default function LeaveApprovalsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getLeaveTypeColor(leave.leave_type)}`}
-                      >
-                        {leave.leave_type?.charAt(0)?.toUpperCase() +
-                          leave.leave_type?.slice(1)}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${leave.is_half_day ? "bg-orange-100 text-orange-700" : getLeaveTypeColor(leave.leave_type)}`}
+                        >
+                          {leave.is_half_day ? "Half-Day" : leave.leave_type?.charAt(0)?.toUpperCase() +
+                            leave.leave_type?.slice(1)}
+                        </span>
+                        {leave.is_half_day ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                            <Sun className="w-3 h-3" />
+                            {leave.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div>{formatDate(leave.from_date)}</div>
-                      <div className="text-gray-500">
-                        to {formatDate(leave.to_date)}
-                      </div>
+                      {!leave.is_half_day && (
+                        <div className="text-gray-500">to {formatDate(leave.to_date)}</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 font-semibold">
-                      {leave.total_days}
+                      {leave.is_half_day ? "½" : leave.total_days}
                     </td>
                     <td className="px-6 py-4">
-                      {getStatusBadge(leave.status)}
+                      {getStatusBadge(leave.status, leave.acknowledged_at)}
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => {
-                          setSelectedLeave(leave);
-                          setShowApprovalModal(true);
-                          setRejectionReason("");
-                        }}
-                        className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                          leave.status === "pending"
-                            ? "bg-blue-600 text-white hover:bg-blue-700"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        {leave.status === "pending" ? "Review" : "View"}
-                      </button>
+                      <div className="flex gap-2">
+                        {leave.status === "pending" && !leave.acknowledged_at && (
+                          <button
+                            onClick={() => handleAcknowledge(leave.id)}
+                            className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+                          >
+                            Acknowledge
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedLeave(leave);
+                            setShowApprovalModal(true);
+                            setRejectionReason("");
+                          }}
+                          className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                            leave.status === "pending"
+                              ? "bg-blue-600 text-white hover:bg-blue-700"
+                              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                          }`}
+                        >
+                          {leave.status === "pending" ? "Review" : "View"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -352,21 +408,46 @@ export default function LeaveApprovalsPage() {
               </p>
               <p>
                 <span className="font-medium">Type:</span>{" "}
-                {selectedLeave.leave_type}
+                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${selectedLeave.is_half_day ? "bg-orange-100 text-orange-700" : getLeaveTypeColor(selectedLeave.leave_type)}`}>
+                  {selectedLeave.is_half_day ? "Half-Day" : selectedLeave.leave_type?.charAt(0)?.toUpperCase() + selectedLeave.leave_type?.slice(1)}
+                </span>
+                {selectedLeave.is_half_day && (
+                  <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                    <Sun className="w-3 h-3" />
+                    Half-Day · {selectedLeave.half_day_type === "1st_half" ? "1st Half (Morning)" : "2nd Half (Afternoon)"}
+                  </span>
+                )}
               </p>
               <p>
-                <span className="font-medium">From:</span>{" "}
-                {formatDate(selectedLeave.from_date)} -{" "}
-                {formatDate(selectedLeave.to_date)}
+                <span className="font-medium">{selectedLeave.is_half_day ? "Date:" : "From:"}</span>{" "}
+                {formatDate(selectedLeave.from_date)}
+                {!selectedLeave.is_half_day && <> - {formatDate(selectedLeave.to_date)}</>}
               </p>
               <p>
                 <span className="font-medium">Days:</span>{" "}
-                {selectedLeave.total_days}
+                {selectedLeave.is_half_day ? "0.5 (Half-Day)" : selectedLeave.total_days}
               </p>
               <p>
                 <span className="font-medium">Reason:</span>{" "}
                 {selectedLeave.reason}
               </p>
+              <p className="pt-1">
+                <span className="font-medium">Status:</span>{" "}
+                <span className="inline-block align-middle">
+                  {getStatusBadge(selectedLeave.status, selectedLeave.acknowledged_at)}
+                </span>
+              </p>
+              {selectedLeave.reviewed_by && (
+                <p className="text-xs text-gray-600">
+                  Reviewed by <span className="font-medium">{selectedLeave.reviewed_by}</span> on {formatDate(selectedLeave.reviewed_at)}
+                </p>
+              )}
+              {selectedLeave.acknowledged_by && (
+                <p className="text-xs text-indigo-600 flex items-center gap-1">
+                  <BadgeCheck className="w-3.5 h-3.5" />
+                  Acknowledged by <span className="font-medium">{selectedLeave.acknowledged_by}</span> on {formatDate(selectedLeave.acknowledged_at)}
+                </p>
+              )}
             </div>
 
             {selectedLeave.status === "pending" && (
@@ -411,6 +492,15 @@ export default function LeaveApprovalsPage() {
                   >
                     {actionLoading ? "..." : "Reject"}
                   </button>
+                  {!selectedLeave.acknowledged_at && (
+                    <button
+                      onClick={() => handleAcknowledge(selectedLeave.id)}
+                      disabled={actionLoading}
+                      className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {actionLoading ? "..." : "Acknowledge"}
+                    </button>
+                  )}
                 </>
               )}
             </div>

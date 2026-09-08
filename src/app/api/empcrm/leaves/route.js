@@ -21,6 +21,21 @@ export async function GET(request) {
 
     const conn = await getDbConnection();
 
+    // Auto-migration: Ensure 'half-day' value exists in leave_type ENUM
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
+    } catch (e) { /* ignore - already applied */ }
+    try {
+      await conn.execute(`UPDATE employee_leaves SET leave_type = 'half-day' WHERE is_half_day = 1 AND leave_type != 'half-day'`);
+    } catch (e) { /* ignore */ }
+    // Auto-migration: Add acknowledgment columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_at timestamp NULL DEFAULT NULL COMMENT 'Acknowledgment timestamp (SuperAdmin/ReportingManager)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
+    } catch (e) { /* ignore */ }
+
     const referer = request.headers.get("referer") || "";
     const forceUserMode = referer.includes("user-dashboard");
     const forceAdminMode = referer.includes("admin-dashboard");
@@ -112,7 +127,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { leave_type, from_date, to_date, reason } = body;
+    const { leave_type, from_date, to_date, reason, is_half_day, half_day_type } = body;
 
     // Validation
     if (!leave_type || !from_date || !to_date || !reason) {
@@ -122,7 +137,31 @@ export async function POST(request) {
       );
     }
 
+    // Half-day specific validation
+    const isHalfDay = !!is_half_day;
+    if (isHalfDay && !["1st_half", "2nd_half"].includes(half_day_type)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid half_day_type. Must be '1st_half' or '2nd_half'" },
+        { status: 400 }
+      );
+    }
+
     const conn = await getDbConnection();
+
+    // Auto-migration: Ensure 'half-day' value exists in leave_type ENUM
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
+    } catch (e) { /* ignore - already applied */ }
+    try {
+      await conn.execute(`UPDATE employee_leaves SET leave_type = 'half-day' WHERE is_half_day = 1 AND leave_type != 'half-day'`);
+    } catch (e) { /* ignore */ }
+    // Auto-migration: Add acknowledgment columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_at timestamp NULL DEFAULT NULL COMMENT 'Acknowledgment timestamp (SuperAdmin/ReportingManager)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
+    } catch (e) { /* ignore */ }
 
     // Fetch user's profile to get leave policy, date of joining, and empId
     const [profiles] = await conn.execute(
@@ -196,20 +235,24 @@ export async function POST(request) {
       return Math.max(0, accrued);
     };
 
-    // Calculate total days
-    const fromDate = new Date(from_date);
-    const toDate = new Date(to_date);
-    const totalDays = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
-
-    if (totalDays <= 0) {
-      return NextResponse.json(
-        { success: false, error: "Invalid date range" },
-        { status: 400 }
-      );
+    // Calculate total days (half-day = 0.5, stored as decimal)
+    let totalDays;
+    if (isHalfDay) {
+      totalDays = 0.5;
+    } else {
+      const fromDate = new Date(from_date);
+      const toDate = new Date(to_date);
+      totalDays = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
+      if (totalDays <= 0) {
+        return NextResponse.json(
+          { success: false, error: "Invalid date range" },
+          { status: 400 }
+        );
+      }
     }
 
-    // Skip validation for unpaid leave - it's always available
-    if (leave_type !== 'unpaid') {
+    // Skip validation for unpaid leave (always available) or half-day (0.5 day, minimal impact)
+    if (leave_type !== 'unpaid' && !isHalfDay) {
       // Check if leave type is enabled for this employee
       const leaveTypeKey = `${leave_type}_enabled`;
       if (!leavePolicy[leaveTypeKey]) {
@@ -279,18 +322,21 @@ export async function POST(request) {
     }
 
     // Insert leave application
+    const finalLeaveType = isHalfDay ? 'half-day' : leave_type;
     const [result] = await conn.execute(
       `INSERT INTO employee_leaves 
-       (username, empId, full_name, leave_type, from_date, to_date, total_days, reason) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (username, empId, full_name, leave_type, from_date, to_date, total_days, is_half_day, half_day_type, reason) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         session.username,
         empId,
         profile.full_name || session.username,
-        leave_type,
+        finalLeaveType,
         from_date,
         to_date,
         totalDays,
+        isHalfDay ? 1 : 0,
+        isHalfDay ? half_day_type : null,
         reason
       ]
     );
@@ -328,10 +374,10 @@ export async function POST(request) {
           from: `"${profile.full_name || session.username}" <${creds.smtp_user}@dynacleanindustries.com>`,
           to: hrEmail,
           cc: tlEmail,
-          subject: `New Leave Application: ${profile.full_name || session.username} - ${leave_type.toUpperCase()}`,
+          subject: `New ${isHalfDay ? "Half-Day " : ""}Leave Application: ${profile.full_name || session.username} - ${leave_type.toUpperCase()}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6;">
-              <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">New Leave Application</h2>
+              <h2 style="color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px;">New ${isHalfDay ? "Half-Day " : ""}Leave Application</h2>
               <p>A new leave application has been submitted and requires your attention.</p>
               
               <table style="width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #f9fafb;">
@@ -341,14 +387,14 @@ export async function POST(request) {
                 </tr>
                 <tr>
                   <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold;">Leave Type</td>
-                  <td style="padding: 12px; border: 1px solid #e5e7eb;">${leave_type.toUpperCase()}</td>
+                  <td style="padding: 12px; border: 1px solid #e5e7eb;">${leave_type.toUpperCase()}${isHalfDay ? ` — Half-Day (${half_day_type === "1st_half" ? "1st Half / Morning" : "2nd Half / Afternoon"})` : ""}</td>
                 </tr>
                 <tr>
                   <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold;">Duration</td>
                   <td style="padding: 12px; border: 1px solid #e5e7eb;">
-                    ${new Date(from_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} To ${new Date(to_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    ${new Date(from_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${!isHalfDay ? ` To ${new Date(to_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ""}
                     <br>
-                    <span style="color: #666; font-size: 0.9em;">(${totalDays} days)</span>
+                    <span style="color: #666; font-size: 0.9em;">(${isHalfDay ? "0.5 days" : `${totalDays} days`})</span>
                   </td>
                 </tr>
                 <tr>
@@ -419,9 +465,9 @@ export async function PATCH(request) {
       );
     }
 
-    if (!["approved", "rejected"].includes(status)) {
+    if (!["approved", "rejected", "acknowledge"].includes(status)) {
       return NextResponse.json(
-        { success: false, error: "Invalid status. Must be 'approved' or 'rejected'" },
+        { success: false, error: "Invalid status. Must be 'approved', 'rejected', or 'acknowledge'" },
         { status: 400 }
       );
     }
@@ -435,10 +481,35 @@ export async function PATCH(request) {
 
     const conn = await getDbConnection();
 
+    // Auto-migration: Ensure 'half-day' value exists in leave_type ENUM
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
+    } catch (e) { /* ignore - already applied */ }
+    try {
+      await conn.execute(`UPDATE employee_leaves SET leave_type = 'half-day' WHERE is_half_day = 1 AND leave_type != 'half-day'`);
+    } catch (e) { /* ignore */ }
+    // Auto-migration: Add acknowledgment columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_at timestamp NULL DEFAULT NULL COMMENT 'Acknowledgment timestamp (SuperAdmin/ReportingManager)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
+    } catch (e) { /* ignore */ }
+
     const [leaveRows] = await conn.execute(`SELECT * FROM employee_leaves WHERE id = ?`, [leaveId]);
     const leave = leaveRows[0];
     if (!leave) {
       return NextResponse.json({ success: false, error: "Leave not found" }, { status: 404 });
+    }
+
+    // Acknowledge: allowed on any status (pending/approved/rejected) as long as not already acknowledged
+    if (status === "acknowledge") {
+      if (leave.acknowledged_at) {
+        return NextResponse.json(
+          { success: false, error: "Leave already acknowledged." },
+          { status: 400 }
+        );
+      }
     }
 
     // Reporting manager can only approve their reportees' leaves, but SUPERADMIN can approve any
@@ -451,7 +522,24 @@ export async function PATCH(request) {
     const [emailRows] = await conn.execute(`SELECT * FROM email_credentials WHERE username = ?`, [leave.username]);
     const email = emailRows[0];
 
-    // Update leave status
+    if (status === "acknowledge") {
+      // Acknowledge action: keep existing status, just mark acknowledgment
+      await conn.execute(
+        `UPDATE employee_leaves
+         SET acknowledged_at = NOW(), acknowledged_by = ?
+         WHERE id = ?`,
+        [session.username, leaveId]
+      );
+      if (conn.release) conn.release();
+
+      return NextResponse.json({
+        success: true,
+        message: "Leave acknowledged successfully",
+        acknowledged: true,
+      });
+    }
+
+    // Update leave status (approve / reject)
     await conn.execute(
       `UPDATE employee_leaves 
        SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?
@@ -459,8 +547,8 @@ export async function PATCH(request) {
       [status, session.username, rejection_reason || null, leaveId]
     );
 
-    // If approving unpaid leave, create salary deduction based on 26-day divisor
-    if (status === "approved" && leave?.leave_type === "unpaid") {
+    // If approving unpaid leave (full-day only), create salary deduction based on 26-day divisor
+    if (status === "approved" && leave?.leave_type === "unpaid" && !(leave?.is_half_day == 1)) {
       try {
         const username = leave.username;
         const totalDays = Number(leave.total_days || 0);
