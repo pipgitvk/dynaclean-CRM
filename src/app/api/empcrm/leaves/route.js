@@ -325,8 +325,8 @@ export async function POST(request) {
     const finalLeaveType = isHalfDay ? 'half-day' : leave_type;
     const [result] = await conn.execute(
       `INSERT INTO employee_leaves 
-       (username, empId, full_name, leave_type, from_date, to_date, total_days, is_half_day, half_day_type, reason) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (username, empId, full_name, leave_type, from_date, to_date, total_days, is_half_day, half_day_type, reason, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         session.username,
         empId,
@@ -337,7 +337,8 @@ export async function POST(request) {
         totalDays,
         isHalfDay ? 1 : 0,
         isHalfDay ? half_day_type : null,
-        reason
+        reason,
+        session.username
       ]
     );
 
