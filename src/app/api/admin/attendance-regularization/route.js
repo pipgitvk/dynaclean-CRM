@@ -21,6 +21,17 @@ export async function GET() {
     }
 
     const conn = await getDbConnection();
+
+    try {
+      await conn.execute(
+        `ALTER TABLE attendance_regularization_requests
+         ADD COLUMN acknowledged_at DATETIME NULL,
+         ADD COLUMN acknowledged_by VARCHAR(255) NULL`
+      );
+    } catch (e) {
+      if (!String(e.message).includes("Duplicate column name")) throw e;
+    }
+
     const [rows] = await conn.execute(
       `SELECT *
        FROM attendance_regularization_requests
@@ -56,14 +67,24 @@ export async function PATCH(request) {
     const body = await request.json();
     const { id, action, reviewer_comment } = body;
 
-    if (!id || !["approve", "reject", "revert"].includes(action)) {
+    if (!id || !["approve", "reject", "revert", "acknowledge"].includes(action)) {
       return NextResponse.json(
-        { success: false, message: "id and action (approve|reject|revert) are required" },
+        { success: false, message: "id and action (approve|reject|revert|acknowledge) are required" },
         { status: 400 }
       );
     }
 
     const conn = await getDbConnection();
+    try {
+      await conn.execute(
+        `ALTER TABLE attendance_regularization_requests
+         ADD COLUMN acknowledged_at DATETIME NULL,
+         ADD COLUMN acknowledged_by VARCHAR(255) NULL`
+      );
+    } catch (e) {
+      if (!String(e.message).includes("Duplicate column name")) throw e;
+    }
+
     const [reqRows] = await conn.execute(
       `SELECT * FROM attendance_regularization_requests WHERE id = ? LIMIT 1`,
       [id]
@@ -73,6 +94,24 @@ export async function PATCH(request) {
     }
 
     const reqRow = reqRows[0];
+
+    // Handle acknowledge action - status stays the same, only acknowledged_at/by set
+    if (action === "acknowledge") {
+      if (reqRow.acknowledged_at) {
+        return NextResponse.json(
+          { success: false, message: "This request is already acknowledged." },
+          { status: 409 }
+        );
+      }
+      await conn.execute(
+        `UPDATE attendance_regularization_requests SET
+          acknowledged_at = NOW(),
+          acknowledged_by = ?
+         WHERE id = ?`,
+        [payload.username, id]
+      );
+      return NextResponse.json({ success: true, message: "Request acknowledged." });
+    }
     
     // Handle revert action
     if (action === "revert") {

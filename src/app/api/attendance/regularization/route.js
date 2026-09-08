@@ -69,6 +69,16 @@ export async function GET(request) {
 
     const conn = await getDbConnection();
 
+    try {
+      await conn.execute(
+        `ALTER TABLE attendance_regularization_requests
+         ADD COLUMN acknowledged_at DATETIME NULL,
+         ADD COLUMN acknowledged_by VARCHAR(255) NULL`
+      );
+    } catch (e) {
+      if (!String(e.message).includes("Duplicate column name")) throw e;
+    }
+
     if (scope === "summary") {
       const reportees = await getReportees(session.username);
       const isReportingManager = reportees.length > 0;
@@ -377,14 +387,24 @@ export async function PATCH(request) {
     const body = await request.json();
     const { id, action, reviewer_comment } = body;
 
-    if (!id || !["approve", "reject"].includes(action)) {
+    if (!id || !["approve", "reject", "acknowledge"].includes(action)) {
       return NextResponse.json(
-        { success: false, error: "id and action (approve|reject) are required" },
+        { success: false, error: "id and action (approve|reject|acknowledge) are required" },
         { status: 400 }
       );
     }
 
     const conn = await getDbConnection();
+    try {
+      await conn.execute(
+        `ALTER TABLE attendance_regularization_requests
+         ADD COLUMN acknowledged_at DATETIME NULL,
+         ADD COLUMN acknowledged_by VARCHAR(255) NULL`
+      );
+    } catch (e) {
+      if (!String(e.message).includes("Duplicate column name")) throw e;
+    }
+
     const [reqRows] = await conn.execute(
       `SELECT * FROM attendance_regularization_requests WHERE id = ? LIMIT 1`,
       [id]
@@ -394,6 +414,29 @@ export async function PATCH(request) {
     }
 
     const reqRow = reqRows[0];
+
+    if (action === "acknowledge") {
+      if (reqRow.acknowledged_at) {
+        return NextResponse.json(
+          { success: false, error: "This request is already acknowledged." },
+          { status: 409 }
+        );
+      }
+      const isOwner = reqRow.username === session.username;
+      const isManager = await isReportingManagerOf(session.username, reqRow.username);
+      if (!isOwner && !isManager) {
+        return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      }
+      await conn.execute(
+        `UPDATE attendance_regularization_requests SET
+          acknowledged_at = NOW(),
+          acknowledged_by = ?
+         WHERE id = ?`,
+        [session.username, id]
+      );
+      return NextResponse.json({ success: true, message: "Request acknowledged." });
+    }
+
     if (reqRow.status !== "pending") {
       return NextResponse.json(
         { success: false, error: "This request is no longer pending." },

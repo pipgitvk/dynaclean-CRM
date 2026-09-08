@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { BadgeCheck } from "lucide-react";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 
 function formatLogDate(v) {
@@ -26,7 +27,7 @@ function displayOut(req) {
   return req.proposed_checkout_time ?? req.original_checkout_time ?? null;
 }
 
-function statusBadge(status) {
+function statusBadge(status, acknowledgedAt) {
   const s = String(status || "").toLowerCase();
   if (s === "pending") {
     return "bg-amber-100 text-amber-900 border border-amber-200";
@@ -38,6 +39,28 @@ function statusBadge(status) {
     return "bg-red-50 text-red-800 border border-red-200";
   }
   return "bg-gray-100 text-gray-800 border border-gray-200";
+}
+
+function StatusBadge({ status, acknowledgedAt }) {
+  const cls = statusBadge(status);
+  const display = status || "—";
+  const statusEl = (
+    <span
+      className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${cls}`}
+    >
+      {display}
+    </span>
+  );
+  if (!acknowledgedAt) return statusEl;
+  return (
+    <div className="flex flex-col gap-1 items-start">
+      {statusEl}
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+        <BadgeCheck className="w-3 h-3" />
+        Acknowledged
+      </span>
+    </div>
+  );
 }
 
 export default function AdminAttendanceRegularizationPage() {
@@ -75,7 +98,8 @@ export default function AdminAttendanceRegularizationPage() {
       const labels = {
         approve: "Approve",
         reject: "Reject",
-        revert: "Revert"
+        revert: "Revert",
+        acknowledge: "Acknowledge",
       };
       const label = labels[action] || "Action";
       
@@ -243,11 +267,10 @@ export default function AdminAttendanceRegularizationPage() {
                       {formatLogDate(req.log_date)}
                     </td>
                     <td className="px-3 py-2">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${statusBadge(req.status)}`}
-                      >
-                        {req.status || "—"}
-                      </span>
+                      <StatusBadge
+                        status={req.status}
+                        acknowledgedAt={req.acknowledged_at}
+                      />
                     </td>
                     <td className="px-3 py-2 min-w-0 text-gray-700 align-top break-words">
                       {req.reason || "—"}
@@ -276,6 +299,17 @@ export default function AdminAttendanceRegularizationPage() {
                           <span className="text-gray-500">By:</span>{" "}
                           {req.reviewed_by || "—"}
                         </div>
+                        {req.acknowledged_by && (
+                          <div className="flex items-center gap-1 text-indigo-700">
+                            <BadgeCheck className="w-3 h-3" />
+                            <span>
+                              Acknowledged by {req.acknowledged_by}
+                              {req.acknowledged_at
+                                ? ` on ${new Date(req.acknowledged_at).toLocaleString()}`
+                                : ""}
+                            </span>
+                          </div>
+                        )}
                         <div className="text-gray-400 mt-1 pt-1 border-t border-gray-50">
                           {req.created_at
                             ? new Date(req.created_at).toLocaleString()
@@ -299,7 +333,7 @@ export default function AdminAttendanceRegularizationPage() {
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {req.status === "pending" ? (
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <button
                             onClick={() => handleAction(req.id, "approve")}
                             disabled={actionLoading !== null}
@@ -314,16 +348,36 @@ export default function AdminAttendanceRegularizationPage() {
                           >
                             {actionLoading === `${req.id}-reject` ? "…" : "Reject"}
                           </button>
+                          {!req.acknowledged_at && (
+                            <button
+                              onClick={() => handleAction(req.id, "acknowledge")}
+                              disabled={actionLoading !== null}
+                              className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {actionLoading === `${req.id}-acknowledge` ? "…" : "Acknowledge"}
+                            </button>
+                          )}
                         </div>
                       ) : req.status === "approved" || req.status === "rejected" ? (
-                        <button
-                          onClick={() => handleAction(req.id, "revert")}
-                          disabled={actionLoading !== null}
-                          className="px-2 py-1 text-xs font-medium rounded bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={`Revert ${req.status} request to pending`}
-                        >
-                          {actionLoading === `${req.id}-revert` ? "…" : "Revert"}
-                        </button>
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => handleAction(req.id, "revert")}
+                            disabled={actionLoading !== null}
+                            className="px-2 py-1 text-xs font-medium rounded bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={`Revert ${req.status} request to pending`}
+                          >
+                            {actionLoading === `${req.id}-revert` ? "…" : "Revert"}
+                          </button>
+                          {!req.acknowledged_at && (
+                            <button
+                              onClick={() => handleAction(req.id, "acknowledge")}
+                              disabled={actionLoading !== null}
+                              className="px-2 py-1 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {actionLoading === `${req.id}-acknowledge` ? "…" : "Acknowledge"}
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
                       )}

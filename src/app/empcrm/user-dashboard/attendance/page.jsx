@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import toast from "react-hot-toast";
-import { Sun } from "lucide-react";
+import { Sun, BadgeCheck } from "lucide-react";
 import {
   DEFAULT_ATTENDANCE_RULES,
   getCheckinStatus as checkinStatusFromRules,
@@ -15,6 +15,34 @@ import {
 import { rowHasMeaningfulCheckinOrCheckout } from "@/lib/attendanceMeaningfulPunch";
 import { formatAttendanceTimeForDisplay as formatTime } from "@/lib/istDateTime";
 import AttendanceRegularizeModal from "@/app/user-dashboard/attendance/AttendanceRegularizeModal";
+
+function statusBadgeClass(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "pending") return "bg-amber-100 text-amber-900 border border-amber-200";
+  if (s === "approved") return "bg-green-100 text-green-900 border border-green-200";
+  if (s === "rejected") return "bg-red-50 text-red-800 border border-red-200";
+  return "bg-gray-100 text-gray-800 border border-gray-200";
+}
+
+function RegStatusBadge({ status, acknowledgedAt }) {
+  const cls = statusBadgeClass(status);
+  const display = status || "—";
+  const statusEl = (
+    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium capitalize ${cls}`}>
+      {display}
+    </span>
+  );
+  if (!acknowledgedAt) return statusEl;
+  return (
+    <div className="flex flex-col gap-1 items-start">
+      {statusEl}
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+        <BadgeCheck className="w-3 h-3" />
+        Acknowledged
+      </span>
+    </div>
+  );
+}
 
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
@@ -736,58 +764,91 @@ const AttendancePage = () => {
                     )}
                     {log.type === "absent" && (
                       <div className="mt-3">
-                        {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                          <div className="flex items-center gap-2 justify-center">
-                            <span className="text-amber-700 font-medium text-sm">Pending approval</span>
+                        {(() => {
+                          const key = logDateKeyForReg(log);
+                          const pendingReq = pendingRegByDate.get(key);
+                          const rejectedReq = rejectedRegByDate.get(key);
+                          const approvedReq = approvedRegByDate.get(key);
+                          if (pendingReq) {
+                            return (
+                              <div className="flex flex-col items-center gap-2">
+                                <RegStatusBadge status="pending" acknowledgedAt={pendingReq.acknowledged_at} />
+                                <button
+                                  type="button"
+                                  onClick={() => openEditRegModal(pendingReq)}
+                                  className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                >
+                                  Edit
+                                </button>
+                                {pendingReq.acknowledged_by && (
+                                  <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                    <BadgeCheck className="w-3 h-3" />
+                                    <span>Acknowledged by {pendingReq.acknowledged_by}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (rejectedReq) {
+                            return (
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  <RegStatusBadge status="rejected" acknowledgedAt={rejectedReq.acknowledged_at} />
+                                  <button
+                                    type="button"
+                                    onClick={() => showRejectionRemarks(rejectedReq.reviewer_comment)}
+                                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                    title="View rejection remarks"
+                                  >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                {rejectedReq.acknowledged_by && (
+                                  <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                    <BadgeCheck className="w-3 h-3" />
+                                    <span>Acknowledged by {rejectedReq.acknowledged_by}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          if (approvedReq) {
+                            return (
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                  <RegStatusBadge status="approved" acknowledgedAt={approvedReq.acknowledged_at} />
+                                  <button
+                                    type="button"
+                                    onClick={() => showApprovalRemarks(approvedReq.reviewer_comment)}
+                                    className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                    title="View approval remarks"
+                                  >
+                                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
+                                {approvedReq.acknowledged_by && (
+                                  <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                    <BadgeCheck className="w-3 h-3" />
+                                    <span>Acknowledged by {approvedReq.acknowledged_by}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          return (
                             <button
                               type="button"
-                              onClick={() => openEditRegModal(pendingRegByDate.get(logDateKeyForReg(log)))}
-                              className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                              onClick={() => openRegularizeModal(log)}
+                              className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
                             >
-                              Edit
+                              Regularize
                             </button>
-                          </div>
-                        ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-red-600 font-medium text-sm">
-                              Request Rejected
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                              title="View rejection remarks"
-                            >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
-                        ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-green-600 font-medium text-sm">
-                              Request Approved
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                              className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                              title="View approval remarks"
-                            >
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => openRegularizeModal(log)}
-                            className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
-                          >
-                            Regularize
-                          </button>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
@@ -919,54 +980,96 @@ const AttendancePage = () => {
                         </td>
                         {filterStatus === "regularize" && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-amber-700 font-medium">Pending</span>
-                                <button
-                                  type="button"
-                                  onClick={() => openEditRegModal(pendingRegByDate.get(logDateKeyForReg(log)))}
-                                  className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
-                                >
-                                  Edit
-                                </button>
-                              </div>
-                            ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-red-600 font-medium text-sm">Rejected</span>
-                                <button
-                                  type="button"
-                                  onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View rejection remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-green-600 font-medium text-sm">Approved</span>
-                                <button
-                                  type="button"
-                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View approval remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : rowNeedsRegularization(log) ? (
-                              <button
-                                type="button"
-                                onClick={() => openRegularizeModal(log)}
-                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
-                              >
-                                Regularize
-                              </button>
-                            ) : null}
+                            {(() => {
+                              const key = logDateKeyForReg(log);
+                              const pReq = pendingRegByDate.get(key);
+                              const rReq = rejectedRegByDate.get(key);
+                              const aReq = approvedRegByDate.get(key);
+                              if (pReq) {
+                                return (
+                                  <div className="flex flex-col items-start gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditRegModal(pReq)}
+                                        className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                    {pReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {pReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (rReq) {
+                                return (
+                                  <div className="flex flex-col items-start gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showRejectionRemarks(rReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View rejection remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {rReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {rReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (aReq) {
+                                return (
+                                  <div className="flex flex-col items-start gap-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showApprovalRemarks(aReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View approval remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {aReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {aReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (rowNeedsRegularization(log)) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => openRegularizeModal(log)}
+                                    className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                                  >
+                                    Regularize
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
                         )}
                       </>
@@ -999,110 +1102,184 @@ const AttendancePage = () => {
                         )}
                         {log.type === "absent" && (
                           <div className="mt-3 flex justify-center">
-                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-amber-700 font-medium text-sm">Pending approval</span>
+                            {(() => {
+                              const key = logDateKeyForReg(log);
+                              const pReq = pendingRegByDate.get(key);
+                              const rReq = rejectedRegByDate.get(key);
+                              const aReq = approvedRegByDate.get(key);
+                              if (pReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditRegModal(pReq)}
+                                        className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                    {pReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {pReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (rReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showRejectionRemarks(rReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View rejection remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {rReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {rReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (aReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showApprovalRemarks(aReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View approval remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {aReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {aReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return (
                                 <button
                                   type="button"
-                                  onClick={() => openEditRegModal(pendingRegByDate.get(logDateKeyForReg(log)))}
-                                  className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                  onClick={() => openRegularizeModal(log)}
+                                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
                                 >
-                                  Edit
+                                  Regularize
                                 </button>
-                              </div>
-                            ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-red-600 font-medium text-sm">
-                                  Request Rejected
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View rejection remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-green-600 font-medium text-sm">
-                                  Request Approved
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View approval remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openRegularizeModal(log)}
-                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
-                              >
-                                Regularize
-                              </button>
-                            )}
+                              );
+                            })()}
                           </div>
                         )}
                         {filterStatus === "regularize" && (
                           <div className="mt-3 flex justify-center">
-                            {pendingRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-amber-700 font-medium text-sm">Pending</span>
+                            {(() => {
+                              const key = logDateKeyForReg(log);
+                              const pReq = pendingRegByDate.get(key);
+                              const rReq = rejectedRegByDate.get(key);
+                              const aReq = approvedRegByDate.get(key);
+                              if (pReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="pending" acknowledgedAt={pReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => openEditRegModal(pReq)}
+                                        className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                    {pReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {pReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (rReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="rejected" acknowledgedAt={rReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showRejectionRemarks(rReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View rejection remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {rReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {rReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (aReq) {
+                                return (
+                                  <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <RegStatusBadge status="approved" acknowledgedAt={aReq.acknowledged_at} />
+                                      <button
+                                        type="button"
+                                        onClick={() => showApprovalRemarks(aReq.reviewer_comment)}
+                                        className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
+                                        title="View approval remarks"
+                                      >
+                                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    {aReq.acknowledged_by && (
+                                      <div className="flex items-center gap-1 text-[11px] text-indigo-700">
+                                        <BadgeCheck className="w-3 h-3" />
+                                        <span>Acknowledged by {aReq.acknowledged_by}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return (
                                 <button
                                   type="button"
-                                  onClick={() => openEditRegModal(pendingRegByDate.get(logDateKeyForReg(log)))}
-                                  className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                                  onClick={() => openRegularizeModal(log)}
+                                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
                                 >
-                                  Edit
+                                  Regularize
                                 </button>
-                              </div>
-                            ) : rejectedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-red-600 font-medium text-sm">Rejected</span>
-                                <button
-                                  type="button"
-                                  onClick={() => showRejectionRemarks(rejectedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View rejection remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : approvedRegByDate.get(logDateKeyForReg(log)) ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-green-600 font-medium text-sm">Approved</span>
-                                <button
-                                  type="button"
-                                  onClick={() => showApprovalRemarks(approvedRegByDate.get(logDateKeyForReg(log)).reviewer_comment)}
-                                  className="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50"
-                                  title="View approval remarks"
-                                >
-                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openRegularizeModal(log)}
-                                className="px-3 py-1.5 rounded-md text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
-                              >
-                                Regularize
-                              </button>
-                            )}
+                              );
+                            })()}
                           </div>
                         )}
                       </td>
