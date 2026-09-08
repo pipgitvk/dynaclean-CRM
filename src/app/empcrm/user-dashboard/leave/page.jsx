@@ -506,7 +506,13 @@ export default function UserLeaveManagement() {
                       {leave.reason}
                     </td>
                     <td className="px-6 py-4">
-                      {getStatusBadge(leave.status, leave.acknowledged_at)}
+                      {leave.status !== "pending" && getStatusBadge(leave.status, leave.acknowledged_at)}
+                      {leave.acknowledged_at && (
+                        <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+                          <BadgeCheck className="w-3 h-3" />
+                          Acknowledged
+                        </div>
+                      )}
                       {leave.status === "rejected" && leave.rejection_reason && (
                         <div className="mt-2 text-xs text-red-600 max-w-xs">
                           <div className="flex items-start gap-1">
@@ -515,10 +521,10 @@ export default function UserLeaveManagement() {
                           </div>
                         </div>
                       )}
-                      {leave.acknowledged_by && (
-                        <div className="mt-2 text-xs text-indigo-600 max-w-xs flex items-center gap-1">
-                          <BadgeCheck className="w-3 h-3 flex-shrink-0" />
-                          <span>Acknowledged by {leave.acknowledged_by} on {formatDate(leave.acknowledged_at)}</span>
+                      {leave.acknowledgement_remark && (
+                        <div className="mt-2 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs text-indigo-700 max-w-xs">
+                          <div className="font-medium text-indigo-800 mb-1">Remark:</div>
+                          <p className="text-indigo-600">{leave.acknowledgement_remark}</p>
                         </div>
                       )}
                     </td>

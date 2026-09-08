@@ -27,6 +27,8 @@ export default function AdminLeaveManagement() {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [showAcknowledgeModal, setShowAcknowledgeModal] = useState(false);
+  const [acknowledgementRemark, setAcknowledgementRemark] = useState("");
 
   // Reporting manager assignment (inside View modal)
   const [canAddReportingManager, setCanAddReportingManager] = useState(false);
@@ -208,7 +210,7 @@ export default function AdminLeaveManagement() {
       const response = await fetch("/api/empcrm/leaves", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leaveId, status: "acknowledge" })
+        body: JSON.stringify({ leaveId, status: "acknowledge", acknowledgement_remark: acknowledgementRemark })
       });
 
       const data = await response.json();
@@ -216,7 +218,8 @@ export default function AdminLeaveManagement() {
       if (data.success) {
         alert("Leave acknowledged successfully");
         fetchLeaves();
-        setShowApprovalModal(false);
+        setShowAcknowledgeModal(false);
+        setAcknowledgementRemark("");
       } else {
         alert(data.error || "Failed to acknowledge leave");
       }
@@ -571,7 +574,11 @@ export default function AdminLeaveManagement() {
                         )}
                         {leave.status === "pending" && !leave.acknowledged_at && (
                           <button
-                            onClick={() => handleAcknowledge(leave.id)}
+                            onClick={() => {
+                              setSelectedLeave(leave);
+                              setShowAcknowledgeModal(true);
+                              setAcknowledgementRemark("");
+                            }}
                             className="px-3 py-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
                           >
                             Acknowledge
@@ -859,7 +866,11 @@ export default function AdminLeaveManagement() {
                   )}
                   {selectedLeave.status === "pending" && !selectedLeave.acknowledged_at && (
                     <button
-                      onClick={() => handleAcknowledge(selectedLeave.id)}
+                      onClick={() => {
+                        setShowApprovalModal(false);
+                        setShowAcknowledgeModal(true);
+                        setAcknowledgementRemark("");
+                      }}
                       disabled={actionLoading}
                       className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                     >
@@ -978,6 +989,63 @@ export default function AdminLeaveManagement() {
           </div>
         </div>
       )}
+
+      {/* Acknowledgement Remark Modal */}
+      {showAcknowledgeModal && selectedLeave && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6 border-b border-gray-200 flex items-center gap-3">
+              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                <BadgeCheck className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">Acknowledge Leave</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {selectedLeave.full_name || selectedLeave.username}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Remark <span className="text-gray-500">(Optional)</span>
+                </label>
+                <textarea
+                  value={acknowledgementRemark}
+                  onChange={(e) => setAcknowledgementRemark(e.target.value)}
+                  placeholder="Enter your remark or comment about this leave..."
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-2">This remark will be visible to the employee.</p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAcknowledgeModal(false);
+                  setAcknowledgementRemark("");
+                  setSelectedLeave(null);
+                }}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleAcknowledge(selectedLeave.id)}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {actionLoading ? "Processing..." : "Acknowledge"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

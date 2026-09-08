@@ -456,7 +456,7 @@ export async function PATCH(request) {
     }
 
     const body = await request.json();
-    const { leaveId, status, rejection_reason } = body;
+    const { leaveId, status, rejection_reason, acknowledgement_remark } = body;
 
     if (!leaveId || !status) {
       return NextResponse.json(
@@ -495,6 +495,10 @@ export async function PATCH(request) {
     try {
       await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
     } catch (e) { /* ignore */ }
+    // Auto-migration: Add acknowledgement_remark column if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledgement_remark longtext DEFAULT NULL COMMENT 'Remark/comment provided by the person acknowledging the leave'`);
+    } catch (e) { /* ignore */ }
 
     const [leaveRows] = await conn.execute(`SELECT * FROM employee_leaves WHERE id = ?`, [leaveId]);
     const leave = leaveRows[0];
@@ -523,12 +527,12 @@ export async function PATCH(request) {
     const email = emailRows[0];
 
     if (status === "acknowledge") {
-      // Acknowledge action: keep existing status, just mark acknowledgment
+      // Acknowledge action: keep existing status, just mark acknowledgment with optional remark
       await conn.execute(
         `UPDATE employee_leaves
-         SET acknowledged_at = NOW(), acknowledged_by = ?
+         SET acknowledged_at = NOW(), acknowledged_by = ?, acknowledgement_remark = ?
          WHERE id = ?`,
-        [session.username, leaveId]
+        [session.username, acknowledgement_remark || null, leaveId]
       );
       if (conn.release) conn.release();
 
