@@ -129,27 +129,15 @@ function ProductAndSpareLists({ type, userRole }) {
             <tr>
               {type === "product" ? (
                 <>
-                  <th className="p-2 text-left">Image</th>
-                  <th className="p-2 text-left">Code</th>
-                  <th className="p-2 text-left">Name</th>
-                  <th className="p-2 text-left">Product No</th>
-                  <th className="p-2 text-left">Min Qty</th>
-                  <th className="p-2 text-left">Price</th>
-                  {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <th className="p-2 text-left">GEM Price</th>}
-                  {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <th className="p-2 text-left">GEM Last Neg. Price</th>}
-                  {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <th className="p-2 text-left">Dealer Price</th>}
-                  <th className="p-2 text-left">Last Neg. Price</th>
+                  <th className="p-2 text-left">Product</th>
+                  <th className="p-2 text-left">Prices</th>
                   <th className="p-2 text-left">Specification</th>
                   <th className="p-2 text-left">Spares</th>
                 </>
               ) : (
                 <>
-                  <th className="p-2 text-left">Image</th>
-                  <th className="p-2 text-left">Spare No</th>
-                  <th className="p-2 text-left">Name</th>
-                  <th className="p-2 text-left">Min Qty</th>
-                  <th className="p-2 text-left">Price</th>
-                  <th className="p-2 text-left">Last Neg. Price</th>
+                  <th className="p-2 text-left">Spare</th>
+                  <th className="p-2 text-left">Prices</th>
                   <th className="p-2 text-left">Specification</th>
                 </>
               )}
@@ -169,27 +157,65 @@ function ProductAndSpareLists({ type, userRole }) {
                 <tr key={key} className="border-t">
                   <>
                     <td className="p-2">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      ) : (
-                        <span className="text-gray-400">No image</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            className="w-12 h-12 object-cover rounded flex-shrink-0"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-xs w-12 h-12 flex items-center justify-center border rounded flex-shrink-0">No img</span>
+                        )}
+                        <div className="min-w-0">
+                          {type === "product" ? (
+                            <>
+                              <div className="font-semibold text-xs">{r.item_code}</div>
+                              <div className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded inline-block font-semibold mb-0.5">{r.product_number}</div>
+                              <div className="text-xs text-gray-800">{r.item_name}</div>
+                              <div className="text-xs text-gray-500">Min Qty: <span className="font-medium text-gray-800">{r.min_qty}</span></div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="font-semibold text-xs">{r.spare_number}</div>
+                              <div className="text-xs text-gray-800">{r.item_name}</div>
+                              <div className="text-xs text-gray-500">Min Qty: <span className="font-medium text-gray-800">{r.min_qty}</span></div>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </td>
 
                     {type === "product" ? (
                       <>
-                        <td className="p-2">{r.item_code}</td>
-                        <td className="p-2">{r.item_name}</td>
-                        <td className="p-2">{r.product_number}</td>
-                        <td className="p-2">{r.min_qty}</td>
-                        <td className="p-2">{r.price_per_unit}</td>
-                        {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <td className="p-2">{r.gem_price || 0}</td>}
-                        {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <td className="p-2">{parseFloat(r.gem_last_negotiation_price) || 0}</td>}
-                        {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && <td className="p-2">{parseFloat(r.dealer_price) || 0}</td>}
-                        <td className="p-2">{r.last_negotiation_price || 0}</td>
+                        {/* All prices in one column */}
+                        <td className="p-2">
+                          <div className="space-y-1 min-w-[180px]">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-gray-500 text-xs w-28 shrink-0">Price</span>
+                              <span className="font-medium">{r.price_per_unit || 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-gray-500 text-xs w-28 shrink-0">Last Neg. Price</span>
+                              <span className="font-medium">{r.last_negotiation_price || 0}</span>
+                            </div>
+                            {["SUPERADMIN", "ADMIN", "GEM", "EA"].includes(userRole) && (
+                              <>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-gray-500 text-xs w-28 shrink-0">GEM Price</span>
+                                  <span className="font-medium">{r.gem_price || 0}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-gray-500 text-xs w-28 shrink-0">GEM Last Neg.</span>
+                                  <span className="font-medium">{parseFloat(r.gem_last_negotiation_price) || 0}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-gray-500 text-xs w-28 shrink-0">Dealer Price</span>
+                                  <span className="font-medium">{parseFloat(r.dealer_price) || 0}</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-2">{r.specification}</td>
                         <td className="p-2">
                           <button
@@ -203,11 +229,19 @@ function ProductAndSpareLists({ type, userRole }) {
                       </>
                     ) : (
                       <>
-                        <td className="p-2">{r.spare_number}</td>
-                        <td className="p-2">{r.item_name}</td>
-                        <td className="p-2">{r.min_qty}</td>
-                        <td className="p-2">{r.price}</td>
-                        <td className="p-2">{r.last_negotiation_price || 0}</td>
+                        {/* Spare prices in one column */}
+                        <td className="p-2">
+                          <div className="space-y-1 min-w-[160px]">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-gray-500 text-xs w-28 shrink-0">Price</span>
+                              <span className="font-medium">{r.price || 0}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-gray-500 text-xs w-28 shrink-0">Last Neg. Price</span>
+                              <span className="font-medium">{r.last_negotiation_price || 0}</span>
+                            </div>
+                          </div>
+                        </td>
                         <td className="p-2">{r.specification}</td>
                       </>
                     )}
@@ -220,7 +254,7 @@ function ProductAndSpareLists({ type, userRole }) {
               <tr>
                 <td
                   className="p-2 text-gray-500"
-                  colSpan={type === "product" ? 9 : 7}
+                  colSpan={type === "product" ? 4 : 3}
                 >
                   No data
                 </td>
