@@ -14,6 +14,8 @@ export default function QuotationTableClient({ username, customerId, role }) {
   const [toDate, setToDate] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   const employeeOptions = useMemo(() => {
     const names = new Set();
@@ -89,6 +91,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
     });
 
     setFiltered(filteredData);
+    setCurrentPage(1);
   }, [search, quotations, employeeFilter, statusFilter]);
 
   const handleReset = () => {
@@ -97,7 +100,68 @@ export default function QuotationTableClient({ username, customerId, role }) {
     setSearch("");
     setEmployeeFilter("");
     setStatusFilter("");
+    setCurrentPage(1);
   };
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedRows = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  const PaginationBar = () => (
+    <div className="flex items-center justify-between px-2 py-3 border-t mt-2 text-sm text-gray-600">
+      <span>
+        Showing {filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setCurrentPage(1)}
+          disabled={currentPage === 1}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+        >«</button>
+        <button
+          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+        >‹</button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1)
+          .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+          .reduce((acc, p, i, arr) => {
+            if (i > 0 && p - arr[i - 1] > 1) acc.push("...");
+            acc.push(p);
+            return acc;
+          }, [])
+          .map((p, i) =>
+            p === "..." ? (
+              <span key={`ellipsis-${i}`} className="px-2">…</span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => setCurrentPage(p)}
+                className={`px-2.5 py-1 rounded border text-xs ${
+                  p === currentPage
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "hover:bg-gray-100"
+                }`}
+              >
+                {p}
+              </button>
+            )
+          )}
+        <button
+          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+          disabled={currentPage === totalPages}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+        >›</button>
+        <button
+          onClick={() => setCurrentPage(totalPages)}
+          disabled={currentPage === totalPages}
+          className="px-2 py-1 rounded border disabled:opacity-40 hover:bg-gray-100"
+        >»</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bg-white rounded shadow p-4">
@@ -186,7 +250,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
                 </td>
               </tr>
             ) : filtered.length > 0 ? (
-              filtered.map((q) => (
+              paginatedRows.map((q) => (
                 <tr key={q.quote_number} className="border-t hover:bg-gray-50">
                   <td className="px-4 py-2">{q.quote_number}</td>
                   <td className="px-4 py-2">{q.company_name}</td>
@@ -243,6 +307,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
             )}
           </tbody>
         </table>
+        <PaginationBar />
       </div>
 
       {/* Cards - Visible on small screens */}
@@ -250,7 +315,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
         {loading ? (
           <div className="text-center py-4 text-gray-500">Loading...</div>
         ) : filtered.length > 0 ? (
-          filtered.map((q) => (
+          paginatedRows.map((q) => (
             <div
               key={q.quote_number}
               className="bg-white p-4 rounded-lg shadow-md border border-gray-200"
@@ -317,6 +382,7 @@ export default function QuotationTableClient({ username, customerId, role }) {
             No quotations found.
           </div>
         )}
+        <PaginationBar />
       </div>
     </div>
   );

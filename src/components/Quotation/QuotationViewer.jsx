@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useMemo } from "react";
+import { useRef, useState, useMemo, forwardRef, useImperativeHandle } from "react";
 import Link from "next/link";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -30,14 +30,14 @@ function maskMobile(phone) {
   return digits.slice(0, -4) + "****";
 }
 
-export default function QuotationViewer({
+export default forwardRef(function QuotationViewer({
   header,
   items,
   customerEmail = "",
   customerPhone = "",
   customerFirstName = "",
   showAddProspectLink = true,
-}) {
+}, ref) {
   const containerRef = useRef();
   const totalQty = items.reduce((sum, i) => sum + Number(i.quantity), 0);
 
@@ -61,6 +61,9 @@ export default function QuotationViewer({
 
   const [isDownloading, setIsDownloading] = useState(false);
   const [isInvoice, setIsInvoice] = useState(false);
+
+  // Expose downloadPDF so parent components can trigger it via ref
+  useImperativeHandle(ref, () => ({ downloadPDF }));
 
   const downloadPDF = async () => {
     const el = containerRef.current;
@@ -706,4 +709,4 @@ export default function QuotationViewer({
       </div>
     </div>
   );
-}
+});
