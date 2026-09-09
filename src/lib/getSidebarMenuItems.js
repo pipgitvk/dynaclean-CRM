@@ -38,7 +38,7 @@ function transformMenuItemPaths(item, roleKey) {
     return { ...item, path: "/admin-dashboard/reports/payment-pending" };
   }
 
-  if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "denied-leads") {
+  if ((roleUpper === "SALES CUM BACKOFFICE" || roleUpper === "SERVICE SUPPORT") && item.moduleKey === "denied-leads") {
     return { ...item, path: "/sales-dashboard/denied-leads" };
   }
 
