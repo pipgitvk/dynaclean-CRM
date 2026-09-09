@@ -404,6 +404,18 @@ const AttendancePage = () => {
         }
       });
 
+    // Create a map of paid leaves (NOT half-day) — used to override timing display
+    const paidLeaveMap = new Map();
+    leaves
+      .filter(leave => leave.username === user && leave.leave_type === 'paid' && !leave.is_half_day)
+      .forEach((leave) => {
+        const fromD = new Date(leave.from_date);
+        const toD = new Date(leave.to_date);
+        for (let d = new Date(fromD); d <= toD; d.setDate(d.getDate() + 1)) {
+          paidLeaveMap.set(d.toLocaleDateString("en-CA"), leave);
+        }
+      });
+
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dateString = d.toLocaleDateString("en-CA");
       const existingLog = dateMap.get(dateString);
@@ -411,11 +423,21 @@ const AttendancePage = () => {
       const isHoliday = holidayMap.has(dateString);
       const isOnLeave = leaveMap.has(dateString);
       const approvedHalfDay = halfDayLeaveMap.get(dateString) || null;
+      const approvedPaidLeave = paidLeaveMap.get(dateString) || null;
 
       const hasRealPunch =
         existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
 
-      if (hasRealPunch) {
+      // If paid leave exists for this date → always show as full-width paid leave row (no timing)
+      if (approvedPaidLeave) {
+        allDates.push({
+          username: existingLog?.username || user,
+          date: d.toISOString(),
+          type: "paidleave",
+          leaveType: "Paid",
+          leaveReason: approvedPaidLeave.reason || null,
+        });
+      } else if (hasRealPunch) {
         allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
       } else {
         const base = existingLog
@@ -833,7 +855,7 @@ const AttendancePage = () => {
                   key={index}
                   className={`rounded-lg shadow-md p-4 space-y-2 ${log.type === "absent"
                     ? "bg-orange-50"
-                    : log.type === "leave"
+                    : log.type === "leave" || log.type === "paidleave"
                       ? "bg-blue-50"
                       : log.type === "sunday"
                         ? "bg-purple-50"
@@ -1042,7 +1064,7 @@ const AttendancePage = () => {
                   ) : (
                     <div className="text-center py-4">
                       <p className="text-lg font-bold">
-                        {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                        {log.type === "absent" ? "Absent" : log.type === "leave" || log.type === "paidleave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
                       </p>
                       {log.leaveType && (
                         <p className="text-sm text-gray-600 mt-1 capitalize">{log.leaveType} Leave</p>
@@ -1313,13 +1335,15 @@ const AttendancePage = () => {
                             ? "bg-orange-50 text-orange-700"
                             : log.type === "leave"
                               ? "bg-blue-50 text-blue-700"
+                              : log.type === "paidleave"
+                                ? "bg-blue-50 text-blue-700"
                               : log.type === "sunday"
                                 ? "bg-purple-50 text-purple-700"
                                 : "bg-indigo-50 text-indigo-700"
                             }`}
                         >
                           <p className="font-bold text-lg">
-                            {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                            {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "paidleave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
                           </p>
                           {log.leaveType && (
                             <p className="text-sm mt-1 capitalize">{log.leaveType} Leave</p>
