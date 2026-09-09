@@ -468,7 +468,7 @@ const AttendancePage = () => {
   const summary = filteredLogs.reduce(
     (acc, log) => {
       if (log.type === "absent") acc.absents++;
-      if (log.type === "leave") acc.leaves++;
+      if (log.type === "leave" || log.type === "paidleave") acc.leaves++;
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
