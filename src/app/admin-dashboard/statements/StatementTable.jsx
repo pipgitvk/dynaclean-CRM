@@ -1752,8 +1752,8 @@ export default function StatementTable({ rows }) {
                       <div className="border rounded-lg p-4 bg-purple-50">
                         <h4 className="font-semibold text-purple-900 mb-3">🛒 Purchases</h4>
                         <div className="space-y-4">
-                          {(expense.purchases || tokens.map(t => ({ token: String(t).trim() }))).map((pur, idx) => {
-                            const token = pur.token || String(tokens[idx] || "").trim();
+                          {(visiblePurchases.length > 0 ? visiblePurchases : visibleTokens.map(t => ({ token: String(t).trim() }))).map((pur, idx) => {
+                            const token = pur.token || String(visibleTokens[idx] || "").trim();
                             return (
                               <div key={idx} className={`text-sm ${idx > 0 ? "pt-3 border-t border-purple-200" : ""}`}>
                                 <p className="font-semibold text-purple-800 mb-1 font-mono">{token}</p>
