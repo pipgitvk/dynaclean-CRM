@@ -217,15 +217,15 @@ export async function GET(req) {
         ${bidAnd}
     `, bidParams);
 
-    // Get bids with active RA period (today between RA start and end date)
+    // Get bids with RA period overlapping with the next 1 week (today to 7 days from now)
+    // Overlap condition: RA starts before/at end of window AND RA ends after/at start of window
     const [activeRA] = await conn.execute(`
       SELECT COUNT(*) as count
       FROM bids
-      WHERE bid_status = 'ra_participated'
-        AND ra_start_date IS NOT NULL
+      WHERE ra_start_date IS NOT NULL
         AND ra_end_date IS NOT NULL
-        AND CURDATE() >= ra_start_date
-        AND CURDATE() <= ra_end_date
+        AND ra_start_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+        AND ra_end_date >= CURDATE()
         ${bidAnd}
     `, bidParams);
 

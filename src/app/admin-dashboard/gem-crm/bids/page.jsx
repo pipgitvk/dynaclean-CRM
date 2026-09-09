@@ -308,7 +308,7 @@ export default function GemCrmBidsPage() {
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Timer className="w-5 h-5 text-purple-600" />
-            <span className="text-purple-800 font-medium">Showing bids with active RA period</span>
+            <span className="text-purple-800 font-medium">Showing bids with RA period within 1 week</span>
           </div>
           <button
             onClick={clearActiveRAFilter}
@@ -562,6 +562,12 @@ export default function GemCrmBidsPage() {
                 <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   RA
                 </th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
+                  RA Start Date
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
+                  RA End Date
+                </th>
                 <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase">
                   Status
                 </th>
@@ -573,7 +579,7 @@ export default function GemCrmBidsPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan="14" className="py-8 text-center text-gray-500">
+                  <td colSpan="16" className="py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
@@ -581,7 +587,7 @@ export default function GemCrmBidsPage() {
                 </tr>
               ) : bids.length === 0 ? (
                 <tr>
-                  <td colSpan="14" className="py-8 text-center text-gray-500">
+                  <td colSpan="16" className="py-8 text-center text-gray-500">
                     No bids found
                   </td>
                 </tr>
@@ -642,6 +648,12 @@ export default function GemCrmBidsPage() {
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${bid.ra_participated === 'yes' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                         {bid.ra_participated === 'yes' ? 'YES' : 'NO'}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {bid.ra_start_date ? new Date(bid.ra_start_date).toLocaleDateString('en-IN') : "-"}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      {bid.ra_end_date ? new Date(bid.ra_end_date).toLocaleDateString('en-IN') : "-"}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <StatusBadge status={bid.bid_status} />

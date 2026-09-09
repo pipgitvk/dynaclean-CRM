@@ -207,13 +207,13 @@ export async function GET(req) {
         conditions.push("bid_end_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
       }
 
-      // Filter for bids with active RA period (today between RA start and end date)
+      // Filter for bids with RA period overlapping with the next 1 week (today to 7 days)
+      // Overlap condition: RA starts before/at end of window AND RA ends after/at start of window
       if (activeRA) {
-        conditions.push("bid_status = 'ra_participated'");
         conditions.push("ra_start_date IS NOT NULL");
         conditions.push("ra_end_date IS NOT NULL");
-        conditions.push("CURDATE() >= ra_start_date");
-        conditions.push("CURDATE() <= ra_end_date");
+        conditions.push("ra_start_date <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)");
+        conditions.push("ra_end_date >= CURDATE()");
       }
 
       const whereClause = conditions.length > 0
