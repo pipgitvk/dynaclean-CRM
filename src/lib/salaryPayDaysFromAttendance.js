@@ -187,6 +187,20 @@ export function computeSalaryPayDaysForUser(p) {
 
   const leaveMap = buildLeaveDateMapForUser(leavesAll, username);
 
+  // Paid leave map (non-half-day) — overrides punch, same logic as attendance page
+  const paidLeaveMap = new Map();
+  for (const leave of leavesAll || []) {
+    if (String(leave.username ?? "").trim().toLowerCase() !== String(username ?? "").trim().toLowerCase()) continue;
+    if (leave.leave_type !== 'paid') continue;
+    if (leave.is_half_day == 1 || leave.is_half_day === true) continue;
+    const fromD = new Date(leave.from_date);
+    const toD = new Date(leave.to_date);
+    for (let x = new Date(fromD); x <= toD; x.setDate(x.getDate() + 1)) {
+      const k = ymdKey(x.getFullYear(), x.getMonth() + 1, x.getDate());
+      if (k) paidLeaveMap.set(k, leave);
+    }
+  }
+
   let present = 0;
   let half_day = 0;
   let late_days = 0;
@@ -244,6 +258,12 @@ export function computeSalaryPayDaysForUser(p) {
     }
 
     const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
+    if (paidLeaveMap.has(dateString)) {
+      // Paid leave overrides punch — count as paid leave, not present
+      paid_leave++;
+      weekdayPayCredits += 1;
+      continue;
+    }
     if (existingLog && hasRealPunch) {
       const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
       freeGraceUsed = cls.freeGraceUsed;

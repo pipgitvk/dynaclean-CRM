@@ -121,7 +121,7 @@ export async function GET(request) {
     );
 
     const [leaves] = await db.query(
-      `SELECT username, from_date, to_date, leave_type, reason
+      `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type
        FROM employee_leaves
        WHERE status = 'approved'`
     );

@@ -69,6 +69,20 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
 
   const leaveMap = buildLeaveMapForUser(leavesAll, username);
 
+  // Paid leave map (non-half-day, leave_type=paid) — overrides punch like the attendance page does
+  const paidLeaveMap = new Map();
+  for (const leave of leavesAll || []) {
+    if (String(leave.username ?? "").trim().toLowerCase() !== String(username ?? "").trim().toLowerCase()) continue;
+    if (leave.leave_type !== 'paid') continue;
+    if (leave.is_half_day == 1 || leave.is_half_day === true) continue;
+    const fromD = new Date(leave.from_date);
+    const toD = new Date(leave.to_date);
+    for (let x = new Date(fromD); x <= toD; x.setDate(x.getDate() + 1)) {
+      const k = dateToYmdKey(x);
+      if (k) paidLeaveMap.set(k, leave);
+    }
+  }
+
   let dojValid = false;
   let doj = null;
   if (dateOfJoining != null && String(dateOfJoining).trim() !== "") {
@@ -105,7 +119,10 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     const isOnLeave = leaveMap.has(dateString);
 
     const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
-    if (existingLog && hasRealPunch) {
+    // Paid leave takes priority over punch (same logic as attendance page frontend)
+    if (paidLeaveMap.has(dateString)) {
+      summary.leaves++;
+    } else if (existingLog && hasRealPunch) {
       // Match payroll (`computeSalaryPayDaysForUser`): only "regular" is a full credit day.
       const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
       freeGraceUsed = cls.freeGraceUsed;
