@@ -623,7 +623,7 @@ export default function AdminLeaveManagement() {
                             Revert
                           </button>
                         )}
-                        {leave.status === "pending" && !leave.acknowledged_at && (
+                        {leave.status === "pending" && !leave.acknowledged_at && userRole !== "HR RECRUITER" && (
                           <button
                             onClick={() => {
                               setSelectedLeave(leave);
@@ -932,7 +932,7 @@ export default function AdminLeaveManagement() {
                       {actionLoading ? "Processing..." : "Revert"}
                     </button>
                   )}
-                  {selectedLeave.status === "pending" && !selectedLeave.acknowledged_at && (
+                  {selectedLeave.status === "pending" && !selectedLeave.acknowledged_at && userRole !== "HR RECRUITER" && (
                     <button
                       onClick={() => {
                         setShowApprovalModal(false);

@@ -71,6 +71,7 @@ export async function GET(request) {
     if (reportingManagerMode) {
       const placeholders = reportees.map(() => "?").join(", ");
       query += ` AND el.username IN (${placeholders})`;
+      query += ` AND el.created_by IS NULL`; // Exclude HR/admin-added leaves — those go to superadmin only
       params.push(...reportees);
     } else if (!isAdmin) {
       query += ` AND el.username = ?`;
