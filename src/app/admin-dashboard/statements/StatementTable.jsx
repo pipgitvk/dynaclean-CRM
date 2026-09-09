@@ -732,17 +732,112 @@ export default function StatementTable({ rows }) {
     }
     setExpenseLoading(true);
     setExpense(null);
+    
+    // Fetch the statement row first
     fetch(`/api/statements/${modalId}`)
       .then((r) => r.json())
-      .then((row) => {
-        if (row?.error) throw new Error(row.error);
-        if (row.client_expense_id) {
-          return fetch(`/api/client-expenses/${row.client_expense_id}`).then((r) => r.json());
+      .then(async (statement) => {
+        if (statement?.error) throw new Error(statement.error);
+        
+        const linkedData = { ...statement };
+        
+        // Fetch linked expense if exists
+        if (statement.client_expense_id) {
+          try {
+            const expRes = await fetch(`/api/client-expenses/${statement.client_expense_id}`);
+            const expData = await expRes.json();
+            if (expRes.ok && !expData.error) {
+              linkedData.expense = expData;
+            }
+          } catch (e) {
+            console.error("Failed to fetch expense:", e);
+          }
         }
-        return null;
+        
+        // Fetch linked invoice if exists
+        if (statement.invoice_number) {
+          try {
+            const invRes = await fetch(`/api/invoice-list?search=${encodeURIComponent(statement.invoice_number)}&limit=5`);
+            const invData = await invRes.json();
+            // API returns { data: [...] } or { invoices: [...] }
+            const invList = invData.data || invData.invoices || [];
+            const matched = invList.find(i =>
+              String(i.invoice_number || "").trim() === String(statement.invoice_number).trim()
+            ) || invList[0];
+            if (invRes.ok && matched) {
+              linkedData.invoice = matched;
+            }
+          } catch (e) {
+            console.error("Failed to fetch invoice:", e);
+          }
+        }
+        
+        // Fetch linked DD if exists
+        if (statement.dd_id) {
+          try {
+            const ddRes = await fetch(`/api/dd-management?search=${statement.dd_id}`, { credentials: "include" });
+            const ddData = await ddRes.json();
+            const ddList = ddData.data || ddData.records || (Array.isArray(ddData) ? ddData : []);
+            const matched = ddList.find(d => Number(d.id) === Number(statement.dd_id)) || ddList[0];
+            if (ddRes.ok && matched) {
+              linkedData.dd = matched;
+            }
+          } catch (e) {
+            console.error("Failed to fetch DD:", e);
+          }
+        }
+        
+        // Fetch linked purchases if exists
+        if (statement.linked_purchase_ids) {
+          try {
+            let tokens = [];
+            try { tokens = JSON.parse(String(statement.linked_purchase_ids)); } catch { tokens = String(statement.linked_purchase_ids).split(",").map(s => s.trim()); }
+            const purchaseItems = [];
+            for (const token of tokens) {
+              const t = String(token).trim();
+              const match = t.match(/^(IP|PP|PS)(\d+)$/i);
+              if (!match) continue;
+              const pId = match[2];
+              const prefix = match[1].toUpperCase();
+              const apiUrl = prefix === "PS"
+                ? `/api/spare/stock-request?id=${pId}`
+                : `/api/stock-request?id=${pId}`;
+              try {
+                const res = await fetch(apiUrl);
+                const data = await res.json();
+                const item = Array.isArray(data) ? data[0] : (data?.requests?.[0] || data?.request || data);
+                if (item && !item.error) {
+                  purchaseItems.push({ token: t, prefix, id: pId, ...item });
+                } else {
+                  purchaseItems.push({ token: t, prefix, id: pId });
+                }
+              } catch {
+                purchaseItems.push({ token: t, prefix, id: pId });
+              }
+            }
+            if (purchaseItems.length > 0) linkedData.purchases = purchaseItems;
+          } catch (e) {
+            console.error("Failed to fetch purchases:", e);
+          }
+        }
+        
+        // Fetch linked asset if exists
+        if (statement.linked_module_type === 'Assets' && statement.linked_module_id) {
+          try {
+            const assetRes = await fetch(`/api/assets-management/${statement.linked_module_id}`);
+            const assetData = await assetRes.json();
+            if (assetRes.ok && !assetData.error) {
+              linkedData.asset = assetData;
+            }
+          } catch (e) {
+            console.error("Failed to fetch asset:", e);
+          }
+        }
+        
+        return linkedData;
       })
-      .then((exp) => {
-        setExpense(exp && !exp.error ? exp : null);
+      .then((linkedData) => {
+        setExpense(linkedData);
       })
       .catch((e) => {
         toast.error(e.message || "Failed to load");
@@ -1540,12 +1635,12 @@ export default function StatementTable({ rows }) {
         </div>
       )}
 
-      {/* Expense View Modal */}
+      {/* Statement Linked Records View Modal */}
       {modalId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <h3 className="text-lg font-semibold">Client Expense Details</h3>
+              <h3 className="text-lg font-semibold">Statement Linked Records</h3>
               <button
                 type="button"
                 onClick={() => setModalId(null)}
@@ -1558,51 +1653,167 @@ export default function StatementTable({ rows }) {
               {expenseLoading ? (
                 <div className="py-8 text-center text-gray-500">Loading...</div>
               ) : expense ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
-                    <div className="space-y-2">
-                      <p><span className="font-medium">ID:</span> {expense.id}</p>
-                      <p><span className="font-medium">Expense Name:</span> {expense.expense_name}</p>
-                      <p><span className="font-medium">Client Name:</span> {expense.client_name}</p>
-                      <p><span className="font-medium">Group Name:</span> {expense.group_name || "-"}</p>
-                      <p><span className="font-medium">Tax applicable:</span> {expense.tax_applicable ? "Yes" : "No"}</p>
-                      {expense.tax_applicable && (
-                        <>
-                          {expense.gst_rate != null && <p><span className="font-medium">Tax Rate:</span> {Number(expense.gst_rate)}%</p>}
-                          {expense.tax_type && <p><span className="font-medium">Tax type:</span> {expense.tax_type}</p>}
-                          {expense.tax_type === "CGST+SGST" && (
-                            <>
-                              <p><span className="font-medium">CGST:</span> {expense.cgst != null ? `₹${Number(expense.cgst).toFixed(2)}` : "-"}</p>
-                              <p><span className="font-medium">SGST:</span> {expense.sgst != null ? `₹${Number(expense.sgst).toFixed(2)}` : "-"}</p>
-                            </>
-                          )}
-                          {expense.tax_type === "IGST" && <p><span className="font-medium">IGST:</span> {expense.igst != null ? `₹${Number(expense.igst).toFixed(2)}` : "-"}</p>}
-                        </>
+                <div className="space-y-6">
+
+                  {/* Expense linked */}
+                  {expense.client_expense_id && (
+                    <div className="border rounded-lg p-4 bg-blue-50">
+                      <h4 className="font-semibold text-blue-900 mb-3">💰 Client Expense</h4>
+                      {expense.expense ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                          <p><span className="font-medium">ID:</span> {expense.expense.id}</p>
+                          {expense.expense.expense_name && <p><span className="font-medium">Expense Name:</span> {expense.expense.expense_name}</p>}
+                          {expense.expense.client_name && <p><span className="font-medium">Client:</span> {expense.expense.client_name}</p>}
+                          {expense.expense.group_name && <p><span className="font-medium">Group:</span> {expense.expense.group_name}</p>}
+                          {expense.expense.head && <p><span className="font-medium">Head:</span> {expense.expense.head}</p>}
+                          {expense.expense.amount != null && <p><span className="font-medium">Amount:</span> ₹{Number(expense.expense.amount).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
+                          {expense.expense.hsn && <p><span className="font-medium">HSN:</span> {expense.expense.hsn}</p>}
+                          <p><span className="font-medium">Tax applicable:</span> {expense.expense.tax_applicable ? "Yes" : "No"}</p>
+                          {expense.expense.transaction_id && <p><span className="font-medium">Txn ID:</span> <span className="font-mono text-xs">{expense.expense.transaction_id}</span></p>}
+                          {expense.expense.created_at && <p><span className="font-medium">Created:</span> {dayjs(expense.expense.created_at).format("DD MMM YYYY")}</p>}
+                        </div>
+                      ) : (
+                        <p className="text-gray-400 text-xs">Expense details not available</p>
                       )}
-                      <p><span className="font-medium">Main Head:</span> <span className={expense.main_head === "Direct" ? "text-blue-600" : "text-amber-600"}>{expense.main_head}</span></p>
-                      <p><span className="font-medium">Head:</span> {expense.head || "-"}</p>
-                      <p><span className="font-medium">Supply:</span> {expense.supply || "-"}</p>
-                      {expense.sub_heads?.length > 0 && <p><span className="font-medium">Sub-head:</span> {expense.sub_heads[0]}</p>}
                     </div>
-                    <div className="space-y-2">
-                      <p><span className="font-medium">Type of Ledger:</span> {expense.type_of_ledger || "-"}</p>
-                      <p><span className="font-medium">HSN:</span> {expense.hsn || "-"}</p>
-                      <p><span className="font-medium">Transaction ID:</span> <span className="font-mono text-xs">{expense.transaction_id || "-"}</span></p>
-                      <p><span className="font-medium">Amount:</span> {expense.amount != null ? `₹${Number(expense.amount).toFixed(2)}` : "-"}</p>
-                      <p><span className="font-medium">Created:</span> {expense.created_at ? dayjs(expense.created_at).format("DD MMM YYYY HH:mm") : "-"}</p>
+                  )}
+
+                  {/* Invoice linked */}
+                  {expense.invoice_number && (
+                    <div className="border rounded-lg p-4 bg-green-50">
+                      <h4 className="font-semibold text-green-900 mb-3">📄 Invoice</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <p><span className="font-medium">Invoice No:</span> <span className="font-mono">{expense.invoice_number}</span></p>
+                        {expense.invoice ? (
+                          <>
+                            <p><span className="font-medium">Customer:</span> {expense.invoice.buyer_name || expense.invoice.customer_name || "-"}</p>
+                            <p><span className="font-medium">Amount:</span> {expense.invoice.grand_total != null ? `₹${Number(expense.invoice.grand_total).toLocaleString("en-IN", {minimumFractionDigits:2})}` : "-"}</p>
+                            <p><span className="font-medium">Date:</span> {expense.invoice.invoice_date ? dayjs(expense.invoice.invoice_date).format("DD MMM YYYY") : "-"}</p>
+                            {expense.invoice.employee_name && <p><span className="font-medium">Employee:</span> {expense.invoice.employee_name}</p>}
+                            {expense.invoice.gst_number && <p><span className="font-medium">GST:</span> {expense.invoice.gst_number}</p>}
+                            {expense.invoice.cgst != null && Number(expense.invoice.cgst) > 0 && <p><span className="font-medium">CGST:</span> ₹{Number(expense.invoice.cgst).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
+                            {expense.invoice.sgst != null && Number(expense.invoice.sgst) > 0 && <p><span className="font-medium">SGST:</span> ₹{Number(expense.invoice.sgst).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
+                            {expense.invoice.igst != null && Number(expense.invoice.igst) > 0 && <p><span className="font-medium">IGST:</span> ₹{Number(expense.invoice.igst).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
+                          </>
+                        ) : (
+                          <p className="text-gray-400 text-xs col-span-2">Invoice details not available</p>
+                        )}
+                      </div>
+                      {/* Invoice items */}
+                      {expense.invoice?.items?.length > 0 && (
+                        <div className="mt-3 border-t border-green-200 pt-3">
+                          <p className="text-xs font-semibold text-green-800 mb-2">Items ({expense.invoice.items.length})</p>
+                          <div className="space-y-1">
+                            {expense.invoice.items.map((item, idx) => (
+                              <div key={idx} className="text-xs text-gray-700 flex justify-between gap-2">
+                                <span>{item.item_name || item.item_code || "-"}</span>
+                                <span className="text-gray-500 shrink-0">
+                                  {item.quantity && `Qty: ${item.quantity}`}
+                                  {item.price_per_unit != null && ` · ₹${Number(item.price_per_unit).toLocaleString("en-IN")}`}
+                                  {item.taxable_value != null && ` · ₹${Number(item.taxable_value).toLocaleString("en-IN")}`}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="mt-6 flex justify-end">
-                    <Link
-                      href={`/admin-dashboard/client-expenses/edit/${expense.id}?from=statements`}
-                      className="px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                    >
-                      Edit Expenses
-                    </Link>
-                  </div>
-                </>
+                  )}
+
+                  {/* Purchases linked */}
+                  {(() => {
+                    const raw = expense.linked_purchase_ids;
+                    if (!raw) return null;
+                    let tokens = [];
+                    try { tokens = JSON.parse(String(raw)); } catch { tokens = String(raw).split(",").map(s => s.trim()); }
+                    if (tokens.length === 0) return null;
+                    return (
+                      <div className="border rounded-lg p-4 bg-purple-50">
+                        <h4 className="font-semibold text-purple-900 mb-3">🛒 Purchases</h4>
+                        <div className="space-y-4">
+                          {(expense.purchases || tokens.map(t => ({ token: String(t).trim() }))).map((pur, idx) => {
+                            const token = pur.token || String(tokens[idx] || "").trim();
+                            return (
+                              <div key={idx} className={`text-sm ${idx > 0 ? "pt-3 border-t border-purple-200" : ""}`}>
+                                <p className="font-semibold text-purple-800 mb-1 font-mono">{token}</p>
+                                {pur.id && (pur.product_name || pur.product_code || pur.vendor_name || pur.total_amount != null) ? (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-700">
+                                    {pur.product_name && <p><span className="font-medium">Product:</span> {pur.product_name}</p>}
+                                    {pur.product_code && <p><span className="font-medium">Code:</span> {pur.product_code}</p>}
+                                    {pur.vendor_name && <p><span className="font-medium">Vendor:</span> {pur.vendor_name}</p>}
+                                    {pur.quantity != null && <p><span className="font-medium">Qty:</span> {pur.quantity}</p>}
+                                    {pur.unit_price != null && <p><span className="font-medium">Unit Price:</span> ₹{Number(pur.unit_price).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
+                                    {pur.total_amount != null && <p><span className="font-medium">Total:</span> ₹{Number(pur.total_amount).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
+                                    {pur.status && <p><span className="font-medium">Status:</span> {pur.status}</p>}
+                                    {pur.created_at && <p><span className="font-medium">Date:</span> {dayjs(pur.created_at).format("DD MMM YYYY")}</p>}
+                                  </div>
+                                ) : (
+                                  <p className="text-gray-400 text-xs">Purchase details not available</p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* DD linked */}
+                  {expense.dd_id && (
+                    <div className="border rounded-lg p-4 bg-orange-50">
+                      <h4 className="font-semibold text-orange-900 mb-3">🏦 Demand Draft</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <p><span className="font-medium">DD ID:</span> {expense.dd_id}</p>
+                        {expense.dd ? (
+                          <>
+                            {expense.dd.dd_number && <p><span className="font-medium">DD Number:</span> <span className="font-mono">{expense.dd.dd_number}</span></p>}
+                            {expense.dd.bg_number && <p><span className="font-medium">BG Number:</span> <span className="font-mono">{expense.dd.bg_number}</span></p>}
+                            {expense.dd.party_name && <p><span className="font-medium">Party:</span> {expense.dd.party_name}</p>}
+                            {expense.dd.beneficiary_name && <p><span className="font-medium">Beneficiary:</span> {expense.dd.beneficiary_name}</p>}
+                            {expense.dd.amount != null && <p><span className="font-medium">Amount:</span> ₹{Number(expense.dd.amount).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
+                            {expense.dd.bank_name && <p><span className="font-medium">Bank:</span> {expense.dd.bank_name}</p>}
+                            {expense.dd.type && <p><span className="font-medium">Type:</span> {expense.dd.type}</p>}
+                            {expense.dd.status && <p><span className="font-medium">Status:</span> {expense.dd.status}</p>}
+                            {expense.dd.dd_date && <p><span className="font-medium">DD Date:</span> {dayjs(expense.dd.dd_date).format("DD MMM YYYY")}</p>}
+                            {expense.dd.expiry_date && <p><span className="font-medium">Expiry:</span> {dayjs(expense.dd.expiry_date).format("DD MMM YYYY")}</p>}
+                            {expense.dd.dd_location && <p><span className="font-medium">Location:</span> {expense.dd.dd_location}</p>}
+                            {expense.dd.claim_date && <p><span className="font-medium">Claim Date:</span> {dayjs(expense.dd.claim_date).format("DD MMM YYYY")}</p>}
+                          </>
+                        ) : (
+                          <p className="text-gray-400 text-xs col-span-2">DD details not available</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Asset linked */}
+                  {expense.linked_module_type === "Assets" && expense.linked_module_id && (
+                    <div className="border rounded-lg p-4 bg-red-50">
+                      <h4 className="font-semibold text-red-900 mb-3">🏢 Asset</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <p><span className="font-medium">Asset ID:</span> {expense.linked_module_id}</p>
+                        {expense.asset ? (
+                          <>
+                            {expense.asset.asset_name && <p><span className="font-medium">Name:</span> {expense.asset.asset_name}</p>}
+                            {expense.asset.cost != null && <p><span className="font-medium">Cost:</span> ₹{Number(expense.asset.cost).toLocaleString("en-IN", {minimumFractionDigits:2})}</p>}
+                            {expense.asset.category && <p><span className="font-medium">Category:</span> {expense.asset.category}</p>}
+                            {expense.asset.purchase_date && <p><span className="font-medium">Purchase Date:</span> {dayjs(expense.asset.purchase_date).format("DD MMM YYYY")}</p>}
+                            {expense.asset.status && <p><span className="font-medium">Status:</span> {expense.asset.status}</p>}
+                          </>
+                        ) : (
+                          <p className="text-gray-400 text-xs col-span-2">Asset details not available</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Nothing linked */}
+                  {!expense.client_expense_id && !expense.invoice_number && !expense.dd_id && !(expense.linked_module_type === "Assets" && expense.linked_module_id) && !expense.linked_purchase_ids && (
+                    <div className="py-8 text-center text-gray-500">No records linked to this statement</div>
+                  )}
+                </div>
               ) : (
-                <div className="py-8 text-center text-gray-500">No expense linked to this statement</div>
+                <div className="py-8 text-center text-gray-500">No records linked to this statement</div>
               )}
             </div>
           </div>

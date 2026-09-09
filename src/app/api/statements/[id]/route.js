@@ -139,7 +139,7 @@ export async function GET(req, { params }) {
       } catch (__) {}
     }
     const [rows] = await conn.execute(
-      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, invoice_status, expense_allocation, linked_purchase_ids, failed_transaction_id, cancelled_transaction_id, created_at
+      `SELECT id, trans_id, date, txn_dated_deb, txn_posted_date, cheq_no, description, type, amount, client_expense_id, invoice_number, invoice_status, expense_allocation, linked_purchase_ids, dd_id, linked_module_type, linked_module_id, failed_transaction_id, cancelled_transaction_id, created_at
        FROM statements WHERE id = ?`,
       [id]
     );

@@ -63,6 +63,10 @@ export default function DDManagementPage() {
     const [creditSearch, setCreditSearch] = useState("");
     const [creditDateFrom, setCreditDateFrom] = useState("");
     const [creditDateTo, setCreditDateTo] = useState("");
+    const [viewLinkedModal, setViewLinkedModal] = useState(false);
+    const [viewLinkedDD, setViewLinkedDD] = useState(null);
+    const [viewLinkedData, setViewLinkedData] = useState(null);
+    const [viewLinkedLoading, setViewLinkedLoading] = useState(false);
 
     const isAuthorized = ["ADMIN", "SUPERADMIN", "ACCOUNTANT", "DIRECTOR"].includes(userRole.toUpperCase());
 
@@ -312,6 +316,36 @@ export default function DDManagementPage() {
             toast.error("Network error loading statements");
         } finally {
             setLoadingCreditStatements(false);
+        }
+    };
+
+    const openViewLinked = async (dd) => {
+        setViewLinkedDD(dd);
+        setViewLinkedData(null);
+        setViewLinkedModal(true);
+        setViewLinkedLoading(true);
+        try {
+            const linked = { dd };
+            // Find linked statements for this DD from creditStatements
+            const linkedStmts = creditStatements.filter(s => Number(s.dd_id) === Number(dd.id));
+            if (linkedStmts.length > 0) {
+                linked.statements = linkedStmts;
+            } else {
+                // fetch fresh if not loaded yet
+                try {
+                    const res = await fetch(`/api/statements?dd_id=${dd.id}`, { credentials: "include" });
+                    if (res.ok) {
+                        const d = await res.json();
+                        const rows = d.rows || d.statements || (Array.isArray(d) ? d : []);
+                        linked.statements = rows.filter(s => Number(s.dd_id) === Number(dd.id));
+                    }
+                } catch { /* silent */ }
+            }
+            setViewLinkedData(linked);
+        } catch (e) {
+            toast.error("Failed to load linked data");
+        } finally {
+            setViewLinkedLoading(false);
         }
     };
 
@@ -886,6 +920,13 @@ export default function DDManagementPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-1">
+                                                <button
+                                                    onClick={() => openViewLinked(dd)}
+                                                    className="p-1 px-2 text-teal-600 hover:bg-teal-50 rounded border border-teal-100 transition-colors text-[10px] font-bold"
+                                                    title="View Linked Records"
+                                                >
+                                                    <Eye size={12} className="inline mr-0.5" />View
+                                                </button>
                                                 <button
                                                     onClick={() => openStepModal(dd, 1)}
                                                     className="p-1 px-2 text-blue-600 hover:bg-blue-50 rounded border border-blue-100 transition-colors text-[10px] font-bold"
@@ -2232,6 +2273,79 @@ export default function DDManagementPage() {
                             >
                                 Close
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* View Linked Records Modal */}
+            {viewLinkedModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Linked Records — {viewLinkedDD?.type} #{viewLinkedDD?.dd_number || viewLinkedDD?.bg_number || viewLinkedDD?.id}
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => { setViewLinkedModal(false); setViewLinkedDD(null); setViewLinkedData(null); }}
+                                className="p-1 hover:bg-gray-100 rounded"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            {viewLinkedLoading ? (
+                                <div className="py-10 text-center text-gray-500">Loading...</div>
+                            ) : viewLinkedData ? (
+                                <>
+                                    {/* DD Details */}
+                                    <div className="border rounded-lg p-4 bg-orange-50">
+                                        <h4 className="font-semibold text-orange-900 mb-3">🏦 {viewLinkedDD?.type === "BG" ? "Bank Guarantee" : viewLinkedDD?.type === "EPAYMENT" ? "E-Payment" : "Demand Draft"}</h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                            {viewLinkedDD?.dd_number && <p><span className="font-medium">DD Number:</span> <span className="font-mono">{viewLinkedDD.dd_number}</span></p>}
+                                            {viewLinkedDD?.bg_number && <p><span className="font-medium">BG Number:</span> <span className="font-mono">{viewLinkedDD.bg_number}</span></p>}
+                                            {viewLinkedDD?.party_name && <p><span className="font-medium">Party:</span> {viewLinkedDD.party_name}</p>}
+                                            {viewLinkedDD?.beneficiary_name && <p><span className="font-medium">Beneficiary:</span> {viewLinkedDD.beneficiary_name}</p>}
+                                            {viewLinkedDD?.amount != null && <p><span className="font-medium">Amount:</span> ₹{Number(viewLinkedDD.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>}
+                                            {viewLinkedDD?.bank_name && <p><span className="font-medium">Bank:</span> {viewLinkedDD.bank_name}</p>}
+                                            {viewLinkedDD?.status && <p><span className="font-medium">Status:</span> <StatusBadge status={viewLinkedDD.status} /></p>}
+                                            {viewLinkedDD?.dd_date && <p><span className="font-medium">DD Date:</span> {dayjs(viewLinkedDD.dd_date).format("DD MMM YYYY")}</p>}
+                                            {viewLinkedDD?.expiry_date && <p><span className="font-medium">Expiry:</span> {dayjs(viewLinkedDD.expiry_date).format("DD MMM YYYY")}</p>}
+                                            {viewLinkedDD?.claim_date && <p><span className="font-medium">Claim Date:</span> {dayjs(viewLinkedDD.claim_date).format("DD MMM YYYY")}</p>}
+                                            {viewLinkedDD?.assigned_by && <p><span className="font-medium">Assigned By:</span> {viewLinkedDD.assigned_by}</p>}
+                                        </div>
+                                    </div>
+
+                                    {/* Linked Statements */}
+                                    {viewLinkedData.statements?.length > 0 ? (
+                                        <div className="border rounded-lg p-4 bg-blue-50">
+                                            <h4 className="font-semibold text-blue-900 mb-3">📋 Linked Bank Statements ({viewLinkedData.statements.length})</h4>
+                                            <div className="space-y-3">
+                                                {viewLinkedData.statements.map((stmt, idx) => (
+                                                    <div key={idx} className={`text-sm ${idx > 0 ? "pt-3 border-t border-blue-200" : ""}`}>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-700">
+                                                            {stmt.trans_id && <p><span className="font-medium">Trans ID:</span> <span className="font-mono text-xs">{stmt.trans_id}</span></p>}
+                                                            {stmt.date && <p><span className="font-medium">Date:</span> {dayjs(stmt.date).format("DD MMM YYYY")}</p>}
+                                                            {stmt.type && <p><span className="font-medium">Type:</span> <span className={stmt.type === "Credit" ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>{stmt.type}</span></p>}
+                                                            {stmt.amount != null && <p><span className="font-medium">Amount:</span> ₹{Number(stmt.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>}
+                                                            {stmt.description && <p className="sm:col-span-2"><span className="font-medium">Description:</span> {stmt.description}</p>}
+                                                            {stmt.cheq_no && <p><span className="font-medium">Cheq No:</span> {stmt.cheq_no}</p>}
+                                                            {stmt.invoice_status && <p><span className="font-medium">Status:</span> {stmt.invoice_status}</p>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="py-6 text-center text-gray-500 text-sm border rounded-lg bg-gray-50">
+                                            No bank statements linked to this record
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="py-10 text-center text-gray-500">No data available</div>
+                            )}
                         </div>
                     </div>
                 </div>
