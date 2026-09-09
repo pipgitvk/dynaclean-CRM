@@ -13,7 +13,9 @@ import { getDbConnection } from "@/lib/db";
 // Role to dashboard prefix mapping
 function getDashboardPrefix(roleKey) {
   const role = String(roleKey || "").toUpperCase();
-  if (role === "DIRECTOR") return "/director-dashboard";
+  // Director uses user-dashboard, not director-dashboard
+  // (director-dashboard catch-all redirects to user-dashboard anyway)
+  if (role === "DIRECTOR") return "/user-dashboard";
   if (role.includes("SALES")) return "/sales-dashboard";
   if (role.includes("SERVICE") && role.includes("HEAD")) return "/service-head-dashboard";
   if (role.includes("HR")) return "/hr-dashboard";
