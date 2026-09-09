@@ -1,18 +1,27 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { FileDown } from "lucide-react";
 import QuotationViewModal from "@/components/Quotation/QuotationViewModal";
 import QuickQuotationModal from "@/components/Quotation/QuickQuotationModal";
 import QuotationViewer from "@/components/Quotation/QuotationViewer";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export default function UserQuotationsListClient({ quotations, isServiceSupport = false }) {
+  const searchParams = useSearchParams();
+  const customerId = searchParams.get("customer_id") || "";
+
   const [modalQuote, setModalQuote] = useState(null);
   const [showQuickModal, setShowQuickModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
-  const [downloadingQuote, setDownloadingQuote] = useState(null); // quote_number being downloaded
-  const [hiddenPayload, setHiddenPayload] = useState(null);       // fetched data for hidden viewer
+  const [downloadingQuote, setDownloadingQuote] = useState(null);
+  const [hiddenPayload, setHiddenPayload] = useState(null);
   const viewerRef = useRef(null);
+
+  const editHref = (quoteNumber) => {
+    return `/sales-dashboard/quotations/${encodeURIComponent(quoteNumber)}/edit`;
+  };
 
   const handleDownloadPdf = async (quoteNumber) => {
     if (downloadingQuote) return;
@@ -25,7 +34,6 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
         return;
       }
       setHiddenPayload(data);
-      // Wait one tick for the hidden viewer to render, then trigger download
       setTimeout(async () => {
         if (viewerRef.current?.downloadPDF) {
           await viewerRef.current.downloadPDF();
@@ -148,6 +156,14 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
                       >
                         View
                       </button>
+                      {!q.has_order ? (
+                        <Link
+                          href={editHref(q.quote_number)}
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                        >
+                          Edit
+                        </Link>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => handleDownloadPdf(q.quote_number)}
@@ -219,7 +235,7 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
                   </span>
                 )}
               </div>
-              <div className="text-right flex items-center justify-end gap-2">
+              <div className="text-right flex items-center justify-end gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setModalQuote(q.quote_number)}
@@ -227,6 +243,14 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
                 >
                   View
                 </button>
+                {!q.has_order ? (
+                  <Link
+                    href={editHref(q.quote_number)}
+                    className="inline-block bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Edit
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => handleDownloadPdf(q.quote_number)}
@@ -246,7 +270,6 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
         )}
       </div>
 
-      {/* Hidden QuotationViewer for direct PDF generation */}
       {hiddenPayload && (
         <div className="fixed -top-[9999px] -left-[9999px] w-[1123px] pointer-events-none opacity-0 overflow-hidden">
           <QuotationViewer

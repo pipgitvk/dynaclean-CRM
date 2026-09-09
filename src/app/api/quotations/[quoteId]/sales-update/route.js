@@ -82,22 +82,11 @@ export async function PATCH(req, { params }) {
     return Response.json({ success: false, message: "Missing quote number" }, { status: 400 });
   }
 
-  const body = await req.json();
-  const gstin_no = String(body.gstin_no ?? "").trim();
-  const ship_to = String(body.ship_to ?? "").trim();
-
-  if (!ship_to) {
-    return Response.json(
-      { success: false, message: "Ship to address is required" },
-      { status: 400 },
-    );
-  }
-
   const conn = await getDbConnection();
 
   try {
     const [rows] = await conn.execute(
-      "SELECT quote_number, emp_name FROM quotations_records WHERE quote_number = ?",
+      "SELECT * FROM quotations_records WHERE quote_number = ?",
       [quoteId],
     );
 
@@ -124,18 +113,168 @@ export async function PATCH(req, { params }) {
       );
     }
 
-    const state_name = getStateFromGSTIN(gstin_no) || null;
+    const body = await req.json();
 
-    await conn.execute(
-      `UPDATE quotations_records SET
-        gstin = ?,
-        ship_to = ?,
-        state = COALESCE(?, state)
-      WHERE quote_number = ?`,
-      [gstin_no, ship_to, state_name, quoteId],
-    );
+    if (!body.has_changes) {
+      return Response.json({
+        success: true,
+        message: "No changes made",
+        created_new: false,
+        customer_id: quote.customer_id,
+      });
+    }
 
-    return Response.json({ success: true, message: "Quotation updated successfully" });
+    const {
+      company,
+      company_location,
+      gstin_no,
+      state_name,
+      ship_to,
+      terms,
+      payment_term_days,
+      items,
+      subtotal,
+      cgst,
+      sgst,
+      igst,
+      round_off,
+      grand_total,
+      cgstRate,
+      sgstRate,
+      igstRate,
+      quote_date,
+    } = body;
+
+    const effectiveState =
+      state_name && String(state_name).trim()
+        ? String(state_name).trim()
+        : getStateFromGSTIN(gstin_no) || quote.state || null;
+
+    const finalShipTo = ship_to !== undefined ? String(ship_to ?? "").trim() : quote.ship_to;
+    if (ship_to !== undefined && !finalShipTo) {
+      return Response.json(
+        { success: false, message: "Ship to address is required" },
+        { status: 400 },
+      );
+    }
+
+    const finalCustomerId = quote.customer_id;
+
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const todayPrefix = `QUOTE${dateStr}`;
+
+    let attempt = 0;
+    let finalQuoteNumber = "";
+
+    while (attempt < 5) {
+      const [existing] = await conn.execute(
+        `SELECT quote_number FROM quotations_records
+         WHERE quote_number LIKE ?
+         ORDER BY quote_number DESC
+         LIMIT 1`,
+        [`${todayPrefix}%`],
+      );
+
+      let increment = 1;
+      if (existing.length > 0) {
+        const lastQuote = existing[0].quote_number || "";
+        const lastIncrement = parseInt(lastQuote.replace(todayPrefix, ""), 10);
+        if (!Number.isNaN(lastIncrement)) increment = lastIncrement + 1;
+      }
+
+      finalQuoteNumber = `${todayPrefix}${increment.toString().padStart(3, "0")}`;
+
+      try {
+        await conn.execute(
+          `INSERT INTO quotations_records
+           (quote_number, quote_date, customer_id, company_name, company_address, state, gstin, ship_to, qty, gst, cgst_rate, sgst_rate, igst_rate, emp_name, subtotal, round_off, grand_total, term_con, payment_term_days, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            finalQuoteNumber,
+            quote_date ?? quote.quote_date,
+            finalCustomerId,
+            company !== undefined ? String(company ?? "") : quote.company_name,
+            company_location !== undefined ? String(company_location ?? "") : quote.company_address,
+            effectiveState ?? quote.state,
+            gstin_no !== undefined ? String(gstin_no ?? "") : quote.gstin,
+            finalShipTo,
+            items ? items.length : quote.qty,
+            (cgst || 0) + (sgst || 0) + (igst || 0),
+            cgstRate ?? quote.cgst_rate,
+            sgstRate ?? quote.sgst_rate,
+            igstRate ?? quote.igst_rate,
+            payload.username,
+            subtotal ?? quote.subtotal,
+            round_off ?? quote.round_off ?? 0,
+            grand_total ?? quote.grand_total,
+            terms !== undefined ? String(terms ?? "") : quote.term_con,
+            payment_term_days ?? quote.payment_term_days,
+          ],
+        );
+        break;
+      } catch (err) {
+        if (err && (err.code === "ER_DUP_ENTRY" || err.errno === 1062)) {
+          attempt += 1;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!finalQuoteNumber) {
+      throw new Error("Failed to generate unique quote number");
+    }
+
+    if (items && Array.isArray(items) && items.length > 0) {
+      const isInterstate = igstRate > 0;
+
+      for (const item of items) {
+        const taxable = (item.quantity || 0) * (item.price || 0);
+        const gstAmt = taxable * ((item.gst || 0) / 100);
+        const total = taxable + gstAmt;
+        const cgstAmt = isInterstate ? 0 : gstAmt / 2;
+        const sgstAmt = isInterstate ? 0 : gstAmt / 2;
+        const igstAmt = isInterstate ? gstAmt : 0;
+
+        await conn.execute(
+          `INSERT INTO quotation_items
+            (quote_number, item_code, item_name, hsn_sac, specification, quantity, unit,
+             price_per_unit, taxable_price, total_taxable_amt, gst, total_price,
+             cgsttax, cgsttxamt, sgsttax, sgstxamt, igsttax, igsttamt, img_url, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            finalQuoteNumber,
+            item.productCode || item.item_code || "",
+            item.name || item.item_name || "",
+            item.hsn || item.hsn_sac || "",
+            item.specification || "",
+            item.quantity || 0,
+            item.unit || "",
+            item.price || item.price_per_unit || 0,
+            taxable,
+            taxable,
+            item.gst || 0,
+            total,
+            isInterstate ? 0 : (item.gst || 0) / 2,
+            cgstAmt,
+            isInterstate ? 0 : (item.gst || 0) / 2,
+            sgstAmt,
+            isInterstate ? item.gst || 0 : 0,
+            igstAmt,
+            item.imageUrl || item.img_url || "",
+          ],
+        );
+      }
+    }
+
+    return Response.json({
+      success: true,
+      message: "New quotation created successfully",
+      created_new: true,
+      new_quote_number: finalQuoteNumber,
+      customer_id: finalCustomerId,
+    });
   } catch (err) {
     console.error("Sales quotation update error:", err);
     return Response.json(
