@@ -305,7 +305,7 @@ export default function StatementTable({ rows }) {
       // Linked type filter
       if (linkedTypeFilter) {
         const hasInvoice = !!String(row.invoice_number || "").trim();
-        const hasPurchases = getLinkedPurchaseRefs(row).length > 0;
+        const hasPurchases = getLinkedPurchaseRefs(row).filter(x => x.prefix !== "IP").length > 0;
         const hasDD = row.dd_id != null && String(row.dd_id).trim() !== "";
         const hasExpense = row.client_expense_id != null && String(row.client_expense_id).trim() !== "";
         const hasAssets = row.linked_module_type === 'Assets' && row.linked_module_id != null;
@@ -792,13 +792,16 @@ export default function StatementTable({ rows }) {
           try {
             let tokens = [];
             try { tokens = JSON.parse(String(statement.linked_purchase_ids)); } catch { tokens = String(statement.linked_purchase_ids).split(",").map(s => s.trim()); }
+            const hasInvoice = !!String(statement.invoice_number || "").trim();
             const purchaseItems = [];
             for (const token of tokens) {
               const t = String(token).trim();
               const match = t.match(/^(IP|PP|PS)(\d+)$/i);
               if (!match) continue;
-              const pId = match[2];
               const prefix = match[1].toUpperCase();
+              // Skip IP-prefixed tokens when invoice_number already covers them
+              if (prefix === "IP" && hasInvoice) continue;
+              const pId = match[2];
               const apiUrl = prefix === "PS"
                 ? `/api/spare/stock-request?id=${pId}`
                 : `/api/stock-request?id=${pId}`;
@@ -1106,10 +1109,16 @@ export default function StatementTable({ rows }) {
                       {(() => {
                         const refs = getLinkedPurchaseRefs(row);
                         if (refs.length > 0) {
+                          // Hide IP-prefixed refs when an invoice_number already covers them (P299 is redundant when INV299 shown)
+                          const hasInvoice = !!String(row.invoice_number || "").trim();
+                          const visibleRefs = hasInvoice
+                            ? refs.filter(x => x.prefix !== "IP")
+                            : refs;
+                          if (visibleRefs.length === 0) return null;
                           return (
                             <div>
                               <span className="text-xs font-mono text-slate-700">
-                                {refs.map((x) => `P${x.id}`).join(", ")}
+                                {visibleRefs.map((x) => `P${x.id}`).join(", ")}
                               </span>
                             </div>
                           );
@@ -1266,9 +1275,14 @@ export default function StatementTable({ rows }) {
                 {(() => {
                   const refs = getLinkedPurchaseRefs(row);
                   if (refs.length > 0) {
+                    const hasInvoice = !!String(row.invoice_number || "").trim();
+                    const visibleRefs = hasInvoice
+                      ? refs.filter(x => x.prefix !== "IP")
+                      : refs;
+                    if (visibleRefs.length === 0) return null;
                     return (
                       <span className="block text-xs font-mono text-slate-700">
-                        {refs.map((x) => `P${x.id}`).join(", ")}
+                        {visibleRefs.map((x) => `P${x.id}`).join(", ")}
                       </span>
                     );
                   }
@@ -1726,7 +1740,14 @@ export default function StatementTable({ rows }) {
                     if (!raw) return null;
                     let tokens = [];
                     try { tokens = JSON.parse(String(raw)); } catch { tokens = String(raw).split(",").map(s => s.trim()); }
-                    if (tokens.length === 0) return null;
+                    const hasInvoice = !!String(expense.invoice_number || "").trim();
+                    // Filter out IP-prefixed tokens when invoice covers them
+                    const visibleTokens = hasInvoice
+                      ? tokens.filter(t => !String(t).trim().toUpperCase().startsWith("IP"))
+                      : tokens;
+                    if (visibleTokens.length === 0) return null;
+                    // Also filter purchases array
+                    const visiblePurchases = (expense.purchases || []).filter(p => !(hasInvoice && String(p.prefix || "").toUpperCase() === "IP"));
                     return (
                       <div className="border rounded-lg p-4 bg-purple-50">
                         <h4 className="font-semibold text-purple-900 mb-3">🛒 Purchases</h4>
