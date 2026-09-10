@@ -6,7 +6,7 @@ import Link from "next/link";
 import { pickProductImageUrl } from "@/lib/productImageUrl";
 
 
-function ProductAndSpareLists({ type }) {
+function ProductAndSpareLists({ type, onOpenHistory }) {
   const [rows, setRows] = useState([]);
   const [stockTotals, setStockTotals] = useState({ totalQty: 0, totalValue: 0 });
   const [q, setQ] = useState("");
@@ -721,6 +721,13 @@ function ProductAndSpareLists({ type }) {
                             >
                               Edit
                             </button>
+                            <button
+                              onClick={() => onOpenHistory(r)}
+                              className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
+                              title="View transfer and edit history"
+                            >
+                              <History className="w-3 h-3" />
+                            </button>
                             {/* Delete product button hidden
                             {userRole === 'SUPERADMIN' && (
                               <button
@@ -800,6 +807,13 @@ function ProductAndSpareLists({ type }) {
                               className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                             >
                               Edit
+                            </button>
+                            <button
+                              onClick={() => onOpenHistory(r)}
+                              className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
+                              title="View transfer and edit history"
+                            >
+                              <History className="w-3 h-3" />
                             </button>
                             {/* Delete spare button hidden
                             {userRole === 'SUPERADMIN' && (
@@ -1002,6 +1016,13 @@ function ProductAndSpareLists({ type }) {
                   >
                     Edit
                   </button>
+                  <button
+                    onClick={() => onOpenHistory(r)}
+                    className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 w-full flex items-center justify-center"
+                    title="View transfer and edit history"
+                  >
+                    <History className="w-4 h-4" />
+                  </button>
                   {/* Delete product button hidden
                   {type === 'product' && userRole === 'SUPERADMIN' && (
                     <button
@@ -1031,7 +1052,7 @@ function ProductAndSpareLists({ type }) {
 
       {/* EDIT MODAL */}
       {showEditModal && editingProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold">Edit {type === 'product' ? 'Product' : 'Spare'}</h3>
@@ -1451,6 +1472,9 @@ export default function ProductStockForm() {
   const [selectedProductForHistory, setSelectedProductForHistory] = useState(null);
   const [transferHistoryData, setTransferHistoryData] = useState([]);
   const [loadingTransferHistory, setLoadingTransferHistory] = useState(false);
+  const [editHistoryData, setEditHistoryData] = useState([]);
+  const [loadingEditHistory, setLoadingEditHistory] = useState(false);
+  const [historyTab, setHistoryTab] = useState("edits"); // "edits" or "transfer"
   const [showPreBookingModal, setShowPreBookingModal] = useState(false);
   const [preBookingDetails, setPreBookingDetails] = useState([]);
   const [loadingPreBookings, setLoadingPreBookings] = useState(false);
@@ -1649,7 +1673,31 @@ export default function ProductStockForm() {
   const openTransferHistoryModal = (product) => {
     setSelectedProductForHistory(product);
     setShowTransferHistoryModal(true);
-    fetchTransferHistory(product.product_code);
+    setHistoryTab("edits");
+    const productCode = product.product_code || product.item_code;
+    fetchTransferHistory(productCode);
+    fetchEditHistory(productCode);
+  };
+
+  const fetchEditHistory = async (productCode) => {
+    try {
+      setLoadingEditHistory(true);
+      const res = await fetch(`/api/stock/edit-history?product_code=${productCode}`);
+      const data = await res.json();
+      
+      if (!res.ok || data.success === false) {
+        console.error("Failed to fetch edit history", data.error);
+        setEditHistoryData([]);
+        return;
+      }
+      
+      setEditHistoryData(data.history || []);
+    } catch (error) {
+      console.error("Error fetching edit history:", error);
+      setEditHistoryData([]);
+    } finally {
+      setLoadingEditHistory(false);
+    }
   };
 
   // Filtered data for each section
@@ -1713,8 +1761,8 @@ export default function ProductStockForm() {
   }, [stockSummaryData, summarySearch, summaryStatusFilter]);
 
   return (
-    <div className="max-w-6xl mx-auto w-full px-3 sm:px-6 py-4 sm:py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+    <div className="max-w-6xl mx-auto w-full py-4 sm:py-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 px-3 sm:px-6">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Product Stock Management</h2>
         <div className="flex flex-wrap items-center gap-2">
           <Link href="/admin-dashboard/add-assets" className="text-sm px-4 py-2 rounded text-white bg-blue-600 hover:bg-blue-700">
@@ -1770,8 +1818,8 @@ export default function ProductStockForm() {
           <span className="text-xl sm:text-2xl font-bold text-gray-500">{openSection === "list" ? "−" : "+"}</span>
         </div>
         {openSection === "list" && (
-          <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0">
-            <ProductAndSpareLists type="product" />
+          <div className="pb-4 sm:pb-6 pt-0">
+            <ProductAndSpareLists type="product" onOpenHistory={openTransferHistoryModal} />
           </div>
         )}
       </div>
@@ -2651,17 +2699,19 @@ export default function ProductStockForm() {
         </div>
       )}
       
-      {/* Transfer History Modal */}
+      {/* Transfer & Edit History Modal */}
       {showTransferHistoryModal && selectedProductForHistory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
           <div className="bg-white p-6 rounded-lg max-w-4xl w-full mx-4 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Transfer History</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Stock History</h3>
               <button 
                 onClick={() => {
                   setShowTransferHistoryModal(false);
                   setSelectedProductForHistory(null);
                   setTransferHistoryData([]);
+                  setEditHistoryData([]);
+                  setHistoryTab("edits");
                 }}
                 className="text-gray-500 hover:text-gray-700"
               >
@@ -2673,65 +2723,164 @@ export default function ProductStockForm() {
               <p className="text-sm text-gray-600">Product Code</p>
               <p className="font-semibold">{selectedProductForHistory.product_code}</p>
             </div>
-            <div className="mb-4">
+            <div className="mb-6">
               <p className="text-sm text-gray-600">Item Name</p>
               <p className="font-medium">{selectedProductForHistory.item_name}</p>
             </div>
 
-            {loadingTransferHistory ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">Loading transfer history...</p>
-              </div>
-            ) : transferHistoryData.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No transfer history found for this product.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border border-gray-200 rounded">
-                  <thead className="bg-gray-100 text-left">
-                    <tr>
-                      <th className="p-3 border-b font-semibold">Date</th>
-                      <th className="p-3 border-b font-semibold">Quantity</th>
-                      <th className="p-3 border-b font-semibold">From/To Godown</th>
-                      <th className="p-3 border-b font-semibold">Note</th>
-                      <th className="p-3 border-b font-semibold">Added By</th>
-                      <th className="p-3 border-b font-semibold">Stock After Transfer</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transferHistoryData.map((record, idx) => (
-                      <tr key={idx} className="border-t hover:bg-gray-50">
-                        <td className="p-3">
-                          {record.added_date ? 
-                            new Date(record.added_date).toLocaleString('en-IN', {
-                              timeZone: 'Asia/Kolkata',
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                              hour12: false
-                            }) : "--"
-                          }
-                        </td>
-                        <td className="p-3 font-semibold">{record.quantity}</td>
-                        <td className="p-3">{record.godown || "--"}</td>
-                        <td className="p-3 max-w-xs truncate">{record.note || "--"}</td>
-                        <td className="p-3">{record.added_by || "--"}</td>
-                        <td className="p-3">
-                          <div className="text-xs">
-                            <div>Total: {record.total}</div>
-                            <div>Delhi: {record.delhi}</div>
-                            <div>South: {record.south}</div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {/* History Tabs */}
+            <div className="flex gap-4 mb-6 border-b border-gray-200">
+              <button
+                onClick={() => setHistoryTab("edits")}
+                className={`px-4 py-2 font-medium text-sm ${
+                  historyTab === "edits"
+                    ? "text-blue-600 border-b-2 border-blue-600"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                Edit History
+              </button>
+              <button
+                onClick={() => setHistoryTab("transfer")}
+                className={`px-4 py-2 font-medium text-sm ${
+                  historyTab === "transfer"
+                    ? "text-blue-600 border-b-2 border-blue-600"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                Transfer History
+              </button>
+            </div>
+
+            {/* Edit History Tab */}
+            {historyTab === "edits" && (
+              <>
+                {loadingEditHistory ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">Loading edit history...</p>
+                  </div>
+                ) : editHistoryData.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No edit history found for this product.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border border-gray-200 rounded">
+                      <thead className="bg-gray-100 text-left">
+                        <tr>
+                          <th className="p-3 border-b font-semibold">Date</th>
+                          <th className="p-3 border-b font-semibold">Edited By</th>
+                          <th className="p-3 border-b font-semibold">Delhi (Old → New)</th>
+                          <th className="p-3 border-b font-semibold">South (Old → New)</th>
+                          <th className="p-3 border-b font-semibold">Min Qty (Old → New)</th>
+                          <th className="p-3 border-b font-semibold">Change Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editHistoryData.map((record, idx) => (
+                          <tr key={idx} className="border-t hover:bg-gray-50">
+                            <td className="p-3">
+                              {record.edited_at ? 
+                                new Date(record.edited_at).toLocaleString('en-IN', {
+                                  timeZone: 'Asia/Kolkata',
+                                  year: 'numeric',
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                  hour12: false
+                                }) : "--"
+                              }
+                            </td>
+                            <td className="p-3 font-medium">{record.edited_by || "--"}</td>
+                            <td className="p-3 text-xs">
+                              {record.old_delhi != null && record.new_delhi != null 
+                                ? `${record.old_delhi} → ${record.new_delhi}`
+                                : "--"
+                              }
+                            </td>
+                            <td className="p-3 text-xs">
+                              {record.old_south != null && record.new_south != null 
+                                ? `${record.old_south} → ${record.new_south}`
+                                : "--"
+                              }
+                            </td>
+                            <td className="p-3 text-xs">
+                              {record.old_min_qty != null && record.new_min_qty != null 
+                                ? `${record.old_min_qty} → ${record.new_min_qty}`
+                                : "--"
+                              }
+                            </td>
+                            <td className="p-3 max-w-xs truncate">{record.change_description || "--"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Transfer History Tab */}
+            {historyTab === "transfer" && (
+              <>
+                {loadingTransferHistory ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">Loading transfer history...</p>
+                  </div>
+                ) : transferHistoryData.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">No transfer history found for this product.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border border-gray-200 rounded">
+                      <thead className="bg-gray-100 text-left">
+                        <tr>
+                          <th className="p-3 border-b font-semibold">Date</th>
+                          <th className="p-3 border-b font-semibold">Quantity</th>
+                          <th className="p-3 border-b font-semibold">From/To Godown</th>
+                          <th className="p-3 border-b font-semibold">Note</th>
+                          <th className="p-3 border-b font-semibold">Added By</th>
+                          <th className="p-3 border-b font-semibold">Stock After Transfer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transferHistoryData.map((record, idx) => (
+                          <tr key={idx} className="border-t hover:bg-gray-50">
+                            <td className="p-3">
+                              {record.added_date ? 
+                                new Date(record.added_date).toLocaleString('en-IN', {
+                                  timeZone: 'Asia/Kolkata',
+                                  year: 'numeric',
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                  hour12: false
+                                }) : "--"
+                              }
+                            </td>
+                            <td className="p-3 font-semibold">{record.quantity}</td>
+                            <td className="p-3">{record.godown || "--"}</td>
+                            <td className="p-3 max-w-xs truncate">{record.note || "--"}</td>
+                            <td className="p-3">{record.added_by || "--"}</td>
+                            <td className="p-3">
+                              <div className="text-xs">
+                                <div>Total: {record.total}</div>
+                                <div>Delhi: {record.delhi}</div>
+                                <div>South: {record.south}</div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
