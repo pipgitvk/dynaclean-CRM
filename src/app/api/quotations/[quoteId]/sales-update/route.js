@@ -82,24 +82,33 @@ export async function PATCH(req, { params }) {
     return Response.json({ success: false, message: "Missing quote number" }, { status: 400 });
   }
 
-  const conn = await getDbConnection();
+  const pool = await getDbConnection();
+  let conn;
+  let response;
 
   try {
+    conn = await pool.getConnection();
+
     const [rows] = await conn.execute(
       "SELECT * FROM quotations_records WHERE quote_number = ?",
       [quoteId],
     );
 
     if (!rows.length) {
-      return Response.json({ success: false, message: "Quotation not found" }, { status: 404 });
+      response = Response.json(
+        { success: false, message: "Quotation not found" },
+        { status: 404 },
+      );
+      return response;
     }
 
     const quote = rows[0];
     if (quote.emp_name !== payload.username) {
-      return Response.json(
+      response = Response.json(
         { success: false, message: "You can only edit your own quotations" },
         { status: 403 },
       );
+      return response;
     }
 
     const [orderRows] = await conn.execute(
@@ -107,21 +116,23 @@ export async function PATCH(req, { params }) {
       [quoteId],
     );
     if (orderRows.length > 0) {
-      return Response.json(
+      response = Response.json(
         { success: false, message: "Cannot edit quotation after order is created" },
         { status: 400 },
       );
+      return response;
     }
 
     const body = await req.json();
 
     if (!body.has_changes) {
-      return Response.json({
+      response = Response.json({
         success: true,
         message: "No changes made",
         created_new: false,
         customer_id: quote.customer_id,
       });
+      return response;
     }
 
     const {
@@ -150,15 +161,19 @@ export async function PATCH(req, { params }) {
         ? String(state_name).trim()
         : getStateFromGSTIN(gstin_no) || quote.state || null;
 
-    const finalShipTo = ship_to !== undefined ? String(ship_to ?? "").trim() : quote.ship_to;
+    const finalShipTo =
+      ship_to !== undefined ? String(ship_to ?? "").trim() : quote.ship_to;
     if (ship_to !== undefined && !finalShipTo) {
-      return Response.json(
+      response = Response.json(
         { success: false, message: "Ship to address is required" },
         { status: 400 },
       );
+      return response;
     }
 
     const finalCustomerId = quote.customer_id;
+
+    await conn.beginTransaction();
 
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
@@ -195,7 +210,9 @@ export async function PATCH(req, { params }) {
             quote_date ?? quote.quote_date,
             finalCustomerId,
             company !== undefined ? String(company ?? "") : quote.company_name,
-            company_location !== undefined ? String(company_location ?? "") : quote.company_address,
+            company_location !== undefined
+              ? String(company_location ?? "")
+              : quote.company_address,
             effectiveState ?? quote.state,
             gstin_no !== undefined ? String(gstin_no ?? "") : quote.gstin,
             finalShipTo,
@@ -268,18 +285,35 @@ export async function PATCH(req, { params }) {
       }
     }
 
-    return Response.json({
+    await conn.commit();
+
+    response = Response.json({
       success: true,
       message: "New quotation created successfully",
       created_new: true,
       new_quote_number: finalQuoteNumber,
       customer_id: finalCustomerId,
     });
+    return response;
   } catch (err) {
+    if (conn) {
+      try {
+        await conn.rollback();
+      } catch {
+        /* ignore rollback errors */
+      }
+    }
     console.error("Sales quotation update error:", err);
-    return Response.json(
+    response = Response.json(
       { success: false, message: "Server error: " + err.message },
       { status: 500 },
     );
+    return response;
+  } finally {
+    try {
+      if (conn) conn.release();
+    } catch {
+      /* ignore release errors */
+    }
   }
 }

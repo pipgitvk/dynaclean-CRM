@@ -20,7 +20,7 @@ export default function UserQuotationsListClient({ quotations, isServiceSupport 
   const viewerRef = useRef(null);
 
   const editHref = (quoteNumber) => {
-    return `/sales-dashboard/quotations/${encodeURIComponent(quoteNumber)}/edit`;
+    return `/user-dashboard/quotations/${encodeURIComponent(quoteNumber)}/edit`;
   };
 
   const handleDownloadPdf = async (quoteNumber) => {

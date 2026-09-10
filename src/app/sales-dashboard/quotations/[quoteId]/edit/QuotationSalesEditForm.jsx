@@ -49,7 +49,7 @@ const STATE_CODE_TO_NAME = {
   99: "Centre Jurisdiction",
 };
 
-export default function QuotationSalesEditForm({ quoteId, hasOrder = false }) {
+export default function QuotationSalesEditForm({ quoteId, hasOrder = false, redirectOrigin = "sales-dashboard" }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -131,7 +131,11 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false }) {
         const data = await res.json();
         if (!data.success) {
           toast.error("Quotation not found");
-          router.push("/sales-dashboard/quotations");
+          const fallbackPath =
+            redirectOrigin === "user-dashboard"
+              ? "/user-dashboard/quotations"
+              : "/sales-dashboard/quotations";
+          router.push(fallbackPath);
           return;
         }
 
@@ -214,7 +218,11 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false }) {
       } catch (err) {
         console.error("Error loading quotation:", err);
         toast.error("Failed to load quotation");
-        router.push("/sales-dashboard/quotations");
+        const fallbackPath =
+          redirectOrigin === "user-dashboard"
+            ? "/user-dashboard/quotations"
+            : "/sales-dashboard/quotations";
+        router.push(fallbackPath);
       } finally {
         setIsLoading(false);
       }
@@ -341,8 +349,12 @@ export default function QuotationSalesEditForm({ quoteId, hasOrder = false }) {
           toast.success("✅ No changes made");
         }
         const custId = data.customer_id || form.customer_id;
-        if (custId) {
-          router.push(`/user-dashboard/view-customer/${encodeURIComponent(custId)}`);
+        if (redirectOrigin === "user-dashboard") {
+          if (custId) {
+            router.push(`/user-dashboard/view-customer/${encodeURIComponent(custId)}`);
+          } else {
+            router.push("/user-dashboard/quotations");
+          }
         } else {
           router.push("/sales-dashboard/quotations");
         }
