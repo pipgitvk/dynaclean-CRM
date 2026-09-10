@@ -378,7 +378,7 @@ export default function AdminLeaveManagement() {
             : ""
           }
 
-  const pendingCount = leaves.filter(l => l.status === "pending").length;
+  const pendingCount = leaves.filter(l => l.status === "pending" && !l.acknowledged_at).length;
   const approvedCount = leaves.filter(l => l.status === "approved").length;
   const rejectedCount = leaves.filter(l => l.status === "rejected").length;
 
