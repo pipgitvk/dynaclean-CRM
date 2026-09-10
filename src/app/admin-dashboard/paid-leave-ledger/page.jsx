@@ -32,9 +32,34 @@ export default function PaidLeaveLedger() {
     totalDays: 0
   });
   const [accrualStartDate, setAccrualStartDate] = useState(null);
+  const [userRole, setUserRole] = useState("");
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    fetchEmployees();
+    // Check user role first
+    const checkAccess = async () => {
+      try {
+        const res = await fetch("/api/me");
+        const data = await res.json();
+        const role = data?.userRole || data?.role || "";
+        setUserRole(role);
+        
+        // Allow SUPERADMIN, HR roles, and ACCOUNTANT
+        const allowedRoles = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"];
+        if (!allowedRoles.includes(role)) {
+          setAccessDenied(true);
+          return;
+        }
+
+        // If access is allowed, fetch employees
+        fetchEmployees();
+      } catch (e) {
+        console.error("Error checking user role:", e);
+        setAccessDenied(true);
+      }
+    };
+
+    checkAccess();
   }, []);
 
   const fetchEmployees = async () => {
@@ -171,6 +196,18 @@ export default function PaidLeaveLedger() {
         return null;
     }
   };
+
+  if (accessDenied) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-3" />
+          <p className="text-red-800 font-medium text-lg">Access Denied</p>
+          <p className="text-red-600 mt-2">You don't have permission to view this page. Only HR, Accountants, and Superadmins can access the Paid Leave Ledger.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

@@ -104,6 +104,7 @@ export const MODULE_KEY_TO_URL = {
   "attendance-rules": "/admin-dashboard/attendance-rules",
   "all-hr-report": "/admin-dashboard/all-hr-report",
   "add-paid-leaves": "/admin-dashboard/hr-operations",
+  "paid-leave-ledger": "/admin-dashboard/paid-leave-ledger",
 
   // Digital Marketing
   "keywords-management": "/admin-dashboard/keywords",

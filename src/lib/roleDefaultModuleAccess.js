@@ -151,6 +151,7 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "delivery-challan",
     "statements",
     "salary-slips",
+    "paid-leave-ledger",
     "employee-crm",
     "company-documents",
     "assets",

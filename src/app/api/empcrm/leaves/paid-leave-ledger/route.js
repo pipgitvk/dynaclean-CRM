@@ -22,9 +22,9 @@ export async function GET(request) {
       );
     }
 
-    // Check authorization - only admin or the user themselves
-    const isAdmin = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive"].includes(session.role);
-    if (username !== session.username && !isAdmin) {
+    // Check authorization - only admin, accountant, or the user themselves
+    const isAuthorized = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"].includes(session.role);
+    if (username !== session.username && !isAuthorized) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 403 }

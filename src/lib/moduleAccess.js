@@ -185,6 +185,7 @@ export const MODULE_TREE = [
       { key: "final-profile-approval", label: "Final Profile Approval" },
       { key: "hr-daily-report", label: "HR Daily Report" },
       { key: "add-paid-leaves", label: "Add Paid Leaves" },
+      { key: "paid-leave-ledger", label: "Paid Leave Ledger" },
     ],
   },
 ];
@@ -401,6 +402,7 @@ export const SUPERADMIN_MODULE_UI_NODES = [
       { kind: "leaf", key: "hr-daily-report", label: "HR Daily Report" },
       { kind: "leaf", key: "salary-slips", label: "Salary Slips" },
       { kind: "leaf", key: "add-paid-leaves", label: "Add Paid Leaves" },
+      { kind: "leaf", key: "paid-leave-ledger", label: "Paid Leave Ledger" },
     ],
   },
   {

@@ -789,6 +789,13 @@ const allMenuItems = [
         roles: ["ALL"],
         icon: "Calendar",
       },
+      {
+        path: "/admin-dashboard/paid-leave-ledger",
+        name: "Paid Leave Ledger",
+        moduleKey: "paid-leave-ledger",
+        roles: ["ALL"],
+        icon: "Book",
+      },
     ],
   },
   {
