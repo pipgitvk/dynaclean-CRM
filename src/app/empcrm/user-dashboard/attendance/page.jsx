@@ -68,6 +68,8 @@ const AttendancePage = () => {
   const [editCheckin, setEditCheckin] = useState("");
   const [editCheckout, setEditCheckout] = useState("");
   const [editReason, setEditReason] = useState("");
+  const [editFile, setEditFile] = useState(null);
+  const [editFileKey, setEditFileKey] = useState(0);
   const [editSaving, setEditSaving] = useState(false);
 
   const fetchAttendance = async () => {
@@ -217,6 +219,8 @@ const AttendancePage = () => {
         : ""
     );
     setEditReason(pendingReq.reason || "");
+    setEditFile(null);
+    setEditFileKey((k) => k + 1);
     setEditRegModal(true);
   };
 
@@ -226,6 +230,11 @@ const AttendancePage = () => {
       toast.error("Reason is required.");
       return;
     }
+    const hasExistingAttachment = editRegRequest?.attachment_url;
+    if (!editFile && !hasExistingAttachment) {
+      toast.error("Please attach screenshot with date/time.");
+      return;
+    }
     setEditSaving(true);
     try {
       const toMysql = (v) => {
@@ -233,15 +242,17 @@ const AttendancePage = () => {
         const t = String(v).trim();
         return t.includes("T") ? `${t.replace("T", " ")}:00` : `${t}:00`;
       };
+      const fd = new FormData();
+      fd.append("id", editRegRequest.id);
+      fd.append("checkin_time", toMysql(editCheckin) ?? "");
+      fd.append("checkout_time", toMysql(editCheckout) ?? "");
+      fd.append("reason", editReason.trim());
+      if (editFile) {
+        fd.append("attachment", editFile);
+      }
       const res = await fetch("/api/attendance/regularization", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editRegRequest.id,
-          checkin_time: toMysql(editCheckin),
-          checkout_time: toMysql(editCheckout),
-          reason: editReason.trim(),
-        }),
+        body: fd,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Update failed.");
@@ -1423,6 +1434,11 @@ const AttendancePage = () => {
               </button>
             </div>
             <form onSubmit={submitEditReg} className="p-4 space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                <p className="text-xs font-semibold text-red-700">
+                  Note: Regularization is only for system issues, not for late arrived and early leave office.
+                </p>
+              </div>
               <p className="text-sm text-gray-600">
                 Date:{" "}
                 <span className="font-medium text-gray-900">
@@ -1452,14 +1468,47 @@ const AttendancePage = () => {
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Reason <span className="text-red-600">*</span>
                 </label>
-                <textarea
+                <select
                   value={editReason}
                   onChange={(e) => setEditReason(e.target.value)}
-                  rows={3}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                  placeholder="Reason for regularization"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                >
+                  <option value="">Select a reason</option>
+                  <option value="software issue">Software issue</option>
+                  <option value="power outage">Power outage</option>
+                  <option value="wifi issue">Wifi issue</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Attach Screenshot with Date/Time <span className="text-red-600">*</span>
+                </label>
+                {editRegRequest?.attachment_url && (
+                  <div className="mb-2">
+                    <a
+                      href={editRegRequest.attachment_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-amber-700 hover:text-amber-900 underline"
+                    >
+                      View current attachment
+                    </a>
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      Upload a new file below to replace, or keep the existing one.
+                    </p>
+                  </div>
+                )}
+                <input
+                  key={editFileKey}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+                  onChange={(e) => setEditFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-amber-50 file:text-amber-800"
                 />
+                <p className="mt-1 text-xs text-gray-500">
+                  Attach screenshot with date/time — PDF, JPG, PNG, or WebP — max 5 MB
+                </p>
               </div>
               <div className="flex gap-2 justify-end pt-2">
                 <button

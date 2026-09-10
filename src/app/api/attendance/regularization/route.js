@@ -197,6 +197,13 @@ export async function POST(request) {
       typeof file.size === "number" &&
       file.size > 0;
 
+    if (!hasFile) {
+      return NextResponse.json(
+        { success: false, error: "Please attach screenshot with date/time." },
+        { status: 400 }
+      );
+    }
+
     if (hasFile) {
       if (file.size > MAX_ATTACHMENT_BYTES) {
         return NextResponse.json(
@@ -576,7 +583,7 @@ export async function PATCH(request) {
 /**
  * PUT — Employee updates the proposed check-in/check-out of their OWN pending request.
  * Only allowed while status = 'pending'. Reason can also be updated.
- * Body: { id, checkin_time, checkout_time, reason }
+ * Accepts multipart/form-data: { id, checkin_time, checkout_time, reason, attachment (optional) }
  */
 export async function PUT(request) {
   try {
@@ -585,8 +592,24 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { id, checkin_time, checkout_time, reason } = body;
+    const contentType = request.headers.get("content-type") || "";
+    let id, checkin_time, checkout_time, reason, file;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      id = formData.get("id");
+      checkin_time = formData.get("checkin_time");
+      checkout_time = formData.get("checkout_time");
+      reason = formData.get("reason");
+      file = formData.get("attachment");
+    } else {
+      const body = await request.json();
+      id = body.id;
+      checkin_time = body.checkin_time;
+      checkout_time = body.checkout_time;
+      reason = body.reason;
+      file = null;
+    }
 
     if (!id) {
       return NextResponse.json({ success: false, error: "id is required" }, { status: 400 });
@@ -626,14 +649,80 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, error: "Reason is required." }, { status: 400 });
     }
 
+    // Handle optional attachment replacement
+    const hasFile =
+      file &&
+      typeof file !== "string" &&
+      typeof file.size === "number" &&
+      file.size > 0;
+
+    let newAttachmentUrl = req.attachment_url;
+
+    if (hasFile) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        return NextResponse.json(
+          { success: false, error: "Attachment must be 5 MB or smaller." },
+          { status: 400 }
+        );
+      }
+
+      const mime = typeof file.type === "string" ? file.type : "";
+      const nameExt = path
+        .extname(typeof file.name === "string" ? file.name : "")
+        .toLowerCase();
+      const extOk = [".pdf", ".jpg", ".jpeg", ".png", ".webp"].includes(nameExt);
+      const mimeOk = ALLOWED_ATTACHMENT_MIME.has(mime);
+      if (!mimeOk && !extOk) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Attachment must be PDF, JPG, PNG, or WebP.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const extFromMime =
+        mime === "application/pdf"
+          ? ".pdf"
+          : mime === "image/jpeg"
+            ? ".jpg"
+            : mime === "image/png"
+              ? ".png"
+              : mime === "image/webp"
+                ? ".webp"
+                : "";
+      const safeExt = [".pdf", ".jpg", ".jpeg", ".png", ".webp"].includes(nameExt)
+        ? nameExt === ".jpeg"
+          ? ".jpg"
+          : nameExt
+        : extFromMime || (nameExt || ".bin");
+
+      const userFolder = String(session.username).replace(/[^a-zA-Z0-9._-]/g, "_");
+      const uploadDir = path.join(
+        process.cwd(),
+        "public",
+        "attendance_regularization",
+        userFolder
+      );
+      await mkdir(uploadDir, { recursive: true });
+      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}${safeExt}`;
+      const fullPath = path.join(uploadDir, fileName);
+      const buf = Buffer.from(await file.arrayBuffer());
+      await writeFile(fullPath, buf);
+
+      newAttachmentUrl = `/attendance_regularization/${encodeURIComponent(userFolder)}/${encodeURIComponent(fileName)}`;
+    }
+
     await conn.execute(
       `UPDATE attendance_regularization_requests
        SET proposed_checkin_time = ?,
            proposed_checkout_time = ?,
            reason = ?,
+           attachment_url = ?,
            updated_at = NOW()
        WHERE id = ?`,
-      [newCheckin, newCheckout, newReason, id]
+      [newCheckin, newCheckout, newReason, newAttachmentUrl, id]
     );
 
     return NextResponse.json({ success: true, message: "Request updated successfully." });
