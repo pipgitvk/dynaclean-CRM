@@ -81,10 +81,10 @@ export async function POST(req) {
       }
 
       for (const { itemCode, godown, count } of Object.values(spareGroups)) {
-        // Resolve item_code (could be spare_number string or numeric id) → spare_list.id
+        // Resolve item_code (could be spare_number INT or spare_list.id) → spare_list.id
         const [spareMatch] = await conn.execute(
-          `SELECT id FROM spare_list WHERE spare_number = ? OR CAST(id AS CHAR) = ? LIMIT 1`,
-          [itemCode, itemCode]
+          `SELECT id FROM spare_list WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ? LIMIT 1`,
+          [String(itemCode), String(itemCode)]
         );
         if (!spareMatch || spareMatch.length === 0) {
           console.warn(`⚠️ spare not found in spare_list for item_code=${itemCode}, skipping stock deduction`);
