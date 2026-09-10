@@ -91,7 +91,16 @@ export async function POST(req) {
         admin_remark = ?,
         delivery_date = ?
     WHERE order_id = ?`,
-      [booking_url, booking_id, booking_date, 1, bookingBy, adminremark, expected_delivery_date, orderId]
+      [
+        booking_url ?? null,
+        booking_id ?? null,
+        booking_date ?? null,
+        1,
+        bookingBy ?? null,
+        adminremark ?? null,
+        expected_delivery_date ?? null,
+        orderId ?? null,
+      ]
     );
 
     // ✅ Step 3: Send email with custom template (not from database)
