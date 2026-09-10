@@ -238,12 +238,30 @@ export default function CreditNotePage() {
   }
 
   const items = Array.isArray(cn.items) ? cn.items : [];
-  const taxableAmount = Number(cn.taxable_amount || 0);
-  const cgstTotal = Number(cn.cgst_amount || 0);
-  const sgstTotal = Number(cn.sgst_amount || 0);
-  const igstTotal = Number(cn.igst_amount || 0);
-  const totalTax = Number(cn.total_tax || 0);
-  const grandTotal = Number(cn.grand_total || 0);
+
+  // Recalculate all totals from items using taxable_price × gst_rate
+  const taxableAmount = items.reduce((sum, it) => sum + Number(it.taxable_price || 0), 0);
+  const totalTax = items.reduce((sum, it) => {
+    const t = Number(it.taxable_price || 0);
+    const r = Number(it.gst_rate || 0);
+    return sum + (t * r) / 100;
+  }, 0);
+  const cgstTotal = items.reduce((sum, it) => {
+    const t = Number(it.taxable_price || 0);
+    const r = Number(it.cgst_rate || 0);
+    return sum + (t * r) / 100;
+  }, 0);
+  const sgstTotal = items.reduce((sum, it) => {
+    const t = Number(it.taxable_price || 0);
+    const r = Number(it.sgst_rate || 0);
+    return sum + (t * r) / 100;
+  }, 0);
+  const igstTotal = items.reduce((sum, it) => {
+    const t = Number(it.taxable_price || 0);
+    const r = Number(it.igst_rate || 0);
+    return sum + (t * r) / 100;
+  }, 0);
+  const grandTotal = taxableAmount + totalTax;
   const company = INVOICE_LETTERHEAD;
   const isBusy = downloading || saving;
 
@@ -411,10 +429,9 @@ export default function CreditNotePage() {
                   </tr>
                 ) : (
                   items.map((item, idx) => {
-                    const tax =
-                      Number(item.cgst_amount || 0) +
-                      Number(item.sgst_amount || 0) +
-                      Number(item.igst_amount || 0);
+                    const taxableAmt = Number(item.taxable_price || 0);
+                    const gstRate = Number(item.gst_rate || 0);
+                    const tax = (taxableAmt * gstRate) / 100;
                     return (
                       <tr key={idx} className="border-b border-gray-300">
                         <td className="px-2 py-1.5 text-center border-x border-gray-300">
