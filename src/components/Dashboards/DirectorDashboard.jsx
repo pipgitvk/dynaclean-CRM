@@ -308,11 +308,7 @@ export default function DirectorDashboard({ user, reportingManager, regTotal = 0
         />
         <KPICard
           title="Low Stock Alerts"
-          isMultiValue={true}
-          multiValues={[
-            { label: "LOW STOCK", value: lowStockCount },
-            { label: "ZERO STOCK", value: zeroStockCount },
-          ]}
+          value={lowStockCount}
           icon={PackageX}
           gradient="bg-red-500"
           buttonText="VIEW"

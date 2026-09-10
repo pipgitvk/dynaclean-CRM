@@ -433,8 +433,8 @@ function ProductStockList() {
         </div>
       </div>
 
-      {/* ── Zero Stock Alert Card ─────────────────────────────────── */}
-      {showZeroStockCard && zeroStockProducts.length > 0 && (
+      {/* ── Zero Stock Alert Card (Commented Out) ─────────────────────────────────── */}
+      {false && showZeroStockCard && zeroStockProducts.length > 0 && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 shadow-sm overflow-hidden">
           {/* Card Header */}
           <div className="flex items-center justify-between px-5 py-4 bg-red-100 border-b border-red-200">
@@ -503,6 +503,7 @@ function ProductStockList() {
           </div>
         </div>
       )}
+      {/* End Zero Stock Alert Card Comment */}
 
       {/* ── Low Stock Alert Card ──────────────────────────────────── */}
       {lowStockProducts.filter(p => (p.total_quantity ?? 0) > 0).length > 0 && (
