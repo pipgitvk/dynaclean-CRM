@@ -1,26 +1,4 @@
-/**
- * Salary "pay days" from attendance (payroll-oriented).
- *
- * Pay days (for salary):
- *   periodDays = eligible calendar days in month (after DOJ; for **current** salary month only,
- *   not after today — past months use the full calendar month).
- *   requiredWorkingDays = days in period that are not Sunday and not (company) holiday.
- *   totalAttendance = sum of weekday (non‑Sun, non‑holiday) credits: **1 day** per eligible
- *   punched day, **0.5** only when `isHalfDayByRules` (e.g. no checkout / half‑day timing).
- *   Late / grace / classifyAttendanceDayForSalary do **not** reduce pay-days — they only split
- *   present vs late_days for reporting; salary amount can still use finer rules separately.
- *   deductionDays = max(0, requiredWorkingDays − totalAttendance)
- *   salaryPeriodCap = min(30, periodDays) — payout uses 30-day month even when calendar has 31 days
- *   pay_days_base = salaryPeriodCap − deductionDays
- *   Weekly-off Sunday unpaid if Mon–Sat of that calendar week had no meaningful punch on any
- *   non‑holiday weekday (whole week absent); if that week had at least one such punch, WO Sunday stays paid.
- *   pay_days = pay_days_base − count(such Sundays) + Sunday work credits
- *   (each Sunday punch adds 1 day, or 0.5 if half-day by rules — extra pay for working weekly off).
- *
- * - Days before date_of_joining are skipped (not LOP, not paid).
- * - Fetch logs from a few days before month start (`getPayrollAttendanceLogDateRange`) so cross‑month weeks resolve.
- * - For payroll **past months** (`isSalaryMonthFullyElapsed`), days are not capped at today — full calendar month applies.
- */
+
 import {
   classifyAttendanceDayForSalary,
   isHalfDayByRules,

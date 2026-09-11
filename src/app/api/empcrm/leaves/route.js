@@ -793,9 +793,10 @@ export async function PATCH(request) {
 
         let computedDays = overrideTotalDays; // start with original (POST-time calculated value)
 
-        // Smart heuristics (time-based + checkin-based) ONLY apply to single-day full leaves.
+        // Smart heuristics (time-based + checkin-based) ONLY apply to single-day full leaves
+        // that are NOT already marked as half-day in DB (user explicitly selected half-day).
         // Multi-day leaves already have correct total_days from POST creation (first/last day fractions).
-        if (isSingleDay && sched) {
+        if (isSingleDay && sched && leave.is_half_day != 1) {
           const lunchStartMin = timeToMinutes(sched.break_lunch);
           const lunchDuration = Number(sched.lunch_duration_minutes) || 30;
           const lunchEndMin = lunchStartMin !== null ? lunchStartMin + lunchDuration : null;

@@ -368,10 +368,10 @@ const AttendancePage = () => {
       }
     });
 
-  // Create a map of paid leaves (NOT half-day) — overrides timing when approved
+  // Create a map of paid leaves (both full-day and half-day) — overrides timing when approved
   const paidLeaveMap = new Map();
   leaves
-    .filter(leave => leave.leave_type === 'paid' && !leave.is_half_day)
+    .filter(leave => leave.leave_type === 'paid')
     .forEach((leave) => {
       const fromD = new Date(leave.from_date);
       const toD = new Date(leave.to_date);
