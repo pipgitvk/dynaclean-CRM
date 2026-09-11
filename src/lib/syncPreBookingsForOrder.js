@@ -58,8 +58,8 @@ export async function syncPreBookingsForOrder(
        WHERE customer_id = ?
          AND status IN ('pending', 'postponed', 'cancelled')
          AND (
-           product_name = ?
-           OR (? != '' AND item_code = ?)
+           product_name COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci
+           OR (? != '' AND item_code COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci)
          )`,
       [customerIdStr, productName, itemCode, itemCode],
     );
