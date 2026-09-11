@@ -18,11 +18,19 @@ export default function EditKeywordModal({ open, onClose, keyword, onSuccess }) 
 
   useEffect(() => {
     if (keyword) {
+      const initialRank =
+        keyword.latest_followup_rank != null && keyword.latest_followup_rank !== ""
+          ? keyword.latest_followup_rank
+          : keyword.rank;
+      const initialPage =
+        keyword.latest_followup_page != null && keyword.latest_followup_page !== ""
+          ? keyword.latest_followup_page
+          : keyword.page;
       setFormData({
-        keyword: keyword.keyword || "",
-        page: keyword.page || "",
-        rank: keyword.rank || "",
-        assigned_to: keyword.assigned_to || "",
+        keyword: keyword.keyword ?? "",
+        page: initialPage != null ? String(initialPage) : "",
+        rank: initialRank != null ? String(initialRank) : "",
+        assigned_to: keyword.assigned_to ?? "",
       });
     }
   }, [keyword]);
@@ -64,6 +72,10 @@ export default function EditKeywordModal({ open, onClose, keyword, onSuccess }) 
       return toast.error("Keyword is required.");
     }
 
+    const rankRaw = String(formData.rank ?? "").trim();
+    const pageRaw = String(formData.page ?? "").trim();
+    const assignedRaw = String(formData.assigned_to ?? "").trim();
+
     setLoading(true);
     try {
       const res = await fetch("/api/keywords", {
@@ -72,9 +84,9 @@ export default function EditKeywordModal({ open, onClose, keyword, onSuccess }) 
         body: JSON.stringify({
           id: keyword.id,
           keyword: formData.keyword.trim(),
-          page: formData.page.trim() || null,
-          rank: formData.rank ? parseInt(formData.rank) : 0,
-          assigned_to: formData.assigned_to || null,
+          page: pageRaw === "" ? null : pageRaw,
+          rank: rankRaw === "" ? null : parseInt(rankRaw, 10),
+          assigned_to: assignedRaw === "" ? null : assignedRaw,
         }),
       });
 

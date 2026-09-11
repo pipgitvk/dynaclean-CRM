@@ -113,12 +113,47 @@ export async function PUT(request) {
       );
     }
 
+    const resolvedPage = page != null && String(page).trim() !== "" ? page : null;
+    const resolvedRank =
+      rank != null && String(rank).trim() !== "" && Number.isFinite(Number(rank))
+        ? Number(rank)
+        : null;
+    const resolvedAssigned =
+      assigned_to != null && String(assigned_to).trim() !== "" ? assigned_to : null;
+
     await connection.execute(
       `UPDATE keywords 
        SET keyword = ?, page = ?, rank = ?, assigned_to = ?, updated_at = NOW()
        WHERE id = ?`,
-      [keyword, page || null, rank || 0, assigned_to || null, id]
+      [keyword, resolvedPage, resolvedRank, resolvedAssigned, id]
     );
+
+    // Also insert a followup entry so the table's "latest followup" column reflects
+    // the values the user just explicitly saved via the Edit modal.
+    try {
+      const [prevLatest] = await connection.execute(
+        `SELECT id, status FROM keywords_followups 
+         WHERE keyword_id = ? 
+         ORDER BY followup_date DESC, created_at DESC 
+         LIMIT 1`,
+        [id]
+      );
+      const carryStatus = prevLatest.length ? prevLatest[0].status : "pending";
+      await connection.execute(
+        `INSERT INTO keywords_followups 
+          (keyword_id, followup_date, page, rank, status, notes, created_at, updated_at)
+         VALUES (?, CURDATE(), ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          id,
+          resolvedPage,
+          resolvedRank,
+          carryStatus,
+          "Updated via Edit Keyword",
+        ]
+      );
+    } catch (fErr) {
+      console.error("Could not insert followup after keyword edit (non-fatal):", fErr);
+    }
 
     return NextResponse.json(
       { message: "Keyword updated successfully." },

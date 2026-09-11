@@ -236,19 +236,23 @@ const KeywordsTable = () => {
                     {keyword.latest_followup_rank != null && keyword.latest_followup_rank !== "" ? (
                       <span className="inline-flex items-center gap-1 font-semibold text-blue-700">
                         {Number(keyword.latest_followup_rank)}
-                        {keyword.rank > 0 && Number(keyword.latest_followup_rank) < keyword.rank && (
+                        {keyword.rank != null && keyword.rank !== "" && Number(keyword.latest_followup_rank) < Number(keyword.rank) && (
                           <span className="text-green-500 text-xs">▲</span>
                         )}
-                        {keyword.rank > 0 && Number(keyword.latest_followup_rank) > keyword.rank && (
+                        {keyword.rank != null && keyword.rank !== "" && Number(keyword.latest_followup_rank) > Number(keyword.rank) && (
                           <span className="text-red-500 text-xs">▼</span>
                         )}
                       </span>
                     ) : (
-                      <span className="text-gray-700">{keyword.rank || "-"}</span>
+                      <span className="text-gray-700">
+                        {keyword.rank != null && keyword.rank !== "" ? Number(keyword.rank) : "-"}
+                      </span>
                     )}
                   </td>
                   <td className="px-6 py-3 text-gray-700">
-                    {keyword.latest_followup_page || keyword.page || "-"}
+                    {keyword.latest_followup_page != null && keyword.latest_followup_page !== ""
+                      ? keyword.latest_followup_page
+                      : (keyword.page != null && keyword.page !== "" ? keyword.page : "-")}
                   </td>
                   <td className="px-6 py-3 text-gray-700">
                     {formatDate(keyword.latest_followup_date)}
