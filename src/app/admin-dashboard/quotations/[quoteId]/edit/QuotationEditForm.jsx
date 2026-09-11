@@ -31,6 +31,7 @@ export default function QuotationEditForm({ quoteId }) {
   const [roundOff, setRoundOff] = useState(0);
   const [isAutoRoundOff, setIsAutoRoundOff] = useState(true);
   const [editableTerms, setEditableTerms] = useState("");
+  const [originalSnapshot, setOriginalSnapshot] = useState(null);
 
   // State dropdown helpers (same as new form)
   const stateCodeToName = useMemo(
@@ -66,6 +67,24 @@ export default function QuotationEditForm({ quoteId }) {
 
   const SUPPLIER_STATE_CODE = "07";
 
+  const deepEqual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+  const hasChanges = useMemo(() => {
+    if (!originalSnapshot) return false;
+    const currentSnapshot = {
+      form,
+      items,
+      quoteDate,
+      cgstRate,
+      sgstRate,
+      igstRate,
+      roundOff,
+      isAutoRoundOff,
+      editableTerms,
+    };
+    return !deepEqual(originalSnapshot, currentSnapshot);
+  }, [originalSnapshot, form, items, quoteDate, cgstRate, sgstRate, igstRate, roundOff, isAutoRoundOff, editableTerms]);
+
   const getStateFromGSTIN = (gstin) => {
     if (!gstin || gstin.length < 2) return null;
     const code = gstin.slice(0, 2);
@@ -94,8 +113,10 @@ export default function QuotationEditForm({ quoteId }) {
 
         const h = data.header;
         setQuoteNumber(h.quote_number);
-        setQuoteDate(h.quote_date ? h.quote_date.split("T")[0] : "");
-        setForm({
+        const origQuoteDate = h.quote_date ? h.quote_date.split("T")[0] : "";
+        setQuoteDate(origQuoteDate);
+        
+        const origForm = {
           company: h.company_name || "",
           company_location: h.company_address || "",
           gstin_no: h.gstin || "",
@@ -104,12 +125,21 @@ export default function QuotationEditForm({ quoteId }) {
           customer_id: h.customer_id || "",
           terms: h.term_con || "",
           payment_term_days: h.payment_term_days?.toString() || "",
-        });
-        setEditableTerms(h.term_con || "");
-        setCgstRate(parseFloat(h.cgst_rate) || 0);
-        setSgstRate(parseFloat(h.sgst_rate) || 0);
-        setIgstRate(parseFloat(h.igst_rate) || 0);
-        setRoundOff(parseFloat(h.round_off) || 0);
+        };
+        setForm(origForm);
+        
+        const origTerms = h.term_con || "";
+        setEditableTerms(origTerms);
+        
+        const origCgst = parseFloat(h.cgst_rate) || 0;
+        const origSgst = parseFloat(h.sgst_rate) || 0;
+        const origIgst = parseFloat(h.igst_rate) || 0;
+        const origRound = parseFloat(h.round_off) || 0;
+        
+        setCgstRate(origCgst);
+        setSgstRate(origSgst);
+        setIgstRate(origIgst);
+        setRoundOff(origRound);
 
         // Map DB items to form items shape
         const mappedItems = (data.items || []).map((item) => ({
@@ -123,9 +153,22 @@ export default function QuotationEditForm({ quoteId }) {
           price: parseFloat(item.price_per_unit) || 0,
           gst: parseFloat(item.gst) || 18,
         }));
-        setItems(mappedItems.length > 0 ? mappedItems : [
+        const finalItems = mappedItems.length > 0 ? mappedItems : [
           { productCode: "", imageUrl: "", name: "", hsn: "", specification: "", unit: "", quantity: 1, price: 0, gst: 18 }
-        ]);
+        ];
+        setItems(finalItems);
+
+        setOriginalSnapshot({
+          form: origForm,
+          items: finalItems,
+          quoteDate: origQuoteDate,
+          cgstRate: origCgst,
+          sgstRate: origSgst,
+          igstRate: origIgst,
+          roundOff: origRound,
+          isAutoRoundOff: true,
+          editableTerms: origTerms,
+        });
       } catch (err) {
         console.error("Error loading quotation:", err);
         toast.error("Failed to load quotation");
@@ -224,18 +267,25 @@ export default function QuotationEditForm({ quoteId }) {
         sgstRate: effectiveSgstRate,
         igstRate: effectiveIgstRate,
         terms: editableTerms,
+        has_changes: hasChanges,
       };
 
-      const res = await fetch(`/api/quotations/${encodeURIComponent(quoteId)}`, {
-        method: "PUT",
+      const res = await fetch(`/api/quotations/${encodeURIComponent(quoteId)}/admin-update`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(dataToSend),
       });
 
       const data = await res.json();
       if (data.success) {
-        toast.success("✅ Quotation updated successfully");
-        router.push("/admin-dashboard/quotations");
+        if (data.created_new) {
+          toast.success(`✅ New quotation created: ${data.new_quote_number}`);
+          router.push(`/admin-dashboard/quotations?customer_id=${encodeURIComponent(form.customer_id)}`);
+        } else {
+          toast.success("✅ No changes made");
+          router.push("/admin-dashboard/quotations");
+        }
+        router.refresh();
       } else {
         toast.error("Error: " + (data.message || "Update failed"));
       }
@@ -477,7 +527,6 @@ export default function QuotationEditForm({ quoteId }) {
         />
       </div>
 
-      {/* Submit */}
       <div className="flex gap-4 justify-end pb-8">
         <button
           type="button"
@@ -486,13 +535,23 @@ export default function QuotationEditForm({ quoteId }) {
         >
           Cancel
         </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="px-8 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
-        >
-          {isSubmitting ? "Saving..." : "Save Changes"}
-        </button>
+        {hasChanges ? (
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-8 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+          >
+            {isSubmitting ? "Creating..." : "Save as New Quotation"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="px-8 py-2 bg-gray-300 text-gray-500 rounded cursor-not-allowed font-semibold"
+          >
+            No Changes
+          </button>
+        )}
       </div>
     </form>
   );
