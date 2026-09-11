@@ -586,12 +586,13 @@ const AttendancePage = () => {
   const summary = chronologicallySortedLogs.reduce(
     (acc, log) => {
       if (log.type === "absent") acc.absents++;
-      // Only FULL-DAY leaves go into the "Leaves" summary card.
-      // Half-day leave rows (DB half-day or punch-in present on leave date)
-      // count toward the separate "Half-Days" summary card instead.
       if (log.type === "leave" || log.type === "paidleave") {
         if (log.is_half_day == 1) {
           acc.halfDays++;
+          // Only PAID leave half-days count toward "Paid Half-Days" separate card.
+          if (log.type === "paidleave" || log.leaveType === "Paid" || log.leave_type === "paid") {
+            acc.paidHalfDays++;
+          }
         } else {
           acc.leaves++;
         }
@@ -600,14 +601,12 @@ const AttendancePage = () => {
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
         acc.present++;
-        // Use grace period logic: first 3 grace period days (15 min late) are NOT half-days
         const username = log.username;
         if (!acc.graceCounters[username]) {
           acc.graceCounters[username] = 0;
         }
         const { isHalfDay, graceUsed } = isHalfDayWithGrace(log, rulesFor(username), acc.graceCounters[username]);
         acc.graceCounters[username] = graceUsed;
-        // Attendance-based half-day (late punch / etc) — combine with leave-based half-days.
         if (isHalfDay) acc.halfDays++;
         if (isLateDaySummary(log, rulesFor(log.username))) {
           acc.lateDays++;
@@ -615,7 +614,7 @@ const AttendancePage = () => {
       }
       return acc;
     },
-    { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0, graceCounters: {} }
+    { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, paidHalfDays: 0, lateDays: 0, graceCounters: {} }
   );
 
   const handleDownload = async () => {
@@ -752,7 +751,7 @@ const AttendancePage = () => {
             </p>
           ) : (
             <>
-          <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-8 gap-4 mb-8 text-center">
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-green-600">
                 {summary.present}
@@ -784,6 +783,15 @@ const AttendancePage = () => {
                 {summary.halfDays}
               </p>
               <p className="text-sm text-gray-500">Half-Days</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm flex flex-col items-center gap-1">
+              <div className="flex items-center gap-1">
+                <Sun className="w-5 h-5 text-amber-500" />
+                <p className="text-2xl font-bold text-amber-600">
+                  {summary.paidHalfDays}
+                </p>
+              </div>
+              <p className="text-sm text-gray-500">Paid Half-Days</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-2xl font-bold text-red-600">

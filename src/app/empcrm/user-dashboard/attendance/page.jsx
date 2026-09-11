@@ -476,7 +476,7 @@ const AttendancePage = () => {
 
   // Calculate summary statistics
   const { summary, dayKindByDateKey } = (() => {
-    const acc = { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, lateDays: 0 };
+    const acc = { present: 0, absents: 0, leaves: 0, holidays: 0, sundays: 0, halfDays: 0, paidHalfDays: 0, lateDays: 0 };
     const map = new Map();
     let graceHalfDaysUsed = 0;
     for (let i = allDates.length - 1; i >= 0; i--) {
@@ -484,12 +484,14 @@ const AttendancePage = () => {
       const k = new Date(log.date).toLocaleDateString("en-CA");
       map.set(k, log.type);
       if (log.type === "absent") acc.absents++;
-      // Only FULL-DAY leaves go into the "Leaves" summary card.
-      // Half-day leave rows (either DB-marked half-day or has punch-in on leave date)
-      // count toward the separate "Half-Days" summary card instead.
       if (log.type === "leave" || log.type === "paidleave") {
         if (log.is_half_day == 1) {
           acc.halfDays++;
+          // Only leave-type half-days that are PAID count toward "Paid Half-Days" card.
+          // Attendance-based (late punch etc.) half-days are NOT paid — they stay only in Half-Days.
+          if (log.type === "paidleave" || log.leaveType === "Paid" || log.leave_type === "paid") {
+            acc.paidHalfDays++;
+          }
         } else {
           acc.leaves++;
         }
@@ -501,7 +503,6 @@ const AttendancePage = () => {
         const cls = classifyAttendanceDay(log, rules, graceHalfDaysUsed);
         graceHalfDaysUsed = cls.graceHalfDaysUsed;
         map.set(k, cls.kind);
-        // Attendance-based half-day (late punch / etc) — add to same Half-Days card.
         if (cls.kind === "halfDay") acc.halfDays++;
         if (cls.kind === "lateDay") acc.lateDays++;
       }
@@ -573,7 +574,7 @@ const AttendancePage = () => {
         </div>
 
         {/* Summary Statistics Section */}
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-8 text-center">
+        <div className="grid grid-cols-2 md:grid-cols-8 gap-4 mb-8 text-center">
           <div className="bg-white p-4 rounded-lg shadow-md">
             <p className="text-2xl font-bold text-green-600">{summary.present}</p>
             <p className="text-sm text-gray-500">Present</p>
@@ -603,6 +604,15 @@ const AttendancePage = () => {
               {summary.halfDays}
             </p>
             <p className="text-sm text-gray-500">Half-Days</p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-md flex flex-col items-center gap-1">
+            <div className="flex items-center gap-1">
+              <Sun className="w-5 h-5 text-amber-500" />
+              <p className="text-2xl font-bold text-amber-600">
+                {summary.paidHalfDays}
+              </p>
+            </div>
+            <p className="text-sm text-gray-500">Paid Half-Days</p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow-md">
             <p className="text-2xl font-bold text-red-600">{summary.lateDays}</p>
