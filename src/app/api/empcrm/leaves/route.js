@@ -792,31 +792,37 @@ export async function PATCH(request) {
 
         let computedDays = overrideTotalDays; // start with original (POST-time calculated value)
 
-        // Smart heuristics (time-based + checkin-based) ONLY apply to single-day full leaves
-        // that are NOT already marked as half-day in DB (user explicitly selected half-day).
-        // Multi-day leaves already have correct total_days from POST creation (first/last day fractions).
-        if (isSingleDay && sched && leave.is_half_day != 1) {
-          const lunchStartMin = timeToMinutes(sched.break_lunch);
-          const lunchDuration = Number(sched.lunch_duration_minutes) || 30;
-          const lunchEndMin = lunchStartMin !== null ? lunchStartMin + lunchDuration : null;
-          const halfDayCheckinMin = timeToMinutes(sched.half_day_checkin_time);
+        const WORK_START_DEFAULT = 9 * 60;
+        const WORK_END_DEFAULT = 18 * 60;
+        const LUNCH_DEFAULT_MIN = 13 * 60; // 13:00 fallback (matches deriveHalfDayType helper)
+        const LUNCH_DURATION_DEFAULT = 30;
 
+        // Default schedule values (used when DB schedule missing)
+        const lunchStartMin = timeToMinutes(sched?.break_lunch) ?? LUNCH_DEFAULT_MIN;
+        const lunchDuration = Number(sched?.lunch_duration_minutes) || LUNCH_DURATION_DEFAULT;
+        const lunchEndMin = lunchStartMin !== null ? lunchStartMin + lunchDuration : null;
+        const halfDayCheckinMin = timeToMinutes(sched?.half_day_checkin_time);
+
+        // Smart heuristics (time-based + checkin-based) for single-day full leaves
+        // NOT already marked as half-day in DB (user didn't explicitly select half-day)
+        if (isSingleDay && leave.is_half_day != 1) {
           // ── A. start_time / end_time based calculation ──
+          //    (runs even when attendance schedule is missing, using 13:00 lunch fallback)
           const startMin = timeToMinutes(leave.start_time);
           const endMin = timeToMinutes(leave.end_time);
 
           if (lunchStartMin !== null && (startMin !== null || endMin !== null)) {
             let isHalfByTime = false;
 
-            // If start_time is AFTER lunch start → 2nd-half leave → half day
-            if (startMin !== null && startMin > lunchStartMin) {
+            // start_time at or AFTER lunch → 2nd-half leave → 0.5 day
+            if (startMin !== null && startMin >= lunchStartMin) {
               isHalfByTime = true;
             }
-            // If end_time is AT OR BEFORE lunch start → 1st-half leave → half day
+            // end_time is AT OR BEFORE lunch start → 1st-half leave → 0.5 day
             if (endMin !== null && endMin <= lunchStartMin) {
               isHalfByTime = true;
             }
-            // If start_time is AFTER lunch end AND end_time covers only post-lunch → half day
+            // start at/after lunch end → 2nd half → 0.5
             if (startMin !== null && lunchEndMin !== null && startMin >= lunchEndMin) {
               isHalfByTime = true;
             }
@@ -826,8 +832,7 @@ export async function PATCH(request) {
             }
           }
 
-          // ── B. Attendance check-in based calculation ──
-          // Check attendance_logs for the leave's from_date (only single-day, so this IS the leave day)
+          // ── B. Attendance check-in based calculation (only if schedule has half_day_checkin_time)
           if (halfDayCheckinMin !== null) {
             const leaveDate = leave.from_date instanceof Date
               ? leave.from_date.toISOString().slice(0, 10)
@@ -846,13 +851,11 @@ export async function PATCH(request) {
               const checkinDate = new Date(logRows[0].checkin_time);
               const checkinMin = checkinDate.getHours() * 60 + checkinDate.getMinutes();
 
-              // If employee checked in at or after half_day_checkin_time → they worked half day
               if (checkinMin >= halfDayCheckinMin) {
+                // Employee checked in late enough → they worked the other half → 0.5
                 computedDays = 0.5;
-              }
-              // If checked in well before half_day_checkin_time → full day (override time-based half)
-              else if (startMin === null && endMin === null) {
-                // No start/end time provided; use only checkin signal
+              } else if (startMin === null && endMin === null) {
+                // Checked in well before threshold and no time bounds → full day
                 computedDays = 1;
               }
             }
