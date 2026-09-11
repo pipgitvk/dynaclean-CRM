@@ -505,10 +505,13 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         delete payload.service_next_followup;
       }
 
-      // Normal Sales / other roles - service_next_followup aur gem_next_followup nahi bhejna
+      // Normal Sales / other roles - gem_next_followup nahi bhejna
+      // service_next_followup sirf tab bhejna jab status "Denied" ho
       if (!isServiceSupport && !isGEM) {
-        delete payload.service_next_followup;
         delete payload.gem_next_followup;
+        if (formData.status !== "Denied") {
+          delete payload.service_next_followup;
+        }
       }
 
       const res = await fetch(`/api/followup/${customerId}`, {
@@ -780,11 +783,13 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         </div>
       )}
 
-      {/* Service Next Follow-up Date - Only for SERVICE SUPPORT, hidden when purpose is Denied follow-up */}
-      {isServiceSupport && formData.purpose !== "Denied follow-up" && (
+      {/* Service Next Follow-up Date - Always for SERVICE SUPPORT (regardless of purpose),
+          OR for normal roles when status is Denied */}
+      {(isServiceSupport ||
+        (!isServiceSupport && !isGEM && formData.status === "Denied")) && (
         <div>
           <label className="block text-sm font-medium text-gray-700">
-            Service Next Follow-up Date (IST)
+            Service Next Follow-up Date (IST) <span className="text-red-500">*</span>
           </label>
           <input
             type="datetime-local"
@@ -795,10 +800,13 @@ export default function FollowupForm({ customerId, userRole = "" }) {
             max={formatISTDateTime(new Date(Date.now() + 60 * 24 * 60 * 60 * 1000))}
             disabled={isLoadingCustomer}
             className={`w-full px-4 py-2 border rounded-lg ${isLoadingCustomer ? "bg-gray-100 cursor-not-allowed" : ""}`}
+            required
           />
           <p className="mt-1 text-xs text-blue-600">
             {isLoadingCustomer
               ? "Loading lead information..."
+              : formData.status === "Denied"
+              ? "Schedule when to follow up again on this denied lead (maximum 2 months from now)."
               : "Schedule your next service follow-up (maximum 2 months from now)."}
           </p>
         </div>
