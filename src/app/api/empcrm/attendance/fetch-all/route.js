@@ -74,7 +74,7 @@ export async function GET(request) {
 
     // Fetch all approved leaves
     const [leaves] = await db.query(
-      `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type
+      `SELECT username, from_date, to_date, leave_type, reason, is_half_day, half_day_type, start_time, end_time
        FROM employee_leaves
        WHERE status = 'approved'
        ORDER BY from_date DESC`
