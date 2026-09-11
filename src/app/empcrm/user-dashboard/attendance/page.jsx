@@ -136,6 +136,14 @@ const AttendancePage = () => {
     log?.date ? new Date(log.date).toLocaleDateString("en-CA") : "";
 
   const rowNeedsRegularization = (log) => {
+    // If there's an approved unpaid leave on this date, don't show regularize button
+    const dateKey = new Date(log.date).toLocaleDateString("en-CA");
+    const leaveOnDate = leaveMap.get(dateKey);
+    if (leaveOnDate && leaveOnDate.leave_type === "unpaid") {
+      return false;
+    }
+    
+    // Only "present" type logs can be regularized
     if (log.type !== "present") return false;
     const checkinOk = getCheckinStatus(log.checkin_time) === "onTime";
     const checkoutOk = getCheckoutStatus(log.checkout_time) === "onTime";
@@ -528,6 +536,10 @@ const AttendancePage = () => {
       if (log.type !== "present") return false;
       const k = new Date(log.date).toLocaleDateString("en-CA");
       return dayKindByDateKey.get(k) === "halfDay";
+    } else if (filterStatus === "regularize") {
+      // Only show logs that need regularization (excluding unpaid leaves)
+      if (!rowNeedsRegularization(log)) return false;
+      return true;
     }
 
     return true;
@@ -1338,6 +1350,12 @@ const AttendancePage = () => {
                                     )}
                                   </div>
                                 );
+                              }
+                              // Don't show Regularize button if this is an unpaid leave
+                              const dateKey = new Date(log.date).toLocaleDateString("en-CA");
+                              const leaveOnDate = leaveMap.get(dateKey);
+                              if (leaveOnDate && leaveOnDate.leave_type === "unpaid") {
+                                return null;
                               }
                               return (
                                 <button
