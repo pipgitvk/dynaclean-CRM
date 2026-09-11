@@ -198,7 +198,7 @@ import ProfileApprovalsCard from "@/components/ProfileApprovalsCard";
 import ScheduleVisitCard from "@/components/scheduleVisit/ScheduleVisitCard";
 import OverduePaymentCard from "@/components/OverduePaymentCard";
 import KeywordPerformanceQuickCard from "@/components/keywords/KeywordPerformanceQuickCard";
-import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText } from "lucide-react";
+import { Package, BarChart3, Upload, DollarSign, Calendar, Plane, FileText, ClipboardList, Wrench } from "lucide-react";
 
 // import UpcomingLeads from "@/components/Leads/UpcommingLeads";
 
@@ -398,12 +398,36 @@ export default async function UserDashboardPage() {
           <ScheduleVisitCard href="/admin-dashboard/schedule-visits" />
           <OverduePaymentCard />
           <KeywordPerformanceQuickCard />
- <a href="/admin-dashboard/stats" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-purple-500 min-h-[140px]">
+          <a href="/admin-dashboard/stats" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-purple-500 min-h-[140px]">
             <div className="flex flex-col h-full justify-between">
               <div className="flex items-center gap-2 mb-2">
                 <BarChart3 className="w-5 h-5 text-purple-500 shrink-0" />
                 <h2 className="text-sm font-bold text-black leading-tight">
                   System Performance
+                </h2>
+              </div>
+            </div>
+          </a>
+
+          {/* Sales Team Report */}
+          <a href="/admin-dashboard/today-reports?tab=sales" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-blue-500 min-h-[140px]">
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex items-center gap-2 mb-2">
+                <ClipboardList className="w-5 h-5 text-blue-500 shrink-0" />
+                <h2 className="text-sm font-bold text-black leading-tight">
+                  Sales Team Report
+                </h2>
+              </div>
+            </div>
+          </a>
+
+          {/* Service Team Report */}
+          <a href="/admin-dashboard/today-reports?tab=service" className="bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 border-teal-500 min-h-[140px]">
+            <div className="flex flex-col h-full justify-between">
+              <div className="flex items-center gap-2 mb-2">
+                <Wrench className="w-5 h-5 text-teal-500 shrink-0" />
+                <h2 className="text-sm font-bold text-black leading-tight">
+                  Service Team Report
                 </h2>
               </div>
             </div>
