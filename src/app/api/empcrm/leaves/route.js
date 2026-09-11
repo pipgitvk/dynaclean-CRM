@@ -476,25 +476,24 @@ export async function POST(request) {
         );
         const lunchTime = schedRows[0]?.break_lunch; // "HH:MM:SS"
 
-        if (lunchTime) {
-          const timeToMinutes = (t) => {
-            if (!t) return null;
-            const parts = String(t).split(":");
-            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
-          };
-          const lunchMin = timeToMinutes(lunchTime);
-          const startMin = timeToMinutes(start_time); // from form (if provided)
-          const endMin = timeToMinutes(end_time);
+        const timeToMinutes = (t) => {
+          if (!t) return null;
+          const parts = String(t).split(":");
+          return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        };
+        // Fallback lunch = 13:00 if schedule row missing or break_lunch not set
+        const lunchMin = lunchTime ? timeToMinutes(lunchTime) : 13 * 60;
+        const startMin = timeToMinutes(start_time); // from form (if provided)
+        const endMin = timeToMinutes(end_time);
 
-          if (startMin !== null && lunchMin !== null) {
-            // start_time is after or at lunch → 2nd half
-            resolvedHalfDayType = startMin >= lunchMin ? "2nd_half" : "1st_half";
-          } else if (endMin !== null && lunchMin !== null) {
-            // end_time is at or before lunch → 1st half
-            resolvedHalfDayType = endMin <= lunchMin ? "1st_half" : "2nd_half";
-          }
-          // If neither start_time nor end_time provided, keep whatever user sent
+        if (startMin !== null && lunchMin !== null) {
+          // start_time is after or at lunch → 2nd half
+          resolvedHalfDayType = startMin >= lunchMin ? "2nd_half" : "1st_half";
+        } else if (endMin !== null && lunchMin !== null) {
+          // end_time is at or before lunch → 1st half
+          resolvedHalfDayType = endMin <= lunchMin ? "1st_half" : "2nd_half";
         }
+        // If neither start_time nor end_time provided, keep whatever user sent
       } catch (schedErr) {
         console.error("Could not auto-detect half_day_type:", schedErr);
         // Non-fatal — fall back to whatever was sent by client

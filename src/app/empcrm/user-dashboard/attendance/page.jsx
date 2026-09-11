@@ -311,6 +311,24 @@ const AttendancePage = () => {
     setToDate("");
   };
 
+  // Helper: derive half_day_type from start_time / end_time using standard lunch break (13:00).
+  // Used when DB-stored half_day_type is missing/null.
+  const deriveHalfDayType = (startTime, endTime) => {
+    const toMin = (t) => {
+      if (!t) return null;
+      const s = String(t).trim();
+      const m = s.match(/^(\d{1,2}):(\d{2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+    const LUNCH_MIN = 13 * 60; // 13:00 = standard lunch reference
+    const startMin = toMin(startTime);
+    const endMin = toMin(endTime);
+    if (startMin !== null) return startMin >= LUNCH_MIN ? "2nd_half" : "1st_half";
+    if (endMin !== null) return endMin <= LUNCH_MIN ? "1st_half" : "2nd_half";
+    return null;
+  };
+
   // Generate a list of all dates from the first log to the current date (or date range if specified)
   const allDates = [];
 
@@ -358,10 +376,11 @@ const AttendancePage = () => {
     .forEach((leave) => {
       const fromDate = new Date(leave.from_date);
       const toDate = new Date(leave.to_date);
+      const derived = deriveHalfDayType(leave.start_time, leave.end_time);
       for (let d = new Date(fromDate); d <= toDate; d.setDate(d.getDate() + 1)) {
         halfDayLeaveMap.set(d.toLocaleDateString("en-CA"), {
           is_half_day: leave.is_half_day,
-          half_day_type: leave.half_day_type,
+          half_day_type: leave.half_day_type || derived,
           leave_type: leave.leave_type,
           reason: leave.reason,
         });
@@ -398,13 +417,15 @@ const AttendancePage = () => {
       // If no attendance logs → FULL day leave.
       const leaveIsHalfDay = approvedPaidLeave.is_half_day == 1 || approvedPaidLeave.leave_type === 'half-day';
       const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
+      const derivedType = deriveHalfDayType(approvedPaidLeave.start_time, approvedPaidLeave.end_time);
+      const finalHalfType = approvedPaidLeave.half_day_type || derivedType || (hasRealPunch ? "1st_half" : "1st_half");
       allDates.push({
         date: d.toISOString(),
         type: "paidleave",
         leaveType: "Paid",
         leaveReason: approvedPaidLeave.reason || null,
         is_half_day: treatAsHalfDay ? 1 : 0,
-        half_day_type: treatAsHalfDay ? (approvedPaidLeave.half_day_type || (hasRealPunch ? "1st_half" : "1st_half")) : null,
+        half_day_type: treatAsHalfDay ? finalHalfType : null,
         has_punch_on_leave: hasRealPunch ? 1 : 0,
       });
     } else if (hasRealPunch) {
@@ -434,6 +455,8 @@ const AttendancePage = () => {
         // No attendance logs → treat leave exactly as stored.
         // If logs existed, we'd be in hasRealPunch branch above.
         const leaveIsHalfDay = leaveInfo?.is_half_day == 1 || leaveInfo?.leave_type === 'half-day';
+        const derivedType = deriveHalfDayType(leaveInfo?.start_time, leaveInfo?.end_time);
+        const finalHalfType = leaveInfo?.half_day_type || derivedType;
         allDates.push({
           ...base,
           date: d.toISOString(),
@@ -441,7 +464,7 @@ const AttendancePage = () => {
           leaveType: leaveInfo?.leave_type || "Leave",
           leaveReason: leaveInfo?.reason || null,
           is_half_day: leaveIsHalfDay ? 1 : 0,
-          half_day_type: leaveIsHalfDay ? (leaveInfo?.half_day_type || null) : null,
+          half_day_type: leaveIsHalfDay ? finalHalfType : null,
           has_punch_on_leave: 0,
         });
       } else {
