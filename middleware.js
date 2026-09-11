@@ -140,6 +140,7 @@ export async function middleware(request) {
         "/admin-dashboard/credit-notes",
         "/admin-dashboard/ledger",
         "/admin-dashboard/bank-masters",
+        "/admin-dashboard/paid-leave-ledger",
       ];
       if (ACCOUNTANT_ADMIN_PREFIXES.some((p) => pathname.startsWith(p))) {
         if (isJwtAccountingRole(role) || role === "ADMIN") {
