@@ -1,32 +1,36 @@
-
-
+/**
+ * Returns a card background color based on how far away the follow-up is.
+ *
+ * @param {number|null} hours  Hours until follow-up (negative = overdue)
+ * @returns {string}  CSS rgb() color string
+ *
+ * Color logic:
+ *  🔴 Red         — overdue (hours < 0)
+ *  🟠 Light Orange — due within next 2 hours (0 <= hours <= 2)
+ *  🟢 Light Green  — 2–12 hours away
+ *  🔵 Light Sky Blue — more than 12 hours away
+ */
 export function getGradientColor(hours) {
-  // Softer, lighter shades instead of harsh primaries
-  const minColor = [255, 102, 102];   // Soft Red (instead of #FF0000)
-  const midColor = [255, 204, 102];   // Soft Orange (instead of #FFA500)
-  const maxColor = [102, 204, 153];   // Soft Green (instead of #008000)
-
-  if (hours === null) return `rgb(${midColor.join(", ")})`;
-  if (hours < -3) return `rgb(${minColor.join(", ")})`;
-
-  const normalize = (val, min, max) => (val - min) / (max - min);
-  const interpolate = (a, b, t) => a + t * (b - a);
-
-  let r, g, b;
-
-  if (hours < 0) {
-    // Interpolate between soft red and soft orange
-    const t = normalize(hours, -3, 0);
-    r = interpolate(minColor[0], midColor[0], t);
-    g = interpolate(minColor[1], midColor[1], t);
-    b = interpolate(minColor[2], midColor[2], t);
-  } else {
-    // Interpolate between soft orange and soft green
-    const t = normalize(hours, 0, 6);
-    r = interpolate(midColor[0], maxColor[0], t);
-    g = interpolate(midColor[1], maxColor[1], t);
-    b = interpolate(midColor[2], maxColor[2], t);
+  if (hours === null) {
+    // No follow-up date set → light orange as a neutral "needs attention" signal
+    return "rgb(255, 180, 100)";
   }
 
-  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+  if (hours < 0) {
+    // Overdue — Red
+    return "rgb(220, 53, 69)";
+  }
+
+  if (hours <= 2) {
+    // Due soon (within 2 hours) — Light Orange
+    return "rgb(255, 153, 51)";
+  }
+
+  if (hours <= 12) {
+    // Upcoming (2–12 hours) — Light Green
+    return "rgb(60, 179, 113)";
+  }
+
+  // Far upcoming (> 12 hours) — Light Sky Blue
+  return "rgb(100, 181, 246)";
 }
