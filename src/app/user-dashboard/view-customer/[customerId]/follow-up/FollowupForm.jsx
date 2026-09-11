@@ -655,6 +655,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
             <option value="Service">Service</option>
             <option value="CAMC">CAMC</option>
             <option value="Installation">Installation</option>
+            <option value="Sales">Sales</option>
+            <option value="Denied follow-up">Denied follow-up</option>
           </select>
         </div>
       )}
@@ -778,8 +780,8 @@ export default function FollowupForm({ customerId, userRole = "" }) {
         </div>
       )}
 
-      {/* Service Next Follow-up Date - Only for SERVICE SUPPORT */}
-      {isServiceSupport && (
+      {/* Service Next Follow-up Date - Only for SERVICE SUPPORT, hidden when purpose is Denied follow-up */}
+      {isServiceSupport && formData.purpose !== "Denied follow-up" && (
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Service Next Follow-up Date (IST)
