@@ -52,11 +52,25 @@ function combineDateAndTimeForDb(dateYmd, timeHHmm) {
   return `${dateYmd} ${hh}:${mm}:00`;
 }
 
+function toYmd(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function currentMonthRange() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: toYmd(first), to: toYmd(now) };
+}
+
 const AttendancePage = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const initialRange = currentMonthRange();
+  const [fromDate, setFromDate] = useState(initialRange.from);
+  const [toDate, setToDate] = useState(initialRange.to);
   const [filterStatus, setFilterStatus] = useState("all");
   const [selectedUser, setSelectedUser] = useState("all");
   /** Set only after clicking Search; drives summary + table */
@@ -259,8 +273,9 @@ const AttendancePage = () => {
 
   const handleShowAll = () => {
     setFilterStatus("all");
-    setFromDate("");
-    setToDate("");
+    const { from, to } = currentMonthRange();
+    setFromDate(from);
+    setToDate(to);
   };
 
   const handleSearch = () => {
@@ -548,18 +563,26 @@ const AttendancePage = () => {
 
   // Apply filters to the complete timeline
   const filteredLogs = fullTimeline.filter((log) => {
-    // Date range filter is already applied in date generation
+    // 1) Date range: fromDate (inclusive) to toDate (inclusive) based on calendar inputs
+    if (fromDate) {
+      const logYmd = toYmd(new Date(log.date));
+      if (logYmd < fromDate) return false;
+    }
+    if (toDate) {
+      const logYmd = toYmd(new Date(log.date));
+      if (logYmd > toDate) return false;
+    }
+
+    // 2) Status filter
     let matchesFilter = true;
 
     if (filterStatus === "late") {
-      // Show only RED late status (09:46-09:59 or 18:14), NOT grace period or half day
       const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
       const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
       matchesFilter =
         log.type === "present" &&
         (checkinStatus === 'late' || checkoutStatus === 'late');
     } else if (filterStatus === "onTime") {
-      // Show green on time AND orange grace period (NOT red late or yellow half day)
       const checkinStatus = getCheckinStatus(log.checkin_time, log.username);
       const checkoutStatus = getCheckoutStatus(log.checkout_time, log.username);
       matchesFilter =
@@ -569,7 +592,6 @@ const AttendancePage = () => {
         checkoutStatus !== 'late' &&
         checkoutStatus !== 'halfDay';
     } else if (filterStatus === "halfDay") {
-      // Show half-days considering grace period logic (first 3 grace days not counted)
       matchesFilter = log.type === "present" && isHalfDay(log);
     } else if (filterStatus === "all") {
       matchesFilter = true;
@@ -836,7 +858,7 @@ const AttendancePage = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleShowAll}
-                className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all" && !fromDate && !toDate
+                className={`px-4 py-2 rounded-md font-medium text-sm transition-colors duration-200 ${filterStatus === "all"
                   ? "bg-blue-600 text-white shadow-md"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
