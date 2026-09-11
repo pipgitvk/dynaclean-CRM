@@ -709,7 +709,8 @@ const allMenuItems = [
       {
         path: "/admin-dashboard/paid-leave-ledger",
         name: "Paid Leave Ledger",
-        roles: ["SUPERADMIN", "HR", "HR HEAD"],
+        accessKey: "paid-leave-ledger",
+        roles: ["SUPERADMIN", "HR", "HR HEAD", "ACCOUNTANT"],
         icon: "Calendar",
       },
     ],

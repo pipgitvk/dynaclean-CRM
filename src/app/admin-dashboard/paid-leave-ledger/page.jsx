@@ -36,22 +36,36 @@ export default function PaidLeaveLedger() {
   const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    // Check user role first
+    const normalizeRole = (r) => String(r || "").trim().replace(/\s+/g, " ").toUpperCase();
+
+    const isAccountingRole = (roleStr) => {
+      const k = normalizeRole(roleStr);
+      if (k === "ACCOUNTANT") return true;
+      return /\bACCOUNTANT\b/.test(k);
+    };
+
     const checkAccess = async () => {
       try {
         const res = await fetch("/api/me");
         const data = await res.json();
         const role = data?.userRole || data?.role || "";
         setUserRole(role);
-        
-        // Allow SUPERADMIN, HR roles, and ACCOUNTANT
-        const allowedRoles = ["SUPERADMIN", "HR HEAD", "HR", "HR Executive", "ACCOUNTANT"];
-        if (!allowedRoles.includes(role)) {
+        const roleNorm = normalizeRole(role);
+
+        const isHrRole =
+          roleNorm === "HR HEAD" ||
+          roleNorm === "HR" ||
+          roleNorm === "HR EXECUTIVE" ||
+          roleNorm === "JUNIOR HR EXECUTIVE" ||
+          roleNorm === "HR RECRUITER";
+
+        const superAdmin = roleNorm === "SUPERADMIN" || roleNorm === "DIRECTOR";
+
+        if (!superAdmin && !isHrRole && !isAccountingRole(role)) {
           setAccessDenied(true);
           return;
         }
 
-        // If access is allowed, fetch employees
         fetchEmployees();
       } catch (e) {
         console.error("Error checking user role:", e);
