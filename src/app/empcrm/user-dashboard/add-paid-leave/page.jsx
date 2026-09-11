@@ -26,7 +26,10 @@ export default function AddPaidLeavePage() {
   const [formData, setFormData] = useState({
     from_date: "",
     to_date: "",
-    reason: ""
+    reason: "",
+    has_time_range: false,
+    start_time: "",
+    end_time: ""
   });
 
   // Half-day leave form
@@ -34,7 +37,10 @@ export default function AddPaidLeavePage() {
   const [halfDayData, setHalfDayData] = useState({
     date: "",
     half_day_type: "1st_half",
-    reason: ""
+    reason: "",
+    has_time_range: false,
+    start_time: "",
+    end_time: ""
   });
 
   useEffect(() => {
@@ -96,26 +102,38 @@ export default function AddPaidLeavePage() {
       alert("Please fill in all fields");
       return;
     }
+    if (formData.has_time_range && (!formData.start_time || !formData.end_time)) {
+      alert("Please fill Start Time and End Time when time range is enabled");
+      return;
+    }
 
     try {
       setSubmitting(true);
+      const payload = {
+        username: selectedEmployee,
+        from_date: formData.from_date,
+        to_date: formData.to_date,
+        reason: formData.reason,
+        is_half_day: false,
+        has_time_range: formData.has_time_range,
+        start_time: formData.start_time,
+        end_time: formData.end_time
+      };
+      if (formData.has_time_range && formData.start_time && formData.end_time) {
+        payload.start_date_time = formData.from_date ? `${formData.from_date}T${formData.start_time}` : null;
+        payload.end_date_time   = formData.to_date   ? `${formData.to_date}T${formData.end_time}`     : null;
+      }
       const res = await fetch("/api/admin/hr-operations/paid-leaves", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: selectedEmployee,
-          from_date: formData.from_date,
-          to_date: formData.to_date,
-          reason: formData.reason,
-          is_half_day: false
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json();
       if (data.success) {
         alert("Paid leave request submitted for approval");
         setShowForm(false);
-        setFormData({ from_date: "", to_date: "", reason: "" });
+        setFormData({ from_date: "", to_date: "", reason: "", has_time_range: false, start_time: "", end_time: "" });
         fetchLeaves();
       } else {
         alert(data.error || "Failed to add leave");
@@ -134,27 +152,39 @@ export default function AddPaidLeavePage() {
       alert("Please fill in all fields");
       return;
     }
+    if (halfDayData.has_time_range && (!halfDayData.start_time || !halfDayData.end_time)) {
+      alert("Please fill Start Time and End Time when time range is enabled");
+      return;
+    }
 
     try {
       setSubmitting(true);
+      const payload = {
+        username: selectedEmployee,
+        from_date: halfDayData.date,
+        to_date: halfDayData.date,
+        reason: halfDayData.reason,
+        is_half_day: true,
+        half_day_type: halfDayData.half_day_type,
+        has_time_range: halfDayData.has_time_range,
+        start_time: halfDayData.start_time,
+        end_time: halfDayData.end_time
+      };
+      if (halfDayData.has_time_range && halfDayData.start_time && halfDayData.end_time && halfDayData.date) {
+        payload.start_date_time = `${halfDayData.date}T${halfDayData.start_time}`;
+        payload.end_date_time   = `${halfDayData.date}T${halfDayData.end_time}`;
+      }
       const res = await fetch("/api/admin/hr-operations/paid-leaves", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: selectedEmployee,
-          from_date: halfDayData.date,
-          to_date: halfDayData.date,
-          reason: halfDayData.reason,
-          is_half_day: true,
-          half_day_type: halfDayData.half_day_type
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json();
       if (data.success) {
         alert("Half-day paid leave request submitted for approval");
         setShowHalfDayForm(false);
-        setHalfDayData({ date: "", half_day_type: "1st_half", reason: "" });
+        setHalfDayData({ date: "", half_day_type: "1st_half", reason: "", has_time_range: false, start_time: "", end_time: "" });
         fetchLeaves();
       } else {
         alert(data.error || "Failed to add half-day leave");
@@ -341,6 +371,12 @@ export default function AddPaidLeavePage() {
                           {leave.half_day_type === "1st_half" ? "1st Half" : "2nd Half"}
                         </div>
                       )}
+                      {leave.start_time && leave.end_time && (
+                        <div className="text-gray-600 mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>{leave.start_time} — {leave.end_time}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-lg font-semibold text-gray-900">
@@ -404,6 +440,60 @@ export default function AddPaidLeavePage() {
                 </div>
               </div>
 
+              {/* Time Range Toggle + Start/End Time */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Specify Start & End Time</p>
+                    <p className="text-xs text-gray-500">Turn on if leave duration is within a specific window of the day</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.has_time_range}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          has_time_range: e.target.checked,
+                          ...(e.target.checked ? {} : { start_time: "", end_time: "" })
+                        })
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                {formData.has_time_range && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        From Date — Start Time <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.start_time}
+                        onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        To Date — End Time <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.end_time}
+                        onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {calculateTotalDays() > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-800">
@@ -431,7 +521,7 @@ export default function AddPaidLeavePage() {
                   type="button"
                   onClick={() => {
                     setShowForm(false);
-                    setFormData({ from_date: "", to_date: "", reason: "" });
+                    setFormData({ from_date: "", to_date: "", reason: "", has_time_range: false, start_time: "", end_time: "" });
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                   disabled={submitting}
@@ -514,6 +604,60 @@ export default function AddPaidLeavePage() {
                 />
               </div>
 
+              {/* Time Range Toggle + Start/End Time */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Specify Start & End Time</p>
+                    <p className="text-xs text-gray-500">Turn on if leave duration is within a specific window of the day</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={halfDayData.has_time_range}
+                      onChange={(e) =>
+                        setHalfDayData({
+                          ...halfDayData,
+                          has_time_range: e.target.checked,
+                          ...(e.target.checked ? {} : { start_time: "", end_time: "" })
+                        })
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                  </label>
+                </div>
+
+                {halfDayData.has_time_range && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Start Time <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={halfDayData.start_time}
+                        onChange={(e) => setHalfDayData({ ...halfDayData, start_time: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        End Time <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={halfDayData.end_time}
+                        onChange={(e) => setHalfDayData({ ...halfDayData, end_time: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Reason <span className="text-red-500">*</span>
@@ -539,7 +683,7 @@ export default function AddPaidLeavePage() {
                   type="button"
                   onClick={() => {
                     setShowHalfDayForm(false);
-                    setHalfDayData({ date: "", half_day_type: "1st_half", reason: "" });
+                    setHalfDayData({ date: "", half_day_type: "1st_half", reason: "", has_time_range: false, start_time: "", end_time: "" });
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                   disabled={submitting}

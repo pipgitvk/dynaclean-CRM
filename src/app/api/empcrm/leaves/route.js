@@ -25,15 +25,19 @@ export async function GET(request) {
     try {
       await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
     } catch (e) { /* ignore - already applied */ }
-    try {
-      await conn.execute(`UPDATE employee_leaves SET leave_type = 'half-day' WHERE is_half_day = 1 AND leave_type != 'half-day'`);
-    } catch (e) { /* ignore */ }
     // Auto-migration: Add acknowledgment columns if not exists
     try {
       await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_at timestamp NULL DEFAULT NULL COMMENT 'Acknowledgment timestamp (SuperAdmin/ReportingManager)'`);
     } catch (e) { /* ignore */ }
     try {
       await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
+    } catch (e) { /* ignore */ }
+    // Auto-migration: Add start_time and end_time columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN start_time time DEFAULT NULL COMMENT 'Leave start time of day (HH:MM)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN end_time time DEFAULT NULL COMMENT 'Leave end time of day (HH:MM)'`);
     } catch (e) { /* ignore */ }
 
     const referer = request.headers.get("referer") || "";
@@ -43,11 +47,11 @@ export async function GET(request) {
 
     // Reporting manager mode: user has reportees and is fetching for approval
     const reportees = await getReportees(session.username);
-    const isReportingManager = reportees.length > 0 && !isRealAdmin;
+    const isReportingManager = reportees.length > 0; // Also allow HR/HR HEAD to be RMs if they have reportees
     const requestingApprovalMode = mode === "approve" || referer.includes("leave-approvals");
 
-    // If requesting approval mode but no reportees, return empty
-    if (requestingApprovalMode && !isReportingManager) {
+    // If requesting approval mode but no reportees AND not an admin, return empty
+    if (requestingApprovalMode && !isReportingManager && !isRealAdmin) {
       return NextResponse.json({
         success: true,
         leaves: [],
@@ -71,7 +75,9 @@ export async function GET(request) {
     if (reportingManagerMode) {
       const placeholders = reportees.map(() => "?").join(", ");
       query += ` AND el.username IN (${placeholders})`;
-      query += ` AND el.created_by IS NULL`; // Exclude HR/admin-added leaves — those go to superadmin only
+      // Include self-submitted leaves only (employee submitted their own leave OR legacy NULL).
+      // HR/admin-added leaves on behalf (created_by != username OR created_by is HR username) go to superadmin only.
+      query += ` AND (el.created_by IS NULL OR el.created_by = el.username)`;
       params.push(...reportees);
     } else if (!isAdmin) {
       query += ` AND el.username = ?`;
@@ -128,7 +134,26 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { leave_type, from_date, to_date, reason, is_half_day, half_day_type } = body;
+    let { leave_type, from_date, to_date, reason, is_half_day, half_day_type, has_time_range, start_time, end_time, start_date_time, end_date_time } = body;
+
+    // If combined datetime strings provided (e.g. "2026-09-10T14:30"), prefer them.
+    // Unambiguous: time + date together. Extract date & time parts for DB columns.
+    if (start_date_time) {
+      const m = String(start_date_time).match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}:\d{2})/);
+      if (m) {
+        if (!from_date || has_time_range) from_date = m[1];
+        start_time = m[2];
+        has_time_range = true;
+      }
+    }
+    if (end_date_time) {
+      const m = String(end_date_time).match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}:\d{2})/);
+      if (m) {
+        if (!to_date || has_time_range) to_date = m[1];
+        end_time = m[2];
+        has_time_range = true;
+      }
+    }
 
     // Validation
     if (!leave_type || !from_date || !to_date || !reason) {
@@ -138,9 +163,27 @@ export async function POST(request) {
       );
     }
 
+    // If time range toggle is on, both times must be provided
+    if (has_time_range) {
+      if (!start_time || !end_time) {
+        return NextResponse.json(
+          { success: false, error: "Start time and End time are required when time range is enabled" },
+          { status: 400 }
+        );
+      }
+      if (start_time >= end_time) {
+        return NextResponse.json(
+          { success: false, error: "Start time must be before End time" },
+          { status: 400 }
+        );
+      }
+    } else {
+      // When toggle is off, keep times NULL in DB
+    }
+
     // Half-day specific validation
     const isHalfDay = !!is_half_day;
-    if (isHalfDay && !["1st_half", "2nd_half"].includes(half_day_type)) {
+    if (isHalfDay && half_day_type && !["1st_half", "2nd_half"].includes(half_day_type)) {
       return NextResponse.json(
         { success: false, error: "Invalid half_day_type. Must be '1st_half' or '2nd_half'" },
         { status: 400 }
@@ -153,15 +196,19 @@ export async function POST(request) {
     try {
       await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
     } catch (e) { /* ignore - already applied */ }
-    try {
-      await conn.execute(`UPDATE employee_leaves SET leave_type = 'half-day' WHERE is_half_day = 1 AND leave_type != 'half-day'`);
-    } catch (e) { /* ignore */ }
     // Auto-migration: Add acknowledgment columns if not exists
     try {
       await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_at timestamp NULL DEFAULT NULL COMMENT 'Acknowledgment timestamp (SuperAdmin/ReportingManager)'`);
     } catch (e) { /* ignore */ }
     try {
       await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
+    } catch (e) { /* ignore */ }
+    // Auto-migration: Add start_time and end_time columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN start_time time DEFAULT NULL COMMENT 'Leave start time of day (HH:MM)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN end_time time DEFAULT NULL COMMENT 'Leave end time of day (HH:MM)'`);
     } catch (e) { /* ignore */ }
 
     // Fetch user's profile to get leave policy, date of joining, and empId
@@ -236,19 +283,116 @@ export async function POST(request) {
       return Math.max(0, accrued);
     };
 
-    // Calculate total days (half-day = 0.5, stored as decimal)
+    // Calculate total days (half-day = 0.5 unless time range given, stored as decimal)
     let totalDays;
     if (isHalfDay) {
-      totalDays = 0.5;
+      // If time range provided for half-day, calculate actual fraction
+      if (has_time_range && start_time && end_time) {
+        try {
+          const [schedRows] = await conn.execute(
+            `SELECT checkin_time, checkout_time FROM employee_attendance_schedule WHERE username = ? LIMIT 1`,
+            [session.username]
+          );
+          const timeToMinutes = (t) => {
+            if (!t) return null;
+            const parts = String(t).split(":");
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+          };
+          const workStart = timeToMinutes(schedRows[0]?.checkin_time) ?? 9 * 60;
+          const workEnd   = timeToMinutes(schedRows[0]?.checkout_time) ?? 18 * 60;
+          const workDayMinutes = workEnd - workStart;
+          const fromDate = new Date(from_date);
+          const toDate   = new Date(to_date);
+          const dateDiff = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
+          const leaveStartMin = timeToMinutes(start_time);
+          const leaveEndMin   = timeToMinutes(end_time);
+
+          if (leaveStartMin !== null && leaveEndMin !== null && workDayMinutes > 0) {
+            let coveredMinutes;
+            if (dateDiff === 1) {
+              coveredMinutes = Math.max(0, Math.min(leaveEndMin, workEnd) - Math.max(leaveStartMin, workStart));
+            } else {
+              const firstDayMin = Math.max(0, workEnd - Math.max(leaveStartMin, workStart));
+              const lastDayMin  = Math.max(0, Math.min(leaveEndMin, workEnd) - workStart);
+              const middleDays  = dateDiff - 2;
+              coveredMinutes = firstDayMin + lastDayMin + middleDays * workDayMinutes;
+            }
+            totalDays = parseFloat((coveredMinutes / workDayMinutes).toFixed(1));
+            totalDays = Math.max(0.5, Math.min(totalDays, dateDiff));
+          } else {
+            totalDays = 0.5;
+          }
+        } catch {
+          totalDays = 0.5;
+        }
+      } else {
+        totalDays = 0.5;
+      }
     } else {
       const fromDate = new Date(from_date);
       const toDate = new Date(to_date);
-      totalDays = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
-      if (totalDays <= 0) {
+      const dateDiff = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
+      if (dateDiff <= 0) {
         return NextResponse.json(
           { success: false, error: "Invalid date range" },
           { status: 400 }
         );
+      }
+
+      // If start_time and end_time are provided, adjust total_days:
+      // - start_time belongs to from_date (leave starts mid-day)
+      // - end_time belongs to to_date (leave ends mid-day)
+      // We subtract the fraction of the first day before start_time
+      // and the fraction of the last day after end_time,
+      // based on a standard 9-hour working day (09:00 - 18:00 = 540 min).
+      if (has_time_range && start_time && end_time) {
+        try {
+          // Fetch employee's schedule for accurate work window
+          const [schedRows] = await conn.execute(
+            `SELECT checkin_time, checkout_time FROM employee_attendance_schedule WHERE username = ? LIMIT 1`,
+            [session.username]
+          );
+          const timeToMinutes = (t) => {
+            if (!t) return null;
+            const parts = String(t).split(":");
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+          };
+
+          // Work window: use schedule if available, else default 9:00 - 18:00
+          const workStart = timeToMinutes(schedRows[0]?.checkin_time) ?? 9 * 60;   // 540
+          const workEnd   = timeToMinutes(schedRows[0]?.checkout_time) ?? 18 * 60; // 1080
+          const workDayMinutes = workEnd - workStart; // e.g. 540 min
+
+          const leaveStartMin = timeToMinutes(start_time); // start_time on from_date
+          const leaveEndMin   = timeToMinutes(end_time);   // end_time on to_date
+
+          if (leaveStartMin !== null && leaveEndMin !== null && workDayMinutes > 0) {
+            if (dateDiff === 1) {
+              // Same day: fraction = (leaveEnd - leaveStart) / workDay
+              const coveredMin = Math.max(0, Math.min(leaveEndMin, workEnd) - Math.max(leaveStartMin, workStart));
+              totalDays = parseFloat((coveredMin / workDayMinutes).toFixed(1));
+            } else {
+              // Multi-day:
+              // First day: from leaveStart to workEnd
+              const firstDayMin  = Math.max(0, workEnd - Math.max(leaveStartMin, workStart));
+              // Last day:  from workStart to leaveEnd
+              const lastDayMin   = Math.max(0, Math.min(leaveEndMin, workEnd) - workStart);
+              // Middle full days
+              const middleDays   = dateDiff - 2;
+              const totalMinutes = firstDayMin + lastDayMin + middleDays * workDayMinutes;
+              totalDays = parseFloat((totalMinutes / workDayMinutes).toFixed(1));
+            }
+            // Safety: must be at least 0.5 and at most dateDiff
+            totalDays = Math.max(0.5, Math.min(totalDays, dateDiff));
+          } else {
+            totalDays = dateDiff;
+          }
+        } catch {
+          // Non-fatal: fall back to date diff
+          totalDays = dateDiff;
+        }
+      } else {
+        totalDays = dateDiff;
       }
     }
 
@@ -322,12 +466,51 @@ export async function POST(request) {
       }
     }
 
+    // Auto-detect half_day_type from start_time vs employee's lunch break time
+    let resolvedHalfDayType = half_day_type || null;
+    if (isHalfDay) {
+      try {
+        const [schedRows] = await conn.execute(
+          `SELECT break_lunch FROM employee_attendance_schedule WHERE username = ? LIMIT 1`,
+          [session.username]
+        );
+        const lunchTime = schedRows[0]?.break_lunch; // "HH:MM:SS"
+
+        if (lunchTime) {
+          const timeToMinutes = (t) => {
+            if (!t) return null;
+            const parts = String(t).split(":");
+            return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+          };
+          const lunchMin = timeToMinutes(lunchTime);
+          const startMin = timeToMinutes(start_time); // from form (if provided)
+          const endMin = timeToMinutes(end_time);
+
+          if (startMin !== null && lunchMin !== null) {
+            // start_time is after or at lunch → 2nd half
+            resolvedHalfDayType = startMin >= lunchMin ? "2nd_half" : "1st_half";
+          } else if (endMin !== null && lunchMin !== null) {
+            // end_time is at or before lunch → 1st half
+            resolvedHalfDayType = endMin <= lunchMin ? "1st_half" : "2nd_half";
+          }
+          // If neither start_time nor end_time provided, keep whatever user sent
+        }
+      } catch (schedErr) {
+        console.error("Could not auto-detect half_day_type:", schedErr);
+        // Non-fatal — fall back to whatever was sent by client
+      }
+    }
+
     // Insert leave application
-    const finalLeaveType = isHalfDay ? 'half-day' : leave_type;
+    // leave_type stays as user selected (paid/sick/casual/unpaid)
+    // is_half_day flag separately indicates if it's a half-day duration
+    const finalLeaveType = leave_type;
+    const finalStartTime = has_time_range ? start_time : null;
+    const finalEndTime = has_time_range ? end_time : null;
     const [result] = await conn.execute(
       `INSERT INTO employee_leaves 
-       (username, empId, full_name, leave_type, from_date, to_date, total_days, is_half_day, half_day_type, reason, created_by) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (username, empId, full_name, leave_type, from_date, to_date, start_time, end_time, total_days, is_half_day, half_day_type, reason, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         session.username,
         empId,
@@ -335,9 +518,11 @@ export async function POST(request) {
         finalLeaveType,
         from_date,
         to_date,
+        finalStartTime,
+        finalEndTime,
         totalDays,
         isHalfDay ? 1 : 0,
-        isHalfDay ? half_day_type : null,
+        isHalfDay ? resolvedHalfDayType : null,
         reason,
         session.username
       ]
@@ -395,6 +580,7 @@ export async function POST(request) {
                   <td style="padding: 12px; border: 1px solid #e5e7eb; font-weight: bold;">Duration</td>
                   <td style="padding: 12px; border: 1px solid #e5e7eb;">
                     ${new Date(from_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}${!isHalfDay ? ` To ${new Date(to_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ""}
+                    ${finalStartTime && finalEndTime ? `<br><span style="color:#111827; font-weight:600;">Time:</span> ${finalStartTime} — ${finalEndTime}` : ""}
                     <br>
                     <span style="color: #666; font-size: 0.9em;">(${isHalfDay ? "0.5 days" : `${totalDays} days`})</span>
                   </td>
@@ -487,15 +673,19 @@ export async function PATCH(request) {
     try {
       await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
     } catch (e) { /* ignore - already applied */ }
-    try {
-      await conn.execute(`UPDATE employee_leaves SET leave_type = 'half-day' WHERE is_half_day = 1 AND leave_type != 'half-day'`);
-    } catch (e) { /* ignore */ }
     // Auto-migration: Add acknowledgment columns if not exists
     try {
       await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_at timestamp NULL DEFAULT NULL COMMENT 'Acknowledgment timestamp (SuperAdmin/ReportingManager)'`);
     } catch (e) { /* ignore */ }
     try {
       await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN acknowledged_by varchar(255) DEFAULT NULL COMMENT 'Username who acknowledged the leave'`);
+    } catch (e) { /* ignore */ }
+    // Auto-migration: Add start_time and end_time columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN start_time time DEFAULT NULL COMMENT 'Leave start time of day (HH:MM)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN end_time time DEFAULT NULL COMMENT 'Leave end time of day (HH:MM)'`);
     } catch (e) { /* ignore */ }
     // Auto-migration: Add acknowledgement_remark column if not exists
     try {
@@ -562,19 +752,191 @@ export async function PATCH(request) {
       });
     }
 
-    // Update leave status (approve / reject)
+    // ─── Smart leave day calculation on approval ────────────────────────────────
+    // When approving a paid / sick / casual / half-day leave that has start_time / end_time,
+    // recalculate total_days (0.5 or original) based on:
+    //   1. start_time / end_time vs employee's lunch break window
+    //   2. actual check-in in attendance_logs vs half_day_checkin_time
+    // If leave_type is paid and balance is insufficient → convert to unpaid.
+    let overrideLeaveType = leave.leave_type;
+    let overrideTotalDays = leave.is_half_day == 1 ? 0.5 : (Number(leave.total_days) || 1);
+    let overrideIsHalfDay = leave.is_half_day == 1 ? 1 : 0;
+
+    const isApprovedNonUnpaid =
+      status === "approved" &&
+      ["paid", "sick", "casual", "half-day"].includes(leave.leave_type);
+
+    if (isApprovedNonUnpaid) {
+      try {
+        // 1. Calculate date span — multi-day (>1 day) leaves use POST-calculated total_days as-is
+        //    because start_time/end_time fractions for first/last day are already handled at create time.
+        const fromD = new Date(leave.from_date);
+        const toD = new Date(leave.to_date);
+        const dateDiff = Math.ceil((toD - fromD) / (1000 * 60 * 60 * 24)) + 1;
+        const isSingleDay = dateDiff === 1;
+
+        // 2. Fetch employee attendance schedule for lunch break info
+        const [schedRows] = await conn.execute(
+          `SELECT break_lunch, lunch_duration_minutes, half_day_checkin_time
+           FROM employee_attendance_schedule
+           WHERE username = ? LIMIT 1`,
+          [leave.username]
+        );
+        const sched = schedRows[0] || null;
+
+        // Helper: convert "HH:MM:SS" or "HH:MM" TIME string → total minutes from midnight
+        const timeToMinutes = (t) => {
+          if (!t) return null;
+          const parts = String(t).split(":");
+          return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+        };
+
+        let computedDays = overrideTotalDays; // start with original (POST-time calculated value)
+
+        // Smart heuristics (time-based + checkin-based) ONLY apply to single-day full leaves.
+        // Multi-day leaves already have correct total_days from POST creation (first/last day fractions).
+        if (isSingleDay && sched) {
+          const lunchStartMin = timeToMinutes(sched.break_lunch);
+          const lunchDuration = Number(sched.lunch_duration_minutes) || 30;
+          const lunchEndMin = lunchStartMin !== null ? lunchStartMin + lunchDuration : null;
+          const halfDayCheckinMin = timeToMinutes(sched.half_day_checkin_time);
+
+          // ── A. start_time / end_time based calculation ──
+          const startMin = timeToMinutes(leave.start_time);
+          const endMin = timeToMinutes(leave.end_time);
+
+          if (lunchStartMin !== null && (startMin !== null || endMin !== null)) {
+            let isHalfByTime = false;
+
+            // If start_time is AFTER lunch start → 2nd-half leave → half day
+            if (startMin !== null && startMin > lunchStartMin) {
+              isHalfByTime = true;
+            }
+            // If end_time is AT OR BEFORE lunch start → 1st-half leave → half day
+            if (endMin !== null && endMin <= lunchStartMin) {
+              isHalfByTime = true;
+            }
+            // If start_time is AFTER lunch end AND end_time covers only post-lunch → half day
+            if (startMin !== null && lunchEndMin !== null && startMin >= lunchEndMin) {
+              isHalfByTime = true;
+            }
+
+            if (isHalfByTime) {
+              computedDays = 0.5;
+            }
+          }
+
+          // ── B. Attendance check-in based calculation ──
+          // Check attendance_logs for the leave's from_date (only single-day, so this IS the leave day)
+          if (halfDayCheckinMin !== null) {
+            const leaveDate = leave.from_date instanceof Date
+              ? leave.from_date.toISOString().slice(0, 10)
+              : String(leave.from_date).slice(0, 10);
+
+            const startMin = timeToMinutes(leave.start_time);
+            const endMin = timeToMinutes(leave.end_time);
+
+            const [logRows] = await conn.execute(
+              `SELECT checkin_time FROM attendance_logs
+               WHERE username = ? AND DATE(checkin_time) = ? LIMIT 1`,
+              [leave.username, leaveDate]
+            );
+
+            if (logRows.length > 0 && logRows[0].checkin_time) {
+              const checkinDate = new Date(logRows[0].checkin_time);
+              const checkinMin = checkinDate.getHours() * 60 + checkinDate.getMinutes();
+
+              // If employee checked in at or after half_day_checkin_time → they worked half day
+              if (checkinMin >= halfDayCheckinMin) {
+                computedDays = 0.5;
+              }
+              // If checked in well before half_day_checkin_time → full day (override time-based half)
+              else if (startMin === null && endMin === null) {
+                // No start/end time provided; use only checkin signal
+                computedDays = 1;
+              }
+            }
+          }
+        }
+
+        // Clamp to at most the original requested days
+        computedDays = Math.min(computedDays, overrideTotalDays);
+        overrideIsHalfDay = computedDays < 1 ? 1 : 0;
+
+        // ── C. For paid leave: check balance ──
+        if (leave.leave_type === "paid") {
+          // Get accrual start date from employee_profiles
+          const [profRows] = await conn.execute(
+            `SELECT leave_policy FROM employee_profiles WHERE username = ? LIMIT 1`,
+            [leave.username]
+          );
+          const leavePolicy = profRows[0]?.leave_policy
+            ? (typeof profRows[0].leave_policy === "string"
+                ? JSON.parse(profRows[0].leave_policy)
+                : profRows[0].leave_policy)
+            : null;
+
+          const accrualStartDate = leavePolicy?.accrual_start_date || null;
+          const paidPerMonth = Number(leavePolicy?.paid_leaves_per_month) || 1.5;
+
+          let accrued = 0;
+          if (accrualStartDate) {
+            const start = new Date(accrualStartDate);
+            const now = new Date();
+            // Count completed months from accrual start up to now
+            const monthsElapsed =
+              (now.getFullYear() - start.getFullYear()) * 12 +
+              (now.getMonth() - start.getMonth());
+            accrued = Math.max(0, monthsElapsed) * paidPerMonth;
+          }
+
+          // Sum all approved paid leave days (excluding this leave)
+          const [usedRows] = await conn.execute(
+            `SELECT COALESCE(SUM(total_days), 0) AS used
+             FROM employee_leaves
+             WHERE username = ? AND leave_type = 'paid' AND status = 'approved' AND id != ?`,
+            [leave.username, leaveId]
+          );
+          const usedDays = Number(usedRows[0]?.used) || 0;
+          const balance = accrued - usedDays;
+
+          if (balance < computedDays) {
+            // Not enough paid leave → convert to unpaid
+            overrideLeaveType = "unpaid";
+          }
+        }
+
+        overrideTotalDays = computedDays;
+      } catch (smartErr) {
+        console.error("Smart leave day calculation failed (non-fatal):", smartErr);
+        // Fall back to original values — don't block approval
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    // Update leave status (approve / reject), with smart-calculated total_days / leave_type
     await conn.execute(
       `UPDATE employee_leaves 
-       SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?
+       SET status = ?, reviewed_by = ?, reviewed_at = NOW(), rejection_reason = ?,
+           total_days = ?, leave_type = ?, is_half_day = ?
        WHERE id = ?`,
-      [status, session.username, rejection_reason || null, leaveId]
+      [status, session.username, rejection_reason || null,
+       status === "approved" ? overrideTotalDays : (Number(leave.total_days) || 1),
+       status === "approved" ? overrideLeaveType : leave.leave_type,
+       status === "approved" ? overrideIsHalfDay : (leave.is_half_day == 1 ? 1 : 0),
+       leaveId]
     );
 
-    // If approving unpaid leave (full-day only), create salary deduction based on 26-day divisor
-    if (status === "approved" && leave?.leave_type === "unpaid" && !(leave?.is_half_day == 1)) {
+    // If approving unpaid leave (full-day or half-day that was converted), create salary deduction
+    // Use the final resolved values (overrideLeaveType / overrideTotalDays / overrideIsHalfDay)
+    const finalLeaveType = status === "approved" ? overrideLeaveType : leave.leave_type;
+    const finalTotalDays = status === "approved" ? overrideTotalDays : (Number(leave.total_days) || 1);
+    const finalIsHalfDay = status === "approved" ? overrideIsHalfDay : (leave.is_half_day == 1 ? 1 : 0);
+
+    if (status === "approved" && finalLeaveType === "unpaid") {
       try {
         const username = leave.username;
-        const totalDays = Number(leave.total_days || 0);
+        const totalDays = finalTotalDays; // use smart-calculated days (may be 0.5 for half-day)
         if (username && totalDays > 0) {
           // Fetch active salary structure
           const [structRows] = await conn.execute(
@@ -629,7 +991,7 @@ export async function PATCH(request) {
                 `INSERT INTO employee_salary_deductions 
                  (username, deduction_type_id, amount, percentage, effective_from, effective_to, reason, created_by)
                  VALUES (?, ?, ?, NULL, ?, ?, ?, ?)`,
-                [username, deductionTypeId, amount, effFrom, effTo, `Unpaid Leave: ${totalDays} day(s)`, session.username]
+                [username, deductionTypeId, amount, effFrom, effTo, `Unpaid Leave: ${finalTotalDays} day(s)`, session.username]
               );
             }
           }

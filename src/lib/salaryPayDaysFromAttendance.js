@@ -187,12 +187,14 @@ export function computeSalaryPayDaysForUser(p) {
 
   const leaveMap = buildLeaveDateMapForUser(leavesAll, username);
 
-  // Paid leave map (non-half-day) — overrides punch, same logic as attendance page
+  // Paid leave map — ALL paid leaves, both full-day and half-day.
+  // Per-date we store the full leave record so the day loop can decide:
+  //   - Full-day leave (DB is_half_day = 0 AND no real punch) → 1.0 credit, Leaves card
+  //   - Half-day leave (DB is_half_day = 1 OR real punch exists on leave day) → 0.5 credit, Half-Days card
   const paidLeaveMap = new Map();
   for (const leave of leavesAll || []) {
     if (String(leave.username ?? "").trim().toLowerCase() !== String(username ?? "").trim().toLowerCase()) continue;
     if (leave.leave_type !== 'paid') continue;
-    if (leave.is_half_day == 1 || leave.is_half_day === true) continue;
     const fromD = new Date(leave.from_date);
     const toD = new Date(leave.to_date);
     for (let x = new Date(fromD); x <= toD; x.setDate(x.getDate() + 1)) {
@@ -259,9 +261,20 @@ export function computeSalaryPayDaysForUser(p) {
 
     const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
     if (paidLeaveMap.has(dateString)) {
-      // Paid leave overrides punch — count as paid leave, not present
-      paid_leave++;
-      weekdayPayCredits += 1;
+      // PAID LEAVE DAY
+      //  — treat as HALF-DAY when DB says half-day OR employee actually punched in on the leave day
+      //    (means they worked half, took leave half).
+      //  — Otherwise FULL leave day.
+      const leaveRec = paidLeaveMap.get(dateString);
+      const dbHalf = leaveRec?.is_half_day == 1 || leaveRec?.leave_type === 'half-day';
+      const treatAsHalfDay = hasRealPunch || dbHalf;
+      if (treatAsHalfDay) {
+        half_day++;
+        weekdayPayCredits += 0.5;
+      } else {
+        paid_leave++;
+        weekdayPayCredits += 1;
+      }
       continue;
     }
     if (existingLog && hasRealPunch) {
@@ -296,11 +309,21 @@ export function computeSalaryPayDaysForUser(p) {
       continue;
     }
     if (isOnLeave) {
+      // Generic (non-paid or other-type) approved leave day.
+      //  — unpaid leave: LOP deduction only
+      //  — paid-type leave (sick/casual etc): use same half-vs-full rules as paid leaves above
       if (leaveType === 'unpaid') {
         lop++;
       } else {
-        paid_leave++;
-        weekdayPayCredits += 1;
+        const dbHalf = (leaveType === 'half-day');
+        const treatAsHalfDay = hasRealPunch || dbHalf;
+        if (treatAsHalfDay) {
+          half_day++;
+          weekdayPayCredits += 0.5;
+        } else {
+          paid_leave++;
+          weekdayPayCredits += 1;
+        }
       }
       continue;
     }

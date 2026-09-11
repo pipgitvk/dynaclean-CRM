@@ -428,14 +428,21 @@ const AttendancePage = () => {
       const hasRealPunch =
         existingLog && rowHasMeaningfulCheckinOrCheckout(existingLog);
 
-      // If paid leave exists for this date → always show as full-width paid leave row (no timing)
+      // If paid leave exists for this date — display logic:
+      //   If attendance punch logs exist → Half-Day Leave (worked half-day + leave half).
+      //   No punches → Full leave as usual.
       if (approvedPaidLeave) {
+        const leaveIsHalfDay = approvedPaidLeave.is_half_day == 1 || approvedPaidLeave.leave_type === 'half-day';
+        const treatAsHalfDay = hasRealPunch || leaveIsHalfDay;
         allDates.push({
           username: existingLog?.username || user,
           date: d.toISOString(),
           type: "paidleave",
           leaveType: "Paid",
           leaveReason: approvedPaidLeave.reason || null,
+          is_half_day: treatAsHalfDay ? 1 : 0,
+          half_day_type: treatAsHalfDay ? (approvedPaidLeave.half_day_type || (hasRealPunch ? "1st_half" : "1st_half")) : null,
+          has_punch_on_leave: hasRealPunch ? 1 : 0,
         });
       } else if (hasRealPunch) {
         allDates.push({ ...existingLog, type: "present", workedSunday: isWeekend, approvedHalfDay });
@@ -475,12 +482,16 @@ const AttendancePage = () => {
         } else if (isOnLeave) {
           const leaveInfo = leaveMap.get(dateString);
           const isUnpaid = leaveInfo?.leave_type === "unpaid";
+          const leaveIsHalfDay = leaveInfo?.is_half_day == 1 || leaveInfo?.leave_type === 'half-day';
           allDates.push({
             ...base,
             date: d.toISOString(),
             type: isUnpaid ? "absent" : "leave",
             leaveType: leaveInfo?.leave_type || "Leave",
             leaveReason: leaveInfo?.reason || null,
+            is_half_day: leaveIsHalfDay ? 1 : 0,
+            half_day_type: leaveIsHalfDay ? (leaveInfo?.half_day_type || null) : null,
+            has_punch_on_leave: 0,
           });
         } else {
           allDates.push({
@@ -553,7 +564,16 @@ const AttendancePage = () => {
   const summary = chronologicallySortedLogs.reduce(
     (acc, log) => {
       if (log.type === "absent") acc.absents++;
-      if (log.type === "leave" || log.type === "paidleave") acc.leaves++;
+      // Only FULL-DAY leaves go into the "Leaves" summary card.
+      // Half-day leave rows (DB half-day or punch-in present on leave date)
+      // count toward the separate "Half-Days" summary card instead.
+      if (log.type === "leave" || log.type === "paidleave") {
+        if (log.is_half_day == 1) {
+          acc.halfDays++;
+        } else {
+          acc.leaves++;
+        }
+      }
       if (log.type === "holiday") acc.holidays++;
       if (log.type === "sunday") acc.sundays++;
       if (log.type === "present") {
@@ -565,6 +585,7 @@ const AttendancePage = () => {
         }
         const { isHalfDay, graceUsed } = isHalfDayWithGrace(log, rulesFor(username), acc.graceCounters[username]);
         acc.graceCounters[username] = graceUsed;
+        // Attendance-based half-day (late punch / etc) — combine with leave-based half-days.
         if (isHalfDay) acc.halfDays++;
         if (isLateDaySummary(log, rulesFor(log.username))) {
           acc.lateDays++;
@@ -1063,13 +1084,33 @@ const AttendancePage = () => {
                     </>
                   ) : (
                     <div className="text-center py-4">
-                      <p className="text-lg font-bold">
-                        {log.type === "absent" ? "Absent" : log.type === "leave" || log.type === "paidleave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
-                      </p>
-                      {log.leaveType && (
+                      {(log.type === "leave" || log.type === "paidleave") ? (
+                        <>
+                          <p className={`text-lg font-bold ${log.is_half_day == 1 ? "text-orange-600" : ""}`}>
+                            {log.is_half_day == 1 ? "Half Day" : "Leave"}
+                          </p>
+                          {log.is_half_day == 1 && (
+                            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                              <Sun className="w-3 h-3" />
+                              {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
+                            </span>
+                          )}
+                          {log.leaveType && (
+                            <p className="text-sm text-gray-600 mt-2 capitalize">{log.leaveType} Leave</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-lg font-bold">
+                          {log.type === "absent" ? "Absent" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                        </p>
+                      )}
+                      {!(log.type === "leave" || log.type === "paidleave") && log.leaveType && (
                         <p className="text-sm text-gray-600 mt-1 capitalize">{log.leaveType} Leave</p>
                       )}
-                      {log.leaveReason && (
+                      {(log.type === "leave" || log.type === "paidleave") && log.leaveReason && (
+                        <p className="text-xs text-gray-500 mt-2">{log.leaveReason}</p>
+                      )}
+                      {!(log.type === "leave" || log.type === "paidleave") && log.leaveReason && (
                         <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>
                       )}
                       {log.holidayTitle && log.holidayTitle !== "Weekend" && log.holidayTitle !== "Sunday" && (
@@ -1343,10 +1384,26 @@ const AttendancePage = () => {
                             }`}
                         >
                           <p className="font-bold text-lg">
-                            {log.type === "absent" ? "Absent" : log.type === "leave" ? "Leave" : log.type === "paidleave" ? "Leave" : log.type === "sunday" ? "Sunday" : "Holiday"}
+                            {log.type === "absent"
+                              ? "Absent"
+                              : (log.type === "leave" || log.type === "paidleave")
+                                ? log.is_half_day == 1
+                                  ? <span className="text-orange-600">Half Day</span>
+                                  : "Leave"
+                                : log.type === "sunday"
+                                  ? "Sunday"
+                                  : "Holiday"}
                           </p>
+                          {(log.type === "leave" || log.type === "paidleave") && log.is_half_day == 1 && (
+                            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                              <Sun className="w-3 h-3" />
+                              {log.half_day_type === "2nd_half" ? "2nd Half" : "1st Half"}
+                            </span>
+                          )}
                           {log.leaveType && (
-                            <p className="text-sm mt-1 capitalize">{log.leaveType} Leave</p>
+                            <p className={`text-sm capitalize ${log.is_half_day == 1 ? "mt-2 text-gray-600" : "mt-1"}`}>
+                              {log.leaveType} Leave
+                            </p>
                           )}
                           {log.leaveReason && (
                             <p className="text-xs text-gray-500 mt-1">{log.leaveReason}</p>

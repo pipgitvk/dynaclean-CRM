@@ -25,13 +25,46 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { username, from_date, to_date, reason, is_half_day = false, half_day_type = null } = body;
+    let { username, from_date, to_date, reason, is_half_day = false, half_day_type = null, has_time_range = false, start_time = null, end_time = null, start_date_time, end_date_time } = body;
+
+    // If combined datetime strings provided (e.g. "2026-09-10T14:30"), prefer them.
+    if (start_date_time) {
+      const m = String(start_date_time).match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}:\d{2})/);
+      if (m) {
+        if (!from_date || has_time_range) from_date = m[1];
+        start_time = m[2];
+        has_time_range = true;
+      }
+    }
+    if (end_date_time) {
+      const m = String(end_date_time).match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}:\d{2})/);
+      if (m) {
+        if (!to_date || has_time_range) to_date = m[1];
+        end_time = m[2];
+        has_time_range = true;
+      }
+    }
 
     if (!username || !from_date || !to_date || !reason) {
       return NextResponse.json(
         { success: false, error: "Employee, dates, and reason are required" },
         { status: 400 }
       );
+    }
+
+    if (has_time_range) {
+      if (!start_time || !end_time) {
+        return NextResponse.json(
+          { success: false, error: "Start time and End time are required when time range is enabled" },
+          { status: 400 }
+        );
+      }
+      if (start_time >= end_time) {
+        return NextResponse.json(
+          { success: false, error: "Start time must be before End time" },
+          { status: 400 }
+        );
+      }
     }
 
     const conn = await getDbConnection();
@@ -44,6 +77,14 @@ export async function POST(request) {
     // Auto-migration: Ensure half-day enum value exists
     try {
       await conn.execute(`ALTER TABLE employee_leaves MODIFY COLUMN leave_type enum('sick','paid','casual','unpaid','half-day') NOT NULL`);
+    } catch (e) { /* ignore */ }
+
+    // Auto-migration: Add start_time and end_time columns if not exists
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN start_time time DEFAULT NULL COMMENT 'Leave start time of day (HH:MM)'`);
+    } catch (e) { /* ignore */ }
+    try {
+      await conn.execute(`ALTER TABLE employee_leaves ADD COLUMN end_time time DEFAULT NULL COMMENT 'Leave end time of day (HH:MM)'`);
     } catch (e) { /* ignore */ }
 
     // Fetch employee to verify existence and get empId
@@ -67,18 +108,23 @@ export async function POST(request) {
       totalDays = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
     }
 
+    const finalStartTime = has_time_range ? start_time : null;
+    const finalEndTime = has_time_range ? end_time : null;
+
     // Insert leave record with created_by set to current user
     // Status is set to 'pending' - needs superadmin approval
     const [insertResult] = await conn.execute(
       `INSERT INTO employee_leaves 
-       (empId, username, leave_type, from_date, to_date, total_days, reason, status, is_half_day, half_day_type, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (empId, username, leave_type, from_date, to_date, start_time, end_time, total_days, reason, status, is_half_day, half_day_type, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         empId,
         username,
         'paid',
         from_date,
         to_date,
+        finalStartTime,
+        finalEndTime,
         totalDays,
         reason,
         'pending',
@@ -100,6 +146,8 @@ export async function POST(request) {
         leave_type: 'paid',
         from_date,
         to_date,
+        start_time: finalStartTime,
+        end_time: finalEndTime,
         total_days: totalDays,
         reason,
         status: 'pending',

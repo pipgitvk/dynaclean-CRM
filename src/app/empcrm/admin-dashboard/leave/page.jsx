@@ -84,7 +84,7 @@ export default function AdminLeaveManagement() {
 
   useEffect(() => {
     applyFilters();
-  }, [leaves, statusFilter, searchTerm]);
+  }, [leaves, statusFilter, searchTerm, isSuperAdmin]);
 
   const fetchLeaves = async () => {
     try {
@@ -160,6 +160,17 @@ export default function AdminLeaveManagement() {
 
   const applyFilters = () => {
     let filtered = [...leaves];
+
+    // Filter by created_by: If created_by != username, only SUPERADMIN can see
+    // If created_by == username or NULL, HR can see (employee submitted their own leave)
+    filtered = filtered.filter(leave => {
+      if (isSuperAdmin) {
+        // SUPERADMIN sees everything
+        return true;
+      }
+      // HR/others: only see leaves where created_by == username (self-submitted) or NULL (legacy)
+      return leave.created_by == null || leave.created_by === leave.username;
+    });
 
     // Status filter
     if (statusFilter !== "all") {
@@ -562,6 +573,12 @@ export default function AdminLeaveManagement() {
                       {!leave.is_half_day && (
                         <div className="text-gray-500">to {formatDate(leave.to_date)}</div>
                       )}
+                      {leave.start_time && leave.end_time && (
+                        <div className="text-gray-600 mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>{leave.start_time} — {leave.end_time}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-lg font-semibold text-gray-900">
@@ -748,9 +765,17 @@ export default function AdminLeaveManagement() {
                     .map(l => (
                     <tr key={l.id} className="hover:bg-gray-50">
                       <td className="px-6 py-3 text-sm text-gray-900">
-                        {l.is_half_day
-                          ? formatDate(l.from_date)
-                          : `${formatDate(l.from_date)} - ${formatDate(l.to_date)}`}
+                        <div>
+                          {l.is_half_day
+                            ? formatDate(l.from_date)
+                            : `${formatDate(l.from_date)} - ${formatDate(l.to_date)}`}
+                        </div>
+                        {l.start_time && l.end_time && (
+                          <div className="text-gray-600 mt-1 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{l.start_time} — {l.end_time}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-3 text-sm">
                         <div className="flex flex-col gap-1">
@@ -838,6 +863,25 @@ export default function AdminLeaveManagement() {
                   </div>
                 )}
               </div>
+
+              {selectedLeave.start_time && selectedLeave.end_time && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      Start Time
+                    </label>
+                    <p className="text-gray-900 font-medium">{selectedLeave.start_time}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      End Time
+                    </label>
+                    <p className="text-gray-900 font-medium">{selectedLeave.end_time}</p>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="text-sm font-medium text-gray-600">Reason</label>

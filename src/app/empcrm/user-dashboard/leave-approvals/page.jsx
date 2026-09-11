@@ -358,6 +358,12 @@ export default function LeaveApprovalsPage() {
                       {!leave.is_half_day && (
                         <div className="text-gray-500">to {formatDate(leave.to_date)}</div>
                       )}
+                      {leave.start_time && leave.end_time && (
+                        <div className="text-gray-600 mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>{leave.start_time} — {leave.end_time}</span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 font-semibold">
                       {leave.is_half_day ? "½" : leave.total_days}
@@ -432,6 +438,15 @@ export default function LeaveApprovalsPage() {
                 {formatDate(selectedLeave.from_date)}
                 {!selectedLeave.is_half_day && <> - {formatDate(selectedLeave.to_date)}</>}
               </p>
+              {selectedLeave.start_time && selectedLeave.end_time && (
+                <p className="flex items-start gap-1">
+                  <span className="font-medium">Time:</span>
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 mt-0.5" />
+                    {selectedLeave.start_time} — {selectedLeave.end_time}
+                  </span>
+                </p>
+              )}
               <p>
                 <span className="font-medium">Days:</span>{" "}
                 {selectedLeave.is_half_day ? "0.5 (Half-Day)" : selectedLeave.total_days}
