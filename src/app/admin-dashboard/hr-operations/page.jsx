@@ -293,13 +293,6 @@ export default function HROperationsPage() {
                 <Plus className="w-5 h-5" />
                 Add Full-Day Leave
               </button>
-              <button
-                onClick={() => setShowHalfDayForm(true)}
-                className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium flex items-center justify-center gap-2"
-              >
-                <Sun className="w-5 h-5" />
-                Add Half-Day Leave
-              </button>
             </div>
           )}
         </div>
