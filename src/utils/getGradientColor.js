@@ -8,7 +8,8 @@
  *  🔴 Red         — overdue (hours < 0)
  *  🟠 Light Orange — due within next 2 hours (0 <= hours <= 2)
  *  🟢 Light Green  — 2–12 hours away
- *  🔵 Light Sky Blue — more than 12 hours away
+ *  🔵 Light Sky Blue — 12–48 hours away
+ *  ⚪ Grey          — more than 48 hours away
  */
 export function getGradientColor(hours) {
   if (hours === null) {
@@ -31,6 +32,11 @@ export function getGradientColor(hours) {
     return "rgb(60, 179, 113)";
   }
 
-  // Far upcoming (> 12 hours) — Light Sky Blue
-  return "rgb(100, 181, 246)";
+  if (hours <= 48) {
+    // Far upcoming (12–48 hours) — Light Sky Blue
+    return "rgb(100, 181, 246)";
+  }
+
+  // Beyond 48 hours — Neutral Grey
+  return "rgb(160, 160, 170)";
 }
