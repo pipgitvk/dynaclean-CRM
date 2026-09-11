@@ -79,7 +79,8 @@ export async function GET(req) {
           ) THEN 'Product'
           WHEN EXISTS (
             SELECT 1 FROM spare_list sl
-            WHERE CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+            WHERE CAST(sl.spare_number AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
+               OR CAST(sl.id AS CHAR) = TRIM(CAST(psr.product_code AS CHAR))
           ) THEN 'Spare'
           ELSE NULL
         END AS item_category
@@ -229,32 +230,38 @@ export async function POST(req) {
       const qtyNum = Number(received_quantity) || 0;
       const isDelhi = /delhi/i.test(String(warehouse_name || ""));
 
-      const [[productMatch]] = await conn.execute(
-        `SELECT 1 AS found FROM products_list
-         WHERE LOWER(TRIM(item_code)) = LOWER(TRIM(?)) LIMIT 1`,
-        [request.product_code]
-      );
+      // Determine if this product_code belongs to a spare or a product
+      // product_stock_request stores spare items using spare_number (INT column) as product_code
+      // Match by spare_number (cast to char) OR by id (cast to char) for backward compat
       const [[spareMatch]] = await conn.execute(
-        `SELECT id FROM spare_list
-         WHERE CAST(id AS CHAR) = TRIM(CAST(? AS CHAR)) LIMIT 1`,
+        `SELECT id FROM spare_list WHERE CAST(spare_number AS CHAR) = ? OR CAST(id AS CHAR) = ? LIMIT 1`,
+        [String(request.product_code), String(request.product_code)]
+      );
+      const [[productMatch]] = await conn.execute(
+        `SELECT 1 AS found FROM products_list WHERE LOWER(TRIM(item_code)) = LOWER(TRIM(?)) LIMIT 1`,
         [request.product_code]
       );
-      const isSpare = !productMatch?.found && !!spareMatch?.id;
+
+      // A record is a spare if spare_list match found AND no product match
+      const isSpare = !!spareMatch?.id && !productMatch?.found;
       const spare_id = isSpare ? spareMatch.id : null;
 
-      if (isSpare) {
-        console.log("Spare warehouse-in → stock_list / stock_summary, spare_id:", spare_id);
+      console.log(`Routing: product_code=${request.product_code}, isSpare=${isSpare}, spare_id=${spare_id}`);
 
-        const [lastRows] = await conn.execute(
+      if (isSpare) {
+        // ---- SPARE: insert into stock_list + stock_summary ----
+        console.log("Spare detected → inserting into stock_list / stock_summary");
+
+        const [lastSpareRows] = await conn.execute(
           `SELECT total, delhi, south FROM stock_list WHERE spare_id = ? ORDER BY created_at DESC LIMIT 1`,
           [spare_id]
         );
 
         let totalDB = 0, delhiDB = 0, southDB = 0;
-        if (lastRows.length > 0) {
-          totalDB = Number(lastRows[0].total) || 0;
-          delhiDB = Number(lastRows[0].delhi) || 0;
-          southDB = Number(lastRows[0].south) || 0;
+        if (lastSpareRows.length > 0) {
+          totalDB = Number(lastSpareRows[0].total) || 0;
+          delhiDB = Number(lastSpareRows[0].delhi) || 0;
+          southDB = Number(lastSpareRows[0].south) || 0;
         }
 
         const delhiD = isDelhi ? delhiDB + qtyNum : delhiDB;
@@ -263,8 +270,9 @@ export async function POST(req) {
 
         await conn.execute(
           `INSERT INTO stock_list (
-            spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status, added_date, from_company, delivery_address,
-            supporting_file, added_by, godown, total, Delhi, South, godown_location
+            spare_id, quantity, amount_per_unit, net_amount, note, location, stock_status,
+            added_date, from_company, delivery_address, supporting_file, added_by,
+            godown, total, Delhi, South, godown_location
           ) VALUES (?, ?, ?, ?, ?, ?, 'IN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             spare_id,
@@ -286,22 +294,22 @@ export async function POST(req) {
           ]
         );
 
-        const [summaryRows] = await conn.execute(
+        const [spareSummaryRows] = await conn.execute(
           "SELECT total_quantity, Delhi, South FROM stock_summary WHERE spare_id = ?",
           [spare_id]
         );
 
-        if (summaryRows.length > 0) {
-          const existing = summaryRows[0];
+        if (spareSummaryRows.length > 0) {
+          const existing = spareSummaryRows[0];
           const newTotal = (Number(existing.total_quantity) || 0) + qtyNum;
           let newDelhi = Number(existing.Delhi) || 0;
           let newSouth = Number(existing.South) || 0;
           if (isDelhi) newDelhi += qtyNum; else newSouth += qtyNum;
 
           await conn.execute(
-            `UPDATE stock_summary SET 
-              last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?, 
-              last_status = 'IN', updated_at = NOW() 
+            `UPDATE stock_summary SET
+              last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?,
+              last_status = 'IN', updated_at = NOW()
              WHERE spare_id = ?`,
             [qtyNum, newTotal, newDelhi, newSouth, spare_id]
           );
@@ -310,123 +318,98 @@ export async function POST(req) {
           const initialSouth = isDelhi ? 0 : qtyNum;
 
           await conn.execute(
-            `INSERT INTO stock_summary 
+            `INSERT INTO stock_summary
               (spare_id, last_updated_quantity, total_quantity, Delhi, South, last_status)
              VALUES (?, ?, ?, ?, ?, 'IN')`,
             [spare_id, qtyNum, qtyNum, initialDelhi, initialSouth]
           );
         }
+
+        console.log("Spare stock updated in stock_list / stock_summary");
+
       } else {
-      console.log("Fetching last stock totals...");
+        // ---- PRODUCT: insert into product_stock + product_stock_summary ----
+        console.log("Product detected → inserting into product_stock / product_stock_summary");
 
-      const [lastRows] = await conn.execute(
-        `SELECT total, delhi, south FROM product_stock 
-         WHERE product_code = ? 
-         ORDER BY created_at DESC 
-         LIMIT 1`,
-        [request.product_code]
-      );
+        const [lastRows] = await conn.execute(
+          `SELECT total, delhi, south FROM product_stock 
+           WHERE product_code = ? 
+           ORDER BY created_at DESC 
+           LIMIT 1`,
+          [request.product_code]
+        );
 
-      console.log("Last stock rows:", lastRows);
+        let totalDB = 0, delhiDB = 0, southDB = 0;
+        if (lastRows.length > 0) {
+          totalDB = Number(lastRows[0].total) || 0;
+          delhiDB = Number(lastRows[0].delhi) || 0;
+          southDB = Number(lastRows[0].south) || 0;
+        }
 
-      let totalDB = 0, delhiDB = 0, southDB = 0;
-      if (lastRows.length > 0) {
-        totalDB = Number(lastRows[0].total) || 0;
-        delhiDB = Number(lastRows[0].delhi) || 0;
-        southDB = Number(lastRows[0].south) || 0;
-      }
-
-      console.log("Warehouse location check:", { isDelhi });
-
-      const delhiD = isDelhi ? delhiDB + qtyNum : delhiDB;
-      const southD = isDelhi ? southDB : southDB + qtyNum;
-      const totalD = totalDB + qtyNum;
-
-      console.log("New stock totals:", { totalD, delhiD, southD });
-
-      console.log("Inserting into product_stock...");
-
-      const insertStockQuery = `
-        INSERT INTO product_stock (
-          product_code,
-          quantity,
-          amount_per_unit,
-          net_amount,
-          note,
-          location,
-          stock_status,
-          from_company,
-          delivery_address,
-          gst,
-          hs_code,
-          added_by,
-          supporting_file,
-          added_date,
-          godown,
-          total,
-          delhi,
-          south
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, ?)
-      `;
-
-      await conn.execute(insertStockQuery, [
-        request.product_code,
-        qtyNum,
-        request.amount_per_unit,
-        request.net_amount,
-        remarks || `Stock request #${request_id} fulfilled`,
-        location || request.delivery_location,
-        'IN',
-        request.from_company,
-        request.delivery_location,
-        String(request.gst_rate ?? ''),
-        request.hsn,
-        username,
-        received_image,
-        received_date ? new Date(received_date) : new Date(),
-        warehouse_name,
-        totalD,
-        delhiD,
-        southD
-      ]);
-
-      console.log("Updating product_stock_summary...");
-
-      const [summaryRows] = await conn.execute(
-        "SELECT total_quantity, Delhi, South FROM product_stock_summary WHERE product_code = ?",
-        [request.product_code]
-      );
-
-      console.log("Summary rows:", summaryRows);
-
-      if (summaryRows.length > 0) {
-        const existingSummary = summaryRows[0];
-        const newTotal = (Number(existingSummary.total_quantity) || 0) + qtyNum;
-        let newDelhi = Number(existingSummary.Delhi) || 0;
-        let newSouth = Number(existingSummary.South) || 0;
-        if (isDelhi) newDelhi += qtyNum; else newSouth += qtyNum;
-
-        console.log("Updating existing summary...");
+        const delhiD = isDelhi ? delhiDB + qtyNum : delhiDB;
+        const southD = isDelhi ? southDB : southDB + qtyNum;
+        const totalD = totalDB + qtyNum;
 
         await conn.execute(
-          `UPDATE product_stock_summary
-             SET last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?, last_status = 'IN', updated_at = NOW()
-             WHERE product_code = ?`,
-          [qtyNum, newTotal, newDelhi, newSouth, request.product_code]
+          `INSERT INTO product_stock (
+            product_code, quantity, amount_per_unit, net_amount, note, location,
+            stock_status, from_company, delivery_address, gst, hs_code, added_by,
+            supporting_file, added_date, godown, total, delhi, south
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            request.product_code,
+            qtyNum,
+            request.amount_per_unit,
+            request.net_amount,
+            remarks || `Stock request #${request_id} fulfilled`,
+            location || request.delivery_location,
+            'IN',
+            request.from_company,
+            request.delivery_location,
+            String(request.gst_rate ?? ''),
+            request.hsn,
+            username,
+            received_image,
+            received_date ? new Date(received_date) : new Date(),
+            warehouse_name,
+            totalD,
+            delhiD,
+            southD
+          ]
         );
-      } else {
-        const initialDelhi = isDelhi ? qtyNum : 0;
-        const initialSouth = isDelhi ? 0 : qtyNum;
 
-        console.log("Creating new summary row...");
-
-        await conn.execute(
-          `INSERT INTO product_stock_summary
-             (product_code, last_updated_quantity, total_quantity, Delhi, South, last_status)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-          [request.product_code, qtyNum, qtyNum, initialDelhi, initialSouth, 'IN']
+        const [summaryRows] = await conn.execute(
+          "SELECT total_quantity, Delhi, South FROM product_stock_summary WHERE product_code = ?",
+          [request.product_code]
         );
-      }
+
+        if (summaryRows.length > 0) {
+          const existingSummary = summaryRows[0];
+          const newTotal = (Number(existingSummary.total_quantity) || 0) + qtyNum;
+          let newDelhi = Number(existingSummary.Delhi) || 0;
+          let newSouth = Number(existingSummary.South) || 0;
+          if (isDelhi) newDelhi += qtyNum; else newSouth += qtyNum;
+
+          await conn.execute(
+            `UPDATE product_stock_summary
+               SET last_updated_quantity = ?, total_quantity = ?, Delhi = ?, South = ?,
+                   last_status = 'IN', updated_at = NOW()
+               WHERE product_code = ?`,
+            [qtyNum, newTotal, newDelhi, newSouth, request.product_code]
+          );
+        } else {
+          const initialDelhi = isDelhi ? qtyNum : 0;
+          const initialSouth = isDelhi ? 0 : qtyNum;
+
+          await conn.execute(
+            `INSERT INTO product_stock_summary
+               (product_code, last_updated_quantity, total_quantity, Delhi, South, last_status)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+            [request.product_code, qtyNum, qtyNum, initialDelhi, initialSouth, 'IN']
+          );
+        }
+
+        console.log("Product stock updated in product_stock / product_stock_summary");
       }
 
       console.log("Committing transaction...");
