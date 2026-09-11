@@ -83,6 +83,19 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     }
   }
 
+  // Half-day leave map — track which dates have approved half-day leaves
+  const halfDayLeaveMap = new Map();
+  for (const leave of leavesAll || []) {
+    if (String(leave.username ?? "").trim().toLowerCase() !== String(username ?? "").trim().toLowerCase()) continue;
+    if (!(leave.is_half_day == 1 || leave.is_half_day === true)) continue;
+    const fromD = new Date(leave.from_date);
+    const toD = new Date(leave.to_date);
+    for (let x = new Date(fromD); x <= toD; x.setDate(x.getDate() + 1)) {
+      const k = dateToYmdKey(x);
+      if (k) halfDayLeaveMap.set(k, leave);
+    }
+  }
+
   let dojValid = false;
   let doj = null;
   if (dateOfJoining != null && String(dateOfJoining).trim() !== "") {
@@ -117,11 +130,21 @@ export function computeAttendanceDetailsCardSummaryForMonth(p) {
     const isWeekend = d.getDay() === 0;
     const isHoliday = holidayMap.has(dateString);
     const isOnLeave = leaveMap.has(dateString);
+    const hasHalfDayLeave = halfDayLeaveMap.has(dateString);
 
     const hasRealPunch = rowHasMeaningfulCheckinOrCheckout(existingLog);
     // Paid leave takes priority over punch (same logic as attendance page frontend)
     if (paidLeaveMap.has(dateString)) {
-      summary.leaves++;
+      // Full paid leave day: treat as half-day if there's also a real punch
+      // (employee worked half the day and took leave for the other half)
+      if (hasRealPunch) {
+        summary.halfDays++;
+      } else {
+        summary.leaves++;
+      }
+    } else if (hasHalfDayLeave) {
+      // DB-marked half-day leave → always counts as half-day
+      summary.halfDays++;
     } else if (existingLog && hasRealPunch) {
       // Match payroll (`computeSalaryPayDaysForUser`): only "regular" is a full credit day.
       const cls = classifyAttendanceDayForSalary(existingLog, rules, freeGraceUsed);
