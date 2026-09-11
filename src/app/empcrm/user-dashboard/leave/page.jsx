@@ -307,7 +307,6 @@ export default function UserLeaveManagement() {
           {leave.available > 0 && ` (${leave.available} days available)`}
         </option>
       ))}
-      <option value="half-day">Half-Day Leave</option>
       <option value="unpaid">Unpaid Leave</option>
     </>
   );
@@ -331,15 +330,9 @@ export default function UserLeaveManagement() {
             <Plus className="w-5 h-5" />
             Apply for Leave
           </button>
-          <button
-            onClick={handleHalfDayClick}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center gap-2 font-medium"
-          >
-            <Sun className="w-5 h-5" />
-            Apply for Half-Day
-          </button>
         </div>
       </div>
+      
 
       {/* Leave Balance KPIs */}
       {loading ? (
@@ -449,39 +442,9 @@ export default function UserLeaveManagement() {
                 )}
               </div>
             </div>
-
-            {/* Half-Day Leave Card */}
-            {stats.halfDayLeaves && (
-              <div className="bg-white rounded-lg shadow-md border border-orange-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800">Half-Day Leave</h3>
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
-                    <Sun className="w-3 h-3" /> half-day
-                  </span>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600">Half-day applications (1st Half / 2nd Half)</p>
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-sm text-gray-600">Taken this year</span>
-                    <span className="text-lg font-bold text-gray-900">{stats.halfDayLeaves.taken} days</span>
-                  </div>
-                  {stats.halfDayLeaves.pending > 0 && (
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-                      <span className="text-sm text-yellow-600 flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        Pending
-                      </span>
-                      <span className="text-sm font-semibold text-yellow-600">{stats.halfDayLeaves.pending} days</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      )}
 
-      {/* Leave History Table */}
+            {/* Leave History Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="p-4 bg-gray-50 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-800">Leave History</h2>
@@ -595,6 +558,8 @@ export default function UserLeaveManagement() {
           </div>
         )}
       </div>
+        </div>
+      )}
 
       {/* Full-Day Leave Application Modal */}
       {showApplicationForm && (
@@ -740,195 +705,6 @@ export default function UserLeaveManagement() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   {submitting ? "Submitting..." : "Submit Application"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Half-Day Leave Application Modal */}
-      {showHalfDayForm && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
-            <div className="p-6 border-b border-gray-200 flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                <Sun className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">Apply for Half-Day Leave</h2>
-                <p className="text-sm text-gray-500">Half-day counts as 0.5 days</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleHalfDaySubmit} className="p-6 space-y-4">
-              {/* Leave Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Leave Type <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={halfDayData.leave_type}
-                  onChange={(e) => setHalfDayData({ ...halfDayData, leave_type: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                  required
-                >
-                  {leaveTypeOptions}
-                </select>
-              </div>
-
-              {/* Auto-detected Half Type Badge */}
-              {(() => {
-                // Derive detected half from start_time vs lunchBreakTime
-                const timeToMin = (t) => {
-                  if (!t) return null;
-                  const p = String(t).split(":");
-                  return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
-                };
-                const lunchMin = timeToMin(lunchBreakTime);
-                const startMin = timeToMin(halfDayData.start_time);
-                const endMin   = timeToMin(halfDayData.end_time);
-                let detected = null;
-                if (lunchMin !== null && startMin !== null) {
-                  detected = startMin >= lunchMin ? "2nd_half" : "1st_half";
-                } else if (lunchMin !== null && endMin !== null) {
-                  detected = endMin <= lunchMin ? "1st_half" : "2nd_half";
-                }
-                if (!detected) return (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                    <p className="text-sm text-orange-700">
-                      Half type will be auto-detected from your Start Time vs lunch break ({lunchBreakTime ? lunchBreakTime.slice(0,5) : "not set"})
-                    </p>
-                  </div>
-                );
-                return (
-                  <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 flex items-center gap-3">
-                    <Sun className="w-5 h-5 text-orange-500 shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold text-orange-800">
-                        Auto-detected: {detected === "1st_half" ? "1st Half (Morning)" : "2nd Half (Afternoon)"}
-                      </p>
-                      <p className="text-xs text-orange-600">
-                        Based on your start time vs lunch break ({lunchBreakTime ? lunchBreakTime.slice(0,5) : "—"})
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Single Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={halfDayData.date}
-                  onChange={(e) => setHalfDayData({ ...halfDayData, date: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              {/* Time Range Toggle + Start/End Time */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Specify Start & End Time</p>
-                    <p className="text-xs text-gray-500">Turn on if half-day leave is within a specific window</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={halfDayData.has_time_range}
-                      onChange={(e) =>
-                        setHalfDayData({
-                          ...halfDayData,
-                          has_time_range: e.target.checked,
-                          ...(e.target.checked ? {} : { start_time: "", end_time: "" })
-                        })
-                      }
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                  </label>
-                </div>
-
-                {halfDayData.has_time_range && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Start Time <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={halfDayData.start_time}
-                        onChange={(e) => setHalfDayData({ ...halfDayData, start_time: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        End Time <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={halfDayData.end_time}
-                        onChange={(e) => setHalfDayData({ ...halfDayData, end_time: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {halfDayData.date && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                  <p className="text-sm text-orange-800">
-                    <span className="font-semibold">Half-Day</span>
-                    {" · "}{formatDate(halfDayData.date)}
-                    {" · "}
-                    <span className="font-bold">0.5 days</span>
-                  </p>
-                </div>
-              )}
-
-              {/* Reason */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={halfDayData.reason}
-                  onChange={(e) => setHalfDayData({ ...halfDayData, reason: e.target.value })}
-                  placeholder="Enter reason for half-day leave..."
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowHalfDayForm(false);
-                    setHalfDayData({ leave_type: "", date: "", half_day_type: "", reason: "", has_time_range: false, start_time: "", end_time: "" });
-                  }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 flex items-center gap-2"
-                >
-                  <Sun className="w-4 h-4" />
-                  {submitting ? "Submitting..." : "Submit Half-Day"}
                 </button>
               </div>
             </form>

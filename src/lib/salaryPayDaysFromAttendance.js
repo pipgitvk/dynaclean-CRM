@@ -205,6 +205,8 @@ export function computeSalaryPayDaysForUser(p) {
 
   let present = 0;
   let half_day = 0;
+  let half_day_paid = 0;  // Half-days from paid leaves
+  let half_day_unpaid = 0;  // Half-days from unpaid leaves or punch-based
   let late_days = 0;
   let sunday = 0;
   /** Sundays with no log (paid weekly off; not LOP). Saturday is not included. */
@@ -270,6 +272,7 @@ export function computeSalaryPayDaysForUser(p) {
       const treatAsHalfDay = hasRealPunch || dbHalf;
       if (treatAsHalfDay) {
         half_day++;
+        half_day_paid++;  // Paid leave half-day
         weekdayPayCredits += 0.5;
       } else {
         paid_leave++;
@@ -285,7 +288,11 @@ export function computeSalaryPayDaysForUser(p) {
       // Count half-days for all present days using grace period logic (matching attendance page behavior)
       const { isHalfDay, graceUsed } = isHalfDayWithGrace(existingLog, rules, halfDayGraceUsed);
       halfDayGraceUsed = graceUsed;
-      if (isHalfDay) half_day++;
+      if (isHalfDay) {
+        half_day++;
+        // Punch-based half-day (not from leave) = unpaid half-day
+        half_day_unpaid++;
+      }
       // Apply half-day credit reduction (0.5) for ALL half-days, regardless of day type
       if (isHalfDay) {
         weekdayPayCredits += 0.5;
@@ -319,6 +326,7 @@ export function computeSalaryPayDaysForUser(p) {
         const treatAsHalfDay = hasRealPunch || dbHalf;
         if (treatAsHalfDay) {
           half_day++;
+          half_day_unpaid++;  // Non-paid leave half-day (sick, casual, etc)
           weekdayPayCredits += 0.5;
         } else {
           paid_leave++;
@@ -358,6 +366,8 @@ export function computeSalaryPayDaysForUser(p) {
   return {
     present,
     half_day,
+    half_day_paid,
+    half_day_unpaid,
     late_days,
     total_punched_days,
     sunday,

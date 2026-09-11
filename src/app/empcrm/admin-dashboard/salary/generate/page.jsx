@@ -222,6 +222,8 @@ const GenerateSalaryPage = () => {
                         present: presN,
                         totalPunchedDays: totalPunched,
                         halfDay: Number(empAtt.half_day_count) || 0,
+                        halfDayPaid: Number(empAtt.half_day_paid_count) || 0,
+                        halfDayUnpaid: Number(empAtt.half_day_unpaid_count) || 0,
                         lateDay: lateN,
                         weekendOff: Number(empAtt.weekend_off_count) || 0,
                         holiday: Number(empAtt.holiday_count) || 0,
@@ -1224,6 +1226,17 @@ const GenerateSalaryPage = () => {
                                                         : attendanceBreakdown.halfDay}
                                                 </dd>
                                             </div>
+                                            <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                                <dt className="text-slate-600">
+                                                    <span className="text-xs block">Paid Half-Days</span>
+                                                    <span className="text-[11px] text-slate-500">(paid leave + punch-based)</span>
+                                                </dt>
+                                                <dd className="font-semibold text-emerald-600 tabular-nums">
+                                                    {attendanceDisplayAllZero
+                                                        ? 0
+                                                        : attendanceBreakdown.halfDayPaid}
+                                                </dd>
+                                            </div>
                                             <div className="flex justify-between gap-2 pt-2 items-baseline">
                                                 <dt className="text-slate-800 font-medium">Pay days (for salary)</dt>
                                                 <dd className="text-lg font-bold text-purple-700 tabular-nums">
@@ -1253,6 +1266,15 @@ const GenerateSalaryPage = () => {
                                             <dt className="text-slate-600">Half days</dt>
                                             <dd className="font-semibold text-amber-700 tabular-nums">
                                                 {fz(v.halfDays)}
+                                            </dd>
+                                        </div>
+                                        <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">
+                                            <dt className="text-slate-600">
+                                                <span className="text-xs block">Paid Half-Days</span>
+                                                <span className="text-[11px] text-slate-500">(paid leave + punch-based)</span>
+                                            </dt>
+                                            <dd className="font-semibold text-emerald-600 tabular-nums">
+                                                {fz(attendanceBreakdown.halfDayPaid)}
                                             </dd>
                                         </div>
                                         <div className="flex justify-between gap-2 py-1.5 border-b border-slate-100">

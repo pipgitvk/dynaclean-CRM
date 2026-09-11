@@ -57,6 +57,8 @@ function mapOneEmployeeSummary(emp, logs, holidays, leaves, globalRules, schedul
     total_punched_days:
       stats.total_punched_days != null ? Number(stats.total_punched_days) : stats.present + stats.late_days,
     half_day_count: stats.half_day,
+    half_day_paid_count: stats.half_day_paid || 0,
+    half_day_unpaid_count: stats.half_day_unpaid || 0,
     late_day_count: stats.late_days,
     sunday_count: stats.sunday,
     weekend_off_count: stats.weekend_off,
