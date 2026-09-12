@@ -38,6 +38,10 @@ function transformMenuItemPaths(item, roleKey) {
     return { ...item, path: "/admin-dashboard/reports/payment-pending" };
   }
 
+  if (roleUpper === "SALES CUM BACKOFFICE" && item.moduleKey === "backlinks-excel-data") {
+    return { ...item, path: "/sales-dashboard/backlinks-excel" };
+  }
+
   if (item.moduleKey === "denied-leads") {
     return { ...item, path: "/sales-dashboard/denied-leads" };
   }
@@ -266,7 +270,7 @@ const allMenuItems = [
         path: "/digital-marketing-dashboard/backlinks-excel",
         name: "Backlinks Excel",
         moduleKey: "backlinks-excel-data",
-        roles: ["SUPERADMIN", "DIGITAL MARKETER"],
+        roles: ["SUPERADMIN", "DIGITAL MARKETER", "SALES CUM BACKOFFICE"],
         icon: "FileText",
       },
       {
