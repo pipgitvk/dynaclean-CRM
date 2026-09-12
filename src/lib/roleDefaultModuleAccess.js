@@ -388,6 +388,9 @@ export const ROLE_DEFAULT_MODULE_KEYS = {
     "prospects-add",
     "prospects-ne",
     "installation-videos",
+    "keywords-management",
+    "backlinks-management",
+    "backlinks-excel-data",
   ],
   DIRECTOR: [
     "dashboard-home",

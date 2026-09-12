@@ -20,6 +20,8 @@ const KeywordsTable = () => {
   const [isFollowupsModalOpen, setIsFollowupsModalOpen] = useState(false);
   const [selectedKeyword, setSelectedKeyword] = useState(null);
   const [digitalMarketers, setDigitalMarketers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchKeywords();
@@ -78,6 +80,17 @@ const KeywordsTable = () => {
       (filterRank === "" || kw.rank === parseInt(filterRank)) &&
       (filterAssignedTo === "" || kw.assigned_to === filterAssignedTo)
   );
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredKeywords.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedKeywords = filteredKeywords.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterPage, filterRank, filterAssignedTo]);
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -218,14 +231,14 @@ const KeywordsTable = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredKeywords.length === 0 ? (
+            {paginatedKeywords.length === 0 ? (
               <tr>
                 <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                   No keywords found. Add one to get started!
                 </td>
               </tr>
             ) : (
-              filteredKeywords.map((keyword) => (
+              paginatedKeywords.map((keyword) => (
                 <tr key={keyword.id} className="border-b hover:bg-gray-50 transition">
                   <td className="px-6 py-3 font-medium text-gray-800">
                     {keyword.keyword}
@@ -290,12 +303,12 @@ const KeywordsTable = () => {
 
       {/* Mobile Card View */}
       <div className="lg:hidden space-y-4">
-        {filteredKeywords.length === 0 ? (
+        {paginatedKeywords.length === 0 ? (
           <div className="bg-white rounded-lg p-6 text-center text-gray-500">
             No keywords found. Add one to get started!
           </div>
         ) : (
-          filteredKeywords.map((keyword) => (
+          paginatedKeywords.map((keyword) => (
             <div
               key={keyword.id}
               className="bg-white rounded-lg shadow p-4 space-y-3"
@@ -340,6 +353,79 @@ const KeywordsTable = () => {
           ))
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-white rounded-lg p-4 shadow">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Items per page:</label>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+
+          <div className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages} (Total: {filteredKeywords.length} items)
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {/* Page Numbers */}
+            <div className="flex gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-2 py-1 rounded text-sm ${
+                      currentPage === pageNum
+                        ? "bg-blue-600 text-white"
+                        : "border border-gray-300 hover:bg-gray-100"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <AddKeywordModal
