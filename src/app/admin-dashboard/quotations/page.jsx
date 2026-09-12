@@ -29,16 +29,24 @@ export default async function QuotationPage({ searchParams }) {
         <h1 className="text-2xl font-bold text-gray-800">
           Quotation Management
         </h1>
-        <a
-          href={
-            customerId
-              ? `/admin-dashboard/quotations/new?customerId=${encodeURIComponent(customerId)}`
-              : "/admin-dashboard/quotations/new"
-          }
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-        >
-          New Quotation
-        </a>
+        <div className="flex items-center gap-3">
+          <a
+            href={
+              customerId
+                ? `/admin-dashboard/quotations/new?customerId=${encodeURIComponent(customerId)}`
+                : "/admin-dashboard/quotations/new"
+            }
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            New Quotation
+          </a>
+          <a
+            href="/admin-dashboard/invoices/performa"
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          >
+            Performa Invoice
+          </a>
+        </div>
       </div>
 
       {/* Send username to client component */}
