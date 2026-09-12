@@ -12,7 +12,7 @@ export default function DispatchFormPage({ params }) {
   const [savedIds, setSavedIds] = useState(new Set());
   const [initialSerialNos, setInitialSerialNos] = useState(new Set());
   const [stockInfo, setStockInfo] = useState({});
-  const [lowStockWarnings, setLowStockWarnings] = useState({});
+  const [zeroStockWarnings, setZeroStockWarnings] = useState({});
   const [accessories, setAccessories] = useState({}); // { item_code: [accessories] }
   const [accessoriesChecked, setAccessoriesChecked] = useState({}); // { rowId: { accessoryId: boolean } }
 
@@ -71,7 +71,7 @@ export default function DispatchFormPage({ params }) {
   const fetchStockForRow = async (rowId, quoteNumber, godown, itemCode) => {
     if (!quoteNumber || !godown || !itemCode) {
       setStockInfo((prev) => ({ ...prev, [rowId]: null }));
-      setLowStockWarnings((prev) => ({ ...prev, [rowId]: "" }));
+      setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
       return;
     }
 
@@ -90,28 +90,21 @@ export default function DispatchFormPage({ params }) {
         const data = await res.json();
         setStockInfo((prev) => ({ ...prev, [rowId]: data.stockResults }));
 
-        // Check for low stock warnings
-        let warningMessage = "";
-        data.stockResults.forEach((item) => {
-          if (
-            item.stock_count !== null &&
-            item.min_qty !== null &&
-            item.stock_count < item.min_qty
-          ) {
-            warningMessage += `Warning: The stock for "${item.item_name}" is currently below the minimum required quantity. Please replenish the stock in the selected godown.\n`;
-          }
-        });
-        setLowStockWarnings((prev) => ({ ...prev, [rowId]: warningMessage }));
+        // Check if any item has 0 or null stock
+        const hasZeroStock = data.stockResults.some(
+          (item) => !item.stock_count || item.stock_count <= 0
+        );
+        setZeroStockWarnings((prev) => ({ ...prev, [rowId]: hasZeroStock }));
       } else {
         const { error } = await res.json();
         console.error("Stock check error:", error);
         setStockInfo((prev) => ({ ...prev, [rowId]: null }));
-        setLowStockWarnings((prev) => ({ ...prev, [rowId]: "" }));
+        setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
       }
     } catch (err) {
       console.error("Failed to fetch stock:", err);
       setStockInfo((prev) => ({ ...prev, [rowId]: null }));
-      setLowStockWarnings((prev) => ({ ...prev, [rowId]: "" }));
+      setZeroStockWarnings((prev) => ({ ...prev, [rowId]: false }));
     }
   };
 
@@ -146,7 +139,7 @@ export default function DispatchFormPage({ params }) {
         } else {
           // Godown cleared - clear stock info
           setStockInfo((prev) => ({ ...prev, [id]: null }));
-          setLowStockWarnings((prev) => ({ ...prev, [id]: "" }));
+          setZeroStockWarnings((prev) => ({ ...prev, [id]: false }));
         }
       }
     }
@@ -208,10 +201,10 @@ export default function DispatchFormPage({ params }) {
       throw new Error("Please select a godown before saving.");
     }
 
-    // Check for low stock warning
-    if (lowStockWarnings[row.id]) {
+    // Block dispatch if stock is 0 in selected godown
+    if (zeroStockWarnings[row.id]) {
       throw new Error(
-        "Please add stock to the selected godown before dispatching this item.",
+        "Stock is 0 in the selected godown. Cannot dispatch this item.",
       );
     }
 
@@ -253,11 +246,11 @@ export default function DispatchFormPage({ params }) {
           "Please select godowns for all items before completing dispatch",
         );
       }
-      // Check if any items have low stock warnings
-      const hasLowStockIssues = rows.some((r) => lowStockWarnings[r.id]);
-      if (hasLowStockIssues) {
+      // Block if any item has 0 stock in selected godown
+      const hasZeroStock = rows.some((r) => zeroStockWarnings[r.id]);
+      if (hasZeroStock) {
         throw new Error(
-          "Please resolve all stock warnings before completing dispatch",
+          "Stock is 0 for one or more items in the selected godown. Please resolve before completing dispatch.",
         );
       }
       // mark order dispatch complete
@@ -391,22 +384,21 @@ export default function DispatchFormPage({ params }) {
                           key={item.item_code}
                           className="text-sm text-green-700"
                         >
-                          {item.item_name || item.item_code}: {item.stock_count}{" "}
-                          (Min Qty: {item.min_qty || 0})
+                          {item.item_name || item.item_code}: {item.stock_count}
                         </p>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Low Stock Warning */}
-                {lowStockWarnings[r.id] && (
+                {/* Zero Stock Warning */}
+                {zeroStockWarnings[r.id] && (
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
-                    <h4 className="text-sm font-medium text-red-800 mb-2">
-                      ⚠️ Stock Warning:
+                    <h4 className="text-sm font-medium text-red-800 mb-1">
+                      ⚠️ Stock Not Available:
                     </h4>
-                    <p className="text-sm text-red-700 whitespace-pre-line">
-                      {lowStockWarnings[r.id]}
+                    <p className="text-sm text-red-700">
+                      Stock is 0 in <strong>{r.godown}</strong>. Cannot dispatch this item.
                     </p>
                   </div>
                 )}
@@ -470,7 +462,7 @@ export default function DispatchFormPage({ params }) {
                       hasSerialNo={r.serial_no && r.serial_no.trim() !== ""}
                       hasGodown={r.godown && r.godown.trim() !== ""}
                       isLocked={false}
-                      hasLowStockWarning={!!lowStockWarnings[r.id]}
+                      hasZeroStock={!!zeroStockWarnings[r.id]}
                       isProduct={isProductItem(r.item_code)}
                     />
                   )}
@@ -501,8 +493,8 @@ export default function DispatchFormPage({ params }) {
             !rows
               .filter((r) => isProductItem(r.item_code))
               .every((r) => r.serial_no && r.serial_no.trim() !== "") ||
-            // No pending low stock warnings
-            rows.some((r) => lowStockWarnings[r.id])
+            // Block if any item has 0 stock
+            rows.some((r) => zeroStockWarnings[r.id])
           }
           saving={saving}
         />
@@ -519,7 +511,7 @@ function RowSaveButton({
   hasSerialNo,
   hasGodown,
   isLocked,
-  hasLowStockWarning,
+  hasZeroStock,
   isProduct,
 }) {
   const [handleClick, isLoading] = useAsyncClick(async () => {
@@ -534,7 +526,7 @@ function RowSaveButton({
   const serialRequired = isProduct;
 
   // Locked rows (stock already deducted): allow updating photos/accessories anytime
-  // Unlocked rows: require serial no (for products), godown, no low stock warning, and not already saved
+  // Unlocked rows: require serial no (for products), godown, stock > 0, and not already saved
   const isDisabled = isLocked
     ? globalSaving || isLoading
     : globalSaving ||
@@ -542,7 +534,7 @@ function RowSaveButton({
       isSaved ||
       (serialRequired && !hasSerialNo) ||
       !hasGodown ||
-      hasLowStockWarning;
+      hasZeroStock;
 
   return (
     <button
