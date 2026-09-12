@@ -33,10 +33,10 @@ export function getGradientColor(hours) {
   }
 
   if (hours <= 48) {
-    // Far upcoming (12–48 hours) — Blue
-    return "rgb(66, 135, 245)";
+    // Far upcoming (12–48 hours) — Sky Blue
+    return "rgb(100, 181, 246)";
   }
 
-  // Beyond 48 hours — Blue
-  return "rgb(66, 135, 245)";
+  // Beyond 48 hours — Sky Blue
+  return "rgb(100, 181, 246)";
 }
