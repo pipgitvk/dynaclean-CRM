@@ -51,28 +51,28 @@ const SimpleCard = ({ title, value, icon: Icon, borderColor, onClick, subtext, m
   return (
     <a 
       onClick={onClick}
-      className={`bg-white rounded-lg shadow-md p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 min-h-[120px] flex flex-col justify-between ${borderColor}`}
+      className={`bg-white rounded-lg shadow-md p-3 sm:p-4 text-black hover:shadow-lg transition-shadow h-full cursor-pointer block border-l-4 min-h-[100px] sm:min-h-[120px] flex flex-col justify-between ${borderColor}`}
     >
       <div>
         <div className="flex items-center gap-2 mb-2">
-          {Icon && <Icon className="w-5 h-5 shrink-0" />}
-          <h2 className="text-sm font-bold text-black leading-tight uppercase">
+          {Icon && <Icon className="w-4 sm:w-5 h-4 sm:h-5 shrink-0" />}
+          <h2 className="text-xs sm:text-sm font-bold text-black leading-tight uppercase">
             {title}
           </h2>
         </div>
         
         {multiValues ? (
-          <div className="grid grid-cols-3 gap-2 mt-2">
+          <div className="grid grid-cols-3 gap-1 sm:gap-2 mt-2">
             {multiValues.map((item, idx) => (
               <div key={idx} className="text-center">
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">{item.label}</p>
-                <p className="text-xl font-bold text-gray-900">{item.value}</p>
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-0.5">{item.label}</p>
+                <p className="text-lg sm:text-xl font-bold text-gray-900">{item.value}</p>
               </div>
             ))}
           </div>
         ) : (
           <>
-            <p className="text-2xl font-bold mt-1 text-gray-900">
+            <p className="text-xl sm:text-2xl font-bold mt-1 text-gray-900 line-clamp-2">
               {value}
             </p>
             {subtext && (
@@ -198,10 +198,10 @@ export default function DirectorDashboard({ user, reportingManager, regTotal = 0
   }
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in duration-700">
+    <div className="space-y-8 pb-12 animate-in fade-in duration-700 px-2 sm:px-4 md:px-0 max-w-full">
 
       {/* Dashboard Cards Grid - Same as Admin Dashboard */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 md:gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 px-2 sm:px-0">
         {/* Pending Tasks */}
         <SimpleCard
           title="Pending Tasks"
