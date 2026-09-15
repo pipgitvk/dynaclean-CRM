@@ -261,6 +261,8 @@ export default function ServiceSupportReportPage() {
               <thead className="bg-gray-50 text-gray-600 uppercase text-xs tracking-wide">
                 <tr>
                   <th className="px-4 py-3 text-left">#</th>
+                  <th className="px-4 py-3 text-left">Machine ID</th>
+                  <th className="px-4 py-3 text-left">Service ID</th>
                   <th className="px-4 py-3 text-left">Serial Number</th>
                   <th className="px-4 py-3 text-left">Model</th>
                   <th className="px-4 py-3 text-left">Contact</th>
@@ -274,6 +276,8 @@ export default function ServiceSupportReportPage() {
                 {machineFollowups.map((row, i) => (
                   <tr key={row.id ?? i} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-gray-400">{i + 1}</td>
+                    <td className="px-4 py-2">{row.machine_id || "—"}</td>
+                    <td className="px-4 py-2">{row.service_id || "—"}</td>
                     <td className="px-4 py-2 font-medium text-gray-800">{row.serial_number || "—"}</td>
                     <td className="px-4 py-2">{row.product_model || "—"}</td>
                     <td className="px-4 py-2">{row.contact || "—"}</td>

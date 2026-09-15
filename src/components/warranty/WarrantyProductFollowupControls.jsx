@@ -10,7 +10,7 @@ import {
 
 export function useWarrantyProductFollowup(onSaved) {
   const [followUpTarget, setFollowUpTarget] = useState(null);
-  const [historySerial, setHistorySerial] = useState(null);
+  const [historyTarget, setHistoryTarget] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
 
   function ProductFollowupIcons({ product, className = "mb-1.5" }) {
@@ -19,7 +19,7 @@ export function useWarrantyProductFollowup(onSaved) {
         variant="icon"
         className={className}
         onFollowUp={() => setFollowUpTarget(toFollowupTarget(product))}
-        onHistory={() => setHistorySerial(product.serial_number)}
+        onHistory={() => setHistoryTarget(product)}
       />
     );
   }
@@ -33,10 +33,13 @@ export function useWarrantyProductFollowup(onSaved) {
           onSaved={onSaved}
         />
       )}
-      {historySerial && (
+      {historyTarget && (
         <HistoryModal
-          serialNumber={historySerial}
-          onClose={() => setHistorySerial(null)}
+          serialNumber={historyTarget.serial_number}
+          contact={historyTarget.contact}
+          email={historyTarget.email}
+          includeCustomerFollowups={!!historyTarget.includeCustomerFollowups}
+          onClose={() => setHistoryTarget(null)}
           onPreviewImage={(img) => setPreviewImage(img)}
         />
       )}

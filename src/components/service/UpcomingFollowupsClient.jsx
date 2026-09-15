@@ -32,6 +32,8 @@ function FollowUpModal({ fu, onClose, onSaved }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showSugg, setShowSugg] = useState(false);
   const [form, setForm] = useState({
+    machine_id: fu.machine_id || "",
+    service_id: fu.service_id || "",
     serial_number: fu.serial_number || "",
     product_model: fu.product_model || "",
     contact: fu.contact || "",
@@ -67,6 +69,8 @@ function FollowUpModal({ fu, onClose, onSaved }) {
     e.preventDefault();
     setSubmitting(true);
     const fd = new FormData();
+    if (form.machine_id) fd.append("machine_id", form.machine_id);
+    if (form.service_id) fd.append("service_id", form.service_id);
     fd.append("serial_number", form.serial_number);
     fd.append("product_model", form.product_model);
     fd.append("contact", form.contact);
@@ -120,7 +124,7 @@ function FollowUpModal({ fu, onClose, onSaved }) {
                 {suggestions.map((p, i) => (
                   <div key={i} className="p-2 hover:bg-gray-100 cursor-pointer" onClick={() => {
                     setSerialSearch(p.serial_number);
-                    setForm(prev => ({ ...prev, serial_number: p.serial_number, product_model: p.model }));
+                    setForm(prev => ({ ...prev, machine_id: p.id || "", serial_number: p.serial_number, product_model: p.model }));
                     setShowSugg(false);
                   }}>
                     <div className="font-medium">{p.serial_number}</div>

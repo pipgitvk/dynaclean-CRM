@@ -5,6 +5,7 @@ import Link from "next/link";
 import Modal from "./Modal";
 import ServiceAttachmentLink from "./ServiceAttachmentLink";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { useWarrantyProductFollowup } from "@/components/warranty/WarrantyProductFollowupControls";
 
 export default function ServiceTable({ serviceRecords, role }) {
   const [records, setRecords] = useState(serviceRecords || []);
@@ -40,6 +41,8 @@ export default function ServiceTable({ serviceRecords, role }) {
   const [engineers, setEngineers] = useState([]);
   const [isAssignSubmitting, setIsAssignSubmitting] = useState(false);
   const [assignError, setAssignError] = useState("");
+
+  const { ProductFollowupIcons, followupModals } = useWarrantyProductFollowup();
 
   useEffect(() => {
     setRecords(serviceRecords || []);
@@ -590,6 +593,18 @@ export default function ServiceTable({ serviceRecords, role }) {
                       className={`hover:bg-blue-50 transition-all duration-200 ${rowBackgroundColor}`}
                     >
                       <td className="px-6 py-3">
+                        <ProductFollowupIcons
+                          product={{
+                            machine_id: record.machine_id,
+                            service_id: record.service_id,
+                            serial_number: record.serial_number,
+                            model: record.model,
+                            contact: record.contact,
+                            email: record.email,
+                            includeCustomerFollowups: true,
+                          }}
+                          className="mb-1"
+                        />
                         <div>{record.service_id}</div>
                         {record.serial_number && (
                           <div className="text-xs text-green-600 font-medium mt-0.5">{record.serial_number}</div>
@@ -838,9 +853,23 @@ export default function ServiceTable({ serviceRecords, role }) {
                   className={`bg-white shadow-md rounded-lg p-4 space-y-2 ${cardBackgroundColor}`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-lg text-blue-600">
-                      Service ID: {record.service_id}
-                    </span>
+                    <div>
+                      <ProductFollowupIcons
+                        product={{
+                          machine_id: record.machine_id,
+                          service_id: record.service_id,
+                          serial_number: record.serial_number,
+                          model: record.model,
+                          contact: record.contact,
+                          email: record.email,
+                          includeCustomerFollowups: true,
+                        }}
+                        className="mb-1"
+                      />
+                      <span className="font-bold text-lg text-blue-600">
+                        Service ID: {record.service_id}
+                      </span>
+                    </div>
                     <div className="flex flex-col items-end max-w-[50%]">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -1210,6 +1239,7 @@ export default function ServiceTable({ serviceRecords, role }) {
           </div>
         </div>
       )}
+      {followupModals}
     </div>
   );
 }

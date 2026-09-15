@@ -26,6 +26,8 @@ export function toLocalDT(date) {
 
 export function toFollowupTarget(product) {
   return {
+    machine_id: product.machine_id ?? product.id ?? "",
+    service_id: product.service_id || "",
     serial_number: product.serial_number || "",
     product_model: product.product_model || product.model || "",
     contact: product.contact || product.email || "",
@@ -41,6 +43,8 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
   const [suggestions, setSuggestions] = useState([]);
   const [showSugg, setShowSugg] = useState(false);
   const [form, setForm] = useState({
+    machine_id: fu.machine_id || "",
+    service_id: fu.service_id || "",
     serial_number: fu.serial_number || "",
     product_model: fu.product_model || "",
     contact: fu.contact || "",
@@ -80,6 +84,8 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
     e.preventDefault();
     setSubmitting(true);
     const fd = new FormData();
+    if (form.machine_id) fd.append("machine_id", form.machine_id);
+    if (form.service_id) fd.append("service_id", form.service_id);
     fd.append("serial_number", form.serial_number);
     fd.append("product_model", form.product_model);
     fd.append("contact", form.contact);
@@ -116,8 +122,8 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
           </button>
         </div>
 
-        <div className="px-6 py-4 bg-gray-50 border-b grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[["Serial Number", fu.serial_number], ["Product Model", fu.product_model || "—"], ["Contact", fu.contact || "—"]].map(
+        <div className="px-6 py-4 bg-gray-50 border-b grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[["Machine ID", fu.machine_id || "—"], ["Service ID", fu.service_id || "—"], ["Serial Number", fu.serial_number], ["Product Model", fu.product_model || "—"], ["Contact", fu.contact || "—"]].map(
             ([label, val]) => (
               <div key={label}>
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
@@ -152,6 +158,7 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
                         setSerialSearch(p.serial_number);
                         setForm((prev) => ({
                           ...prev,
+                          machine_id: p.id || "",
                           serial_number: p.serial_number,
                           product_model: p.model,
                           contact: p.contact || p.email || "",
@@ -280,24 +287,55 @@ export function FollowUpModal({ fu, onClose, onSaved, allowEditIdentity = false 
   );
 }
 
-export function HistoryModal({ serialNumber, onClose, onPreviewImage }) {
+export function HistoryModal({
+  serialNumber,
+  onClose,
+  onPreviewImage,
+  contact,
+  email,
+  includeCustomerFollowups = false,
+}) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/machines-followup?serial=${encodeURIComponent(serialNumber)}`);
+        const qs = new URLSearchParams({ serial: serialNumber || "" });
+        if (includeCustomerFollowups) {
+          qs.set("customer_followups", "1");
+          if (contact) qs.set("contact", contact);
+          if (email) qs.set("email", email);
+        }
+        const res = await fetch(`/api/machines-followup?${qs.toString()}`);
         const data = await res.json();
-        if (data.success) setRecords(data.history || []);
-        else toast.error(data.error || "Failed to load history");
+        if (!data.success) {
+          toast.error(data.error || "Failed to load history");
+          return;
+        }
+
+        const machineRows = (data.history || []).map((rec) => ({
+          ...rec,
+          source: "machine",
+          sortAt: rec.followed_at || rec.created_at,
+        }));
+        const customerRows = (data.customerHistory || []).map((rec) => ({
+          ...rec,
+          source: "customer",
+          id: rec.s_no,
+          sortAt: rec.followed_date || rec.time_stamp,
+        }));
+        const merged = [...machineRows, ...customerRows].sort(
+          (a, b) => new Date(b.sortAt || 0).getTime() - new Date(a.sortAt || 0).getTime()
+        );
+        setRecords(merged);
       } catch {
         toast.error("Failed to load history");
       } finally {
         setLoading(false);
       }
     })();
-  }, [serialNumber]);
+  }, [serialNumber, contact, email, includeCustomerFollowups]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
@@ -308,7 +346,10 @@ export function HistoryModal({ serialNumber, onClose, onPreviewImage }) {
               <History size={20} className="text-purple-600" /> Follow-up History
             </h3>
             <p className="text-sm text-gray-400 mt-0.5">
-              Serial: <span className="font-semibold text-gray-700">{serialNumber}</span>
+              Serial: <span className="font-semibold text-gray-700">{serialNumber || "—"}</span>
+              {includeCustomerFollowups ? (
+                <span className="ml-2 text-gray-400">· includes customer follow-ups</span>
+              ) : null}
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200">
@@ -338,49 +379,102 @@ export function HistoryModal({ serialNumber, onClose, onPreviewImage }) {
           ) : (
             <ol className="relative border-l-2 border-purple-200 ml-3">
               {records.map((rec, idx) => (
-                <li key={rec.id} className="mb-6 ml-5">
+                <li key={`${rec.source}-${rec.id}-${idx}`} className="mb-6 ml-5">
                   <span
                     className={`absolute -left-[11px] flex items-center justify-center w-5 h-5 rounded-full ring-4 ring-white ${
-                      idx === 0 ? "bg-purple-600" : "bg-gray-400"
+                      rec.source === "customer"
+                        ? idx === 0 ? "bg-blue-600" : "bg-blue-400"
+                        : idx === 0 ? "bg-purple-600" : "bg-gray-400"
                     }`}
                   >
                     <span className="w-2 h-2 rounded-full bg-white" />
                   </span>
                   <div
                     className={`p-4 rounded-lg border ${
-                      idx === 0 ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"
+                      rec.source === "customer"
+                        ? "bg-blue-50 border-blue-200"
+                        : idx === 0
+                          ? "bg-purple-50 border-purple-200"
+                          : "bg-gray-50 border-gray-200"
                     }`}
                   >
                     <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                       <div className="flex items-center gap-2">
                         {idx === 0 && (
-                          <span className="text-xs font-bold bg-purple-600 text-white px-2 py-0.5 rounded-full">
+                          <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${rec.source === "customer" ? "bg-blue-600" : "bg-purple-600"}`}>
                             Latest
                           </span>
                         )}
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            rec.source === "customer"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-purple-100 text-purple-800"
+                          }`}
+                        >
+                          {rec.source === "customer" ? "Customer" : "Machine"}
+                        </span>
                         <span className="text-xs text-gray-400">#{rec.id}</span>
+                        {rec.machine_id ? (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono">
+                            Machine ID {rec.machine_id}
+                          </span>
+                        ) : null}
+                        {rec.service_id ? (
+                          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-mono">
+                            Service ID {rec.service_id}
+                          </span>
+                        ) : null}
+                        {rec.customer_id ? (
+                          <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-mono">
+                            Cust {rec.customer_id}
+                          </span>
+                        ) : null}
                       </div>
                       <span className="text-xs text-gray-500">
-                        Added by <span className="font-semibold text-gray-700">{rec.added_by}</span>
+                        Added by{" "}
+                        <span className="font-semibold text-gray-700">
+                          {rec.added_by || rec.followed_by || "—"}
+                        </span>
                       </span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
                       <div>
                         <span className="text-gray-500">Followed At:</span>{" "}
-                        <span className="font-medium">{dayjs(rec.followed_at).tz(IST).format("DD/MM/YYYY HH:mm")}</span>
+                        <span className="font-medium">
+                          {rec.sortAt ? dayjs(rec.sortAt).tz(IST).format("DD/MM/YYYY HH:mm") : "—"}
+                        </span>
                       </div>
                       <div>
                         <span className="text-gray-500">Next Follow-up:</span>{" "}
                         <span className="font-medium">
-                          {rec.next_followup_date
-                            ? dayjs(rec.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm")
+                          {rec.service_next_followup || rec.next_followup_date
+                            ? dayjs(rec.service_next_followup || rec.next_followup_date).tz(IST).format("DD/MM/YYYY HH:mm")
                             : "—"}
                         </span>
                       </div>
+                      {rec.comm_mode && (
+                        <div>
+                          <span className="text-gray-500">Mode:</span>{" "}
+                          <span className="font-medium">{rec.comm_mode}</span>
+                        </div>
+                      )}
+                      {rec.purpose && (
+                        <div>
+                          <span className="text-gray-500">Purpose:</span>{" "}
+                          <span className="font-medium">{rec.purpose}</span>
+                        </div>
+                      )}
                       {rec.contact && (
                         <div>
                           <span className="text-gray-500">Contact:</span>{" "}
                           <span className="font-medium">{rec.contact}</span>
+                        </div>
+                      )}
+                      {rec.name && rec.source === "customer" && (
+                        <div>
+                          <span className="text-gray-500">Name:</span>{" "}
+                          <span className="font-medium">{rec.name}</span>
                         </div>
                       )}
                       {rec.product_model && (
@@ -410,9 +504,11 @@ export function HistoryModal({ serialNumber, onClose, onPreviewImage }) {
                         </div>
                       )}
                     </div>
-                    <div className="mt-2 text-xs text-gray-400">
-                      Recorded: {dayjs(rec.created_at).tz(IST).format("DD/MM/YYYY HH:mm")}
-                    </div>
+                    {rec.created_at || rec.time_stamp ? (
+                      <div className="mt-2 text-xs text-gray-400">
+                        Recorded: {dayjs(rec.created_at || rec.time_stamp).tz(IST).format("DD/MM/YYYY HH:mm")}
+                      </div>
+                    ) : null}
                   </div>
                 </li>
               ))}

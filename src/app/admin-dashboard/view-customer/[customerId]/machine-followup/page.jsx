@@ -177,6 +177,16 @@ export default async function MachineFollowupPage({ params }) {
                         </span>
                       )}
                       <span className="text-xs text-gray-400">#{rec.id}</span>
+                      {rec.machine_id ? (
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-mono">
+                          Machine ID {rec.machine_id}
+                        </span>
+                      ) : null}
+                      {rec.service_id ? (
+                        <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-mono">
+                          Service ID {rec.service_id}
+                        </span>
+                      ) : null}
                       {rec.serial_number && (
                         <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-mono">
                           {rec.serial_number}

@@ -71,6 +71,7 @@ export default function ServiceFollowupsPage() {
   const [addMin] = useState(toLocalDT(new Date(nowIST.getTime() - 24 * 3600 * 1000)));
   const [addMax] = useState(toLocalDT(new Date(nowIST.getTime() - 60 * 1000)));
   const [addForm, setAddForm] = useState({
+    machine_id: "",
     serial_number: "",
     product_model: "",
     contact: "",
@@ -111,6 +112,7 @@ export default function ServiceFollowupsPage() {
 
   const handleOpenAddModal = () => {
     setAddForm({
+      machine_id: "",
       serial_number: "",
       product_model: "",
       contact: "",
@@ -127,6 +129,8 @@ export default function ServiceFollowupsPage() {
     e.preventDefault();
     setAddSubmitting(true);
     const fd = new FormData();
+    if (addForm.machine_id) fd.append("machine_id", addForm.machine_id);
+    if (addForm.service_id) fd.append("service_id", addForm.service_id);
     fd.append("serial_number", addForm.serial_number);
     fd.append("product_model", addForm.product_model);
     fd.append("contact", addForm.contact);
@@ -155,7 +159,7 @@ export default function ServiceFollowupsPage() {
 
   const SkeletonRow = () => (
     <tr className="odd:bg-white even:bg-gray-50 animate-pulse">
-      {Array(9)
+      {Array(11)
         .fill(0)
         .map((_, i) => (
           <td key={i} className="p-3 border-b border-gray-200">
@@ -191,13 +195,11 @@ export default function ServiceFollowupsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col w-full">
-        <div className="hidden md:block flex-grow overflow-hidden w-full">
-          <div className="h-full w-full overflow-x-auto overflow-y-auto rounded border shadow bg-white">
-            <table className="w-full text-sm text-left border-collapse table-auto">
+      <div className="w-full overflow-x-auto overflow-y-auto rounded border shadow bg-white">
+        <table className="w-full text-sm text-left border-collapse table-auto min-w-[1100px]">
               <thead className="bg-gray-800 text-white sticky top-0 z-10 shadow-md">
                 <tr>
-                  {["ID", "Serial Number", "Product Model", "Contact", "Followed At", "Next Follow-up", "Added By", "Image", "Action"].map(
+                  {["ID", "Machine ID", "Service ID", "Serial Number", "Product Model", "Contact", "Followed At", "Next Follow-up", "Added By", "Image", "Action"].map(
                     (h) => (
                       <th key={h} className="p-3 border-b border-gray-700 whitespace-nowrap">
                         {h}
@@ -213,6 +215,8 @@ export default function ServiceFollowupsPage() {
                   followups.map((fu, i) => (
                     <tr key={i} className="odd:bg-white even:bg-gray-50 hover:bg-gray-100 transition-colors">
                       <td className="p-3 border-b border-gray-200 font-medium">{fu.id}</td>
+                      <td className="p-3 border-b border-gray-200">{fu.machine_id || "—"}</td>
+                      <td className="p-3 border-b border-gray-200">{fu.service_id || "—"}</td>
                       <td className="p-3 border-b border-gray-200">{fu.serial_number}</td>
                       <td className="p-3 border-b border-gray-200">{fu.product_model || "—"}</td>
                       <td className="p-3 border-b border-gray-200">{fu.contact || "—"}</td>
@@ -255,15 +259,13 @@ export default function ServiceFollowupsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="text-center p-4 text-gray-500">
+                    <td colSpan={11} className="text-center p-4 text-gray-500">
                       No follow-ups found
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
       </div>
 
       {totalPages > 1 && (
@@ -321,6 +323,7 @@ export default function ServiceFollowupsPage() {
                           setAddSerialSearch(p.serial_number);
                           setAddForm((prev) => ({
                             ...prev,
+                            machine_id: p.id || "",
                             serial_number: p.serial_number,
                             product_model: p.model,
                             contact: p.contact || p.email || "",

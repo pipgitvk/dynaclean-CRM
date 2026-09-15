@@ -77,6 +77,8 @@ export async function GET(req) {
     const [mfRows] = await conn.execute(
       `SELECT
          mf.id,
+         mf.machine_id,
+         mf.service_id,
          mf.serial_number,
          mf.product_model,
          mf.contact,
